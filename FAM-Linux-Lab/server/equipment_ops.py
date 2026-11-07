@@ -337,7 +337,7 @@ def register_equipment_ops(app, *, data, fail, allowed):
             if __package__:from . import equipment_replacement as r
             else:import equipment_replacement as r
             if result['interface']!=value['interface'] or type(result['staticIp']) is not bool or result['staticIp']!=value['staticIp'] or r.unicast(result['newMac'])!=result['newMac']:raise ValueError('target')
-            if result['oldMac'] and r.unicast(result['oldMac'])!=result['oldMac']:raise ValueError('MAC')
+            if not isinstance(result['oldMac'],str) or (result['oldMac'] and (r.unicast(result['oldMac'])!=result['oldMac'] or result['oldMac']==result['newMac'])):raise ValueError('MAC')
             if value['staticIp']:
                 if not result['oldMac'] or result['oldMac']==result['newMac'] or str(ipaddress.IPv4Address(result['ip']))!=result['ip']:raise ValueError('IP')
             elif result['ip']!='':raise ValueError('IP')

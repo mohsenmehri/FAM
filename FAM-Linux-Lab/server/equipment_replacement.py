@@ -140,7 +140,7 @@ def validate_plan(value):
     if not isinstance(value,dict) or set(value)!={'interface','staticIp','ip','oldMac','planHash','vlan','acl'}:raise ValueError('plan')
     interface(value['interface'])
     if type(value['staticIp']) is not bool or type(value['vlan']) is not int or value['vlan']!=100 or not isinstance(value['planHash'],str) or not HASH.fullmatch(value['planHash']):raise ValueError('plan')
-    if value['oldMac'] and unicast(value['oldMac'])!=value['oldMac']:raise ValueError('MAC')
+    if not isinstance(value['oldMac'],str) or (value['oldMac'] and unicast(value['oldMac'])!=value['oldMac']):raise ValueError('MAC')
     if value['staticIp']:
         if not value['oldMac'] or str(ipaddress.IPv4Address(value['ip']))!=value['ip'] or value['acl']!='Inspection':raise ValueError('IP')
     elif value['ip']!='' or value['acl']!='':raise ValueError('plan')
