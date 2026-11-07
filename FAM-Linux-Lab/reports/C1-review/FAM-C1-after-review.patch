@@ -1,0 +1,844 @@
+diff --git a/FAM-Linux-Lab/server/app.py b/FAM-Linux-Lab/server/app.py
+index 5ed8f07..21f441c 100644
+--- a/FAM-Linux-Lab/server/app.py
++++ b/FAM-Linux-Lab/server/app.py
+@@ -442,7 +442,7 @@ def public_user(row):
+     def load_list(column):
+         try:
+             value=json.loads(row[column])
+-            if not isinstance(value,list):raise ValueError('expected list')
++            if not isinstance(value,list) or any(not isinstance(item,str) for item in value):raise ValueError('expected string list')
+             return value
+         except (json.JSONDecodeError,TypeError,ValueError) as error:
+             logging.getLogger(__name__).error('Malformed users.%s for account id=%s: %s',column,row['id'],error)
+@@ -450,13 +450,14 @@ def public_user(row):
+     value={k:row[k] for k in ['id','username','name','role','enabled','revision']} | {'enabled':bool(row['enabled']),'regions':load_list('regions'),'sheets':load_list('sheets')}
+     # Omit absent fields so older rows remain legacy-role accounts until their
+     # first save through the new custom-access editor.
++    if (row['categories'] is None) != (row['permissions'] is None):
++        fail(500,'داده‌های حساب کاربری آسیب دیده است؛ مدیر باید آن را بررسی کند.')
+     if row['categories'] is not None and row['permissions'] is not None:
+         value['categories']=load_list('categories');value['permissions']=load_list('permissions')
+     try:
+         stored=json.loads(row['equipment_scope']) if 'equipment_scope' in row.keys() and row['equipment_scope'] is not None else None
+-        permissions,scopes=eq_inventory.policy(value,stored)
++        _,scopes=eq_inventory.policy(value,stored)
+         value['equipmentScope']=scopes;value['equipmentPolicyVersion']=1
+-        if 'permissions' in value:value['permissions']=value['permissions']+sorted(permissions-set(value['permissions']))
+     except (ValueError,TypeError,KeyError):fail(500,'سیاست تجهیزات حساب معتبر نیست؛ مدیر باید آن را بررسی کند.')
+     return value
+ 
+@@ -578,11 +579,14 @@ def create_app(config=None):
+             salt,digest=credentials(initial)
+             db.execute('INSERT INTO state VALUES(1,0,?,?,0)',(str(uuid.uuid4()),packed(EMPTY)))
+             db.execute('INSERT INTO settings(id,users_revision) VALUES(1,0)')
+-            db.execute('INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+-              (str(uuid.uuid4()),'admin','admin',1,1,packed([str(index) for index in range(1,len(REGIONS)+1)]),'[]',packed(sorted(BUILTIN_CATEGORIES)),packed(sorted(PERMISSIONS)),str(uuid.uuid4()),salt,digest))
++            db.execute('INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash,equipment_scope) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
++              (str(uuid.uuid4()),'admin','admin',1,1,packed([str(index) for index in range(1,len(REGIONS)+1)]),'[]',packed(sorted(BUILTIN_CATEGORIES)),packed(sorted(PERMISSIONS)),str(uuid.uuid4()),salt,digest,packed({k:['*'] for k in eq_inventory.FIELDS})))
+         if not db.execute('SELECT 1 FROM settings WHERE id=1').fetchone():raise RuntimeError('Database settings missing; restore a verified backup.')
+         validate_state(json.loads(db.execute('SELECT payload FROM state WHERE id=1').fetchone()[0]))
+-        active=[public_user(row) for row in db.execute('SELECT * FROM users WHERE enabled=1')]
++        active=[]
++        for row in db.execute('SELECT * FROM users WHERE enabled=1'):
++            try:active.append(public_user(row))
++            except Problem:logging.getLogger(__name__).error('Invalid account id=%s excluded from startup authorization',row['id'])
+         if not any(may_manage_users(user) for user in active):raise RuntimeError('No active user-access manager: restore a verified backup, do not reseed.')
+     def user_and_session(db):
+         token=hashlib.sha256(request.cookies.get('fam_session','').encode()).hexdigest()
+@@ -785,7 +789,22 @@ def create_app(config=None):
+             db.execute('INSERT INTO receipts VALUES(?,?,?,?)',(u['id'],rid,digest,packed(result)))
+             return jsonify(result)
+     def users_result(db):
+-        return {'revision':db.execute('SELECT users_revision FROM settings WHERE id=1').fetchone()[0], 'users':[public_user(r) for r in db.execute('SELECT * FROM users ORDER BY username')]}
++        users=[]
++        for row in db.execute('SELECT * FROM users ORDER BY username'):
++            try:users.append(public_user(row))
++            except Problem:
++                # The opaque row is never editable or rewritten by an ordinary save.
++                users.append({'id':row['id'],'username':row['username'],'name':row['name'],
++                              'enabled':False,'accountInvalid':True})
++        # User managers need category IDs to assign a scope, not device records.
++        # Do not expose nodes, hosts, standards, cards or credentials here.
++        try:
++            row=db.execute('SELECT payload FROM equipment_state WHERE id=1').fetchone()
++            catalog=eq_inventory.inventory(json.loads(row['payload'])['inventory'])['catalog']
++        except (ValueError,TypeError,KeyError,IndexError):catalog=None
++        return {'revision':db.execute('SELECT users_revision FROM settings WHERE id=1').fetchone()[0],
++                'users':users,'equipmentCatalog':catalog}
++
+     @app.get('/api/users')
+     def users():
+         admin(g.user)
+@@ -799,7 +818,19 @@ def create_app(config=None):
+             u,session=user_and_session(db);admin(u)
+             if body.get('revision')!=db.execute('SELECT users_revision FROM settings WHERE id=1').fetchone()[0]:fail(409,'فهرست کاربران تغییر کرده است؛ دوباره باز کنید.')
+             old={row['id']:dict(row) for row in db.execute('SELECT * FROM users')};ids=set();names=set();normal=[]
++            invalid=set()
++            for uid,row in old.items():
++                try:public_user(row)
++                except Problem:invalid.add(uid)
+             for x in values:
++                if isinstance(x,dict) and isinstance(x.get('id'),str) and x.get('id') in invalid:
++                    uid=x['id']
++                    if x.get('accountInvalid') is not True or uid in ids:fail(400,'حساب آسیب‌دیده باید بدون تغییر حفظ شود.')
++                    ids.add(uid);names.add(old[uid]['username'])
++                    normal.append({'id':uid,'invalid':True,'enabled':False,'public':{}})
++                    continue
++                if isinstance(x,dict) and x.get('accountInvalid'):fail(400,'حساب آسیب‌دیده معتبر نیست.')
++
+                 if not isinstance(x,dict):fail(400,'کاربر نامعتبر است.')
+                 uid=x.get('id');name=x.get('username','');display=x.get('name','');enabled=x.get('enabled')
+                 if not isinstance(uid,str) or not re.fullmatch(r'[a-zA-Z0-9-]{10,60}',uid) or uid in ids or not isinstance(name,str) or not re.fullmatch(r'[a-z0-9_.-]{3,40}',name) or name in names or not isinstance(display,str) or not 1<=len(display.strip())<=60 or type(enabled)!=bool:
+@@ -810,20 +841,26 @@ def create_app(config=None):
+                 previous=old.get(uid);custom=('categories' in x or 'permissions' in x)
+                 if custom:
+                     categories=x.get('categories');permissions=x.get('permissions')
+-                    if not isinstance(categories,list) or not isinstance(permissions,list) or len(categories)>100 or len(permissions)>len(PERMISSIONS) or any(not isinstance(v,str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,79}',v) for v in categories) or any(v not in PERMISSIONS for v in permissions):
++                    existing_permissions=json.loads(previous['permissions']) if previous and previous['permissions'] is not None else []
++                    if not isinstance(categories,list) or not isinstance(permissions,list) or len(categories)>100 or len(permissions)>max(len(PERMISSIONS),len(existing_permissions)) or any(not isinstance(v,str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,79}',v) for v in categories) or any(not isinstance(v,str) or (v not in PERMISSIONS and v not in existing_permissions) for v in permissions):
+                         fail(400,'دسترسی‌های سفارشی کاربر معتبر نیست.')
+                     categories=list(dict.fromkeys(categories));permissions=list(dict.fromkeys(permissions))
+                     # Kept only for legacy compatibility. It is never exposed in
+                     # the custom-access editor and does not grant capabilities.
+                     role=previous['role'] if previous else 4
+                     cat_value,perm_value=packed(categories),packed(permissions)
++                    # Preserve unchanged explicit data byte-for-byte on a round trip.
++                    if previous and previous['categories'] is not None and json.loads(previous['categories'])==categories:cat_value=previous['categories']
++                    if previous and previous['permissions'] is not None and list(dict.fromkeys(existing_permissions))==permissions:perm_value=previous['permissions']
+                 else:
+                     if previous and previous['categories'] is not None:fail(400,'حساب دسترسی سفارشی باید دسته‌ها و مجوزهای خود را حفظ کند.')
+                     role=x.get('role')
+                     if type(role)!=int or role not in [1,2,3,4]:fail(400,'سطح دسترسی قدیمی معتبر نیست.')
+                     categories=permissions=None;cat_value=perm_value=None
+                 try:
+-                    eq_scope=eq_inventory.scope(x['equipmentScope']) if 'equipmentScope' in x else (eq_inventory.scope(json.loads(previous['equipment_scope'])) if previous and previous['equipment_scope'] else eq_inventory.policy({'role':role})[1] if not custom else {k:[] for k in eq_inventory.FIELDS})
++                    stored_scope=json.loads(previous['equipment_scope']) if previous and previous['equipment_scope'] is not None else None
++                    previous_scope=eq_inventory.policy({},stored_scope)[1]
++                    eq_scope=eq_inventory.scope(x['equipmentScope']) if 'equipmentScope' in x else previous_scope
+                 except (ValueError,TypeError,KeyError):fail(400,'محدودهٔ تجهیزات معتبر نیست.')
+                 password=x.get('password')
+                 if previous is None and not password:fail(400,'رمز کاربر جدید لازم است.')
+@@ -831,13 +868,18 @@ def create_app(config=None):
+                 pub={'id':uid,'username':name,'name':display.strip(),'role':role,'enabled':enabled,'regions':x['regions'],'sheets':x['sheets']}
+                 if custom:pub['categories']=categories;pub['permissions']=permissions
+                 pub['equipmentScope']=eq_scope;pub['equipmentPolicyVersion']=1
+-                changed=not previous or password or any(public_user(previous).get(key)!=value for key,value in pub.items()) or (previous and (previous['categories']!=cat_value or previous['permissions']!=perm_value))
++                previous_public=public_user(previous) if previous else {}
++                if previous and previous['permissions']==perm_value and 'permissions' in previous_public:
++                    previous_public['permissions']=permissions
++                changed=not previous or password or any(previous_public.get(key)!=value for key,value in pub.items()) or (previous and (previous['categories']!=cat_value or previous['permissions']!=perm_value))
+                 revision=str(uuid.uuid4()) if changed else previous['revision']
+-                normal.append({'id':uid,'username':name,'name':display.strip(),'role':role,'enabled':enabled,'regions':x['regions'],'sheets':x['sheets'],'categories':cat_value,'permissions':perm_value,'revision':revision,'salt':salt,'hash':digest,'public':pub,'equipment_scope':packed(eq_scope)})
++                normal.append({'id':uid,'username':name,'name':display.strip(),'role':role,'enabled':enabled,'regions':x['regions'],'sheets':x['sheets'],'categories':cat_value,'permissions':perm_value,'revision':revision,'salt':salt,'hash':digest,'public':pub,'equipment_scope':previous['equipment_scope'] if previous and eq_scope==previous_scope else packed(eq_scope)})
++            if invalid-ids:fail(400,'حساب‌های آسیب‌دیده باید بدون تغییر حفظ شوند.')
+             if not any(item['enabled'] and may_manage_users(item['public']) for item in normal):fail(400,'حداقل یک مدیر فعال مدیریت کاربران لازم است.')
+             for uid in set(old)-ids:db.execute('DELETE FROM users WHERE id=?',(uid,))
+             # Update in-place: REPLACE would cascade-delete active sessions.
+             for item in normal:
++                if item.get('invalid'):continue
+                 db.execute('''INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(id) DO UPDATE SET username=excluded.username,name=excluded.name,role=excluded.role,enabled=excluded.enabled,regions=excluded.regions,sheets=excluded.sheets,categories=excluded.categories,permissions=excluded.permissions,revision=excluded.revision,salt=excluded.salt,hash=excluded.hash''',
+                   (item['id'],item['username'],item['name'],item['role'],int(item['enabled']),packed(item['regions']),packed(item['sheets']),item['categories'],item['permissions'],item['revision'],item['salt'],item['hash']))
+diff --git a/FAM-Linux-Lab/server/equipment_inventory.py b/FAM-Linux-Lab/server/equipment_inventory.py
+index 5ef56f7..91273b2 100644
+--- a/FAM-Linux-Lab/server/equipment_inventory.py
++++ b/FAM-Linux-Lab/server/equipment_inventory.py
+@@ -23,21 +23,19 @@ def scope(value):
+     return out
+ 
+ def policy(user,stored=None):
+-    legacy=not isinstance(user.get('permissions'),list)
+-    entry=user.get('role',4)<=2 if legacy else bool({'equipment-operations','manage-users'} & set(user['permissions']))
+-    if stored is None:
+-        permissions=set(OPS) if entry else set()
+-        if not legacy:permissions|=set(user['permissions'])
+-        if (user.get('role')==1 if legacy else 'manage-users' in user.get('permissions',[])):permissions.add('clear-history')
+-        scopes={k:['*'] if entry else [] for k in FIELDS}
+-    else:
+-        scopes=scope(stored);permissions=set(user.get('permissions',[])) if not legacy else (set(OPS) if entry else set())
++    # Legacy roles and NULL scope never imply equipment capabilities or targets.
++    permissions=set(user['permissions']) if isinstance(user.get('permissions'),list) else set()
++    scopes={k:[] for k in FIELDS} if stored is None else scope(stored)
+     return permissions,scopes
+ 
+ def permitted(user,operation='equipment-operations'):
+-    permissions=set(user.get('permissions',[]))
+-    if not isinstance(user.get('permissions'),list):return user.get('role',4)<=2 and operation in OPS
+-    return bool({'equipment-operations','manage-users'} & permissions) and (operation=='equipment-operations' or operation in permissions)
++    # Empty in any dimension cannot describe an authorized equipment target.
++    scopes=user.get('equipmentScope',{})
++    if not isinstance(scopes,dict) or any(not scopes.get(k) for k in FIELDS):return False
++    permissions=user.get('permissions')
++    if not isinstance(permissions,list):return False
++    permissions=set(permissions)
++    return 'equipment-operations' in permissions and operation in permissions
+ 
+ def ref(user,key,ident):
+     values=user.get('equipmentScope',{}).get(key,[])
+diff --git a/FAM-Linux-Lab/server/private_ui/FAM.html b/FAM-Linux-Lab/server/private_ui/FAM.html
+index 5df3f10..e3e737a 100644
+--- a/FAM-Linux-Lab/server/private_ui/FAM.html
++++ b/FAM-Linux-Lab/server/private_ui/FAM.html
+@@ -8714,7 +8714,7 @@ Object.assign(window, {
+ <script id="fam-local-access-js">
+ /* Central accounts: server sessions and permissions; no local credential store. */
+ const Access = (() => {
+-  let db={users:[]},activeId=null,usersRevision=0;
++  let db={users:[]},activeId=null,usersRevision=0,usersEquipmentCatalog=null;
+   const username=s=>String(s||'').trim().toLowerCase();
+   // The central editor intentionally uses the same capability vocabulary and
+   // scope controls as the current offline editor. The server validates every
+@@ -8732,16 +8732,17 @@ const Access = (() => {
+   ];
+   const PERMISSIONS=new Set(PERMISSION_GROUPS.flatMap(group=>group.items.map(([id])=>id)));
+   const allPermissions=()=>[...PERMISSIONS];
+-  const legacyPermissions=role=>role===1?allPermissions():role===2?allPermissions().filter(p=>!['save-results','refresh-panel','import-data','empty-data','restore-data','reset-data','manage-users','clear-history'].includes(p)):role===3?['view-sheets','search','view-history','edit-cells','refresh-index','export-xlsx','backup-server']:['view-sheets','search'];
++  const legacyPermissions=role=>(role===1?allPermissions():role===2?allPermissions().filter(p=>!['save-results','refresh-panel','import-data','empty-data','restore-data','reset-data','manage-users','clear-history'].includes(p)):role===3?['view-sheets','search','view-history','edit-cells','refresh-index','export-xlsx','backup-server']:['view-sheets','search']).filter(p=>!p.startsWith('equipment-'));
+   const allKnownCategoryIds=()=>[...new Set([...(typeof managedCategories==='function'?managedCategories().map(c=>c.id):[]),'other'])];
+   const normalizeAccessUser=user=>{
++    if(user?.accountInvalid)return {...user,enabled:false,legacy:false,permissions:[],categories:[],regions:[],sheets:[],equipmentScope:Object.fromEntries(['types','models','regions','siteKinds','sites'].map(k=>[k,[]]))};
+     const sheets=Array.isArray(user?.sheets)?user.sheets.filter(v=>typeof v==='string'):[];
+     const legacy=!Array.isArray(user?.categories)||!Array.isArray(user?.permissions);
+     const inferred=user?.role<=2?allKnownCategoryIds():[...new Set(sheets.map(s=>typeof categoryOf==='function'?categoryOf(s)?.id:null).filter(Boolean))];
+     if(user?.role>2&&Array.isArray(user?.regions)&&user.regions.length&&!inferred.includes('provinces'))inferred.push('provinces');
+     const supplied=Array.isArray(user?.categories)?user.categories.filter(v=>typeof v==='string'):inferred;
+     const regions=legacy&&user?.role<=2&&typeof managedRegions==='function'?managedRegions().filter(r=>r.id!=='unassigned').map(r=>r.id):(Array.isArray(user?.regions)?user.regions.filter(v=>typeof v==='string'):[]);
+-    return {...user,equipmentPolicyVersion:1,equipmentScope:user?.equipmentScope||Object.fromEntries(['types','models','regions','siteKinds','sites'].map(k=>[k,[]])),legacy,sheets,regions:[...new Set(regions)],categories:[...new Set(supplied.includes('*')?allKnownCategoryIds():supplied)],permissions:Array.isArray(user?.permissions)?[...new Set(user.permissions.filter(v=>PERMISSIONS.has(v)))]:legacyPermissions(user?.role)};
++    return {...user,equipmentPolicyVersion:1,equipmentScope:user?.equipmentScope||Object.fromEntries(['types','models','regions','siteKinds','sites'].map(k=>[k,[]])),legacy,sheets,regions:[...new Set(regions)],categories:[...new Set(supplied.includes('*')?allKnownCategoryIds():supplied)],permissions:Array.isArray(user?.permissions)?[...new Set(user.permissions)]:legacyPermissions(user?.role)};
+   };
+   async function credential(password){
+     if(password.length<4||password.length>128)throw Error('رمز باید بین ۴ تا ۱۲۸ نویسه باشد.');
+@@ -8752,11 +8753,12 @@ const Access = (() => {
+     // saves somebody else. A legacy row is migrated only when its own form is
+     // saved through the custom editor.
+     const users=next.users.map(user=>{
++      if(user.accountInvalid)return {id:user.id,accountInvalid:true};
+       if(!user.legacy)return user;
+       const {legacy,categories,permissions,...legacyUser}=user;return legacyUser;
+     });
+     const result=await FamShared.api('users',{revision:usersRevision,users});
+-    db={users:result.users.map(normalizeAccessUser)};usersRevision=result.revision;
++    db={users:result.users.map(normalizeAccessUser)};usersRevision=result.revision;usersEquipmentCatalog=result.equipmentCatalog;
+   }
+   function establish(user){
+     const normalized=normalizeAccessUser(user),found=db.users.findIndex(u=>u.id===normalized.id);
+@@ -8785,7 +8787,7 @@ const Access = (() => {
+   function can(operation,sheet){
+     const u=current();if(!u)return false;
+     if(operation==='own-password')return true;
+-    if(operation==='equipment')return has(u,'equipment-operations')||has(u,'manage-users');
++    if(operation==='equipment')return has(u,'equipment-operations')&&['types','models','regions','siteKinds','sites'].every(key=>Array.isArray(u.equipmentScope?.[key])&&u.equipmentScope[key].length>0);
+     if(operation==='clear-history')return has(u,'clear-history')&&has(u,'view-history');
+     if(operation.startsWith('equipment-'))return can('equipment')&&has(u,operation);
+     const scoped={read:'view-sheets','search-read':'search',manual:'edit-cells',export:'export-xlsx',backup:'backup-server',add:'add-record',remove:'remove-record','save-results':'save-results','view-history':'view-history',undo:'undo-remove'}[operation];
+@@ -8868,7 +8870,7 @@ const Access = (() => {
+   }
+   function viewAllowed(view){
+     if(view==='equipment')return can('equipment');
+-    if(view==='panel')return can('data-access');
++    if(view==='panel')return can('data-access')||can('users');
+     if(view==='sheet')return can('view-sheets');
+     if(view==='results')return can('search')||can('remove');
+     if(view==='log')return can('view-history');
+@@ -8951,7 +8953,7 @@ const Access = (() => {
+   }
+   async function manageUsers(){
+     if(!requirePermission('users'))return;
+-    try{const result=await FamShared.api('users');db={users:result.users.map(normalizeAccessUser)};usersRevision=result.revision;}catch(e){Toast(e.message,'err');return;}
++    try{const result=await FamShared.api('users');db={users:result.users.map(normalizeAccessUser)};usersRevision=result.revision;usersEquipmentCatalog=result.equipmentCatalog;}catch(e){Toast(e.message,'err');return;}
+     if(!requirePermission('users'))return;
+     const ov=document.getElementById('modal-overlay');const previous=document.activeElement;
+     const box=el('div',{class:'mbox category-manager',role:'dialog','aria-modal':'true','aria-labelledby':'users-title'});
+@@ -8970,6 +8972,7 @@ const Access = (() => {
+         const item=button('ویرایش: '+u.name+' ('+u.username+')'+(u.enabled?'':' · غیرفعال'),'user-'+u.id,()=>{
+           if(saving)return;selected=u.id;status.textContent='';drawList();drawEditor();
+         });
++        if(u.accountInvalid){item.disabled=true;item.textContent='حساب آسیب‌دیده؛ بدون تغییر حفظ می‌شود: '+u.username;}
+         item.classList.toggle('is-selected',selected===u.id);
+         item.setAttribute('aria-pressed',String(selected===u.id));
+         list.appendChild(item);
+@@ -9032,7 +9035,7 @@ const Access = (() => {
+       scopes.appendChild(categories);syncRegions();
+ 
+       const equipmentScope=structuredClone(draft.equipmentScope),eqScope=el('section',{id:'user-equipment-scope',class:'user-scope-section'},el('h4',{text:'محدودهٔ تجهیزات مجاز'}),el('p',{class:'hint',text:'ابعاد با «و» ترکیب می‌شوند. همه یعنی دسته‌های فعلی و آینده؛ انتخاب‌های تکی با شناسه ثابت ذخیره می‌شوند و تغییر نام خودکار است. هیچ انتخابی یعنی عدم دسترسی در آن بُعد.'}));
+-      equipmentScopeRefresh=()=>{eqScope.querySelectorAll('fieldset,.category-error').forEach(n=>n.remove());try{const data=FamEquipmentServer.inventory();
++      equipmentScopeRefresh=()=>{eqScope.querySelectorAll('fieldset,.category-error').forEach(n=>n.remove());try{if(!usersEquipmentCatalog)throw Error('catalog unavailable');const data={catalog:usersEquipmentCatalog};
+        for(const [key,label]of Object.entries(FamEquipmentInventory.dimensions)){
+         const group=el('fieldset',{class:'permission-group'},el('legend',{text:label})),selected=new Set(equipmentScope[key]);
+         const all=el('input',{type:'checkbox','data-equipment-all':key,checked:selected.has('*')});
+diff --git a/FAM-Linux-Lab/tests/test_equipment_scope_policy.py b/FAM-Linux-Lab/tests/test_equipment_scope_policy.py
+new file mode 100644
+index 0000000..ad68ab0
+--- /dev/null
++++ b/FAM-Linux-Lab/tests/test_equipment_scope_policy.py
+@@ -0,0 +1,429 @@
++"""C1 authorization regression tests. Only temporary SQLite and mock executors.
++
++Run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -v
++Run from FAM-Linux-Lab with the server's Flask dependency installed.
++"""
++import json
++import socket
++import sqlite3
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++from unittest.mock import patch
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'server'))
++import app as server
++import equipment_inventory as eq
++
++EMPTY = {k: [] for k in eq.FIELDS}
++FULL = {k: ['*'] for k in eq.FIELDS}
++LIMITED = {'types': ['type-switch'], 'models': ['model-2960'],
++           'regions': ['region-1'], 'siteKinds': ['kind-building'], 'sites': ['building-0']}
++SCAN = ['equipment-operations', 'equipment-scan']
++ORIGIN = {'Origin': 'https://audit.invalid'}
++DEVICE = {'username': 'fixture-user', 'password': 'fixture-password'}
++
++
++class EquipmentPolicyTests(unittest.TestCase):
++    def setUp(self):
++        self.tmp = tempfile.TemporaryDirectory(prefix='fam-c1-')
++        self.addCleanup(self.tmp.cleanup)
++        self.db = str(Path(self.tmp.name) / 'fixture.sqlite3')
++        self.calls = []
++        self.addCleanup(patch.stopall)
++        patch.object(socket.socket, 'connect', side_effect=AssertionError('network forbidden')).start()
++        patch.object(socket.socket, 'connect_ex', side_effect=AssertionError('network forbidden')).start()
++        patch.object(subprocess, 'Popen', side_effect=AssertionError('subprocess forbidden')).start()
++        self.config = {'TESTING': True, 'DB_PATH': self.db, 'PUBLIC_ORIGIN': ORIGIN['Origin'],
++                       'COOKIE_SECURE': False, 'EQUIPMENT_OPS_ENABLED': True,
++                       'EQUIPMENT_EXECUTOR': self.executor}
++        self.app = server.create_app(self.config)
++        self.salt, self.digest = server.credentials('fixture-password')
++        with sqlite3.connect(self.db) as db:
++            payload = json.loads(db.execute('SELECT payload FROM equipment_state').fetchone()[0])
++            def node(ident, host, region, typ='type-switch', model='model-2960'):
++                return {'id': ident, 'name': ident, 'host': host, 'typeId': typ, 'modelId': model,
++                        'regionId': region, 'siteKindId': 'kind-building', 'siteId': 'building-0'}
++            payload['inventory']['nodes'] = [node('inside', '10.0.0.10', 'region-1'),
++                                              node('outside', '10.0.0.12', 'region-2'),
++                                              node('router', '10.0.0.13', 'region-1', 'type-router', 'model-1841')]
++            db.execute('UPDATE equipment_state SET payload=?', (json.dumps(payload),))
++
++    def executor(self, job):
++        self.calls.append(job['operation'])
++        if job['operation'] in ('status', 'inspect'):
++            return {'ok': True, 'ports': [{'interface': 'Fa0/1', 'description': ''}]}
++        if job['operation'] == 'recover':
++            return {'ok': True, 'recovery': 'recovered'}
++        return {'ok': False, 'error': 'fixture_only'}
++
++    def add_user(self, name, permissions, scope, role=4, categories='[]'):
++        with sqlite3.connect(self.db) as db:
++            db.execute('INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash,equipment_scope) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
++                       (name + '-fixture-id', name, name, role, 1, '[]', '[]',
++                        categories, None if permissions is None else json.dumps(permissions),
++                        'fixture-revision', self.salt, self.digest,
++                        scope if isinstance(scope, str) or scope is None else json.dumps(scope)))
++
++    def login(self, name, password='fixture-password'):
++        client = self.app.test_client()
++        result = client.post('/api/login', headers=ORIGIN, json={'username': name, 'password': password})
++        self.assertEqual(result.status_code, 200, result.get_json())
++        return client, {**ORIGIN, 'X-FAM-CSRF': result.json['csrf']}, result.json['user']
++
++    def check(self, client, headers, host):
++        return client.post('/api/equipment/check', headers=headers, json={**DEVICE, 'host': host})
++
++    def stored(self, name):
++        with sqlite3.connect(self.db) as db:
++            return db.execute('SELECT permissions,equipment_scope,revision FROM users WHERE username=?', (name,)).fetchone()
++
++    def test_policy_null_empty_and_explicit(self):
++        for role in (1, 2, 3, 4):
++            for perms in (None, [], ['manage-users'], ['equipment-operations'], SCAN):
++                with self.subTest(role=role, permissions=perms):
++                    u = {'role': role}
++                    if perms is not None: u['permissions'] = perms
++                    permissions, scope = eq.policy(u, None)
++                    self.assertEqual(scope, EMPTY)
++                    self.assertEqual(permissions, set(perms or []))
++                    self.assertFalse(eq.permitted({**u, 'equipmentScope': scope}))
++        self.assertEqual(eq.policy({'permissions': SCAN}, LIMITED), (set(SCAN), LIMITED))
++        for invalid in ({}, [], False, '', {'types': []}, {**EMPTY, 'types': None}):
++            with self.subTest(invalid=invalid), self.assertRaises(ValueError): eq.policy({}, invalid)
++
++    def test_each_scope_dimension_is_required_and_combined_with_and(self):
++        node = {'typeId': 'type-switch', 'modelId': 'model-2960', 'regionId': 'region-1',
++                'siteKindId': 'kind-building', 'siteId': 'building-0'}
++        self.assertTrue(eq.node_allowed({'equipmentScope': LIMITED}, node))
++        for key, field in eq.FIELDS.items():
++            altered = dict(node)
++            altered[field] = 'different'
++            with self.subTest(dimension=key):
++                self.assertFalse(eq.node_allowed({'equipmentScope': LIMITED}, altered))
++                partial = dict(LIMITED, **{key: []})
++                self.assertFalse(eq.permitted({'permissions': SCAN, 'equipmentScope': partial}))
++
++    def test_sql_and_json_null_deny_even_with_all_explicit_permissions(self):
++        for name, raw in [('sqlnull', None), ('jsonnull', 'null')]:
++            self.add_user(name, list(eq.OPS), raw)
++            c, h, u = self.login(name)
++            self.assertEqual(u['equipmentScope'], EMPTY)
++            self.assertEqual(c.get('/api/equipment/state').status_code, 403)
++            self.assertEqual(self.check(c, h, '10.0.0.10').status_code, 403)
++            self.assertEqual(self.check(c, h, '10.0.0.11').status_code, 403)
++        self.assertEqual(self.calls, [])
++
++    def test_limited_empty_wildcard_without_permissions_and_router(self):
++        cases = [('limited', SCAN, LIMITED, [200, 403, 403, 403]),
++                 ('empty', SCAN, EMPTY, [403, 403, 403, 403]),
++                 ('noperm', [], FULL, [403, 403, 403, 403]),
++                 ('wildcard', SCAN, FULL, [200, 200, 200, 403])]
++        for name, perms, scope, expected in cases:
++            self.add_user(name, perms, scope)
++            c, h, _ = self.login(name)
++            actual = [self.check(c, h, host).status_code for host in
++                      ('10.0.0.10', '10.0.0.12', '10.0.0.11', '10.0.0.13')]
++            self.assertEqual(actual, expected, name)
++        self.assertEqual(self.calls, ['status'] * 4)
++
++    def test_manager_without_equipment_can_manage_users_but_not_equipment(self):
++        self.add_user('manager', ['manage-users'], FULL)
++        c, h, u = self.login('manager')
++        self.assertEqual(u['permissions'], ['manage-users'])
++        users = c.get('/api/users')
++        self.assertEqual(users.status_code, 200)
++        self.assertEqual(c.post('/api/users', headers=h, json=users.json).status_code, 200)
++        self.assertEqual(c.get('/api/equipment/state').status_code, 403)
++        self.assertEqual(self.check(c, h, '10.0.0.11').status_code, 403)
++        self.assertEqual(self.calls, [])
++
++    def test_get_post_never_materializes_permissions_or_scope(self):
++        self.add_user('nullcustom', ['equipment-operations'], None)
++        self.add_user('jsoncustom', ['manage-users'], 'null')
++        self.add_user('legacytwo', None, None, role=2, categories=None)
++        self.add_user('explicit', SCAN, LIMITED)
++        before = {n: self.stored(n) for n in ('nullcustom', 'jsoncustom', 'legacytwo', 'explicit')}
++        c, h, _ = self.login('admin', '1109')
++        result = c.get('/api/users')
++        users = {u['username']: u for u in result.json['users']}
++        self.assertEqual(users['nullcustom']['permissions'], ['equipment-operations'])
++        self.assertEqual(users['jsoncustom']['permissions'], ['manage-users'])
++        self.assertNotIn('permissions', users['legacytwo'])
++        self.assertEqual(c.post('/api/users', headers=h, json=result.json).status_code, 200)
++        for name, original in before.items(): self.assertEqual(self.stored(name), original, name)
++
++    def test_repair_requires_explicit_permission_and_ticket(self):
++        self.add_user('scanonly', SCAN, LIMITED)
++        c, h, _ = self.login('scanonly')
++        check = self.check(c, h, '10.0.0.10')
++        ticket = check.json['recoveryTickets']['Fa0/1']
++        response = c.post('/api/equipment/recover', headers=h, json={**DEVICE, 'host': '10.0.0.10', 'interface': 'Fa0/1', 'ticket': ticket})
++        self.assertEqual(response.status_code, 403)
++        self.assertEqual(self.calls, ['status'])
++        self.add_user('repairer', SCAN + ['equipment-repair'], LIMITED)
++        c, h, _ = self.login('repairer')
++        ticket = self.check(c, h, '10.0.0.10').json['recoveryTickets']['Fa0/1']
++        body = {**DEVICE, 'host': '10.0.0.10', 'interface': 'Fa0/1', 'ticket': ticket}
++        self.assertEqual(c.post('/api/equipment/recover', headers=h, json=body).status_code, 200)
++        self.assertEqual(c.post('/api/equipment/recover', headers=h, json=body).status_code, 409)
++        self.assertEqual(self.calls, ['status', 'status', 'recover'])
++
++    def test_all_equipment_routes_deny_null_before_executor(self):
++        self.add_user('nullall', list(eq.OPS), None)
++        c, h, _ = self.login('nullall')
++        for route in ('check', 'inspect', 'descriptions', 'diagnose', 'recover',
++                      'replacement/plan', 'replacement/apply', 'group/plan', 'group/apply'):
++            with self.subTest(route=route):
++                self.assertEqual(c.post('/api/equipment/' + route, headers=h, json={}).status_code, 403)
++        self.assertEqual(c.get('/api/equipment/state').status_code, 403)
++        self.assertEqual(self.calls, [])
++
++    def test_target_scope_rechecked_across_operation_routes(self):
++        self.add_user('operator', SCAN + ['equipment-repair'], LIMITED)
++        c, h, _ = self.login('operator')
++        simple = dict(DEVICE)
++        diagnosis = {**simple, 'clientIp': '10.0.0.20', 'clientMac': ''}
++        replacement = {**simple, 'interface': 'Fa0/1', 'staticIp': False}
++        group = {**simple, 'interfaces': ['Fa0/1'], 'mode': 'recover', 'staticIp': False}
++        approval = {'ticket': 'x' * 50, 'planHash': 'a' * 64}
++        routes = [('check', simple), ('inspect', simple), ('descriptions', simple),
++                  ('diagnose', diagnosis), ('recover', {**simple, 'interface': 'Fa0/1', 'ticket': 'x' * 50}),
++                  ('replacement/plan', replacement), ('replacement/apply', {**replacement, **approval}),
++                  ('group/plan', group), ('group/apply', {**group, **approval})]
++        for route, body in routes:
++            with self.subTest(route=route):
++                before = list(self.calls)
++                response = c.post('/api/equipment/' + route, headers=h,
++                                  json={**body, 'host': '10.0.0.12'})
++                self.assertEqual(response.status_code, 403, response.get_json())
++                self.assertEqual(self.calls, before)
++        for route, body in routes[:4]:
++            with self.subTest(allowed_route=route):
++                before = len(self.calls)
++                response = c.post('/api/equipment/' + route, headers=h,
++                                  json={**body, 'host': '10.0.0.10'})
++                # Mock success for check/inspect, deliberately incomplete output for the others.
++                self.assertIn(response.status_code, (200, 502))
++                self.assertEqual(len(self.calls), before + 1)
++        for route, body in (routes[5], routes[7]):
++            before = len(self.calls)
++            self.assertEqual(c.post('/api/equipment/' + route, headers=h,
++                                    json={**body, 'host': '10.0.0.10'}).status_code, 502)
++            self.assertEqual(len(self.calls), before + 1)
++        for route, body in (routes[6], routes[8]):
++            before = len(self.calls)
++            self.assertEqual(c.post('/api/equipment/' + route, headers=h,
++                                    json={**body, 'host': '10.0.0.10'}).status_code, 409)
++            self.assertEqual(len(self.calls), before)
++
++    def test_explicit_scope_and_permissions_can_be_assigned_by_manager(self):
++        self.add_user('needscope', SCAN, None)
++        self.add_user('manageronly', ['manage-users'], None)
++        c, h, _ = self.login('manageronly')
++        result = c.get('/api/users')
++        self.assertEqual(result.status_code, 200)
++        payload = result.json
++        user = next(u for u in payload['users'] if u['username'] == 'needscope')
++        user['equipmentScope'] = LIMITED
++        self.assertEqual(c.post('/api/users', headers=h, json=payload).status_code, 200)
++        self.assertEqual(json.loads(self.stored('needscope')[0]), SCAN)
++        self.assertEqual(json.loads(self.stored('needscope')[1]), LIMITED)
++        target, heads, _ = self.login('needscope')
++        self.assertEqual(self.check(target, heads, '10.0.0.10').status_code, 200)
++        self.assertEqual(self.check(target, heads, '10.0.0.12').status_code, 403)
++        self.assertIsNone(self.stored('manageronly')[1])
++
++    def test_inventory_view_filters_and_missing_scope_cannot_change_cards(self):
++        self.add_user('viewer', SCAN, LIMITED)
++        c, h, _ = self.login('viewer')
++        response = c.get('/api/equipment/state')
++        self.assertEqual(response.status_code, 200)
++        self.assertEqual([n['host'] for n in response.json['inventory']['nodes']], ['10.0.0.10'])
++        self.add_user('noarea', list(eq.OPS), None)
++        c, h, _ = self.login('noarea')
++        body = {'revision': 0, 'requestId': '00000000-0000-0000-0000-000000000001',
++                'kind': 'cards', 'value': {'version': 1, 'cards': []}}
++        self.assertEqual(c.post('/api/equipment/state', headers=h, json=body).status_code, 403)
++        with sqlite3.connect(self.db) as db:
++            self.assertEqual(db.execute('SELECT revision FROM equipment_state').fetchone()[0], 0)
++
++    def test_legacy_roles_have_no_implicit_equipment_permissions(self):
++        for role in (1, 2, 3, 4):
++            self.add_user('legacy' + str(role), None, FULL, role=role, categories=None)
++            c, h, user = self.login('legacy' + str(role))
++            self.assertNotIn('permissions', user)
++            self.assertEqual(c.get('/api/equipment/state').status_code, 403)
++            self.assertEqual(self.check(c, h, '10.0.0.11').status_code, 403)
++        self.assertEqual(self.calls, [])
++
++    def test_fresh_bootstrap_is_explicit_and_survives_restart(self):
++        permissions, raw_scope, revision = self.stored('admin')
++        self.assertEqual(set(json.loads(permissions)), server.PERMISSIONS)
++        self.assertEqual(json.loads(raw_scope), FULL)
++        c, h, _ = self.login('admin', '1109')
++        self.assertEqual(c.get('/api/users').status_code, 200)
++        self.assertEqual(self.check(c, h, '10.0.0.11').status_code, 200)
++        server.create_app(self.config)
++        self.assertEqual(self.stored('admin'), (permissions, raw_scope, revision))
++
++    def test_legacy_schema_migration_null_fails_closed_no_account_rewrite(self):
++        self.add_user('oldmanager', None, None, role=1, categories=None)
++        before = self.stored('oldmanager')
++        with sqlite3.connect(self.db) as db: db.execute('ALTER TABLE users DROP COLUMN equipment_scope')
++        migrated = server.create_app(self.config)
++        self.assertEqual(self.stored('oldmanager'), before)
++        c = migrated.test_client()
++        result = c.post('/api/login', headers=ORIGIN, json={'username': 'oldmanager', 'password': 'fixture-password'})
++        self.assertEqual(result.status_code, 200)
++        h = {**ORIGIN, 'X-FAM-CSRF': result.json['csrf']}
++        self.assertEqual(c.get('/api/users').status_code, 200)
++        self.assertEqual(c.get('/api/equipment/state').status_code, 403)
++        self.assertEqual(self.check(c, h, '10.0.0.11').status_code, 403)
++
++    def test_partial_account_and_invalid_scope_fail_closed(self):
++        self.add_user('partial', None, FULL, role=1, categories='[]')
++        self.add_user('invalid', SCAN, '{}')
++        for name in ('partial', 'invalid'):
++            c = self.app.test_client()
++            self.assertEqual(c.post('/api/login', headers=ORIGIN, json={'username': name, 'password': 'fixture-password'}).status_code, 500)
++        self.assertEqual(self.calls, [])
++
++    def test_disabled_account_and_revision_changes_revoke_session(self):
++        for name, update in [('disabled', 'enabled=0'), ('revised', "revision='changed'")]:
++            self.add_user(name, SCAN, LIMITED)
++            c, h, _ = self.login(name)
++            with sqlite3.connect(self.db) as db:
++                db.execute('UPDATE users SET ' + update + ' WHERE username=?', (name,))
++            self.assertEqual(self.check(c, h, '10.0.0.10').status_code, 401)
++        self.assertEqual(self.calls, [])
++
++    def test_invalid_accounts_are_isolated_and_not_rewritten(self):
++        self.add_user('broken_scope', SCAN, '{}')
++        self.add_user('broken_fields', None, FULL, role=1, categories='[]')
++        self.add_user('broken_json', SCAN, None)
++        with sqlite3.connect(self.db) as db:
++            db.execute("UPDATE users SET permissions='{' WHERE username='broken_json'")
++            before = db.execute("SELECT * FROM users WHERE username LIKE 'broken_%' ORDER BY username").fetchall()
++        server.create_app(self.config)
++        c, h, _ = self.login('admin', '1109')
++        response = c.get('/api/users')
++        self.assertEqual(response.status_code, 200)
++        payload = response.json
++        damaged = [u for u in payload['users'] if u.get('accountInvalid')]
++        self.assertEqual({u['username'] for u in damaged}, {'broken_scope', 'broken_fields', 'broken_json'})
++        for u in damaged:
++            self.assertNotIn('permissions', u)
++            badclient = self.app.test_client()
++            self.assertEqual(badclient.post('/api/login', headers=ORIGIN, json={'username': u['username'], 'password': 'fixture-password'}).status_code, 500)
++        payload['users'].append({'id': 'created-fixture-001', 'username': 'created', 'name': 'created',
++                                 'enabled': True, 'regions': [], 'sheets': [], 'categories': [],
++                                 'permissions': SCAN, 'equipmentScope': LIMITED, 'password': 'fixture-password'})
++        saved = c.post('/api/users', headers=h, json=payload)
++        self.assertEqual(saved.status_code, 200, saved.get_json())
++        created, heads, _ = self.login('created')
++        self.assertEqual(self.check(created, heads, '10.0.0.10').status_code, 200)
++        with sqlite3.connect(self.db) as db:
++            self.assertEqual(before, db.execute("SELECT * FROM users WHERE username LIKE 'broken_%' ORDER BY username").fetchall())
++        payload = c.get('/api/users').json
++        payload['users'] = [u for u in payload['users'] if u.get('username') != 'broken_scope']
++        self.assertEqual(c.post('/api/users', headers=h, json=payload).status_code, 400)
++        payload = c.get('/api/users').json
++        target = next(u for u in payload['users'] if u.get('username') == 'broken_scope')
++        target.pop('accountInvalid')
++        self.assertEqual(c.post('/api/users', headers=h, json=payload).status_code, 400)
++        with sqlite3.connect(self.db) as db:
++            self.assertEqual(before, db.execute("SELECT * FROM users WHERE username LIKE 'broken_%' ORDER BY username").fetchall())
++
++    def test_manager_can_create_edit_and_delete_a_user_without_equipment_access(self):
++        self.add_user('manageronly', ['manage-users'], None)
++        c, h, _ = self.login('manageronly')
++        payload = c.get('/api/users').json
++        payload['users'].append({'id':'new-user-fixture-id', 'username':'newuser', 'name':'newuser',
++                                 'enabled':True, 'regions':[], 'sheets':[], 'categories':[],
++                                 'permissions':SCAN, 'equipmentScope':LIMITED, 'password':'fixture-password'})
++        result = c.post('/api/users', headers=h, json=payload)
++        self.assertEqual(result.status_code, 200, result.get_json())
++        payload = result.json
++        newuser = next(u for u in payload['users'] if u.get('username') == 'newuser')
++        newuser['name'] = 'new display name'
++        result = c.post('/api/users', headers=h, json=payload)
++        self.assertEqual(result.status_code, 200, result.get_json())
++        with sqlite3.connect(self.db) as db:
++            self.assertEqual(db.execute("SELECT name FROM users WHERE username='newuser'").fetchone()[0], 'new display name')
++        payload = result.json
++        payload['users'] = [u for u in payload['users'] if u.get('username') != 'newuser']
++        self.assertEqual(c.post('/api/users', headers=h, json=payload).status_code, 200)
++        with sqlite3.connect(self.db) as db:
++            self.assertIsNone(db.execute("SELECT id FROM users WHERE username='newuser'").fetchone())
++        self.assertEqual(c.get('/api/equipment/state').status_code, 403)
++        self.assertEqual(self.calls, [])
++
++    def test_manager_catalog_supports_scope_edit_without_device_access(self):
++        self.add_user('manageronly', ['manage-users'], None)
++        self.add_user('targetuser', SCAN, LIMITED)
++        c, h, _ = self.login('manageronly')
++        result = c.get('/api/users')
++        self.assertEqual(result.status_code, 200)
++        catalog = result.json['equipmentCatalog']
++        self.assertEqual(set(catalog), set(eq.FIELDS))
++        self.assertIn('region-2', [x['id'] for x in catalog['regions']])
++        serialized = json.dumps(catalog)
++        self.assertNotIn('10.0.0.', serialized)
++        self.assertNotIn('nodes', catalog)
++        self.assertEqual(c.get('/api/equipment/state').status_code, 403)
++        self.assertEqual(self.check(c, h, '10.0.0.10').status_code, 403)
++        payload = result.json
++        user = next(u for u in payload['users'] if u.get('username') == 'targetuser')
++        user['equipmentScope']['regions'] = ['region-2']
++        saved = c.post('/api/users', headers=h, json=payload)
++        self.assertEqual(saved.status_code, 200, saved.get_json())
++        target, th, _ = self.login('targetuser')
++        self.assertEqual(self.check(target, th, '10.0.0.10').status_code, 403)
++        self.assertEqual(self.check(target, th, '10.0.0.12').status_code, 200)
++        self.assertEqual(self.calls, ['status'])
++        self.assertEqual(target.get('/api/users').status_code, 403)
++
++    def test_unknown_and_duplicate_existing_permissions_preserved(self):
++        original = ['equipment-operations', 'future-permission', 'equipment-scan', 'equipment-scan']
++        self.add_user('future', original, LIMITED)
++        before = self.stored('future')
++        c, h, _ = self.login('admin', '1109')
++        payload = c.get('/api/users').json
++        user = next(u for u in payload['users'] if u.get('username') == 'future')
++        self.assertEqual(user['permissions'], original)
++        user['permissions'] = list(dict.fromkeys(user['permissions']))
++        saved = c.post('/api/users', headers=h, json=payload)
++        self.assertEqual(saved.status_code, 200, saved.get_json())
++        self.assertEqual(self.stored('future'), before)
++        payload = c.get('/api/users').json
++        user = next(u for u in payload['users'] if u.get('username') == 'future')
++        user['permissions'].append('invented-permission')
++        self.assertEqual(c.post('/api/users', headers=h, json=payload).status_code, 400)
++        self.assertEqual(self.stored('future'), before)
++
++    def test_invalid_scope_cannot_be_saved_or_grant_access(self):
++        self.add_user('targetuser', SCAN, LIMITED)
++        c, h, _ = self.login('admin', '1109')
++        before = self.stored('targetuser')
++        for invalid in (None, {}, [], False, {'types': ['*']}):
++            with self.subTest(scope=invalid):
++                payload = c.get('/api/users').json
++                user = next(u for u in payload['users'] if u.get('username') == 'targetuser')
++                user['equipmentScope'] = invalid
++                self.assertEqual(c.post('/api/users', headers=h, json=payload).status_code, 400)
++                self.assertEqual(self.stored('targetuser'), before)
++
++    def test_csrf_origin_and_scope_change_are_rechecked(self):
++        self.add_user('scoped', SCAN, LIMITED)
++        c, h, _ = self.login('scoped')
++        self.assertEqual(self.check(c, ORIGIN, '10.0.0.10').status_code, 403)
++        self.assertEqual(self.check(c, {**h, 'Origin': 'https://bad.invalid'}, '10.0.0.10').status_code, 403)
++        with sqlite3.connect(self.db) as db: db.execute("UPDATE users SET equipment_scope=? WHERE username='scoped'", (json.dumps(EMPTY),))
++        self.assertEqual(self.check(c, h, '10.0.0.10').status_code, 403)
++        self.assertEqual(self.calls, [])
++
++
++if __name__ == '__main__': unittest.main()
+diff --git a/FAM-Linux-Lab/tests/test_equipment_scope_browser.py b/FAM-Linux-Lab/tests/test_equipment_scope_browser.py
+new file mode 100644
+index 0000000..b273fba
+--- /dev/null
++++ b/FAM-Linux-Lab/tests/test_equipment_scope_browser.py
+@@ -0,0 +1,77 @@
++"""Optional local-only Chromium test; skipped unless browser paths are configured.
++
++Requires FAM_BROWSER_EXECUTABLE and FAM_PLAYWRIGHT_MODULE (playwright-core),
++plus node and Flask. No service or database outside the temporary fixture is used.
++"""
++import json
++import os
++import socket
++import sqlite3
++import subprocess
++import sys
++import tempfile
++import threading
++import unittest
++from pathlib import Path
++from unittest.mock import patch
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'server'))
++import app as server
++import equipment_ops
++from werkzeug.serving import make_server
++
++
++@unittest.skipUnless(os.environ.get('FAM_BROWSER_EXECUTABLE') and os.environ.get('FAM_PLAYWRIGHT_MODULE'),
++                     'set FAM_BROWSER_EXECUTABLE and FAM_PLAYWRIGHT_MODULE for the browser test')
++class EquipmentScopeBrowserTests(unittest.TestCase):
++    def test_manager_can_edit_scope_without_equipment_access(self):
++        with tempfile.TemporaryDirectory(prefix='fam-browser-fixture-') as tmp:
++            dbpath = str(Path(tmp) / 'fixture.sqlite3')
++            with socket.socket() as sock:
++                sock.bind(('127.0.0.1', 0))
++                port = sock.getsockname()[1]
++            origin = 'http://127.0.0.1:' + str(port)
++            def forbidden(job): raise AssertionError('fixture executor must not run')
++            app = server.create_app({'TESTING': True, 'DB_PATH': dbpath, 'PUBLIC_ORIGIN': origin,
++                'COOKIE_SECURE': False, 'EQUIPMENT_OPS_ENABLED': True, 'EQUIPMENT_EXECUTOR': forbidden})
++            salt, digest = server.credentials('fixture-password')
++            limited = {'types':['type-switch'], 'models':['model-2960'], 'regions':['region-1'],
++                       'siteKinds':['kind-building'], 'sites':['building-0']}
++            with sqlite3.connect(dbpath) as db:
++                for name, permissions, scope in (
++                    ('manager', ['manage-users'], None),
++                    ('target', ['equipment-operations','equipment-scan','future-permission'], json.dumps(limited)),
++                    ('broken', ['equipment-operations'], '{}')):
++                    db.execute('INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash,equipment_scope) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
++                        (name+'-fixture-id',name,name,4,1,'[]','[]','[]',json.dumps(permissions),'fixture-revision',salt,digest,scope))
++            with sqlite3.connect(dbpath) as db:
++                db.execute('INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash,equipment_scope) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
++                           ('legacy-fixture-id','legacy','legacy',2,1,'[]','[]',None,None,'fixture-revision',salt,digest,None))
++            client = app.test_client()
++            login = client.post('/api/login', headers={'Origin': origin},
++                                json={'username':'manager', 'password':'fixture-password'})
++            self.assertEqual(login.status_code, 200)
++            environment = {**os.environ, 'FAM_FIXTURE_ORIGIN':origin,
++                           'FAM_FIXTURE_COOKIE':client.get_cookie('fam_session').value}
++            with patch.object(equipment_ops, '_execute', side_effect=AssertionError('executor forbidden')) as execute:
++                http = make_server('127.0.0.1', port, app)
++                thread = threading.Thread(target=http.serve_forever, daemon=True)
++                thread.start()
++                try:
++                    subprocess.run(['node', str(Path(__file__).with_name('equipment_scope_browser.js'))],
++                                   env=environment, timeout=90, check=True)
++                finally:
++                    http.shutdown()
++                    thread.join()
++                    http.server_close()
++                execute.assert_not_called()
++            with sqlite3.connect(dbpath) as db:
++                permissions, scope = db.execute("SELECT permissions,equipment_scope FROM users WHERE username='target'").fetchone()
++                self.assertEqual(json.loads(permissions), ['equipment-operations','equipment-scan','future-permission'])
++                self.assertEqual(json.loads(scope)['regions'], ['region-2'])
++                self.assertTrue(all('*' not in v for v in json.loads(scope).values()))
++                self.assertEqual(db.execute("SELECT equipment_scope FROM users WHERE username='broken'").fetchone()[0], '{}')
++                self.assertIsNone(db.execute("SELECT equipment_scope FROM users WHERE username='manager'").fetchone()[0])
++                legacy_permissions, legacy_scope = db.execute("SELECT permissions,equipment_scope FROM users WHERE username='legacy'").fetchone()
++                self.assertTrue(all(not p.startswith('equipment-') for p in json.loads(legacy_permissions)))
++                self.assertIsNone(legacy_scope)
+diff --git a/FAM-Linux-Lab/tests/equipment_scope_browser.js b/FAM-Linux-Lab/tests/equipment_scope_browser.js
+new file mode 100644
+index 0000000..de7bd82
+--- /dev/null
++++ b/FAM-Linux-Lab/tests/equipment_scope_browser.js
+@@ -0,0 +1,51 @@
++// Optional real-browser regression; only the synthetic local fixture is reachable.
++const {chromium} = require(process.env.FAM_PLAYWRIGHT_MODULE);
++const assert = require('assert');
++(async () => {
++  const origin = process.env.FAM_FIXTURE_ORIGIN;
++  const browser = await chromium.launch({executablePath: process.env.FAM_BROWSER_EXECUTABLE,
++    headless: true, args: ['--no-sandbox', '--disable-background-networking',
++      '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1']});
++  try {
++    const context = await browser.newContext();
++    await context.route('**/*', route => route.request().url().startsWith(origin + '/')
++      ? route.continue() : route.abort());
++    await context.addCookies([{name:'fam_session',value:process.env.FAM_FIXTURE_COOKIE,
++      url:origin,httpOnly:true,sameSite:'Strict'}]);
++    const page = await context.newPage();
++    const errors = [];
++    page.on('pageerror', error => errors.push(error.message));
++    await page.goto(origin + '/app', {waitUntil:'domcontentloaded'});
++    await page.waitForFunction(() => typeof Access !== 'undefined' && !!Access.current());
++    assert.strictEqual(await page.evaluate(() => Access.can('users')), true);
++    assert.strictEqual(await page.evaluate(() => Access.can('equipment')), false);
++    await page.locator('#workspace-enter-panel').click();
++    await page.locator('[data-act="toggle-sidebar"]').click();
++    await page.locator('[data-act="manage-users"]').first().click();
++    await page.waitForSelector('#user-form');
++    assert.strictEqual(await page.locator('#user-broken-fixture-id').isDisabled(), true);
++    await page.locator('#user-target-fixture-id').click();
++    const inScope = page.locator('[data-equipment-dimension="regions"][data-equipment-ref="region-1"]');
++    const outScope = page.locator('[data-equipment-dimension="regions"][data-equipment-ref="region-2"]');
++    assert.strictEqual(await inScope.isChecked(), true);
++    assert.strictEqual(await outScope.count(), 1);
++    await inScope.uncheck(); await outScope.check();
++    const saved = page.waitForResponse(r => r.url().endsWith('/api/users') && r.request().method() === 'POST');
++    await page.locator('#user-save').click();
++    assert.strictEqual((await saved).status(), 200);
++    await page.waitForFunction(() => document.querySelector('#users-status')?.textContent.includes('ذخیره شد'));
++    await page.locator('#user-target-fixture-id').click();
++    assert.strictEqual(await page.locator('[data-equipment-dimension="regions"][data-equipment-ref="region-2"]').isChecked(), true);
++    assert.strictEqual(await page.locator('[data-equipment-all="regions"]').isChecked(), false);
++    await page.locator('#user-legacy-fixture-id').click();
++    const implicitEquipment = await page.locator('[data-user-permission^="equipment-"]:checked').count();
++    assert.strictEqual(implicitEquipment, 0);
++    await page.locator('#user-name').fill('legacy edited');
++    const legacySaved = page.waitForResponse(r => r.url().endsWith('/api/users') && r.request().method() === 'POST');
++    await page.locator('#user-save').click();
++    assert.strictEqual((await legacySaved).status(), 200);
++    assert.strictEqual(await page.evaluate(async () => (await fetch('/api/equipment/state')).status), 403);
++    assert.deepStrictEqual(errors, []);
++    console.log('Browser scope editor regression: PASS');
++  } finally { await browser.close(); }
++})().catch(error => { console.error(error.stack); process.exitCode = 1; });
