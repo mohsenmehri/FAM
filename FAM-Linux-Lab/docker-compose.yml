@@ -1,0 +1,41 @@
+# FAM lab stack: HTTPS reverse proxy (nginx) + FAM application.
+# SQLite lives in ./data on the host so it can be backed up and moved.
+# PostgreSQL is added in a later milestone with a tested data migration.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fam-app:1.0
+    restart: unless-stopped
+    environment:
+      FAM_DB: /data/fam.sqlite3
+      FAM_PUBLIC_ORIGIN: ${FAM_PUBLIC_ORIGIN}
+      FAM_BIND: 0.0.0.0
+      FAM_PORT: "8765"
+      FAM_EQUIPMENT_OPS_ENABLED: "1"
+      FAM_EQUIPMENT_PYTHON: /usr/local/bin/python
+      FAM_EQUIPMENT_SSH: /usr/local/bin/ssh
+      FAM_EQUIPMENT_KNOWN_HOSTS: /data/equipment_known_hosts
+      FAM_EQUIPMENT_RUNTIME_DIR: /data/tmp
+      # Temporary lab-only convenience (the owner finalizes the policy later):
+      # accept 4-character passwords in this lab. Delete this line to restore
+      # the product default of 12 characters without any code change.
+      FAM_PASSWORD_MIN_LENGTH: "4"
+    volumes:
+      - ./data:/data
+    expose:
+      - "8765"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./server/www:/usr/share/nginx/html:ro
+    depends_on:
+      - app
