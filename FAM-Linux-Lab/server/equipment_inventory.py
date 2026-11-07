@@ -23,21 +23,19 @@ def scope(value):
     return out
 
 def policy(user,stored=None):
-    legacy=not isinstance(user.get('permissions'),list)
-    entry=user.get('role',4)<=2 if legacy else bool({'equipment-operations','manage-users'} & set(user['permissions']))
-    if stored is None:
-        permissions=set(OPS) if entry else set()
-        if not legacy:permissions|=set(user['permissions'])
-        if (user.get('role')==1 if legacy else 'manage-users' in user.get('permissions',[])):permissions.add('clear-history')
-        scopes={k:['*'] if entry else [] for k in FIELDS}
-    else:
-        scopes=scope(stored);permissions=set(user.get('permissions',[])) if not legacy else (set(OPS) if entry else set())
+    # Legacy roles and NULL scope never imply equipment capabilities or targets.
+    permissions=set(user['permissions']) if isinstance(user.get('permissions'),list) else set()
+    scopes={k:[] for k in FIELDS} if stored is None else scope(stored)
     return permissions,scopes
 
 def permitted(user,operation='equipment-operations'):
-    permissions=set(user.get('permissions',[]))
-    if not isinstance(user.get('permissions'),list):return user.get('role',4)<=2 and operation in OPS
-    return bool({'equipment-operations','manage-users'} & permissions) and (operation=='equipment-operations' or operation in permissions)
+    # Empty in any dimension cannot describe an authorized equipment target.
+    scopes=user.get('equipmentScope',{})
+    if not isinstance(scopes,dict) or any(not scopes.get(k) for k in FIELDS):return False
+    permissions=user.get('permissions')
+    if not isinstance(permissions,list):return False
+    permissions=set(permissions)
+    return 'equipment-operations' in permissions and operation in permissions
 
 def ref(user,key,ident):
     values=user.get('equipmentScope',{}).get(key,[])

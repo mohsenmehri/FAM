@@ -432,6 +432,18 @@ def authorise_change(user,old,new):
     for n in old['order']:
         if n in META and n not in new['order']:new['order'].append(n)
 
+def valid_user_identity(uid,name,display,enabled):
+    return (isinstance(uid,str) and re.fullmatch(r'[a-zA-Z0-9-]{10,60}',uid) is not None
+            and isinstance(name,str) and re.fullmatch(r'[a-z0-9_.-]{3,40}',name) is not None
+            and isinstance(display,str) and 1<=len(display.strip())<=60 and type(enabled)==bool)
+
+def valid_user_scope_list(value):
+    return isinstance(value,list) and len(value)<=500 and all(isinstance(v,str) and len(v)<=100 for v in value)
+
+def valid_user_categories(value):
+    return (isinstance(value,list) and len(value)<=100 and
+            all(isinstance(v,str) and re.fullmatch(r'[a-z][a-z0-9_-]{0,79}',v) for v in value))
+
 def public_user(row):
     """Return only safe, structurally valid account fields.
 
@@ -442,21 +454,27 @@ def public_user(row):
     def load_list(column):
         try:
             value=json.loads(row[column])
-            if not isinstance(value,list):raise ValueError('expected list')
+            if not isinstance(value,list) or any(not isinstance(item,str) for item in value):raise ValueError('expected string list')
             return value
         except (json.JSONDecodeError,TypeError,ValueError) as error:
             logging.getLogger(__name__).error('Malformed users.%s for account id=%s: %s',column,row['id'],error)
             fail(500,'داده‌های حساب کاربری آسیب دیده است؛ لاگ سرور را بررسی کنید.')
     value={k:row[k] for k in ['id','username','name','role','enabled','revision']} | {'enabled':bool(row['enabled']),'regions':load_list('regions'),'sheets':load_list('sheets')}
+    if not valid_user_identity(value['id'],value['username'],value['name'],value['enabled']) or any(not valid_user_scope_list(value[k]) for k in ('regions','sheets')):
+        fail(500,'داده‌های حساب کاربری آسیب دیده است؛ مدیر باید آن را بررسی کند.')
     # Omit absent fields so older rows remain legacy-role accounts until their
     # first save through the new custom-access editor.
+    if (row['categories'] is None) != (row['permissions'] is None):
+        fail(500,'داده‌های حساب کاربری آسیب دیده است؛ مدیر باید آن را بررسی کند.')
     if row['categories'] is not None and row['permissions'] is not None:
         value['categories']=load_list('categories');value['permissions']=load_list('permissions')
+        if not valid_user_categories(value['categories']):fail(500,'داده‌های حساب کاربری آسیب دیده است؛ مدیر باید آن را بررسی کند.')
+    elif type(value['role'])!=int or value['role'] not in [1,2,3,4]:
+        fail(500,'داده‌های حساب کاربری آسیب دیده است؛ مدیر باید آن را بررسی کند.')
     try:
         stored=json.loads(row['equipment_scope']) if 'equipment_scope' in row.keys() and row['equipment_scope'] is not None else None
-        permissions,scopes=eq_inventory.policy(value,stored)
+        _,scopes=eq_inventory.policy(value,stored)
         value['equipmentScope']=scopes;value['equipmentPolicyVersion']=1
-        if 'permissions' in value:value['permissions']=value['permissions']+sorted(permissions-set(value['permissions']))
     except (ValueError,TypeError,KeyError):fail(500,'سیاست تجهیزات حساب معتبر نیست؛ مدیر باید آن را بررسی کند.')
     return value
 
@@ -578,11 +596,14 @@ def create_app(config=None):
             salt,digest=credentials(initial)
             db.execute('INSERT INTO state VALUES(1,0,?,?,0)',(str(uuid.uuid4()),packed(EMPTY)))
             db.execute('INSERT INTO settings(id,users_revision) VALUES(1,0)')
-            db.execute('INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-              (str(uuid.uuid4()),'admin','admin',1,1,packed([str(index) for index in range(1,len(REGIONS)+1)]),'[]',packed(sorted(BUILTIN_CATEGORIES)),packed(sorted(PERMISSIONS)),str(uuid.uuid4()),salt,digest))
+            db.execute('INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash,equipment_scope) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+              (str(uuid.uuid4()),'admin','admin',1,1,packed([str(index) for index in range(1,len(REGIONS)+1)]),'[]',packed(sorted(BUILTIN_CATEGORIES)),packed(sorted(PERMISSIONS)),str(uuid.uuid4()),salt,digest,packed({k:['*'] for k in eq_inventory.FIELDS})))
         if not db.execute('SELECT 1 FROM settings WHERE id=1').fetchone():raise RuntimeError('Database settings missing; restore a verified backup.')
         validate_state(json.loads(db.execute('SELECT payload FROM state WHERE id=1').fetchone()[0]))
-        active=[public_user(row) for row in db.execute('SELECT * FROM users WHERE enabled=1')]
+        active=[]
+        for row in db.execute('SELECT * FROM users WHERE enabled=1'):
+            try:active.append(public_user(row))
+            except Problem:logging.getLogger(__name__).error('Invalid account id=%s excluded from startup authorization',row['id'])
         if not any(may_manage_users(user) for user in active):raise RuntimeError('No active user-access manager: restore a verified backup, do not reseed.')
     def user_and_session(db):
         token=hashlib.sha256(request.cookies.get('fam_session','').encode()).hexdigest()
@@ -785,7 +806,22 @@ def create_app(config=None):
             db.execute('INSERT INTO receipts VALUES(?,?,?,?)',(u['id'],rid,digest,packed(result)))
             return jsonify(result)
     def users_result(db):
-        return {'revision':db.execute('SELECT users_revision FROM settings WHERE id=1').fetchone()[0], 'users':[public_user(r) for r in db.execute('SELECT * FROM users ORDER BY username')]}
+        users=[]
+        for row in db.execute('SELECT * FROM users ORDER BY username'):
+            try:users.append(public_user(row))
+            except Problem:
+                # The opaque row is never editable or rewritten by an ordinary save.
+                users.append({'id':row['id'],'username':row['username'],'name':row['name'],
+                              'enabled':False,'accountInvalid':True})
+        # User managers need category IDs to assign a scope, not device records.
+        # Do not expose nodes, hosts, standards, cards or credentials here.
+        try:
+            row=db.execute('SELECT payload FROM equipment_state WHERE id=1').fetchone()
+            catalog=eq_inventory.inventory(json.loads(row['payload'])['inventory'])['catalog']
+        except (ValueError,TypeError,KeyError,IndexError):catalog=None
+        return {'revision':db.execute('SELECT users_revision FROM settings WHERE id=1').fetchone()[0],
+                'users':users,'equipmentCatalog':catalog}
+
     @app.get('/api/users')
     def users():
         admin(g.user)
@@ -799,31 +835,49 @@ def create_app(config=None):
             u,session=user_and_session(db);admin(u)
             if body.get('revision')!=db.execute('SELECT users_revision FROM settings WHERE id=1').fetchone()[0]:fail(409,'فهرست کاربران تغییر کرده است؛ دوباره باز کنید.')
             old={row['id']:dict(row) for row in db.execute('SELECT * FROM users')};ids=set();names=set();normal=[]
+            invalid=set()
+            for uid,row in old.items():
+                try:public_user(row)
+                except Problem:invalid.add(uid)
             for x in values:
+                if isinstance(x,dict) and isinstance(x.get('id'),str) and x.get('id') in invalid:
+                    uid=x['id']
+                    if x.get('accountInvalid') is not True or uid in ids:fail(400,'حساب آسیب‌دیده باید بدون تغییر حفظ شود.')
+                    ids.add(uid);names.add(old[uid]['username'])
+                    normal.append({'id':uid,'invalid':True,'enabled':False,'public':{}})
+                    continue
+                if isinstance(x,dict) and x.get('accountInvalid'):fail(400,'حساب آسیب‌دیده معتبر نیست.')
+
                 if not isinstance(x,dict):fail(400,'کاربر نامعتبر است.')
                 uid=x.get('id');name=x.get('username','');display=x.get('name','');enabled=x.get('enabled')
-                if not isinstance(uid,str) or not re.fullmatch(r'[a-zA-Z0-9-]{10,60}',uid) or uid in ids or not isinstance(name,str) or not re.fullmatch(r'[a-z0-9_.-]{3,40}',name) or name in names or not isinstance(display,str) or not 1<=len(display.strip())<=60 or type(enabled)!=bool:
+                if not valid_user_identity(uid,name,display,enabled) or uid in ids or name in names:
                     fail(400,'مشخصات کاربر معتبر نیست.')
                 ids.add(uid);names.add(name)
                 for field in ['regions','sheets']:
-                    if not isinstance(x.get(field),list) or len(x[field])>500 or any(not isinstance(v,str) or len(v)>100 for v in x[field]):fail(400,'محدودهٔ کاربر نامعتبر است.')
+                    if not valid_user_scope_list(x.get(field)):fail(400,'محدودهٔ کاربر نامعتبر است.')
                 previous=old.get(uid);custom=('categories' in x or 'permissions' in x)
                 if custom:
                     categories=x.get('categories');permissions=x.get('permissions')
-                    if not isinstance(categories,list) or not isinstance(permissions,list) or len(categories)>100 or len(permissions)>len(PERMISSIONS) or any(not isinstance(v,str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,79}',v) for v in categories) or any(v not in PERMISSIONS for v in permissions):
+                    existing_permissions=json.loads(previous['permissions']) if previous and previous['permissions'] is not None else []
+                    if not valid_user_categories(categories) or not isinstance(permissions,list) or len(permissions)>max(len(PERMISSIONS),len(existing_permissions)) or any(not isinstance(v,str) or (v not in PERMISSIONS and v not in existing_permissions) for v in permissions):
                         fail(400,'دسترسی‌های سفارشی کاربر معتبر نیست.')
                     categories=list(dict.fromkeys(categories));permissions=list(dict.fromkeys(permissions))
                     # Kept only for legacy compatibility. It is never exposed in
                     # the custom-access editor and does not grant capabilities.
                     role=previous['role'] if previous else 4
                     cat_value,perm_value=packed(categories),packed(permissions)
+                    # Preserve unchanged explicit data byte-for-byte on a round trip.
+                    if previous and previous['categories'] is not None and json.loads(previous['categories'])==categories:cat_value=previous['categories']
+                    if previous and previous['permissions'] is not None and list(dict.fromkeys(existing_permissions))==permissions:perm_value=previous['permissions']
                 else:
                     if previous and previous['categories'] is not None:fail(400,'حساب دسترسی سفارشی باید دسته‌ها و مجوزهای خود را حفظ کند.')
                     role=x.get('role')
                     if type(role)!=int or role not in [1,2,3,4]:fail(400,'سطح دسترسی قدیمی معتبر نیست.')
                     categories=permissions=None;cat_value=perm_value=None
                 try:
-                    eq_scope=eq_inventory.scope(x['equipmentScope']) if 'equipmentScope' in x else (eq_inventory.scope(json.loads(previous['equipment_scope'])) if previous and previous['equipment_scope'] else eq_inventory.policy({'role':role})[1] if not custom else {k:[] for k in eq_inventory.FIELDS})
+                    stored_scope=json.loads(previous['equipment_scope']) if previous and previous['equipment_scope'] is not None else None
+                    previous_scope=eq_inventory.policy({},stored_scope)[1]
+                    eq_scope=eq_inventory.scope(x['equipmentScope']) if 'equipmentScope' in x else previous_scope
                 except (ValueError,TypeError,KeyError):fail(400,'محدودهٔ تجهیزات معتبر نیست.')
                 password=x.get('password')
                 if previous is None and not password:fail(400,'رمز کاربر جدید لازم است.')
@@ -831,13 +885,18 @@ def create_app(config=None):
                 pub={'id':uid,'username':name,'name':display.strip(),'role':role,'enabled':enabled,'regions':x['regions'],'sheets':x['sheets']}
                 if custom:pub['categories']=categories;pub['permissions']=permissions
                 pub['equipmentScope']=eq_scope;pub['equipmentPolicyVersion']=1
-                changed=not previous or password or any(public_user(previous).get(key)!=value for key,value in pub.items()) or (previous and (previous['categories']!=cat_value or previous['permissions']!=perm_value))
+                previous_public=public_user(previous) if previous else {}
+                if previous and previous['permissions']==perm_value and 'permissions' in previous_public:
+                    previous_public['permissions']=permissions
+                changed=not previous or password or any(previous_public.get(key)!=value for key,value in pub.items()) or (previous and (previous['categories']!=cat_value or previous['permissions']!=perm_value))
                 revision=str(uuid.uuid4()) if changed else previous['revision']
-                normal.append({'id':uid,'username':name,'name':display.strip(),'role':role,'enabled':enabled,'regions':x['regions'],'sheets':x['sheets'],'categories':cat_value,'permissions':perm_value,'revision':revision,'salt':salt,'hash':digest,'public':pub,'equipment_scope':packed(eq_scope)})
+                normal.append({'id':uid,'username':name,'name':display.strip(),'role':role,'enabled':enabled,'regions':x['regions'],'sheets':x['sheets'],'categories':cat_value,'permissions':perm_value,'revision':revision,'salt':salt,'hash':digest,'public':pub,'equipment_scope':previous['equipment_scope'] if previous and eq_scope==previous_scope else packed(eq_scope)})
+            if invalid-ids:fail(400,'حساب‌های آسیب‌دیده باید بدون تغییر حفظ شوند.')
             if not any(item['enabled'] and may_manage_users(item['public']) for item in normal):fail(400,'حداقل یک مدیر فعال مدیریت کاربران لازم است.')
             for uid in set(old)-ids:db.execute('DELETE FROM users WHERE id=?',(uid,))
             # Update in-place: REPLACE would cascade-delete active sessions.
             for item in normal:
+                if item.get('invalid'):continue
                 db.execute('''INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
                   ON CONFLICT(id) DO UPDATE SET username=excluded.username,name=excluded.name,role=excluded.role,enabled=excluded.enabled,regions=excluded.regions,sheets=excluded.sheets,categories=excluded.categories,permissions=excluded.permissions,revision=excluded.revision,salt=excluded.salt,hash=excluded.hash''',
                   (item['id'],item['username'],item['name'],item['role'],int(item['enabled']),packed(item['regions']),packed(item['sheets']),item['categories'],item['permissions'],item['revision'],item['salt'],item['hash']))

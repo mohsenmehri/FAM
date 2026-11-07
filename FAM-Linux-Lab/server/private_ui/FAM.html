@@ -8714,7 +8714,7 @@ Object.assign(window, {
 <script id="fam-local-access-js">
 /* Central accounts: server sessions and permissions; no local credential store. */
 const Access = (() => {
-  let db={users:[]},activeId=null,usersRevision=0;
+  let db={users:[]},activeId=null,usersRevision=0,usersEquipmentCatalog=null;
   const username=s=>String(s||'').trim().toLowerCase();
   // The central editor intentionally uses the same capability vocabulary and
   // scope controls as the current offline editor. The server validates every
@@ -8732,16 +8732,17 @@ const Access = (() => {
   ];
   const PERMISSIONS=new Set(PERMISSION_GROUPS.flatMap(group=>group.items.map(([id])=>id)));
   const allPermissions=()=>[...PERMISSIONS];
-  const legacyPermissions=role=>role===1?allPermissions():role===2?allPermissions().filter(p=>!['save-results','refresh-panel','import-data','empty-data','restore-data','reset-data','manage-users','clear-history'].includes(p)):role===3?['view-sheets','search','view-history','edit-cells','refresh-index','export-xlsx','backup-server']:['view-sheets','search'];
+  const legacyPermissions=role=>(role===1?allPermissions():role===2?allPermissions().filter(p=>!['save-results','refresh-panel','import-data','empty-data','restore-data','reset-data','manage-users','clear-history'].includes(p)):role===3?['view-sheets','search','view-history','edit-cells','refresh-index','export-xlsx','backup-server']:['view-sheets','search']).filter(p=>!p.startsWith('equipment-'));
   const allKnownCategoryIds=()=>[...new Set([...(typeof managedCategories==='function'?managedCategories().map(c=>c.id):[]),'other'])];
   const normalizeAccessUser=user=>{
+    if(user?.accountInvalid)return {...user,enabled:false,legacy:false,permissions:[],categories:[],regions:[],sheets:[],equipmentScope:Object.fromEntries(['types','models','regions','siteKinds','sites'].map(k=>[k,[]]))};
     const sheets=Array.isArray(user?.sheets)?user.sheets.filter(v=>typeof v==='string'):[];
     const legacy=!Array.isArray(user?.categories)||!Array.isArray(user?.permissions);
     const inferred=user?.role<=2?allKnownCategoryIds():[...new Set(sheets.map(s=>typeof categoryOf==='function'?categoryOf(s)?.id:null).filter(Boolean))];
     if(user?.role>2&&Array.isArray(user?.regions)&&user.regions.length&&!inferred.includes('provinces'))inferred.push('provinces');
     const supplied=Array.isArray(user?.categories)?user.categories.filter(v=>typeof v==='string'):inferred;
     const regions=legacy&&user?.role<=2&&typeof managedRegions==='function'?managedRegions().filter(r=>r.id!=='unassigned').map(r=>r.id):(Array.isArray(user?.regions)?user.regions.filter(v=>typeof v==='string'):[]);
-    return {...user,equipmentPolicyVersion:1,equipmentScope:user?.equipmentScope||Object.fromEntries(['types','models','regions','siteKinds','sites'].map(k=>[k,[]])),legacy,sheets,regions:[...new Set(regions)],categories:[...new Set(supplied.includes('*')?allKnownCategoryIds():supplied)],permissions:Array.isArray(user?.permissions)?[...new Set(user.permissions.filter(v=>PERMISSIONS.has(v)))]:legacyPermissions(user?.role)};
+    return {...user,equipmentPolicyVersion:1,equipmentScope:user?.equipmentScope||Object.fromEntries(['types','models','regions','siteKinds','sites'].map(k=>[k,[]])),legacy,sheets,regions:[...new Set(regions)],categories:[...new Set(supplied.includes('*')?allKnownCategoryIds():supplied)],permissions:Array.isArray(user?.permissions)?[...new Set(user.permissions)]:legacyPermissions(user?.role)};
   };
   async function credential(password){
     if(password.length<4||password.length>128)throw Error('رمز باید بین ۴ تا ۱۲۸ نویسه باشد.');
@@ -8752,11 +8753,12 @@ const Access = (() => {
     // saves somebody else. A legacy row is migrated only when its own form is
     // saved through the custom editor.
     const users=next.users.map(user=>{
+      if(user.accountInvalid)return {id:user.id,accountInvalid:true};
       if(!user.legacy)return user;
       const {legacy,categories,permissions,...legacyUser}=user;return legacyUser;
     });
     const result=await FamShared.api('users',{revision:usersRevision,users});
-    db={users:result.users.map(normalizeAccessUser)};usersRevision=result.revision;
+    db={users:result.users.map(normalizeAccessUser)};usersRevision=result.revision;usersEquipmentCatalog=result.equipmentCatalog;
   }
   function establish(user){
     const normalized=normalizeAccessUser(user),found=db.users.findIndex(u=>u.id===normalized.id);
@@ -8785,7 +8787,7 @@ const Access = (() => {
   function can(operation,sheet){
     const u=current();if(!u)return false;
     if(operation==='own-password')return true;
-    if(operation==='equipment')return has(u,'equipment-operations')||has(u,'manage-users');
+    if(operation==='equipment')return has(u,'equipment-operations')&&['types','models','regions','siteKinds','sites'].every(key=>Array.isArray(u.equipmentScope?.[key])&&u.equipmentScope[key].length>0);
     if(operation==='clear-history')return has(u,'clear-history')&&has(u,'view-history');
     if(operation.startsWith('equipment-'))return can('equipment')&&has(u,operation);
     const scoped={read:'view-sheets','search-read':'search',manual:'edit-cells',export:'export-xlsx',backup:'backup-server',add:'add-record',remove:'remove-record','save-results':'save-results','view-history':'view-history',undo:'undo-remove'}[operation];
@@ -8868,7 +8870,7 @@ const Access = (() => {
   }
   function viewAllowed(view){
     if(view==='equipment')return can('equipment');
-    if(view==='panel')return can('data-access');
+    if(view==='panel')return can('data-access')||can('users');
     if(view==='sheet')return can('view-sheets');
     if(view==='results')return can('search')||can('remove');
     if(view==='log')return can('view-history');
@@ -8951,7 +8953,7 @@ const Access = (() => {
   }
   async function manageUsers(){
     if(!requirePermission('users'))return;
-    try{const result=await FamShared.api('users');db={users:result.users.map(normalizeAccessUser)};usersRevision=result.revision;}catch(e){Toast(e.message,'err');return;}
+    try{const result=await FamShared.api('users');db={users:result.users.map(normalizeAccessUser)};usersRevision=result.revision;usersEquipmentCatalog=result.equipmentCatalog;}catch(e){Toast(e.message,'err');return;}
     if(!requirePermission('users'))return;
     const ov=document.getElementById('modal-overlay');const previous=document.activeElement;
     const box=el('div',{class:'mbox category-manager',role:'dialog','aria-modal':'true','aria-labelledby':'users-title'});
@@ -8970,6 +8972,7 @@ const Access = (() => {
         const item=button('ویرایش: '+u.name+' ('+u.username+')'+(u.enabled?'':' · غیرفعال'),'user-'+u.id,()=>{
           if(saving)return;selected=u.id;status.textContent='';drawList();drawEditor();
         });
+        if(u.accountInvalid){item.disabled=true;item.textContent='حساب آسیب‌دیده؛ بدون تغییر حفظ می‌شود: '+u.username;}
         item.classList.toggle('is-selected',selected===u.id);
         item.setAttribute('aria-pressed',String(selected===u.id));
         list.appendChild(item);
@@ -9032,7 +9035,7 @@ const Access = (() => {
       scopes.appendChild(categories);syncRegions();
 
       const equipmentScope=structuredClone(draft.equipmentScope),eqScope=el('section',{id:'user-equipment-scope',class:'user-scope-section'},el('h4',{text:'محدودهٔ تجهیزات مجاز'}),el('p',{class:'hint',text:'ابعاد با «و» ترکیب می‌شوند. همه یعنی دسته‌های فعلی و آینده؛ انتخاب‌های تکی با شناسه ثابت ذخیره می‌شوند و تغییر نام خودکار است. هیچ انتخابی یعنی عدم دسترسی در آن بُعد.'}));
-      equipmentScopeRefresh=()=>{eqScope.querySelectorAll('fieldset,.category-error').forEach(n=>n.remove());try{const data=FamEquipmentServer.inventory();
+      equipmentScopeRefresh=()=>{eqScope.querySelectorAll('fieldset,.category-error').forEach(n=>n.remove());try{if(!usersEquipmentCatalog)throw Error('catalog unavailable');const data={catalog:usersEquipmentCatalog};
        for(const [key,label]of Object.entries(FamEquipmentInventory.dimensions)){
         const group=el('fieldset',{class:'permission-group'},el('legend',{text:label})),selected=new Set(equipmentScope[key]);
         const all=el('input',{type:'checkbox','data-equipment-all':key,checked:selected.has('*')});
