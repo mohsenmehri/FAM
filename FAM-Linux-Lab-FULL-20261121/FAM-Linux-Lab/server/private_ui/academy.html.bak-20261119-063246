@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="FAM Academy — مسیرهای کامل سیسکو با ماژول بصری، آزمایشگاه تعاملی CLI و آزمون">
+  <title>FAM Academy — مسیرهای کامل سیسکو</title>
+  <script id="fam-academy-fam-bridge" nonce="__FAM_CSP_NONCE__">
+    window.FAM_ACADEMY_BOOTSTRAP = __FAM_ACADEMY_BOOTSTRAP__;
+    (() => {
+      'use strict';
+      const boot = window.FAM_ACADEMY_BOOTSTRAP || {};
+      const csrf = boot.csrf || '';
+      window.FamAcademyBridge = {
+        user: boot.user || null,
+        progress: boot.progress || { completed: [] },
+        async saveProgress(completed) {
+          try {
+            await fetch('/api/academy/progress', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+              body: JSON.stringify({ completed })
+            });
+          } catch (e) {}
+        }
+      };
+    })();
+  </script>
+  <style nonce="__FAM_CSP_NONCE__">
+    :root {
+      --bg: #0b101b; --panel: #121a2b; --panel2: #182338; --border: #25334d;
+      --text: #e6edf7; --muted: #93a4c3; --accent: #38bdf8; --accent2: #a78bfa;
+      --ok: #22c55e; --warn: #f59e0b; --err: #ef4444;
+      --font: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    html[data-theme="light"] {
+      --bg: #f4f7fb; --panel: #ffffff; --panel2: #eef3f9; --border: #d5dfec;
+      --text: #0f172a; --muted: #475569; --accent: #0284c7; --accent2: #7c3aed;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; }
+    a { color: var(--accent); text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--border); color: var(--accent); }
+    .nav-actions { display: flex; align-items: center; gap: 8px; }
+    .btn {
+      padding: 7px 13px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--panel2); color: var(--text); font-size: 13px; transition: .15s;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: var(--accent); color: #06121e; border-color: var(--accent); font-weight: 600; }
+    .container { max-width: 1240px; margin: 0 auto; padding: 24px 20px 60px; }
+    .hero { margin-bottom: 20px; }
+    .hero h1 { margin: 0 0 6px; font-size: 24px; }
+    .hero p { margin: 0; color: var(--muted); font-size: 14px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 22px; }
+    .chip {
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
+      background: var(--panel); color: var(--muted); font-size: 12px;
+    }
+    .chip.active { background: var(--accent); color: #06121e; border-color: var(--accent); font-weight: 600; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+      padding: 18px; display: flex; flex-direction: column; gap: 10px; transition: .15s;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .card-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+    .card h3 { margin: 0; font-size: 17px; }
+    .card p { margin: 0; font-size: 13px; color: var(--muted); flex: 1; }
+    .progress-bar { height: 6px; background: var(--panel2); border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--ok); width: 0%; transition: width .3s; }
+    .course-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+    .course-head { padding: 14px 18px; background: var(--panel2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .lesson-row {
+      padding: 12px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .lesson-row:last-child { border-bottom: 0; }
+    .lesson-tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .split { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+    @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+    .canvas-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .canvas-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+    .step-list { display: flex; flex-direction: column; gap: 6px; }
+    .step-item {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--panel); text-align: right; color: var(--text); font-size: 13px;
+    }
+    .step-item.active { border-color: var(--accent); background: var(--panel2); }
+    .step-item small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .terminal {
+      background: #06090f; color: #e2e8f0; font-family: var(--mono); font-size: 13px;
+      border-radius: 10px; border: 1px solid var(--border); padding: 14px;
+      height: 410px; display: flex; flex-direction: column; direction: ltr; text-align: left;
+    }
+    .term-out { flex: 1; overflow-y: auto; white-space: pre-wrap; margin-bottom: 8px; }
+    .term-in { display: flex; align-items: center; gap: 6px; border-top: 1px solid #1e293b; padding-top: 8px; }
+    .term-in input {
+      flex: 1; background: transparent; border: 0; outline: 0; color: #38bdf8;
+      font-family: var(--mono); font-size: 13px;
+    }
+    .task-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel2); margin-bottom: 8px; font-size: 13px; }
+    .task-item.done { border: 1px solid var(--ok); color: var(--ok); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span>FAM Academy</span>
+      <span class="badge">مسیرهای کامل سیسکو</span>
+    </div>
+    <div class="nav-actions">
+      <button class="btn" id="btn-back-paths">همهٔ مسیرها</button>
+      <a class="btn" href="/app">بازگشت به FAM</a>
+    </div>
+  </header>
+
+  <main class="container" id="app-root"></main>
+
+  <script nonce="__FAM_CSP_NONCE__">
+  (() => {
+    'use strict';
+    try {
+      const t = localStorage.getItem('fam.ui.theme');
+      if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    } catch (e) {}
+
+    const PATHS = [
+      {
+        id: 'ccna',
+        category: 'ccna',
+        level: 'Associate',
+        title: 'CCNA 200-301 — مبانی تا راه‌اندازی شبکه',
+        desc: 'مبانی شبکه، سوئیچینگ VLAN/STP، مسیریابی OSPF، سرویس‌های IP و امنیت پایه با ماژول بصری و لاب CLI.',
+        courses: [
+          {
+            id: 'net-fund',
+            title: 'دورهٔ ۱: مبانی شبکه (Network Fundamentals)',
+            lessons: [
+              {
+                id: 'packet-journey',
+                title: 'مسیر یک بسته از کلاینت تا سرور (L2/L3)',
+                duration: '۱۰ دقیقه',
+                steps: [
+                  { title: '۱. درخواست کلاینت', desc: 'کلاینت 10.4.86.11 بسته را برای سرور 192.168.97.128 می‌سازد.', hop: 'Client', ms: '0 ms', x: 90, y: 120 },
+                  { title: '۲. ARP و ارسال به سوئیچ', desc: 'فریم با MAC گیت‌وی از پورت Access وارد Switch-486 می‌شود.', hop: 'Switch-486', ms: '1 ms', x: 260, y: 120 },
+                  { title: '۳. مسیریابی در روتر', desc: 'Router-486 جدول مسیر را بررسی و بسته را از Gi0/1 ارسال می‌کند.', hop: 'Router-486', ms: '3 ms', x: 430, y: 120 },
+                  { title: '۴. عبور از لینک WAN', desc: 'بسته با TTL کاهش‌یافته از لینک بین‌شهری عبور می‌کند.', hop: 'WAN', ms: '12 ms', x: 600, y: 120 },
+                  { title: '۵. تحویل به سرور', desc: 'سرور FAM درخواست را پردازش و پاسخ را برمی‌گرداند.', hop: 'FAM-Server', ms: '15 ms', x: 760, y: 120 }
+                ],
+                lab: {
+                  host: 'Switch-486',
+                  tasks: [
+                    { id: 't1', label: 'ورود به حالت privileged با enable', match: /^en(able)?$/i },
+                    { id: 't2', label: 'بررسی اینترفیس‌ها با show ip interface brief', match: /^sh(ow)?\s+ip\s+int(erface)?\s+br(ief)?$/i },
+                    { id: 't3', label: 'تست گیت‌وی با ping 10.4.86.1', match: /^ping\s+10\.4\.86\.1$/i }
+                  ]
+                },
+                quiz: { q: 'وقتی مقصد در ساب‌نت دیگری است، MAC مقصد فریم لایه ۲ چیست؟', options: ['MAC سرور نهایی', 'MAC گیت‌وی پیش‌فرض', 'MAC برودکست'], answer: 1 }
+              }
+            ]
+          },
+          {
+            id: 'switching-vlan',
+            title: 'دورهٔ ۲: سوئیچینگ، VLAN و STP',
+            lessons: [
+              {
+                id: 'vlan-trunk',
+                title: 'VLAN، Trunk 802.1Q و Spanning-Tree',
+                duration: '۱۵ دقیقه',
+                steps: [
+                  { title: '۱. ورود فریم بدون تگ', desc: 'فریم از کلاینت وارد پورت Access در VLAN 100 می‌شود.', hop: 'PC-Access', ms: '0 ms', x: 110, y: 120 },
+                  { title: '۲. تگ‌گذاری 802.1Q', desc: 'سوئیچ تگ VLAN 100 را روی لینک Trunk اضافه می‌کند.', hop: 'Trunk-Gi1/3', ms: '1 ms', x: 340, y: 120 },
+                  { title: '۳. بررسی STP', desc: 'لینک Root Port در حالت Forwarding است و حلقه مسدود شده.', hop: 'STP-Root', ms: '2 ms', x: 560, y: 120 },
+                  { title: '۴. تحویل به SVI', desc: 'فریم در سوئیچ توزیع به اینترفیس Vlan100 تحویل می‌شود.', hop: 'SVI-Vlan100', ms: '3 ms', x: 750, y: 120 }
+                ],
+                lab: {
+                  host: 'Switch-486',
+                  tasks: [
+                    { id: 'v1', label: 'مشاهدهٔ VLANها با show vlan brief', match: /^sh(ow)?\s+vlan\s+br(ief)?$/i },
+                    { id: 'v2', label: 'بررسی وضعیت STP با show spanning-tree', match: /^sh(ow)?\s+spanning-tree/i }
+                  ]
+                },
+                quiz: { q: 'کدام پروتکل از حلقهٔ لایه ۲ جلوگیری می‌کند؟', options: ['OSPF', 'STP (Spanning-Tree)', 'HSRP'], answer: 1 }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'ccnp-ent',
+        category: 'ccnp',
+        level: 'Professional',
+        title: 'CCNP Enterprise — OSPF، EIGRP و BGP',
+        desc: 'مسیریابی پیشرفتهٔ سازمانی: همسایگی OSPF، متریک EIGRP، سیاست‌های BGP و FHRP (HSRP/VRRP).',
+        courses: [
+          {
+            id: 'ospf-eigrp',
+            title: 'دورهٔ ۱: OSPF و EIGRP در شبکهٔ سازمانی',
+            lessons: [
+              {
+                id: 'ospf-states',
+                title: 'تشکیل همسایگی OSPF و انتخاب DR/BDR',
+                duration: '۱۸ دقیقه',
+                steps: [
+                  { title: '۱. Init / Hello', desc: 'روتر بستهٔ Hello را به آدرس مالتی‌کست 224.0.0.5 می‌فرستد.', hop: 'R1-Hello', ms: '1 ms', x: 110, y: 120 },
+                  { title: '۲. 2-Way & DR/BDR', desc: 'روترها Router-ID هم را می‌بینند و DR/BDR انتخاب می‌شود.', hop: 'DR-Elect', ms: '3 ms', x: 330, y: 120 },
+                  { title: '۳. ExStart / Exchange', desc: 'خلاصهٔ LSDB با بسته‌های DBD مبادله می‌شود.', hop: 'DBD-Sync', ms: '6 ms', x: 540, y: 120 },
+                  { title: '۴. Full & SPF', desc: 'الگوریتم Dijkstra اجرا و بهترین مسیر وارد جدول می‌شود.', hop: 'OSPF-Full', ms: '9 ms', x: 750, y: 120 }
+                ],
+                lab: {
+                  host: 'Router-486',
+                  tasks: [
+                    { id: 'o1', label: 'بررسی همسایه‌های OSPF با show ip ospf neighbor', match: /^sh(ow)?\s+ip\s+ospf\s+nei(ghbor)?$/i },
+                    { id: 'o2', label: 'مشاهدهٔ جدول مسیر با show ip route', match: /^sh(ow)?\s+ip\s+route$/i }
+                  ]
+                },
+                quiz: { q: 'آدرس مالتی‌کست پیش‌فرض Hello در OSPF چیست؟', options: ['224.0.0.5', '224.0.0.10', '224.0.0.2'], answer: 0 }
+              },
+              {
+                id: 'eigrp-dual',
+                title: 'EIGRP — Feasible Successor و الگوریتم DUAL',
+                duration: '۱۵ دقیقه',
+                steps: [
+                  { title: '۱. Hello (224.0.0.10)', desc: 'کشف همسایه‌ها با بررسی AS Number و K-Values.', hop: 'EIGRP-Hello', ms: '1 ms', x: 130, y: 120 },
+                  { title: '۲. جدول توپولوژی', desc: 'محاسبهٔ Feasible Distance و Reported Distance.', hop: 'Topology', ms: '3 ms', x: 430, y: 120 },
+                  { title: '۳. Successor / Backup', desc: 'انتخاب مسیر اصلی و مسیر پشتیبان بدون حلقه.', hop: 'DUAL-Ready', ms: '5 ms', x: 730, y: 120 }
+                ],
+                lab: {
+                  host: 'Router-486',
+                  tasks: [
+                    { id: 'e1', label: 'مشاهدهٔ همسایه‌های EIGRP با show ip eigrp neighbors', match: /^sh(ow)?\s+ip\s+eigrp\s+nei(ghbors)?$/i }
+                  ]
+                },
+                quiz: { q: 'شرط Feasibility Condition در EIGRP چیست؟', options: ['RD < FD مسیر اصلی', 'RD > FD مسیر اصلی', 'Hop Count < 15'], answer: 0 }
+              }
+            ]
+          },
+          {
+            id: 'bgp-wan',
+            title: 'دورهٔ ۲: BGP و مسیریابی WAN',
+            lessons: [
+              {
+                id: 'bgp-peering',
+                title: 'eBGP / iBGP و انتخاب بهترین مسیر BGP',
+                duration: '۲۰ دقیقه',
+                steps: [
+                  { title: '۱. TCP 179', desc: 'برقراری نشست TCP بین دو همسایهٔ BGP.', hop: 'TCP-179', ms: '2 ms', x: 110, y: 120 },
+                  { title: '۲. Open & Keepalive', desc: 'توافق روی AS Number و Hold Timer.', hop: 'BGP-Open', ms: '5 ms', x: 340, y: 120 },
+                  { title: '۳. Update & Attributes', desc: 'تبادل Prefixها همراه با Weight، Local_Pref و AS_Path.', hop: 'Attributes', ms: '8 ms', x: 560, y: 120 },
+                  { title: '۴. Established', desc: 'بهترین مسیر انتخاب و در جدول مسیر نصب می‌شود.', hop: 'Established', ms: '10 ms', x: 750, y: 120 }
+                ],
+                lab: {
+                  host: 'Router-486',
+                  tasks: [
+                    { id: 'b1', label: 'بررسی نشست‌های BGP با show ip bgp summary', match: /^sh(ow)?\s+ip\s+bgp\s+sum(mary)?$/i }
+                  ]
+                },
+                quiz: { q: 'BGP از کدام پورت و پروتکل لایه ۴ استفاده می‌کند؟', options: ['UDP 520', 'TCP 179', 'IP Protocol 89'], answer: 1 }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'ccnp-sec',
+        category: 'ccnp',
+        level: 'Professional',
+        title: 'CCNP Security — امنیت سوئیچ، ACL، NAT و AAA',
+        desc: 'Port Security، DHCP Snooping، Dynamic ARP Inspection، فایروال و کنترل دسترسی.',
+        courses: [
+          {
+            id: 'l2-sec',
+            title: 'دورهٔ ۱: سخت‌سازی لایه ۲',
+            lessons: [
+              {
+                id: 'port-sec-dai',
+                title: 'Port Security، DHCP Snooping و DAI',
+                duration: '۱۴ دقیقه',
+                steps: [
+                  { title: '۱. DHCP Snooping', desc: 'ساخت Binding Table از IP و MAC معتبر روی پورت‌ها.', hop: 'Snooping', ms: '1 ms', x: 130, y: 120 },
+                  { title: '۲. DAI Check', desc: 'مقایسهٔ بسته‌های ARP با Binding Table و مسدودسازی جعل.', hop: 'DAI-Guard', ms: '2 ms', x: 430, y: 120 },
+                  { title: '۳. Port Security', desc: 'محدودکردن تعداد MAC روی پورت Access.', hop: 'Port-Sec', ms: '3 ms', x: 730, y: 120 }
+                ],
+                lab: {
+                  host: 'Switch-486',
+                  tasks: [
+                    { id: 's1', label: 'بررسی جدول امنیتی با show port-security', match: /^sh(ow)?\s+port-security/i }
+                  ]
+                },
+                quiz: { q: 'DAI برای تشخیص جعل ARP به چه جدولی تکیه دارد؟', options: ['CAM Table', 'DHCP Snooping Binding Table', 'Routing Table'], answer: 1 }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'foundation',
+        category: 'foundation',
+        level: 'مرحله ۱ · از صفر مطلق',
+        title: 'مبانی شبکه و زیرساخت (Foundation)',
+        desc: 'Computer Fundamentals، IT Essentials، لینوکس/ویندوز، OSI و TCP/IP، IPv4/IPv6، Ethernet، DHCP/DNS/NAT، عیب‌یابی و امنیت پایه.',
+        courses: [
+          {
+            id: 'f-core',
+            title: '۱۰ دورهٔ پایه: از سخت‌افزار تا عیب‌یابی بسته',
+            lessons: [
+              {
+                id: 'f-osi-tcp',
+                title: 'مدل OSI و TCP/IP و کپسوله‌سازی (Encapsulation)',
+                duration: '۱۲ دقیقه',
+                steps: [
+                  { title: '۱. لایهٔ Application', desc: 'تولید دادهٔ کاربر (HTTP/DNS) در مبدأ.', hop: 'App-Data', ms: '0 ms', x: 110, y: 120 },
+                  { title: '۲. لایهٔ Transport (TCP/UDP)', desc: 'افزودن هدر پورت مبدأ و مقصد (Segment).', hop: 'TCP-Seg', ms: '1 ms', x: 320, y: 120 },
+                  { title: '۳. لایهٔ Network (IP)', desc: 'افزودن IP مبدأ و مقصد (Packet).', hop: 'IP-Pkt', ms: '2 ms', x: 540, y: 120 },
+                  { title: '۴. لایهٔ Data Link (Ethernet)', desc: 'افزودن MAC و FCS و ارسال روی سیم (Frame).', hop: 'Eth-Frame', ms: '3 ms', x: 750, y: 120 }
+                ],
+                lab: {
+                  host: 'PC-Lab',
+                  tasks: [
+                    { id: 'ft1', label: 'تست ارتباط با ping 10.4.86.1', match: /^ping\s+10\.4\.86\.1$/i }
+                  ]
+                },
+                quiz: { q: 'واحد داده در لایهٔ ۳ (Network) چیست؟', options: ['Frame', 'Packet', 'Segment'], answer: 1 }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'ccnp-dc',
+        category: 'ccnp',
+        level: 'Professional',
+        title: 'CCNP Data Center — VXLAN، VPC و Fabric',
+        desc: 'معماری Spine-Leaf، تانل‌های VXLAN EVPN و افزونگی دیتاسنتر.',
+        courses: []
+      },
+      {
+        id: 'ccnp-sp', category: 'ccnp', level: 'مرحله ۳ · CCNP',
+        title: 'CCNP Service Provider — شبکهٔ اپراتورها و مخابرات',
+        desc: 'SPCOR 350-501، Advanced BGP، MPLS L3VPN/L2VPN، Segment Routing، IS-IS و IOS XR.',
+        courses: []
+      },
+      {
+        id: 'ccnp-wl', category: 'ccnp', level: 'مرحله ۳ · CCNP',
+        title: 'CCNP Wireless — شبکه‌های بی‌سیم سازمانی',
+        desc: 'استانداردهای 802.11، Wi-Fi 6/6E/7، WLC، Roaming و امنیت بی‌سیم.',
+        courses: []
+      },
+      {
+        id: 'ccnp-collab', category: 'ccnp', level: 'مرحله ۳ · CCNP',
+        title: 'CCNP Collaboration — VoIP و ارتباطات یکپارچه',
+        desc: 'SIP، RTP، CUCM، Voice Gateways، Dial Plan و QoS برای صدا.',
+        courses: []
+      },
+      {
+        id: 'ccnp-auto', category: 'ccnp', level: 'مرحله ۳ · CCNP',
+        title: 'CCNP Automation — برنامه‌نویسی و اتوماسیون شبکه',
+        desc: 'Python، Git، REST API، NETCONF/RESTCONF، YANG، Ansible، Terraform و Cisco NSO.',
+        courses: []
+      },
+      {
+        id: 'ccnp-cyber', category: 'ccnp', level: 'مرحله ۳ · CCNP',
+        title: 'CCNP Cybersecurity — دفاع سایبری و SOC',
+        desc: 'Threat Hunting، Incident Response، SIEM، تحلیل بدافزار و NDR.',
+        courses: []
+      },
+      {
+        id: 'ccie-expert', category: 'ccie', level: 'مرحله ۴ · Expert',
+        title: 'سطح Expert — مدارک CCIE و CCDE',
+        desc: 'طراحی، پیاده‌سازی و عیب‌یابی شبکه‌های پیچیده: CCIE Enterprise، Security، Data Center، SP، Wireless و CCDE.',
+        courses: []
+      },
+      {
+        id: 'net-architect', category: 'architect', level: 'مرحله ۵ · Architect',
+        title: 'مهندس ارشد و Network Architect',
+        desc: 'معماری شبکه‌های بانکی و اپراتوری، SDN/SD-WAN، Cloud (AWS/Azure/GCP)، Kubernetes، Zero Trust و Observability.',
+        courses: []
+      },
+      {
+        id: 'cisco-platforms', category: 'platforms', level: 'مرحله ۶ · تکمیلی',
+        title: 'پلتفرم‌های تکمیلی سیسکو',
+        desc: 'Cisco Catalyst Center (DNA)، Cisco SD-WAN (Viptela)، Cisco ACI، Meraki، ThousandEyes و Cisco ISE.',
+        courses: []
+      }
+    ];
+
+    const state = {
+      view: 'paths',
+      filter: 'all',
+      pathId: null,
+      lessonId: null,
+      tab: 'visual',
+      stepIdx: 0,
+      playing: false,
+      timer: null,
+      completed: new Set((window.FamAcademyBridge?.progress?.completed) || []),
+      labDone: new Set(),
+      termLines: ['Cisco IOS Simulator — Type "help" for supported commands.'],
+      priv: false,
+      conf: false
+    };
+
+    const root = document.getElementById('app-root');
+    document.getElementById('btn-back-paths').onclick = () => { stopPlay(); state.view = 'paths'; render(); };
+
+    function markComplete(id) {
+      if (!state.completed.has(id)) {
+        state.completed.add(id);
+        window.FamAcademyBridge?.saveProgress([...state.completed]);
+      }
+    }
+
+    function stopPlay() {
+      state.playing = false;
+      if (state.timer) { clearInterval(state.timer); state.timer = null; }
+    }
+
+    function render() {
+      if (state.view === 'paths') return renderPaths();
+      if (state.view === 'path') return renderPathDetail();
+      if (state.view === 'lesson') return renderLesson();
+    }
+
+    function renderPaths() {
+      const list = PATHS.filter(p => state.filter === 'all' || p.category === state.filter);
+      root.innerHTML = `
+        <section class="hero">
+          <h1>مسیرهای یادگیری سیسکو</h1>
+          <p>آموزش کامل CCNA و CCNP (OSPF، EIGRP، BGP، امنیت و دیتاسنتر) همراه با ماژول بصری و آزمایشگاه CLI</p>
+        </section>
+        <div class="filters">
+          ${[['all','همهٔ مراحل'],['foundation','۱. مبانی زیرساخت'],['ccna','۲. CCNA'],['ccnp','۳. شاخه‌های CCNP'],['ccie','۴. CCIE / Expert'],['architect','۵. معمار شبکه'],['platforms','۶. پلتفرم‌های سیسکو']].map(([k,l]) =>
+            `<button class="chip ${state.filter===k?'active':''}" data-filter="${k}">${l}</button>`).join('')}
+        </div>
+        <div class="grid">
+          ${list.map(p => {
+            const total = p.courses.reduce((a,c)=>a+c.lessons.length,0) || 1;
+            const done = p.courses.reduce((a,c)=>a+c.lessons.filter(l=>state.completed.has(l.id)).length,0);
+            const pct = Math.round((done/total)*100);
+            return `<article class="card">
+              <div class="card-meta"><span>${p.level}</span><span>${p.courses.length} دوره</span></div>
+              <h3>${p.title}</h3>
+              <p>${p.desc}</p>
+              <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+              <button class="btn btn-primary" data-open-path="${p.id}">ورود به مسیر (${pct}%)</button>
+            </article>`;
+          }).join('')}
+        </div>`;
+      root.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { state.filter = b.dataset.filter; render(); });
+      root.querySelectorAll('[data-open-path]').forEach(b => b.onclick = () => { state.pathId = b.dataset.openPath; state.view = 'path'; render(); });
+    }
+
+    function renderPathDetail() {
+      const p = PATHS.find(x => x.id === state.pathId);
+      if (!p) { state.view = 'paths'; return render(); }
+      root.innerHTML = `
+        <section class="hero">
+          <h1>${p.title}</h1>
+          <p>${p.desc}</p>
+        </section>
+        ${p.courses.length === 0 ? '<div class="card"><p>سرفصل‌های این مسیر در حال تکمیل است.</p></div>' :
+          p.courses.map(c => `
+            <div class="course-box">
+              <div class="course-head"><strong>${c.title}</strong><span class="badge">${c.lessons.length} درس</span></div>
+              ${c.lessons.map(l => `
+                <div class="lesson-row">
+                  <div>
+                    <strong>${l.title}</strong>
+                    <div style="font-size:12px;color:var(--muted)">${l.duration} ${state.completed.has(l.id)?'· ✅ تکمیل‌شده':''}</div>
+                  </div>
+                  <button class="btn btn-primary" data-open-lesson="${l.id}">شروع درس</button>
+                </div>
+              `).join('')}
+            </div>`).join('')}`;
+      root.querySelectorAll('[data-open-lesson]').forEach(b => b.onclick = () => {
+        state.lessonId = b.dataset.openLesson; state.view = 'lesson'; state.tab = 'visual';
+        state.stepIdx = 0; state.labDone = new Set(); state.priv = false; state.conf = false;
+        stopPlay(); render();
+      });
+    }
+
+    function runIosCommand(host, cmd) {
+      if (/^help$/i.test(cmd)) return 'Commands: enable, conf t, end, show ip interface brief, show ip route, show vlan brief, show spanning-tree, show ip ospf neighbor, show ip eigrp neighbors, show ip bgp summary, show port-security, ping 10.4.86.1, clear';
+      if (/^en(able)?$/i.test(cmd)) { state.priv = true; return ''; }
+      if (/^conf(igure)?\s+t(erminal)?$/i.test(cmd)) { if (!state.priv) return '% Invalid input'; state.conf = true; return 'Enter configuration commands, one per line. End with CNTL/Z.'; }
+      if (/^(end|exit)$/i.test(cmd)) { if (state.conf) { state.conf = false; return ''; } state.priv = false; return ''; }
+      if (/^sh(ow)?\s+ip\s+int(erface)?\s+br(ief)?$/i.test(cmd)) return 'Interface              IP-Address      OK? Method Status                Protocol\nVlan100                10.4.86.2       YES NVRAM  up                    up\nGigabitEthernet0/1     192.168.190.134 YES NVRAM  up                    up';
+      if (/^sh(ow)?\s+ip\s+route$/i.test(cmd)) return 'Codes: C - connected, O - OSPF, D - EIGRP, B - BGP\nC    10.4.86.0/26 is directly connected, GigabitEthernet0/0\nO    10.2.15.0/26 [110/2] via 192.168.190.141, 00:12:04, GigabitEthernet0/1';
+      if (/^sh(ow)?\s+vlan\s+br(ief)?$/i.test(cmd)) return 'VLAN Name                             Status    Ports\n1    default                          active    Gi0/2, Gi0/3\n100  BRANCH-DATA                      active    Gi0/0, Gi0/1';
+      if (/^sh(ow)?\s+spanning-tree/i.test(cmd)) return 'VLAN0100\n  Root ID    Priority 24676\n  Bridge ID  Priority 32868\n  Gi1/3      Root FWD 4 128.4';
+      if (/^sh(ow)?\s+ip\s+ospf\s+nei(ghbor)?$/i.test(cmd)) return 'Neighbor ID     Pri   State           Dead Time   Address         Interface\n192.168.190.141   1   FULL/DR         00:00:34    192.168.190.141 Gi0/1';
+      if (/^sh(ow)?\s+ip\s+eigrp\s+nei(ghbors)?$/i.test(cmd)) return 'H   Address         Interface       Hold Uptime   SRTT   RTO  Q  Seq\n0   192.168.190.141 Gi0/1           12   01:05:22 12     100  0  42';
+      if (/^sh(ow)?\s+ip\s+bgp\s+sum(mary)?$/i.test(cmd)) return 'Neighbor        V    AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd\n192.168.190.141 4 65215     120     118        4    0    0 01:10:05        3';
+      if (/^sh(ow)?\s+port-security/i.test(cmd)) return 'Secure Port  MaxSecureAddr  CurrentAddr  SecurityViolation  Security Action\nGi0/0        2              1            0                  Shutdown';
+      if (/^ping\s+10\.4\.86\.1$/i.test(cmd)) return 'Sending 5, 100-byte ICMP Echos to 10.4.86.1:\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/2/3 ms';
+      return '% Invalid input detected at "^" marker.';
+    }
+
+    function renderLesson() {
+      const p = PATHS.find(x => x.id === state.pathId);
+      const lesson = p?.courses.flatMap(c => c.lessons).find(l => l.id === state.lessonId);
+      if (!lesson) { state.view = 'path'; return render(); }
+      const step = lesson.steps[state.stepIdx];
+
+      root.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h2 style="margin:0;font-size:20px">${lesson.title}</h2>
+          <button class="btn" id="btn-back-path">بازگشت به سرفصل</button>
+        </div>
+        <div class="lesson-tabs">
+          <button class="chip ${state.tab==='visual'?'active':''}" data-tab="visual">۱. ماژول بصری</button>
+          <button class="chip ${state.tab==='lab'?'active':''}" data-tab="lab">۲. آزمایشگاه CLI</button>
+          <button class="chip ${state.tab==='quiz'?'active':''}" data-tab="quiz">۳. آزمون</button>
+        </div>
+        <div id="tab-body"></div>`;
+
+      document.getElementById('btn-back-path').onclick = () => { stopPlay(); state.view = 'path'; render(); };
+      root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { stopPlay(); state.tab = b.dataset.tab; render(); });
+
+      const body = document.getElementById('tab-body');
+      if (state.tab === 'visual') {
+        body.innerHTML = `
+          <div class="split">
+            <div class="canvas-box">
+              <div class="canvas-controls">
+                <div>
+                  <button class="btn btn-primary" id="v-play">${state.playing?'توقف':'پخش خودکار'}</button>
+                  <button class="btn" id="v-replay">شروع مجدد</button>
+                </div>
+                <span class="badge">گام ${state.stepIdx+1} از ${lesson.steps.length} · ${step.hop} (${step.ms})</span>
+              </div>
+              <svg viewBox="0 0 850 240" style="width:100%;height:auto;background:#070b14;border-radius:10px;border:1px solid var(--border)">
+                <line x1="90" y1="120" x2="760" y2="120" stroke="#334155" stroke-width="4" stroke-dasharray="6 6"/>
+                ${lesson.steps.map((s,i)=>`
+                  <g>
+                    <circle cx="${s.x}" cy="${s.y}" r="24" fill="${i===state.stepIdx?'#0ea5e9':'#1e293b'}" stroke="#38bdf8" stroke-width="2"/>
+                    <text x="${s.x}" y="${s.y+45}" fill="#cbd5e1" font-size="12" text-anchor="middle">${s.hop}</text>
+                  </g>`).join('')}
+                <circle cx="${step.x}" cy="${step.y}" r="10" fill="#22c55e">
+                  <animate attributeName="r" values="8;13;8" dur="1.2s" repeatCount="indefinite"/>
+                </circle>
+              </svg>
+              <p style="margin:12px 0 0;font-size:14px">${step.desc}</p>
+            </div>
+            <div class="step-list">
+              ${lesson.steps.map((s,i)=>`
+                <button class="step-item ${i===state.stepIdx?'active':''}" data-step="${i}">
+                  <strong>${s.title}</strong>
+                  <small>${s.hop} · ${s.ms}</small>
+                </button>`).join('')}
+            </div>
+          </div>`;
+        document.getElementById('v-replay').onclick = () => { stopPlay(); state.stepIdx = 0; render(); };
+        document.getElementById('v-play').onclick = () => {
+          if (state.playing) { stopPlay(); render(); return; }
+          state.playing = true;
+          state.timer = setInterval(() => {
+            if (state.stepIdx < lesson.steps.length - 1) { state.stepIdx++; render(); }
+            else { stopPlay(); render(); }
+          }, 1800);
+          render();
+        };
+        body.querySelectorAll('[data-step]').forEach(b => b.onclick = () => { stopPlay(); state.stepIdx = Number(b.dataset.step); render(); });
+      } else if (state.tab === 'lab') {
+        const host = lesson.lab.host || 'Router';
+        const prompt = state.conf ? `${host}(config)#` : (state.priv ? `${host}#` : `${host}>`);
+        body.innerHTML = `
+          <div class="split">
+            <div class="terminal">
+              <div class="term-out">${state.termLines.join('\n')}</div>
+              <div class="term-in">
+                <span>${prompt}</span>
+                <input id="term-cmd" autocomplete="off" placeholder="Type command (help for list)">
+              </div>
+            </div>
+            <div class="canvas-box">
+              <h3 style="margin-top:0">وظایف آزمایشگاه</h3>
+              ${lesson.lab.tasks.map(t => `<div class="task-item ${state.labDone.has(t.id)?'done':''}">${state.labDone.has(t.id)?'✅':'⬜'} ${t.label}</div>`).join('')}
+            </div>
+          </div>`;
+        const inp = document.getElementById('term-cmd');
+        inp.focus();
+        inp.onkeydown = (e) => {
+          if (e.key !== 'Enter') return;
+          const cmd = inp.value.trim();
+          if (!cmd) return;
+          state.termLines.push(`${prompt} ${cmd}`);
+          if (/^clear$/i.test(cmd)) { state.termLines = []; }
+          else {
+            const out = runIosCommand(host, cmd);
+            if (out) state.termLines.push(out);
+          }
+          lesson.lab.tasks.forEach(t => { if (t.match.test(cmd)) state.labDone.add(t.id); });
+          if (state.labDone.size === lesson.lab.tasks.length) markComplete(lesson.id);
+          render();
+        };
+      } else if (state.tab === 'quiz') {
+        body.innerHTML = `
+          <div class="canvas-box">
+            <h3>${lesson.quiz.q}</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+              ${lesson.quiz.options.map((o,i)=>`<button class="step-item" data-ans="${i}">${o}</button>`).join('')}
+            </div>
+            <p id="quiz-msg" style="margin-top:12px;font-weight:600"></p>
+          </div>`;
+        body.querySelectorAll('[data-ans]').forEach(b => b.onclick = () => {
+          const ok = Number(b.dataset.ans) === lesson.quiz.answer;
+          const msg = document.getElementById('quiz-msg');
+          msg.textContent = ok ? '✅ درست است! درس تکمیل شد.' : '❌ نادرست است؛ دوباره تلاش کنید.';
+          msg.style.color = ok ? 'var(--ok)' : 'var(--err)';
+          if (ok) markComplete(lesson.id);
+        });
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (state.view !== 'lesson' || state.tab !== 'visual') return;
+      const p = PATHS.find(x => x.id === state.pathId);
+      const lesson = p?.courses.flatMap(c => c.lessons).find(l => l.id === state.lessonId);
+      if (!lesson) return;
+      if (e.key === 'ArrowDown' && state.stepIdx < lesson.steps.length - 1) { stopPlay(); state.stepIdx++; render(); }
+      if (e.key === 'ArrowUp' && state.stepIdx > 0) { stopPlay(); state.stepIdx--; render(); }
+      if (e.key === 'Escape') { stopPlay(); state.view = 'path'; render(); }
+    });
+
+    render();
+  })();
+  </script>
+</body>
+</html>

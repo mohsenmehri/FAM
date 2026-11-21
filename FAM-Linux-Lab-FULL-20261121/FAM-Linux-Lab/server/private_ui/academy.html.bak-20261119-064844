@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="FAM Academy — پلتفرم آموزش مهندسی شبکه و سیسکو">
+  <title>FAM Academy — مسیرهای کامل سیسکو</title>
+  <script id="fam-academy-fam-bridge" nonce="__FAM_CSP_NONCE__">
+    window.FAM_ACADEMY_BOOTSTRAP = __FAM_ACADEMY_BOOTSTRAP__;
+    (() => {
+      'use strict';
+      const boot = window.FAM_ACADEMY_BOOTSTRAP || {};
+      const csrf = boot.csrf || '';
+      window.FamAcademyBridge = {
+        user: boot.user || null,
+        progress: boot.progress || { completed: [], labs: {} },
+        async saveProgress(payload) {
+          try {
+            await fetch('/api/academy/progress', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+              body: JSON.stringify(payload)
+            });
+          } catch (e) {}
+        }
+      };
+    })();
+  </script>
+  <style nonce="__FAM_CSP_NONCE__">
+    :root {
+      --bg: #0b101b; --panel: #121a2b; --panel2: #182338; --border: #25334d;
+      --text: #e6edf7; --muted: #93a4c3; --accent: #38bdf8; --accent2: #a78bfa;
+      --ok: #22c55e; --warn: #f59e0b; --err: #ef4444;
+      --font: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    html[data-theme="light"] {
+      --bg: #f4f7fb; --panel: #ffffff; --panel2: #eef3f9; --border: #d5dfec;
+      --text: #0f172a; --muted: #475569; --accent: #0284c7; --accent2: #7c3aed;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.65; }
+    button { font-family: inherit; cursor: pointer; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--border); color: var(--accent); }
+    .badge-ok { color: var(--ok); border-color: var(--ok); }
+    .nav-actions { display: flex; align-items: center; gap: 8px; }
+    .btn {
+      padding: 7px 13px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--panel2); color: var(--text); font-size: 13px; transition: .15s;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: var(--accent); color: #06121e; border-color: var(--accent); font-weight: 600; }
+    .container { max-width: 1260px; margin: 0 auto; padding: 24px 20px 60px; }
+    .hero h1 { margin: 0 0 6px; font-size: 24px; }
+    .hero p { margin: 0; color: var(--muted); font-size: 14px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 22px; }
+    .chip {
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border);
+      background: var(--panel); color: var(--muted); font-size: 12px;
+    }
+    .chip.active { background: var(--accent); color: #06121e; border-color: var(--accent); font-weight: 600; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+      padding: 18px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .card-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+    .card h3 { margin: 0; font-size: 17px; }
+    .card p { margin: 0; font-size: 13px; color: var(--muted); flex: 1; }
+    .progress-bar { height: 6px; background: var(--panel2); border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--ok); width: 0%; transition: width .3s; }
+    .course-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+    .course-head { padding: 14px 18px; background: var(--panel2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .lesson-row { padding: 12px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .lesson-row:last-child { border-bottom: 0; }
+    .lesson-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .split { display: grid; grid-template-columns: 1fr 360px; gap: 16px; }
+    @media (max-width: 960px) { .split { grid-template-columns: 1fr; } }
+    .canvas-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .step-item {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--panel); text-align: right; color: var(--text); font-size: 13px; width: 100%;
+    }
+    .step-item.active { border-color: var(--accent); background: var(--panel2); }
+    .terminal {
+      background: #06090f; color: #e2e8f0; font-family: var(--mono); font-size: 13px;
+      border-radius: 10px; border: 1px solid var(--border); padding: 14px;
+      height: 360px; display: flex; flex-direction: column; direction: ltr; text-align: left;
+    }
+    .term-out { flex: 1; overflow-y: auto; white-space: pre-wrap; margin-bottom: 8px; }
+    .term-in { display: flex; align-items: center; gap: 6px; border-top: 1px solid #1e293b; padding-top: 8px; }
+    .term-in input { flex: 1; background: transparent; border: 0; outline: 0; color: #38bdf8; font-family: var(--mono); font-size: 13px; }
+    .task-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel2); margin-bottom: 8px; font-size: 13px; }
+    .task-item.done { border: 1px solid var(--ok); color: var(--ok); }
+    .sec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .code-inline { font-family: var(--mono); background: var(--panel2); padding: 2px 6px; border-radius: 4px; font-size: 12px; direction: ltr; display: inline-block; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span>FAM Academy</span>
+      <span class="badge">فاز A · Vertical Slice: VLAN</span>
+    </div>
+    <div class="nav-actions">
+      <button class="btn" id="btn-back-paths">همهٔ مسیرها</button>
+      <a class="btn" href="/app">بازگشت به FAM</a>
+    </div>
+  </header>
+
+  <main class="container" id="app-root"></main>
+
+  <script nonce="__FAM_CSP_NONCE__">
+  (() => {
+    'use strict';
+    try {
+      if (localStorage.getItem('fam.ui.theme') === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    } catch (e) {}
+
+    // =========================================================================
+    // 1. Extensible FAM Lab Orchestrator (Registry for Simulator & Real Lab)
+    // =========================================================================
+    const FamLabOrchestrator = (() => {
+      const engines = new Map();
+      return {
+        register(name, factory) { engines.set(name, factory); },
+        create(name, scenario) {
+          const factory = engines.get(name);
+          if (!factory) throw new Error('Lab engine not found: ' + name);
+          return factory(scenario);
+        },
+        list() { return [...engines.keys()]; }
+      };
+    })();
+
+    // Real Cisco Lab adapter (placeholder for PNETLab / EVE-NG / CML)
+    FamLabOrchestrator.register('real-cisco-lab', () => ({
+      engineName: 'Real Cisco Lab (PNETLab / EVE-NG)',
+      isSimulated: false,
+      notice: 'اتصال مستقیم به IOS واقعی در این نسخه غیرفعال است؛ از FAM Simulator استفاده کنید.'
+    }));
+
+    // =========================================================================
+    // 2. FAM Simulator Engine (Parser + Config + Device State + Control/Data)
+    // =========================================================================
+    FamLabOrchestrator.register('fam-simulator', (scenario) => {
+      const deepClone = (x) => JSON.parse(JSON.stringify(x));
+      let devices = deepClone(scenario.initialDevices);
+      let activeDevId = scenario.defaultDevice || 'SW1';
+      let mode = 'exec'; // exec | priv | config | config-if | config-vlan
+      let ctx = {};
+
+      function dev() { return devices[activeDevId]; }
+
+      function prompt() {
+        const h = dev().hostname;
+        if (mode === 'exec') return `${h}>`;
+        if (mode === 'priv') return `${h}#`;
+        if (mode === 'config') return `${h}(config)#`;
+        if (mode === 'config-if') return `${h}(config-if)#`;
+        if (mode === 'config-vlan') return `${h}(config-vlan)#`;
+        return `${h}>`;
+      }
+
+      function learnMac(sw, vlan, mac, port) {
+        if (!sw.macTable) sw.macTable = [];
+        const idx = sw.macTable.findIndex(e => e.mac === mac && e.vlan === vlan);
+        if (idx >= 0) sw.macTable[idx].port = port;
+        else sw.macTable.push({ vlan, mac, type: 'DYNAMIC', port });
+      }
+
+      function runPing(srcHostId, dstIp) {
+        const src = devices[srcHostId];
+        if (!src || src.type !== 'host') return '% Ping supported from host or use topology test.';
+        const dst = Object.values(devices).find(d => d.type === 'host' && d.ip === dstIp);
+        if (!dst) return `Sending 5, 100-byte ICMP Echos to ${dstIp}:\n.....\nSuccess rate is 0 percent (0/5)`;
+
+        const sw = devices['SW1'];
+        const r1 = devices['R1'];
+        const srcPort = sw.interfaces[src.uplink];
+        const dstPort = sw.interfaces[dst.uplink];
+        const srcVlan = srcPort.vlan;
+        const dstVlan = dstPort.vlan;
+
+        // Learn source MAC on SW1
+        learnMac(sw, srcVlan, src.mac, src.uplink);
+
+        // Same VLAN L2 switching
+        if (srcVlan === dstVlan && srcPort.mode === 'access' && dstPort.mode === 'access') {
+          if (!src.arp) src.arp = {};
+          src.arp[dst.ip] = dst.mac;
+          learnMac(sw, dstVlan, dst.mac, dst.uplink);
+          return `Sending 5, 100-byte ICMP Echos to ${dstIp} (Same VLAN ${srcVlan} via SW1):\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/1/2 ms`;
+        }
+
+        // Inter-VLAN Routing via R1 (Router-on-a-Stick)
+        const trunkPort = sw.interfaces['Gi0/0'];
+        const hasTrunk = trunkPort && trunkPort.mode === 'trunk' &&
+          (trunkPort.allowedVlans === 'all' || (trunkPort.allowedVlans || []).includes(srcVlan)) &&
+          (trunkPort.allowedVlans === 'all' || (trunkPort.allowedVlans || []).includes(dstVlan));
+        const rSrcSub = r1.subinterfaces?.[`Gi0/0.${srcVlan}`];
+        const rDstSub = r1.subinterfaces?.[`Gi0/0.${dstVlan}`];
+
+        if (hasTrunk && rSrcSub?.dot1q === srcVlan && rDstSub?.dot1q === dstVlan && rSrcSub.ip && rDstSub.ip) {
+          if (!src.arp) src.arp = {};
+          src.arp[src.gateway] = r1.mac;
+          if (!r1.arp) r1.arp = {};
+          r1.arp[src.ip] = src.mac;
+          r1.arp[dst.ip] = dst.mac;
+          learnMac(sw, srcVlan, r1.mac, 'Gi0/0');
+          learnMac(sw, dstVlan, r1.mac, 'Gi0/0');
+          learnMac(sw, dstVlan, dst.mac, dst.uplink);
+          return `Sending 5, 100-byte ICMP Echos to ${dstIp} (Inter-VLAN via Trunk Gi0/0 & R1):\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 2/3/4 ms`;
+        }
+
+        return `Sending 5, 100-byte ICMP Echos to ${dstIp}:\n.....\nSuccess rate is 0 percent (0/5) — Check VLAN, Trunk (Gi0/0), or Router-on-a-Stick subinterfaces.`;
+      }
+
+      function exec(rawCmd) {
+        const cmd = rawCmd.trim();
+        if (!cmd) return '';
+        const d = dev();
+
+        if (/^help$/i.test(cmd)) {
+          return 'Commands: enable, conf t, exit, end, vlan <id>, name <n>, interface <if>, switchport mode access|trunk, switchport access vlan <id>, encapsulation dot1q <id>, ip address <ip> <mask>, show vlan brief, show interfaces trunk, show mac address-table, show arp, show ip interface brief, show ip route, show running-config';
+        }
+        if (/^en(able)?$/i.test(cmd)) { mode = 'priv'; return ''; }
+        if (/^exit$/i.test(cmd)) {
+          if (mode === 'config-if' || mode === 'config-vlan') mode = 'config';
+          else if (mode === 'config') mode = 'priv';
+          else if (mode === 'priv') mode = 'exec';
+          return '';
+        }
+        if (/^end$/i.test(cmd)) { if (mode !== 'exec') mode = 'priv'; return ''; }
+
+        if (/^conf(igure)?\s+t(erminal)?$/i.test(cmd)) {
+          if (mode !== 'priv') return '% Invalid input detected at "^" marker.';
+          mode = 'config';
+          return 'Enter configuration commands, one per line. End with CNTL/Z.';
+        }
+
+        // Global config commands
+        if (mode === 'config') {
+          let m = cmd.match(/^vlan\s+(\d+)$/i);
+          if (m && d.type === 'switch') {
+            const vid = Number(m[1]);
+            if (!d.vlans[vid]) d.vlans[vid] = { name: `VLAN${String(vid).padStart(4,'0')}`, status: 'active' };
+            mode = 'config-vlan'; ctx = { vlan: vid };
+            return '';
+          }
+          m = cmd.match(/^int(erface)?\s+([a-zA-Z0-9\/\.]+)$/i);
+          if (m) {
+            const ifName = normalizeIf(m[2]);
+            if (d.type === 'switch' && d.interfaces[ifName]) {
+              mode = 'config-if'; ctx = { ifName }; return '';
+            }
+            if (d.type === 'router') {
+              if (!d.subinterfaces) d.subinterfaces = {};
+              if (ifName.includes('.') && !d.subinterfaces[ifName]) {
+                d.subinterfaces[ifName] = { dot1q: null, ip: null, mask: null, status: 'up' };
+              }
+              if (d.interfaces[ifName] || d.subinterfaces[ifName]) {
+                mode = 'config-if'; ctx = { ifName }; return '';
+              }
+            }
+            return `% Invalid interface "${m[2]}"`;
+          }
+        }
+
+        if (mode === 'config-vlan') {
+          const m = cmd.match(/^name\s+(.+)$/i);
+          if (m) { d.vlans[ctx.vlan].name = m[1].trim(); return ''; }
+        }
+
+        if (mode === 'config-if') {
+          if (d.type === 'switch') {
+            const iface = d.interfaces[ctx.ifName];
+            if (/^switchport\s+mode\s+access$/i.test(cmd)) { iface.mode = 'access'; return ''; }
+            if (/^switchport\s+mode\s+trunk$/i.test(cmd)) { iface.mode = 'trunk'; iface.allowedVlans = 'all'; return ''; }
+            const m = cmd.match(/^switchport\s+access\s+vlan\s+(\d+)$/i);
+            if (m) {
+              const vid = Number(m[1]);
+              if (!d.vlans[vid]) d.vlans[vid] = { name: `VLAN${String(vid).padStart(4,'0')}`, status: 'active' };
+              iface.mode = 'access'; iface.vlan = vid; return '';
+            }
+          } else if (d.type === 'router') {
+            const sub = d.subinterfaces?.[ctx.ifName];
+            if (sub) {
+              let m = cmd.match(/^encapsulation\s+dot1q\s+(\d+)$/i);
+              if (m) { sub.dot1q = Number(m[1]); return ''; }
+              m = cmd.match(/^ip\s+address\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+)$/i);
+              if (m) { sub.ip = m[1]; sub.mask = m[2]; return ''; }
+            }
+            if (/^no\s+shut(down)?$/i.test(cmd)) return '';
+          }
+        }
+
+        // Show commands (device-type & live-state aware)
+        if (/^sh(ow)?\s+vlan\s+br(ief)?$/i.test(cmd)) {
+          if (d.type !== 'switch') return '% Command only available on Layer 2 Switch.';
+          const lines = ['VLAN Name                             Status    Ports', '---- -------------------------------- --------- -------------------------------'];
+          Object.entries(d.vlans).forEach(([vid, info]) => {
+            const ports = Object.entries(d.interfaces)
+              .filter(([, iv]) => iv.mode === 'access' && iv.vlan === Number(vid))
+              .map(([k]) => k).join(', ');
+            lines.push(`${String(vid).padEnd(4)} ${info.name.padEnd(32)} ${info.status.padEnd(9)} ${ports}`);
+          });
+          return lines.join('\n');
+        }
+
+        if (/^sh(ow)?\s+int(erfaces)?\s+trunk$/i.test(cmd)) {
+          if (d.type !== 'switch') return '% Command only available on Switch.';
+          const trunks = Object.entries(d.interfaces).filter(([, iv]) => iv.mode === 'trunk');
+          if (!trunks.length) return 'No trunking interfaces configured.';
+          return 'Port        Mode         Encapsulation  Status        Native vlan\n' +
+            trunks.map(([k]) => `${k.padEnd(11)} on           802.1q         trunking      1`).join('\n');
+        }
+
+        if (/^sh(ow)?\s+mac\s+address-table$/i.test(cmd)) {
+          if (d.type !== 'switch') return '% Command only available on Switch.';
+          const rows = d.macTable || [];
+          if (!rows.length) return 'Mac Address Table is empty. Run a ping test first.';
+          return 'Vlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n' +
+            rows.map(r => `${String(r.vlan).padEnd(7)} ${r.mac.padEnd(17)} ${r.type.padEnd(11)} ${r.port}`).join('\n');
+        }
+
+        if (/^sh(ow)?\s+arp$/i.test(cmd)) {
+          const entries = Object.entries(d.arp || {});
+          if (!entries.length) return 'ARP table is empty.';
+          return 'Protocol  Address          Hardware Addr   Type\n' +
+            entries.map(([ip, mac]) => `Internet  ${ip.padEnd(16)} ${mac.padEnd(15)} ARPA`).join('\n');
+        }
+
+        if (/^sh(ow)?\s+ip\s+int(erface)?\s+br(ief)?$/i.test(cmd)) {
+          const lines = ['Interface              IP-Address      OK? Method Status                Protocol'];
+          Object.entries(d.interfaces || {}).forEach(([k, v]) => {
+            lines.push(`${k.padEnd(22)} ${(v.ip || 'unassigned').padEnd(15)} YES manual up                    up`);
+          });
+          Object.entries(d.subinterfaces || {}).forEach(([k, v]) => {
+            lines.push(`${k.padEnd(22)} ${(v.ip || 'unassigned').padEnd(15)} YES manual up                    up`);
+          });
+          return lines.join('\n');
+        }
+
+        if (/^sh(ow)?\s+ip\s+route$/i.test(cmd)) {
+          if (d.type !== 'router') return '% IP routing table is on Router (R1).';
+          const subs = Object.entries(d.subinterfaces || {}).filter(([, v]) => v.ip);
+          if (!subs.length) return 'Gateway of last resort is not set (no subinterfaces with IP).';
+          return 'Codes: C - connected\n' +
+            subs.map(([k, v]) => `C    ${v.ip}/24 is directly connected, ${k}`).join('\n');
+        }
+
+        return '% Invalid input detected at "^" marker.';
+      }
+
+      function normalizeIf(s) {
+        return s.replace(/^gi(gabitethernet)?/i, 'Gi');
+      }
+
+      return {
+        engineName: 'FAM Simulator (State-Engine)',
+        isSimulated: true,
+        notice: 'در حال اجرا روی FAM Simulator (شبیه‌ساز آموزشی ایزوله؛ جایگزین IOS واقعی نیست).',
+        getDevices: () => devices,
+        getActiveId: () => activeDevId,
+        setActiveId: (id) => { if (devices[id]) { activeDevId = id; mode = 'exec'; } },
+        getPrompt: prompt,
+        exec,
+        runPing,
+        reset: () => { devices = deepClone(scenario.initialDevices); mode = 'exec'; ctx = {}; },
+        assess: () => scenario.assess(devices)
+      };
+    });
+
+    // =========================================================================
+    // 3. VLAN Vertical Slice Scenario + 6-Stage Curriculum
+    // =========================================================================
+    const VLAN_SCENARIO = {
+      defaultDevice: 'SW1',
+      initialDevices: {
+        SW1: {
+          type: 'switch', hostname: 'SW1',
+          vlans: { 1: { name: 'default', status: 'active' } },
+          interfaces: {
+            'Gi0/0': { mode: 'access', vlan: 1 }, // intentionally broken for troubleshooting/lab
+            'Gi0/1': { mode: 'access', vlan: 1 },
+            'Gi0/2': { mode: 'access', vlan: 1 },
+            'Gi0/3': { mode: 'access', vlan: 1 }
+          },
+          macTable: []
+        },
+        R1: {
+          type: 'router', hostname: 'R1', mac: '00aa.00bb.0001',
+          interfaces: { 'Gi0/0': { ip: null } },
+          subinterfaces: {},
+          arp: {}
+        },
+        PC1: { type: 'host', hostname: 'PC1', ip: '10.10.10.11', mask: '255.255.255.0', gateway: '10.10.10.1', mac: '0001.0001.0011', uplink: 'Gi0/1', arp: {} },
+        PC2: { type: 'host', hostname: 'PC2', ip: '10.10.10.12', mask: '255.255.255.0', gateway: '10.10.10.1', mac: '0001.0001.0012', uplink: 'Gi0/2', arp: {} },
+        PC3: { type: 'host', hostname: 'PC3', ip: '10.10.20.13', mask: '255.255.255.0', gateway: '10.10.20.1', mac: '0001.0001.0013', uplink: 'Gi0/3', arp: {} }
+      },
+      assess(devs) {
+        const sw = devs.SW1, r1 = devs.R1;
+        return [
+          { id: 'a1', label: 'ساخت VLAN 10 و VLAN 20 روی SW1', ok: Boolean(sw.vlans[10] && sw.vlans[20]) },
+          { id: 'a2', label: 'عضویت Gi0/1 و Gi0/2 در VLAN 10 و Gi0/3 در VLAN 20', ok: sw.interfaces['Gi0/1'].vlan === 10 && sw.interfaces['Gi0/2'].vlan === 10 && sw.interfaces['Gi0/3'].vlan === 20 },
+          { id: 'a3', label: 'تنظیم Gi0/0 روی SW1 به حالت Trunk (802.1Q)', ok: sw.interfaces['Gi0/0'].mode === 'trunk' },
+          { id: 'a4', label: 'پیکربندی Router-on-a-Stick روی R1 (Gi0/0.10 و Gi0/0.20)', ok: r1.subinterfaces['Gi0/0.10']?.dot1q === 10 && r1.subinterfaces['Gi0/0.10']?.ip === '10.10.10.1' && r1.subinterfaces['Gi0/0.20']?.dot1q === 20 && r1.subinterfaces['Gi0/0.20']?.ip === '10.10.20.1' }
+        ];
+      }
+    };
+
+    const PATHS = [
+      { id: 'foundation', stage: '۱', level: 'Foundation', title: 'مبانی شبکه و زیرساخت', desc: 'OSI، TCP/IP، IPv4/IPv6، Subnetting، ARP، DHCP و امنیت پایه.' },
+      { id: 'ccna', stage: '۲', level: '200-301 CCNA', title: 'CCNA 200-301 (شامل Vertical Slice کامل VLAN)', desc: 'مسیر رسمی CCNA همراه با ماژول کامل VLAN، Trunk و Router-on-a-Stick.', hasVlanSlice: true },
+      { id: 'ccnp-ent', stage: '۳', level: '1 Core + 1 Conc', title: 'CCNP Enterprise (ENCOR 350-401)', desc: 'Core: 350-401 | Conc: ENARSI 300-410, ENSDWI 300-415, ENSLD 300-420, ENAUTO 300-435, ENCC 300-440, ENNA 300-445.' },
+      { id: 'ccnp-wl', stage: '۳', level: '1 Core + 1 Conc', title: 'CCNP Wireless (WLCOR 350-101)', desc: 'مسیر مستقل از مارس ۲۰۲۶ | Core: 350-101 | Conc: WLSD 300-110, WLSI 300-120.' },
+      { id: 'ccnp-sec', stage: '۳', level: '1 Core + 1 Conc', title: 'CCNP Security (SCOR 350-701)', desc: 'Core: 350-701 | Conc: SNCF 300-710, SISE 300-715, SSCA 300-740, SDSI 300-745.' },
+      { id: 'ccnp-dc', stage: '۳', level: '1 Core + 1 Conc', title: 'CCNP Data Center (DCCOR 350-601)', desc: 'Core: 350-601 | Conc: DCID 300-610, DCIT 300-615, DCACI 300-620, DCNAUTO 300-635, DCAI 300-640.' },
+      { id: 'ccnp-sp', stage: '۳', level: '1 Core + 1 Conc', title: 'CCNP Service Provider (SPCOR 350-501)', desc: 'Core: 350-501 | Conc: SPRI 300-510, SPVI 300-515, SPCNI 300-540.' },
+      { id: 'ccnp-collab', stage: '۳', level: '1 Core + 1 Conc', title: 'CCNP Collaboration (CLCOR 350-801)', desc: 'Core: 350-801 | Conc: CLACC 300-815, CLHCT 300-820, CLCCE 300-830.' },
+      { id: 'ccnp-auto', stage: '۳', level: '1 Core + 1 Conc', title: 'CCNP Automation (AUTOCOR 350-901)', desc: 'جایگزین DevNet از فوریه ۲۰۲۶ | Core: 350-901 | Conc: ENAUTO 300-435, DCNAUTO 300-635.' },
+      { id: 'ccnp-cyber', stage: '۳', level: '1 Core + 1 Conc', title: 'CCNP Cybersecurity (CBRCOR 350-201)', desc: 'Core: 350-201 | Conc: CBRFIR 300-215, CBRTHD 300-220.' },
+      { id: 'ccie', stage: '۴', level: 'Expert', title: 'CCIE & CCDE', desc: 'آزمون عملی Lab در شاخه‌های Enterprise, Wireless, Security, DC, SP, Collaboration, Automation و CCDE.' },
+      { id: 'architect', stage: '۵', level: 'Architect', title: 'مهندس ارشد و Network Architect', desc: 'طراحی شبکه‌های بانکی، HA/DR، SD-WAN، Cloud و Observability.' }
+    ];
+
+    // =========================================================================
+    // 4. UI State & Rendering
+    // =========================================================================
+    const sim = FamLabOrchestrator.create('fam-simulator', VLAN_SCENARIO);
+    const saved = window.FamAcademyBridge?.progress || {};
+    const state = {
+      view: 'paths', // paths | vlan-lesson
+      stage: 'all',
+      tab: 'learn', // learn | visual | lab | quiz
+      animStep: 0,
+      termLines: ['FAM Simulator Ready. Select SW1 or R1 above, type "help" for commands.'],
+      completed: new Set(saved.completed || [])
+    };
+
+    const root = document.getElementById('app-root');
+    document.getElementById('btn-back-paths').onclick = () => { state.view = 'paths'; render(); };
+
+    function saveAll() {
+      window.FamAcademyBridge?.saveProgress({ completed: [...state.completed] });
+    }
+
+    function render() {
+      if (state.view === 'paths') return renderPaths();
+      return renderVlanLesson();
+    }
+
+    function renderPaths() {
+      const list = PATHS.filter(p => state.stage === 'all' || p.stage === state.stage);
+      root.innerHTML = `
+        <section class="hero">
+          <h1>نقشهٔ آموزشی و مدارک رسمی Cisco (به‌روزشده ۲۰۲۶)</h1>
+          <p>برای دریافت هر مدرک CCNP، گذراندن ۱ آزمون Core و انتخاب ۱ آزمون Concentration کافی است.</p>
+        </section>
+        <div class="filters">
+          ${[['all','همه'],['۱','مرحله ۱: مبانی'],['۲','مرحله ۲: CCNA'],['۳','مرحله ۳: CCNP'],['۴','مرحله ۴: CCIE'],['۵','مرحله ۵: Architect']].map(([k,l]) =>
+            `<button class="chip ${state.stage===k?'active':''}" data-stage="${k}">${l}</button>`).join('')}
+        </div>
+        <div class="grid">
+          ${list.map(p => `
+            <article class="card">
+              <div class="card-meta"><span>مرحله ${p.stage}</span><span class="badge">${p.level}</span></div>
+              <h3>${p.title}</h3>
+              <p>${p.desc}</p>
+              ${p.hasVlanSlice
+                ? `<button class="btn btn-primary" id="btn-open-vlan">ورود به Vertical Slice: درس کامل VLAN</button>`
+                : `<span class="badge">در فازهای بعدی تکمیل می‌شود</span>`}
+            </article>`).join('')}
+        </div>`;
+      root.querySelectorAll('[data-stage]').forEach(b => b.onclick = () => { state.stage = b.dataset.stage; render(); });
+      const vbtn = document.getElementById('btn-open-vlan');
+      if (vbtn) vbtn.onclick = () => { state.view = 'vlan-lesson'; state.tab = 'learn'; render(); };
+    }
+
+    function renderVlanLesson() {
+      root.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <div>
+            <h2 style="margin:0;font-size:20px">درس نمونه (Vertical Slice): VLAN، Trunk 802.1Q و Router-on-a-Stick</h2>
+            <small style="color:var(--muted)">موتور فعال: ${sim.engineName} — ${sim.notice}</small>
+          </div>
+          <span class="badge ${state.completed.has('vlan-slice')?'badge-ok':''}">${state.completed.has('vlan-slice')?'✅ تکمیل‌شده':'در حال یادگیری'}</span>
+        </div>
+        <div class="lesson-tabs">
+          <button class="chip ${state.tab==='learn'?'active':''}" data-tab="learn">۱. آموزش ساختاریافته</button>
+          <button class="chip ${state.tab==='visual'?'active':''}" data-tab="visual">۲. انیمیشن Broadcast Domain</button>
+          <button class="chip ${state.tab==='lab'?'active':''}" data-tab="lab">۳. آزمایشگاه تعاملی CLI و توپولوژی</button>
+          <button class="chip ${state.tab==='quiz'?'active':''}" data-tab="quiz">۴. آزمون</button>
+        </div>
+        <div id="vlan-body"></div>`;
+
+      root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; render(); });
+      const body = document.getElementById('vlan-body');
+
+      if (state.tab === 'learn') {
+        body.innerHTML = `
+          <div class="sec-grid">
+            <div class="card"><h3>اهداف یادگیری</h3><p>تفکیک Broadcast Domain با VLAN، پیکربندی Access/Trunk 802.1Q و مسیریابی بین VLANها با Router-on-a-Stick.</p></div>
+            <div class="card"><h3>طرح IP و توپولوژی لاب</h3><p>VLAN 10: <span class="code-inline">10.10.10.0/24</span> (GW: <span class="code-inline">10.10.10.1</span>)<br>VLAN 20: <span class="code-inline">10.10.20.0/24</span> (GW: <span class="code-inline">10.10.20.1</span>)</p></div>
+            <div class="card"><h3>دستورات کلیدی IOS</h3><p><span class="code-inline">vlan 10</span> / <span class="code-inline">switchport access vlan 10</span><br><span class="code-inline">switchport mode trunk</span><br><span class="code-inline">int Gi0/0.10</span> → <span class="code-inline">encapsulation dot1q 10</span></p></div>
+            <div class="card"><h3>اشتباهات رایج</h3><p>فراموش کردن Trunk روی لینک روتر، یا یکی نبودن شماره VLAN در <span class="code-inline">encapsulation dot1q</span> با VLAN سوئیچ.</p></div>
+          </div>`;
+      } else if (state.tab === 'visual') {
+        const steps = [
+          { t: '۱. ارسال Broadcast از PC1 (VLAN 10)', d: 'فریم ARP Broadcast وارد پورت Gi0/1 سوئیچ SW1 می‌شود.', active: ['PC1','SW1'] },
+          { t: '۲. ارسال به پورت‌های هم‌VLAN', d: 'سوئیچ فریم را فقط به Gi0/2 (PC2 در VLAN 10) و Trunk Gi0/0 می‌فرستد؛ Gi0/3 (VLAN 20) ایزوله می‌ماند.', active: ['PC1','SW1','PC2','R1'] },
+          { t: '۳. عبور بین VLANها از طریق R1', d: 'برای ارتباط PC1 (VLAN 10) با PC3 (VLAN 20)، بسته از Trunk به R1 رفته و روت می‌شود.', active: ['PC1','SW1','R1','PC3'] }
+        ];
+        const s = steps[state.animStep];
+        body.innerHTML = `
+          <div class="canvas-box">
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              ${steps.map((x,i)=>`<button class="chip ${i===state.animStep?'active':''}" data-as="${i}">${x.t}</button>`).join('')}
+            </div>
+            <svg viewBox="0 0 760 220" style="width:100%;height:auto;background:#070b14;border-radius:10px;border:1px solid var(--border)">
+              <line x1="120" y1="160" x2="350" y2="110" stroke="#334155" stroke-width="3"/>
+              <line x1="260" y1="180" x2="350" y2="110" stroke="#334155" stroke-width="3"/>
+              <line x1="580" y1="160" x2="350" y2="110" stroke="#334155" stroke-width="3"/>
+              <line x1="350" y1="110" x2="350" y2="40" stroke="#a78bfa" stroke-width="4" stroke-dasharray="5 5"/>
+              ${[['PC1',120,160,'#38bdf8'],['PC2',260,180,'#38bdf8'],['PC3',580,160,'#f59e0b'],['SW1',350,110,'#22c55e'],['R1',350,40,'#a78bfa']].map(([n,x,y,c])=>`
+                <circle cx="${x}" cy="${y}" r="20" fill="${s.active.includes(n)?c:'#1e293b'}" stroke="${c}" stroke-width="2"/>
+                <text x="${x}" y="${y+32}" fill="#e2e8f0" font-size="12" text-anchor="middle">${n}</text>`).join('')}
+            </svg>
+            <p style="margin:12px 0 0">${s.d}</p>
+          </div>`;
+        body.querySelectorAll('[data-as]').forEach(b => b.onclick = () => { state.animStep = Number(b.dataset.as); render(); });
+      } else if (state.tab === 'lab') {
+        const devs = sim.getDevices();
+        const sw = devs.SW1;
+        const tasks = sim.assess();
+        const allDone = tasks.every(t => t.ok);
+        if (allDone && !state.completed.has('vlan-slice')) { state.completed.add('vlan-slice'); saveAll(); }
+
+        const colorFor = (p) => p.mode === 'trunk' ? '#a78bfa' : (p.vlan === 10 ? '#38bdf8' : (p.vlan === 20 ? '#f59e0b' : '#64748b'));
+
+        body.innerHTML = `
+          <div class="split">
+            <div>
+              <div class="canvas-box" style="margin-bottom:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+                  <div>
+                    <strong>انتخاب دستگاه CLI:</strong>
+                    <button class="chip ${sim.getActiveId()==='SW1'?'active':''}" id="sel-sw1">SW1 (Switch)</button>
+                    <button class="chip ${sim.getActiveId()==='R1'?'active':''}" id="sel-r1">R1 (Router)</button>
+                  </div>
+                  <div>
+                    <button class="btn" id="btn-ping-12">Ping PC1→PC2</button>
+                    <button class="btn" id="btn-ping-13">Ping PC1→PC3</button>
+                    <button class="btn" id="btn-reset-lab">Reset Lab</button>
+                  </div>
+                </div>
+                <svg viewBox="0 0 700 170" style="width:100%;height:auto;background:#070b14;border-radius:8px;border:1px solid var(--border)">
+                  <line x1="110" y1="130" x2="350" y2="85" stroke="${colorFor(sw.interfaces['Gi0/1'])}" stroke-width="3"/>
+                  <line x1="250" y1="130" x2="350" y2="85" stroke="${colorFor(sw.interfaces['Gi0/2'])}" stroke-width="3"/>
+                  <line x1="570" y1="130" x2="350" y2="85" stroke="${colorFor(sw.interfaces['Gi0/3'])}" stroke-width="3"/>
+                  <line x1="350" y1="85" x2="350" y2="28" stroke="${colorFor(sw.interfaces['Gi0/0'])}" stroke-width="4"/>
+                  <circle cx="350" cy="85" r="18" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+                  <text x="350" y="90" fill="#fff" font-size="11" text-anchor="middle">SW1</text>
+                  <circle cx="350" cy="28" r="16" fill="#1e293b" stroke="#a78bfa" stroke-width="2"/>
+                  <text x="350" y="32" fill="#fff" font-size="11" text-anchor="middle">R1</text>
+                  <text x="380" y="58" fill="#cbd5e1" font-size="11">Gi0/0: ${sw.interfaces['Gi0/0'].mode}</text>
+                  <text x="110" y="155" fill="#cbd5e1" font-size="11" text-anchor="middle">PC1 (V${sw.interfaces['Gi0/1'].vlan})</text>
+                  <text x="250" y="155" fill="#cbd5e1" font-size="11" text-anchor="middle">PC2 (V${sw.interfaces['Gi0/2'].vlan})</text>
+                  <text x="570" y="155" fill="#cbd5e1" font-size="11" text-anchor="middle">PC3 (V${sw.interfaces['Gi0/3'].vlan})</text>
+                </svg>
+              </div>
+              <div class="terminal">
+                <div class="term-out" id="term-out">${state.termLines.join('\n')}</div>
+                <div class="term-in">
+                  <span>${sim.getPrompt()}</span>
+                  <input id="term-cmd" autocomplete="off" placeholder="Type IOS command (help for list)">
+                </div>
+              </div>
+            </div>
+            <div class="canvas-box">
+              <h3 style="margin-top:0">ارزیابی خودکار وضعیت دستگاه</h3>
+              ${tasks.map(t => `<div class="task-item ${t.ok?'done':''}">${t.ok?'✅':'⬜'} ${t.label}</div>`).join('')}
+              <p style="font-size:12px;color:var(--muted);margin-top:12px">نکته: با <span class="code-inline">show vlan brief</span>، <span class="code-inline">show mac address-table</span> و <span class="code-inline">show ip route</span> وضعیت واقعی موتور را ببینید.</p>
+            </div>
+          </div>`;
+
+        document.getElementById('sel-sw1').onclick = () => { sim.setActiveId('SW1'); render(); };
+        document.getElementById('sel-r1').onclick = () => { sim.setActiveId('R1'); render(); };
+        document.getElementById('btn-ping-12').onclick = () => { state.termLines.push('[PC1 -> 10.10.10.12]\n' + sim.runPing('PC1', '10.10.10.12')); render(); };
+        document.getElementById('btn-ping-13').onclick = () => { state.termLines.push('[PC1 -> 10.10.20.13]\n' + sim.runPing('PC1', '10.10.20.13')); render(); };
+        document.getElementById('btn-reset-lab').onclick = () => { sim.reset(); state.termLines = ['Lab reset to initial broken state.']; render(); };
+
+        const inp = document.getElementById('term-cmd');
+        inp.focus();
+        inp.onkeydown = (e) => {
+          if (e.key !== 'Enter') return;
+          const cmd = inp.value.trim();
+          if (!cmd) return;
+          state.termLines.push(`${sim.getPrompt()} ${cmd}`);
+          if (/^clear$/i.test(cmd)) state.termLines = [];
+          else {
+            const out = sim.exec(cmd);
+            if (out) state.termLines.push(out);
+          }
+          render();
+        };
+      } else if (state.tab === 'quiz') {
+        body.innerHTML = `
+          <div class="canvas-box">
+            <h3>برای ارتباط دو کلاینت در VLAN 10 و VLAN 20 روی یک سوئیچ لایه ۲، کدام شرط لازم است؟</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+              <button class="step-item" data-q="0">فقط ساختن VLAN 10 و 20 روی سوئیچ کافی است</button>
+              <button class="step-item" data-q="1">لینک Trunk 802.1Q به روتر و Subinterfaceهای دارای encapsulation dot1q و IP گیت‌وی</button>
+              <button class="step-item" data-q="2">تنظیم هر دو پورت کلاینت روی حالت Trunk</button>
+            </div>
+            <p id="q-msg" style="margin-top:12px;font-weight:600"></p>
+          </div>`;
+        body.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
+          const ok = b.dataset.q === '1';
+          const m = document.getElementById('q-msg');
+          m.textContent = ok ? '✅ درست است!' : '❌ نادرست؛ دوباره بررسی کنید.';
+          m.style.color = ok ? 'var(--ok)' : 'var(--err)';
+          if (ok) { state.completed.add('vlan-slice'); saveAll(); }
+        });
+      }
+    }
+
+    render();
+  })();
+  </script>
+</body>
+</html>

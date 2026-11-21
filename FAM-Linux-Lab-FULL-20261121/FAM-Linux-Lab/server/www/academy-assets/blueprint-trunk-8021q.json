@@ -1,0 +1,561 @@
+{
+  "id": "ccna-trunk-8021q",
+  "title": "Trunking و تگ‌گذاری IEEE 802.1Q؛ عبور چند VLAN از یک لینک",
+  "track": "CCNA 200-301",
+  "course": "Network Access",
+  "learningObjective": "بتوانی Trunk را از Access تشخیص بدهی، ساختار Tag استاندارد 802.1Q را درک کنی، Native VLAN و Allowed VLAN List را تنظیم کنی و با فرمان‌های IOS وضعیت عملیاتی Trunk را بررسی و عیب‌یابی کنی.",
+  "glossary": [
+    {
+      "term": "Trunk",
+      "fa": "لینک لایهٔ ۲ برای عبور ترافیک چند VLAN بین تجهیزات."
+    },
+    {
+      "term": "802.1Q",
+      "fa": "استاندارد IEEE برای افزودن شناسهٔ VLAN به فریم Ethernet."
+    },
+    {
+      "term": "VLAN Tag",
+      "fa": "فیلد چهار بایتی در فریم 802.1Q که اطلاعات VLAN و اولویت را حمل می‌کند."
+    },
+    {
+      "term": "Native VLAN",
+      "fa": "VLANی که فریم‌های بدون Tag روی Trunk به آن نسبت داده می‌شوند."
+    },
+    {
+      "term": "Allowed VLAN List",
+      "fa": "فهرست VLANهایی که اجازهٔ عبور از یک Trunk را دارند."
+    },
+    {
+      "term": "DTP",
+      "fa": "پروتکل Cisco برای مذاکرهٔ خودکار حالت Trunk در برخی سوئیچ‌ها."
+    },
+    {
+      "term": "Dynamic Auto",
+      "fa": "حالت DTP که منتظر مذاکره از سمت مقابل می‌ماند و به‌تنهایی Trunk را آغاز نمی‌کند."
+    },
+    {
+      "term": "Dynamic Desirable",
+      "fa": "حالت DTP که فعالانه تلاش می‌کند لینک را به Trunk تبدیل کند."
+    },
+    {
+      "term": "Native VLAN Mismatch",
+      "fa": "ناهماهنگی Native VLAN دو سر Trunk که می‌تواند موجب هشدار و طبقه‌بندی اشتباه فریم بدون Tag شود."
+    }
+  ],
+  "topology": {
+    "devices": [
+      {
+        "id": "PC-A",
+        "type": "pc",
+        "x": 20,
+        "y": 75,
+        "vlan": 10
+      },
+      {
+        "id": "SW1",
+        "type": "switch",
+        "x": 145,
+        "y": 75,
+        "vlan": 10
+      },
+      {
+        "id": "SW2",
+        "type": "switch",
+        "x": 330,
+        "y": 75,
+        "vlan": 10
+      },
+      {
+        "id": "PC-B",
+        "type": "pc",
+        "x": 455,
+        "y": 35,
+        "vlan": 10
+      },
+      {
+        "id": "PC-C",
+        "type": "pc",
+        "x": 455,
+        "y": 130,
+        "vlan": 20
+      }
+    ],
+    "links": [
+      {
+        "a": "PC-A:eth0",
+        "b": "SW1:Gi0/1",
+        "vlan": 10
+      },
+      {
+        "a": "SW1:Gi0/24",
+        "b": "SW2:Gi0/24",
+        "vlan": 10
+      },
+      {
+        "a": "SW2:Gi0/1",
+        "b": "PC-B:eth0",
+        "vlan": 10
+      },
+      {
+        "a": "SW2:Gi0/2",
+        "b": "PC-C:eth0",
+        "vlan": 20
+      }
+    ]
+  },
+  "stages": {
+    "concept": {
+      "title": "۱. مفهوم؛ چرا Trunk و 802.1Q لازم‌اند؟",
+      "whyLayered": "وقتی چند VLAN روی دو سوئیچ وجود دارند، اگر برای هر VLAN یک کابل جدا بین سوئیچ‌ها بکشیم، تعداد لینک‌ها زیاد و مدیریت دشوار می‌شود. Trunk اجازه می‌دهد چند VLAN روی یک لینک فیزیکی عبور کنند. استاندارد 802.1Q با افزودن Tag به فریم Ethernet، شناسهٔ VLAN را مشخص می‌کند تا سوئیچ مقصد بداند فریم را در کدام Broadcast Domain پردازش کند.",
+      "analogy": "یک جادهٔ مشترک را تصور کن که چند خط حمل‌ونقل دارد. همهٔ خودروها از همان جاده استفاده می‌کنند، اما برچسب یا مجوز هر خودرو مشخص می‌کند متعلق به کدام مسیر است. Trunk جادهٔ مشترک است و 802.1Q Tag شناسهٔ مسیر هر فریم است. اگر برچسب حذف یا اشتباه خوانده شود، مقصد نمی‌تواند فریم را در VLAN درست قرار دهد.",
+      "deepDive": [
+        "در Ethernet بدون Tag، سوئیچ روی یک پورت Access از تنظیم پورت می‌فهمد فریم به کدام VLAN تعلق دارد. اما روی Trunk، فریم‌های چند VLAN باید روی همان لینک منتقل شوند؛ بنابراین 802.1Q یک Tag چهار بایتی به فریم اضافه می‌کند. این Tag شامل TPID و اطلاعات TCI است که VLAN ID و اطلاعات اولویت را در بر می‌گیرد.",
+        "VLAN ID در Tag دوازده بیت است و شناسه‌های 1 تا 4094 را برای استفادهٔ معمول فراهم می‌کند. فریم‌های VLANهای مجاز معمولاً Tagged عبور می‌کنند. Native VLAN استثنای رایج است: فریم‌های آن روی Trunk به‌صورت پیش‌فرض بدون Tag ارسال می‌شوند و در سمت مقابل به Native VLAN نسبت داده می‌شوند.",
+        "Allowed VLAN List مشخص می‌کند کدام VLANها حق عبور از Trunk را دارند. اگر VLAN در این فهرست نباشد، حتی با وجود اینکه روی هر دو سوئیچ ساخته شده و لینک Trunk فعال است، ترافیک آن از لینک عبور نمی‌کند. پس وضعیت Trunking و Allowed List را جداگانه بررسی کن.",
+        "در برخی سوئیچ‌های Cisco، DTP می‌تواند برای مذاکرهٔ حالت Trunk استفاده شود. Dynamic Desirable فعالانه مذاکره می‌کند؛ Dynamic Auto منتظر درخواست طرف مقابل می‌ماند. دو سمت Auto معمولاً Trunk تشکیل نمی‌دهند. در طراحی کنترل‌شده بهتر است حالت Trunk را صریح تنظیم کنی و مذاکرهٔ غیرضروری را با nonegotiate غیرفعال کنی؛ البته پشتیبانی فرمان به مدل و IOS وابسته است.",
+        "Native VLAN دو سر لینک باید یکسان باشد. اگر یک سمت VLAN 999 و سمت دیگر VLAN 1 را Native بداند، فریم بدون Tag در دو سمت به VLANهای متفاوت نسبت داده می‌شود. برای کاهش ریسک، در بسیاری از طراحی‌ها Native VLAN غیرکاربری و بدون میزبان انتخاب می‌شود و VLANهای کاربران به‌صورت Tagged عبور می‌کنند."
+      ],
+      "keyIdeas": [
+        "Trunk چند VLAN را روی یک لینک فیزیکی حمل می‌کند؛ Access معمولاً یک VLAN را به میزبان متصل می‌کند.",
+        "802.1Q شناسهٔ VLAN را داخل Tag فریم قرار می‌دهد.",
+        "Native VLAN روی Trunk معمولاً بدون Tag منتقل می‌شود؛ دو سمت باید مقدار یکسان داشته باشند.",
+        "Allowed VLAN List عبور VLANها را محدود می‌کند؛ بالا بودن Trunk به معنی عبور همهٔ VLANها نیست.",
+        "DTP در برخی تجهیزات Cisco مذاکرهٔ خودکار می‌کند؛ Dynamic Auto به‌تنهایی آغازگر Trunk نیست.",
+        "برای طراحی امن و قابل پیش‌بینی، Trunk را صریح پیکربندی و VLANهای مجاز را محدود کن."
+      ],
+      "misconceptions": [
+        "Trunk یک پروتکل مسیریابی نیست؛ همچنان یک لینک لایهٔ ۲ است.",
+        "وجود VLAN در Allowed List به‌تنهایی تضمین نمی‌کند VLAN در سوئیچ مقصد ساخته و Active باشد.",
+        "Native VLAN را با VLAN 1 یکی فرض نکن؛ مقدار Native قابل تغییر است.",
+        "DTP در همهٔ برندها و همهٔ پلتفرم‌ها وجود ندارد؛ 802.1Q استاندارد Tagging است اما DTP اختصاصی Cisco است.",
+        "فرمان switchport trunk encapsulation dot1q روی بعضی مدل‌ها اصلاً وجود ندارد، چون تنها Encapsulation پشتیبانی‌شده 802.1Q است."
+      ],
+      "fieldNotes": [
+        "در خروجی show interfaces trunk هم وضعیت لینک، هم Native VLAN و هم VLANهای مجاز/فعال را بخوان.",
+        "برای تغییر Allowed List از add و remove استفاده کن تا ناخواسته کل فهرست قبلی را جایگزین نکنی.",
+        "Native VLAN را در هر دو سمت یکسان تنظیم کن و از VLAN بدون کاربر برای آن استفاده کن.",
+        "اگر سوئیچ مقصد Cisco نیست یا DTP پشتیبانی نمی‌کند، Trunk را به‌صورت دستی تنظیم کن و مذاکرهٔ DTP را غیرفعال کن."
+      ]
+    },
+    "example": {
+      "title": "۲. مثال؛ حمل VLAN 10 و VLAN 20 روی یک Trunk",
+      "scenario": "دو سوئیچ SW1 و SW2 هر دو VLAN 10 و VLAN 20 را دارند. PC-A در VLAN 10 روی SW1 قرار دارد؛ PC-B در VLAN 10 و PC-C در VLAN 20 روی SW2 هستند. لینک Gi0/24 بین سوئیچ‌ها Trunk است، VLANهای 10 و 20 را حمل می‌کند و Native VLAN برابر 999 است.",
+      "addressingTable": [
+        {
+          "دستگاه": "PC-A",
+          "پورت": "SW1 Gi0/1",
+          "VLAN": "10",
+          "IPv4": "192.0.2.10/24"
+        },
+        {
+          "دستگاه": "PC-B",
+          "پورت": "SW2 Gi0/1",
+          "VLAN": "10",
+          "IPv4": "192.0.2.20/24"
+        },
+        {
+          "دستگاه": "PC-C",
+          "پورت": "SW2 Gi0/2",
+          "VLAN": "20",
+          "IPv4": "198.51.100.10/24"
+        },
+        {
+          "دستگاه": "SW1",
+          "پورت": "Gi0/24",
+          "حالت": "Trunk",
+          "Allowed": "10,20,999",
+          "Native": "999"
+        },
+        {
+          "دستگاه": "SW2",
+          "پورت": "Gi0/24",
+          "حالت": "Trunk",
+          "Allowed": "10,20,999",
+          "Native": "999"
+        }
+      ],
+      "packetFlow": [
+        "PC-A یک فریم Ethernet بدون Tag به SW1 می‌فرستد؛ چون Gi0/1 یک Access Port در VLAN 10 است، سوئیچ فریم را به VLAN 10 نسبت می‌دهد.",
+        "SW1 برای عبور فریم از Trunk، Tag مربوط به VLAN 10 را اضافه می‌کند و فریم را روی Gi0/24 ارسال می‌کند.",
+        "SW2 Tag را می‌خواند، VLAN 10 را تشخیص می‌دهد و فریم را فقط در محدودهٔ VLAN 10 پردازش می‌کند؛ PC-B می‌تواند آن را دریافت کند.",
+        "PC-C در VLAN 20 است، بنابراین Broadcast متعلق به VLAN 10 نباید به پورت آن برسد.",
+        "اگر فریم بدون Tag روی Trunk دریافت شود، به Native VLAN نسبت داده می‌شود. در این مثال Native VLAN برابر 999 است؛ پس هر دو سمت باید دقیقاً همین مقدار را داشته باشند."
+      ],
+      "workedExample": [
+        {
+          "title": "چرا فریم PC-A ابتدا بدون Tag است؟",
+          "explanation": "PC-A یک میزبان عادی متصل به Access Port است و نیازی به شناخت VLAN ID ندارد. سوئیچ از تنظیم پورت می‌فهمد فریم به VLAN 10 تعلق دارد.",
+          "result": "VLAN عضویت میزبان از تنظیم Access Port مشخص می‌شود."
+        },
+        {
+          "title": "چه زمانی Tag اضافه می‌شود؟",
+          "explanation": "هنگام خروج فریم از Trunk، سوئیچ شناسهٔ VLAN را در Tag 802.1Q قرار می‌دهد تا سوئیچ مقصد بتواند آن را تشخیص دهد.",
+          "result": "فریم VLAN 10 با Tag شناسهٔ 10 عبور می‌کند."
+        },
+        {
+          "title": "Allowed List چه نقشی دارد؟",
+          "explanation": "اگر VLAN 10 در Allowed List نباشد، فریم آن از Trunk عبور نمی‌کند؛ حتی اگر پورت در حالت trunking باشد.",
+          "result": "VLAN 10، 20 و 999 باید در فهرست مجاز باشند."
+        },
+        {
+          "title": "چرا Native VLAN باید هماهنگ باشد؟",
+          "explanation": "فریم بدون Tag شناسهٔ صریح ندارد؛ سوئیچ دریافت‌کننده آن را به Native VLAN خودش نسبت می‌دهد. اختلاف دو سمت باعث می‌شود یک فریم در دو VLAN متفاوت تفسیر شود.",
+          "result": "Native VLAN دو سمت در این سناریو باید 999 باشد."
+        }
+      ],
+      "expectedBehavior": "PC-A و PC-B در VLAN 10 می‌توانند از Trunk عبور کنند و ارتباط داشته باشند. PC-C در VLAN 20 باقی می‌ماند. فریم‌های VLAN 10 و 20 Tagged هستند و فریم‌های Native VLAN 999 بدون Tag خواهند بود."
+    },
+    "practice": {
+      "title": "۳. تمرین؛ عیب‌یابی Trunk",
+      "introduction": "در عیب‌یابی Trunk چهار سؤال را جداگانه پاسخ بده: آیا لینک Trunk است؟ آیا VLAN روی هر دو سوئیچ وجود دارد؟ آیا VLAN در Allowed List است؟ آیا Native VLAN دو سمت هماهنگ است؟",
+      "troubleshootingTable": [
+        {
+          "layer": "Operational Mode",
+          "checks": "show interfaces trunk را اجرا کن و مطمئن شو پورت در وضعیت trunking است."
+        },
+        {
+          "layer": "Encapsulation",
+          "checks": "show interfaces Gi0/24 switchport را بررسی کن؛ Encapsulation باید 802.1Q باشد."
+        },
+        {
+          "layer": "Allowed VLAN",
+          "checks": "VLAN موردنظر باید در Allowed VLAN List و Allowed and Active حضور داشته باشد."
+        },
+        {
+          "layer": "Native VLAN",
+          "checks": "Native VLAN هر دو سر لینک را مقایسه کن."
+        },
+        {
+          "layer": "DTP",
+          "checks": "در صورت استفاده از DTP، حالت هر دو سمت و نتیجهٔ مذاکره را با show dtp interface بررسی کن."
+        }
+      ],
+      "troubleshootingCases": [
+        {
+          "symptom": "دو پورت به کابل متصل‌اند اما در show interfaces trunk دیده نمی‌شوند.",
+          "cause": "پورت‌ها Access هستند یا مذاکرهٔ DTP در دو سمت به نتیجه نرسیده است.",
+          "diagnosis": "show interfaces Gi0/24 switchport و show dtp interface Gi0/24 را بررسی کن.",
+          "fix": "در طراحی ثابت، switchport mode trunk را در هر دو سمت اعمال کن؛ در صورت نیاز مذاکره را غیرفعال کن.",
+          "verify": "show interfaces trunk باید پورت را trunking نشان دهد."
+        },
+        {
+          "symptom": "Trunk فعال است اما کاربران VLAN 20 ارتباط ندارند.",
+          "cause": "VLAN 20 در Allowed VLAN List نیست یا در سوئیچ مقصد Active نیست.",
+          "diagnosis": "Allowed List و Allowed and Active را در خروجی show interfaces trunk مقایسه کن و show vlan brief را ببین.",
+          "fix": "VLAN را در هر دو سوئیچ بساز و با switchport trunk allowed vlan add 20 آن را اضافه کن.",
+          "verify": "VLAN 20 باید در فهرست مجاز و فعال دیده شود و MAC میزبان در VLAN 20 یاد گرفته شود."
+        },
+        {
+          "symptom": "پیام Native VLAN mismatch در لاگ دیده می‌شود.",
+          "cause": "Native VLAN دو سر Trunk یکسان نیست.",
+          "diagnosis": "show interfaces trunk را در دو سمت اجرا و مقدار Native VLAN را مقایسه کن.",
+          "fix": "هر دو سمت را طبق طرح به VLAN 999 تنظیم کن.",
+          "verify": "پیام mismatch نباید دوباره تولید شود و Native VLAN دو سمت باید یکسان باشد."
+        },
+        {
+          "symptom": "VLAN 10 عبور می‌کند اما VLAN 20 نه.",
+          "cause": "VLAN 20 از Allowed List حذف شده، در سوئیچ مقصد ساخته نشده یا پورت Access مقصد در VLAN اشتباه است.",
+          "diagnosis": "show interfaces trunk، show vlan brief و show interfaces Gi0/2 switchport را بررسی کن.",
+          "fix": "VLAN 20 را در دو سوئیچ ایجاد، به Allowed List اضافه و پورت میزبان را اصلاح کن.",
+          "verify": "show mac address-table dynamic vlan 20 باید MAC میزبان را روی پورت مورد انتظار نشان دهد."
+        },
+        {
+          "symptom": "Trunk بین دو سوئیچ Cisco با حالت Dynamic Auto بالا نمی‌آید.",
+          "cause": "هر دو سمت منتظر آغاز مذاکره از سمت مقابل هستند.",
+          "diagnosis": "show dtp interface Gi0/24 و حالت switchport را در هر دو سمت بررسی کن.",
+          "fix": "یکی از دو سمت را Dynamic Desirable کن یا هر دو را صریحاً Trunk قرار بده؛ برای طراحی کنترل‌شده حالت دستی ترجیح دارد.",
+          "verify": "show interfaces trunk باید لینک را trunking نشان دهد."
+        }
+      ],
+      "drills": [
+        "اگر Trunk بالا است ولی VLAN 30 در Allowed List نیست، چه چیزی در show interfaces trunk می‌بینی؟",
+        "چرا Native VLAN mismatch فقط یک هشدار ظاهری نیست و می‌تواند طبقه‌بندی فریم را تغییر دهد؟",
+        "تفاوت Dynamic Auto و Dynamic Desirable را با رفتار هرکدام توضیح بده.",
+        "چرا باید VLANهای مجاز Trunk را محدود کرد؟"
+      ]
+    },
+    "lab": {
+      "title": "۴. آزمایشگاه PNETLab؛ Trunk امن با VLANهای مجاز محدود",
+      "pnetlabTopology": {
+        "title": "SW1 Gi0/24 ⇄ SW2 Gi0/24؛ VLAN 10 و 20، Native VLAN 999",
+        "objective": "دو VLAN کاربری و یک Native VLAN بدون کاربر بساز، لینک بین دو سوئیچ را به‌صورت Trunk ثابت تنظیم کن و عبور VLANها را بررسی کن.",
+        "portVlanTable": [
+          {
+            "دستگاه": "PC-A",
+            "رابط": "eth0",
+            "VLAN": "10",
+            "IP": "192.0.2.10/24",
+            "اتصال": "SW1 Gi0/1"
+          },
+          {
+            "دستگاه": "PC-B",
+            "رابط": "eth0",
+            "VLAN": "10",
+            "IP": "192.0.2.20/24",
+            "اتصال": "SW2 Gi0/1"
+          },
+          {
+            "دستگاه": "PC-C",
+            "رابط": "eth0",
+            "VLAN": "20",
+            "IP": "198.51.100.10/24",
+            "اتصال": "SW2 Gi0/2"
+          },
+          {
+            "دستگاه": "SW1",
+            "رابط": "Gi0/24",
+            "VLAN": "Trunk",
+            "Native": "999",
+            "Allowed": "10,20,999"
+          },
+          {
+            "دستگاه": "SW2",
+            "رابط": "Gi0/24",
+            "VLAN": "Trunk",
+            "Native": "999",
+            "Allowed": "10,20,999"
+          }
+        ],
+        "configs": {
+          "SW1": "hostname SW1\nvlan 10\n name USERS_A\nvlan 20\n name USERS_B\nvlan 999\n name NATIVE_UNUSED\ninterface GigabitEthernet0/1\n switchport mode access\n switchport access vlan 10\n no shutdown\ninterface GigabitEthernet0/24\n switchport mode trunk\n switchport trunk native vlan 999\n switchport trunk allowed vlan 10,20,999\n switchport nonegotiate\n no shutdown",
+          "SW2": "hostname SW2\nvlan 10\n name USERS_A\nvlan 20\n name USERS_B\nvlan 999\n name NATIVE_UNUSED\ninterface GigabitEthernet0/1\n switchport mode access\n switchport access vlan 10\n no shutdown\ninterface GigabitEthernet0/2\n switchport mode access\n switchport access vlan 20\n no shutdown\ninterface GigabitEthernet0/24\n switchport mode trunk\n switchport trunk native vlan 999\n switchport trunk allowed vlan 10,20,999\n switchport nonegotiate\n no shutdown",
+          "PC-A": "ip 192.0.2.10/24",
+          "PC-B": "ip 192.0.2.20/24",
+          "PC-C": "ip 198.51.100.10/24"
+        },
+        "steps": [
+          {
+            "action": "VLANهای 10، 20 و 999 را روی هر دو سوئیچ بساز.",
+            "expected": "show vlan brief باید هر سه VLAN را active نشان دهد.",
+            "reason": "VLAN Native نیز باید در هر دو سمت تعریف شده باشد."
+          },
+          {
+            "action": "پورت‌های میزبان را Access و در VLANهای مناسب قرار بده.",
+            "expected": "PC-A و PC-B در VLAN 10 و PC-C در VLAN 20 باشند.",
+            "reason": "میزبان معمولی فریم بدون Tag ارسال می‌کند."
+          },
+          {
+            "action": "Gi0/24 دو سوئیچ را Trunk ثابت کن، Native VLAN را 999 و Allowed List را محدود کن.",
+            "expected": "show interfaces trunk باید 802.1Q، Native 999 و Allowed 10,20,999 را نشان دهد.",
+            "reason": "این مرحله حمل چند VLAN و هماهنگی Native را کنترل می‌کند."
+          },
+          {
+            "action": "از PC-A به PC-B Ping بگیر.",
+            "expected": "Ping باید از VLAN 10 عبور کند.",
+            "reason": "ترافیک VLAN 10 باید Tagged از Trunk عبور کند."
+          },
+          {
+            "action": "VLAN 20 را موقتاً از Allowed List حذف و نتیجه را مشاهده کن؛ سپس آن را برگردان.",
+            "expected": "ترافیک VLAN 20 از لینک عبور نکند و پس از اضافه کردن مجدد برقرار شود.",
+            "reason": "اثر Allowed VLAN List را به‌صورت کنترل‌شده مشاهده می‌کنی."
+          }
+        ]
+      },
+      "commands": [
+        {
+          "cmd": "show interfaces trunk",
+          "desc": "وضعیت Trunk، Native VLAN و Allowed VLAN را نمایش می‌دهد.",
+          "explain": "این فرمان نقطهٔ شروع اصلی برای عیب‌یابی Trunk است."
+        },
+        {
+          "cmd": "show interfaces GigabitEthernet0/24 switchport",
+          "desc": "حالت مدیریتی و عملیاتی پورت و تنظیمات VLAN را نشان می‌دهد.",
+          "explain": "Administrative Mode و Operational Mode باید با طراحی موردنظر هماهنگ باشند."
+        },
+        {
+          "cmd": "show dtp interface GigabitEthernet0/24",
+          "desc": "وضعیت مذاکرهٔ DTP را نمایش می‌دهد.",
+          "explain": "اگر switchport nonegotiate تنظیم شده باشد، انتظار مذاکرهٔ DTP نداشته باش."
+        },
+        {
+          "cmd": "show vlan brief",
+          "desc": "وجود VLANها و عضویت پورت‌های Access را بررسی می‌کند.",
+          "explain": "Native VLAN و VLANهای کاربری باید Active باشند."
+        },
+        {
+          "cmd": "show mac address-table dynamic vlan 10",
+          "desc": "MACهای آموخته‌شده در VLAN 10 را نشان می‌دهد.",
+          "explain": "پس از تولید ترافیک، MAC میزبان راه دور باید از طریق Trunk یاد گرفته شود."
+        }
+      ],
+      "verificationCommands": [
+        {
+          "cmd": "show interfaces trunk",
+          "purpose": "تأیید Operational Trunk، Native VLAN و Allowed List.",
+          "expected": "Gi0/24 در حالت trunking، Native 999 و VLANهای 10,20,999 مجاز باشند."
+        },
+        {
+          "cmd": "show interfaces Gi0/24 switchport",
+          "purpose": "تأیید تنظیمات عملیاتی سوئیچ‌پورت.",
+          "expected": "Operational Mode برابر trunk و Trunking Native Mode VLAN برابر 999."
+        },
+        {
+          "cmd": "show vlan brief",
+          "purpose": "تأیید وجود VLANها روی هر دو سوئیچ.",
+          "expected": "VLANهای 10، 20 و 999 در وضعیت active."
+        }
+      ],
+      "verificationCommand": "show interfaces trunk",
+      "expectedOutput": "Port        Mode         Encapsulation  Status        Native vlan\nGi0/24      on           802.1q         trunking      999\n\nPort        Vlans allowed on trunk\nGi0/24      10,20,999",
+      "interpretation": "Mode برابر on یعنی Trunk به‌صورت دستی تنظیم شده است. Status باید trunking باشد. Native vlan باید 999 و Allowed List باید فقط VLANهای موردنیاز را نشان دهد. در برخی مدل‌ها نام ستون‌ها یا جزئیات خروجی کمی متفاوت است.",
+      "commonMistakes": [
+        "اجرای switchport trunk encapsulation dot1q روی مدلی که فقط 802.1Q دارد و این فرمان را پشتیبانی نمی‌کند.",
+        "تنظیم Native VLAN فقط در یک سمت لینک.",
+        "جایگزین کردن کامل Allowed List با یک VLAN و حذف ناخواسته VLANهای قبلی؛ برای تغییر افزایشی از add استفاده کن.",
+        "فرض کردن اینکه Trunk حتماً با DTP بالا می‌آید؛ در حالت nonegotiate باید طرف مقابل را دستی تنظیم کنی.",
+        "استفاده از Native VLAN برای میزبان‌های عادی بدون بررسی سیاست امنیتی."
+      ]
+    },
+    "quiz": {
+      "title": "۵. آزمون تسلط؛ ۱۰ سؤال Trunk و 802.1Q",
+      "instructions": "روی تفاوت وضعیت عملیاتی، VLANهای مجاز و Native VLAN تمرکز کن.",
+      "questions": [
+        {
+          "q": "استاندارد رایج Tagging روی Trunk اترنت کدام است؟",
+          "options": [
+            "802.1Q",
+            "802.11",
+            "802.3ad",
+            "OSPF"
+          ],
+          "answer": 0,
+          "explanation": "IEEE 802.1Q شناسهٔ VLAN را در Tag فریم Ethernet قرار می‌دهد.",
+          "tip": "802.1Q مربوط به VLAN tagging است."
+        },
+        {
+          "q": "یک Trunk می‌تواند چه چیزی را حمل کند؟",
+          "options": [
+            "فقط یک VLAN",
+            "چند VLAN روی یک لینک",
+            "فقط بسته‌های IP بدون فریم",
+            "فقط VLAN 1"
+          ],
+          "answer": 1,
+          "explanation": "Trunk با Tag کردن فریم‌ها امکان حمل چند VLAN روی یک لینک را فراهم می‌کند.",
+          "tip": "Access معمولاً یک VLAN، Trunk چند VLAN."
+        },
+        {
+          "q": "Native VLAN در Trunk 802.1Q چه رفتاری دارد؟",
+          "options": [
+            "همیشه رمزگذاری می‌شود",
+            "فریم‌های بدون Tag به آن نسبت داده می‌شوند",
+            "همیشه VLAN 1 و غیرقابل تغییر است",
+            "تمام VLANها را حذف می‌کند"
+          ],
+          "answer": 1,
+          "explanation": "فریم بدون Tag روی Trunk به Native VLAN نسبت داده می‌شود؛ دو سمت باید هماهنگ باشند.",
+          "tip": "Native VLAN mismatch را بررسی کن."
+        },
+        {
+          "q": "اگر VLAN 20 از Allowed VLAN List حذف شود چه رخ می‌دهد؟",
+          "options": [
+            "Trunk حتماً down می‌شود",
+            "ترافیک VLAN 20 از آن Trunk عبور نمی‌کند",
+            "VLAN 20 به Native تبدیل می‌شود",
+            "سوئیچ VLAN 10 را حذف می‌کند"
+          ],
+          "answer": 1,
+          "explanation": "Allowed List عبور VLANها را کنترل می‌کند؛ حذف یک VLAN لزوماً لینک Trunk را پایین نمی‌آورد.",
+          "tip": "Status و Allowed List دو مفهوم جدا هستند."
+        },
+        {
+          "q": "دو سمت Trunk روی Dynamic Auto باشند؛ نتیجهٔ رایج چیست؟",
+          "options": [
+            "هر دو سمت حتماً Trunk می‌شوند",
+            "معمولاً Trunk تشکیل نمی‌شود",
+            "یکی Access و دیگری Routed می‌شود",
+            "Native VLAN خودکار 999 می‌شود"
+          ],
+          "answer": 1,
+          "explanation": "Dynamic Auto منتظر مذاکرهٔ آغازشده از طرف مقابل می‌ماند؛ دو سمت Auto معمولاً Trunk را آغاز نمی‌کنند.",
+          "tip": "Desirable فعالانه مذاکره می‌کند."
+        },
+        {
+          "q": "کدام فرمان وضعیت Trunk و Native VLAN را به‌صورت خلاصه نشان می‌دهد؟",
+          "options": [
+            "show ip route",
+            "show interfaces trunk",
+            "show arp",
+            "show version"
+          ],
+          "answer": 1,
+          "explanation": "show interfaces trunk وضعیت پورت، Encapsulation، Native VLAN و Allowed VLANها را نشان می‌دهد.",
+          "tip": "این فرمان را اولین بررسی قرار بده."
+        },
+        {
+          "q": "چرا Native VLAN دو سمت باید یکسان باشد؟",
+          "options": [
+            "برای افزایش سرعت پورت",
+            "تا فریم بدون Tag در دو سمت به VLAN متفاوت نسبت داده نشود",
+            "برای تغییر آدرس MAC",
+            "برای فعال کردن DHCP"
+          ],
+          "answer": 1,
+          "explanation": "فریم بدون Tag شناسهٔ VLAN درون خود ندارد؛ هر سوئیچ آن را به Native VLAN خودش نسبت می‌دهد.",
+          "tip": "Native mismatch می‌تواند موجب نشت یا طبقه‌بندی نادرست ترافیک شود."
+        },
+        {
+          "q": "کدام جمله دربارهٔ DTP درست است؟",
+          "options": [
+            "استاندارد IEEE برای مسیریابی است",
+            "پروتکل مذاکرهٔ Trunk اختصاصی Cisco است",
+            "جایگزین 802.1Q است",
+            "در همهٔ سوئیچ‌های جهان وجود دارد"
+          ],
+          "answer": 1,
+          "explanation": "DTP پروتکل Cisco برای مذاکرهٔ خودکار Trunk در برخی پلتفرم‌هاست؛ 802.1Q استاندارد Tagging است.",
+          "tip": "DTP و 802.1Q دو نقش متفاوت دارند."
+        },
+        {
+          "q": "اگر Trunk فعال باشد اما VLAN 20 در سوئیچ مقصد وجود نداشته باشد چه باید کرد؟",
+          "options": [
+            "فقط کابل را تعویض کرد",
+            "VLAN را در سوئیچ مقصد ایجاد و Active کرد",
+            "IP سرور را عوض کرد",
+            "STP را خاموش کرد"
+          ],
+          "answer": 1,
+          "explanation": "Allowed List جایگزین تعریف VLAN نیست؛ سوئیچ مقصد باید VLAN را بشناسد و فعال داشته باشد.",
+          "tip": "Allowed و Active را با هم بررسی کن."
+        },
+        {
+          "q": "چرا در طراحی Trunk بهتر است VLANهای مجاز محدود شوند؟",
+          "options": [
+            "برای جلوگیری از عبور ترافیک غیرضروری و کاهش سطح خطا/ریسک",
+            "برای حذف جدول MAC",
+            "برای تبدیل Trunk به Access",
+            "برای غیرفعال کردن 802.1Q"
+          ],
+          "answer": 0,
+          "explanation": "محدود کردن VLANهای مجاز، ترافیک غیرضروری را از لینک حذف می‌کند و دامنهٔ انتشار اشتباه را کاهش می‌دهد.",
+          "tip": "اصل کمترین دسترسی را در لایهٔ ۲ هم رعایت کن."
+        }
+      ]
+    },
+    "summary": {
+      "title": "۶. جمع‌بندی؛ Trunk قابل پیش‌بینی و امن",
+      "oneSentence": "Trunk چند VLAN را با Tag 802.1Q حمل می‌کند؛ وضعیت trunking، Allowed VLAN و Native VLAN را جداگانه و در هر دو سمت بررسی کن.",
+      "takeaways": [
+        "Trunk یک لینک لایهٔ ۲ برای عبور چند VLAN است.",
+        "802.1Q شناسهٔ VLAN را در Tag فریم Ethernet قرار می‌دهد.",
+        "Native VLAN فریم‌های بدون Tag را دریافت می‌کند و باید در دو سمت یکسان باشد.",
+        "Allowed VLAN List تعیین می‌کند کدام VLANها اجازهٔ عبور دارند.",
+        "DTP پروتکل اختصاصی Cisco برای مذاکرهٔ Trunk در برخی مدل‌هاست؛ تنظیم دستی معمولاً قابل پیش‌بینی‌تر است.",
+        "فرمان show interfaces trunk نقطهٔ شروع اصلی Verification است."
+      ],
+      "checklist": [
+        "می‌توانم Access و Trunk را با رفتار فریم مقایسه کنم.",
+        "می‌توانم توضیح بدهم Tag 802.1Q چه اطلاعاتی حمل می‌کند.",
+        "می‌توانم Native VLAN را در دو سمت یکسان تنظیم کنم.",
+        "می‌توانم Allowed VLAN List را محدود و راستی‌آزمایی کنم.",
+        "می‌توانم تفاوت Dynamic Auto و Dynamic Desirable را توضیح بدهم.",
+        "می‌توانم Native VLAN mismatch و حذف VLAN از Allowed List را عیب‌یابی کنم."
+      ],
+      "nextLessons": [
+        "مبانی VLAN — ccna-vlan-l2-01",
+        "STP و RSTP — ccna-stp-rstp",
+        "امنیت لایهٔ ۲ — ccna-port-sec"
+      ]
+    }
+  }
+}

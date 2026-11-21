@@ -1,0 +1,198 @@
+{
+  "lessonId": "ccna-nat-pat",
+  "track": "CCNA 200-301",
+  "title": "ترجمه آدرس NAT و PAT (Overload)",
+  "beforeYouStart": {
+    "prerequisites": [
+      "آشنایی پایه با مفاهیم شبکه"
+    ],
+    "learningObjectives": [
+      "NAT (Network Address Translation) آدرس‌های خصوصی داخلی (RFC 1918) را به آدرس‌های عمومی قاب..."
+    ]
+  },
+  "whyItMatters": "NAT (Network Address Translation) آدرس‌های خصوصی داخلی (RFC 1918) را به آدرس‌های عمومی قابل مسیریابی در اینترنت ترجمه می‌کند. PAT (Port Address Translation) یا NAT Overload امکان استفادهٔ هم‌زمان صدها کاربر داخلی از یک IP عمومی واحد را با تفکیک شماره پورت‌ها فراهم می‌کند.",
+  "sections": [
+    {
+      "id": "concepts",
+      "title": "مبانی و مفاهیم اصلی",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>NAT (Network Address Translation) آدرس‌های خصوصی داخلی (RFC 1918) را به آدرس‌های عمومی قابل مسیریابی در اینترنت ترجمه می‌کند. PAT (Port Address Translation) یا NAT Overload امکان استفادهٔ هم‌زمان صدها کاربر داخلی از یک IP عمومی واحد را با تفکیک شماره پورت‌ها فراهم می‌کند.</p>"
+    },
+    {
+      "id": "how-it-works",
+      "title": "نحوه عملکرد در شبکه",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>بستهٔ خروجی از اینترفیس ip nat inside وارد شده و به سمت ip nat outside می‌رود. روتر آدرس مبدأ (Inside Local) را به آدرس عمومی (Inside Global) تغییر داده و در جدول NAT Translation ثبت می‌کند تا پاسخ برگشتی را به هاست صحیح تحویل دهد.</p><h4>مسیر بسته و عیب‌یابی</h4><p>PC بسته را به Gateway می‌فرستد؛ R1 با ACL مبدأ را انتخاب و inside local را به آدرس outside و شناسهٔ مناسب ترجمه می‌کند. جدول ترجمه اجازه می‌دهد پاسخ بازگشتی به میزبان درست برسد. PAT جای مسیریابی یا سیاست دیوارهٔ آتش را نمی‌گیرد.</p><p>ابتدا وضعیت رابط‌ها و default route، سپس انطباق ACL، برچسب inside/outside و show ip nat translations را هنگام ترافیک بررسی کنید. بدون ترافیک، جدول ممکن است خالی باشد. محیط نمونه فقط از آدرس‌های مستنداتی استفاده می‌کند.</p>"
+    },
+    {
+      "id": "components",
+      "title": "اجزا، مزایا و محدودیت‌ها",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>انواع: Static NAT (نگاشت 1 به 1 برای سرورها)، Dynamic NAT (استفاده از Pool)، PAT/Overload (چند به یک با پورت). محدودیت‌ها: پیچیدگی در عیب‌یابی End-to-End و اختلال در برخی پروتکل‌های قدیمی.</p>"
+    },
+    {
+      "id": "topology",
+      "title": "توپولوژی اختصاصی درس",
+      "html": "<svg viewBox=\"0 0 640 160\" width=\"100%\" height=\"160\" dir=\"ltr\" style=\"background:#06090f;border:1px solid #1e293b;border-radius:8px\"><line x1=\"115\" y1=\"80\" x2=\"215\" y2=\"80\" stroke=\"#38bdf8\" stroke-width=\"2.5\"/><line x1=\"315\" y1=\"80\" x2=\"395\" y2=\"80\" stroke=\"#38bdf8\" stroke-width=\"2.5\"/><line x1=\"495\" y1=\"80\" x2=\"545\" y2=\"80\" stroke=\"#22c55e\" stroke-width=\"2.5\"/><rect x=\"15\" y=\"52\" width=\"100\" height=\"56\" rx=\"8\" fill=\"#0f172a\" stroke=\"#38bdf8\" stroke-width=\"1.5\"/><text x=\"65\" y=\"84\" fill=\"#e2e8f0\" font-size=\"11\" text-anchor=\"middle\" font-family=\"sans-serif\">LAN 192.168.10.x</text><rect x=\"215\" y=\"52\" width=\"100\" height=\"56\" rx=\"8\" fill=\"#0f172a\" stroke=\"#38bdf8\" stroke-width=\"1.5\"/><text x=\"265\" y=\"84\" fill=\"#e2e8f0\" font-size=\"11\" text-anchor=\"middle\" font-family=\"sans-serif\">R1 (NAT/PAT)</text><rect x=\"395\" y=\"52\" width=\"100\" height=\"56\" rx=\"8\" fill=\"#0f172a\" stroke=\"#38bdf8\" stroke-width=\"1.5\"/><text x=\"445\" y=\"84\" fill=\"#e2e8f0\" font-size=\"11\" text-anchor=\"middle\" font-family=\"sans-serif\">203.0.113.2</text><rect x=\"545\" y=\"52\" width=\"85\" height=\"56\" rx=\"8\" fill=\"#0f172a\" stroke=\"#22c55e\" stroke-width=\"1.5\"/><text x=\"587\" y=\"84\" fill=\"#e2e8f0\" font-size=\"10\" text-anchor=\"middle\" font-family=\"sans-serif\">Internet 8.8.8.8</text></svg>"
+    },
+    {
+      "id": "scenario",
+      "title": "سناریوی عملی و تجهیزات",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>شبکه داخلی 192.168.10.0/24 (Gi0/0: inside) از طریق روتر R1 و اینترفیس عمومی Gi0/1 (203.0.113.2/30: outside) با PAT به شبکهٔ بالادستی آزمایشی متصل می‌شود. در این مثال، نشانی همسایهٔ بالادستی 203.0.113.1/30 است؛ این نشانی‌ها مستنداتی‌اند و اتصال اینترنت واقعی را نشان نمی‌دهند.</p>"
+    },
+    {
+      "id": "ios-commands",
+      "title": "دستورات Cisco IOS به ترتیب اجرا",
+      "html": "<div style='margin-bottom:8px;padding:8px;background:#020617;border:1px solid #1e293b;border-radius:6px'><code dir='ltr' style='color:#38bdf8;display:block;margin-bottom:4px'>access-list 1 permit 192.168.10.0 0.0.0.255</code><span style='font-size:12px;color:#cbd5e1'>تعیین ترافیک مجاز داخلی برای ترجمه</span></div><div style='margin-bottom:8px;padding:8px;background:#020617;border:1px solid #1e293b;border-radius:6px'><code dir='ltr' style='color:#38bdf8;display:block;margin-bottom:4px'>ip nat inside source list 1 interface GigabitEthernet0/1 overload</code><span style='font-size:12px;color:#cbd5e1'>فعال‌سازی PAT روی اینترفیس خروجی</span></div><div style='margin-bottom:8px;padding:8px;background:#020617;border:1px solid #1e293b;border-radius:6px'><code dir='ltr' style='color:#38bdf8;display:block;margin-bottom:4px'>interface GigabitEthernet0/0</code><span style='font-size:12px;color:#cbd5e1'>انتخاب اینترفیس داخلی</span></div><div style='margin-bottom:8px;padding:8px;background:#020617;border:1px solid #1e293b;border-radius:6px'><code dir='ltr' style='color:#38bdf8;display:block;margin-bottom:4px'>ip nat inside</code><span style='font-size:12px;color:#cbd5e1'>علامت‌گذاری اینترفیس به‌عنوان Inside</span></div><div style='margin-bottom:8px;padding:8px;background:#020617;border:1px solid #1e293b;border-radius:6px'><code dir='ltr' style='color:#38bdf8;display:block;margin-bottom:4px'>interface GigabitEthernet0/1</code><span style='font-size:12px;color:#cbd5e1'>انتخاب اینترفیس بیرونی</span></div><div style='margin-bottom:8px;padding:8px;background:#020617;border:1px solid #1e293b;border-radius:6px'><code dir='ltr' style='color:#38bdf8;display:block;margin-bottom:4px'>ip nat outside</code><span style='font-size:12px;color:#cbd5e1'>علامت‌گذاری اینترفیس به‌عنوان Outside</span></div><div class='lesson-case'><strong>مسیر پیش‌فرض و آزمون</strong><pre dir='ltr' class='cli-block'>ip route 0.0.0.0 0.0.0.0 203.0.113.1\nshow ip route 0.0.0.0\nshow ip nat translations\nshow ip nat statistics</pre><p>این مسیر فقط در صورت اتصال و دسترس‌پذیری همسایهٔ فرضی کار می‌کند. پس از ایجاد ترافیک، ترجمه را بررسی کنید؛ در سمت بالادست نیز مسیر برگشت و سیاست دسترسی لازم است.</p></div>"
+    },
+    {
+      "id": "verification",
+      "title": "تست و خروجی مورد انتظار (Verification)",
+      "html": "<pre dir='ltr' style='padding:10px;background:#020617;border:1px solid #1e293b;border-radius:6px;color:#86efac;font-size:11px;overflow:auto'>Pro Inside global      Inside local       Outside local      Outside global\ntcp 203.0.113.2:1024   192.168.10.10:51234 8.8.8.8:443       8.8.8.8:443</pre>"
+    },
+    {
+      "id": "troubleshooting",
+      "title": "عیب‌یابی (Troubleshooting)",
+      "html": "<p style='line-height:1.8;color:#fca5a5'>1) عدم ترجمه: فراموشی ip nat inside/outside یا ACL اشتباه. 2) اتمام Pool در Dynamic NAT: استفاده از overload.</p>"
+    },
+    {
+      "id": "exam-tips",
+      "title": "نکات آزمون CCNA / CCNP و ارتباط با مباحث دیگر",
+      "html": "<p style='line-height:1.8;color:#fde68a'>تفاوت 4 اصطلاح Inside Local, Inside Global, Outside Local, Outside Global در آزمون CCNA بسیار مهم است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "CCNA-NAT-PAT",
+      "fa": "ترجمه آدرس NAT و PAT (Overload)",
+      "simple": "مفهوم کلیدی و استاندارد پیاده‌سازی در ترجمه آدرس NAT و PAT (Overload)."
+    },
+    {
+      "term": "Verification",
+      "fa": "راستی‌آزمایی",
+      "simple": "بررسی خروجی زنده دستورات show در Cisco IOS برای اطمینان از صحت عملکرد."
+    },
+    {
+      "term": "Troubleshooting",
+      "fa": "عیب‌یابی",
+      "simple": "تحلیل گام‌به‌گام خطاهای لایه‌ای و تطبیق پیکربندی."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "کاربرگ اختصاصی آزمایشگاه (اجرا نشده)",
+      "html": "<p class=\"lesson-quiz-warning\">کاربرگ طراحی‌شده برای محیط ایزوله است و روی تجهیزات یا PNETLab اجرا و تأیید نشده است. نام رابط‌ها و قابلیت‌های IOS را با ایمیج خود تطبیق دهید؛ نمونه را در شبکه عملیاتی اجرا نکنید.</p><h4>توپولوژی و پیش‌نیاز</h4><p>PC=192.168.10.10/24 در شبکه داخلی با Gateway=192.168.10.1؛ R1 Gi0/0=192.168.10.1/24، Gi0/1=203.0.113.2/30 به ISP Gi0/0=203.0.113.1/30. مقصد آزمایشی ISP Loopback0=198.51.100.1/32 است. آدرس‌های مستنداتی اینترنت واقعی نیستند.</p><h4>دستورات و نقش تجهیزات</h4><h4>R1</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>conf t\ninterface gi0/0\n ip address 192.168.10.1 255.255.255.0\n ip nat inside\n no shutdown\ninterface gi0/1\n ip address 203.0.113.2 255.255.255.252\n ip nat outside\n no shutdown\naccess-list 1 permit 192.168.10.0 0.0.0.255\nip nat inside source list 1 interface gi0/1 overload\nip route 0.0.0.0 0.0.0.0 203.0.113.1\nend</code></pre><h4>ISP</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>conf t\ninterface gi0/0\n ip address 203.0.113.1 255.255.255.252\n no shutdown\ninterface loopback0\n ip address 198.51.100.1 255.255.255.255\nend</code></pre><h4>راستی‌آزمایی و عیب‌یابی</h4><p>از PC مقصد 198.51.100.1 را ping کنید و show ip nat translations و show ip nat statistics را هنگام ترافیک روی R1 ثبت کنید. ترجمه ممکن است بعد از انقضا حذف شود.</p>"
+    },
+    "quiz": {
+      "questions": [
+        {
+          "q": "کاربران LAN با آدرس خصوصی باید با یک IP عمومی مشترک به اینترنت بروند. کدام روش مناسب است؟",
+          "options": [
+            "static route بدون NAT",
+            "PAT با overload",
+            "Standard ACL بدون ترجمه",
+            "DHCP relay به‌تنهایی"
+          ],
+          "answer": 1,
+          "explanation": "PAT چند ارتباط را با ترجمهٔ آدرس و معمولاً شماره پورت از یک آدرس عمومی عبور می‌دهد."
+        },
+        {
+          "q": "روی روتر، اینترفیس متصل به LAN و اینترفیس متصل به ISP برای PAT چگونه علامت می‌خورند؟",
+          "options": [
+            "LAN به‌صورت ip nat inside و ISP به‌صورت ip nat outside",
+            "هر دو inside",
+            "هر دو outside",
+            "فقط روی پورت سوئیچ access"
+          ],
+          "answer": 0,
+          "explanation": "NAT به تعیین سمت inside و outside نیاز دارد؛ جهت را نسبت به شبکهٔ خصوصی و بیرونی مشخص کنید."
+        },
+        {
+          "q": "در PAT، دو کلاینت خصوصی هم‌زمان به یک سرور وب وصل می‌شوند. روتر چگونه ترجمه‌ها را از هم تفکیک می‌کند؟",
+          "options": [
+            "با اختصاص یک AS number به هر packet",
+            "با نام hostname بدون درنظرگرفتن پورت",
+            "با تغییر VLAN مقصد به شمارهٔ کلاینت",
+            "با نگاشت شامل آدرس، پروتکل و پورت‌ها"
+          ],
+          "answer": 3,
+          "explanation": "PAT برای اتصال‌های هم‌زمان از اطلاعات لایهٔ انتقال و آدرس‌ها در جدول ترجمه استفاده می‌کند."
+        },
+        {
+          "q": "ACL مربوط به NAT فقط 10.0.0.0/24 را permit می‌کند. کاربر 10.0.1.10 چرا ترجمه نمی‌شود؟",
+          "options": [
+            "ACL مربوط به NAT فقط DNS را بررسی می‌کند",
+            "NAT همیشه برای تمام subnetها فعال است",
+            "آدرس مبدأ در ACL انتخاب NAT تطبیق ندارد",
+            "PAT به آدرس private اجازهٔ ورود نمی‌دهد"
+          ],
+          "answer": 2,
+          "explanation": "ACL در این کاربرد، ترافیک واجد شرایط ترجمه را انتخاب می‌کند؛ subnet دوم باید طبق سیاست اضافه شود."
+        },
+        {
+          "q": "برای بررسی inside local و inside global یک ارتباط PAT در IOS کدام دستور مناسب است؟",
+          "options": [
+            "show vlan brief",
+            "show ip nat translations",
+            "show ip ospf neighbor",
+            "show ntp associations"
+          ],
+          "answer": 1,
+          "explanation": "جدول NAT translations نگاشت‌های فعال شامل آدرس و در صورت PAT پورت‌ها را نشان می‌دهد."
+        },
+        {
+          "q": "کاربر باید از بیرون همیشه با یک IP عمومی ثابت به سرور داخلی برسد. کدام روش مناسب‌تر است؟",
+          "options": [
+            "Static NAT یا static port forwarding مطابق نیاز",
+            "PAT پویا برای ترافیک خروجی بدون نگاشت ورودی",
+            "DHCP relay",
+            "STP root primary"
+          ],
+          "answer": 0,
+          "explanation": "نگاشت static آدرس یا پورت ثابت را به سرور داخلی مرتبط می‌کند؛ ACL و مسیر برگشت نیز باید درست باشند."
+        },
+        {
+          "q": "ترجمهٔ NAT در جدول وجود دارد اما وب خارجی باز نمی‌شود. کدام نتیجه درست است؟",
+          "options": [
+            "PAT تمام مشکلات لایهٔ ۲ را رفع می‌کند",
+            "وجود ترجمه اثبات می‌کند DNS و مقصد سالم‌اند",
+            "جدول NAT الزاماً نشان‌دهندهٔ پاسخ موفق سرور است",
+            "وجود ترجمه به‌تنهایی کافی نیست؛ مسیر، ACL و دسترسی مقصد نیز باید بررسی شوند"
+          ],
+          "answer": 3,
+          "explanation": "ترجمه فقط یکی از مراحل است؛ مسیر رفت و برگشت، فیلترها، DNS و سلامت سرویس را نیز بررسی کنید."
+        },
+        {
+          "q": "IP خصوصی واقعی کاربر پیش از ترجمه در اصطلاح NAT کدام است؟",
+          "options": [
+            "outside global",
+            "inside global",
+            "inside local",
+            "DHCP server identifier"
+          ],
+          "answer": 2,
+          "explanation": "inside local آدرس میزبان داخلی در دید شبکهٔ داخل است؛ inside global نمای ترجمه‌شدهٔ آن در بیرون است."
+        },
+        {
+          "q": "روتر PAT را برای LAN تنظیم کرده اما هیچ translation ساخته نمی‌شود. کدام بررسی مستقیم‌تر است؟",
+          "options": [
+            "صرفاً ساعت کلاینت را تغییر دهید",
+            "inside/outside، ACL انتخاب NAT و مسیر خروجی را بررسی کنید",
+            "همهٔ VLANها را حذف کنید",
+            "OSPF router ID را بدون بررسی تغییر دهید"
+          ],
+          "answer": 1,
+          "explanation": "ترتیب نقش اینترفیس‌ها، تطبیق ACL، پیکربندی overload و ارسال واقعی ترافیک عوامل اصلی ایجاد translation هستند."
+        },
+        {
+          "q": "برای بررسی شمارنده‌ها و وضعیت کلی NAT کدام دستور مکمل جدول ترجمه است؟",
+          "options": [
+            "show ip nat statistics",
+            "show ip dhcp pool تنها",
+            "show spanning-tree root",
+            "show ip ospf database"
+          ],
+          "answer": 0,
+          "explanation": "show ip nat statistics آمار ترجمه‌ها، interfaceهای inside/outside و hit/miss را برای تشخیص کمک می‌کند."
+        }
+      ]
+    }
+  }
+}

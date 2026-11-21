@@ -1,0 +1,198 @@
+{
+  "lessonId": "ccna-rest-json",
+  "track": "CCNA 200-301",
+  "title": "اتوماسیون شبکه: REST API، JSON و Cisco DNA Center",
+  "beforeYouStart": {
+    "prerequisites": [
+      "آشنایی پایه با مفاهیم شبکه"
+    ],
+    "learningObjectives": [
+      "اتوماسیون شبکه با استفاده از کنترلرهای SDN (مانند Cisco DNA Center) و رابط‌های برنامه‌نویس..."
+    ]
+  },
+  "whyItMatters": "اتوماسیون شبکه با استفاده از کنترلرهای SDN (مانند Cisco DNA Center) و رابط‌های برنامه‌نویسی RESTful API جایگزین پیکربندی دستی CLI در مقیاس بزرگ می‌شود. داده‌ها معمولاً در قالب ساختاریافتهٔ JSON (جفت‌های Key-Value) مبادله می‌شوند.",
+  "sections": [
+    {
+      "id": "concepts",
+      "title": "مبانی و مفاهیم اصلی",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>اتوماسیون شبکه با استفاده از کنترلرهای SDN (مانند Cisco DNA Center) و رابط‌های برنامه‌نویسی RESTful API جایگزین پیکربندی دستی CLI در مقیاس بزرگ می‌شود. داده‌ها معمولاً در قالب ساختاریافتهٔ JSON (جفت‌های Key-Value) مبادله می‌شوند.</p>"
+    },
+    {
+      "id": "how-it-works",
+      "title": "نحوه عملکرد در شبکه",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>کلاینت از طریق پروتکل HTTP/HTTPS درخواست‌های CRUD را ارسال می‌کند: GET (خواندن)، POST (ایجاد)، PUT/PATCH (به‌روزرسانی)، DELETE (حذف). سرور کد وضعیت (مثل 200 OK، 201 Created، 401 Unauthorized، 404 Not Found) و بدنهٔ JSON را برمی‌گرداند.</p><h4>چرخهٔ احراز هویت و پاسخ</h4><p>درخواست token و درخواست داده دو مرحله‌اند: ابتدا با حساب مجاز از endpoint احراز هویت توکن دریافت کنید و سپس token را در header درخواست GET بفرستید. وضعیت 401 معمولاً مشکل اعتبار یا انقضای احراز هویت و 403 مشکل مجوز است؛ نام endpoint، ساختار پاسخ و مجوزها به نسخهٔ کنترلر بستگی دارند.</p><p>TLS با CA معتبر و نام میزبان تطبیق‌یافته از ارتباط محافظت می‌کند؛ JSON مجموعه‌ای از کلید و مقدار است و نباید اطلاعات حساس response یا token در گزارش عمومی چاپ شود. نمونهٔ کاربرگ رمز و token را در آرگومان خط فرمان قرار نمی‌دهد.</p>"
+    },
+    {
+      "id": "components",
+      "title": "اجزا، مزایا و محدودیت‌ها",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>مقایسه ابزارها: Ansible (Agentless با YAML روی SSH)، Puppet/Chef (نیاز به Agent یا مدل Pull/Push). تفاوت JSON و YAML و XML در خوانایی و ساختار.</p>"
+    },
+    {
+      "id": "topology",
+      "title": "توپولوژی اختصاصی درس",
+      "html": "<svg viewBox=\"0 0 640 160\" width=\"100%\" height=\"160\" dir=\"ltr\" style=\"background:#06090f;border:1px solid #1e293b;border-radius:8px\"><line x1=\"115\" y1=\"80\" x2=\"215\" y2=\"80\" stroke=\"#38bdf8\" stroke-width=\"2.5\"/><line x1=\"315\" y1=\"80\" x2=\"395\" y2=\"80\" stroke=\"#38bdf8\" stroke-width=\"2.5\"/><line x1=\"495\" y1=\"80\" x2=\"545\" y2=\"80\" stroke=\"#22c55e\" stroke-width=\"2.5\"/><rect x=\"15\" y=\"52\" width=\"100\" height=\"56\" rx=\"8\" fill=\"#0f172a\" stroke=\"#38bdf8\" stroke-width=\"1.5\"/><text x=\"65\" y=\"84\" fill=\"#e2e8f0\" font-size=\"11\" text-anchor=\"middle\" font-family=\"sans-serif\">Python/Ansible</text><rect x=\"215\" y=\"52\" width=\"100\" height=\"56\" rx=\"8\" fill=\"#0f172a\" stroke=\"#38bdf8\" stroke-width=\"1.5\"/><text x=\"265\" y=\"84\" fill=\"#e2e8f0\" font-size=\"11\" text-anchor=\"middle\" font-family=\"sans-serif\">REST HTTPS (JSON)</text><rect x=\"395\" y=\"52\" width=\"100\" height=\"56\" rx=\"8\" fill=\"#0f172a\" stroke=\"#38bdf8\" stroke-width=\"1.5\"/><text x=\"445\" y=\"84\" fill=\"#e2e8f0\" font-size=\"11\" text-anchor=\"middle\" font-family=\"sans-serif\">DNA Center</text><rect x=\"545\" y=\"52\" width=\"85\" height=\"56\" rx=\"8\" fill=\"#0f172a\" stroke=\"#22c55e\" stroke-width=\"1.5\"/><text x=\"587\" y=\"84\" fill=\"#e2e8f0\" font-size=\"10\" text-anchor=\"middle\" font-family=\"sans-serif\">Managed Switches</text></svg>"
+    },
+    {
+      "id": "scenario",
+      "title": "سناریوی عملی و تجهیزات",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>دریافت فهرست تجهیزات شبکه از Cisco DNA Center از طریق درخواست REST GET به مسیر /dna/intent/api/v1/network-device با توکن احراز هویت X-Auth-Token.</p>"
+    },
+    {
+      "id": "ios-commands",
+      "title": "دستورات Cisco IOS به ترتیب اجرا",
+      "html": "<p>برای گرفتن X-Auth-Token باید ابتدا با حساب مجاز به endpoint احراز هویت درخواست POST داد، سپس توکن را در header درخواست GET قرار داد. نمونهٔ کامل با TLS و عدم ثبت رمز در history در کاربرگ آمده است.</p><pre class=\"cli-block\" dir=\"ltr\"><code>GET /dna/intent/api/v1/network-device\nX-Auth-Token: &lt;token from authentication endpoint&gt;</code></pre>"
+    },
+    {
+      "id": "verification",
+      "title": "تست و خروجی مورد انتظار (Verification)",
+      "html": "<pre dir='ltr' style='padding:10px;background:#020617;border:1px solid #1e293b;border-radius:6px;color:#86efac;font-size:11px;overflow:auto'>HTTP/1.1 200 OK\n{\"response\": [{\"hostname\": \"SW1\", \"platformId\": \"C9300-24P\", \"reachabilityStatus\": \"Reachable\"}]}</pre>"
+    },
+    {
+      "id": "troubleshooting",
+      "title": "عیب‌یابی (Troubleshooting)",
+      "html": "<p style='line-height:1.8;color:#fca5a5'>1) خطای 401 Unauthorized: منقضی‌شدن X-Auth-Token. 2) خطای Syntax در JSON: وجود کامای اضافی (Trailing Comma) یا عدم استفاده از Double Quote.</p>"
+    },
+    {
+      "id": "exam-tips",
+      "title": "نکات آزمون CCNA / CCNP و ارتباط با مباحث دیگر",
+      "html": "<p style='line-height:1.8;color:#fde68a'>نگاشت متدهای HTTP به CRUD، تفاوت Ansible/Puppet/Chef و تشخیص JSON معتبر در بخش Automation آزمون CCNA 200-301 پرسیده می‌شوند.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "CCNA-REST-JSON",
+      "fa": "اتوماسیون شبکه: REST API، JSON و Cisco DNA Center",
+      "simple": "مفهوم کلیدی و استاندارد پیاده‌سازی در اتوماسیون شبکه: REST API، JSON و Cisco DNA Center."
+    },
+    {
+      "term": "Verification",
+      "fa": "راستی‌آزمایی",
+      "simple": "بررسی خروجی زنده دستورات show در Cisco IOS برای اطمینان از صحت عملکرد."
+    },
+    {
+      "term": "Troubleshooting",
+      "fa": "عیب‌یابی",
+      "simple": "تحلیل گام‌به‌گام خطاهای لایه‌ای و تطبیق پیکربندی."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "کاربرگ اختصاصی آزمایشگاه (اجرا نشده)",
+      "html": "<p class=\"lesson-quiz-warning\">این کاربرگ طراحی‌شده است و روی IOS یا PNETLab اجرا و تأیید نشده است. نام رابط‌ها و نسخه و قابلیت‌های ایمیج را پیش از اجرا در محیط ایزوله بررسی کنید. خروجی‌ها و شمارنده‌ها باید در محیط واقعی ثبت شوند.</p><h4>پیش‌نیاز</h4><p>روی رایانه‌ای مورد اعتماد با Python 3، فایل CA معتبر lab-ca.pem و حساب فقط‌خواندنی در Cisco Catalyst Center / DNA Center از HTTPS استفاده کنید. نام کنترلر و مسیرهای API را با نسخهٔ واقعی تطبیق دهید. نمونه را در فایلی مثل lab_rest.py ذخیره و با python3 lab_rest.py اجرا کنید.</p><h4>درخواست توکن و فهرست تجهیزات بدون قرار دادن رمز یا توکن در آرگومان فرایند</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>from getpass import getpass\nfrom urllib.request import Request, build_opener, HTTPSHandler, HTTPRedirectHandler\nfrom urllib.error import HTTPError, URLError\nimport base64\nimport json\nimport ssl\n\nbase = &#x27;https://dnac.lab&#x27;  # نام باید با گواهی معتبر مطابقت داشته باشد\ncontext = ssl.create_default_context(cafile=&#x27;lab-ca.pem&#x27;)\n\nclass NoRedirect(HTTPRedirectHandler):\n    def redirect_request(self, req, fp, code, msg, headers, newurl):\n        return None  # رمز یا توکن را به آدرس دیگر ارسال نکنید\n\nopener = build_opener(HTTPSHandler(context=context), NoRedirect())\nusername = input(&#x27;Username: &#x27;)\npassword = getpass(&#x27;Password: &#x27;)\ncredentials = base64.b64encode((username + &#x27;:&#x27; + password).encode()).decode()\ndel password, username\ntry:\n    request = Request(base + &#x27;/dna/system/api/v1/auth/token&#x27;, method=&#x27;POST&#x27;,\n                      headers={&#x27;Authorization&#x27;: &#x27;Basic &#x27; + credentials})\n    with opener.open(request, timeout=15) as response:\n        token = json.load(response)[&#x27;Token&#x27;]\n    del credentials, request\n    request = Request(base + &#x27;/dna/intent/api/v1/network-device&#x27;,\n                      headers={&#x27;X-Auth-Token&#x27;: token})\n    with opener.open(request, timeout=15) as response:\n        devices = json.load(response)\n    print(json.dumps(devices, ensure_ascii=False, indent=2))\nexcept HTTPError as error:\n    print(&#x27;HTTP error:&#x27;, error.code)  # بدنهٔ خطا یا توکن را چاپ نکنید\nexcept (URLError, OSError, ValueError, KeyError) as error:\n    print(&#x27;Request failed; check TLS, connectivity and API response type:&#x27;, type(error).__name__)\nfinally:\n    # حذف ارجاع‌ها پاک‌سازی قطعی حافظه در Python را تضمین نمی‌کند.\n    credentials = token = request = None\n</code></pre><h4>راستی‌آزمایی و امنیت</h4><p>گذرواژه تعاملی و بدون echo دریافت می‌شود؛ رمز و توکن در حافظهٔ همان فرایند قرار می‌گیرند، نه آرگومان فرایند. از میزبان مورد اعتماد استفاده کنید؛ Python پاک‌سازی قطعی حافظه را تضمین نمی‌کند؛ redirect خودکار غیرفعال است تا اعتبارنامه به مقصد دیگر ارسال نشود. 401 را با بررسی اعتبار یا انقضای توکن، 403 را با مجوز حساب و خطای TLS را با CA و نام میزبان بررسی کنید. پاسخ و لاگ‌ها می‌توانند اطلاعات تجهیزات را داشته باشند؛ با احتیاط نگهداری شوند. هیچ درخواست تغییردهنده‌ای ارسال نمی‌شود.</p>"
+    },
+    "quiz": {
+      "questions": [
+        {
+          "q": "برای خواندن فهرست تجهیزات از REST API بدون تغییر منبع، کدام متد معمولاً مناسب است؟",
+          "options": [
+            "DELETE",
+            "GET",
+            "POST برای حذف",
+            "PATCH بدون بدنه"
+          ],
+          "answer": 1,
+          "explanation": "GET برای بازیابی representation استفاده می‌شود؛ تأثیر واقعی endpoint را باید از مستندات API بررسی کرد."
+        },
+        {
+          "q": "کلاینت به endpoint کنترلر REST درخواست می‌دهد و HTTP 401 دریافت می‌کند. بررسی اول چیست؟",
+          "options": [
+            "اعتبار، انقضا و ارسال صحیح token یا اطلاعات احراز هویت",
+            "تعویض VLAN کاربران بدون بررسی",
+            "فرض سالم بودن اعتبارنامه و حذف logging",
+            "تغییر OSPF cost سرور"
+          ],
+          "answer": 0,
+          "explanation": "401 معمولاً به مشکل احراز هویت مربوط است؛ هدر token، زمان انقضا و روش دریافت توکن را بررسی کنید."
+        },
+        {
+          "q": "برای endpoint مبتنی بر token در Cisco DNA Center، مقدار X-Auth-Token از کجا می‌آید؟",
+          "options": [
+            "از wildcard ACL",
+            "از ثابت قرار دادن رشتهٔ خالی",
+            "از جدول MAC سوئیچ",
+            "از پاسخ endpoint احراز هویت مطابق مستندات نسخهٔ کنترلر"
+          ],
+          "answer": 3,
+          "explanation": "کلاینت ابتدا طبق مستندات کنترلر احراز هویت می‌کند و token برگردانده‌شده را در هدر درخواست‌های بعدی قرار می‌دهد."
+        },
+        {
+          "q": "برنامه JSON زیر را ارسال می‌کند: {\"name\":\"R1\",}. چرا parser استاندارد آن را رد می‌کند؟",
+          "options": [
+            "JSON اجازهٔ object ندارد",
+            "JSON همیشه به single quote نیاز دارد",
+            "در JSON کامای انتهایی پس از آخرین عضو مجاز نیست",
+            "مقدار رشته‌ای باید بدون علامت نقل‌قول باشد"
+          ],
+          "answer": 2,
+          "explanation": "JSON استاندارد کامای انتهایی ندارد و نام کلیدهای object و رشته‌ها باید با double quote نوشته شوند."
+        },
+        {
+          "q": "در REST API یک درخواست POST برای ساخت منبع موفق بوده و سرور 201 برگردانده است. تعبیر رایج چیست؟",
+          "options": [
+            "همیشه خطای احراز هویت رخ داده",
+            "منبع ایجاد شده و جزئیات به قرارداد API وابسته است",
+            "درخواست هیچ بدنه‌ای نمی‌تواند داشته باشد",
+            "منبع قبلی حذف شده است"
+          ],
+          "answer": 1,
+          "explanation": "201 Created عموماً نشان‌دهندهٔ ایجاد منبع است؛ مکان و بدنهٔ پاسخ به پیاده‌سازی endpoint بستگی دارد."
+        },
+        {
+          "q": "تفاوت PUT و PATCH در APIهای REST معمولاً چیست؟",
+          "options": [
+            "PUT معمولاً جایگزینی representation و PATCH تغییر جزئی را بیان می‌کند",
+            "هر دو تنها برای خواندن هستند",
+            "PATCH همیشه session را حذف می‌کند",
+            "PUT فقط برای DNS است"
+          ],
+          "answer": 0,
+          "explanation": "PUT معمولاً برای جایگزینی و PATCH برای تغییر جزئی به‌کار می‌رود؛ قرارداد API ممکن است جزئیات ویژه‌ای داشته باشد."
+        },
+        {
+          "q": "در پاسخ REST کد 404 دریافت می‌شود. کدام بررسی مرتبط‌تر است؟",
+          "options": [
+            "فرض موفقیت درخواست بدون بررسی",
+            "فقط تنظیم سرعت پورت access",
+            "افزودن دستور ntp master",
+            "درستی مسیر endpoint و شناسهٔ منبع"
+          ],
+          "answer": 3,
+          "explanation": "404 معمولاً به پیدا نشدن منبع یا endpoint اشاره دارد؛ URL، نسخهٔ API و شناسه بررسی شوند."
+        },
+        {
+          "q": "تیمی token کنترلر را در اسکریپت REST به‌صورت ثابت منتشر کرده است. روش امن‌تر چیست؟",
+          "options": [
+            "چاپ token در همهٔ logها",
+            "قرار دادن token در مخزن عمومی",
+            "خواندن اعتبارنامه از مخزن امن secrets و دریافت token با TLS",
+            "غیرفعال کردن TLS در production"
+          ],
+          "answer": 2,
+          "explanation": "اعتبارنامه و token حساس‌اند؛ از secret store، TLS معتبر و حذف دادهٔ حساس از log استفاده شود."
+        },
+        {
+          "q": "در JSON مقدار {\"interfaces\":[{\"name\":\"Gi0/1\"}]} از چه ساختاری برای interfaces استفاده کرده است؟",
+          "options": [
+            "رشتهٔ سادهٔ فاقد ساختار",
+            "یک آرایه از objectها",
+            "فقط یک عدد صحیح",
+            "دستور Cisco IOS قابل اجرا"
+          ],
+          "answer": 1,
+          "explanation": "interfaces یک array است و عنصر آن یک object با کلید name است؛ JSON داده است، نه CLI."
+        },
+        {
+          "q": "در درخواست REST تغییر تنظیمات، timeout رخ می‌دهد و معلوم نیست عملیات اجرا شده است یا نه. چه باید کرد؟",
+          "options": [
+            "ابتدا وضعیت منبع را با GET و سیاست idempotency بررسی کنید",
+            "بی‌درنگ POST را بارها بدون بررسی تکرار کنید",
+            "حذف تمام تجهیزات از کنترلر",
+            "فرض کنید timeout حتماً به معنی اجرا نشدن است"
+          ],
+          "answer": 0,
+          "explanation": "timeout ممکن است بعد از اجرای سمت سرور رخ دهد؛ پیش از retry نتیجه را با خواندن وضعیت و قرارداد idempotency بسنجید."
+        }
+      ]
+    }
+  }
+}

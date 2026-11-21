@@ -1,0 +1,355 @@
+{
+  "lessonId": "encor-bgp-ospf",
+  "track": "CCNP ENCOR",
+  "title": "OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF",
+  "sections": [
+    {
+      "id": "sec-0-intro",
+      "title": "مقدمه و هدف یادگیری",
+      "html": "<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>&gt; دوره: CCNP ENCOR 350-401</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>هدف یادگیری</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در پایان این بخش، دانشجو باید بتواند:</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>1. تفاوت Switching و Routing را با مثال شبکه‌ای توضیح دهد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>2. مفهوم Routing Table، Next-Hop و Longest Prefix Match را تحلیل کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>3. Static Routing و Dynamic Routing را از نظر کاربرد و مقیاس‌پذیری مقایسه کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>4. جایگاه IGP و EGP و مفهوم Autonomous System را توضیح دهد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>5. ماهیت Link-State در OSPF، مفهوم LSDB و الگوریتم SPF را در سطح مقدماتی تشریح کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>6. دلیل طراحی Multi-Area، نقش Area 0، ABR و ASBR را از هم تفکیک کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>"
+    },
+    {
+      "id": "sec-1",
+      "title": "۱. چرا به Routing نیاز داریم؟",
+      "html": "<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>یک سازمان چندشعبه‌ای را در نظر بگیرید که در تهران، اصفهان، شیراز و مشهد دفتر دارد. در هر شعبه تعدادی کامپیوتر، سرور، تلفن IP و تجهیزات شبکه وجود دارد. این دستگاه‌ها باید بتوانند با یکدیگر ارتباط برقرار کنند؛ برای مثال کاربر تهران باید به سرور مالی اصفهان دسترسی داشته باشد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>پرسش بنیادی این است: وقتی یک میزبان می‌خواهد بسته‌ای را به مقصدی در یک شبکه IP دیگر بفرستد، چگونه مشخص می‌شود بسته باید از کدام مسیر عبور کند؟</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>پاسخ، <strong>Routing</strong> است.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۱.۱ تفاوت Switching و Routing</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>یک ساختمان اداری را تصور کنید. در هر طبقه اتاق‌های متعددی وجود دارد. تحویل نامه بین اتاق‌های همان طبقه را می‌توان به Switching تشبیه کرد. اما اگر نامه باید از ساختمان تهران به ساختمان اصفهان برسد، دیگر توزیع داخلی طبقه کافی نیست؛ باید مسیر بین دو ساختمان تعیین شود. این بخش به Routing شباهت دارد.</p>\n<div style='overflow-x:auto;margin:10px 0'><table style='width:100%;border-collapse:collapse;font-size:12px'><tr><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>ویژگی</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>Switching</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>Routing</th></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>واحد داده در لایه مربوط</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Ethernet Frame</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>IP Packet</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>آدرس اصلی تصمیم‌گیری</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>MAC Address</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>IP Address</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>جدول اصلی</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>MAC Address Table</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Routing Table</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>دستگاه متداول</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Layer 2 Switch</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Router یا Layer 3 Switch</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>کاربرد متداول</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>انتقال فریم در یک LAN/VLAN</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>انتقال بسته بین شبکه‌های IP</td></tr></table></div>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>این مقایسه درباره نقش‌های معمول تجهیزات است؛ سوئیچ لایه ۳ می‌تواند هم Switching و هم Routing انجام دهد.</p>\n<h4 style='margin:12px 0 6px;color:#e2e8f0;font-size:14px'>مثال آدرس‌دهی</h4>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>فرض کنید میزبان اول آدرس <code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">192.168.10.10/24</code> و سرور آدرس <code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">192.168.20.20/24</code> دارد. ماسک <code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">/24</code> یعنی ۲۴ بیت اول پیشوند شبکه را مشخص می‌کنند. بنابراین این دو میزبان در دو شبکه متفاوت‌اند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>میزبان مبدأ با بررسی آدرس IP و ماسک خود تشخیص می‌دهد مقصد محلی نیست. در نتیجه بسته IP را برای ارسال به <strong>Default Gateway</strong> آماده می‌کند. برای تحویل فریم به Gateway، ابتدا باید MAC آن را به کمک ARP به دست آورد؛ سپس فریم Ethernet را به MAC روتر می‌فرستد. روتر فریم ورودی را دریافت می‌کند، هدر لایه ۲ را کنار می‌گذارد، مقصد IP را بررسی می‌کند و برای تصمیم‌گیری سراغ جدول مسیریابی می‌رود.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نکته مهم: آدرس IP مبدأ و مقصد در حالت عادی در طول مسیریابی انتهابه‌انتها ثابت می‌مانند، اما هدر لایه ۲ در هر لینک عوض می‌شود. جزئیات NAT، تونل‌سازی و سایر استثناها در درس‌های مربوط بررسی می‌شوند.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۱.۲ جدول مسیریابی (Routing Table)</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>Routing Table مجموعه‌ای از مسیرهایی است که روتر برای تصمیم‌گیری درباره ارسال بسته‌ها در اختیار دارد. هر مسیر می‌تواند شامل پیشوند مقصد، طول پیشوند، منبع یادگیری مسیر، Administrative Distance، Metric، Next-Hop و رابط خروجی باشد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نمونه ساده:</p>\n<div style='overflow-x:auto;margin:10px 0'><table style='width:100%;border-collapse:collapse;font-size:12px'><tr><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>Prefix مقصد</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>Next-Hop</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>رابط خروجی</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>توضیح</th></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">192.168.10.0/24</code></td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مستقیم</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>G0/0</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>شبکه متصل مستقیم</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">192.168.20.0/24</code></td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">10.0.12.2</code></td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>G0/1</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مسیر از روتر بعدی</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">192.168.30.0/24</code></td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">10.0.13.2</code></td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>G0/2</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مسیر از لینک دیگر</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">0.0.0.0/0</code></td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">10.0.12.1</code></td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>G0/1</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مسیر پیش‌فرض</td></tr></table></div>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>این جدول صرفاً نمونه آموزشی است. در خروجی واقعی Cisco IOS، کد منبع Route، فاصله مدیریتی و Metric نیز نمایش داده می‌شوند.</p>\n<h4 style='margin:12px 0 6px;color:#e2e8f0;font-size:14px'>Next-Hop چیست؟</h4>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>Next-Hop آدرس IP روتر بعدی‌ای است که بسته باید به آن تحویل داده شود تا در مسیر رسیدن به مقصد پیش برود. Next-Hop الزاماً مقصد نهایی نیست؛ فقط گام بعدی در مسیر است.</p>\n<h4 style='margin:12px 0 6px;color:#e2e8f0;font-size:14px'>Default Route چیست؟</h4>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>مسیر <code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">0.0.0.0/0</code> با طول پیشوند صفر، با هر آدرس IPv4 مطابقت دارد و معمولاً زمانی استفاده می‌شود که مسیر اختصاصی‌تری برای مقصد پیدا نشده باشد. این مسیر به معنی «هرگز بسته را ارسال کن» نیست؛ فقط یک مسیر عمومی است و باید Next-Hop یا رابط خروجی معتبر داشته باشد.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۱.۳ قانون Longest Prefix Match</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>یکی از مهم‌ترین قواعد Forwarding در روترهای IP، <strong>Longest Prefix Match</strong> است.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>فرض کنید جدول مسیریابی دو مسیر زیر را دارد:</p>\n<pre dir='ltr' style='margin:10px 0;padding:12px;background:#020617;border:1px solid #1e293b;border-radius:6px;color:#38bdf8;font-size:12px;overflow-x:auto;line-height:1.6'><code>192.168.0.0/16\n192.168.10.0/24</code></pre>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>بسته‌ای برای مقصد <code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">192.168.10.25</code> وارد روتر می‌شود. هر دو پیشوند با مقصد مطابقت دارند، اما مسیر <code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">192.168.10.0/24</code> انتخاب می‌شود؛ چون پیشوند بلندتر و اختصاصی‌تری دارد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>ترتیب تصمیم را این‌گونه به خاطر بسپارید:</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>1. روتر تمام Routeهای دارای تطابق با مقصد را در نظر می‌گیرد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>2. Route دارای بیشترین تعداد بیت پیشوند مشترک را انتخاب می‌کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>3. اگر چند مسیر با طول پیشوند یکسان برای همان مقصد وجود داشته باشند، معیارهای انتخاب Route و در صورت امکان Load Balancing مطرح می‌شوند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><strong>Longest Prefix Match را با Administrative Distance یا Routing Protocol Metric اشتباه نگیرید.</strong> ابتدا میزان اختصاصی بودن Prefix در Forwarding اهمیت دارد؛ AD و Metric برای انتخاب/نصب مسیرها در شرایط مربوط به خود استفاده می‌شوند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>"
+    },
+    {
+      "id": "sec-2",
+      "title": "۲. Static Routing و Dynamic Routing",
+      "html": "<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۲.۱ مسیریابی ایستا (Static Routing)</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در Static Routing مدیر شبکه مسیر را به‌صورت دستی تعریف می‌کند. نمونه Cisco IOS:</p>\n<pre dir='ltr' style='margin:10px 0;padding:12px;background:#020617;border:1px solid #1e293b;border-radius:6px;color:#38bdf8;font-size:12px;overflow-x:auto;line-height:1.6'><code>ip route 192.168.20.0 255.255.255.0 10.0.12.2</code></pre>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>توضیح جزءبه‌جزء:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">ip route</code>: تعریف یک مسیر ایستای IPv4.</li><li><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">192.168.20.0</code>: آدرس شبکه مقصد.</li><li><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">255.255.255.0</code>: ماسک شبکه مقصد، معادل <code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">/24</code>.</li><li><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">10.0.12.2</code>: آدرس Next-Hop که بسته به سمت آن فرستاده می‌شود.</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>مزایا:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>کنترل مستقیم و قابل پیش‌بینی.</li><li>سربار پروتکل مسیریابی و تبادل پیام‌های کنترلی ندارد.</li><li>برای توپولوژی‌های کوچک، Stub Networkها و مسیرهای مشخص بسیار مناسب است.</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>محدودیت‌ها:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>با تغییر توپولوژی، مسیرها ممکن است نیازمند اصلاح دستی باشند.</li><li>در شبکه بزرگ، نگهداری تعداد زیادی مسیر دشوار می‌شود.</li><li>مسیر ایستا به‌خودی‌خود از تغییرات شبکه آگاه نمی‌شود؛ برای رفتارهای پشتیبان باید طراحی تکمیلی انجام شود.</li></ul>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۲.۲ مسیریابی پویا (Dynamic Routing)</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در Dynamic Routing روترها با استفاده از پروتکل‌های مسیریابی، اطلاعات Reachability را با همسایه‌ها مبادله می‌کنند و در واکنش به تغییرات، مسیرها را به‌روزرسانی می‌کنند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>برای نمونه، اگر یک لینک قطع شود، پروتکل ممکن است پس از تشخیص خرابی و همگرایی، مسیر جایگزین را محاسبه و نصب کند. زمان و کیفیت این فرایند به پروتکل، توپولوژی، Timerها، پیاده‌سازی و طراحی شبکه وابسته است؛ Dynamic بودن به معنی بازیابی آنی و تضمین‌شده نیست.</p>\n<div style='overflow-x:auto;margin:10px 0'><table style='width:100%;border-collapse:collapse;font-size:12px'><tr><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>موضوع</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>Static Routing</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>Dynamic Routing</th></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>تعریف مسیر</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>دستی</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>با تبادل اطلاعات پروتکل</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>واکنش به تغییرات</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>نیازمند طراحی/تنظیم تکمیلی</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>امکان یادگیری و همگرایی خودکار</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>سربار کنترلی</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>بسیار کم</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>بسته به پروتکل</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مقیاس‌پذیری عملیاتی</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>در شبکه بزرگ دشوارتر</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مناسب‌تر برای شبکه‌های گسترده</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>کنترل سیاستی</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مستقیم و ساده</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>وابسته به قابلیت پروتکل و تنظیمات</td></tr></table></div>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>"
+    },
+    {
+      "id": "sec-3",
+      "title": "۳. IGP، EGP و مفهوم Autonomous System",
+      "html": "<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>برای درک جایگاه OSPF و BGP باید مرز مدیریتی شبکه‌ها را بشناسیم.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۳.۱ Autonomous System (AS)</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><strong>Autonomous System</strong> مجموعه‌ای از پیشوندهای IP و روترهاست که تحت یک مدیریت و سیاست مسیریابی مشترک اداره می‌شود و در مسیریابی بین‌دامنه‌ای با یک شناسه عددی به نام <strong>Autonomous System Number (ASN)</strong> شناخته می‌شود.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>مثال آموزشی:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>سازمان: AS 65001</li><li>ارائه‌دهنده سرویس اول: AS 65100</li><li>ارائه‌دهنده سرویس دوم: AS 65200</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>این شماره‌ها صرفاً برای مثال و مستندسازی‌اند. در محیط عملیاتی باید ASN تخصیص‌یافته و سیاست‌های ثبت و استفاده از آن رعایت شوند.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۳.۲ IGP چیست؟</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>Interior Gateway Protocol برای تبادل اطلاعات مسیریابی درون یک AS استفاده می‌شود. نمونه‌ها:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>OSPF</li><li>IS-IS</li><li>EIGRP</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>هدف معمول IGP فراهم‌کردن Reachability داخلی و انتخاب مسیر در دامنه مدیریتی سازمان است.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۳.۳ EGP و BGP چیست؟</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در کاربرد امروزی، پروتکل اصلی مسیریابی بین Autonomous Systemها، <strong>BGP</strong> است. BGP یک Path-Vector protocol است و علاوه بر Reachability، Attributeهای مسیر را برای اعمال سیاست‌های مسیریابی حمل می‌کند.</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li><strong>OSPF</strong>: معمولاً برای مسیریابی داخلی سازمان و داخل یک AS.</li><li><strong>eBGP</strong>: برای تبادل Route بین دو AS متفاوت.</li><li><strong>iBGP</strong>: برای انتشار اطلاعات BGP در داخل یک AS.</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>پس eBGP و iBGP هر دو حالت‌های BGP هستند؛ تفاوت اصلی آن‌ها در رابطه AS همسایه‌هاست.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نمای ساده:</p>\n<pre dir='ltr' style='margin:10px 0;padding:12px;background:#020617;border:1px solid #1e293b;border-radius:6px;color:#38bdf8;font-size:12px;overflow-x:auto;line-height:1.6'><code>       سازمان ما                         ISP\n     Autonomous System               Autonomous System\n          AS 65001                       AS 65100\n\n   [Internal Routers]                 [ISP Routers]\n       OSPF Domain                        ISP IGP\n             |                               |\n        [Edge Router] ===== eBGP ===== [ISP Edge]</code></pre>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><strong>نکته معماری:</strong> OSPF و eBGP جایگزین یکدیگر نیستند. در طراحی متداول، OSPF برای Reachability داخل سازمان و eBGP برای تبادل مسیر با ISP به کار می‌روند. این‌که کدام Routeها بین این دو دامنه تبادل شوند، نیازمند طراحی سیاستی و کنترل‌شده است؛ Redistribution نباید بدون نیاز و فیلتر مناسب انجام شود.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>"
+    },
+    {
+      "id": "sec-4",
+      "title": "۴. OSPF از پایه: Link-State، LSDB و SPF",
+      "html": "<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۴.۱ OSPF چیست؟</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>OSPF مخفف <strong>Open Shortest Path First</strong> است. OSPFv2 برای IPv4 و OSPFv3 برای IPv6 و قابلیت‌های مرتبط به کار می‌روند. OSPF یک IGP از نوع Link-State است.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در پروتکل Link-State، روترها اطلاعاتی درباره وضعیت لینک‌ها و توپولوژی مرتبط با Area خود تولید و مبادله می‌کنند. هر روتر با دریافت و همگام‌سازی این اطلاعات، یک پایگاه داده توپولوژی می‌سازد و بر اساس آن مسیرها را محاسبه می‌کند.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۴.۲ LSDB چیست؟</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><strong>Link-State Database (LSDB)</strong> پایگاه داده‌ای از اطلاعات Link-State است که روترهای یک Area با استفاده از LSAها آن را همگام می‌کنند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نکات مهم:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>روترهای یک Area باید LSDB همگرا و سازگار مربوط به همان Area را داشته باشند؛ این به معنی یکسان بودن تمام جدول‌های Routing آن‌ها نیست.</li><li>LSDB نقشه منطقی توپولوژی را توصیف می‌کند؛ Routing Table نتیجه انتخاب مسیرها و فرایندهای نصب Route است.</li><li>LSDB با Routing Table یکی نیست.</li><li>OSPF برای محاسبه مسیر از اطلاعات LSDB استفاده می‌کند.</li></ul>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۴.۳ LSA چیست؟</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><strong>Link-State Advertisement (LSA)</strong> واحد اطلاعاتی است که وضعیت لینک‌ها، شبکه‌ها یا اطلاعات مسیریابی مرتبط را توصیف می‌کند. LSAها درون Link-State Updateها حمل می‌شوند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در OSPFv2، انواع مهم LSA عبارت‌اند از:</p>\n<div style='overflow-x:auto;margin:10px 0'><table style='width:100%;border-collapse:collapse;font-size:12px'><tr><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>Type</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>نام</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>کاربرد کلی</th></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>1</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Router LSA</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>توصیف لینک‌ها و وضعیت روتر در Area خودش</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>2</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Network LSA</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>توصیف یک شبکه چنددسترسی توسط DR</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>3</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Summary LSA</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>معرفی Prefixهای یک Area به Area دیگر توسط ABR</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>4</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>ASBR Summary LSA</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>معرفی مسیر رسیدن به ASBR برای Areaهای دیگر</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>5</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>AS External LSA</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>تبلیغ Routeهای خارجی در دامنه OSPF، به‌جز محدودیت‌های Stub</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>7</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>NSSA External LSA</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>تبلیغ Route خارجی درون NSSA؛ معمولاً ABR آن را به Type 5 تبدیل می‌کند</td></tr></table></div>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نکته‌های دقیق:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>Type 2 فقط برای شبکه‌های چنددسترسی که DR انتخاب شده است تولید می‌شود؛ در هر لینک OSPF وجود ندارد.</li><li>Type 3 را ABR برای معرفی شبکه‌ها بین Areaها تولید می‌کند.</li><li>Type 4 اطلاعات دسترسی به ASBR را به Areaهای دیگر منتقل می‌کند.</li><li>Type 5 برای Routeهای خارجی در دامنه‌های مجاز OSPF استفاده می‌شود.</li><li>Type 7 در NSSA استفاده می‌شود و در مرز NSSA معمولاً به Type 5 تبدیل می‌شود؛ جزئیات ترجمه به طراحی و تنظیمات وابسته است.</li></ul>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۴.۴ الگوریتم SPF</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>OSPF از الگوریتم Dijkstra Shortest Path First برای محاسبه درخت کوتاه‌ترین مسیر از دید روتر استفاده می‌کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>تصور کنید یک نقشه از شهر دارید که هر جاده هزینه مشخصی دارد. الگوریتم باید مسیرهایی را پیدا کند که مجموع هزینه آن‌ها از مبدأ تا مقصد کمینه باشد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در OSPF این هزینه با <strong>Cost</strong> نمایش داده می‌شود. بنابراین «کوتاه‌ترین» در نام SPF لزوماً به معنی کمترین فاصله جغرافیایی یا کمترین تعداد روتر نیست؛ معیار، مجموع Cost لینک‌هاست.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>فرایند ساده‌شده:</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>1. روتر LSAهای مرتبط را دریافت و LSDB را همگام می‌کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>2. توپولوژی را از LSDB استخراج می‌کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>3. الگوریتم SPF را با ریشه روتر محلی اجرا می‌کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>4. بهترین مسیرها را محاسبه می‌کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>5. Routeهای منتخب را با توجه به قواعد انتخاب و نصب، در Routing Table قرار می‌دهد.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۴.۵ OSPF Cost</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>Cost معیار عددی OSPF برای انتخاب مسیر است. در Cisco IOS مقدار Cost معمولاً بر اساس Reference Bandwidth تقسیم بر پهنای باند Interface محاسبه می‌شود؛ مقدار دقیق به تنظیمات و پلتفرم بستگی دارد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نمونه تنظیم دستی:</p>\n<pre dir='ltr' style='margin:10px 0;padding:12px;background:#020617;border:1px solid #1e293b;border-radius:6px;color:#38bdf8;font-size:12px;overflow-x:auto;line-height:1.6'><code>interface GigabitEthernet0/0\n ip ospf cost 10</code></pre>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>این فرمان Cost رابط را برای OSPF برابر 10 می‌کند. در طراحی واقعی باید Costها را در سراسر شبکه با یک سیاست سازگار تنظیم کرد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نکته: پهنای باندی که در محاسبه پیش‌فرض Cost استفاده می‌شود الزاماً اندازه‌گیری لحظه‌ای Throughput لینک نیست. همچنین Reference Bandwidth پیش‌فرض قدیمی می‌تواند در شبکه‌های سریع باعث یکسان شدن Cost لینک‌های با پهنای باند بالا شود؛ به همین دلیل طراحی درست Reference Bandwidth اهمیت دارد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>"
+    },
+    {
+      "id": "sec-5",
+      "title": "۵. چرا OSPF Multi-Area؟",
+      "html": "<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در شبکه کوچک، یک Area ممکن است کافی باشد. اما با بزرگ‌شدن شبکه، نگهداری توپولوژی گسترده در یک Area می‌تواند حجم LSDB، دامنه انتشار برخی LSAها و دفعات/هزینه محاسبات SPF را افزایش دهد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>OSPF امکان تقسیم دامنه مسیریابی به Areaهای منطقی را فراهم می‌کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>مزایای طراحی درست Multi-Area:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>محدودکردن انتشار بسیاری از LSAها به محدوده‌های مشخص.</li><li>کوچک‌تر و قابل مدیریت‌تر کردن LSDB هر Area.</li><li>کاهش دامنه برخی تغییرات توپولوژی.</li><li>امکان طراحی سلسله‌مراتبی و خلاصه‌سازی Routeها در مرز Areaها.</li><li>جداسازی منطقی بخش‌های مختلف شبکه.</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>Multi-Area به‌تنهایی تضمین‌کننده طراحی بهتر نیست. تعداد و اندازه Areaها، محل ABRها، نوع LSAها، خلاصه‌سازی، افزونگی و نیازهای عملیاتی باید با هم طراحی شوند.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۵.۱ Area چیست؟</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>Area یک تقسیم‌بندی منطقی در OSPF است. روترهای داخل یک Area اطلاعات Link-State مربوط به همان Area را نگهداری می‌کنند. مرزهای Area با Routerهای مرزی OSPF شکل می‌گیرند.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۵.۲ Area 0 یا Backbone Area</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>Area 0 ستون فقرات معماری چندناحیه‌ای OSPF است. در طراحی استاندارد، ترافیک مسیریابی بین Areaها از طریق Backbone عبور می‌کند و Areaهای غیر Backbone باید به Area 0 متصل باشند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>Area 0:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>یک مفهوم منطقی است، نه الزاماً یک مکان فیزیکی.</li><li>می‌تواند چندین روتر و لینک داشته باشد.</li><li>می‌تواند از نظر فیزیکی در چند محل گسترده باشد.</li><li>برای اتصال منطقی Areaهای دیگر نقش مرکزی دارد.</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نمای مفهومی:</p>\n<div dir='ltr' style='width:100%;margin:10px 0'><svg viewBox='0 0 720 294' width='100%' preserveAspectRatio='xMinYMin meet' style='display:block;background:#06090f;border:1px solid #1e293b;border-radius:8px'><text x='20' y='24' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>              Area 1</text><text x='20' y='42' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>          [R1]-----[R2]</text><text x='20' y='60' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>             \\     /</text><text x='20' y='78' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>              [ABR-1]</text><text x='20' y='96' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>                  |</text><text x='20' y='114' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>                  |</text><text x='20' y='132' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>       +-----------------------+</text><text x='20' y='150' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>       |        Area 0         |</text><text x='20' y='168' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>       |   [Core-1]---[Core-2] |</text><text x='20' y='186' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>       +-----------------------+</text><text x='20' y='204' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>                  |</text><text x='20' y='222' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>               [ABR-2]</text><text x='20' y='240' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>                  |</text><text x='20' y='258' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>              Area 2</text><text x='20' y='276' fill='#e2e8f0' font-size='11' font-family='monospace' text-anchor='start'>          [R3]-----[R4]</text></svg></div>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در این مثال ABR-1 به Area 1 و Area 0 متصل است؛ ABR-2 به Area 0 و Area 2 متصل است.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۵.۳ Internal Router</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>روتری که تمام Interfaceهای OSPF آن در یک Area قرار دارند، Internal Router همان Area محسوب می‌شود. چنین روتری توپولوژی Area خودش را در LSDB نگهداری می‌کند.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۵.۴ ABR — Area Border Router</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><strong>Area Border Router</strong> روتری است که به Area 0 و حداقل یک Area دیگر متصل است و اطلاعات مربوط به Areaها را در مرز آن‌ها مدیریت می‌کند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نقش‌های کلیدی ABR:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>نگهداری LSDB جداگانه برای Areaهای متصل.</li><li>اجرای وظایف مسیریابی مربوط به Areaهای متصل.</li><li>تولید Summary LSAهای Type 3 برای معرفی Prefixها بین Areaها.</li><li>مشارکت در طراحی و خلاصه‌سازی مسیرها در مرز Area.</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نکته: ABR صرفاً «روتری با دو Interface» نیست؛ معیار، عضویت Interfaceهای OSPF در Areaهای متفاوت و نقش آن در Backbone است.</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>۵.۵ ASBR — Autonomous System Boundary Router</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><strong>Autonomous System Boundary Router</strong> روتری است که Routeهای خارج از دامنه OSPF را به OSPF وارد می‌کند؛ معمولاً از طریق Redistribution.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>مثال: روتر مرزی سازمان Routeهایی را از یک پروتکل دیگر یا از Routeهای Static دریافت می‌کند و با سیاست مناسب آن‌ها را به OSPF تزریق می‌کند. این روتر می‌تواند ASBR باشد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>نکات کلیدی:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>اتصال فیزیکی به ISP به‌تنهایی روتر را ASBR نمی‌کند.</li><li>نقش ASBR به وارد کردن اطلاعات مسیریابی خارجی به OSPF مربوط است.</li><li>ASBR معمولاً LSAهای خارجی مانند Type 5 یا در NSSA، Type 7 تولید می‌کند.</li><li>یک روتر می‌تواند هم‌زمان ABR و ASBR باشد؛ این دو نقش متناقض نیستند.</li></ul>\n<h4 style='margin:12px 0 6px;color:#e2e8f0;font-size:14px'>مقایسه ABR و ASBR</h4>\n<div style='overflow-x:auto;margin:10px 0'><table style='width:100%;border-collapse:collapse;font-size:12px'><tr><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>ویژگی</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>ABR</th><th style='padding:8px;border:1px solid #1e293b;text-align:right;background:#0f172a;color:#38bdf8;'>ASBR</th></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مفهوم</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مرز بین Areaها</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>مرز ورود Routeهای خارجی به OSPF</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>نقش اصلی</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>ارتباط و معرفی Prefixها بین Areaها</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Redistribution به OSPF</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>LSA شاخص</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Type 3 و در شرایط مربوط Type 4</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>Type 5 یا Type 7</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>اتصال به Area 0</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>در طراحی Multi-Area استاندارد بله</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>الزاماً خیر</td></tr><tr><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>امکان هم‌زمانی نقش‌ها</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>بله</td><td style='padding:8px;border:1px solid #1e293b;text-align:right;color:#cbd5e1;'>بله</td></tr></table></div>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>"
+    },
+    {
+      "id": "sec-6",
+      "title": "۶. سناریوی سازمانی برای جمع‌بندی مفاهیم",
+      "html": "<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>سازمانی را تصور کنید که یک مرکز اصلی و دو منطقه عملیاتی دارد:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>مرکز اصلی در Area 0.</li><li>منطقه شمال در Area 1.</li><li>منطقه جنوب در Area 2.</li><li>روتر مرزی سازمان به ISP از طریق eBGP متصل است.</li><li>OSPF برای مسیریابی داخلی سازمان استفاده می‌شود.</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>طرح مفهومی:</p>\n<div dir='ltr' style='width:100%;margin:12px 0'><svg viewBox='0 0 700 180' width='100%' style='display:block;background:#06090f;border:1px solid #1e293b;border-radius:10px'><rect x='230' y='14' width='240' height='36' rx='8' fill='#082f49' stroke='#38bdf8' stroke-width='1.5'/><text x='350' y='37' fill='#fff' font-size='12' font-weight='bold' text-anchor='middle'>Routing Architecture</text><line x1='290' y1='50' x2='170' y2='86' stroke='#38bdf8' stroke-width='2'/><line x1='410' y1='50' x2='530' y2='86' stroke='#22c55e' stroke-width='2'/><rect x='50' y='86' width='240' height='74' rx='8' fill='#0f172a' stroke='#38bdf8' stroke-width='1.5'/><text x='170' y='108' fill='#38bdf8' font-size='12' font-weight='bold' text-anchor='middle'>IGP (Inside AS)</text><text x='170' y='128' fill='#cbd5e1' font-size='11' text-anchor='middle'>OSPF Multi-Area (Area 0)</text><text x='170' y='146' fill='#94a3b8' font-size='10' text-anchor='middle'>ABR · LSA 1/2/3 · SPF</text><rect x='410' y='86' width='240' height='74' rx='8' fill='#0f172a' stroke='#22c55e' stroke-width='1.5'/><text x='530' y='108' fill='#86efac' font-size='12' font-weight='bold' text-anchor='middle'>EGP (Between AS)</text><text x='530' y='128' fill='#cbd5e1' font-size='11' text-anchor='middle'>eBGP (TCP Port 179)</text><text x='530' y='146' fill='#94a3b8' font-size='10' text-anchor='middle'>AS_PATH · Policy · Loop-Free</text></svg></div>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><code dir=\"ltr\" style=\"background:#0f172a;padding:1px 5px;border-radius:4px;color:#38bdf8\">ASBR*</code> فقط در صورتی درست است که Routeهای خارجی از طریق Redistribution به OSPF وارد شوند. صرف برقراری eBGP باعث ASBR شدن خودکار روتر در OSPF نمی‌شود.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در این معماری:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>OSPF مسئول Reachability و مسیریابی داخلی است.</li><li>eBGP مسئول تبادل Route با AS ارائه‌دهنده سرویس است.</li><li>سیاست تبادل Route بین BGP و OSPF باید آگاهانه طراحی شود.</li><li>نباید تمام Routeهای BGP را بدون فیلتر و بررسی به OSPF تزریق کرد.</li><li>Default Route، Prefixهای سازمان و مسیرهای اینترنتی باید مطابق سیاست مسیریابی سازمان مدیریت شوند.</li></ul>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>"
+    },
+    {
+      "id": "sec-7",
+      "title": "۷. اشتباهات رایج و رفع ابهام",
+      "html": "<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>1. <strong>OSPF و BGP را دو پروتکل جایگزین هم بدانیم:</strong> نادرست است؛ معمولاً اهداف و محدوده کاربرد متفاوت دارند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>2. <strong>هر روتر متصل به ISP را ASBR بنامیم:</strong> نادرست است؛ ASBR به وارد کردن Route خارجی به OSPF مربوط است.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>3. <strong>ABR و ASBR را یکی بدانیم:</strong> نادرست است؛ یکی مرز Area و دیگری مرز ورود Route خارجی است.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>4. <strong>LSDB را همان Routing Table بدانیم:</strong> نادرست است؛ LSDB اطلاعات توپولوژی را نگهداری می‌کند و Routing Table مسیرهای منتخب را.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>5. <strong>Cost را تعداد Hop بدانیم:</strong> نادرست است؛ OSPF مجموع Cost لینک‌ها را مبنا قرار می‌دهد.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>6. <strong>فکر کنیم همه LSAها در تمام Areaها منتشر می‌شوند:</strong> نادرست است؛ Scope و نوع LSA و نوع Area تعیین‌کننده‌اند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>7. <strong>تصور کنیم Area 0 حتماً یک روتر مرکزی است:</strong> نادرست است؛ Area 0 یک Area منطقی است.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>8. <strong>فکر کنیم یک روتر نمی‌تواند هم ABR و هم ASBR باشد:</strong> نادرست است؛ هر دو نقش می‌توانند روی یک روتر جمع شوند.</p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>"
+    },
+    {
+      "id": "sec-9",
+      "title": "۹. جمع‌بندی و نقشه ذهنی",
+      "html": "<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>Routing بسته را بین شبکه‌های IP منتقل می‌کند.</li><li>Switching معمولاً فریم‌ها را در LAN/VLAN جابه‌جا می‌کند.</li><li>Routing Table برای مقصدها مسیر و Next-Hop را مشخص می‌کند.</li><li>Longest Prefix Match اختصاصی‌ترین Prefix منطبق را انتخاب می‌کند.</li><li>Static Route دستی تعریف می‌شود؛ Dynamic Routing از تبادل اطلاعات پروتکل استفاده می‌کند.</li><li>IGP درون AS و BGP برای تبادل بین ASها به کار می‌رود.</li><li>OSPF یک Link-State IGP است.</li><li>LSDB اطلاعات توپولوژی را نگهداری می‌کند.</li><li>LSAها اطلاعات Link-State را حمل می‌کنند.</li><li>SPF مسیرها را بر اساس Cost محاسبه می‌کند.</li><li>Multi-Area دامنه‌های منطقی OSPF را تفکیک می‌کند.</li><li>Area 0 Backbone است.</li><li>ABR مرز Areaهاست.</li><li>ASBR Routeهای خارجی را به OSPF وارد می‌کند.</li></ul>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>نقشه ذهنی</h3>\n<div dir='ltr' style='width:100%;margin:12px 0'><svg viewBox='0 0 700 180' width='100%' style='display:block;background:#06090f;border:1px solid #1e293b;border-radius:10px'><rect x='230' y='14' width='240' height='36' rx='8' fill='#082f49' stroke='#38bdf8' stroke-width='1.5'/><text x='350' y='37' fill='#fff' font-size='12' font-weight='bold' text-anchor='middle'>Routing Architecture</text><line x1='290' y1='50' x2='170' y2='86' stroke='#38bdf8' stroke-width='2'/><line x1='410' y1='50' x2='530' y2='86' stroke='#22c55e' stroke-width='2'/><rect x='50' y='86' width='240' height='74' rx='8' fill='#0f172a' stroke='#38bdf8' stroke-width='1.5'/><text x='170' y='108' fill='#38bdf8' font-size='12' font-weight='bold' text-anchor='middle'>IGP (Inside AS)</text><text x='170' y='128' fill='#cbd5e1' font-size='11' text-anchor='middle'>OSPF Multi-Area (Area 0)</text><text x='170' y='146' fill='#94a3b8' font-size='10' text-anchor='middle'>ABR · LSA 1/2/3 · SPF</text><rect x='410' y='86' width='240' height='74' rx='8' fill='#0f172a' stroke='#22c55e' stroke-width='1.5'/><text x='530' y='108' fill='#86efac' font-size='12' font-weight='bold' text-anchor='middle'>EGP (Between AS)</text><text x='530' y='128' fill='#cbd5e1' font-size='11' text-anchor='middle'>eBGP (TCP Port 179)</text><text x='530' y='146' fill='#94a3b8' font-size='10' text-anchor='middle'>AS_PATH · Policy · Loop-Free</text></svg></div>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>---</p>\n<h3 style='margin:14px 0 8px;color:#38bdf8;font-size:15px'>پیش‌نمایش بخش بعدی</h3>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'><strong>بخش ۲ — OSPF Neighbor Formation، Adjacency و DR/BDR</strong></p>\n<p style='margin:6px 0;line-height:1.9;color:#cbd5e1;font-size:13px'>در بخش بعد، به‌صورت مرحله‌به‌مرحله بررسی می‌کنیم:</p>\n<ul style='margin:6px 0 10px 20px;line-height:1.9;color:#cbd5e1'><li>OSPF Hello Packet چه اطلاعاتی دارد؟</li><li>همسایه‌ها با چه شرایطی یکدیگر را می‌پذیرند؟</li><li>تفاوت Neighbor و Adjacency چیست؟</li><li>حالت‌های Down، Init، 2-Way، ExStart، Exchange، Loading و Full چه معنایی دارند؟</li><li>چرا در شبکه‌های Broadcast از DR و BDR استفاده می‌شود؟</li><li>چه عواملی باعث گیرکردن همسایگی OSPF می‌شوند؟</li></ul>"
+    }
+  ],
+  "interactiveQuiz": [
+    {
+      "id": "q-1",
+      "title": "پرسش ۱ — تفاوت Switching و Routing",
+      "reviewStageId": "concept",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>تصمیم‌گیری روتر برای ارسال بسته به شبکهٔ دیگر بر چه اساسی انجام می‌شود؟</p>",
+      "options": [
+        "آدرس MAC مقصد",
+        "آدرس IP مقصد و جدول مسیریابی",
+        "شماره پورت VLAN",
+        "سرعت کابل فیزیکی"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۲. روتر در لایه ۳ بر اساس IP مقصد و Routing Table تصمیم می‌گیرد. گزینه‌های ۱ و ۳ مربوط به لایه ۲ (سوئیچ) هستند.</p>"
+    },
+    {
+      "id": "q-2",
+      "title": "پرسش ۲ — قانون Longest Prefix Match",
+      "reviewStageId": "concept",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>اگر روتر دو مسیر 10.1.0.0/16 و 10.1.2.0/24 را برای مقصد 10.1.2.50 داشته باشد، کدام را انتخاب می‌کند؟</p>",
+      "options": [
+        "10.1.0.0/16 چون AD کمتری دارد",
+        "10.1.2.0/24 چون پیشوند طولانی‌تر و دقیق‌تر است",
+        "هر دو را همزمان Load Balance می‌کند",
+        "بسته را Drop می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۲. قانون LPM همیشه طولانی‌ترین ماسک منطبق (/24 نسبت به /16) را بدون توجه به AD یا Metric انتخاب می‌کند.</p>"
+    },
+    {
+      "id": "q-3",
+      "title": "پرسش ۳ — Static در مقابل Dynamic Routing",
+      "reviewStageId": "concept",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>محدودیت اصلی Static Routing در شبکه‌های بزرگ سازمانی چیست؟</p>",
+      "options": [
+        "مصرف بالای CPU",
+        "نبود واکنش خودکار به قطعی لینک و دشواری نگهداری",
+        "داشتن Administrative Distance بالا",
+        "عدم پشتیبانی از Default Route"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۲. Static Routing کمترین مصرف CPU و AD=1 دارد، اما در برابر تغییرات توپولوژی به‌صورت خودکار واکنش نشان نمی‌دهد.</p>"
+    },
+    {
+      "id": "q-4",
+      "title": "پرسش ۴ — Autonomous System و IGP/EGP",
+      "reviewStageId": "concept",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>برای اتصال یک سازمان (AS 65001) به ISP (AS 65100) کدام پروتکل استاندارد است؟</p>",
+      "options": [
+        "OSPFv2",
+        "EIGRP",
+        "eBGP",
+        "RIPv2"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۳. eBGP پروتکل EGP برای تبادل مسیر بین ASهای متفاوت است؛ OSPF، EIGRP و RIP همگی IGP هستند.</p>"
+    },
+    {
+      "id": "q-5",
+      "title": "پرسش ۵ — LSDB و الگوریتم SPF",
+      "reviewStageId": "concept",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>در OSPF، تمام روترهای داخل یک Area چه چیزی را به‌صورت یکسان نگه می‌دارند؟</p>",
+      "options": [
+        "جدول MAC",
+        "پایگاه داده LSDB",
+        "جدول NAT",
+        "فهرست AS_PATH"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۲. تمام روترهای یک Area دارای LSDB یکسان هستند و هر روتر روی آن الگوریتم SPF را اجرا می‌کند.</p>"
+    },
+    {
+      "id": "q-6",
+      "title": "پرسش ۶ — OSPF Cost و Reference Bandwidth",
+      "reviewStageId": "lab",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>با Reference Bandwidth پیش‌فرض 100 Mbps، تفاوت Cost بین لینک 100Mbps و 1Gbps در OSPF چقدر است؟</p>",
+      "options": [
+        "10 در مقابل 1",
+        "هر دو برابر 1 می‌شوند",
+        "100 در مقابل 10",
+        "1000 در مقابل 100"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۲. چون 100/100=1 و 100/1000=0.1 که به 1 گرد می‌شود؛ به همین دلیل در شبکه‌های مدرن auto-cost reference-bandwidth 10000 تنظیم می‌شود.</p>"
+    },
+    {
+      "id": "q-7",
+      "title": "پرسش ۷ — معماری Multi-Area و Area 0",
+      "reviewStageId": "example",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>چرا در OSPF Multi-Area تمام Areaهای غیراصلی باید به Area 0 متصل باشند؟</p>",
+      "options": [
+        "برای افزایش پهنای باند",
+        "برای جلوگیری از حلقه مسیریابی بین‌ناحیه‌ای",
+        "برای حذف نیاز به Router-ID",
+        "برای فعال‌سازی BGP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۲. OSPF دارای معماری سلسله‌مراتبی دو‌سطحی است: ترافیک بین‌ناحیه‌ای (Inter-Area) باید از طریق Area 0 و روترهای ABR عبور کند و Areaهای غیراصلی اجازه تبادل مستقیم LSA Type 3 با یکدیگر را ندارند؛ این طراحی هم مسیر‌یابی بین‌ناحیه‌ای را استاندارد می‌کند و هم از ایجاد حلقهٔ Inter-Area جلوگیری می‌نماید.</p>"
+    },
+    {
+      "id": "q-8",
+      "title": "پرسش ۸ — نقش ABR",
+      "reviewStageId": "example",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>کدام LSA توسط روتر ABR برای خلاصه‌سازی مسیرهای یک Area به Area 0 ارسال می‌شود؟</p>",
+      "options": [
+        "LSA Type 1",
+        "LSA Type 2",
+        "LSA Type 3 (Summary)",
+        "LSA Type 5"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۳. ABRها با LSA Type 3 مسیرهای بین‌ناحیه‌ای (O IA) را تبلیغ می‌کنند.</p>"
+    },
+    {
+      "id": "q-9",
+      "title": "پرسش ۹ — تفاوت ABR و ASBR",
+      "reviewStageId": "practice",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>روتری که مسیرهای BGP یا Static را به داخل OSPF تزریق (Redistribute) می‌کند چه نام دارد؟</p>",
+      "options": [
+        "Internal Router",
+        "DR",
+        "ABR",
+        "ASBR"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۴. ASBR (Autonomous System Boundary Router) مرز بین OSPF و پروتکل‌های بیرونی است.</p>"
+    },
+    {
+      "id": "q-10",
+      "title": "پرسش ۱۰ — عیب‌یابی eBGP",
+      "reviewStageId": "lab",
+      "promptHtml": "<p style='color:#cbd5e1;font-size:12px'>در خروجی show ip bgp summary چه علامتی نشان‌دهندهٔ برقراری کامل همسایگی (Established) است؟</p>",
+      "options": [
+        "عبارت Active",
+        "عبارت Idle",
+        "نمایش یک عدد (تعداد پیشوندها) در ستون State/PfxRcd",
+        "عبارت Connect"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p style='color:#86efac;font-size:12px'>صحیح: گزینه ۳. وجود عدد در ستون State/PfxRcd یعنی همسایگی Established است؛ Active و Idle نشان‌دهندهٔ خطا در برقراری ارتباط هستند.</p>"
+    }
+  ],
+  "stages": {
+    "concept": {
+      "id": "concept",
+      "step": "1. Concept",
+      "title": "۱. Concept — آموزش مفهومی عمیق و مرحله‌به‌مرحله",
+      "html": "<div style='margin-top:14px;padding:12px;background:#08101e;border:1px solid #1e293b;border-radius:8px'><h4 style='color:#38bdf8;margin:0 0 8px'>تشکیل همسایگی (Adjacency) و اجرای SPF بر اساس نوع شبکه</h4><p style='font-size:12px;color:#cbd5e1;line-height:1.8'>• <strong>در شبکه‌های Broadcast / Multi-Access (مثل Ethernet):</strong> روترها پس از <code>Init</code> به <code>2-Way</code> می‌رسند؛ در این مرحله <strong>انتخاب DR و BDR</strong> انجام می‌شود. سپس روترها فقط با DR/BDR وارد مراحل <code>ExStart → Exchange → Loading → FULL</code> می‌شوند (سایر روترها با هم در حالت <code>2-Way/DROTHER</code> می‌مانند).<br>• <strong>در شبکه‌های Point-to-Point (مثل لینک‌های سریال یا p2p):</strong> هیچ انتخاب DR/BDR وجود ندارد و دو روتر مستقیماً از <code>2-Way</code> وارد <code>ExStart → Exchange → Loading → FULL</code> می‌شوند.<br>• <strong>اجرای SPF:</strong> پس از رسیدن به <code>FULL</code> و یکسان‌شدن LSDB، هر روتر الگوریتم Dijkstra (SPF) را به‌صورت مستقل روی LSDB خود اجرا می‌کند.</p></div>"
+    },
+    "example": {
+      "id": "example",
+      "step": "2. Example",
+      "title": "۲. Example — سناریوی سازمانی، توپولوژی و مثال عملی",
+      "html": "<div style='margin-top:14px;padding:12px;background:#08101e;border:1px solid #1e293b;border-radius:8px'><h4 style='color:#38bdf8;margin:0 0 8px'>مثال عددی ۱ — Longest Prefix Match (LPM)</h4><p style='font-size:12px;color:#cbd5e1;line-height:1.8'>فرض کنید روتر برای مقصد <code>10.20.30.55</code> سه مسیر در جدول دارد: <code>10.0.0.0/8</code> (OSPF)، <code>10.20.0.0/16</code> (Static, AD=1) و <code>10.20.30.0/24</code> (OSPF, AD=110). با وجود AD کمتر در Static، روتر مسیر <code>10.20.30.0/24</code> را انتخاب می‌کند چون <strong>/24 طولانی‌ترین پیشوند منطبق</strong> است.</p><h4 style='color:#38bdf8;margin:12px 0 8px'>مثال عددی ۲ — محاسبه OSPF Cost و مقایسه دو مسیر</h4><p style='font-size:12px;color:#cbd5e1;line-height:1.8'>با Reference Bandwidth پیش‌فرض <code>100 Mbps</code>، لینک‌های 100M و 1G هر دو Cost=1 دارند! با تنظیم <code>auto-cost reference-bandwidth 10000</code> (10Gbps): لینک 10G دارای Cost=1، لینک 1G دارای Cost=10 و لینک 100M دارای Cost=100 می‌شود. بنابراین مسیر <code>R1→R3→R4</code> (دو لینک 1G = Cost 20) بر مسیر مستقیم <code>R1→R4</code> (یک لینک 100M = Cost 100) ترجیح داده می‌شود.</p></div><div style='overflow-x:auto;margin:12px 0'><h4 style='color:#38bdf8;margin:0 0 6px'>جدول آدرس‌دهی و نقش تجهیزات در سناریوی سازمانی</h4><table style='width:100%;border-collapse:collapse;font-size:12px'><tr style='background:#0f172a;color:#38bdf8'><th style='padding:8px;border:1px solid #1e293b;text-align:right'>تجهیز</th><th style='padding:8px;border:1px solid #1e293b;text-align:right'>نقش</th><th style='padding:8px;border:1px solid #1e293b;text-align:right'>اینترفیس و IP</th><th style='padding:8px;border:1px solid #1e293b;text-align:right'>ناحیه / AS</th></tr><tr><td style='padding:8px;border:1px solid #1e293b'>ISP-RTR</td><td style='padding:8px;border:1px solid #1e293b'>روتر سرویس‌دهنده</td><td style='padding:8px;border:1px solid #1e293b' dir='ltr'>Gi0/0: 198.51.100.2/30</td><td style='padding:8px;border:1px solid #1e293b'>AS 65100 (eBGP)</td></tr><tr><td style='padding:8px;border:1px solid #1e293b'>Edge-RTR</td><td style='padding:8px;border:1px solid #1e293b'>مرز سازمان (ASBR*)</td><td style='padding:8px;border:1px solid #1e293b' dir='ltr'>Gi0/0: 198.51.100.1/30 | Gi0/1: 10.0.0.1/30</td><td style='padding:8px;border:1px solid #1e293b'>AS 65001 / Area 0</td></tr><tr><td style='padding:8px;border:1px solid #1e293b'>ABR-1</td><td style='padding:8px;border:1px solid #1e293b'>مرز Area 0 و Area 1</td><td style='padding:8px;border:1px solid #1e293b' dir='ltr'>Gi0/0: 10.0.0.2/30 | Gi0/1: 10.1.1.1/24</td><td style='padding:8px;border:1px solid #1e293b'>Area 0 &amp; Area 1</td></tr><tr><td style='padding:8px;border:1px solid #1e293b'>ABR-2</td><td style='padding:8px;border:1px solid #1e293b'>مرز Area 0 و Area 2</td><td style='padding:8px;border:1px solid #1e293b' dir='ltr'>Gi0/0: 10.0.0.5/30 | Gi0/1: 10.2.2.1/24</td><td style='padding:8px;border:1px solid #1e293b'>Area 0 &amp; Area 2</td></tr></table></div>"
+    },
+    "practice": {
+      "id": "practice",
+      "step": "3. Practice",
+      "title": "۳. Practice — اشتباهات رایج و رفع ابهام تحلیلی",
+      "html": "<div style='margin-top:14px;padding:12px;background:#08101e;border:1px solid #1e293b;border-radius:8px'><h4 style='color:#38bdf8;margin:0 0 8px'>تمرین‌های تحلیلی و عیب‌یابی (Practice)</h4><p style='font-size:12px;color:#cbd5e1;line-height:1.8'><strong>تمرین ۱:</strong> همسایه eBGP روی R1 در حالت <code>Active</code> گیر کرده است. علت‌های محتمل و گام‌های تشخیص را بنویسید.</p><details style='margin-bottom:10px'><summary style='cursor:pointer;color:#22c55e;font-size:12px'>مشاهده پاسخ تحلیلی تمرین ۱</summary><p style='font-size:12px;color:#cbd5e1;margin-top:6px'>علت‌ها: مسدودبودن TCP 179، اشتباه بودن <code>remote-as</code> یا نبودن مسیر لایه ۳ به IP همسایه. گام‌ها: ۱) <code>ping</code> به IP همسایه، ۲) بررسی ACLها، ۳) تطبیق شماره AS در دو طرف.</p></details><p style='font-size:12px;color:#cbd5e1;line-height:1.8'><strong>تمرین ۲:</strong> روتر در جدول خود <code>172.16.0.0/16</code> (Static) و <code>172.16.10.0/24</code> (OSPF) را دارد. بسته با مقصد <code>172.16.10.5</code> از کدام مسیر می‌رود؟</p><details><summary style='cursor:pointer;color:#22c55e;font-size:12px'>مشاهده پاسخ تحلیلی تمرین ۲</summary><p style='font-size:12px;color:#cbd5e1;margin-top:6px'>از مسیر <code>172.16.10.0/24</code> (OSPF)؛ زیرا LPM (/24 در مقابل /16) همیشه بر Administrative Distance مقدم است.</p></details></div>"
+    },
+    "lab": {
+      "id": "lab",
+      "step": "4. Lab",
+      "title": "۴. Lab — کاربرگ آزمایشگاهی ایستا (Static Worksheet)",
+      "html": "<p class=\"lesson-quiz-warning\">این کاربرگ طراحی‌شده است و روی IOS یا PNETLab اجرا و تأیید نشده است. نام رابط‌ها و نسخه و قابلیت‌های ایمیج را پیش از اجرا در محیط ایزوله بررسی کنید. خروجی‌ها و شمارنده‌ها باید در محیط واقعی ثبت شوند.</p><h4>توپولوژی و محدوده</h4><p>چهار روتر IOS: Edge Gi0/0 به ISP Gi0/0 روی 198.51.100.0/30، Edge Gi0/1 به ABR-1 Gi0/0 روی 10.0.0.0/30 (Area 0)، و ABR-1 Gi0/1 به Area1-RTR Gi0/0 روی 10.1.1.0/24 (Area 1). این کاربرگ زیرمجموعهٔ سناریوی مفهومی دو ناحیه است؛ Area 2 و ABR-2 در این تمرین ساخته نمی‌شوند. آدرس‌های 198.51.100.0/24 و 203.0.113.0/24 مستنداتی‌اند. Null0 فقط برای ایجاد Prefix در RIB جهت اعلان BGP است و مقصد واقعی نیست. هیچ Redistribution یا Default Route تنظیم نشده است.</p><h4>پیکربندی هر روتر</h4><h4>Edge-RTR</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>configure terminal\ninterface GigabitEthernet0/0\n ip address 198.51.100.1 255.255.255.252\n no shutdown\ninterface GigabitEthernet0/1\n ip address 10.0.0.1 255.255.255.252\n no shutdown\nexit\nip route 203.0.113.0 255.255.255.0 Null0\nrouter ospf 1\n router-id 1.1.1.1\n auto-cost reference-bandwidth 10000\n network 10.0.0.0 0.0.0.3 area 0\nexit\nrouter bgp 65001\n bgp router-id 1.1.1.1\n neighbor 198.51.100.2 remote-as 65100\n network 203.0.113.0 mask 255.255.255.0\nend</code></pre><h4>ABR-1</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>configure terminal\ninterface GigabitEthernet0/0\n ip address 10.0.0.2 255.255.255.252\n no shutdown\ninterface GigabitEthernet0/1\n ip address 10.1.1.1 255.255.255.0\n no shutdown\nexit\nrouter ospf 1\n router-id 2.2.2.2\n auto-cost reference-bandwidth 10000\n network 10.0.0.0 0.0.0.3 area 0\n network 10.1.1.0 0.0.0.255 area 1\nend</code></pre><h4>Area1-RTR</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>configure terminal\ninterface GigabitEthernet0/0\n ip address 10.1.1.2 255.255.255.0\n no shutdown\nexit\nrouter ospf 1\n router-id 3.3.3.3\n auto-cost reference-bandwidth 10000\n network 10.1.1.0 0.0.0.255 area 1\nend</code></pre><h4>ISP-RTR</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>configure terminal\ninterface GigabitEthernet0/0\n ip address 198.51.100.2 255.255.255.252\n no shutdown\nexit\nrouter bgp 65100\n bgp router-id 4.4.4.4\n neighbor 198.51.100.1 remote-as 65001\nend</code></pre><h4>راستی‌آزمایی؛ نتایج زیر انتظار طراحی هستند، نه خروجی واقعی</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>Edge-RTR# show ip interface brief\nEdge-RTR# show ip ospf neighbor\nEdge-RTR# show ip ospf database\nEdge-RTR# show ip route 10.1.1.0\nEdge-RTR# show ip bgp summary\nEdge-RTR# show ip bgp 203.0.113.0\nISP-RTR# show ip bgp 203.0.113.0\nABR-1# show ip ospf neighbor</code></pre><p>انتظار: همسایگی Edge و ABR و همسایگی ABR و Area1-RTR به FULL برسد؛ Edge مسیر بین‌ناحیه‌ای 10.1.1.0/24 از طریق 10.0.0.2 را ببیند؛ نشست eBGP برقرار و ISP پیشوند 203.0.113.0/24 را دریافت کند. در show ip bgp summary عدد ستون State/PfxRcd نشان‌دهندهٔ نشست Established است و صفر هم می‌تواند معتبر باشد؛ زمان‌ها، DR و تعداد Prefix به محیط بستگی دارند. در صورت خطا وضعیت رابط، ping همسایه، Area، AS و TCP 179 را بررسی کنید. اعلان prefix به معنی رسیدن به سرویس واقعی پشت Null0 نیست.</p>"
+    },
+    "quiz": {
+      "id": "quiz",
+      "step": "5. Quiz",
+      "title": "۵. Quiz — آزمون تعاملی سنجش یادگیری (۱۰ سؤال)",
+      "html": "<div id='encor-interactive-quiz'></div>",
+      "questions": [
+        {
+          "q": "سؤال 1 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 2 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 3 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 4 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 5 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 6 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 7 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 8 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 9 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        },
+        {
+          "q": "سؤال 10 (OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF): کدام دستور برای بررسی وضعیت در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF استفاده می‌شود؟",
+          "options": [
+            "show running-config",
+            "reload",
+            "erase startup-config",
+            "shutdown"
+          ],
+          "answer": 0,
+          "explanation": "دستور show running-config خروجی زنده وضعیت را برای Verification در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF نمایش می‌دهد."
+        }
+      ]
+    }
+  },
+  "glossary": [
+    {
+      "term": "ENCOR-BGP-OSPF",
+      "fa": "OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF",
+      "simple": "مفهوم کلیدی و استاندارد پیاده‌سازی در OSPF Multi-Area & eBGP — بخش ۱: مبانی مسیریابی و معماری OSPF."
+    },
+    {
+      "term": "Verification",
+      "fa": "راستی‌آزمایی",
+      "simple": "بررسی خروجی زنده دستورات show در Cisco IOS برای اطمینان از صحت عملکرد."
+    },
+    {
+      "term": "Troubleshooting",
+      "fa": "عیب‌یابی",
+      "simple": "تحلیل گام‌به‌گام خطاهای لایه‌ای و تطبیق پیکربندی."
+    }
+  ]
+}

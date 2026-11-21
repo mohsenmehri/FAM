@@ -1,0 +1,572 @@
+{
+  "id": "ccna-vlan-l2-01",
+  "title": "مبانی VLAN؛ جداسازی Broadcast Domain در لایهٔ ۲",
+  "track": "CCNA 200-301",
+  "course": "Network Access",
+  "learningObjective": "بتوانی توضیح بدهی VLAN چگونه یک سوئیچ فیزیکی را به چند Broadcast Domain منطقی تقسیم می‌کند، پورت Access را به VLAN اختصاص بدهی، ارتباط یک VLAN را از روی Trunk بین دو سوئیچ عبور بدهی و با فرمان‌های IOS عضویت VLAN و یادگیری MAC را راستی‌آزمایی کنی.",
+  "glossary": [
+    {
+      "term": "VLAN",
+      "fa": "شبکهٔ محلی مجازی برای جدا کردن Broadcast Domain در لایهٔ ۲."
+    },
+    {
+      "term": "Broadcast Domain",
+      "fa": "محدوده‌ای که فریم Broadcast لایهٔ ۲ در آن منتشر می‌شود."
+    },
+    {
+      "term": "Access Port",
+      "fa": "پورتی که معمولاً به یک VLAN تعلق دارد و فریم بدون Tag را به میزبان تحویل می‌دهد."
+    },
+    {
+      "term": "Trunk Port",
+      "fa": "پورتی که ترافیک چند VLAN را بین تجهیزات شبکه عبور می‌دهد."
+    },
+    {
+      "term": "802.1Q",
+      "fa": "استاندارد افزودن Tag شناسهٔ VLAN به فریم Ethernet روی Trunk."
+    },
+    {
+      "term": "VLAN ID",
+      "fa": "شناسهٔ عددی VLAN؛ در Ethernet 802.1Q محدودهٔ رایج 1 تا 4094 است."
+    },
+    {
+      "term": "MAC Address Table",
+      "fa": "جدول نگاشت MAC مبدأ به پورت و VLAN در سوئیچ."
+    },
+    {
+      "term": "Inter-VLAN Routing",
+      "fa": "مسیریابی لایهٔ ۳ بین دو VLAN یا subnet متفاوت."
+    },
+    {
+      "term": "Native VLAN",
+      "fa": "VLANی که در Trunk 802.1Q به‌صورت پیش‌فرض بدون Tag عبور می‌کند."
+    },
+    {
+      "term": "VTP",
+      "fa": "پروتکل مدیریت انتشار اطلاعات VLAN بین سوئیچ‌های Cisco؛ وابسته به طراحی و نسخه."
+    }
+  ],
+  "topology": {
+    "devices": [
+      {
+        "id": "PC-A",
+        "type": "pc",
+        "x": 18,
+        "y": 70,
+        "vlan": 10
+      },
+      {
+        "id": "SW1",
+        "type": "switch",
+        "x": 132,
+        "y": 70,
+        "vlan": 10
+      },
+      {
+        "id": "SW2",
+        "type": "switch",
+        "x": 300,
+        "y": 70,
+        "vlan": 10
+      },
+      {
+        "id": "PC-B",
+        "type": "pc",
+        "x": 430,
+        "y": 30,
+        "vlan": 10
+      },
+      {
+        "id": "PC-C",
+        "type": "pc",
+        "x": 430,
+        "y": 125,
+        "vlan": 20
+      }
+    ],
+    "links": [
+      {
+        "a": "PC-A:eth0",
+        "b": "SW1:Gi0/1",
+        "vlan": 10
+      },
+      {
+        "a": "SW1:Gi0/24",
+        "b": "SW2:Gi0/24",
+        "vlan": 10
+      },
+      {
+        "a": "SW2:Gi0/1",
+        "b": "PC-B:eth0",
+        "vlan": 10
+      },
+      {
+        "a": "SW2:Gi0/2",
+        "b": "PC-C:eth0",
+        "vlan": 20
+      }
+    ]
+  },
+  "stages": {
+    "concept": {
+      "title": "۱. مفهوم؛ چرا به VLAN نیاز داریم؟",
+      "whyLayered": "اگر همهٔ کاربران، تلفن‌ها، سرورها و تجهیزات مدیریتی را بدون جداسازی به یک شبکهٔ لایهٔ ۲ وصل کنیم، Broadcastها در محدودهٔ بزرگی منتشر می‌شوند و جداسازی منطقی بخش‌ها دشوار می‌شود. VLAN به ما اجازه می‌دهد روی یک زیرساخت سوئیچینگ مشترک، چند Broadcast Domain مستقل بسازیم. عضویت VLAN در لایهٔ ۲ تعیین می‌کند فریم Broadcast در کدام محدوده منتشر شود؛ اما برای ارتباط بین VLANها به روتر یا سوئیچ لایهٔ ۳ نیاز داریم.",
+      "analogy": "یک ساختمان اداری را تصور کن که چند واحد مستقل دارد. همه از یک ساختمان و راهروهای مشترک استفاده می‌کنند، اما اعلان داخل واحد مالی لزوماً نباید در واحد منابع انسانی پخش شود. VLAN مثل جدا کردن این واحدها با دیوارهای منطقی است؛ سوئیچ همان ساختمان فیزیکی است و VLAN مرز انتشار Broadcast را تعیین می‌کند.",
+      "deepDive": [
+        "VLAN مخفف Virtual LAN است. هر VLAN یک Broadcast Domain مستقل در لایهٔ ۲ می‌سازد. اگر دو PC در VLAN 10 باشند و در یک subnet IP قرار بگیرند، می‌توانند از طریق سوئیچ و بدون عبور از روتر با هم ارتباط داشته باشند. اگر PC دیگر در VLAN 20 باشد، فریم Broadcast VLAN 10 به آن پورت ارسال نمی‌شود؛ حتی اگر هر دو PC به همان سوئیچ فیزیکی متصل باشند.",
+        "در پورت Access، سوئیچ معمولاً فریم بدون Tag را از میزبان دریافت می‌کند و آن را به VLAN اختصاص داده‌شده به پورت نسبت می‌دهد. هنگام ارسال به میزبان نیز فریم بدون Tag تحویل داده می‌شود. میزبان معمولی لازم نیست از وجود VLAN ID روی پورت Access اطلاع داشته باشد.",
+        "Trunk برای عبور ترافیک چند VLAN بین سوئیچ‌ها یا بین سوئیچ و روتر/سرور استفاده می‌شود. در 802.1Q، شناسهٔ VLAN داخل Tag فریم قرار می‌گیرد تا سوئیچ مقصد بداند فریم به کدام VLAN تعلق دارد. بنابراین Trunk یک لینک واحد است که می‌تواند ترافیک VLANهای متعدد را حمل کند.",
+        "VLAN به‌تنهایی IP یا Gateway ایجاد نمی‌کند. در طراحی معمول، هر VLAN یک subnet IP متناظر دارد و برای ارتباط بین VLANها باید SVI روی سوئیچ لایهٔ ۳ یا Subinterface روی روتر ساخته شود. اگر دو میزبان در VLANهای متفاوت باشند، حتی با وجود کابل و سوئیچ مشترک، بدون مسیر لایهٔ ۳ به هم دسترسی نخواهند داشت.",
+        "VLAN IDهای 1 تا 4094 در فضای 802.1Q تعریف می‌شوند، اما همهٔ شناسه‌ها در هر پلتفرم به یک شکل قابل استفاده نیستند. VLAN 1 به‌صورت پیش‌فرض وجود دارد و در طراحی امن بهتر است برای کاربران عادی و Native VLAN بدون بررسی سیاست سازمانی استفاده نشود. Native VLAN در Trunk فریم‌های بدون Tag را دریافت می‌کند؛ دو سر Trunk باید دربارهٔ آن توافق داشته باشند."
+      ],
+      "keyIdeas": [
+        "هر VLAN یک Broadcast Domain جداگانه است؛ این جداسازی منطقی است و به معنی داشتن سوئیچ فیزیکی جدا نیست.",
+        "پورت Access معمولاً عضو یک VLAN است؛ پورت Trunk چند VLAN را حمل می‌کند.",
+        "Tag 802.1Q شناسهٔ VLAN را روی فریم Trunk حمل می‌کند.",
+        "سوئیچ MACها را همراه VLAN یاد می‌گیرد؛ یک MAC می‌تواند در VLANهای متفاوت به‌صورت ورودی‌های جدا دیده شود.",
+        "ارتباط بین VLANها به مسیریابی لایهٔ ۳ نیاز دارد؛ VLAN به‌تنهایی Route ایجاد نمی‌کند.",
+        "VLAN و subnet مفاهیم متفاوت‌اند، اما در طراحی معمول غالباً برای هر VLAN یک subnet مجزا در نظر گرفته می‌شود."
+      ],
+      "misconceptions": [
+        "ساخت VLAN روی سوئیچ به‌تنهایی باعث ارتباط بین VLANها نمی‌شود.",
+        "Trunk همان Access Port با سرعت بیشتر نیست؛ نقش آن حمل چند VLAN با Tag است.",
+        "VLAN به معنی رمزنگاری یا امنیت کامل نیست؛ برای کنترل دسترسی به ACL، سیاست امنیتی و جداسازی درست نیاز داری.",
+        "اگر دو PC در یک VLAN باشند اما subnet IP متفاوت داشته باشند، عضویت VLAN به‌تنهایی مشکل لایهٔ ۳ را حل نمی‌کند.",
+        "فریم‌های Broadcast یک VLAN نباید به VLAN دیگر Flood شوند؛ اگر این اتفاق دیده شود، عضویت VLAN یا مسیر لایهٔ ۲ را بررسی کن."
+      ],
+      "fieldNotes": [
+        "برای هر VLAN نام معنادار بگذار تا خروجی show vlan brief قابل فهم باشد.",
+        "VLANهای موردنیاز را روی هر دو سوئیچ ایجاد کن؛ Trunk به‌تنهایی VLAN را در همهٔ طراحی‌ها به شکل خودکار ایجاد نمی‌کند.",
+        "Allowed VLAN List را محدود به VLANهای موردنیاز کن؛ این کار سطح انتشار ترافیک ناخواسته را کاهش می‌دهد.",
+        "در مستندات، VLAN ID، نام، subnet، Gateway، پورت‌های Access و Trunkهای حامل آن را ثبت کن."
+      ]
+    },
+    "example": {
+      "title": "۲. مثال؛ دو سوئیچ، سه میزبان و دو VLAN",
+      "scenario": "PC-A و PC-B اعضای VLAN 10 هستند، اما به دو سوئیچ متفاوت متصل‌اند. PC-C عضو VLAN 20 است و به SW2 وصل شده است. لینک بین SW1 و SW2 یک Trunk است و VLANهای 10 و 20 را حمل می‌کند. انتظار داریم PC-A و PC-B در صورت IP درست بتوانند ارتباط لایهٔ ۲/۳ محلی داشته باشند، اما PC-C به‌دلیل عضویت در VLAN متفاوت Broadcastهای VLAN 10 را دریافت نکند.",
+      "addressingTable": [
+        {
+          "دستگاه": "PC-A",
+          "پورت سوئیچ": "SW1 Gi0/1",
+          "VLAN": "10",
+          "IPv4": "192.0.2.10/24",
+          "نقش": "کاربر واحد A"
+        },
+        {
+          "دستگاه": "PC-B",
+          "پورت سوئیچ": "SW2 Gi0/1",
+          "VLAN": "10",
+          "IPv4": "192.0.2.20/24",
+          "نقش": "کاربر واحد A"
+        },
+        {
+          "دستگاه": "PC-C",
+          "پورت سوئیچ": "SW2 Gi0/2",
+          "VLAN": "20",
+          "IPv4": "198.51.100.10/24",
+          "نقش": "کاربر واحد B"
+        },
+        {
+          "دستگاه": "SW1",
+          "پورت سوئیچ": "Gi0/24",
+          "VLAN": "Trunk",
+          "IPv4": "—",
+          "نقش": "لینک بین سوئیچ‌ها"
+        },
+        {
+          "دستگاه": "SW2",
+          "پورت سوئیچ": "Gi0/24",
+          "VLAN": "Trunk",
+          "IPv4": "—",
+          "نقش": "لینک بین سوئیچ‌ها"
+        }
+      ],
+      "packetFlow": [
+        "PC-A یک Broadcast مانند ARP Request می‌فرستد. سوئیچ SW1 آن را فقط در VLAN 10 و از پورت‌های عضو همان VLAN منتشر می‌کند؛ فریم از Trunk با Tag مربوط به VLAN 10 به SW2 می‌رسد.",
+        "SW2 Tag را می‌خواند و فریم را در VLAN 10 پردازش می‌کند. PC-B عضو VLAN 10 است، پس فریم می‌تواند به پورت PC-B برسد.",
+        "PC-C عضو VLAN 20 است؛ بنابراین فریم Broadcast متعلق به VLAN 10 نباید به پورت Gi0/2 ارسال شود.",
+        "اگر PC-A بخواهد با PC-C ارتباط IP برقرار کند، مقصد در subnet دیگری است و PC-A باید بسته را به Gateway بدهد. این ارتباط بدون روتر یا SVI لایهٔ ۳ برقرار نمی‌شود.",
+        "وقتی SW2 فریم‌های PC-B را دریافت می‌کند، MAC مبدأ را همراه VLAN 10 روی پورت Gi0/1 یاد می‌گیرد. جدول MAC فقط MAC را نگه نمی‌دارد؛ VLAN و پورت نیز بخشی از تصمیم Forwarding هستند."
+      ],
+      "workedExample": [
+        {
+          "title": "تعیین VLAN پورت میزبان",
+          "explanation": "PC-A روی SW1 Gi0/1 قرار دارد. چون میزبان معمولی فریم بدون Tag می‌فرستد، پورت Access باید آن را به VLAN 10 نسبت دهد.",
+          "result": "show interfaces Gi0/1 switchport باید Access Mode و Access VLAN 10 را نشان دهد."
+        },
+        {
+          "title": "عبور VLAN روی لینک بین سوئیچ‌ها",
+          "explanation": "SW1 و SW2 باید روی پورت‌های متصل به هم Trunk باشند و VLANهای 10 و 20 در Allowed VLAN List حضور داشته باشند.",
+          "result": "show interfaces trunk باید VLANهای 10 و 20 را در وضعیت مجاز و فعال نشان دهد."
+        },
+        {
+          "title": "یادگیری MAC در هر VLAN",
+          "explanation": "پس از ارسال ترافیک از PC-A، SW1 آدرس MAC مبدأ را روی Gi0/1 در VLAN 10 یاد می‌گیرد. SW2 نیز MAC PC-B را در VLAN 10 و روی پورت خودش ثبت می‌کند.",
+          "result": "show mac address-table dynamic vlan 10 باید ورودی‌های VLAN 10 را نشان دهد."
+        },
+        {
+          "title": "تشخیص نیاز به مسیریابی",
+          "explanation": "PC-A و PC-C در VLAN و subnet متفاوت هستند. سوئیچ لایهٔ ۲ فریم را از VLAN 10 به VLAN 20 منتقل نمی‌کند.",
+          "result": "برای ارتباط PC-A و PC-C باید Gateway و Inter-VLAN Routing طراحی شود."
+        }
+      ],
+      "expectedBehavior": "PC-A و PC-B در VLAN 10 و subnet یکسان می‌توانند به هم دسترسی داشته باشند. PC-C در VLAN 20 عضو Broadcast Domain جداست؛ برای ارتباط IP با VLAN 10 به مسیریابی لایهٔ ۳ نیاز دارد."
+    },
+    "practice": {
+      "title": "۳. تمرین؛ تشخیص خطای VLAN و Trunk",
+      "introduction": "وقتی ارتباط یک میزبان قطع است، ابتدا بررسی کن پورت در VLAN موردنظر قرار دارد یا نه. سپس مسیر Trunk تا سوئیچ بعدی را بررسی کن. روشن بودن Link به معنی عبور درست VLAN نیست.",
+      "troubleshootingTable": [
+        {
+          "layer": "عضویت Access",
+          "checks": "show vlan brief و show interfaces Gi0/1 switchport را اجرا کن."
+        },
+        {
+          "layer": "وجود VLAN",
+          "checks": "بررسی کن VLAN موردنظر روی هر دو سوئیچ ساخته شده و وضعیت آن active باشد."
+        },
+        {
+          "layer": "Trunk",
+          "checks": "show interfaces trunk و show interfaces Gi0/24 switchport را اجرا کن."
+        },
+        {
+          "layer": "Allowed VLAN",
+          "checks": "اطمینان پیدا کن VLAN موردنیاز در Allowed VLAN List لینک Trunk وجود دارد."
+        },
+        {
+          "layer": "MAC Learning",
+          "checks": "با show mac address-table dynamic vlan 10 بررسی کن MAC میزبان روی پورت و VLAN مورد انتظار دیده شود."
+        },
+        {
+          "layer": "لایهٔ ۳",
+          "checks": "اگر میزبان‌ها در VLANهای متفاوت‌اند، Gateway، SVI یا Subinterface و Route را بررسی کن."
+        }
+      ],
+      "troubleshootingCases": [
+        {
+          "symptom": "PC-A و PC-B در یک VLAN هستند اما بین دو سوئیچ ارتباط ندارند.",
+          "cause": "Trunk برقرار نیست، VLAN روی یکی از سوئیچ‌ها وجود ندارد یا VLAN در Allowed List حذف شده است.",
+          "diagnosis": "روی هر دو سوئیچ show interfaces trunk و show vlan brief را اجرا کن.",
+          "fix": "VLAN را در هر دو سوئیچ ایجاد کن، پورت‌های بین سوئیچ را Trunk کن و VLAN موردنیاز را مجاز کن.",
+          "verify": "MAC میزبان راه دور باید از طریق Trunk در جدول MAC سوئیچ محلی یاد گرفته شود و Ping موفق باشد."
+        },
+        {
+          "symptom": "PC-A به PC-B دسترسی دارد اما PC-C را نمی‌بیند.",
+          "cause": "PC-C در VLAN و subnet دیگری است؛ این رفتار در نبود Inter-VLAN Routing طبیعی است.",
+          "diagnosis": "VLAN پورت PC-C و آدرس IP/Mask آن را بررسی کن.",
+          "fix": "اگر ارتباط لازم است، Gateway و SVI یا Router-on-a-Stick را پیکربندی کن؛ اگر جداسازی هدف است، تغییری لازم نیست.",
+          "verify": "پس از افزودن مسیریابی، ACLها و Routeهای هر دو جهت را بررسی کن."
+        },
+        {
+          "symptom": "پورت سوئیچ Link دارد اما در show vlan brief در VLAN اشتباه دیده می‌شود.",
+          "cause": "Access VLAN پورت به اشتباه تنظیم شده یا پورت به‌صورت Trunk/Mode دیگری عمل می‌کند.",
+          "diagnosis": "show interfaces Gi0/1 switchport را اجرا کن و Administrative/Operational Mode را مقایسه کن.",
+          "fix": "switchport mode access و switchport access vlan 10 را اعمال کن.",
+          "verify": "پورت باید در VLAN 10 دیده شود و MAC میزبان با VLAN 10 ثبت شود."
+        },
+        {
+          "symptom": "Trunk بالا است اما VLAN 20 از لینک عبور نمی‌کند.",
+          "cause": "VLAN 20 در Allowed VLAN List نیست یا روی سوئیچ مقصد فعال نشده است.",
+          "diagnosis": "show interfaces trunk و show vlan brief را در هر دو سمت مقایسه کن.",
+          "fix": "VLAN 20 را ایجاد و با switchport trunk allowed vlan add 20 به فهرست مجاز اضافه کن.",
+          "verify": "VLAN 20 باید در ستون Allowed and Active و سپس در MAC Table دیده شود."
+        },
+        {
+          "symptom": "دو سوئیچ روی Native VLAN متفاوت هستند و پیام هشدار دریافت می‌شود.",
+          "cause": "Native VLAN دو سر Trunk یکسان نیست و فریم‌های بدون Tag ممکن است به VLAN متفاوتی نسبت داده شوند.",
+          "diagnosis": "show interfaces trunk را در هر دو سمت اجرا و Native VLAN را مقایسه کن.",
+          "fix": "طبق طراحی، Native VLAN یکسان و ترجیحاً غیرکاربری تنظیم کن.",
+          "verify": "هشدار Native VLAN mismatch حذف شود و دو سر لینک تنظیم یکسان داشته باشند."
+        }
+      ],
+      "drills": [
+        "اگر یک PC به VLAN 10 تعلق دارد، آیا Broadcast آن باید به PC عضو VLAN 20 برسد؟ چرا؟",
+        "چرا ایجاد VLAN 10 روی SW1 کافی نیست وقتی میزبان VLAN 10 روی SW2 قرار دارد؟",
+        "تفاوت نتیجهٔ show vlan brief با show interfaces trunk چیست؟",
+        "اگر دو میزبان در VLAN متفاوت باشند اما IPهایشان در یک subnet باشند، چرا این طراحی می‌تواند مشکل‌ساز شود؟"
+      ]
+    },
+    "lab": {
+      "title": "۴. آزمایشگاه PNETLab؛ ساخت دو VLAN و عبور Trunk بین دو سوئیچ",
+      "pnetlabTopology": {
+        "title": "PC-A — SW1 == 802.1Q Trunk == SW2 — PC-B / PC-C",
+        "objective": "VLAN 10 و VLAN 20 را روی هر دو سوئیچ ایجاد کن، PC-A و PC-B را در VLAN 10 و PC-C را در VLAN 20 قرار بده، سپس عبور VLAN 10 و 20 را از Trunk راستی‌آزمایی کن.",
+        "portVlanTable": [
+          {
+            "دستگاه": "PC-A",
+            "رابط": "eth0",
+            "IP": "192.0.2.10/24",
+            "VLAN": "10",
+            "اتصال": "SW1 Gi0/1"
+          },
+          {
+            "دستگاه": "PC-B",
+            "رابط": "eth0",
+            "IP": "192.0.2.20/24",
+            "VLAN": "10",
+            "اتصال": "SW2 Gi0/1"
+          },
+          {
+            "دستگاه": "PC-C",
+            "رابط": "eth0",
+            "IP": "198.51.100.10/24",
+            "VLAN": "20",
+            "اتصال": "SW2 Gi0/2"
+          },
+          {
+            "دستگاه": "SW1",
+            "رابط": "Gi0/24",
+            "IP": "—",
+            "VLAN": "Trunk 10,20",
+            "اتصال": "SW2 Gi0/24"
+          },
+          {
+            "دستگاه": "SW2",
+            "رابط": "Gi0/24",
+            "IP": "—",
+            "VLAN": "Trunk 10,20",
+            "اتصال": "SW1 Gi0/24"
+          }
+        ],
+        "configs": {
+          "SW1": "hostname SW1\nvlan 10\n name USERS_A\nvlan 20\n name USERS_B\ninterface GigabitEthernet0/1\n switchport mode access\n switchport access vlan 10\n no shutdown\ninterface GigabitEthernet0/24\n switchport mode trunk\n switchport trunk allowed vlan 10,20\n no shutdown",
+          "SW2": "hostname SW2\nvlan 10\n name USERS_A\nvlan 20\n name USERS_B\ninterface GigabitEthernet0/1\n switchport mode access\n switchport access vlan 10\n no shutdown\ninterface GigabitEthernet0/2\n switchport mode access\n switchport access vlan 20\n no shutdown\ninterface GigabitEthernet0/24\n switchport mode trunk\n switchport trunk allowed vlan 10,20\n no shutdown",
+          "PC-A": "ip 192.0.2.10/24",
+          "PC-B": "ip 192.0.2.20/24",
+          "PC-C": "ip 198.51.100.10/24"
+        },
+        "steps": [
+          {
+            "action": "VLANهای 10 و 20 را روی هر دو سوئیچ ایجاد کن.",
+            "expected": "show vlan brief باید هر دو VLAN را active نشان دهد.",
+            "reason": "هر سوئیچ باید VLANهای لازم برای پردازش Tagها را بشناسد."
+          },
+          {
+            "action": "پورت PC-A و PC-B را Access VLAN 10 و پورت PC-C را Access VLAN 20 کن.",
+            "expected": "پورت‌های Access در VLAN صحیح دیده شوند.",
+            "reason": "عضویت پورت، Broadcast Domain میزبان را تعیین می‌کند."
+          },
+          {
+            "action": "Gi0/24 دو سوئیچ را Trunk و VLANهای 10 و 20 را مجاز کن.",
+            "expected": "show interfaces trunk باید لینک و VLANهای مجاز را نشان دهد.",
+            "reason": "Trunk شناسهٔ VLAN را بین سوئیچ‌ها منتقل می‌کند."
+          },
+          {
+            "action": "از PC-A به PC-B Ping بگیر.",
+            "expected": "در صورت تنظیم IP درست، Ping باید موفق باشد.",
+            "reason": "هر دو میزبان در VLAN 10 و subnet یکسان هستند؛ ترافیک از Trunk عبور می‌کند."
+          },
+          {
+            "action": "از PC-A به PC-C Ping بگیر.",
+            "expected": "بدون Inter-VLAN Routing، ارتباط نباید برقرار شود.",
+            "reason": "VLAN 20 یک Broadcast Domain مستقل است و سوئیچ لایهٔ ۲ بین VLANها Route نمی‌کند."
+          }
+        ]
+      },
+      "commands": [
+        {
+          "cmd": "show vlan brief",
+          "desc": "نمایش VLANها و پورت‌های Access عضو هرکدام.",
+          "explain": "برای هر پورت میزبان، VLAN مورد انتظار را بررسی کن."
+        },
+        {
+          "cmd": "show interfaces trunk",
+          "desc": "نمایش پورت‌های Trunk و VLANهای عبوری.",
+          "explain": "Native VLAN، وضعیت Trunk و Allowed VLAN List را بررسی کن."
+        },
+        {
+          "cmd": "show interfaces GigabitEthernet0/1 switchport",
+          "desc": "نمایش جزئیات عملیاتی یک پورت.",
+          "explain": "Administrative Mode و Operational Mode و Access VLAN را با هم مقایسه کن."
+        },
+        {
+          "cmd": "show mac address-table dynamic vlan 10",
+          "desc": "نمایش MACهای یادگرفته‌شده در VLAN 10.",
+          "explain": "MAC میزبان محلی و MAC میزبان راه دور باید با پورت‌های مناسب دیده شوند."
+        },
+        {
+          "cmd": "show spanning-tree vlan 10",
+          "desc": "بررسی وضعیت STP برای VLAN 10.",
+          "explain": "پورت‌های مسیر موردنیاز باید در حالت Forwarding باشند."
+        }
+      ],
+      "verificationCommands": [
+        {
+          "cmd": "show vlan brief",
+          "purpose": "تأیید وجود VLAN و عضویت پورت‌های Access.",
+          "expected": "VLAN 10 و 20 active و پورت‌های میزبان در VLAN صحیح."
+        },
+        {
+          "cmd": "show interfaces trunk",
+          "purpose": "تأیید Trunk و عبور VLANهای مجاز.",
+          "expected": "Gi0/24 در حالت trunking و VLANهای 10 و 20 مجاز باشند."
+        },
+        {
+          "cmd": "show mac address-table dynamic vlan 10",
+          "purpose": "تأیید یادگیری MAC در VLAN 10.",
+          "expected": "MACهای PC-A و PC-B در پورت‌های صحیح ثبت شوند."
+        }
+      ],
+      "verificationCommand": "show interfaces trunk",
+      "expectedOutput": "Port        Mode         Encapsulation  Status        Native vlan\nGi0/24      on           802.1q         trunking      1\n\nPort        Vlans allowed on trunk\nGi0/24      10,20",
+      "interpretation": "trunking یعنی لینک در وضعیت عملیاتی Trunk قرار دارد. Allowed VLAN List فقط مشخص می‌کند چه VLANهایی اجازهٔ عبور دارند؛ برای اطمینان از فعال بودن VLAN در سوئیچ مقصد، show vlan brief و ستون Allowed and Active را نیز بررسی کن.",
+      "commonMistakes": [
+        "فراموش کردن ایجاد VLAN در سوئیچ دوم؛ Trunk به‌تنهایی VLAN را در همهٔ سوئیچ‌ها ایجاد نمی‌کند.",
+        "تنظیم پورت میزبان به‌صورت Trunk به‌جای Access؛ میزبان معمولی انتظار فریم بدون Tag دارد.",
+        "حذف VLAN از Allowed List و تصور اینکه صرفاً بالا بودن Trunk کافی است.",
+        "انتظار ارتباط بین VLAN 10 و VLAN 20 بدون SVI یا روتر لایهٔ ۳.",
+        "تغییر Native VLAN فقط در یک سمت Trunk و ایجاد Native VLAN mismatch."
+      ]
+    },
+    "quiz": {
+      "title": "۵. آزمون تسلط؛ ۱۰ سؤال VLAN",
+      "instructions": "به هر سؤال با توجه به محدودهٔ Broadcast و نقش پورت پاسخ بده؛ صرفاً نام فرمان‌ها را حفظ نکن.",
+      "questions": [
+        {
+          "q": "VLAN در درجهٔ اول چه چیزی را جدا می‌کند؟",
+          "options": [
+            "Collision Domain در کل شبکه",
+            "Broadcast Domain در لایهٔ ۲",
+            "جدول مسیریابی IP",
+            "کابل فیزیکی"
+          ],
+          "answer": 1,
+          "explanation": "هر VLAN یک Broadcast Domain منطقی مستقل ایجاد می‌کند.",
+          "tip": "VLAN به جداسازی لایهٔ ۲ مربوط است."
+        },
+        {
+          "q": "پورت Access معمولاً چه نوع ترافیکی را به میزبان تحویل می‌دهد؟",
+          "options": [
+            "فریم 802.1Q تگ‌دار برای چند VLAN",
+            "فریم متعلق به VLAN پورت، بدون Tag",
+            "فقط بسته‌های IP مسیریابی‌شده",
+            "فقط Broadcast"
+          ],
+          "answer": 1,
+          "explanation": "در حالت رایج، میزبان روی Access Port عضو یک VLAN است و فریم بدون Tag ارسال و دریافت می‌کند.",
+          "tip": "Tagging معمولاً روی Trunk دیده می‌شود."
+        },
+        {
+          "q": "وظیفهٔ اصلی Trunk چیست؟",
+          "options": [
+            "ساخت آدرس IP برای VLAN",
+            "عبور ترافیک چند VLAN روی یک لینک",
+            "جایگزینی روتر",
+            "حذف جدول MAC"
+          ],
+          "answer": 1,
+          "explanation": "Trunk با استفاده از Tag 802.1Q شناسهٔ VLAN را بین تجهیزات منتقل می‌کند.",
+          "tip": "یک لینک فیزیکی، چند VLAN منطقی."
+        },
+        {
+          "q": "PC-A در VLAN 10 و PC-C در VLAN 20 هستند. برای ارتباط IP بین آن‌ها چه چیزی لازم است؟",
+          "options": [
+            "فقط یک کابل دیگر",
+            "Inter-VLAN Routing",
+            "تغییر MAC Address",
+            "خاموش کردن STP"
+          ],
+          "answer": 1,
+          "explanation": "VLANها Broadcast Domain جدا دارند؛ برای ارتباط بین subnetها به روتر یا سوئیچ لایهٔ ۳ نیاز است.",
+          "tip": "سوئیچ لایهٔ ۲ بین VLANها Route نمی‌کند."
+        },
+        {
+          "q": "کدام فرمان VLANها و پورت‌های Access عضو آن‌ها را نشان می‌دهد؟",
+          "options": [
+            "show ip route",
+            "show vlan brief",
+            "show arp",
+            "show controllers"
+          ],
+          "answer": 1,
+          "explanation": "show vlan brief نمای کلی VLANهای سوئیچ و پورت‌های عضو را نشان می‌دهد.",
+          "tip": "برای وضعیت Trunk از show interfaces trunk استفاده کن."
+        },
+        {
+          "q": "در Trunk 802.1Q شناسهٔ VLAN چگونه منتقل می‌شود؟",
+          "options": [
+            "با تغییر IP مقصد",
+            "با Tag در فریم Ethernet",
+            "با تغییر شمارهٔ TCP Port",
+            "با پیام DNS"
+          ],
+          "answer": 1,
+          "explanation": "802.1Q یک Tag حاوی VLAN ID به فریم اضافه می‌کند تا سوئیچ مقصد VLAN را تشخیص دهد.",
+          "tip": "VLAN ID در لایهٔ پیوند داده حمل می‌شود."
+        },
+        {
+          "q": "اگر VLAN 20 در Allowed VLAN List نباشد چه می‌شود؟",
+          "options": [
+            "VLAN 20 خودکار به VLAN 10 تبدیل می‌شود",
+            "ترافیک VLAN 20 از آن Trunk عبور نمی‌کند",
+            "پورت فیزیکی حتماً down می‌شود",
+            "IP میزبان تغییر می‌کند"
+          ],
+          "answer": 1,
+          "explanation": "Allowed VLAN List تعیین می‌کند کدام VLANها اجازهٔ عبور از Trunk را دارند.",
+          "tip": "Trunk بالا بودن با عبور همهٔ VLANها یکسان نیست."
+        },
+        {
+          "q": "MAC Address Table سوئیچ معمولاً چه اطلاعاتی را نگه می‌دارد؟",
+          "options": [
+            "IP و Default Gateway",
+            "MAC، VLAN و پورت",
+            "نام دامنه و DNS",
+            "شمارهٔ سریال کابل"
+          ],
+          "answer": 1,
+          "explanation": "سوئیچ MAC مبدأ را همراه VLAN و پورت ورودی یاد می‌گیرد تا فریم‌های بعدی را هدایت کند.",
+          "tip": "برای یک MAC، VLAN بخشی از زمینهٔ یادگیری است."
+        },
+        {
+          "q": "Native VLAN در Trunk 802.1Q چه ویژگی‌ای دارد؟",
+          "options": [
+            "همیشه VLAN 100 است",
+            "فریم‌های بدون Tag را به آن نسبت می‌دهند",
+            "فقط برای IPv6 است",
+            "تمام ترافیک را رمز می‌کند"
+          ],
+          "answer": 1,
+          "explanation": "در تنظیم معمول 802.1Q، فریم‌های بدون Tag روی Trunk به Native VLAN نسبت داده می‌شوند؛ دو سر لینک باید هماهنگ باشند.",
+          "tip": "Native VLAN mismatch را جدی بگیر."
+        },
+        {
+          "q": "آیا VLAN به‌تنهایی یک مرز امنیتی کامل محسوب می‌شود؟",
+          "options": [
+            "بله، هیچ کنترل دیگری لازم نیست",
+            "خیر؛ برای کنترل ارتباط و دسترسی به سیاست‌های تکمیلی نیاز است",
+            "فقط در شبکهٔ بی‌سیم",
+            "فقط وقتی DHCP فعال باشد"
+          ],
+          "answer": 1,
+          "explanation": "VLAN جداسازی لایهٔ ۲ ایجاد می‌کند، اما برای کنترل دسترسی بین بخش‌ها باید ACL، Firewall و سیاست‌های امنیتی مناسب طراحی شوند.",
+          "tip": "Segmentation پایهٔ امنیت است، نه تمام امنیت."
+        }
+      ]
+    },
+    "summary": {
+      "title": "۶. جمع‌بندی؛ VLAN، Access و Trunk",
+      "oneSentence": "VLAN مرز Broadcast را می‌سازد؛ Access میزبان را به یک VLAN وصل می‌کند و Trunk چند VLAN را با Tag بین تجهیزات عبور می‌دهد.",
+      "takeaways": [
+        "هر VLAN یک Broadcast Domain مستقل در لایهٔ ۲ است.",
+        "پورت Access معمولاً به یک VLAN اختصاص دارد و فریم بدون Tag را به میزبان تحویل می‌دهد.",
+        "Trunk با 802.1Q چند VLAN را روی یک لینک حمل می‌کند.",
+        "VLAN باید روی سوئیچ‌های مسیر وجود داشته باشد و در Allowed VLAN List لینک Trunk مجاز باشد.",
+        "ارتباط بین VLANها به روتر یا سوئیچ لایهٔ ۳ نیاز دارد.",
+        "برای عیب‌یابی، عضویت VLAN، وضعیت Trunk، Allowed List، جدول MAC و STP را به‌ترتیب بررسی کن."
+      ],
+      "checklist": [
+        "می‌توانم تفاوت Access Port و Trunk Port را با مثال توضیح بدهم.",
+        "می‌توانم VLAN را بسازم و نام‌گذاری کنم.",
+        "می‌توانم پورت‌های Access را به VLAN صحیح اختصاص بدهم.",
+        "می‌توانم Trunk 802.1Q را بین دو سوئیچ راه‌اندازی و بررسی کنم.",
+        "می‌توانم با show vlan brief و show interfaces trunk وضعیت را تفسیر کنم.",
+        "می‌توانم توضیح بدهم چرا دو VLAN بدون مسیریابی لایهٔ ۳ با هم ارتباط ندارند."
+      ],
+      "nextLessons": [
+        "Trunking و تگ‌گذاری IEEE 802.1Q — ccna-trunk-8021q",
+        "STP و RSTP — ccna-stp-rstp",
+        "امنیت لایهٔ ۲ — ccna-port-sec"
+      ]
+    }
+  }
+}

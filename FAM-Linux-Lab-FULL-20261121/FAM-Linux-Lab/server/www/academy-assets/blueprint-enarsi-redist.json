@@ -1,0 +1,198 @@
+{
+  "lessonId": "enarsi-redist",
+  "track": "CCNP ENARSI",
+  "title": "توزیع مجدد مسیرها (Route Redistribution) و Route-Map",
+  "beforeYouStart": {
+    "prerequisites": [
+      "آشنایی پایه با مفاهیم شبکه"
+    ],
+    "learningObjectives": [
+      "Route Redistribution فرآیند تزریق مسیرهای یادگرفته‌شده از یک پروتکل مسیریابی (مثل EIGRP یا..."
+    ]
+  },
+  "whyItMatters": "Route Redistribution فرآیند تزریق مسیرهای یادگرفته‌شده از یک پروتکل مسیریابی (مثل EIGRP یا Static) به پروتکل دیگر (مثل OSPF) است. Route-Map ابزار قدرتمندی برای فیلترکردن، تغییر Metric و برچسب‌گذاری (Route Tagging) جهت جلوگیری از Routing Loop است.",
+  "sections": [
+    {
+      "id": "concepts",
+      "title": "مبانی و مفاهیم اصلی",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>Route Redistribution فرآیند تزریق مسیرهای یادگرفته‌شده از یک پروتکل مسیریابی (مثل EIGRP یا Static) به پروتکل دیگر (مثل OSPF) است. Route-Map ابزار قدرتمندی برای فیلترکردن، تغییر Metric و برچسب‌گذاری (Route Tagging) جهت جلوگیری از Routing Loop است.</p>"
+    },
+    {
+      "id": "how-it-works",
+      "title": "نحوه عملکرد در شبکه",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>هنگام توزیع مجدد به OSPF، باید کلمهٔ کلیدی subnets استفاده شود تا مسیرهای Classless نیز منتقل شوند. در توزیع مجدد دوطرفه (Mutual Redistribution)، مسیرهای تزریق‌شده با Tag علامت‌گذاری می‌شوند تا دوباره به پروتکل مبدأ برنگردند.</p><h4>تحلیل مسیر و جلوگیری از بازگشت</h4><p>توزیع مجدد تبدیل سادهٔ همهٔ ویژگی‌های پروتکل مبدأ به مقصد نیست؛ seed metric، نوع مسیر و سیاست فیلتر باید برای هر پروتکل طراحی شوند. در مثال R2، مسیرهای OSPF وارد EIGRP با tag 100 و مسیرهای EIGRP وارد OSPF با tag 200 می‌شوند.</p><p>قبل از انتقال EIGRP به OSPF، tag 100 رد می‌شود و در جهت دیگر tag 200 رد می‌شود. با چند مرز باید حفظ tag، سازگاری policy، Administrative Distance، مسیرهای ناخواسته و شمارنده‌ها روی همهٔ نقاط بررسی شوند؛ وجود tag به‌تنهایی اثبات عدم حلقه نیست.</p>"
+    },
+    {
+      "id": "components",
+      "title": "اجزا، مزایا و محدودیت‌ها",
+      "html": "<p style='line-height:1.8;color:#cbd5e1'>مفاهیم: Seed Metric (متریک پیش‌فرض هنگام ورود به پروتکل جدید)، E1 در مقابل E2 در OSPF (جمع‌شدن هزینهٔ داخلی با خارجی در E1). محدودیت‌ها: خطر بالای ایجاد Suboptimal Routing یا Routing Loop در نقاط توزیع چندگانه.</p>"
+    },
+    {
+      "id": "topology",
+      "title": "توپولوژی اختصاصی درس",
+      "html": "<p>R1 (OSPF, 192.168.1.1/32) — 10.0.12.0/30 — R2 (ASBR، دو Route-Map) — 10.0.23.0/30 — R3 (EIGRP, 192.168.3.1/32).</p>"
+    },
+    {
+      "id": "scenario",
+      "title": "سناریوی عملی و تجهیزات",
+      "html": "<p>در سناریوی کاربرگ، R1 با R2 در OSPF Area 0 و R3 با R2 در EIGRP AS 100 همسایه است. R2 مسیرها را در هر دو جهت با tag متمایز و فیلتر tag بازگشتی توزیع می‌کند. آدرس‌ها و رابط‌های کامل در کاربرگ آمده‌اند.</p>"
+    },
+    {
+      "id": "ios-commands",
+      "title": "دستورات Cisco IOS به ترتیب اجرا",
+      "html": "<p>پیکربندی کامل R1، R2 و R3 در کاربرگ آمده است. در R2 نمونهٔ سیاست دوطرفه:</p><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>route-map OSPF_TO_EIGRP deny 10\n match tag 200\nroute-map OSPF_TO_EIGRP permit 20\n set tag 100\nroute-map EIGRP_TO_OSPF deny 10\n match tag 100\nroute-map EIGRP_TO_OSPF permit 20\n set tag 200\nrouter eigrp 100\n redistribute ospf 1 metric 100000 100 255 1 1500 route-map OSPF_TO_EIGRP\nexit\nrouter ospf 1\n redistribute eigrp 100 subnets route-map EIGRP_TO_OSPF</code></pre><p>برچسب به‌تنهایی جلوی حلقه را نمی‌گیرد. در مرزهای متعدد، سیاست سازگار برای تمام نقاط و طراحی فیلتر لازم است.</p>"
+    },
+    {
+      "id": "verification",
+      "title": "تست و خروجی مورد انتظار (Verification)",
+      "html": "<p>انتظار طراحی، نه خروجی واقعی: R1 مسیر خارجی OSPF به 192.168.3.1/32 و R3 مسیر خارجی EIGRP به 192.168.1.1/32 را ببیند. show ip route، show ip protocols، show route-map و جزئیات مسیرها را در هر جهت بررسی کنید.</p>"
+    },
+    {
+      "id": "troubleshooting",
+      "title": "عیب‌یابی (Troubleshooting)",
+      "html": "<p style='line-height:1.8;color:#fca5a5'>1) فقط شبکه‌های Classful منتقل می‌شوند: فراموشی کلمهٔ کلیدی subnets. 2) حلقه مسیریابی: نبود Route Tagging در توزیع مجدد دوطرفه.</p>"
+    },
+    {
+      "id": "exam-tips",
+      "title": "نکات آزمون CCNA / CCNP و ارتباط با مباحث دیگر",
+      "html": "<p style='line-height:1.8;color:#fde68a'>تفاوت AD مسیرهای EIGRP External (170) با OSPF External (110) و نقش subnets در redistribute ospf از نکات کلیدی ENARSI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "ENARSI-REDIST",
+      "fa": "توزیع مجدد مسیرها (Route Redistribution) و Route-Map",
+      "simple": "مفهوم کلیدی و استاندارد پیاده‌سازی در توزیع مجدد مسیرها (Route Redistribution) و Route-Map."
+    },
+    {
+      "term": "Verification",
+      "fa": "راستی‌آزمایی",
+      "simple": "بررسی خروجی زنده دستورات show در Cisco IOS برای اطمینان از صحت عملکرد."
+    },
+    {
+      "term": "Troubleshooting",
+      "fa": "عیب‌یابی",
+      "simple": "تحلیل گام‌به‌گام خطاهای لایه‌ای و تطبیق پیکربندی."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "کاربرگ اختصاصی آزمایشگاه (اجرا نشده)",
+      "html": "<p class=\"lesson-quiz-warning\">کاربرگ طراحی‌شده برای محیط ایزوله است و روی تجهیزات یا PNETLab اجرا و تأیید نشده است. نام رابط‌ها و قابلیت‌های IOS را با ایمیج خود تطبیق دهید؛ نمونه را در شبکه عملیاتی اجرا نکنید.</p><h4>توپولوژی و پیش‌نیاز</h4><p>R1 Gi0/0=10.0.12.1/30 به R2 Gi0/0=10.0.12.2/30 در OSPF Area 0؛ R2 Gi0/1=10.0.23.1/30 به R3 Gi0/0=10.0.23.2/30 در EIGRP AS 100. Loopbackهای R1 و R3 به‌ترتیب 192.168.1.1/32 و 192.168.3.1/32 هستند. در صورت وجود چند مرز باید همین سیاست به‌طور سازگار در همهٔ مرزها اجرا شود.</p><h4>دستورات و نقش تجهیزات</h4><h4>R1</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>conf t\ninterface gi0/0\n ip address 10.0.12.1 255.255.255.252\n no shutdown\ninterface loopback0\n ip address 192.168.1.1 255.255.255.255\nrouter ospf 1\n router-id 1.1.1.1\n network 10.0.12.0 0.0.0.3 area 0\n network 192.168.1.1 0.0.0.0 area 0\nend</code></pre><h4>R3</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>conf t\ninterface gi0/0\n ip address 10.0.23.2 255.255.255.252\n no shutdown\ninterface loopback0\n ip address 192.168.3.1 255.255.255.255\nrouter eigrp 100\n no auto-summary\n network 10.0.23.0 0.0.0.3\n network 192.168.3.1 0.0.0.0\nend</code></pre><h4>R2؛ زیرساخت و همسایگی</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>conf t\ninterface gi0/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\ninterface gi0/1\n ip address 10.0.23.1 255.255.255.252\n no shutdown\nrouter ospf 1\n router-id 2.2.2.2\n network 10.0.12.0 0.0.0.3 area 0\nexit\nrouter eigrp 100\n no auto-summary\n network 10.0.23.0 0.0.0.3\nend</code></pre><h4>R2؛ پس از برقراری همسایگی‌های پایه</h4><pre class=\"cli-block\" dir=\"ltr\" style=\"background:#020617;color:#e0e8f6;padding:10px;border-radius:8px;overflow:auto\"><code>conf t\nroute-map OSPF_TO_EIGRP deny 10\n match tag 200\nroute-map OSPF_TO_EIGRP permit 20\n set tag 100\nroute-map EIGRP_TO_OSPF deny 10\n match tag 100\nroute-map EIGRP_TO_OSPF permit 20\n set tag 200\nrouter eigrp 100\n redistribute ospf 1 metric 100000 100 255 1 1500 route-map OSPF_TO_EIGRP\nexit\nrouter ospf 1\n redistribute eigrp 100 subnets route-map EIGRP_TO_OSPF\nend</code></pre><h4>راستی‌آزمایی و عیب‌یابی</h4><p>پیش از اعمال، آدرس‌دهی، همسایگی و نسخهٔ IOS و پشتیبانی tag را بررسی کنید. show ip route، show ip protocols و show route-map را در هر سه روتر ثبت کنید؛ مسیرهای خارجی OSPF/EIGRP و شمارندهٔ match را بررسی و با توقف یک سمت از بازگشت مسیرهای دارای tag جلوگیری کنید. metric مثال است و باید با طراحی سازگار شود.</p>"
+    },
+    "quiz": {
+      "questions": [
+        {
+          "q": "در ASBR مسیر static باید به OSPF منتقل شود، از جمله شبکه‌های /24 غیر classful. کدام تنظیم برای IOS معمول مناسب است؟",
+          "options": [
+            "redistribute ospf 1 زیر همان OSPF",
+            "redistribute static subnets زیر router ospf",
+            "network 0.0.0.0 255.255.255.255 زیر DHCP",
+            "ip route 0.0.0.0 0.0.0.0 Null0 به‌تنهایی"
+          ],
+          "answer": 1,
+          "explanation": "redistribute static subnets مسیرهای static واجد شرایط را به OSPF خارجی وارد می‌کند؛ subnets در این سناریو شبکه‌های classless را شامل می‌کند."
+        },
+        {
+          "q": "دو نقطهٔ redistribution بین OSPF و EIGRP وجود دارد. صرف set tag 100 روی مسیر واردشده چه اثری بر جلوگیری از بازگشت آن دارد؟",
+          "options": [
+            "برچسب به‌تنهایی کافی نیست؛ در جهت بازگشت باید tag فیلتر شود",
+            "خودکار همهٔ بازتوزیع‌های برگشتی را مسدود می‌کند",
+            "OSPF route را بلافاصله از LSDB حذف می‌کند",
+            "metric تمام مسیرها را صفر می‌کند"
+          ],
+          "answer": 0,
+          "explanation": "set tag فقط علامت می‌گذارد؛ route-map بازگشت باید match tag و deny برای آن برچسب داشته باشد."
+        },
+        {
+          "q": "Route-map بازگشت از OSPF به EIGRP ابتدا deny 10 با match tag 100 دارد. برای عبور مسیرهای مجاز بدون آن tag چه لازم است؟",
+          "options": [
+            "no router eigrp در همهٔ روترها",
+            "حذف deny 10 و امید به فیلتر ضمنی",
+            "set tag 100 روی تمام مسیرهای ورودی",
+            "یک permit بعدی با شرایط مناسب"
+          ],
+          "answer": 3,
+          "explanation": "route-map پس از نبود تطابق مجاز، deny ضمنی دارد؛ یک permit بعدی کنترل‌شده مسیرهای دیگر را عبور می‌دهد."
+        },
+        {
+          "q": "دو ASBR مسیر خارجی OSPF را با متریک خارجی برابر تزریق می‌کنند و هزینهٔ داخلی تا ASBRها متفاوت است. E1 چه چیزی را در انتخاب لحاظ می‌کند؟",
+          "options": [
+            "صرفاً هزینهٔ لینک مقصد نهایی در DNS",
+            "فقط سن route در جدول ARP",
+            "هزینهٔ داخلی تا ASBR به‌علاوهٔ هزینهٔ خارجی",
+            "تنها administrative distance برابر صفر"
+          ],
+          "answer": 2,
+          "explanation": "در OSPF نوع E1 هزینهٔ داخلی تا ASBR را با هزینهٔ خارجی جمع می‌کند؛ E2 عمدتاً متریک خارجی را معیار اصلی قرار می‌دهد."
+        },
+        {
+          "q": "هنگام redistribution به EIGRP کلاسیک، متریک لازم تعیین نشده و routeها وارد نمی‌شوند. اقدام مرتبط چیست؟",
+          "options": [
+            "افزودن VLAN به allowed list",
+            "تعیین seed metric مناسب با دستور یا route-map در IOS مربوطه",
+            "تغییر نام DHCP pool",
+            "حذف تمام interfaceهای OSPF"
+          ],
+          "answer": 1,
+          "explanation": "EIGRP برای route بازتوزیع‌شده به متریک مرکب معتبر نیاز دارد؛ syntax و پشتیبانی به نسخه و حالت وابسته است."
+        },
+        {
+          "q": "مسیر static در جدول RIB روتر ASBR وجود ندارد؛ redistribute static تنظیم شده است. چرا مسیر به OSPF نمی‌رسد؟",
+          "options": [
+            "مسیر نصب‌نشده در RIB معمولاً منبع واجد شرایط redistribution نیست",
+            "همهٔ staticهای کانفیگ‌شده بدون وجود در RIB تبلیغ می‌شوند",
+            "OSPF فقط MAC address را بازتوزیع می‌کند",
+            "route-map نبود route را جبران می‌کند"
+          ],
+          "answer": 0,
+          "explanation": "ابتدا وجود و فعال‌بودن مسیر منبع در جدول مسیریابی و دسترسی next-hop را کنترل کنید."
+        },
+        {
+          "q": "برای دیدن مسیرهای خارجی دریافت‌شده از redistribution در روتر OSPF کدام خروجی مفید است؟",
+          "options": [
+            "show mac address-table به‌تنهایی",
+            "show vlan brief و بررسی VLAN نام سرور",
+            "show ip dhcp binding",
+            "show ip route ospf و بررسی O E1 یا O E2"
+          ],
+          "answer": 3,
+          "explanation": "نشانگرهای O E1 و O E2 در جدول مسیر، route خارجی OSPF را مشخص می‌کنند؛ برای عیب‌یابی جزئیات LSDB هم بررسی شود."
+        },
+        {
+          "q": "در redistribution دوطرفه چه مشکلی می‌تواند از تفاوت administrative distance و ورود مجدد route ایجاد شود؟",
+          "options": [
+            "افزایش تعداد VLANها توسط OSPF",
+            "تبدیل اجباری همهٔ آدرس‌ها به IPv6",
+            "انتخاب مسیر نامطلوب یا حلقه در صورت سیاست نامناسب",
+            "جلوگیری خودکار از همهٔ حلقه‌ها"
+          ],
+          "answer": 2,
+          "explanation": "چند نقطهٔ redistribution می‌توانند به بازگشت اطلاعات و انتخاب نامطلوب منجر شوند؛ فیلتر و tagging باید هر دو جهت را پوشش دهند."
+        },
+        {
+          "q": "در route-map مورد استفاده برای redistribution خط deny دارای match tag 100 است؛ اثر آن چیست؟",
+          "options": [
+            "همهٔ بسته‌های TCP پورت 100 مسدود می‌شوند",
+            "مسیرهای با tag 100 از این عمل redistribution حذف می‌شوند",
+            "tag همهٔ routeها به 100 تغییر می‌کند",
+            "روی interface به‌صورت خودکار ACL نصب می‌شود"
+          ],
+          "answer": 1,
+          "explanation": "deny در route-map مسیر منطبق را از همان عملیات redistribution حذف می‌کند؛ این فیلتر بسته روی اینترفیس نیست."
+        },
+        {
+          "q": "route به OSPF وارد شده اما روتر مقصد آن را نمی‌بیند. پس از بررسی RIB مبدأ کدام گام مرتبط است؟",
+          "options": [
+            "بررسی route-map، LSA خارجی و نوع area در مسیر",
+            "فقط بررسی DNS option در DHCP",
+            "حذف تمام VLANهای شبکه",
+            "تغییر NTP stratum به صفر"
+          ],
+          "answer": 0,
+          "explanation": "route-map و انتشار LSA خارجی و محدودیت‌های area مانند stub بر دریافت route تأثیر دارند."
+        }
+      ]
+    }
+  }
+}
