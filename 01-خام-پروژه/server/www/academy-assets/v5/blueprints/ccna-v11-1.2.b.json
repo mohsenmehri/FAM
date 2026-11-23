@@ -1,0 +1,385 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccna-v11-1.2.b",
+ "objectiveId": "1.2.b",
+ "kind": "objective",
+ "track": "FAM Curriculum 5.0",
+ "course": "ccna-v11",
+ "title": "معماری three-tier: core جدا از distribution",
+ "titleEn": "Describe — three-tier",
+ "domain": "1.0 Network Fundamentals",
+ "source": "content/lessons/ccna-v11-1.2.b.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 45,
+ "prerequisites": [
+  "ccna-v11-1.2.a"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "ccna-v11-1.2.a"
+  ],
+  "learningObjectives": [
+   "core",
+   "distribution",
+   "access",
+   "ECMP",
+   "summarization",
+   "convergence",
+   "routed",
+   "STP",
+   "latency",
+   "policy",
+   "redundancy",
+   "QoS"
+  ]
+ },
+ "whyItMatters": "دانشگاهی با سه ساختمان، دو بلوک distribution و یک مرکز دادهٔ کوچک دارد. هر ساختمان accessهای خودش را دارد و distribution آن ساختمان SVI، ACL و FHRP را انجام می‌دهد. اگر ساختمان A بخواهد به ساختمان B و مرکز داده وصل شود، ترافیک باید از یک مسیر پرسرعت و کوتاه عبور کند. اگر distributionهای ساختمان‌ها را مستقیم و کامل به هم mesh کنیم، تعداد لینک‌ها با n(n-1)/2 رشد می‌کند، جدول route پیچیده می‌شود و هر بلوک باید سیاست‌های بقیه را بداند. راه‌حل three-tier این است که یک لایهٔ core جدا، فقط برای انتقال سریع بین بلوک‌ها و edge قرار بگیرد. core نباید endpoint بپذیرد، نباید ACL سنگین یا NAT انجام دهد و ن",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>دانشگاهی با سه ساختمان، دو بلوک distribution و یک مرکز دادهٔ کوچک دارد. هر ساختمان accessهای خودش را دارد و distribution آن ساختمان SVI، ACL و FHRP را انجام می‌دهد. اگر ساختمان A بخواهد به ساختمان B و مرکز داده وصل شود، ترافیک باید از یک مسیر پرسرعت و کوتاه عبور کند. اگر distributionهای ساختمان‌ها را مستقیم و کامل به هم mesh کنیم، تعداد لینک‌ها با n(n-1)/2 رشد می‌کند، جدول route پیچیده می‌شود و هر بلوک باید سیاست‌های بقیه را بداند.</p>\n<p>راه‌حل <strong>three-tier</strong> این است که یک لایهٔ <strong>core</strong> جدا، فقط برای انتقال سریع بین بلوک‌ها و edge قرار بگیرد. core نباید endpoint بپذیرد، نباید ACL سنگین یا NAT انجام دهد و نباید VLANهای کاربران را terminate کند. کار core «حمل» است، نه «سیاست‌گذاری». distribution سیاست، SVI، FHRP و summarization را انجام می‌دهد؛ access دسترسی endpoint را.</p>\n<p>این تفکیک در شبکه‌های بزرگ باعث مقیاس‌پذیری، convergence سریع‌تر و failure domain روشن‌تر می‌شود. اما three-tier همیشه بهتر نیست: برای شبکهٔ کوچک، core جدا هزینه و پیچیدگی اضافه می‌کند. این درس می‌گوید چه زمانی three-tier منطقی است، core چه قواعدی دارد و چه چیزی می‌تواند آن را به گلوگاه تبدیل کند.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>سه لایه را مثل یک سیستم حمل‌ونقل ببین:</p>\n<ul><li><strong>Access</strong> = ایستگاه محله. endpoint سوار می‌شود؛ VLAN/PoE/802.1X.</li><li><strong>Distribution</strong> = مرکز توزیع منطقه. تصمیم می‌گیرد کدام مقصد، کدام سیاست، کدام gateway؛ SVI/FHRP/ACL/summarization.</li><li><strong>Core</strong> = بزرگراه بین‌شهری. فقط ترافیک را سریع و با مسیرهای redundant جابه‌جا می‌کند؛ ECMP، latency کم، پهنای باند بالا.</li></ul>\n<p><strong>قاعدهٔ طلایی:</strong> هرچه به core نزدیک‌تر می‌شوی، <strong>سیاست کمتر، سرعت بیشتر، حالت routed بیشتر</strong>. هرچه به access نزدیک‌تر می‌شوی، <strong>سیاست/کنترل بیشتر، سرعت کمتر، حالت Layer 2 بیشتر</strong>.</p>\n<p>سه-tier معمولاً این شکل را دارد:</p>\n<pre><code class=\"language-text\">        [Core-1]=====[Core-2]\n         /   \\         /   \\\n   [DIST-A1]-[DIST-A2]  [DIST-B1]-[DIST-B2]\n      |  |                 |  |\n   [ACC] [ACC]          [ACC] [ACC]</code></pre>\n<p>core و distribution معمولاً <strong>routed</strong> هستند (L3)، نه L2. این کار loop را به routing/convergence می‌سپارد و STP را از core حذف می‌کند. اگر core را L2 بسازی، STP diameter، blocked link و broadcast domain بزرگ برمی‌گردد.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>Core</td><td>انتقال پرسرعت بین بلوک‌ها/edge</td><td>«core باید ACL همهٔ VLANها را داشته باشد»</td></tr><tr><td>Distribution</td><td>policy/routing/aggregation</td><td>«distribution فقط uplink است»</td></tr><tr><td>Access</td><td>اتصال endpoint</td><td>«access همیشه L2 است»</td></tr><tr><td>Collapsed core</td><td>ادغام distribution/core</td><td>«همان three-tier است»</td></tr><tr><td>ECMP</td><td>چند مسیر هم‌هزینه</td><td>«ECMP همیشه load balancing کامل است»</td></tr><tr><td>Routed link</td><td>لینک L3 بین تجهیزات</td><td>«routed link STP ندارد، پس امن است»</td></tr><tr><td>Summarization</td><td>خلاصه‌سازی prefix</td><td>«خلاصه همیشه بدون ریسک است»</td></tr><tr><td>Convergence</td><td>زمان رسیدن به وضعیت پایدار</td><td>«convergence فقط STP است»</td></tr><tr><td>Failure domain</td><td>محدودهٔ اثر خرابی</td><td>«core خراب شود، فقط یک VLAN می‌رود»</td></tr><tr><td>QoS</td><td>اولویت/صف‌بندی</td><td>«QoS فقط در access است»</td></tr><tr><td>Latency</td><td>تأخیر</td><td>«پهنای باند بیشتر همیشه latency را کم می‌کند»</td></tr><tr><td>Redundancy</td><td>مسیر/دستگاه جایگزین</td><td>«redundancy بدون تست، تضمین است»</td></tr></tbody></table></div>\n<p><strong>مرزهای مهم:</strong></p>\n<ul><li><strong>Core ≠ super-distribution.</strong> اگر core SVI/ACL/NAT/FHRP انجام دهد، در واقع distribution را بزرگ کرده‌ای.</li><li><strong>Three-tier ≠ همیشه بهتر.</strong> برای ۵۰ کاربر، core جدا اتلاف است.</li><li><strong>ECMP ≠ کیفیت مسیر.</strong> ECMP فقط مسیرهای هم‌هزینه را تقسیم می‌کند؛ مسیر بد/کند را انتخاب نمی‌کند.</li><li><strong>Routed ≠ بدون سیاست.</strong> core می‌تواند ACL کنترل‌plane/حفاظتی محدود داشته باشد، اما نه policy کاربر.</li><li><strong>Redundancy ≠ HA کامل.</strong> لینک اضافه بدون convergence/testing می‌تواند downtime را طولانی کند.</li></ul>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. نقش core</h3>\n<p>core باید:</p>\n<ul><li><strong>High bandwidth/low latency</strong>: ۴۰/۱۰۰/۴۰۰G بین بلوک‌ها؛ buffer کافی.</li><li><strong>Routed</strong>: L3 linkها، ECMP، routing protocol (OSPF/IS-IS/BGP) یا static در شبکهٔ کوچک.</li><li><strong>Redundant</strong>: دو core، لینک متقابل، power/PSU جدا.</li><li><strong>Simple</strong>: بدون NAT، بدون firewall policy سنگین، بدون SVI کاربر.</li><li><strong>Predictable convergence</strong>: timer/topology ساده، prefix summary.</li><li><strong>QoS limited</strong>: classification/queue برای کنترل/صدا در صورت نیاز، نه policy پیچیده.</li></ul>\n<p>core می‌تواند <strong>collapsed</strong> باشد (distribution+core) در شبکهٔ متوسط. در three-tier واقعی، core جدا است تا distributionها بتوانند سیاست خودشان را داشته باشند و core فقط transport باشد.</p>\n<h3>۴.۲. نقش distribution</h3>\n<p>distribution:</p>\n<ul><li>SVI/gateway VLANها، FHRP (HSRP/VRRP).</li><li>ACL/policy بین VLANها و به سمت firewall.</li><li>QoS trust boundary/marking.</li><li>Route summarization به سمت core.</li><li>STP root برای VLANهای L2.</li><li>اتصال به firewall/load balancer/WAN.</li><li>management/SSH/AAA.</li></ul>\n<p><strong>بدون distribution،</strong> core مجبور می‌شود همهٔ SVI/ACL/FHRP را انجام دهد و به super-switch تبدیل شود. این دقیقاً همان چیزی است که three-tier می‌خواهد از آن اجتناب کند.</p>\n<h3>۴.۳. ECMP و routing</h3>\n<p><strong>ECMP</strong> (Equal-Cost Multi-Path) اجازه می‌دهد چند مسیر هم‌هزینه هم‌زمان استفاده شوند. hash معمولاً بر اساس ۵-tuple است؛ بنابراین یک flow روی یک مسیر می‌ماند و flowهای مختلف تقسیم می‌شوند. مزیت: استفاده از ظرفیت و redundancy. ریسک: <strong>asymmetric routing</strong> و <strong>hash polarization</strong> (همهٔ flowها به یک لینک).</p>\n<p>طراحی:</p>\n<ul><li>هزینهٔ مسیرها برابر باشد تا ECMP فعال شود.</li><li>hash شامل src/dst IP/port باشد (بسته به platform).</li><li>MTU یکسان در همهٔ مسیرها.</li><li>routing protocol convergence سریع.</li><li>تست با flowهای متنوع، نه یک ping.</li></ul>\n<h3>۴.۴. Summarization و convergence</h3>\n<p><strong>Route summarization</strong> در distribution، چند subnet را به یک prefix خلاصه می‌کند و به core می‌فرستد. مزیت: جدول route کوچک‌تر، convergence سریع‌تر، پایداری بیشتر. ریسک: اگر خلاصه بیش از حد broad باشد، ترافیک مقصد ناموجود را به سمت بلوک اشتباه می‌فرستد؛ <strong>blackhole</strong> ایجاد می‌شود.</p>\n<p><strong>Convergence</strong> زمان رسیدن شبکه به وضعیت پایدار پس از تغییر است. عوامل: routing protocol، timer، STP (اگر L2)، FHRP، link detection (BFD)، تعداد route. core باید convergence قابل‌پیش‌بینی داشته باشد؛ timerهای تهاجمی می‌توانند نوسان ایجاد کنند.</p>\n<h3>۴.۵. L2 vs L3 در core</h3>\n<div class=\"table-wrap\"><table><thead><tr><th>طراحی</th><th>مزیت</th><th>ریسک</th></tr></thead><tbody><tr><td>Core L3 routed</td><td>بدون STP، ECMP، loop-free، convergence سریع</td><td>نیاز به IP planning/routing</td></tr><tr><td>Core L2</td><td>ساده برای VLANهای بزرگ</td><td>STP diameter، blocked link، broadcast storm</td></tr><tr><td>Core MPLS/VXLAN</td><td>مقیاس/segmentation</td><td>پیچیدگی، MTU/overlay</td></tr></tbody></table></div>\n<p>در campus کلاسیک، core routed رایج است. در data center، VXLAN/EVPN روی IP underlay رایج است. در هر دو، اصل «core transport، distribution policy» حفظ می‌شود.</p>\n<h3>۴.۶. Failure domains</h3>\n<ul><li><strong>Core link failure</strong>: ECMP مسیر جایگزین می‌دهد؛ اگر ظرفیت کافی نباشد، congestion.</li><li><strong>Core node failure</strong>: routing convergence؛ distribution باید مسیر جایگزین داشته باشد.</li><li><strong>Distribution failure</strong>: FHRP/STP؛ access dual-homed.</li><li><strong>Access uplink failure</strong>: STP/LACP؛ endpoint ممکن است قطع کوتاه ببیند.</li><li><strong>Power failure</strong>: UPS/PSU؛ core و distribution باید برق افزونه داشته باشند.</li></ul>\n<p><strong>Failure domain</strong> را در طراحی مشخص کن: خرابی یک core نباید کل شبکه را down کند؛ خرابی یک distribution نباید ساختمان دیگر را قطع کند.</p>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریو: دو ساختمان (A/B)، هر کدام دو distribution، دو core، edge/WAN. VLAN 10 داده، 20 voice، 30 IoT، 99 management.</p>\n<ol><li><strong>نیاز</strong>: تعداد ساختمان/بلوک، throughput، latency، redundancy، policy.</li><li><strong>لایه</strong>: access/distribution/core؛ core routed.</li><li><strong>آدرس</strong>: subnetها، summaryها، loopback/router ID.</li><li><strong>رouting</strong>: OSPF/IS-IS/BGP؛ area/AS؛ ECMP.</li><li><strong>redundancy</strong>: dual core/link، FHRP، BFD.</li><li><strong>policy</strong>: ACL/QoS در distribution، نه core.</li><li><strong>edge</strong>: firewall/WAN از core یا distribution dedicated.</li><li><strong>تأیید</strong>: ping/traceroute، ECMP، failover، convergence.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>تصمیم</th><th>شاهد</th></tr></thead><tbody><tr><td>نیاز</td><td>scale/latency</td><td>design doc</td></tr><tr><td>لایه</td><td>core routed</td><td>topology</td></tr><tr><td>آدرس</td><td>subnet/summary</td><td><code>show ip route</code></td></tr><tr><td>routing</td><td>protocol/area</td><td><code>show ip ospf neighbor</code></td></tr><tr><td>redundancy</td><td>ECMP/FHRP</td><td><code>show ip route</code>/<code>show standby</code></td></tr><tr><td>policy</td><td>distribution ACL</td><td><code>show access-lists</code></td></tr><tr><td>edge</td><td>firewall handoff</td><td><code>show ip route</code></td></tr><tr><td>تأیید</td><td>failover</td><td>test log</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 680\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Three-tier campus: core pair, distribution blocks and access switches</title>\n  <desc id=\"desc\">Two core switches connect two distribution blocks, each with a pair of distribution switches and access switches below. The core provides fast routed transport and ECMP; distribution provides policy, SVI, FHRP and summarization. A WAN edge and firewall connect through the core. Callouts explain why policy belongs in distribution, not core.</desc>\n  <defs>\n    <marker id=\"ar\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"5\" orient=\"auto\">\n      <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#334155\"/>\n    </marker>\n  </defs>\n  <rect width=\"1100\" height=\"680\" fill=\"#f8fafc\"/>\n  <text x=\"550\" y=\"34\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#0f172a\">Three-tier: core moves packets fast; distribution decides policy</text>\n\n  <!-- core -->\n  <rect x=\"330\" y=\"70\" width=\"440\" height=\"130\" rx=\"14\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>\n  <text x=\"550\" y=\"98\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#1e3a8a\">Core layer</text>\n  <rect x=\"355\" y=\"112\" width=\"170\" height=\"70\" rx=\"10\" fill=\"#dbeafe\" stroke=\"#93c5fd\"/>\n  <text x=\"440\" y=\"136\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#1e3a8a\">CORE-1</text>\n  <text x=\"440\" y=\"156\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">40/100G routed</text>\n  <text x=\"440\" y=\"172\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">ECMP · no edge policy</text>\n\n  <rect x=\"575\" y=\"112\" width=\"170\" height=\"70\" rx=\"10\" fill=\"#dbeafe\" stroke=\"#93c5fd\"/>\n  <text x=\"660\" y=\"136\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#1e3a8a\">CORE-2</text>\n  <text x=\"660\" y=\"156\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">40/100G routed</text>\n  <text x=\"660\" y=\"172\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">redundant path</text>\n  <line x1=\"527\" y1=\"147\" x2=\"573\" y2=\"147\" stroke=\"#1d4ed8\" stroke-width=\"4\"/>\n\n  <!-- building A distribution -->\n  <rect x=\"110\" y=\"280\" width=\"390\" height=\"120\" rx=\"12\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"2\"/>\n  <text x=\"305\" y=\"306\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#5b21b6\">Distribution block A</text>\n  <rect x=\"130\" y=\"320\" width=\"160\" height=\"58\" rx=\"8\" fill=\"#f5f3ff\" stroke=\"#c4b5fd\"/>\n  <text x=\"210\" y=\"342\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#5b21b6\">DIST-A1</text>\n  <text x=\"210\" y=\"360\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">SVI · FHRP · ACL</text>\n  <rect x=\"320\" y=\"320\" width=\"160\" height=\"58\" rx=\"8\" fill=\"#f5f3ff\" stroke=\"#c4b5fd\"/>\n  <text x=\"400\" y=\"342\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#5b21b6\">DIST-A2</text>\n  <text x=\"400\" y=\"360\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">same subnet/policy</text>\n\n  <!-- building B distribution -->\n  <rect x=\"600\" y=\"280\" width=\"390\" height=\"120\" rx=\"12\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"2\"/>\n  <text x=\"795\" y=\"306\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#5b21b6\">Distribution block B</text>\n  <rect x=\"620\" y=\"320\" width=\"160\" height=\"58\" rx=\"8\" fill=\"#f5f3ff\" stroke=\"#c4b5fd\"/>\n  <text x=\"700\" y=\"342\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#5b21b6\">DIST-B1</text>\n  <text x=\"700\" y=\"360\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">SVI · FHRP · ACL</text>\n  <rect x=\"810\" y=\"320\" width=\"160\" height=\"58\" rx=\"8\" fill=\"#f5f3ff\" stroke=\"#c4b5fd\"/>\n  <text x=\"890\" y=\"342\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#5b21b6\">DIST-B2</text>\n  <text x=\"890\" y=\"360\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">same subnet/policy</text>\n\n  <!-- core to dist links -->\n  <line x1=\"410\" y1=\"200\" x2=\"250\" y2=\"278\" stroke=\"#334155\" stroke-width=\"4\" marker-end=\"url(#ar)\"/>\n  <line x1=\"430\" y1=\"200\" x2=\"380\" y2=\"278\" stroke=\"#334155\" stroke-width=\"4\" marker-end=\"url(#ar)\"/>\n  <line x1=\"670\" y1=\"200\" x2=\"730\" y2=\"278\" stroke=\"#334155\" stroke-width=\"4\" marker-end=\"url(#ar)\"/>\n  <line x1=\"690\" y1=\"200\" x2=\"860\" y2=\"278\" stroke=\"#334155\" stroke-width=\"4\" marker-end=\"url(#ar)\"/>\n\n  <!-- access -->\n  <rect x=\"60\" y=\"470\" width=\"140\" height=\"65\" rx=\"8\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"130\" y=\"495\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">ACC-A1</text>\n  <text x=\"130\" y=\"514\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 10/20</text>\n  <text x=\"130\" y=\"528\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">PoE/802.1X</text>\n\n  <rect x=\"230\" y=\"470\" width=\"140\" height=\"65\" rx=\"8\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"300\" y=\"495\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">ACC-A2</text>\n  <text x=\"300\" y=\"514\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 10/20</text>\n  <text x=\"300\" y=\"528\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">PoE/802.1X</text>\n\n  <rect x=\"400\" y=\"470\" width=\"140\" height=\"65\" rx=\"8\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"470\" y=\"495\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">ACC-B1</text>\n  <text x=\"470\" y=\"514\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 30/99</text>\n  <text x=\"470\" y=\"528\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">IoT/security</text>\n\n  <rect x=\"570\" y=\"470\" width=\"140\" height=\"65\" rx=\"8\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"640\" y=\"495\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">ACC-B2</text>\n  <text x=\"640\" y=\"514\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 30/99</text>\n  <text x=\"640\" y=\"528\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">IoT/security</text>\n\n  <rect x=\"740\" y=\"470\" width=\"140\" height=\"65\" rx=\"8\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"810\" y=\"495\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">ACC-B3</text>\n  <text x=\"810\" y=\"514\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 10/20</text>\n  <text x=\"810\" y=\"528\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">PoE/802.1X</text>\n\n  <!-- dist to access -->\n  <line x1=\"180\" y1=\"400\" x2=\"130\" y2=\"468\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"230\" y1=\"400\" x2=\"290\" y2=\"468\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"400\" y1=\"400\" x2=\"470\" y2=\"468\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"700\" y1=\"400\" x2=\"640\" y2=\"468\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"850\" y1=\"400\" x2=\"810\" y2=\"468\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n\n  <!-- edge -->\n  <rect x=\"920\" y=\"90\" width=\"150\" height=\"100\" rx=\"10\" fill=\"#ffffff\" stroke=\"#b45309\" stroke-width=\"2\"/>\n  <text x=\"995\" y=\"117\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#92400e\">WAN / Edge</text>\n  <text x=\"995\" y=\"139\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">firewall</text>\n  <text x=\"995\" y=\"156\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">ISP A / B</text>\n  <text x=\"995\" y=\"173\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">NAT / policy</text>\n  <line x1=\"770\" y1=\"140\" x2=\"918\" y2=\"140\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n\n  <!-- notes -->\n  <rect x=\"60\" y=\"570\" width=\"980\" height=\"80\" rx=\"12\" fill=\"#ffffff\" stroke=\"#cbd5e1\"/>\n  <text x=\"80\" y=\"596\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#0f172a\">Core rules</text>\n  <text x=\"80\" y=\"620\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">No endpoint access · no heavy ACL/service policy · routed L3 with ECMP · fast convergence · redundant power/links · QoS only where needed</text>\n  <text x=\"80\" y=\"640\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">A core that terminates VLANs or filters every flow becomes a bottleneck and a policy chokepoint.</text>\n</svg></div><figcaption>core pair، دو بلوک distribution و access؛ edge از core</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>دستگاه</th><th>نقش</th><th>آدرس/شناسه</th><th>نکته</th></tr></thead><tbody><tr><td>CORE-1</td><td>core</td><td>loopback 10.0.0.1/32</td><td>router ID</td></tr><tr><td>CORE-2</td><td>core</td><td>loopback 10.0.0.2/32</td><td>redundant</td></tr><tr><td>DIST-A1/A2</td><td>distribution A</td><td>SVI 10.10.10.1/.2</td><td>FHRP VIP .254</td></tr><tr><td>DIST-B1/B2</td><td>distribution B</td><td>SVI 10.20.10.1/.2</td><td>FHRP VIP .254</td></tr><tr><td>ACC-A*</td><td>access A</td><td>VLAN 10/20/99</td><td>endpoint</td></tr><tr><td>ACC-B*</td><td>access B</td><td>VLAN 30/99</td><td>IoT</td></tr><tr><td>Edge</td><td>firewall/WAN</td><td>10.0.0.254</td><td>default route</td></tr></tbody></table></div>\n<p><strong>آدرس‌دهی core:</strong> loopback پایدار برای router ID/BGP؛ linkها /31 یا /30؛ summaryها در distribution. <strong>VIP</strong> در subnet SVI، نه core.</p>\n<p><strong>مسیر نمونه:</strong> PC-A 10.10.10.50 → DIST-A VIP → CORE-1/2 → DIST-B → server 10.20.20.10. برگشت باید مسیر متقارن/معتبر داشته باشد؛ ECMP می‌تواند مسیر برگشت را متفاوت کند.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>پیکربندی نمونه برای درک، نه دستورالعمل تولیدی. <code>Designed — Not Run</code>.</p>\n<pre><code class=\"language-text\">! CORE-1 (Cisco IOS-like; lab only)\ninterface Loopback0\n ip address 10.0.0.1 255.255.255.255\n!\ninterface TenGigabitEthernet1/0/1\n description TO-DIST-A1\n no switchport\n ip address 10.0.1.1 255.255.255.252\n!\nrouter ospf 1\n router-id 10.0.0.1\n network 10.0.0.0 0.255.255.255 area 0\n!\n! DIST-A1\ninterface Vlan10\n ip address 10.10.10.1 255.255.255.0\n standby 10 ip 10.10.10.254\n!\nrouter ospf 1\n summary-address 10.10.0.0 255.255.0.0</code></pre>\n<div class=\"table-wrap\"><table><thead><tr><th>هدف</th><th>فرمان نمونه</th><th>نکته</th></tr></thead><tbody><tr><td>routed link</td><td><code>no switchport</code></td><td>L3</td></tr><tr><td>loopback</td><td><code>interface Loopback0</code></td><td>router ID</td></tr><tr><td>OSPF</td><td><code>router ospf</code></td><td>area</td></tr><tr><td>summary</td><td><code>summary-address</code></td><td>distribution</td></tr><tr><td>FHRP</td><td><code>standby</code></td><td>distribution</td></tr><tr><td>ECMP</td><td>مسیرهای هم‌هزینه</td><td>routing</td></tr><tr><td>BFD</td><td><code>bfd</code></td><td>convergence</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td><code>show ip route</code></td><td>مسیر/ECMP</td><td>forwarding واقعی</td></tr><tr><td><code>show ip ospf neighbor</code></td><td>adjacency</td><td>کیفیت مسیر</td></tr><tr><td><code>traceroute</code></td><td>مسیر hop</td><td>return path</td></tr><tr><td><code>show standby</code></td><td>FHRP</td><td>routing</td></tr><tr><td>interface counters</td><td>ظرفیت/error</td><td>latency</td></tr><tr><td>failover test</td><td>redundancy</td><td>همهٔ سناریوها</td></tr><tr><td>CPU/buffer</td><td>سلامت core</td><td>policy</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample shape\nCORE-1# show ip route 10.20.20.0\nO 10.20.0.0/16 [110/20] via 10.0.1.2, TenGigabitEthernet1/0/1\n                     via 10.0.2.2, TenGigabitEthernet1/0/2</code></pre>\n<p><strong>تأیید ECMP:</strong> چند flow به مقصدهای مختلف بفرست و interface counters هر دو مسیر را ببین. یک ping تنها ممکن است همیشه یک مسیر را انتخاب کند. <strong>تأیید failover:</strong> یک core/link را در lab قطع کن و convergence/traffic را ثبت کن.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>یک ساختمان قطع</td><td>distribution/FHRP</td><td>SVI/standby</td><td>لایه را جدا کن</td></tr><tr><td>هر دو ساختمان کند</td><td>core congestion/ECMP</td><td>counters/latency</td><td>ظرفیت/hash</td></tr><tr><td>route missing</td><td>summarization/adjacency</td><td><code>show ip route</code></td><td>summary/neighbor</td></tr><tr><td>asymmetric</td><td>ECMP/hash</td><td>traceroute دوطرفه</td><td>طراحی مسیر</td></tr><tr><td>core CPU بالا</td><td>policy/ACL/control plane</td><td>CPU/process</td><td>policy را به distribution ببر</td></tr><tr><td>loop/broadcast</td><td>L2 در core</td><td>STP/MAC</td><td>core را routed کن</td></tr><tr><td>convergence کند</td><td>timer/BFD</td><td>logs</td><td>timer/BFD</td></tr><tr><td>MTU</td><td>tunnel/overlay</td><td>ping DF</td><td>MTU</td></tr></tbody></table></div>\n<p><strong>core CPU بالا:</strong> اگر core ACL/NAT/بررسی عمیق انجام دهد، بار control/data plane بالا می‌رود. policy را به distribution/firewall منتقل کن. <strong>route missing:</strong> summary می‌تواند routeهای خاص را پنهان کند؛ <code>show ip route &lt;prefix&gt;</code> و adjacency را ببین.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<ul><li><strong>Core ساده</strong>: control-plane protection، ACL محدود برای مدیریت، بدون policy کاربر.</li><li><strong>Segmentation</strong>: VLAN/VRF در distribution، firewall بین zoneها.</li><li><strong>Redundancy</strong>: dual core/PSU/link، UPS، تست failover.</li><li><strong>Routing security</strong>: authentication (OSPF/BGP)، prefix filter، TTL security.</li><li><strong>Management</strong>: out-of-band یا VLAN مدیریت، SSH/AAA، ACL.</li><li><strong>QoS</strong>: classification در edge/distribution، queue در core فقط در حد نیاز.</li><li><strong>Monitoring</strong>: NetFlow/sFlow، SNMP، syslog، latency/loss.</li></ul>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«core باید همهٔ ACLها را داشته باشد.»</td><td>policy در distribution/firewall.</td></tr><tr><td>«three-tier همیشه بهتر است.»</td><td>به scale/نیاز بستگی دارد.</td></tr><tr><td>«ECMP یعنی load balancing کامل.»</td><td>hash بر اساس flow؛ ممکن است نامتوازن.</td></tr><tr><td>«core L2 ساده‌تر است.»</td><td>STP/loop/broadcast ریسک.</td></tr><tr><td>«summarization بدون ریسک است.»</td><td>blackhole اگر broad باشد.</td></tr><tr><td>«redundancy بدون تست کافی است.»</td><td>failover باید تست شود.</td></tr><tr><td>«core می‌تواند endpoint داشته باشد.»</td><td>نقش core transport است.</td></tr><tr><td>«QoS فقط access است.»</td><td>distribution/edge هم نقش دارند.</td></tr></tbody></table></div>\n<p><strong>تصمیم آزمون:</strong> core → transport/ECMP/routed؛ distribution → SVI/policy/FHRP/summary؛ access → endpoint/VLAN/PoE؛ مقیاس بزرگ/چند بلوک → three-tier؛ شبکهٔ کوچک → two-tier/collapsed.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>three-tier = access + distribution + core.</li><li>core transport پرسرعت/routed/ECMP است؛ policy سنگین ندارد.</li><li>distribution سیاست، SVI، FHRP، summarization و QoS trust را انجام می‌دهد.</li><li>core routed از STP/loop/broadcast domain بزرگ جلوگیری می‌کند.</li><li>ECMP ظرفیت/افزونگی می‌دهد، اما hash/asymmetry را باید طراحی کرد.</li><li>summarization جدول route را کوچک می‌کند، با ریسک blackhole.</li><li>three-tier برای مقیاس/چند بلوک/نیاز latency منطقی است؛ برای شبکهٔ کوچک overkill.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 v1.1 Exam Topics — &lt;https://www.cisco.com/c/en/us/training-exams/training/it-certifications/ccna-certification.html&gt;</td><td>Objective 1.2.b three-tier</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>Cisco Campus LAN design guide — &lt;https://www.cisco.com/c/en/us/td/docs/solutions/CVD/Campus/cisco-campus-lan-wlan-design-guide.html&gt;</td><td>core/distribution/access</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 2328 — OSPFv2 — &lt;https://www.rfc-editor.org/rfc/rfc2328.html&gt;</td><td>routing/convergence</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 4271 — BGP-4 — &lt;https://www.rfc-editor.org/rfc/rfc4271.html&gt;</td><td>core/edge routing</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>هیچ core/distribution واقعی اجرا نشده است؛ خروجی‌ها <code>Designed — Not Run</code> هستند.</li><li>protocol/timer/ECMP behavior به vendor/platform وابسته است.</li><li>آدرس‌ها/نام‌ها نمونه‌اند.</li><li>URLها snapshot/hash نشده‌اند و <code>PROVENANCE_NOT_VERIFIED</code> هستند.</li><li>این درس جایگزین design doc، ظرفیت‌سنجی و تست failover نیست.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <a href=\"ccna-v11-1.2.c.html\">spine-leaf: هر leaf به همهٔ spineها</a> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Core",
+   "fa": "Core",
+   "simple": "لایهٔ transport مرکزی."
+  },
+  {
+   "term": "Distribution",
+   "fa": "Distribution",
+   "simple": "لایهٔ policy/routing."
+  },
+  {
+   "term": "Access",
+   "fa": "Access",
+   "simple": "لایهٔ endpoint."
+  },
+  {
+   "term": "Collapsed core",
+   "fa": "Collapsed core",
+   "simple": "ادغام distribution/core."
+  },
+  {
+   "term": "ECMP",
+   "fa": "ECMP",
+   "simple": "چند مسیر هم‌هزینه."
+  },
+  {
+   "term": "Routed link",
+   "fa": "Routed link",
+   "simple": "لینک L3."
+  },
+  {
+   "term": "Summarization",
+   "fa": "Summarization",
+   "simple": "خلاصه‌سازی prefix."
+  },
+  {
+   "term": "Convergence",
+   "fa": "Convergence",
+   "simple": "زمان پایدار شدن."
+  },
+  {
+   "term": "Failure domain",
+   "fa": "Failure domain",
+   "simple": "محدودهٔ اثر خرابی."
+  },
+  {
+   "term": "QoS",
+   "fa": "QoS",
+   "simple": "اولویت/صف."
+  },
+  {
+   "term": "Latency",
+   "fa": "Latency",
+   "simple": "تأخیر."
+  },
+  {
+   "term": "Redundancy",
+   "fa": "Redundancy",
+   "simple": "افزونگی."
+  },
+  {
+   "term": "BFD",
+   "fa": "BFD",
+   "simple": "تشخیص سریع خرابی."
+  },
+  {
+   "term": "Blackhole",
+   "fa": "Blackhole",
+   "simple": "جذب ترافیک بدون مقصد."
+  },
+  {
+   "term": "Hash polarization",
+   "fa": "Hash polarization",
+   "simple": "نامتوازنی ECMP."
+  },
+  {
+   "term": "Super-switch",
+   "fa": "Super-switch",
+   "simple": "core با policy بیش از حد."
+  },
+  {
+   "term": "Router ID",
+   "fa": "Router ID",
+   "simple": "شناسهٔ روتر."
+  },
+  {
+   "term": "Area/AS",
+   "fa": "Area/AS",
+   "simple": "دامنهٔ routing."
+  },
+  {
+   "term": "Overlay",
+   "fa": "Overlay",
+   "simple": "شبکهٔ منطقی روی underlay."
+  },
+  {
+   "term": "Underlay",
+   "fa": "Underlay",
+   "simple": "شبکهٔ فیزیکی/IP زیر overlay."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>پیکربندی نمونه برای درک، نه دستورالعمل تولیدی. <code>Designed — Not Run</code>.</p>\n<pre><code class=\"language-text\">! CORE-1 (Cisco IOS-like; lab only)\ninterface Loopback0\n ip address 10.0.0.1 255.255.255.255\n!\ninterface TenGigabitEthernet1/0/1\n description TO-DIST-A1\n no switchport\n ip address 10.0.1.1 255.255.255.252\n!\nrouter ospf 1\n router-id 10.0.0.1\n network 10.0.0.0 0.255.255.255 area 0\n!\n! DIST-A1\ninterface Vlan10\n ip address 10.10.10.1 255.255.255.0\n standby 10 ip 10.10.10.254\n!\nrouter ospf 1\n summary-address 10.10.0.0 255.255.0.0</code></pre>\n<div class=\"table-wrap\"><table><thead><tr><th>هدف</th><th>فرمان نمونه</th><th>نکته</th></tr></thead><tbody><tr><td>routed link</td><td><code>no switchport</code></td><td>L3</td></tr><tr><td>loopback</td><td><code>interface Loopback0</code></td><td>router ID</td></tr><tr><td>OSPF</td><td><code>router ospf</code></td><td>area</td></tr><tr><td>summary</td><td><code>summary-address</code></td><td>distribution</td></tr><tr><td>FHRP</td><td><code>standby</code></td><td>distribution</td></tr><tr><td>ECMP</td><td>مسیرهای هم‌هزینه</td><td>routing</td></tr><tr><td>BFD</td><td><code>bfd</code></td><td>convergence</td></tr></tbody></table></div><h4>۸. تأیید و شاهد</h4><div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td><code>show ip route</code></td><td>مسیر/ECMP</td><td>forwarding واقعی</td></tr><tr><td><code>show ip ospf neighbor</code></td><td>adjacency</td><td>کیفیت مسیر</td></tr><tr><td><code>traceroute</code></td><td>مسیر hop</td><td>return path</td></tr><tr><td><code>show standby</code></td><td>FHRP</td><td>routing</td></tr><tr><td>interface counters</td><td>ظرفیت/error</td><td>latency</td></tr><tr><td>failover test</td><td>redundancy</td><td>همهٔ سناریوها</td></tr><tr><td>CPU/buffer</td><td>سلامت core</td><td>policy</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample shape\nCORE-1# show ip route 10.20.20.0\nO 10.20.0.0/16 [110/20] via 10.0.1.2, TenGigabitEthernet1/0/1\n                     via 10.0.2.2, TenGigabitEthernet1/0/2</code></pre>\n<p><strong>تأیید ECMP:</strong> چند flow به مقصدهای مختلف بفرست و interface counters هر دو مسیر را ببین. یک ping تنها ممکن است همیشه یک مسیر را انتخاب کند. <strong>تأیید failover:</strong> یک core/link را در lab قطع کن و convergence/traffic را ثبت کن.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "کار اصلی core در three-tier چیست؟",
+   "promptHtml": "کار اصلی core در three-tier چیست؟",
+   "options": [
+    "terminate کردن VLANهای کاربران",
+    "انتقال پرسرعت و redundant بین بلوک‌ها",
+    "اعمال ACL بین همهٔ VLANها",
+    "تأمین PoE"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "core transport پرسرعت/routed بین بلوک‌ها و edge است. terminate VLAN، ACL سنگین و PoE کار distribution/access است؛ اگر core این‌ها را انجام دهد به super-switch تبدیل می‌شود.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا policy سنگین در core توصیه نمی‌شود؟",
+   "promptHtml": "چرا policy سنگین در core توصیه نمی‌شود؟",
+   "options": [
+    "core هیچ‌وقت ACL ندارد",
+    "policy فقط در access معنا دارد",
+    "ACL در core امنیت را کامل حذف می‌کند",
+    "core را به گلوگاه/نقطهٔ پیچیدگی تبدیل می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "core باید سریع/ساده بماند؛ ACL/NAT/بررسی عمیق آن را گلوگاه و failure domain بزرگ می‌کند. core می‌تواند ACL محدود کنترل‌plane داشته باشد؛ policy کاربر جای دیگری است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چه زمانی three-tier نسبت به two-tier منطقی‌تر است؟",
+   "promptHtml": "چه زمانی three-tier نسبت به two-tier منطقی‌تر است؟",
+   "options": [
+    "چند بلوک/ساختمان با نیاز به transport پرسرعت و مقیاس بالا",
+    "شبکهٔ ۱۰ کاربره",
+    "وقتی PoE نداریم",
+    "وقتی فقط یک VLAN داریم"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "three-tier برای مقیاس/چند بلوک/transport پرسرعت توجیه دارد. شبکهٔ کوچک، نبود PoE یا یک VLAN دلیل افزودن core جدا نیست و می‌تواند هزینه/پیچیدگی بی‌مورد بسازد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام وظیفه در distribution انجام می‌شود؟",
+   "promptHtml": "کدام وظیفه در distribution انجام می‌شود؟",
+   "options": [
+    "ECMP در core",
+    "اتصال endpoint",
+    "SVI، FHRP و summarization",
+    "PoE budget"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "distribution gateway/SVI، FHRP، summarization و policy را انجام می‌دهد. ECMP در core، اتصال endpoint و PoE در access هستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "مزیت اصلی ECMP چیست؟",
+   "promptHtml": "مزیت اصلی ECMP چیست؟",
+   "options": [
+    "کاهش تعداد VLAN",
+    "استفاده از چند مسیر هم‌هزینه برای ظرفیت/redundancy",
+    "حذف routing protocol",
+    "جلوگیری از ARP"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "ECMP چند مسیر هم‌هزینه را هم‌زمان استفاده می‌کند و ظرفیت/تحمل خرابی می‌دهد. VLAN، routing protocol و ARP مفاهیم جدا هستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "اگر core را L2 طراحی کنیم، چه ریسکی برمی‌گردد؟",
+   "promptHtml": "اگر core را L2 طراحی کنیم، چه ریسکی برمی‌گردد؟",
+   "options": [
+    "PoE قطع می‌شود",
+    "DNS از کار می‌افتد",
+    "NAT اجباری می‌شود",
+    "STP diameter، blocked link و broadcast domain بزرگ"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "core L2 نیاز به STP، مسیر block و broadcast domain بزرگ دارد که مقیاس/Convergence را سخت می‌کند. PoE، DNS و NAT ارتباط مستقیمی با L2 core ندارند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "summarization بیش از حد broad در distribution چه ریسکی دارد؟",
+   "promptHtml": "summarization بیش از حد broad در distribution چه ریسکی دارد؟",
+   "options": [
+    "blackhole/جذب ترافیک مقصد ناموجود",
+    "افزایش PoE",
+    "حذف FHRP",
+    "کاهش latency"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "خلاصهٔ broad می‌تواند prefixهای ناموجود را هم جذب کند و ترافیک را به مسیر اشتباه بفرستد. PoE/FHRP و latency مفاهیم جدا هستند؛ خلاصهٔ درست می‌تواند latency/convergence را بهتر کند، نه حذف FHRP.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "convergence در core به چه معناست؟",
+   "promptHtml": "convergence در core به چه معناست؟",
+   "options": [
+    "زمان بوت سوئیچ",
+    "تعداد VLANها",
+    "زمان رسیدن topology/routing به وضعیت پایدار پس از تغییر",
+    "زمان تخصیص DHCP"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "convergence به زمان رسیدن routing/topology به وضعیت پایدار پس از خرابی یا تغییر اشاره دارد و با timerها، BFD و تعداد route تعیین می‌شود. بوت سوئیچ، تعداد VLAN و تخصیص DHCP مفاهیم متفاوتی هستند و این زمان را تعریف نمی‌کنند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "خرابی یک core node در طراحی redundant باید چه اثری داشته باشد؟",
+   "promptHtml": "خرابی یک core node در طراحی redundant باید چه اثری داشته باشد؟",
+   "options": [
+    "کل شبکه down شود",
+    "مسیر جایگزین فعال شود و سرویس ادامه یابد",
+    "همهٔ VLANها حذف شوند",
+    "PoE قطع شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "با dual core/ECMP/routing، node سالم مسیر را ادامه می‌دهد؛ ممکن است ظرفیت کاهش یابد اما سرویس باید پایدار بماند. down شدن کل شبکه یا حذف VLAN نشانهٔ طراحی غیرredundant است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "QoS در core معمولاً چه محدوده‌ای دارد؟",
+   "promptHtml": "QoS در core معمولاً چه محدوده‌ای دارد؟",
+   "options": [
+    "فقط queue/classification لازم، نه policy پیچیده",
+    "همهٔ markingها را بازنویسی می‌کند",
+    "جای firewall را می‌گیرد",
+    "PoE را مدیریت می‌کند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "core ممکن است queue/classification محدود برای صدا/کنترل داشته باشد، اما policy/marking پیچیده در edge/distribution است. firewall و PoE نقش‌های جدا دارند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا endpoint نباید به core وصل شود؟",
+   "promptHtml": "چرا endpoint نباید به core وصل شود؟",
+   "options": [
+    "core فقط فیبر دارد",
+    "endpoint در core PoE ندارد",
+    "core هیچ پورتی ندارد",
+    "core را در معرض policy/scale غیرلازم و failure domain بزرگ قرار می‌دهد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "اتصال endpoint به core باعث می‌شود core به access/distribution تبدیل شود و policy/scale/failure domain پیچیده‌تر گردد. فیبر، PoE یا تعداد پورت دلیل اصلی این قاعده نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "تفاوت three-tier و collapsed core چیست؟",
+   "promptHtml": "تفاوت three-tier و collapsed core چیست؟",
+   "options": [
+    "three-tier STP ندارد",
+    "collapsed core همیشه three-tier است",
+    "three-tier core جدا دارد؛ collapsed core distribution/core را ادغام می‌کند",
+    "collapsed core فقط برای data center است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "three-tier یک لایهٔ core جدا دارد؛ collapsed core آن را با distribution ادغام می‌کند. three-tier می‌تواند routed/بدون STP در core باشد اما «STP ندارد» تعریف آن نیست؛ collapsed core محدود به data center نیست.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}
