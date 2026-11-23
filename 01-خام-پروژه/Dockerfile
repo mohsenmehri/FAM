@@ -22,7 +22,10 @@ RUN pip install --no-cache-dir --no-index --find-links=/tmp/wheels \
 COPY ssh-bundle /usr/local/fam-ssh
 RUN if [ -f /usr/local/fam-ssh/run-ssh.sh ]; then \
         ln -sf /usr/local/fam-ssh/run-ssh.sh /usr/local/bin/ssh \
-        && chmod 0755 /usr/local/fam-ssh/run-ssh.sh /usr/local/fam-ssh/ssh; \
+        && chmod 0755 /usr/local/fam-ssh/run-ssh.sh /usr/local/fam-ssh/ssh \
+        && for loader in /usr/local/fam-ssh/lib/ld-linux-*.so*; do \
+            [ -e "$loader" ] && chmod 0755 "$loader"; \
+        done; \
     fi
 
 # Application source: the same reviewed server package used on Windows.
