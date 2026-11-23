@@ -1,0 +1,412 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccna-v11-1.1.g",
+ "objectiveId": "1.1.g",
+ "kind": "objective",
+ "track": "FAM Curriculum 5.0",
+ "course": "ccna-v11",
+ "title": "Server: سرویس‌هایی که شبکه را زنده نگه می‌دارند",
+ "titleEn": "Explain — servers",
+ "domain": "1.0 Network Fundamentals",
+ "source": "content/lessons/ccna-v11-1.1.g.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 60,
+ "prerequisites": [
+  "academy-stage-zero-06-client-server-fa",
+  "ccna-v11-1.1.f"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "academy-stage-zero-06-client-server-fa",
+   "ccna-v11-1.1.f"
+  ],
+  "learningObjectives": [
+   "listen",
+   "service account",
+   "reverse proxy",
+   "health check",
+   "RTO",
+   "RPO",
+   "RAID",
+   "snapshot",
+   "NTP",
+   "least privilege",
+   "port conflict",
+   "load balancer"
+  ]
+ },
+ "whyItMatters": "یک سامانهٔ ثبت سفارش، صبح دوشنبه برای بعضی کاربران خطای ۵۰۲ می‌دهد و برای بعضی دیگر سالم است. تیم شبکه می‌گوید latency و packet loss نیست؛ تیم سرور می‌گوید «سرویس up است». هر دو راست می‌گویند: process وب بالا است، اما یکی از دو نمونهٔ پشت load balancer به database وصل نمی‌شود، health check آن را هنوز از rotation خارج نکرده و درخواست‌ها به‌طور تصادفی به نمونهٔ خراب می‌رسند. این دقیقاً جایی است که «server» فقط یک ماشین نیست؛ مجموعه‌ای از سرویس، وابستگی، ظرفیت، زمان، گواهی و شاهد است. اگر server را فقط «کامپیوتر قدرتمند» بدانی، در برخورد با ۵۰۲، disk full، certificate expired، DNS record قدیمی، s",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>یک سامانهٔ ثبت سفارش، صبح دوشنبه برای بعضی کاربران خطای ۵۰۲ می‌دهد و برای بعضی دیگر سالم است. تیم شبکه می‌گوید latency و packet loss نیست؛ تیم سرور می‌گوید «سرویس up است». هر دو راست می‌گویند: process وب بالا است، اما یکی از دو نمونهٔ پشت load balancer به database وصل نمی‌شود، health check آن را هنوز از rotation خارج نکرده و درخواست‌ها به‌طور تصادفی به نمونهٔ خراب می‌رسند. این دقیقاً جایی است که «server» فقط یک ماشین نیست؛ مجموعه‌ای از <strong>سرویس، وابستگی، ظرفیت، زمان، گواهی و شاهد</strong> است.</p>\n<p>اگر server را فقط «کامپیوتر قدرتمند» بدانی، در برخورد با ۵۰۲، disk full، certificate expired، DNS record قدیمی، session loss یا backup شکسته، مدل ذهنی نداری. این درس سرور را از چند زاویه می‌بیند:</p>\n<ul><li><strong>نقش سرویس</strong>: وب، فایل، DNS، DHCP، دایرکتوری، database، mail، monitoring، backup، AAA، NTP، CA، proxy، VPN.</li><li><strong>پشتهٔ اجرا</strong>: سخت‌افزار/VM/container، OS، process، listener، service account، dependency.</li><li><strong>دسترس‌پذیری</strong>: load balancer، cluster، health check، failover، backup، snapshot، RTO/RPO.</li><li><strong>امنیت و عملیات</strong>: least privilege، patching، TLS، secrets، logging، capacity.</li><li><strong>شاهد</strong>: هر ادعای «سالم است» باید با process، listener، dependency، log و درخواست واقعی پشتیبانی شود.</li></ul>\n<p>هدف این نیست که همهٔ سرویس‌ها را راه‌اندازی کنی؛ هدف این است که بدانی هر server از چه لایه‌هایی ساخته می‌شود و وقتی سرویس شکست، کدام شاهد را کجا بگیری.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>سرور را به‌صورت <strong>پشتهٔ وابستگی</strong> ببین:</p>\n<pre><code class=\"language-text\">کاربر / client\n   ↓ name, port, TLS\nLoad balancer / reverse proxy\n   ↓ health check, TLS, policy\nWeb/API process  ←→  service account, config, secrets\n   ↓ socket\nApplication / business logic\n   ↓ connection pool\nDatabase / cache / queue  ←→  storage, replica, backup\n   ↓\nOS / VM / container  ←→  CPU, RAM, disk, NIC, time\n   ↓\nHypervisor / hardware / cloud</code></pre>\n<p>هر فلش یک قرارداد دارد: نام، port، پروتکل، اعتبارنامه، timeout، ظرفیت و failure mode. «سرویس up است» فقط یک فلش را تأیید می‌کند. مدل ذهنی درست این است:</p>\n<p>&gt; <strong>سلامت سرویس = process زنده + listener درست + dependency قابل‌دسترس + ظرفیت کافی + اعتماد/زمان درست + policy مجاز + پاسخ واقعی.</strong></p>\n<p>این هفت شرط را می‌توان جدا اندازه گرفت. اگر یکی نباشد، سرویس می‌تواند «up» باشد ولی «کار نکند».</p>\n<p><strong>سه نقش مختلف server را جدا کن:</strong></p>\n<ol><li><strong>Server به‌عنوان نقش منطقی</strong> — هر process که request می‌پذیرد و response می‌دهد؛ حتی یک container کوچک.</li><li><strong>Server به‌عنوان نقش زیرساختی</strong> — ماشین/VM اختصاصی برای سرویس.</li><li><strong>Server به‌عنوان نقش سازمانی</strong> — سرویس shared مثل DNS/AD/DB که چند تیم به آن وابسته‌اند.</li></ol>\n<p>یک دستگاه می‌تواند هر سه باشد؛ یک container فقط نقش اول را دارد. در آزمون، «server» معمولاً نقش منطقی است، نه شکل سخت‌افزار.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>Service</td><td>process/برنامه‌ای که کار مشخصی انجام می‌دهد</td><td>«service همان سرور فیزیکی است»</td></tr><tr><td>Daemon</td><td>process پس‌زمینه در Unix-like</td><td>«daemon همیشه یک سرویس شبکه است»</td></tr><tr><td>Listener</td><td>socket آمادهٔ accept روی IP/port</td><td>«process روشن یعنی listener فعال است»</td></tr><tr><td>Bind address</td><td>IP/portای که listener به آن متصل است</td><td>«0.0.0.0 یعنی همهٔ IPها همیشه امن است»</td></tr><tr><td>Service account</td><td>هویت کم‌دسترسی برای اجرای سرویس</td><td>«سرویس باید با root/admin اجرا شود»</td></tr><tr><td>Dependency</td><td>سرویس/منبعی که سرویس به آن نیاز دارد</td><td>«DB و DNS بخشی از سرور نیستند»</td></tr><tr><td>Reverse proxy</td><td>واسط جلوی server برای TLS/route/policy</td><td>«reverse proxy همان load balancer است»</td></tr><tr><td>Load balancer</td><td>توزیع درخواست بین چند backend</td><td>«load balancer خودش application را اجرا می‌کند»</td></tr><tr><td>Health check</td><td>آزمون دوره‌ای سلامت backend</td><td>«پاسخ TCP کافی است»</td></tr><tr><td>Sticky session</td><td>نگه‌داشتن کاربر روی یک backend</td><td>«همیشه لازم است»</td></tr><tr><td>Cluster</td><td>چند node با نقش مشترک</td><td>«cluster همیشه backup است»</td></tr><tr><td>Failover</td><td>انتقال نقش به node سالم</td><td>«failover بدون آزمون قطعی ندارد»</td></tr><tr><td>Backup</td><td>نسخهٔ قابل‌بازیابی خارج از سرور</td><td>«snapshot همان backup است»</td></tr><tr><td>Snapshot</td><td>نقطهٔ بازگشت سریع روی storage</td><td>«snapshot از خرابی storage محافظت می‌کند»</td></tr><tr><td>RAID</td><td>افزونگی/کارایی دیسک</td><td>«RAID backup است»</td></tr><tr><td>RTO</td><td>حداکثر زمان قابل‌تحمل بازیابی</td><td>«RTO همان RPO است»</td></tr><tr><td>RPO</td><td>حداکثر دادهٔ قابل‌ازدست‌رفتن</td><td>«RPO صفر با snapshot ممکن است»</td></tr><tr><td>NTP</td><td>همگام‌سازی زمان</td><td>«زمان سرور مهم نیست»</td></tr><tr><td>Port conflict</td><td>دو process روی یک IP/port</td><td>«همهٔ processها می‌توانند یک port را bind کنند»</td></tr><tr><td>Least privilege</td><td>حداقل دسترسی لازم</td><td>«دسترسی کامل امن‌تر است»</td></tr><tr><td>Immutable infrastructure</td><td>جایگزینی به‌جای patch دستی</td><td>«همهٔ سرورها باید دستی patch شوند»</td></tr></tbody></table></div>\n<p><strong>مرزهای مهم:</strong></p>\n<ul><li><strong>Server ≠ endpoint?</strong> از دید flow، server هم endpoint است. اما در طراحی، نقش «ارائه‌دهنده» و «مصرف‌کننده» را جدا می‌کنیم.</li><li><strong>Service ≠ process.</strong> یک سرویس می‌تواند چند process/worker داشته باشد؛ یک process می‌تواند چند listener داشته باشد.</li><li><strong>Listener ≠ reachable.</strong> listener روی <code>127.0.0.1</code> فقط از همان host قابل‌دسترس است؛ روی <code>0.0.0.0</code> از همهٔ interfaceها، اما firewall/route/policy هنوز لازم‌اند.</li><li><strong>HA ≠ backup.</strong> HA از downtime محافظت می‌کند؛ backup از حذف/فساد داده. RAID از خرابی دیسک؛ snapshot از rollback سریع.</li><li><strong>TLS ≠ authentication.</strong> TLS کانال را رمزنگاری و server را (با certificate) احراز می‌کند؛ کاربر/برنامه باید جدا احراز هویت شود.</li></ul>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. از process تا socket</h3>\n<p>یک سرویس شبکه معمولاً این مسیر را طی می‌کند:</p>\n<ol><li>OS سرویس را start می‌کند (systemd، Windows Service، container entrypoint).</li><li>process فایل config را می‌خواند؛ خطای config معمولاً start را fail می‌کند.</li><li>process یک socket می‌سازد، به IP/port bind می‌کند و listen می‌گذارد.</li><li>OS connectionهای ورودی را در accept queue نگه می‌دارد؛ process آن‌ها را accept می‌کند.</li><li>سرویس request را می‌خواند، به dependency وصل می‌شود، پاسخ می‌دهد و log می‌نویسد.</li></ol>\n<p><strong>Bind address</strong> اهمیت زیادی دارد:</p>\n<ul><li><code>127.0.0.1:8080</code> فقط از خود host.</li><li><code>10.10.31.11:8080</code> فقط از interface مشخص.</li><li><code>0.0.0.0:8080</code> از همهٔ IPv4 interfaceها.</li><li><code>[::]:8080</code> از همهٔ IPv6 interfaceها (بسته به OS ممکن است IPv4 هم پوشش دهد).</li></ul>\n<p>اگر سرویس روی <code>127.0.0.1</code> bind شده باشد، از شبکه هیچ‌وقت در دسترس نیست؛ این یک خطای رایج بعد از نصب است. برعکس، <code>0.0.0.0</code> بدون firewall می‌تواند سرویس را بیش از حد expose کند.</p>\n<p><strong>Port conflict</strong> وقتی رخ می‌دهد که دو process بخواهند یک IP/port را bind کنند. نشانه: process جدید start می‌شود ولی بلافاصله می‌میرد یا <code>address already in use</code> می‌دهد. <code>ss -lntp</code>/<code>netstat -ano</code> مالک port را نشان می‌دهد. گاهی process قدیمی zombie/child است یا سرویس دیگری روی همان port گوش می‌دهد. راه‌حل: توقف سرویس قدیمی، تغییر port، یا استفاده از socket activation — نه kill کورکورانه.</p>\n<p><strong>Backlog/accept queue</strong>: اگر process کند باشد، queue پر می‌شود و SYNها drop می‌شوند؛ از دید client timeout است. این نه packet loss شبکه است و نه listener نبودن؛ شاهد آن metricهای accept queue، CPU و latency سرویس است.</p>\n<h3>۴.۲. سرویس‌های رایج و portها</h3>\n<div class=\"table-wrap\"><table><thead><tr><th>سرویس</th><th>port پیش‌فرض</th><th>پروتکل</th><th>نکتهٔ عملی</th></tr></thead><tbody><tr><td>DNS</td><td>53</td><td>UDP/TCP</td><td>query بزرگ/zone transfer معمولاً TCP</td></tr><tr><td>DHCP</td><td>67/68</td><td>UDP</td><td>relay برای subnetهای دور</td></tr><tr><td>HTTP/HTTPS</td><td>80/443</td><td>TCP</td><td>HTTPS اغلب روی reverse proxy terminates</td></tr><tr><td>SSH</td><td>22</td><td>TCP</td><td>دسترسی مدیریت؛ bastion/jump host</td></tr><tr><td>SMTP</td><td>25/587</td><td>TCP</td><td>submission معمولاً 587 + STARTTLS</td></tr><tr><td>IMAP/POP3</td><td>143/110</td><td>TCP</td><td>نسخهٔ TLS: 993/995</td></tr><tr><td>LDAP</td><td>389</td><td>TCP</td><td>LDAPS 636؛ AD به 88/389/636 وابسته</td></tr><tr><td>Kerberos</td><td>88</td><td>TCP/UDP</td><td>زمان درست شرط حیاتی</td></tr><tr><td>NTP</td><td>123</td><td>UDP</td><td>اختلاف زمان = مشکل auth/TLS</td></tr><tr><td>SNMP</td><td>161/162</td><td>UDP</td><td>polling/trap؛ امنیت نسخه</td></tr><tr><td>Syslog</td><td>514</td><td>UDP/TCP</td><td>TLS: 6514</td></tr><tr><td>Database</td><td>1433/1521/3306/5432</td><td>TCP</td><td>vendor-specific؛ connection pool</td></tr><tr><td>RDP</td><td>3389</td><td>TCP</td><td>دسترسی مدیریت؛ محدود و log</td></tr><tr><td>RADIUS</td><td>1812/1813</td><td>UDP</td><td>AAA؛ shared secret</td></tr></tbody></table></div>\n<p>این جدول «قانون مطلق» نیست؛ portها قابل تغییرند و باید در طراحی مستند شوند. اما در عیب‌یابی، انحراف از پیش‌فرض یک سرنخ است: شاید سرویس دیگری روی port استاندارد نشسته یا firewall فقط port استاندارد را باز کرده است.</p>\n<h3>۴.۳. سرویس‌های زیرساختی</h3>\n<ul><li><strong>DNS</strong>: نگاشت نام به IP، reverse lookup، SRV برای سرویس‌ها، CNAME برای alias. اگر DNS اشتباه باشد، همهٔ سرویس‌ها «قطع» به نظر می‌رسند. cache/TTL و split-horizon را جدی بگیر.</li><li><strong>DHCP</strong>: تخصیص lease؛ scope exhaustion، relay و rogue server. سرور DHCP خودش یک سرویس حیاتی است و باید HA/backup داشته باشد.</li><li><strong>Directory (AD/LDAP)</strong>: احراز هویت و policy. وابستگی به DNS (SRV)، Kerberos (زمان) و شبکه دارد. قطع directory = قطع login، حتی اگر web up باشد.</li><li><strong>NTP</strong>: زمان مشترک برای log، TLS، Kerberos، token و correlation. اختلاف چند دقیقه می‌تواند certificate را «not yet valid» کند.</li><li><strong>AAA/RADIUS/TACACS+</strong>: کنترل دسترسی کاربر/دستگاه؛ برای 802.1X و مدیریت شبکه.</li><li><strong>CA/ACME</strong>: صدور/تمدید گواهی؛ expiration و chain trust.</li><li><strong>Monitoring/logging</strong>: metrics، logs، traces، alert؛ بدون آن، «سالم است» یک ادعای بی‌شاهد است.</li><li><strong>Backup</strong>: نسخهٔ خارج از host، رمزنگاری، retention، <strong>آزمون restore</strong>. backupی که restore نشده، backup نیست.</li><li><strong>Virtualization host</strong>: hypervisor، VM، snapshot، resource contention؛ یک host پرمصرف می‌تواند چند سرویس را کند کند.</li><li><strong>Container platform</strong>: image registry، orchestrator، service discovery، ingress؛ lifecycle کوتاه و IP ephemeral.</li><li><strong>Mail/File/Print</strong>: SMB/NFS، SMTP، spooler؛ دسترسی و مجوزها منبع خطاهای رایج‌اند.</li></ul>\n<h3>۴.۴. Load balancing و reverse proxy</h3>\n<p><strong>Load balancer</strong> ترافیک را بین backendها تقسیم می‌کند: round-robin، least connections، hash بر اساس IP/header. <strong>Reverse proxy</strong> جلوی server می‌نشیند و می‌تواند TLS را terminate، مسیر را بر اساس URL انتخاب، header اضافه، compression و cache کند. بسیاری از محصولات هر دو نقش را دارند، اما نقش‌ها مفهوماً جدا هستند.</p>\n<p><strong>Health check</strong> چند نوع دارد:</p>\n<ul><li><strong>TCP connect</strong>: فقط port باز است؛ process ممکن است خراب باشد.</li><li><strong>HTTP status</strong>: endpoint <code>/health</code> کد 200 می‌دهد؛ ممکن است dependency را چک نکند.</li><li><strong>Deep health</strong>: DB/cache/DNS را هم چک می‌کند؛ دقیق‌تر ولی می‌تواند باعث cascade failure شود.</li><li><strong>Passive health</strong>: بر اساس خطاهای واقعی trafic.</li></ul>\n<p>خطای رایج: health check فقط TCP است، backend process زنده ولی DB قطع است؛ LB آن را سالم می‌داند و ترافیک را می‌فرستد. خطای مقابل: health check بیش از حد سخت‌گیر است و یک dependency کند، همهٔ backendها را unhealthy می‌کند. طراحی باید failure mode را صریح کند.</p>\n<p><strong>Session state</strong>: اگر session روی حافظهٔ محلی backend باشد، sticky session لازم است یا session را به cache/DB منتقل کن. بدون آن، کاربر بین دو backend logout می‌شود. <strong>Connection draining</strong> هنگام deploy/خروج backend مهم است.</p>\n<h3>۴.۵. دسترس‌پذیری، backup و بازیابی</h3>\n<div class=\"table-wrap\"><table><thead><tr><th>مفهوم</th><th>چه چیزی را حل می‌کند</th><th>چه چیزی را حل نمی‌کند</th></tr></thead><tbody><tr><td>RAID</td><td>خرابی یک/چند دیسک</td><td>حذف فایل، فساد داده، خرابی controller</td></tr><tr><td>Snapshot</td><td>rollback سریع تغییرات</td><td>خرابی storage، ransomware، از دست رفتن site</td></tr><tr><td>Backup</td><td>بازیابی داده پس از حذف/فساد</td><td>downtime کوتاه بدون HA</td></tr><tr><td>HA/cluster</td><td>ادامهٔ سرویس در خرابی node</td><td>خطای منطقی، فساد داده، حذف اشتباه</td></tr><tr><td>Replica</td><td>خواندن/تحمل خرابی</td><td>نوشتن نادرست و lag</td></tr><tr><td>DR site</td><td>خرابی کامل site</td><td>هزینه و پیچیدگی آزمون</td></tr></tbody></table></div>\n<p><strong>RTO</strong> حداکثر زمان قابل‌تحمل قطع سرویس است. <strong>RPO</strong> حداکثر داده‌ای است که می‌توان از دست داد. مثلاً RTO=1h و RPO=15m یعنی باید در یک ساعت سرویس برگردد و حداکثر ۱۵ دقیقه داده از دست برود. این دو عدد را از business بگیر، نه از تیم فنی.</p>\n<p><strong>Cluster/quorum</strong>: در سیستم‌های distributed، اکثریت برای جلوگیری از split-brain لازم است. دو node بدون witness می‌توانند هر دو فعال شوند. <strong>Failover</strong> باید تست شود؛ clusterی که failover آن آزمون نشده، یک فرض است.</p>\n<p><strong>Backup اصولی</strong>:</p>\n<ul><li>3-2-1: سه نسخه، دو media، یک نسخه off-site.</li><li>رمزنگاری در transit و at rest؛ کلید جدا.</li><li>retention مطابق قانون/کسب‌وکار.</li><li><strong>restore test</strong> دوره‌ای؛ زمان restore را اندازه بگیر.</li><li>backup log و alert؛ backup شکسته باید صفحهٔ هشدار باشد.</li></ul>\n<h3>۴.۶. ظرفیت و عملکرد</h3>\n<ul><li><strong>CPU</strong>: processهای single-thread می‌توانند با چند core مقیاس نگیرند؛ context switch و steal time در VM مهم است.</li><li><strong>RAM</strong>: page cache، OOM killer، swap؛ کمبود حافظه می‌تواند process را بی‌صدا بکشد.</li><li><strong>Disk</strong>: IOPS، throughput، latency، فضای خالی، inode. disk full می‌تواند log/DB را متوقف کند.</li><li><strong>Network</strong>: پهنای باند، pps، interrupt، offload، NIC queue؛ VM/container overhead.</li><li><strong>Connection pool</strong>: هر backend تعداد محدودی connection به DB دارد؛ pool کوچک = صف، pool بزرگ = فشار به DB.</li><li><strong>File descriptors</strong>: هر socket یک FD است؛ limit کم = <code>too many open files</code>.</li><li><strong>Time</strong>: NTP، clock skew، timeoutهای هماهنگ.</li></ul>\n<p><strong>ظرفیت</strong> را با SLO بسنج: latency p95/p99، error rate، saturation. میانگین گمراه‌کننده است؛ یک tail latency بد می‌تواند تجربه را خراب کند.</p>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریو: <code>app.example</code> از طریق load balancer <code>10.10.30.10</code> به دو web server <code>10.10.30.21/22</code> و سپس <code>app-01 10.10.31.11:8080</code> و <code>db-01 10.10.32.11:5432</code> وصل می‌شود. بعضی کاربران خطای ۵۰۲ می‌گیرند.</p>\n<ol><li><strong>دامنه و VIP</strong>: DNS نام را به VIP resolve می‌کند؟ TTL/cache قدیمی نیست؟</li><li><strong>LB health</strong>: کدام backendها healthy‌اند؟ چرا یکی unhealthy/healthy است؟</li><li><strong>Listener</strong>: روی هر backend، process و listener روی port درست bind شده؟</li><li><strong>مسیر و firewall</strong>: از LB به backend، TCP handshake برقرار است؟ return path؟</li><li><strong>Dependency</strong>: app-01 به DB/DNS/cache وصل است؟ connection pool اشباع نیست؟</li><li><strong>منابع</strong>: CPU/RAM/disk/FD روی هر backend و DB سالم است؟</li><li><strong>TLS/زمان</strong>: certificate معتبر و زمان sync است؟</li><li><strong>Application</strong>: log سرویس چه می‌گوید؟ ۵۰۲ از LB است یا از app؟</li><li><strong>تغییر</strong>: آخرین deploy/config/scale چه زمانی بود؟ correlate کن.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>شاهد</th><th>اگر شکست بخورد</th></tr></thead><tbody><tr><td>DNS/VIP</td><td><code>dig</code>، LB config</td><td>DNS/TTL/record</td></tr><tr><td>Health</td><td>LB status/log</td><td>health check/backend</td></tr><tr><td>Listener</td><td><code>ss -lntp</code></td><td>bind/port/process</td></tr><tr><td>Path</td><td><code>nc -vz</code>، capture</td><td>firewall/route</td></tr><tr><td>Dependency</td><td>app log، DB session</td><td>DB/DNS/cache</td></tr><tr><td>Capacity</td><td>metrics</td><td>CPU/RAM/disk/pool</td></tr><tr><td>TLS/time</td><td><code>openssl s_client</code>، NTP</td><td>cert/time/trust</td></tr><tr><td>App</td><td>access/error log</td><td>code/config</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 680\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Server roles, service listeners and the dependency chain behind one request</title>\n  <desc id=\"desc\">A load balancer sends HTTPS requests to two web servers. The web tier depends on an application server, a database, shared storage and directory services. DNS, NTP, monitoring and backup support all tiers. Callouts show listener, service account, TLS, health check and log evidence.</desc>\n  <defs>\n    <marker id=\"ar\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"5\" orient=\"auto\">\n      <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#334155\"/>\n    </marker>\n  </defs>\n  <rect width=\"1100\" height=\"680\" fill=\"#f8fafc\"/>\n  <text x=\"550\" y=\"34\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#0f172a\">A server is a stack of services, dependencies and evidence</text>\n\n  <!-- client -->\n  <rect x=\"30\" y=\"90\" width=\"150\" height=\"90\" rx=\"12\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>\n  <text x=\"105\" y=\"120\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#1e3a8a\">Client</text>\n  <text x=\"105\" y=\"143\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#475569\">DNS name</text>\n  <text x=\"105\" y=\"160\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#475569\">TCP 443</text>\n\n  <!-- LB -->\n  <rect x=\"230\" y=\"80\" width=\"170\" height=\"110\" rx=\"12\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"2\"/>\n  <text x=\"315\" y=\"108\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#5b21b6\">Load balancer</text>\n  <text x=\"315\" y=\"131\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">VIP 10.10.30.10</text>\n  <text x=\"315\" y=\"150\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">health check /443</text>\n  <text x=\"315\" y=\"169\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">TLS termination</text>\n\n  <!-- web servers -->\n  <rect x=\"450\" y=\"70\" width=\"160\" height=\"80\" rx=\"10\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"530\" y=\"96\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#115e59\">web-01</text>\n  <text x=\"530\" y=\"117\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">10.10.30.21:443</text>\n  <text x=\"530\" y=\"135\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">nginx / app pool</text>\n\n  <rect x=\"450\" y=\"165\" width=\"160\" height=\"80\" rx=\"10\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"530\" y=\"191\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#115e59\">web-02</text>\n  <text x=\"530\" y=\"212\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">10.10.30.22:443</text>\n  <text x=\"530\" y=\"230\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">nginx / app pool</text>\n\n  <!-- app -->\n  <rect x=\"660\" y=\"110\" width=\"150\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#b45309\" stroke-width=\"2\"/>\n  <text x=\"735\" y=\"137\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#92400e\">app-01</text>\n  <text x=\"735\" y=\"158\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">10.10.31.11:8080</text>\n  <text x=\"735\" y=\"177\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">service account</text>\n\n  <!-- db -->\n  <rect x=\"850\" y=\"70\" width=\"130\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#be123c\" stroke-width=\"2\"/>\n  <text x=\"915\" y=\"97\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#9f1239\">db-01</text>\n  <text x=\"915\" y=\"118\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">10.10.32.11:5432</text>\n  <text x=\"915\" y=\"137\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">replica + backup</text>\n\n  <!-- storage -->\n  <rect x=\"850\" y=\"185\" width=\"130\" height=\"75\" rx=\"10\" fill=\"#ffffff\" stroke=\"#475569\" stroke-width=\"2\"/>\n  <text x=\"915\" y=\"211\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#334155\">Storage</text>\n  <text x=\"915\" y=\"232\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">NFS / block</text>\n  <text x=\"915\" y=\"249\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">snapshot ≠ backup</text>\n\n  <!-- supporting services -->\n  <rect x=\"440\" y=\"300\" width=\"540\" height=\"150\" rx=\"14\" fill=\"#ffffff\" stroke=\"#94a3b8\" stroke-width=\"2\"/>\n  <text x=\"710\" y=\"328\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#334155\">Shared dependencies</text>\n  <rect x=\"460\" y=\"345\" width=\"115\" height=\"82\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#cbd5e1\"/>\n  <text x=\"517\" y=\"368\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#334155\">DNS</text>\n  <text x=\"517\" y=\"388\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#475569\">A / AAAA</text>\n  <text x=\"517\" y=\"405\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#475569\">SRV / PTR</text>\n\n  <rect x=\"590\" y=\"345\" width=\"115\" height=\"82\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#cbd5e1\"/>\n  <text x=\"647\" y=\"368\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#334155\">NTP</text>\n  <text x=\"647\" y=\"388\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#475569\">time sync</text>\n  <text x=\"647\" y=\"405\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#475569\">logs / TLS</text>\n\n  <rect x=\"720\" y=\"345\" width=\"115\" height=\"82\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#cbd5e1\"/>\n  <text x=\"777\" y=\"368\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#334155\">Directory</text>\n  <text x=\"777\" y=\"388\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#475569\">LDAP / AD</text>\n  <text x=\"777\" y=\"405\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#475569\">auth / policy</text>\n\n  <rect x=\"850\" y=\"345\" width=\"115\" height=\"82\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#cbd5e1\"/>\n  <text x=\"907\" y=\"368\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#334155\">Monitor</text>\n  <text x=\"907\" y=\"388\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#475569\">metrics / logs</text>\n  <text x=\"907\" y=\"405\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#475569\">alerts / traces</text>\n\n  <!-- arrows -->\n  <line x1=\"180\" y1=\"135\" x2=\"228\" y2=\"135\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"400\" y1=\"120\" x2=\"448\" y2=\"110\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"400\" y1=\"150\" x2=\"448\" y2=\"205\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"610\" y1=\"110\" x2=\"658\" y2=\"140\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"610\" y1=\"205\" x2=\"658\" y2=\"170\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"810\" y1=\"155\" x2=\"848\" y2=\"125\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"735\" y1=\"200\" x2=\"848\" y2=\"220\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"710\" y1=\"270\" x2=\"710\" y2=\"298\" stroke=\"#475569\" stroke-width=\"2\" stroke-dasharray=\"6 4\" marker-end=\"url(#ar)\"/>\n\n  <!-- evidence panel -->\n  <rect x=\"30\" y=\"300\" width=\"370\" height=\"300\" rx=\"14\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>\n  <text x=\"215\" y=\"330\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#1e3a8a\">Evidence on the server</text>\n  <text x=\"52\" y=\"362\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f172a\">1. Process alive?  systemctl status</text>\n  <text x=\"52\" y=\"389\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f172a\">2. Listener bound?  ss -lntp</text>\n  <text x=\"52\" y=\"416\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f172a\">3. Port open on host firewall?</text>\n  <text x=\"52\" y=\"443\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f172a\">4. Dependency reachable?  DB/DNS</text>\n  <text x=\"52\" y=\"470\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f172a\">5. Disk / memory / inode OK?</text>\n  <text x=\"52\" y=\"497\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f172a\">6. TLS cert valid and trusted?</text>\n  <text x=\"52\" y=\"524\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f172a\">7. Logs show accept or error?</text>\n  <text x=\"52\" y=\"551\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f172a\">8. Time correct for auth/TLS?</text>\n  <text x=\"52\" y=\"578\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#64748b\">A live process is not proof of a healthy service.</text>\n\n  <!-- bottom -->\n  <rect x=\"440\" y=\"480\" width=\"540\" height=\"120\" rx=\"12\" fill=\"#ffffff\" stroke=\"#cbd5e1\"/>\n  <text x=\"710\" y=\"506\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#0f172a\">Availability is layered</text>\n  <text x=\"460\" y=\"532\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">HA / cluster: keep service running during a failure</text>\n  <text x=\"460\" y=\"556\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">Backup: recover data after deletion/corruption</text>\n  <text x=\"460\" y=\"580\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">Snapshot: fast rollback point, not an off-host backup</text>\n</svg></div><figcaption>لایه‌های سرور، سرویس‌های وابسته و زنجیرهٔ شاهد</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>جزء</th><th>آدرس/port</th><th>نقش</th><th>وابستگی</th></tr></thead><tbody><tr><td>Client</td><td>10.10.10.0/24</td><td>مصرف‌کننده</td><td>DNS/route</td></tr><tr><td>VIP</td><td>10.10.30.10:443</td><td>load balancer</td><td>health check</td></tr><tr><td>web-01/02</td><td>10.10.30.21/22:443</td><td>TLS/app</td><td>app-01</td></tr><tr><td>app-01</td><td>10.10.31.11:8080</td><td>business logic</td><td>DB/DNS/cache</td></tr><tr><td>db-01</td><td>10.10.32.11:5432</td><td>داده</td><td>storage/replica</td></tr><tr><td>DNS</td><td>10.10.10.53:53</td><td>name</td><td>zone/forwarder</td></tr><tr><td>NTP</td><td>10.10.10.123:123</td><td>زمان</td><td>source</td></tr><tr><td>Monitor</td><td>10.10.40.10:9090</td><td>metrics/log</td><td>agents</td></tr></tbody></table></div>\n<p><strong>مسیر:</strong> client → VIP → web → app → DB. <strong>مسیر برگشت</strong> باید برای هر hop وجود داشته باشد. اگر app به DB وصل شود ولی DB route برگشت به app نداشته باشد، connection timeout می‌شود و web ممکن است ۵۰۲ بدهد.</p>\n<p><strong>نکتهٔ طراحی:</strong> web/app/db را در segmentهای جدا با ACL قرار بده. client نباید مستقیم به DB برسد. LB باید فقط port سرویس را expose کند، نه مدیریت. health check باید از LB به backend مجاز باشد و log آن دیده شود.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>این Objective مفهومی است؛ پیکربندی کامل یک محصول خاص نیست. رویهٔ ایمن:</p>\n<ol><li>سرویس را با <strong>service account</strong> کم‌دسترسی اجرا کن؛ نه root/admin مگر ضرورت مستند.</li><li>config و secret را از env/file با مجوز محدود بخوان؛ secret را در image/گیت نگذار.</li><li>bind address را آگاهانه انتخاب کن؛ <code>0.0.0.0</code> فقط با firewall/segmentation.</li><li>dependency را با timeout/retry/circuit breaker محدود کن؛ retry بی‌نهایت باعث cascade می‌شود.</li><li>health check را عمیق اما غیرشکننده طراحی کن؛ dependencyهای حیاتی را با threshold.</li><li>log ساخت‌یافته با request ID و timestamp؛ NTP را sync کن.</li><li>backup و <strong>restore test</strong> را قبل از نیاز واقعی انجام بده.</li><li>patch/upgrade با rollback و maintenance window؛ immutable image را ترجیح بده.</li><li>monitoring/alert برای process، listener، latency، error، disk، cert expiry و backup.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>کار</th><th>Linux</th><th>Windows</th></tr></thead><tbody><tr><td>وضعیت سرویس</td><td><code>systemctl status &lt;svc&gt;</code></td><td><code>Get-Service &lt;svc&gt;</code></td></tr><tr><td>listener</td><td><code>ss -lntp</code></td><td><code>netstat -ano</code></td></tr><tr><td>log</td><td><code>journalctl -u &lt;svc&gt;</code></td><td>Event Viewer / <code>Get-WinEvent</code></td></tr><tr><td>منابع</td><td><code>top</code>، <code>free</code>، <code>df -h</code></td><td>Task Manager / <code>Get-Counter</code></td></tr><tr><td>TLS</td><td><code>openssl s_client -connect</code></td><td><code>Test-NetConnection</code> + browser</td></tr><tr><td>زمان</td><td><code>timedatectl</code>، <code>chronyc</code></td><td><code>w32tm /query /status</code></td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td><code>systemctl status</code></td><td>process/سرویس start شده</td><td>listener/dependency</td></tr><tr><td><code>ss -lntp</code></td><td>bind/listen روی port</td><td>firewall/route</td></tr><tr><td><code>curl</code> از LB</td><td>پاسخ end-to-end</td><td>همهٔ backendها</td></tr><tr><td><code>curl</code> از هر backend</td><td>پاسخ همان node</td><td>DB/pool</td></tr><tr><td>DB <code>pg_stat_activity</code></td><td>connectionها</td><td>latency query</td></tr><tr><td>LB health log</td><td>وضعیت backend</td><td>صحت health logic</td></tr><tr><td>certificate</td><td>اعتبار/زنجیره/time</td><td>مجوز کاربر</td></tr><tr><td>backup restore log</td><td>قابل‌بازیابی بودن</td><td>RPO واقعی</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample evidence shape, not a real host\n$ systemctl status web\nActive: active (running)\n\n$ ss -lntp | grep :443\nLISTEN 0 511 0.0.0.0:443 0.0.0.0:* users:((&quot;nginx&quot;,pid=1421,fd=6))\n\n$ curl -sS -o /dev/null -w &#x27;%{http_code}\\n&#x27; https://app.example/health\n200</code></pre>\n<p><strong>تأیید واقعی</strong> یعنی از چند نقطه تست کنی: از client، از LB، از هر backend، و در صورت امکان از dependency. یک ۲۰۰ از VIP می‌تواند فقط یک backend سالم را نشان دهد؛ برای پوشش، health status و log هر backend لازم است.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>۵۰۲ فقط برای بعضی</td><td>backend خراب/health check</td><td>LB status/log</td><td>backend را از rotation خارج کن</td></tr><tr><td>connection refused</td><td>listener نیست/port conflict</td><td><code>ss -lntp</code></td><td>process/port را بررسی کن</td></tr><tr><td>timeout</td><td>firewall/route/pool</td><td>capture/metrics</td><td>مسیر/ظرفیت</td></tr><tr><td>۵۰۰ بعد از deploy</td><td>config/code/migration</td><td>app log</td><td>rollback قابل‌کنترل</td></tr><tr><td>login قطع، web سالم</td><td>DNS/AD/Kerberos/time</td><td>auth log</td><td>DNS/time/AD</td></tr><tr><td>certificate error</td><td>expiry/chain/time</td><td><code>openssl s_client</code></td><td>renew/trust/time</td></tr><tr><td>کندی تدریجی</td><td>disk full/leak/pool</td><td>metrics/log</td><td>capacity/restart با تحلیل</td></tr><tr><td>backup failed</td><td>space/permission/agent</td><td>backup log</td><td>فضای مجوز agent</td></tr><tr><td>split-brain</td><td>quorum/network</td><td>cluster log</td><td>quorum را بازیابی کن</td></tr></tbody></table></div>\n<p><strong>disk full</strong>: <code>df -h</code> و <code>df -i</code>؛ logهای بزرگ، core dump، temp، DB WAL. فقط فایل را حذف نکن؛ علت رشد را پیدا کن. <strong>inode exhaustion</strong> با فضای آزاد هم رخ می‌دهد.</p>\n<p><strong>certificate expired</strong>: <code>openssl s_client -connect host:443 -servername host</code> و بررسی <code>notAfter</code>. تمدید باید قبل از expiry و با reload سرویس انجام شود؛ reload می‌تواند بدون downtime باشد.</p>\n<p><strong>time skew</strong>: اگر ساعت چند دقیقه عقب باشد، Kerberos/TLS/token ممکن است fail شوند. NTP را روی سرور و کلاینت بررسی کن؛ <code>chronyc tracking</code> یا <code>w32tm</code>.</p>\n<p><strong>DNS cache</strong>: TTL بالای record قدیمی می‌تواند بعد از تغییر IP، ترافیک را به سرور قدیمی بفرستد. <code>dig +trace</code> و TTL را ببین؛ cache resolver و client را flush کن.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<ul><li><strong>Least privilege</strong>: service account، RBAC، مجوز فایل/DB حداقلی؛ root only برای عملیات لازم.</li><li><strong>Patch/supply chain</strong>: OS، runtime، library، image base؛ SBOM و امضای image در صورت امکان.</li><li><strong>Segmentation</strong>: DMZ برای سرویس عمومی، segment داخلی برای app/db، ACL بین tierها؛ مدیریت از bastion.</li><li><strong>TLS</strong>: certificate معتبر، TLS 1.2+، cipher suite، HSTS در صورت وب عمومی؛ private key محافظت‌شده.</li><li><strong>Secrets</strong>: vault/KMS، rotation، عدم لاگ کردن secret؛ env variable تنها راه امن نیست.</li><li><strong>Logging/monitoring</strong>: access/error/auth log، SIEM، alert روی error rate/latency/disk/cert/backup.</li><li><strong>Backup security</strong>: رمزنگاری، immutable/offline copy، تست restore، محدودیت دسترسی به backup.</li><li><strong>DDoS/rate limit</strong>: reverse proxy/LB، timeout، connection limit؛ نه فقط firewall.</li><li><strong>Container</strong>: image scan، read-only filesystem، non-root، network policy، محدودیت resource.</li><li><strong>Cloud</strong>: shared responsibility؛ IaaS یعنی OS/پچ با تو، PaaS یعنی runtime/patch با provider ولی config/data با تو.</li></ul>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«process up است، پس سرویس سالم است.»</td><td>listener/dependency/capacity/policy هم لازم‌اند.</td></tr><tr><td>«load balancer خودش مشکل را حل می‌کند.»</td><td>health check و backend سالم لازم است.</td></tr><tr><td>«HA جای backup را می‌گیرد.»</td><td>HA downtime را کم می‌کند، حذف/فساد داده را نه.</td></tr><tr><td>«RAID backup است.»</td><td>RAID خرابی دیسک را پوشش می‌دهد، حذف/ransomware را نه.</td></tr><tr><td>«snapshot backup است.»</td><td>snapshot روی همان storage است؛ off-site/restore لازم است.</td></tr><tr><td>«DNS فقط برای internet است.»</td><td>AD/SRV/DB/service discovery هم به DNS وابسته‌اند.</td></tr><tr><td>«زمان سرور مهم نیست.»</td><td>TLS/Kerberos/token/log correlation به زمان وابسته‌اند.</td></tr><tr><td>«0.0.0.0 امن است چون listener است.»</td><td>exposure را firewall/segmentation تعیین می‌کند.</td></tr><tr><td>«هر سرویس باید root باشد.»</td><td>least privilege؛ root فقط در صورت ضرورت.</td></tr><tr><td>«همهٔ ۵۰۲ها از app است.»</td><td>LB نیز ۵۰۲ می‌دهد؛ log و health را ببین.</td></tr></tbody></table></div>\n<p><strong>تصمیم آزمون:</strong> ۵۰۲ → backend/health؛ refused → listener؛ timeout → path/pool؛ login → DNS/AD/time؛ certificate → expiry/chain/time؛ کندی → capacity/pool؛ داده از دست رفته → backup/restore، نه HA.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>server مجموعه‌ای از سرویس، dependency، ظرفیت، اعتماد و شاهد است.</li><li>process زنده ≠ listener؛ listener ≠ reachable؛ reachable ≠ پاسخ سالم.</li><li>bind address، service account، port conflict و connection pool را بشناس.</li><li>load balancer/reverse proxy با health check و session state کار می‌کنند.</li><li>HA، backup، snapshot و RAID چهار چیز متفاوت‌اند؛ RTO/RPO را از business بگیر.</li><li>NTP، DNS، directory و monitoring سرویس‌های زیرساختی حیاتی‌اند.</li><li>امنیت = least privilege، patch، segmentation، TLS، secret management، log.</li><li>عیب‌یابی = از VIP به backend، از process به dependency، با شاهد در هر hop.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 v1.1 Exam Topics — &lt;https://www.cisco.com/c/en/us/training-exams/training/it-certifications/ccna-certification.html&gt;</td><td>Objective 1.1.g servers</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 1034/1035 — DNS — &lt;https://www.rfc-editor.org/rfc/rfc1034.html&gt;</td><td>name records/resolution</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 5905 — Network Time Protocol — &lt;https://www.rfc-editor.org/rfc/rfc5905.html&gt;</td><td>time synchronization</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>NIST SP 800-123 — Guide to General Server Security — &lt;https://csrc.nist.gov/pubs/sp/800/123/final&gt;</td><td>server hardening</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>OWASP ASVS — &lt;https://owasp.org/www-project-application-security-verification-standard/&gt;</td><td>application security</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>هیچ سرور، load balancer، database یا cluster واقعی اجرا نشده است؛ خروجی‌ها <code>Designed — Not Run</code> هستند.</li><li>portها و فرمان‌ها نمونه‌اند؛ vendor/OS/version می‌تواند رفتار را تغییر دهد.</li><li>RTO/RPO نمونه‌اند و باید از business گرفته شوند.</li><li>URLها snapshot/hash نشده‌اند و <code>PROVENANCE_NOT_VERIFIED</code> هستند.</li><li>این درس جایگزین مستندات vendor و runbook سازمان نیست.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <a href=\"ccna-v11-1.1.h.html\">PoE: وقتی کابل داده، برق هم می‌دهد</a> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Service",
+   "fa": "Service",
+   "simple": "برنامه‌ای که کار مشخصی ارائه می‌دهد."
+  },
+  {
+   "term": "Daemon",
+   "fa": "Daemon",
+   "simple": "process پس‌زمینه."
+  },
+  {
+   "term": "Listener",
+   "fa": "Listener",
+   "simple": "socket آمادهٔ accept."
+  },
+  {
+   "term": "Bind address",
+   "fa": "Bind address",
+   "simple": "IP/port اتصال listener."
+  },
+  {
+   "term": "Service account",
+   "fa": "Service account",
+   "simple": "هویت اجرای سرویس."
+  },
+  {
+   "term": "Dependency",
+   "fa": "Dependency",
+   "simple": "منبع/سرویس موردنیاز."
+  },
+  {
+   "term": "Reverse proxy",
+   "fa": "Reverse proxy",
+   "simple": "واسط جلوی server."
+  },
+  {
+   "term": "Load balancer",
+   "fa": "Load balancer",
+   "simple": "توزیع‌کنندهٔ ترافیک."
+  },
+  {
+   "term": "Health check",
+   "fa": "Health check",
+   "simple": "آزمون سلامت backend."
+  },
+  {
+   "term": "Sticky session",
+   "fa": "Sticky session",
+   "simple": "نگه‌داشتن session روی یک backend."
+  },
+  {
+   "term": "Cluster",
+   "fa": "Cluster",
+   "simple": "چند node با نقش مشترک."
+  },
+  {
+   "term": "Quorum",
+   "fa": "Quorum",
+   "simple": "اکثریت لازم برای تصمیم."
+  },
+  {
+   "term": "Failover",
+   "fa": "Failover",
+   "simple": "انتقال نقش در خرابی."
+  },
+  {
+   "term": "Backup",
+   "fa": "Backup",
+   "simple": "نسخهٔ قابل‌بازیابی."
+  },
+  {
+   "term": "Snapshot",
+   "fa": "Snapshot",
+   "simple": "نقطهٔ بازگشت storage."
+  },
+  {
+   "term": "RAID",
+   "fa": "RAID",
+   "simple": "افزونگی دیسک."
+  },
+  {
+   "term": "RTO",
+   "fa": "RTO",
+   "simple": "حداکثر زمان بازیابی."
+  },
+  {
+   "term": "RPO",
+   "fa": "RPO",
+   "simple": "حداکثر دادهٔ قابل‌ازدست‌رفتن."
+  },
+  {
+   "term": "NTP",
+   "fa": "NTP",
+   "simple": "همگام‌سازی زمان."
+  },
+  {
+   "term": "Port conflict",
+   "fa": "Port conflict",
+   "simple": "تعارض دو process روی port."
+  },
+  {
+   "term": "Least privilege",
+   "fa": "Least privilege",
+   "simple": "حداقل دسترسی."
+  },
+  {
+   "term": "Immutable infrastructure",
+   "fa": "Immutable infrastructure",
+   "simple": "جایگزینی به‌جای تغییر دستی."
+  },
+  {
+   "term": "Connection pool",
+   "fa": "Connection pool",
+   "simple": "مجموعهٔ connectionهای reusable."
+  },
+  {
+   "term": "SLO",
+   "fa": "SLO",
+   "simple": "هدف سطح سرویس."
+  },
+  {
+   "term": "Bastion",
+   "fa": "Bastion",
+   "simple": "host مدیریتی محدود."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>این Objective مفهومی است؛ پیکربندی کامل یک محصول خاص نیست. رویهٔ ایمن:</p>\n<ol><li>سرویس را با <strong>service account</strong> کم‌دسترسی اجرا کن؛ نه root/admin مگر ضرورت مستند.</li><li>config و secret را از env/file با مجوز محدود بخوان؛ secret را در image/گیت نگذار.</li><li>bind address را آگاهانه انتخاب کن؛ <code>0.0.0.0</code> فقط با firewall/segmentation.</li><li>dependency را با timeout/retry/circuit breaker محدود کن؛ retry بی‌نهایت باعث cascade می‌شود.</li><li>health check را عمیق اما غیرشکننده طراحی کن؛ dependencyهای حیاتی را با threshold.</li><li>log ساخت‌یافته با request ID و timestamp؛ NTP را sync کن.</li><li>backup و <strong>restore test</strong> را قبل از نیاز واقعی انجام بده.</li><li>patch/upgrade با rollback و maintenance window؛ immutable image را ترجیح بده.</li><li>monitoring/alert برای process، listener، latency، error، disk، cert expiry و backup.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>کار</th><th>Linux</th><th>Windows</th></tr></thead><tbody><tr><td>وضعیت سرویس</td><td><code>systemctl status &lt;svc&gt;</code></td><td><code>Get-Service &lt;svc&gt;</code></td></tr><tr><td>listener</td><td><code>ss -lntp</code></td><td><code>netstat -ano</code></td></tr><tr><td>log</td><td><code>journalctl -u &lt;svc&gt;</code></td><td>Event Viewer / <code>Get-WinEvent</code></td></tr><tr><td>منابع</td><td><code>top</code>، <code>free</code>، <code>df -h</code></td><td>Task Manager / <code>Get-Counter</code></td></tr><tr><td>TLS</td><td><code>openssl s_client -connect</code></td><td><code>Test-NetConnection</code> + browser</td></tr><tr><td>زمان</td><td><code>timedatectl</code>، <code>chronyc</code></td><td><code>w32tm /query /status</code></td></tr></tbody></table></div><h4>۸. تأیید و شاهد</h4><div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td><code>systemctl status</code></td><td>process/سرویس start شده</td><td>listener/dependency</td></tr><tr><td><code>ss -lntp</code></td><td>bind/listen روی port</td><td>firewall/route</td></tr><tr><td><code>curl</code> از LB</td><td>پاسخ end-to-end</td><td>همهٔ backendها</td></tr><tr><td><code>curl</code> از هر backend</td><td>پاسخ همان node</td><td>DB/pool</td></tr><tr><td>DB <code>pg_stat_activity</code></td><td>connectionها</td><td>latency query</td></tr><tr><td>LB health log</td><td>وضعیت backend</td><td>صحت health logic</td></tr><tr><td>certificate</td><td>اعتبار/زنجیره/time</td><td>مجوز کاربر</td></tr><tr><td>backup restore log</td><td>قابل‌بازیابی بودن</td><td>RPO واقعی</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample evidence shape, not a real host\n$ systemctl status web\nActive: active (running)\n\n$ ss -lntp | grep :443\nLISTEN 0 511 0.0.0.0:443 0.0.0.0:* users:((&quot;nginx&quot;,pid=1421,fd=6))\n\n$ curl -sS -o /dev/null -w &#x27;%{http_code}\\n&#x27; https://app.example/health\n200</code></pre>\n<p><strong>تأیید واقعی</strong> یعنی از چند نقطه تست کنی: از client، از LB، از هر backend، و در صورت امکان از dependency. یک ۲۰۰ از VIP می‌تواند فقط یک backend سالم را نشان دهد؛ برای پوشش، health status و log هر backend لازم است.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "سرویسی روی 127.0.0.1:8080 listen می‌کند. کدام جمله درست است؟",
+   "promptHtml": "سرویسی روی <code>127.0.0.1:8080</code> listen می‌کند. کدام جمله درست است؟",
+   "options": [
+    "از همهٔ interfaceهای شبکه قابل‌دسترس است",
+    "فقط از خود همان host قابل‌دسترس است",
+    "firewall آن را حتماً باز می‌کند",
+    "load balancer نمی‌تواند آن را ببیند، چون TLS ندارد"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "bind به 127.0.0.1 یعنی loopback و فقط از همان host. برای دسترسی شبکه باید روی IP مشخص یا 0.0.0.0 bind شود (با firewall). firewall و TLS به‌تنهایی این محدودیت bind را تغییر نمی‌دهند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "process سرویس active است اما client connection refused می‌گیرد. محتمل‌ترین علت چیست؟",
+   "promptHtml": "process سرویس active است اما client connection refused می‌گیرد. محتمل‌ترین علت چیست؟",
+   "options": [
+    "DNS record منقضی است",
+    "certificate منقضی است",
+    "listener روی port مورد انتظار bind نشده است",
+    "backup سرور قدیمی است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "connection refused معمولاً یعنی host reachable است ولی listener روی آن port نیست. DNS و certificate خطاهای متفاوتی می‌دهند؛ backup هم به این نشانه مربوط نیست. process زنده بدون listener کافی نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "health check نوع TCP connect چه چیزی را تضمین می‌کند؟",
+   "promptHtml": "health check نوع TCP connect چه چیزی را تضمین می‌کند؟",
+   "options": [
+    "فقط باز بودن port؛ نه سلامت کامل application",
+    "سالم بودن database",
+    "معتبر بودن certificate",
+    "درست بودن session کاربر"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "TCP connect فقط handshake را انجام می‌دهد و باز بودن port را نشان می‌دهد؛ ممکن است process زنده ولی dependency خراب باشد. DB، certificate و session را باید با health check عمیق‌تر یا شاهد جدا بررسی کرد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام گزینه دربارهٔ snapshot و backup درست است؟",
+   "promptHtml": "کدام گزینه دربارهٔ snapshot و backup درست است؟",
+   "options": [
+    "snapshot همیشه off-site است",
+    "snapshot جای RAID را می‌گیرد",
+    "backup برای rollback سریع تغییرات است",
+    "snapshot نقطهٔ بازگشت سریع است، اما backup قابل‌بازیابی خارج از host لازم است"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "snapshot معمولاً روی همان storage و برای rollback سریع است؛ اگر storage/ransomware از بین برود، snapshot هم ممکن است از بین برود. backup باید خارج از host و آزمون‌شده باشد. snapshot جای RAID یا backup کامل را نمی‌گیرد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا NTP برای server اهمیت دارد؟",
+   "promptHtml": "چرا NTP برای server اهمیت دارد؟",
+   "options": [
+    "فقط برای نمایش ساعت در log",
+    "برای TLS، Kerberos، token و همبستگی logها",
+    "برای تخصیص IP",
+    "برای load balancing"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "اختلاف زمان می‌تواند certificate را نامعتبر، Kerberos/token را fail و ترتیب logها را بی‌معنا کند. NTP به IP یا load balancing مربوط نیست؛ کاربرد آن فراتر از نمایش ساعت است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "تفاوت اصلی A record و CNAME در DNS چیست؟",
+   "promptHtml": "تفاوت اصلی A record و CNAME در DNS چیست؟",
+   "options": [
+    "A برای IPv6 و CNAME برای IPv4 است",
+    "CNAME یک آدرس IP مستقیم است",
+    "A نام را به IPv4 نگاشت می‌کند؛ CNAME نام را به نام دیگر alias می‌کند",
+    "A فقط برای mail است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "A record یک نام را به IPv4 و AAAA به IPv6 نگاشت می‌کند؛ CNAME alias به نام دیگر است. CNAME خودش IP مستقیم نیست و A محدود به mail نیست. این تفاوت در عیب‌یابی DNS و TTL مهم است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "disk سرور پر شده و سرویس خطا می‌دهد. اولین اقدام ایمن چیست؟",
+   "promptHtml": "disk سرور پر شده و سرویس خطا می‌دهد. اولین اقدام ایمن چیست؟",
+   "options": [
+    "فرمت کردن دیسک",
+    "خاموش کردن firewall",
+    "حذف تصادفی فایل‌های بزرگ",
+    "بررسی df -h/df -i و شناسایی علت رشد قبل از تغییر"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "پر شدن دیسک می‌تواند از log، temp، WAL یا inode باشد؛ باید قبل از حذف، علت و فایل مالک را شناخت. فرمت کردن، خاموش کردن firewall یا حذف کورکورانه ریسک از دست رفتن داده و قطع بیشتر را بالا می‌برد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام اصل برای اجرای سرویس درست است؟",
+   "promptHtml": "کدام اصل برای اجرای سرویس درست است؟",
+   "options": [
+    "service account با حداقل دسترسی لازم",
+    "همیشه root برای اطمینان",
+    "دسترسی کامل به همهٔ فایل‌ها",
+    "حذف log برای کاهش دسترسی"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "least privilege یعنی سرویس فقط به منابع لازم دسترسی داشته باشد تا اثر آسیب محدود شود. اجرای همیشگی با root، دسترسی کامل یا حذف log امنیت و قابلیت بررسی را کاهش می‌دهد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "RTO و RPO به‌ترتیب چه چیزی را بیان می‌کنند؟",
+   "promptHtml": "RTO و RPO به‌ترتیب چه چیزی را بیان می‌کنند؟",
+   "options": [
+    "تعداد replica و تعداد backup",
+    "حداکثر زمان بازیابی و حداکثر دادهٔ قابل‌ازدست‌رفتن",
+    "پهنای باند و latency",
+    "تعداد کاربر و تعداد سرور"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "RTO هدف زمانی بازگشت سرویس و RPO هدف حداکثر از دست رفتن داده است. replica/backup و bandwidth/latency مفاهیم مرتبط اما متفاوت‌اند؛ تعداد کاربر/سرور نیز این اهداف را تعریف نمی‌کند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "reverse proxy در جلوی web server معمولاً چه کاری انجام می‌دهد؟",
+   "promptHtml": "reverse proxy در جلوی web server معمولاً چه کاری انجام می‌دهد؟",
+   "options": [
+    "جایگزینی DNS",
+    "اجرای حتماً کد application",
+    "TLS termination، routing و policy",
+    "حذف نیاز به backup"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "reverse proxy می‌تواند TLS را terminate، درخواست را route و policy اعمال کند. جای DNS نیست، لزوماً application را اجرا نمی‌کند و backup را حذف نمی‌کند؛ این‌ها نقش‌های جدا هستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام جمله دربارهٔ VM و container درست است؟",
+   "promptHtml": "کدام جمله دربارهٔ VM و container درست است؟",
+   "options": [
+    "container حتماً kernel جدا دارد",
+    "VM از namespaceهای kernel host استفاده می‌کند",
+    "هر دو همیشه IP ثابت دارند",
+    "VM kernel مهمان دارد؛ container معمولاً kernel host را share می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "VM یک kernel مهمان دارد و سخت‌افزار مجازی می‌بیند؛ container معمولاً processهای isolated روی kernel host است. IP ثابت برای هیچ‌کدام تضمینی نیست و ادعای «container حتماً kernel جدا» غلط است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا HA جای backup را نمی‌گیرد؟",
+   "promptHtml": "چرا HA جای backup را نمی‌گیرد؟",
+   "options": [
+    "HA downtime را کم می‌کند، اما حذف/فساد داده را بازیابی نمی‌کند",
+    "HA همیشه گران‌تر است",
+    "backup همیشه سریع‌تر است",
+    "HA فقط برای DNS است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "HA با replica/failover سرویس را در خرابی node بالا نگه می‌دارد؛ اگر داده حذف یا فاسد شود، replica هم همان فساد را دارد. backup برای بازیابی نقطهٔ قبلی است. هزینه، سرعت یا محدودیت DNS توضیح این تفاوت نیستند.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}

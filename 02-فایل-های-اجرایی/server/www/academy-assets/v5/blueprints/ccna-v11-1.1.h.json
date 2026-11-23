@@ -1,0 +1,407 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccna-v11-1.1.h",
+ "objectiveId": "1.1.h",
+ "kind": "objective",
+ "track": "FAM Curriculum 5.0",
+ "course": "ccna-v11",
+ "title": "PoE: وقتی کابل داده، برق هم می‌دهد",
+ "titleEn": "Explain — PoE",
+ "domain": "1.0 Network Fundamentals",
+ "source": "content/lessons/ccna-v11-1.1.h.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 50,
+ "prerequisites": [
+  "ccna-v11-1.1.b",
+  "ccna-v11-1.1.d"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "ccna-v11-1.1.b",
+   "ccna-v11-1.1.d"
+  ],
+  "learningObjectives": [
+   "PSE",
+   "PD",
+   "802.3af",
+   "802.3at",
+   "802.3bt",
+   "classification",
+   "power budget",
+   "LLDP",
+   "pair",
+   "voltage drop",
+   "UPS",
+   "priority"
+  ]
+ },
+ "whyItMatters": "یک Access Point روی سقف نصب شده و تنها یک کابل Ethernet به آن رسیده است. کابل هم داده می‌دهد و هم برق؛ بنابراین نیازی به پریز برق نزدیک AP نیست. این سادگی، یک قرارداد دقیق پشت خود دارد: سوئیچ باید تشخیص دهد دستگاه چیست، چقدر برق می‌خواهد، آیا استاندارد را پشتیبانی می‌کند و آیا بودجهٔ برق سوئیچ اجازه می‌دهد. اگر یکی از این‌ها رد شود، دستگاه روشن نمی‌شود یا مدام reboot می‌کند و کاربر فقط می‌گوید «AP قطع است». PoE (Power over Ethernet) یعنی انتقال توان الکتریکی روی همان زوج‌سیم‌های کابل داده، بدون آداپتور جداگانه. مزیت آن سادگی نصب، مدیریت متمرکز و امکان برق‌رسانی از UPS سوئیچ است. ریسک آن این اس",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>یک Access Point روی سقف نصب شده و تنها یک کابل Ethernet به آن رسیده است. کابل هم داده می‌دهد و هم برق؛ بنابراین نیازی به پریز برق نزدیک AP نیست. این سادگی، یک قرارداد دقیق پشت خود دارد: سوئیچ باید تشخیص دهد دستگاه چیست، چقدر برق می‌خواهد، آیا استاندارد را پشتیبانی می‌کند و آیا بودجهٔ برق سوئیچ اجازه می‌دهد. اگر یکی از این‌ها رد شود، دستگاه روشن نمی‌شود یا مدام reboot می‌کند و کاربر فقط می‌گوید «AP قطع است».</p>\n<p>PoE (Power over Ethernet) یعنی انتقال توان الکتریکی روی همان زوج‌سیم‌های کابل داده، بدون آداپتور جداگانه. مزیت آن سادگی نصب، مدیریت متمرکز و امکان برق‌رسانی از UPS سوئیچ است. ریسک آن این است که طراح، <strong>بودجهٔ برق</strong>، <strong>استاندارد</strong>، <strong>طول کابل</strong> و <strong>گرمای دسته کابل</strong> را نبیند. یک سوئیچ ۲۴ پورت با بودجهٔ ۳۷۰ وات نمی‌تواند هم‌زمان ۲۴ دستگاه ۳۰ واتی را با حداکثر توان تغذیه کند، حتی اگر هر پورت ظاهراً ۳۰ وات را «پشتیبانی» کند.</p>\n<p>این درس PoE را از سه زاویه می‌بیند: electrical (PSE/PD، ولتاژ/جریان، افت ولتاژ)، protocol (detection، classification، LLDP/CDP، negotiation) و design (budget، UPS، priority، cable). هدف این است که بتوانی بگویی چرا یک دستگاه روشن نمی‌شود و کدام شاهد را کجا بگیری.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>PoE را به‌صورت یک <strong>قرارداد چهار مرحله‌ای</strong> ببین:</p>\n<ol><li><strong>Detect</strong> — PSE ولتاژ کوچکی اعمال می‌کند و امضای PD (حدود ۲۵kΩ) را می‌بیند. اگر امضا نباشد، برق کامل نمی‌دهد.</li><li><strong>Classify</strong> — PSE کلاس توان PD را می‌فهمد (با resistor، دو-رویداد، LLDP/CDP یا Autoclass).</li><li><strong>Power</strong> — پورت توان را اعمال می‌کند؛ PD روشن می‌شود.</li><li><strong>Maintain/Monitor</strong> — PSE جریان/توان را می‌پاید؛ در خطا یا اضافه‌بار، برق را قطع/محدود می‌کند.</li></ol>\n<p>در این مدل:</p>\n<ul><li><strong>PSE</strong> (Power Sourcing Equipment) منبع توان است: سوئیچ PoE، injector، midspan.</li><li><strong>PD</strong> (Powered Device) مصرف‌کننده است: AP، تلفن IP، دوربین، کنترلر در، ساعت، IoT.</li><li><strong>Power budget</strong> مجموع توان قابل‌تأمین PSE است، نه جمع توان همهٔ پورت‌ها.</li><li><strong>Per-port allocation</strong> توانی است که برای هر پورت رزرو/مصرف می‌شود.</li><li><strong>Class</strong> محدودهٔ توان است، نه عدد دقیق مصرف واقعی.</li><li><strong>Priority</strong> تعیین می‌کند در کمبود بودجه، کدام پورت اول برق بگیرد.</li></ul>\n<p><strong>نکتهٔ کلیدی:</strong> PoE یک توافق است، نه یک اجبار. اگر PD استاندارد نباشد، PSE ممکن است آن را تشخیص ندهد و برق ندهد. اگر PD بیشتر از کلاس مصرف کند، PSE ممکن است پورت را قطع کند. اگر بودجهٔ کل تمام شود، پورت‌های کم‌اولویت ممکن است برق نگیرند.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>PoE</td><td>توان روی کابل Ethernet</td><td>«هر کابل Ethernet برق دارد»</td></tr><tr><td>PSE</td><td>منبع توان (سوئیچ/injector)</td><td>«PSE همان PD است»</td></tr><tr><td>PD</td><td>دستگاه مصرف‌کنندهٔ توان</td><td>«PD فقط دوربین است»</td></tr><tr><td>802.3af</td><td>Type 1، تا ۱۵.۴W PSE / ۱۲.۹۵W PD</td><td>«۳۰ وات استاندارد پایه است»</td></tr><tr><td>802.3at</td><td>Type 2، تا ۳۰W PSE / ۲۵.۵W PD</td><td>«PoE+ همیشه ۳۰ وات به PD می‌دهد»</td></tr><tr><td>802.3bt</td><td>Type 3/4، ۶۰/۹۰W PSE، ۴-pair</td><td>«bt روی هر کابل Cat5e قدیمی کار می‌کند»</td></tr><tr><td>Passive PoE</td><td>توان بدون negotiation</td><td>«passive همیشه امن است»</td></tr><tr><td>Detection</td><td>شناسایی امضای PD</td><td>«PSE کورکورانه برق می‌دهد»</td></tr><tr><td>Classification</td><td>تعیین کلاس توان</td><td>«کلاس یعنی مصرف دقیق»</td></tr><tr><td>LLDP/CDP</td><td>negotiation در لایه ۲</td><td>«PoE فقط electrical است»</td></tr><tr><td>Power budget</td><td>مجموع توان PSE</td><td>«جمع توان همهٔ پورت‌ها»</td></tr><tr><td>Per-port allocation</td><td>رزرو توان هر پورت</td><td>«مصرف واقعی همیشه برابر allocation است»</td></tr><tr><td>Priority</td><td>اولویت در کمبود بودجه</td><td>«همهٔ پورت‌ها برابرند»</td></tr><tr><td>Power policing</td><td>محدود/قطع در اضافه‌مصرف</td><td>«همیشه بهترین راه‌حل است»</td></tr><tr><td>Pair</td><td>زوج سیم در کابل</td><td>«همهٔ ۴ زوج همیشه برق دارند»</td></tr><tr><td>Voltage drop</td><td>افت ولتاژ در طول کابل</td><td>«ولتاژ در هر طول ثابت است»</td></tr><tr><td>UPS</td><td>برق اضطراری</td><td>«UPS فقط برای سوئیچ است، نه PoE»</td></tr><tr><td>Class 0</td><td>کلاس قدیمی/پیش‌فرض</td><td>«Class 0 یعنی بدون محدودیت»</td></tr></tbody></table></div>\n<p><strong>مرزهای مهم:</strong></p>\n<ul><li><strong>PoE ≠ PoE+ ≠ PoE++.</strong> نام‌های تجاری گمراه‌کننده‌اند؛ به استاندارد و توان PD نگاه کن.</li><li><strong>PSE port power ≠ PD received power.</strong> افت کابل و تبدیل، توان دریافتی را کم می‌کند.</li><li><strong>Class ≠ actual consumption.</strong> PD می‌تواند کمتر مصرف کند؛ allocation معمولاً بر اساس class است.</li><li><strong>Detection ≠ authentication.</strong> PoE فقط می‌فهمد «PD هست»؛ هویت/امنیت دستگاه کار 802.1X/NAC است.</li><li><strong>PoE ≠ داده.</strong> برق و داده روی یک کابل‌اند، اما لایه‌های منطقی جدا هستند.</li></ul>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. استانداردها و توان</h3>\n<div class=\"table-wrap\"><table><thead><tr><th>استاندارد</th><th>نام رایج</th><th>PSE (حداکثر)</th><th>PD (حداکثر)</th><th>زوج‌ها</th><th>کاربرد</th></tr></thead><tbody><tr><td>802.3af</td><td>Type 1 / PoE</td><td>15.4 W</td><td>12.95 W</td><td>2-pair</td><td>تلفن، AP ساده، دوربین</td></tr><tr><td>802.3at</td><td>Type 2 / PoE+</td><td>30 W</td><td>25.5 W</td><td>2-pair</td><td>AP Wi-Fi 6، دوربین PTZ</td></tr><tr><td>802.3bt Type 3</td><td>PoE++</td><td>60 W</td><td>51 W</td><td>4-pair</td><td>AP پرقدرت، نمایشگر، IoT</td></tr><tr><td>802.3bt Type 4</td><td>PoE++</td><td>90 W</td><td>71.3 W</td><td>4-pair</td><td>لپ‌تاپ، چراغ، تجهیزات سنگین</td></tr></tbody></table></div>\n<p>اعداد PSE و PD تفاوت دارند، چون کابل انرژی تلف می‌کند. در 802.3af، PSE تا ۱۵.۴ وات می‌دهد و PD تضمین‌شده ۱۲.۹۵ وات می‌گیرد. در 802.3at، ۳۰ و ۲۵.۵. در bt، ۶۰/۵۱ و ۹۰/۷۱.۳. این اعداد <strong>حداکثر استاندارد</strong> هستند؛ طراحی واقعی باید حاشیهٔ اطمینان و بودجهٔ سوئیچ را لحاظ کند.</p>\n<p>برخی vendorها توان بالاتر (مثلاً ۶۰/۹۰ وات) با نام‌های اختصاصی می‌دهند؛ این ممکن است پیش از 802.3bt یا متفاوت با آن باشد. در آزمون، استاندارد رسمی را مبنا بگیر و در طراحی، datasheet دقیق محصول را.</p>\n<h3>۴.۲. زوج‌ها و مسیر توان</h3>\n<p>Ethernet روی کابل زوج به‌هم‌تابیده (twisted pair) کار می‌کند. 10/100BASE-T از دو زوج (1-2 و 3-6) برای داده استفاده می‌کند؛ 1000BASE-T و بالاتر از هر چهار زوج.</p>\n<ul><li><strong>Alternative A</strong>: توان روی زوج‌های داده (1-2، 3-6) با center tap ترانسفورماتور.</li><li><strong>Alternative B</strong>: توان روی زوج‌های بیکار (4-5، 7-8) در 10/100.</li><li><strong>802.3bt</strong>: از هر چهار زوج، با جریان/توان بیشتر.</li></ul>\n<p>PD باید بتواند هر دو Alternative را (در استاندارد مربوط) بپذیرد؛ بعضی دستگاه‌های ارزان فقط یکی را می‌فهمند. <strong>Passive PoE</strong> معمولاً بدون detection و با ولتاژ ثابت (24V/48V) کار می‌کند؛ اگر به دستگاه غیرمجاز وصل شود، می‌تواند آن را بسوزاند. Passive برای دوربین‌های ارزان رایج است، اما در شبکهٔ استاندارد خطرناک و غیرقابل‌اعتماد است.</p>\n<p><strong>افت ولتاژ</strong>: توان = ولتاژ × جریان. هرچه جریان بیشتر یا کابل بلندتر/نازک‌تر باشد، افت بیشتر می‌شود. کابل Cat5e با ۲۴ AWG در ۱۰۰ متر می‌تواند افت محسوس داشته باشد؛ برای bt با توان بالا، Cat6/6a و کیفیت بالا توصیه می‌شود. گرمای دستهٔ کابل (bundle) هم مهم است: چند کابل پرقدرت در یک conduit می‌توانند دمای مجاز را رد کنند.</p>\n<h3>۴.۳. Detection و classification</h3>\n<p>PSE قبل از برق کامل، یک ولتاژ کوچک (حدود ۵–۱۰ ولت) اعمال می‌کند و امپدانس/امضای PD را می‌بیند. اگر امضا درست باشد، PD معتبر است. این مرحله از آسیب به دستگاه غیر-PoE جلوگیری می‌کند.</p>\n<p>روش‌های classification:</p>\n<ul><li><strong>Resistor classification (اف/at)</strong>: یک/دو پالس؛ کلاس ۰–۴.</li><li><strong>LLDP/CDP</strong>: PD و PSE توان/نیاز را اعلام می‌کنند؛ دقیق‌تر از resistor.</li><li><strong>802.3at two-event</strong>: PSE دو بار کلاس را می‌پرسد تا Type 2 را تشخیص دهد.</li><li><strong>802.3bt Autoclass</strong>: PSE مصرف واقعی را اندازه می‌گیرد و allocation را تنظیم می‌کند.</li></ul>\n<p>کلاس‌های ۰–۴ در af/at و کلاس‌های ۵–۸ در bt وجود دارند. <strong>Class 0</strong> یعنی «محدودهٔ پیش‌فرض» و نه «بدون محدودیت». اگر PD کلاس بالاتری اعلام کند و PSE پشتیبانی نکند، ممکن است در کلاس پایین‌تر برق بگیرد و کار نکند.</p>\n<p><strong>Negotiation</strong> مهم است: اگر PD با LLDP اعلام کند ۲۵ وات می‌خواهد و PSE فقط ۱۵ وات می‌دهد، نتیجه می‌تواند reboot یا عملکرد ناقص باشد. log سوئیچ معمولاً class/allocated power را نشان می‌دهد.</p>\n<h3>۴.۴. بودجه، اولویت و policing</h3>\n<p><strong>Power budget</strong> کل توان PSE برای PoE است. مثلاً سوئیچ ۲۴ پورت با بودجهٔ ۳۷۰ وات. اگر ۱۲ AP × ۳۰ وات = ۳۶۰ وات + ۴ دوربین × ۱۵ = ۴۲۰ وات شود، بودجه کافی نیست. طراحی باید:</p>\n<ol><li>مصرف هر PD (datasheet، حداکثر/معمول) را جمع کند.</li><li>allocation هر پورت را بر اساس class/LLDP تعیین کند.</li><li>reserve برای AP/دوربین جدید و UPS را اضافه کند.</li><li>priority را برای دستگاه‌های حیاتی تنظیم کند.</li></ol>\n<p><strong>Priority</strong> معمولاً critical/high/low است. در کمبود بودجه، PSE پورت‌های کم‌اولویت را قطع یا deny می‌کند. اگر همه critical باشند، behavior می‌تواند غیرقابل‌پیش‌بینی شود؛ اولویت باید واقعی باشد.</p>\n<p><strong>Power policing</strong> برخلاف priority، مصرف واقعی را محدود می‌کند: اگر PD بیش از حد مجاز مصرف کند، پورت را cut یا error می‌کند. این از سوئیچ/کابل محافظت می‌کند، اما می‌تواند دستگاه را به‌طور ناخواسته reboot کند. <code>power inline police</code> (Cisco) و variantهای vendor.</p>\n<p><strong>Static vs auto</strong>: <code>power inline auto</code> اجازهٔ negotiation می‌دهد؛ <code>static</code> توان ثابت رزرو می‌کند (برای PD بدون negotiation)؛ <code>never</code> برق نمی‌دهد. static بیش از حد می‌تواند بودجه را هدر دهد.</p>\n<h3>۴.۵. UPS و طراحی برق</h3>\n<p>UPS باید <strong>کل بار</strong> را تحمل کند: سوئیچ + PoE + تجهیزات جانبی. اگر UPS فقط برای CPU سوئیچ sizing شود، در قطع برق، APها/دوربین‌ها خاموش می‌شوند و سوئیچ روشن می‌ماند؛ این «شبکهٔ سالم» نیست.</p>\n<p>محاسبهٔ تقریبی:</p>\n<ul><li>توان PoE = مجموع allocation پورت‌های فعال.</li><li>توان سوئیچ = مصرف خود سوئیچ (datasheet).</li><li>حاشیه = ۲۰–۳۰٪ برای رشد/peak.</li><li>زمان backup = ظرفیت باتری / بار کل.</li></ul>\n<p><strong>PoE و UPS</strong> باید با هم طراحی شوند: APهای حیاتی روی UPS، دوربین‌های غیرحیاتی روی مدار جدا، و priority برای حفظ AP/تلفن. در قطع برق طولانی، ممکن است نیاز به خاموشی کنترل‌شدهٔ دستگاه‌های کم‌اولویت باشد.</p>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریو: یک AP جدید روی پورت <code>Gi1/0/12</code> وصل شده، چراغش چشمک می‌زند ولی join نمی‌شود. سوئیچ <code>C2960X</code> با بودجهٔ ۳۷۰ وات، ۱۰ AP × ۳۰ وات و ۸ دوربین × ۱۵ وات.</p>\n<ol><li><strong>Link</strong>: پورت up است؟ speed/duplex درست؟</li><li><strong>Detection</strong>: <code>show power inline</code> وضعیت <code>detecting</code>/<code>denying</code>/<code>on</code> را نشان می‌دهد؟</li><li><strong>Class</strong>: class/allocated power با PD می‌خواند؟</li><li><strong>Budget</strong>: مجموع allocated + این پورت از budget بیشتر است؟</li><li><strong>Cable</strong>: طول/کیفیت/دسته گرما؛ افت ولتاژ؟</li><li><strong>Standard</strong>: PD 802.3at/bt است و PSE آن را پشتیبانی می‌کند؟</li><li><strong>Config</strong>: <code>power inline auto/static/never</code>، priority، policing.</li><li><strong>Device</strong>: log AP، boot loop، آداپتور/دوشاخه، firmware.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>شاهد</th><th>اگر شکست بخورد</th></tr></thead><tbody><tr><td>Link</td><td><code>show interface status</code></td><td>کابل/پورت</td></tr><tr><td>Detection</td><td><code>show power inline</code></td><td>PD/کابل/port</td></tr><tr><td>Class</td><td><code>show power inline</code> detail</td><td>استاندارد/negotiation</td></tr><tr><td>Budget</td><td><code>show power inline</code> total</td><td>بودجه/priority</td></tr><tr><td>Cable</td><td>test/طول/datasheet</td><td>کابل/فاصله</td></tr><tr><td>Config</td><td><code>show running-config interface</code></td><td>policy</td></tr><tr><td>Device</td><td>AP log</td><td>firmware/سخت‌افزار</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 680\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Power over Ethernet: PSE budget, PD classes and the copper path</title>\n  <desc id=\"desc\">A PoE switch provides power and data over twisted-pair cabling to an access point, IP phone, camera and door controller. Callouts show PSE budget, per-port allocation, class detection, cable distance and UPS runtime. A table compares 802.3af, at, bt Type 3 and Type 4 power levels.</desc>\n  <defs>\n    <marker id=\"a\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"5\" orient=\"auto\">\n      <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#334155\"/>\n    </marker>\n    <marker id=\"ab\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"5\" orient=\"auto\">\n      <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#b45309\"/>\n    </marker>\n  </defs>\n  <rect width=\"1100\" height=\"680\" fill=\"#f8fafc\"/>\n  <text x=\"550\" y=\"34\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#0f172a\">PoE: one copper cable carries data and power — within a budget</text>\n\n  <!-- switch -->\n  <rect x=\"40\" y=\"90\" width=\"260\" height=\"300\" rx=\"14\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"170\" y=\"120\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#115e59\">PoE switch (PSE)</text>\n  <text x=\"170\" y=\"142\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#475569\">budget 370 W · 24 ports</text>\n  <rect x=\"65\" y=\"160\" width=\"210\" height=\"52\" rx=\"8\" fill=\"#ccfbf1\" stroke=\"#5eead4\"/>\n  <text x=\"170\" y=\"181\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">Per-port allocation</text>\n  <text x=\"170\" y=\"199\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">class / LLDP / static reserve</text>\n  <rect x=\"65\" y=\"222\" width=\"210\" height=\"52\" rx=\"8\" fill=\"#f0fdfa\" stroke=\"#99f6e4\"/>\n  <text x=\"170\" y=\"243\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">Detection + class</text>\n  <text x=\"170\" y=\"261\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">25k signature, 5–10 V probe</text>\n  <rect x=\"65\" y=\"284\" width=\"210\" height=\"52\" rx=\"8\" fill=\"#fef9c3\" stroke=\"#facc15\"/>\n  <text x=\"170\" y=\"305\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#854d0e\">Priority / police</text>\n  <text x=\"170\" y=\"323\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">critical · high · low · never</text>\n  <text x=\"170\" y=\"362\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#0f766e\">PSE budget is shared by all PDs</text>\n\n  <!-- PDs -->\n  <rect x=\"440\" y=\"70\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>\n  <text x=\"530\" y=\"98\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#1e3a8a\">Access point</text>\n  <text x=\"530\" y=\"119\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">802.3at · 25.5 W</text>\n  <text x=\"530\" y=\"138\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">critical power</text>\n\n  <rect x=\"440\" y=\"180\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#b45309\" stroke-width=\"2\"/>\n  <text x=\"530\" y=\"208\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#92400e\">IP phone</text>\n  <text x=\"530\" y=\"229\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">802.3af · 12.95 W</text>\n  <text x=\"530\" y=\"248\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">voice VLAN + PoE</text>\n\n  <rect x=\"440\" y=\"290\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#be123c\" stroke-width=\"2\"/>\n  <text x=\"530\" y=\"318\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#9f1239\">Camera</text>\n  <text x=\"530\" y=\"339\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">802.3af/at · 12–25 W</text>\n  <text x=\"530\" y=\"358\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">heater may exceed class</text>\n\n  <rect x=\"440\" y=\"400\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"2\"/>\n  <text x=\"530\" y=\"428\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#5b21b6\">Door / IoT</text>\n  <text x=\"530\" y=\"449\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">802.3bt · up to 71 W</text>\n  <text x=\"530\" y=\"468\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">4-pair required</text>\n\n  <!-- cable paths -->\n  <line x1=\"300\" y1=\"150\" x2=\"438\" y2=\"115\" stroke=\"#b45309\" stroke-width=\"4\" marker-end=\"url(#ab)\"/>\n  <line x1=\"300\" y1=\"230\" x2=\"438\" y2=\"225\" stroke=\"#b45309\" stroke-width=\"4\" marker-end=\"url(#ab)\"/>\n  <line x1=\"300\" y1=\"320\" x2=\"438\" y2=\"335\" stroke=\"#b45309\" stroke-width=\"4\" marker-end=\"url(#ab)\"/>\n  <line x1=\"300\" y1=\"360\" x2=\"438\" y2=\"440\" stroke=\"#b45309\" stroke-width=\"4\" marker-end=\"url(#ab)\"/>\n\n  <!-- cable detail -->\n  <rect x=\"660\" y=\"70\" width=\"400\" height=\"200\" rx=\"14\" fill=\"#ffffff\" stroke=\"#334155\" stroke-width=\"2\"/>\n  <text x=\"860\" y=\"100\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#0f172a\">The copper path</text>\n  <text x=\"682\" y=\"128\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">Data pairs and power pairs share the cable.</text>\n  <text x=\"682\" y=\"152\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">Alternative A: power on data pairs (1-2, 3-6).</text>\n  <text x=\"682\" y=\"176\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">Alternative B: power on spare pairs (4-5, 7-8).</text>\n  <text x=\"682\" y=\"200\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">802.3bt: all four pairs, more power, more heat.</text>\n  <text x=\"682\" y=\"224\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">100 m channel limit still applies.</text>\n  <text x=\"682\" y=\"248\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#64748b\">Voltage drop rises with length and current.</text>\n\n  <!-- table -->\n  <rect x=\"660\" y=\"300\" width=\"400\" height=\"240\" rx=\"14\" fill=\"#ffffff\" stroke=\"#94a3b8\"/>\n  <text x=\"860\" y=\"328\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#0f172a\">Standard power at the PD</text>\n  <line x1=\"680\" y1=\"342\" x2=\"1040\" y2=\"342\" stroke=\"#cbd5e1\"/>\n  <text x=\"680\" y=\"365\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#334155\">Standard</text>\n  <text x=\"820\" y=\"365\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#334155\">PSE</text>\n  <text x=\"900\" y=\"365\" font-family=\"Arial, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#334155\">PD</text>\n  <text x=\"680\" y=\"392\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">802.3af Type 1</text>\n  <text x=\"820\" y=\"392\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">15.4 W</text>\n  <text x=\"900\" y=\"392\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">12.95 W</text>\n  <text x=\"680\" y=\"419\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">802.3at Type 2</text>\n  <text x=\"820\" y=\"419\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">30 W</text>\n  <text x=\"900\" y=\"419\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">25.5 W</text>\n  <text x=\"680\" y=\"446\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">802.3bt Type 3</text>\n  <text x=\"820\" y=\"446\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">60 W</text>\n  <text x=\"900\" y=\"446\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">51 W</text>\n  <text x=\"680\" y=\"473\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">802.3bt Type 4</text>\n  <text x=\"820\" y=\"473\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">90 W</text>\n  <text x=\"900\" y=\"473\" font-family=\"Arial, sans-serif\" font-size=\"12\" fill=\"#334155\">71.3 W</text>\n  <text x=\"680\" y=\"505\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#64748b\">Values are standard maxima, not a guarantee for every port.</text>\n\n  <!-- bottom -->\n  <rect x=\"40\" y=\"420\" width=\"580\" height=\"120\" rx=\"12\" fill=\"#ffffff\" stroke=\"#cbd5e1\"/>\n  <text x=\"60\" y=\"448\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#0f172a\">Budget check before deployment</text>\n  <text x=\"60\" y=\"474\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">Sum of allocated port power + reserve ≤ PSE budget</text>\n  <text x=\"60\" y=\"498\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">UPS must carry switch + PoE load, not only the switch CPU</text>\n  <text x=\"60\" y=\"522\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">A port that reboots under load is a power/cable symptom</text>\n\n  <text x=\"550\" y=\"590\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#64748b\">PoE is negotiated, budgeted and limited by copper physics — not just “plug and play”.</text>\n</svg></div><figcaption>PSE، PD، بودجهٔ توان و مسیر مسی PoE</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>دستگاه</th><th>استاندارد</th><th>توان PD</th><th>اولویت</th><th>نقش</th></tr></thead><tbody><tr><td>AP-01</td><td>802.3at</td><td>25.5 W</td><td>critical</td><td>Wi-Fi</td></tr><tr><td>Phone-01</td><td>802.3af</td><td>12.95 W</td><td>high</td><td>voice</td></tr><tr><td>Cam-01</td><td>802.3af</td><td>12.95 W</td><td>low</td><td>surveillance</td></tr><tr><td>Door-01</td><td>802.3bt</td><td>51 W</td><td>high</td><td>access control</td></tr><tr><td>Switch</td><td>PSE</td><td>370 W budget</td><td>—</td><td>source</td></tr></tbody></table></div>\n<p><strong>محاسبهٔ نمونه:</strong> ۱۰ AP × ۳۰ = ۳۰۰ وات، ۸ دوربین × ۱۵ = ۱۲۰ وات، جمع ۴۲۰ وات &gt; ۳۷۰. طراحی باید تعداد AP/دوربین یا سوئیچ/بودجه را تغییر دهد، یا allocation را کاهش دهد. اگر priority درست باشد، دوربین‌های کم‌اولویت در کمبود بودجه قطع می‌شوند، اما این یک رفتار اضطراری است، نه طراحی.</p>\n<p><strong>نکتهٔ آدرس‌دهی:</strong> PoE آدرس IP نمی‌دهد. AP/دوربین بعد از روشن شدن، DHCP/static می‌گیرند و در VLAN مربوط قرار می‌گیرند. اگر PoE سالم ولی VLAN/DHCP خراب باشد، دستگاه روشن است اما مدیریت/سرویس ندارد. این دو را جدا عیب‌یابی کن.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>این Objective مفهومی است؛ پیکربندی نمونه برای درک شاهد است، نه دستورالعمل تولیدی. <code>Designed — Not Run</code>.</p>\n<pre><code class=\"language-text\">! Cisco IOS-like; lab only\ninterface GigabitEthernet1/0/12\n switchport mode access\n switchport access vlan 10\n power inline auto\n power inline priority critical\n!\nshow power inline\nshow power inline GigabitEthernet1/0/12 detail\nshow power inline police</code></pre>\n<div class=\"table-wrap\"><table><thead><tr><th>هدف</th><th>Cisco-like</th><th>نکته</th></tr></thead><tbody><tr><td>فعال‌سازی auto</td><td><code>power inline auto</code></td><td>negotiation</td></tr><tr><td>توان ثابت</td><td><code>power inline static</code></td><td>PD بدون negotiation</td></tr><tr><td>غیرفعال</td><td><code>power inline never</code></td><td>پورت داده‌فقط</td></tr><tr><td>اولویت</td><td><code>power inline priority</code></td><td>critical/high/low</td></tr><tr><td>policing</td><td><code>power inline police</code></td><td>محدودیت مصرف</td></tr><tr><td>شاهد</td><td><code>show power inline</code></td><td>class/allocated/status</td></tr></tbody></table></div>\n<p>رویهٔ ایمن:</p>\n<ol><li>datasheet PD و PSE را بخوان؛ حداکثر و معمول توان.</li><li>بودجه را با reserve محاسبه کن.</li><li>priority را بر اساس حیاتی بودن تنظیم کن.</li><li>کابل Cat5e/6/6a و طول &lt;100m را بررسی کن.</li><li>UPS را برای بار کل sizing کن.</li><li>پس از نصب، <code>show power inline</code> و log دستگاه را ببین.</li><li>تغییر را مستند کن؛ allocation static زیاد می‌تواند بودجه را هدر دهد.</li></ol>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td><code>show power inline</code></td><td>status/class/allocated</td><td>کیفیت کابل</td></tr><tr><td><code>show interface status</code></td><td>link/speed</td><td>توان PD</td></tr><tr><td><code>show power inline police</code></td><td>محدودیت/خطا</td><td>سلامت دستگاه</td></tr><tr><td>AP/phone log</td><td>boot/service</td><td>PoE budget</td></tr><tr><td>multimeter/ tester</td><td>ولتاژ/زوج</td><td>استاندارد negotiation</td></tr><tr><td>UPS load</td><td>بار کل</td><td>زمان backup واقعی</td></tr><tr><td>temperature</td><td>گرمای دسته</td><td>توان مصرفی دقیق</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample shape, not a real device\nSwitch# show power inline GigabitEthernet1/0/12\nInterface  Admin  Oper   Power  Device  Class  Max\nGi1/0/12   auto   on     25.5W  Ieee PD 4      30.0W</code></pre>\n<p><strong>تأیید واقعی:</strong> فقط چراغ روشن کافی نیست. باید status <code>on</code>، class درست، allocated در بودجه، link up، DHCP/مدیریت دستگاه و log بدون boot loop را با هم ببینی. اگر دستگاه روشن است ولی join نمی‌شود، PoE را سالم فرض کن و لایه‌های شبکه/کنترلر را بررسی کن.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>پورت <code>off</code>/<code>denying</code></td><td>detection/بودجه/priority</td><td><code>show power inline</code></td><td>کابل/PD/budget</td></tr><tr><td>دستگاه مدام reboot</td><td>توان کم/class mismatch</td><td>log/allocated</td><td>class/استاندارد/کابل</td></tr><tr><td>فقط بعضی پورت‌ها</td><td>budget/priority</td><td>total allocated</td><td>طراحی/priority</td></tr><tr><td>AP روشن، join نه</td><td>VLAN/DHCP/controller</td><td>IP config/controller log</td><td>شبکه، نه PoE</td></tr><tr><td>دوربین روشن، تصویر نه</td><td>شبکه/کابل داده</td><td>ping/stream</td><td>data path</td></tr><tr><td>کابل داغ</td><td>جریان بالا/دسته</td><td>temperature</td><td>Cat6/تقسیم بار</td></tr><tr><td>طول &gt;100m</td><td>افت/داده</td><td>tester</td><td>کابل/فاصله</td></tr><tr><td>passive PD نسوخته</td><td>ولتاژ اشتباه</td><td>datasheet</td><td>injector مناسب</td></tr></tbody></table></div>\n<p><strong>دستگاه reboot می‌کند:</strong> اگر log AP <code>brownout</code>/<code>power</code> نشان دهد، احتمالاً allocation کمتر از نیاز است یا کابل افت دارد. <code>show power inline detail</code> و datasheet را مقایسه کن. <strong>Class mismatch</strong> وقتی است که PD کلاس بالا اعلام می‌کند ولی PSE فقط کلاس پایین می‌دهد؛ نتیجه می‌تواند کارکرد ناقص باشد.</p>\n<p><strong>Detection fail:</strong> کابل خراب، طول زیاد، PD غیراستاندارد یا پورت سوئیچ. با tester و یک PD سالم تست کن. <strong>Budget deny</strong> با <code>show power inline</code> total و priority دیده می‌شود؛ راه‌حل، کاهش بار یا افزایش بودجه است، نه غیرفعال کردن policing بدون تحلیل.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<ul><li><strong>Physical security</strong>: پورت PoE می‌تواند دستگاه غیرمجاز را روشن کند؛ 802.1X/port security و کنترل فیزیکی.</li><li><strong>Rogue PD</strong>: دوربین/AP ناشناس می‌تواند داده جمع کند؛ NAC/segmentation.</li><li><strong>Passive PoE</strong>: فقط با تجهیزات سازگار و مستند؛ خطر ولتاژ اشتباه.</li><li><strong>Power policing</strong>: محافظت از کابل/سوئیچ، اما می‌تواند سرویس حیاتی را قطع کند؛ threshold و exception.</li><li><strong>UPS</strong>: بار PoE را در طراحی باتری بگنجان؛ تست تخلیه دوره‌ای.</li><li><strong>Segmentation</strong>: AP/دوربین/IoT در VLAN جدا؛ مدیریت از شبکهٔ کاربر جدا.</li><li><strong>Firmware</strong>: AP/دوربین/سوئیچ patch؛ PoE firmware می‌تواند رفتار class را تغییر دهد.</li><li><strong>Monitoring</strong>: power budget، port status، temperature، UPS load و alert.</li></ul>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«PoE یعنی هر پورت ۳۰ وات می‌دهد.»</td><td>بودجهٔ کل و allocation مهم است.</td></tr><tr><td>«۸۰۲.۳af تا ۳۰ وات می‌دهد.»</td><td>af: 15.4W PSE / 12.95W PD.</td></tr><tr><td>«۸۰۲.۳bt روی هر کابل قدیمی کار می‌کند.»</td><td>۴-pair و کیفیت کابل لازم است.</td></tr><tr><td>«class یعنی مصرف دقیق.»</td><td>class محدوده است؛ LLDP/Autoclass دقیق‌تر.</td></tr><tr><td>«passive PoE امن است.»</td><td>بدون negotiation و خطر ولتاژ.</td></tr><tr><td>«PoE آدرس IP می‌دهد.»</td><td>DHCP/static جدا است.</td></tr><tr><td>«چراغ روشن یعنی سرویس سالم.»</td><td>join/DHCP/VLAN/controller جدا.</td></tr><tr><td>«UPS فقط برای سوئیچ است.»</td><td>بار PoE را هم باید تحمل کند.</td></tr><tr><td>«priority جای budget را می‌گیرد.»</td><td>priority فقط تخصیص در کمبود را مدیریت می‌کند.</td></tr></tbody></table></div>\n<p><strong>تصمیم آزمون:</strong> دستگاه روشن نمی‌شود → detection/budget/cable؛ reboot → power/class/cable؛ روشن ولی سرویس نه → شبکه/کنترلر؛ فقط بعضی پورت‌ها → budget/priority؛ کابل داغ → جریان/دسته.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>PoE توان و داده را روی یک کابل می‌فرستد؛ PSE منبع، PD مصرف‌کننده.</li><li>استانداردها: af 15.4/12.95، at 30/25.5، bt 60/51 و 90/71.3 وات.</li><li>af/at روی ۲ زوج؛ bt روی ۴ زوج؛ Alternative A/B مسیر توان را تعیین می‌کند.</li><li>detection امضای PD، classification کلاس، LLDP/CDP negotiation دقیق‌تر.</li><li>power budget مجموع توان PSE است؛ per-port allocation و priority تخصیص را مدیریت می‌کنند.</li><li>افت ولتاژ، طول ۱۰۰ متر، گرمای دسته و کیفیت کابل محدودیت فیزیکی می‌سازند.</li><li>UPS باید بار کل سوئیچ + PoE را تحمل کند.</li><li>عیب‌یابی: status/class/budget/cable را جدا از VLAN/DHCP/controller ببین.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>IEEE 802.3af — DTE Power via MDI — &lt;https://standards.ieee.org/ieee/802.3/7071/&gt;</td><td>Type 1 PoE</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>IEEE 802.3at — PoE+ — &lt;https://standards.ieee.org/ieee/802.3/7072/&gt;</td><td>Type 2 PoE</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>IEEE 802.3bt — 4-pair PoE — &lt;https://standards.ieee.org/ieee/802.3/7073/&gt;</td><td>Type 3/4 PoE</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>Cisco PoE configuration guide — &lt;https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst2960x/software/15-2_4_e/configuration_guide/pwr_cfg.html&gt;</td><td><code>power inline</code></td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>TIA-568 — cabling — &lt;https://tiaonline.org/&gt;</td><td>copper channel limits</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>هیچ سوئیچ، AP، دوربین یا injector واقعی اجرا نشده است؛ خروجی‌ها <code>Designed — Not Run</code> هستند.</li><li>اعداد توان حداکثر استانداردند؛ datasheet محصول می‌تواند متفاوت باشد.</li><li>فرمان‌های Cisco نمونه‌اند و روی همهٔ پلتفرم‌ها یکسان نیستند.</li><li>URLها snapshot/hash نشده‌اند و <code>PROVENANCE_NOT_VERIFIED</code> هستند.</li><li>طراحی نهایی نیاز به محاسبهٔ دقیق بار، بررسی گرمای کابل و تأیید برق‌کار دارد.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <a href=\"ccna-v11-1.2.a.html\">معماری two-tier: access و distribution</a> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "PoE",
+   "fa": "PoE",
+   "simple": "توان روی Ethernet."
+  },
+  {
+   "term": "PSE",
+   "fa": "PSE",
+   "simple": "منبع توان."
+  },
+  {
+   "term": "PD",
+   "fa": "PD",
+   "simple": "دستگاه مصرف‌کننده."
+  },
+  {
+   "term": "802.3af",
+   "fa": "802.3af",
+   "simple": "Type 1."
+  },
+  {
+   "term": "802.3at",
+   "fa": "802.3at",
+   "simple": "Type 2/PoE+."
+  },
+  {
+   "term": "802.3bt",
+   "fa": "802.3bt",
+   "simple": "Type 3/4/PoE++."
+  },
+  {
+   "term": "Type 1/2/3/4",
+   "fa": "Type 1/2/3/4",
+   "simple": "دسته‌بندی استاندارد."
+  },
+  {
+   "term": "Detection",
+   "fa": "Detection",
+   "simple": "شناسایی PD."
+  },
+  {
+   "term": "Classification",
+   "fa": "Classification",
+   "simple": "تعیین کلاس."
+  },
+  {
+   "term": "Class 0–4/5–8",
+   "fa": "Class 0–4/5–8",
+   "simple": "محدودهٔ توان."
+  },
+  {
+   "term": "LLDP",
+   "fa": "LLDP",
+   "simple": "negotiation لایه ۲."
+  },
+  {
+   "term": "CDP",
+   "fa": "CDP",
+   "simple": "پروتکل vendor برای discovery."
+  },
+  {
+   "term": "Power budget",
+   "fa": "Power budget",
+   "simple": "مجموع توان PSE."
+  },
+  {
+   "term": "Allocation",
+   "fa": "Allocation",
+   "simple": "رزرو توان پورت."
+  },
+  {
+   "term": "Priority",
+   "fa": "Priority",
+   "simple": "اولویت تخصیص."
+  },
+  {
+   "term": "Power policing",
+   "fa": "Power policing",
+   "simple": "محدودیت مصرف."
+  },
+  {
+   "term": "Alternative A/B",
+   "fa": "Alternative A/B",
+   "simple": "مسیر زوج‌ها."
+  },
+  {
+   "term": "Passive PoE",
+   "fa": "Passive PoE",
+   "simple": "بدون negotiation."
+  },
+  {
+   "term": "Voltage drop",
+   "fa": "Voltage drop",
+   "simple": "افت ولتاژ کابل."
+  },
+  {
+   "term": "UPS",
+   "fa": "UPS",
+   "simple": "برق اضطراری."
+  },
+  {
+   "term": "Bundle",
+   "fa": "Bundle",
+   "simple": "دستهٔ کابل و گرمای آن."
+  },
+  {
+   "term": "Midspan",
+   "fa": "Midspan",
+   "simple": "injector بین سوئیچ و PD."
+  },
+  {
+   "term": "Autoclass",
+   "fa": "Autoclass",
+   "simple": "تنظیم allocation بر اساس مصرف."
+  },
+  {
+   "term": "Brownout",
+   "fa": "Brownout",
+   "simple": "افت ولتاژ/برق ناکافی."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>این Objective مفهومی است؛ پیکربندی نمونه برای درک شاهد است، نه دستورالعمل تولیدی. <code>Designed — Not Run</code>.</p>\n<pre><code class=\"language-text\">! Cisco IOS-like; lab only\ninterface GigabitEthernet1/0/12\n switchport mode access\n switchport access vlan 10\n power inline auto\n power inline priority critical\n!\nshow power inline\nshow power inline GigabitEthernet1/0/12 detail\nshow power inline police</code></pre>\n<div class=\"table-wrap\"><table><thead><tr><th>هدف</th><th>Cisco-like</th><th>نکته</th></tr></thead><tbody><tr><td>فعال‌سازی auto</td><td><code>power inline auto</code></td><td>negotiation</td></tr><tr><td>توان ثابت</td><td><code>power inline static</code></td><td>PD بدون negotiation</td></tr><tr><td>غیرفعال</td><td><code>power inline never</code></td><td>پورت داده‌فقط</td></tr><tr><td>اولویت</td><td><code>power inline priority</code></td><td>critical/high/low</td></tr><tr><td>policing</td><td><code>power inline police</code></td><td>محدودیت مصرف</td></tr><tr><td>شاهد</td><td><code>show power inline</code></td><td>class/allocated/status</td></tr></tbody></table></div>\n<p>رویهٔ ایمن:</p>\n<ol><li>datasheet PD و PSE را بخوان؛ حداکثر و معمول توان.</li><li>بودجه را با reserve محاسبه کن.</li><li>priority را بر اساس حیاتی بودن تنظیم کن.</li><li>کابل Cat5e/6/6a و طول &lt;100m را بررسی کن.</li><li>UPS را برای بار کل sizing کن.</li><li>پس از نصب، <code>show power inline</code> و log دستگاه را ببین.</li><li>تغییر را مستند کن؛ allocation static زیاد می‌تواند بودجه را هدر دهد.</li></ol><h4>۸. تأیید و شاهد</h4><div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td><code>show power inline</code></td><td>status/class/allocated</td><td>کیفیت کابل</td></tr><tr><td><code>show interface status</code></td><td>link/speed</td><td>توان PD</td></tr><tr><td><code>show power inline police</code></td><td>محدودیت/خطا</td><td>سلامت دستگاه</td></tr><tr><td>AP/phone log</td><td>boot/service</td><td>PoE budget</td></tr><tr><td>multimeter/ tester</td><td>ولتاژ/زوج</td><td>استاندارد negotiation</td></tr><tr><td>UPS load</td><td>بار کل</td><td>زمان backup واقعی</td></tr><tr><td>temperature</td><td>گرمای دسته</td><td>توان مصرفی دقیق</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample shape, not a real device\nSwitch# show power inline GigabitEthernet1/0/12\nInterface  Admin  Oper   Power  Device  Class  Max\nGi1/0/12   auto   on     25.5W  Ieee PD 4      30.0W</code></pre>\n<p><strong>تأیید واقعی:</strong> فقط چراغ روشن کافی نیست. باید status <code>on</code>، class درست، allocated در بودجه، link up، DHCP/مدیریت دستگاه و log بدون boot loop را با هم ببینی. اگر دستگاه روشن است ولی join نمی‌شود، PoE را سالم فرض کن و لایه‌های شبکه/کنترلر را بررسی کن.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در PoE، PSE و PD به‌ترتیب چه نقشی دارند؟",
+   "promptHtml": "در PoE، PSE و PD به‌ترتیب چه نقشی دارند؟",
+   "options": [
+    "PSE مصرف‌کننده و PD منبع توان است",
+    "هر دو مصرف‌کننده‌اند",
+    "PSE منبع توان و PD دستگاه مصرف‌کننده است",
+    "PSE فقط داده و PD فقط برق است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "PSE تجهیزات تأمین توان (سوئیچ/injector) و PD دستگاه مصرف‌کننده (AP، تلفن، دوربین) است. برعکس بودن نقش‌ها، مصرف‌کننده بودن هر دو، یا جدا کردن کامل داده/برق با تعریف PoE سازگار نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "حداکثر توان تضمین‌شده برای PD در 802.3af چقدر است؟",
+   "promptHtml": "حداکثر توان تضمین‌شده برای PD در 802.3af چقدر است؟",
+   "options": [
+    "12.95 W",
+    "15.4 W",
+    "25.5 W",
+    "51 W"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "802.3af حداکثر 15.4W در PSE و 12.95W در PD تضمین می‌کند. 15.4W سمت PSE است، 25.5W مربوط به 802.3at و 51W مربوط به 802.3bt Type 3 است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام ویژگی 802.3bt را از 802.3at متمایز می‌کند؟",
+   "promptHtml": "کدام ویژگی 802.3bt را از 802.3at متمایز می‌کند؟",
+   "options": [
+    "فقط روی فیبر کار می‌کند",
+    "استفاده از هر چهار زوج و توان بالاتر",
+    "حذف کامل detection",
+    "محدودیت ۱۰ متری کابل"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "802.3bt از چهار زوج برای توان بالاتر (Type 3/4) استفاده می‌کند؛ 802.3at معمولاً دو زوج است. bt روی فیبر نیست، detection را حذف نمی‌کند و محدودیت ۱۰ متری ندارد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "یک AP PoE روشن نمی‌شود. اولین شاهد کدام است؟",
+   "promptHtml": "یک AP PoE روشن نمی‌شود. اولین شاهد کدام است؟",
+   "options": [
+    "تنظیمات DNS",
+    "جدول route",
+    "TLS certificate",
+    "وضعیت show power inline و link پورت"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "برای دستگاه بدون برق، ابتدا status پورت PoE (detection/deny/on)، link و کابل را ببین. DNS، route و certificate بعد از روشن شدن و در لایه‌های بالاتر مهم می‌شوند و روشن نشدن را توضیح نمی‌دهند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "اگر مجموع allocation پورت‌ها از power budget بیشتر شود، چه انتظاری منطقی است؟",
+   "promptHtml": "اگر مجموع allocation پورت‌ها از power budget بیشتر شود، چه انتظاری منطقی است؟",
+   "options": [
+    "همهٔ پورت‌ها همیشه حداکثر توان می‌گیرند",
+    "سوئیچ حتماً می‌سوزد",
+    "پورت‌های کم‌اولویت ممکن است برق نگیرند یا deny شوند",
+    "PoE به‌طور خودکار ۹۰ وات می‌دهد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "PSE نمی‌تواند بیش از بودجه توان بدهد؛ در کمبود، priority تعیین می‌کند کدام پورت‌ها برق بگیرند و کم‌اولویت‌ها ممکن است deny/قطع شوند. سوختن سوئیچ یا افزایش خودکار توان به ۹۰ وات تضمین‌شده نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا detection پیش از اعمال توان کامل انجام می‌شود؟",
+   "promptHtml": "چرا detection پیش از اعمال توان کامل انجام می‌شود؟",
+   "options": [
+    "برای جلوگیری از آسیب به دستگاه غیر-PoE",
+    "برای تخصیص IP",
+    "برای رمزنگاری داده",
+    "برای انتخاب VLAN"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "PSE با ولتاژ کم امضای PD را بررسی می‌کند تا فقط به دستگاه معتبر توان بدهد و دستگاه غیر-PoE آسیب نبیند. IP، رمزنگاری و VLAN کار لایه‌های دیگرند و به detection مربوط نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "محدودیت طول کانال برای کابل مسی Ethernet معمولاً چقدر است؟",
+   "promptHtml": "محدودیت طول کانال برای کابل مسی Ethernet معمولاً چقدر است؟",
+   "options": [
+    "10 متر",
+    "100 متر",
+    "500 متر",
+    "2 کیلومتر"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "کانال مسی Ethernet معمولاً تا 100 متر (شامل patch cordها) طراحی می‌شود. 10 متر بسیار کوتاه، 500 متر و 2 کیلومتر خارج از محدودهٔ استاندارد copper Ethernet هستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "LLDP/CDP در PoE چه نقشی می‌توانند داشته باشند؟",
+   "promptHtml": "LLDP/CDP در PoE چه نقشی می‌توانند داشته باشند؟",
+   "options": [
+    "تعیین VLAN مدیریت",
+    "رمزنگاری کابل",
+    "جایگزینی UPS",
+    "اعلام/negotiation نیاز توان بین PSE و PD"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "LLDP/CDP می‌توانند اطلاعات توان و قابلیت‌ها را بین PSE و PD مبادله کنند و allocation را دقیق‌تر کنند. VLAN، رمزنگاری و UPS نقش‌های جدا دارند و با این negotiation یکسان نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "خطر اصلی passive PoE چیست؟",
+   "promptHtml": "خطر اصلی passive PoE چیست؟",
+   "options": [
+    "همیشه سرعت را کم می‌کند",
+    "فقط روی فیبر کار می‌کند",
+    "بدون negotiation ولتاژ ثابت اعمال می‌کند و می‌تواند دستگاه ناسازگار را آسیب بزند",
+    "به UPS نیاز ندارد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "passive PoE معمولاً detection/negotiation ندارد و ولتاژ ثابت می‌دهد؛ اتصال PD ناسازگار می‌تواند آسیب‌زا باشد. کاهش سرعت، فیبر و UPS توضیح خطر اصلی passive نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "برای sizing UPS در یک سوئیچ PoE، کدام بار باید لحاظ شود؟",
+   "promptHtml": "برای sizing UPS در یک سوئیچ PoE، کدام بار باید لحاظ شود؟",
+   "options": [
+    "فقط CPU سوئیچ",
+    "بار سوئیچ به‌همراه توان PoE دستگاه‌ها",
+    "فقط دستگاه‌های بی‌سیم",
+    "فقط روشنایی اتاق"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "UPS باید بار کل شامل مصرف سوئیچ و توان PoE (AP، تلفن، دوربین) را تحمل کند. فقط CPU، فقط Wi-Fi یا روشنایی، بار واقعی را کم‌برآورد می‌کند و در قطع برق سرویس از دست می‌رود.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "دوربین PoE روشن است اما زیر بار سنگین reboot می‌کند. محتمل‌ترین علت چیست؟",
+   "promptHtml": "دوربین PoE روشن است اما زیر بار سنگین reboot می‌کند. محتمل‌ترین علت چیست؟",
+   "options": [
+    "توان/کابل برای peak مصرف کافی نیست",
+    "DNS record اشتباه است",
+    "VLAN trunk نیست",
+    "certificate منقضی است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "reboot زیر بار به افت توان/ولتاژ یا allocation کمتر از peak مصرف اشاره دارد؛ heater/IR دوربین می‌تواند مصرف را بالا ببرد. DNS، trunk و certificate برق را قطع نمی‌کنند و نشانهٔ reboot را توضیح نمی‌دهند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "power policing در PoE چه کاری انجام می‌دهد؟",
+   "promptHtml": "power policing در PoE چه کاری انجام می‌دهد؟",
+   "options": [
+    "اولویت پورت‌ها را تعیین می‌کند",
+    "همیشه توان را به حداکثر می‌رساند",
+    "detection را غیرفعال می‌کند",
+    "مصرف بیش از حد مجاز را محدود یا پورت را قطع می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "power policing مصرف واقعی را زیر آستانه نگه می‌دارد و در اضافه‌مصرف پورت را محدود/قطع می‌کند. priority تخصیص را مدیریت می‌کند، حداکثر کردن توان و غیرفعال کردن detection رفتار policing نیستند.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}

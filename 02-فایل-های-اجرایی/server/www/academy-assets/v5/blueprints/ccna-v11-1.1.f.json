@@ -1,0 +1,414 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccna-v11-1.1.f",
+ "objectiveId": "1.1.f",
+ "kind": "objective",
+ "track": "FAM Curriculum 5.0",
+ "course": "ccna-v11",
+ "title": "Endpoint: نقطهٔ شروع و پایان شاهد",
+ "titleEn": "Explain — endpoints",
+ "domain": "1.0 Network Fundamentals",
+ "source": "content/lessons/ccna-v11-1.1.f.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 55,
+ "prerequisites": [
+  "academy-stage-zero-06-client-server-fa",
+  "ccna-v11-1.1.b",
+  "ccna-v11-1.1.d"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "academy-stage-zero-06-client-server-fa",
+   "ccna-v11-1.1.b",
+   "ccna-v11-1.1.d"
+  ],
+  "learningObjectives": [
+   "default gateway",
+   "ARP",
+   "DNS",
+   "DHCP",
+   "802.1X",
+   "socket",
+   "MTU",
+   "IPv6",
+   "proxy",
+   "duplicate IP",
+   "captive portal",
+   "evidence"
+  ]
+ },
+ "whyItMatters": "در یک سازمان ۲۰۰ کاربره، فقط کاربر یکی از اتاق‌ها نمی‌تواند به سامانهٔ حضور و غیاب وصل شود. سه همکار دیگر در همان اتاق هستند و سالم کار می‌کنند. کاربر می‌گوید «اینترنت من قطع است»، ولی مرورگر یک صفحهٔ داخلی را باز می‌کند و فقط سامانهٔ حضور خطا می‌دهد. از سمت شبکه، سوئیچ همان پورت را up نشان می‌دهد، VLAN درست است و بقیهٔ کاربران همان VLAN سالم‌اند. مسئله کجاست؟ پاسخ در endpoint است: رایانه‌ای که کاربر با آن کار می‌کند و جایی که ارتباط شروع یا تمام می‌شود. endpoint فقط «مصرف‌کننده» نیست؛ منبع شاهد هم هست. تنظیم IP، mask، gateway، DNS، proxy، firewall میزبان، ساعت سیستم، گواهی TLS، وضعیت 802.1X و",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>در یک سازمان ۲۰۰ کاربره، فقط کاربر یکی از اتاق‌ها نمی‌تواند به سامانهٔ حضور و غیاب وصل شود. سه همکار دیگر در همان اتاق هستند و سالم کار می‌کنند. کاربر می‌گوید «اینترنت من قطع است»، ولی مرورگر یک صفحهٔ داخلی را باز می‌کند و فقط سامانهٔ حضور خطا می‌دهد. از سمت شبکه، سوئیچ همان پورت را up نشان می‌دهد، VLAN درست است و بقیهٔ کاربران همان VLAN سالم‌اند. مسئله کجاست؟</p>\n<p>پاسخ در <strong>endpoint</strong> است: رایانه‌ای که کاربر با آن کار می‌کند و جایی که ارتباط شروع یا تمام می‌شود. endpoint فقط «مصرف‌کننده» نیست؛ منبع شاهد هم هست. تنظیم IP، mask، gateway، DNS، proxy، firewall میزبان، ساعت سیستم، گواهی TLS، وضعیت 802.1X و حتی یک VPN نیمه‌فعال می‌توانند ارتباط را بشکنند، در حالی که شبکهٔ میانی سالم است. اگر عیب‌یابی را از سوئیچ شروع کنی، ممکن است ساعت‌ها در لایه‌ای بگردی که مشکل ندارد.</p>\n<p>این Objective می‌گوید endpoint چیست، از چه لایه‌هایی ساخته می‌شود، چگونه آدرس و مسیر می‌گیرد و چطور باید شاهد جمع کرد. مرز مهم: <strong>endpoint بودن به نقش ارتباطی وابسته است، نه به اندازهٔ دستگاه.</strong> لپ‌تاپ، گوشی، چاپگر، دوربین، سرور، ماشین مجازی و container همگی می‌توانند endpoint باشند. یک سرور وب برای کاربران endpoint مقصد است، اما همان سرور وقتی به DNS مراجعه می‌کند خودش endpoint مبدأ است.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>endpoint را به‌صورت شش لایهٔ پشت‌سرهم ببین که هر لایه شاهد جداگانه دارد:</p>\n<ol><li><strong>لایهٔ فیزیکی/NIC</strong> — کابل، پورت، سرعت، duplex، Wi-Fi association، وضعیت carrier، درایور.</li><li><strong>لایهٔ هویت لایه ۲</strong> — MAC، VLAN، 802.1X، port security، MAC randomization.</li><li><strong>لایهٔ هویت و مسیر لایه ۳</strong> — IP، mask، on-link بودن مقصد، gateway، ARP/ND، جدول route.</li><li><strong>لایهٔ نام</strong> — DNS server، search suffix، hosts file، split DNS، DoH/DoT.</li><li><strong>لایهٔ انتقال</strong> — socket، port مبدأ/مقصد، TCP/UDP، MTU/MSS، NAT.</li><li><strong>لایهٔ کاربرد و اعتماد</strong> — process، proxy/PAC، TLS trust، زمان، احراز هویت، policy میزبان.</li></ol>\n<p>این ترتیب یک <strong>نردبان شاهد</strong> می‌سازد. هر پله را می‌توان جدا اندازه گرفت:</p>\n<ul><li>E1: link/carrier و سرعت/duplex.</li><li>E2: IP، mask، gateway و ARP.</li><li>E3: name resolution.</li><li>E4: TCP/UDP port و socket.</li><li>E5: route، NAT، ACL/security policy.</li><li>E6: application، TLS، authentication و log.</li></ul>\n<p><code>ping</code> بخشی از E1–E3 را تأیید می‌کند، اما E4–E6 را نه. به همین دلیل جملهٔ «ping کار می‌کند، پس سرویس سالم است» غلط است. ping ممکن است به IP برسد، در حالی که هیچ listener روی 443 نیست، گواهی TLS منقضی است، proxy درخواست را رد می‌کند یا host firewall برنامه را block کرده است.</p>\n<p><strong>جهت ترافیک</strong> را هم جدا کن. در ارتباط north-south، endpoint کاربر به سرویس مرکزی وصل می‌شود. در east-west، دو endpoint یا دو سرویس داخلی با هم حرف می‌زنند. در هر دو، endpoint مبدأ باید تصمیم بگیرد که مقصد on-link است یا باید به gateway برود. این تصمیم با <strong>mask</strong> گرفته می‌شود، نه با DNS و نه با default gateway به‌تنهایی.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>Endpoint / End system</td><td>مبدأ یا مقصد نهایی یک flow</td><td>«endpoint فقط PC است»</td></tr><tr><td>Host</td><td>دستگاه دارای پشتهٔ IP</td><td>«host و server متضادند»</td></tr><tr><td>NIC</td><td>کارت/کنترلر شبکه و درایور</td><td>«NIC فقط پورت فیزیکی است»</td></tr><tr><td>MAC address</td><td>شناسهٔ لایه ۲ در segment</td><td>«MAC آدرس جهانی و همیشگی است»</td></tr><tr><td>IP address</td><td>شناسهٔ لایه ۳</td><td>«IP هویت کاربر است»</td></tr><tr><td>Subnet mask / prefix</td><td>مرز on-link</td><td>«mask فقط برای subnetting است»</td></tr><tr><td>Default gateway</td><td>hop بعدی برای مقصد off-link</td><td>«gateway همان DNS است»</td></tr><tr><td>On-link</td><td>مقصد در همان subnet</td><td>«هر مقصدی که ping شود on-link است»</td></tr><tr><td>ARP</td><td>نگاشت IPv4 به MAC در LAN</td><td>«ARP برای route بین شبکه‌هاست»</td></tr><tr><td>ND / NDP</td><td>ARP، DAD و discovery در IPv6</td><td>«IPv6 اصلاً broadcast/ARP ندارد، پس discovery هم ندارد»</td></tr><tr><td>DNS</td><td>نگاشت نام به آدرس</td><td>«DNS مسیر را انتخاب می‌کند»</td></tr><tr><td>DHCP</td><td>تخصیص IP/gateway/DNS</td><td>«DHCP اتصال را تضمین می‌کند»</td></tr><tr><td>Socket</td><td>IP + port + protocol</td><td>«socket همان URL است»</td></tr><tr><td>Ephemeral port</td><td>port موقت سمت client</td><td>«port مبدأ همیشه 443 است»</td></tr><tr><td>Proxy / PAC</td><td>واسط و فایل policy</td><td>«proxy فقط در مرورگر اثر دارد»</td></tr><tr><td>802.1X</td><td>احراز هویت لایه ۲</td><td>«802.1X رمزنگاری داده است»</td></tr><tr><td>NAC / Posture</td><td>کنترل وضعیت امنیتی دستگاه</td><td>«NAC فقط VLAN را عوض می‌کند»</td></tr><tr><td>Captive portal</td><td>صفحهٔ ورود/پذیرش پیش از دسترسی</td><td>«captive portal یک مشکل DNS است»</td></tr><tr><td>MTU / MSS</td><td>اندازهٔ بسته/segment</td><td>«MTU فقط روی روتر مهم است»</td></tr><tr><td>VPN / Split tunnel</td><td>تونل و انتخاب مسیر</td><td>«VPN همهٔ ترافیک را همیشه می‌برد»</td></tr><tr><td>APIPA</td><td>169.254.0.0/16 خودکار</td><td>«APIPA یک آدرس معتبر سازمانی است»</td></tr><tr><td>Duplicate IP</td><td>دو دستگاه با یک IPv4</td><td>«duplicate IP همیشه کل شبکه را می‌خواباند»</td></tr></tbody></table></div>\n<p><strong>مرزهای مهم:</strong></p>\n<ul><li><strong>endpoint ≠ user.</strong> یک کاربر می‌تواند چند دستگاه داشته باشد؛ یک دستگاه می‌تواند چند کاربر داشته باشد.</li><li><strong>endpoint ≠ server.</strong> نقش در هر flow تعیین می‌شود؛ سرور هم client است وقتی به DNS/DB وصل می‌شود.</li><li><strong>IP ≠ identity.</strong> NAT، DHCP و VPN باعث می‌شوند یک IP ثابت به یک انسان نسبت داده نشود؛ برای هویت از 802.1X، certificate، user ID و log استفاده کن.</li><li><strong>DNS ≠ route.</strong> DNS فقط نام را به آدرس تبدیل می‌کند؛ تصمیم مسیر با stack و routing table است.</li><li><strong>gateway ≠ DNS.</strong> ممکن است یک دستگاه هر دو نقش را داشته باشد، اما این دو service مستقل‌اند.</li><li><strong>Wi-Fi signal ≠ quality.</strong> نویز، congestion، retry، roaming و channel width می‌توانند با signal خوب هم کیفیت را خراب کنند.</li></ul>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. آدرس‌گیری: از boot تا lease</h3>\n<p>endpoint معمولاً یکی از این دو مسیر را دارد:</p>\n<ul><li><strong>DHCP</strong>: دستگاه با broadcast (IPv4) درخواست می‌دهد؛ سرور با DORA پاسخ می‌دهد: Discover، Offer، Request، Acknowledge. نتیجه یک lease با IP، mask، gateway، DNS، lease time و گاهی optionهای proxy/PAC، NTP، domain و MTU است.</li><li><strong>Static</strong>: ادمین IP/mask/gateway/DNS را دستی می‌دهد. مناسب سرور، چاپگر، تجهیزات شبکه و endpointهایی که باید پیش‌بینی‌پذیر باشند.</li></ul>\n<p>در DHCP، چند نکتهٔ عملی مهم است:</p>\n<ul><li><strong>Lease renewal</strong>: client معمولاً در نیمهٔ lease (T1) renew و در ۸۷.۵٪ (T2) rebind می‌کند. قطعی کوتاه DHCP باعث قطع دائمی نمی‌شود تا زمانی که lease معتبر است.</li><li><strong>Scope exhaustion</strong>: اگر pool تمام شود، client ممکن است APIPA بگیرد یا در حالت Discover بماند. نشانهٔ آن در Windows، آدرس <code>169.254.x.x</code> است.</li><li><strong>Reservation</strong>: برای چاپگر/دوربین با MAC ثابت، رزرو در DHCP بهتر از static دستی است؛ اما اگر MAC عوض شود (Wi-Fi randomization، تعویض NIC)، رزرو هم می‌شکند.</li><li><strong>Duplicate address</strong>: سرور باید قبل از offer، آدرس را probe کند؛ در شبکهٔ شلوغ، static اشتباه می‌تواند با pool تصادم کند. IPv4 DAD کامل نیست؛ ARP probe و log بهترین شاهدند.</li><li><strong>DHCP relay</strong>: اگر سرور در subnet دیگری است، relay/helper باید gateway آن subnet را به سرور برساند. بدون relay، Discover از subnet عبور نمی‌کند.</li><li><strong>Rogue DHCP</strong>: یک DHCP ناشناس می‌تواند gateway/DNS غلط بدهد. DHCP snooping و trusted port فقط در سوئیچ، منبع را کنترل می‌کند؛ endpoint باید پاسخ را با شاهد بررسی کند.</li></ul>\n<p>IPv6 مسیر متفاوتی دارد: RA (Router Advertisement) پیشوند و default gateway می‌دهد؛ M/O flag تعیین می‌کند SLAAC یا DHCPv6 استفاده شود. endpoint می‌تواند هم link-local (<code>fe80::/10</code>) و هم global/ULA داشته باشد. link-local برای ND و next-hop کافی است، اما برای عبور از روتر نیاز به global/ULA و route دارد. <strong>NDP</strong> جای ARP را می‌گیرد: Neighbor Solicitation/Advertisement، Router Solicitation/Advertisement و Duplicate Address Detection.</p>\n<h3>۴.۲. تصمیم on-link و gateway</h3>\n<p>endpoint برای هر مقصد این کار را می‌کند:</p>\n<ol><li>IP مقصد را با mask خودش AND می‌کند.</li><li>اگر نتیجه برابر subnet محلی بود، مقصد on-link است؛ مستقیماً ARP/ND می‌زند.</li><li>اگر off-link بود، MAC مربوط به <strong>default gateway</strong> را می‌پرسد و فریم را به gateway می‌دهد.</li><li>TTL را کاهش می‌دهد؛ روتر مسیر بعدی را انتخاب می‌کند.</li></ol>\n<p>نکتهٔ کلیدی: endpoint <strong>مسیر کامل</strong> را نمی‌داند. فقط می‌داند «مقصد محلی است» یا «به gateway بده». اگر gateway در subnet نباشد یا ARP جواب ندهد، حتی با route درست روی روتر، ارتباط برقرار نمی‌شود.</p>\n<p><strong>ARP</strong> در IPv4:</p>\n<ul><li>Request به broadcast (<code>ff:ff:ff:ff:ff:ff</code>) می‌رود؛ Reply unicast است.</li><li>ARP cache aging دارد؛ ورودی قدیمی ممکن است پس از تغییر MAC باعث blackhole موقت شود.</li><li>Gratuitous ARP برای اعلام تغییر آدرس/MAC استفاده می‌شود؛ اما قابل جعل است.</li><li>Proxy ARP باعث می‌شود یک روتر به‌جای مقصد دور پاسخ دهد؛ می‌تواند troubleshooting را گمراه کند.</li></ul>\n<p><strong>ICMP Redirect</strong> وقتی رخ می‌دهد که gateway می‌بیند مسیر بهتری در همان subnet وجود دارد و به host اطلاع می‌دهد. بسیاری از شبکه‌ها آن را غیرفعال می‌کنند؛ نبودنش مشکل نیست، ولی دیدنش نشانهٔ طراحی غیربهینه است.</p>\n<p><strong>FHRP</strong> (HSRP/VRRP/GLBP) یک IP و MAC مجازی به endpoint می‌دهد. endpoint متوجه نمی‌شود کدام روتر فعال است؛ در عیب‌یابی باید MAC مجازی و وضعیت FHRP را شناخت. اگر ARP برای IP مجازی جواب ندهد، احتمالاً هر دو روتر مشکل دارند یا گروه اشتباه است.</p>\n<h3>۴.۳. نام و مسیر name resolution</h3>\n<p>DNS یک سرویس جدا از route است. endpoint معمولاً یک <strong>stub resolver</strong> دارد که به DNS server(s) می‌پرسد. موارد مهم:</p>\n<ul><li><strong>Search suffix</strong>: <code>intranet</code> ممکن است به <code>intranet.corp.example</code> تبدیل شود. suffix اشتباه = نام resolve نمی‌شود.</li><li><strong>DNS server order</strong>: چند server با timeout و failover؛ اگر اولی بی‌پاسخ باشد، درخواست کند می‌شود.</li><li><strong>Split DNS</strong>: نام داخلی در DNS داخلی و نام عمومی در DNS بیرونی؛ VPN باید resolver درست را بدهد.</li><li><strong>hosts file</strong>: بالاتر از DNS؛ یک ورودی قدیمی می‌تواند نام را به IP غلط ببرد.</li><li><strong>mDNS/LLMNR/NBNS</strong>: برای نام‌های محلی؛ در شبکه‌های بزرگ نویز و امنیت پایین دارند.</li><li><strong>DoH/DoT</strong>: ترافیک DNS را رمزنگاری می‌کند؛ برای firewall و مانیتورینگ، دید را کم می‌کند.</li><li><strong>DNS rebinding / poisoning</strong>: اعتماد به پاسخ DNS بدون DNSSEC در شبکهٔ باز خطرناک است.</li></ul>\n<p><strong>ترتیب تصمیم در endpoint:</strong> application نام را می‌دهد؛ resolver hosts، cache، DNS serverها و suffixها را امتحان می‌کند. اگر نام resolve شد، تازه نوبت به route/port می‌رسد. اگر resolve نشد، هر تلاش برای ping به IP ممکن است موفق باشد و این دو را نباید قاطی کرد.</p>\n<h3>۴.۴. socket، port و MTU</h3>\n<p>یک connection با <strong>۵-tuple</strong> شناخته می‌شود: protocol، IP مبدأ، port مبدأ، IP مقصد، port مقصد. client معمولاً port مبدأ ephemeral (مثلاً 49152–65535 در بسیاری از سیستم‌ها) و port مقصد سرویس (443) را دارد. server روی port مقصد listen می‌کند.</p>\n<ul><li><strong>TCP handshake</strong>: SYN → SYN/ACK → ACK. اگر SYN برود و پاسخ نیاید: route/firewall/down. اگر RST بیاید: host reachable اما listener نیست یا policy reject می‌کند.</li><li><strong>UDP</strong>: بدون handshake؛ نبود پاسخ می‌تواند packet loss، firewall drop یا سرویس down باشد. برای DNS/QUIC/VoIP باید timeout و retry را در نظر گرفت.</li><li><strong>MTU/MSS</strong>: اگر path MTU کوچک‌تر از بسته باشد و DF set باشد، بسته drop می‌شود. نشانهٔ کلاسیک: ping کوچک کار می‌کند، TLS handshake یا دانلود بزرگ گیر می‌کند. <strong>PMTUD</strong> با ICMP «fragmentation needed» کار می‌کند؛ اگر ICMP block شود، black hole ایجاد می‌شود. MSS clamping روی روتر/L3 device یکی از راه‌حل‌های رایج است.</li><li><strong>NAT timeout</strong>: NAT جدول flow را با timeout نگه می‌دارد؛ connection بی‌استفاده ممکن است قطع شود و application باید reconnect کند.</li><li><strong>Ephemeral port exhaustion</strong>: روی سرورهای پرترافیک یا NAT gateway، تعداد port محدود می‌شود؛ نشانه‌اش خطای intermittent connection است.</li></ul>\n<h3>۴.۵. کاربرد، proxy و اعتماد</h3>\n<p>لایهٔ آخر، جایی است که بیشتر «شبکه سالم است ولی کار نمی‌کند» رخ می‌دهد:</p>\n<ul><li><strong>Proxy</strong>: مرورگر یا سیستم‌عامل می‌تواند HTTP/HTTPS را به proxy بفرستد. PAC یک فایل JavaScript است که تصمیم می‌گیرد چه ترافیکی proxy شود. PAC قدیمی/غیرقابل‌دسترس = timeout یا خطای policy.</li><li><strong>TLS trust</strong>: endpoint باید CA مربوط را trust کند، نام گواهی با URL بخواند و زمان سیستم درست باشد. ساعت غلط = certificate not yet valid/expired.</li><li><strong>Captive portal</strong>: قبل از دسترسی، یک صفحهٔ ورود/پذیرش نمایش داده می‌شود. DNS ممکن است به IP portal پاسخ دهد یا HTTP redirect شود؛ این را با DNS خراب اشتباه نگیر.</li><li><strong>802.1X</strong>: supplicant با EAP احراز هویت می‌کند؛ اگر identity/certificate/posture درست نباشد، سوئیچ پورت را در VLAN quarantine یا unauthorized نگه می‌دارد.IP ممکن است بگیرد اما به سرویس نرسد.</li><li><strong>VPN</strong>: split tunnel فقط subnetهای مشخص را به تونل می‌فرستد؛ full tunnel همه را. اگر route تونل با route محلی تعارض داشته باشد، رفتار می‌تواند غیرمنتظره باشد. MTU تونل هم کوچک‌تر است.</li><li><strong>Host firewall/EDR</strong>: policy میزبان می‌تواند process را block کند، حتی وقتی network اجازه می‌دهد. log میزبان و network باید هم‌زمان دیده شوند.</li><li><strong>Application authentication</strong>: login، token، SSO، MFA و license می‌توانند مستقل از شبکه شکست بخورند.</li></ul>\n<h3>۴.۶. endpointهای مجازی و wireless</h3>\n<ul><li><strong>VM</strong>: vNIC با MAC مجازی؛ حالت bridged مثل endpoint فیزیکی در LAN است؛ NAT مسیر را از hypervisor می‌گیرد؛ host-only فقط با host/VMهای دیگر حرف می‌زند. MAC randomization و duplicate MAC در cloneها شایع است.</li><li><strong>Container</strong>: network namespace جدا، veth pair، bridge overlay؛ از دید شبکه یک endpoint با IP/MAC است، اما lifecycle کوتاه‌تر و IP ephemeral دارد.</li><li><strong>Wi-Fi endpoint</strong>: association، authentication (WPA2/WPA3)، DHCP، roaming بین APها. Roaming می‌تواند session را قطع کند؛ 802.11r/k/v کمک می‌کند اما تضمین مطلق نیست. قدرت سیگنال پایین، retry و co-channel interference باعث latency و packet loss می‌شوند.</li><li><strong>IoT/Printer</strong>: firmware قدیمی، TLS ضعیف، multicast/broadcast، sleep mode و IP ثابت دستی؛ اغلب منبع خطاهای عجیب‌اند.</li></ul>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریوی درس:</p>\n<ul><li>PC1: <code>10.10.10.50/24</code>، gateway <code>10.10.10.1</code>، DNS <code>10.10.10.53</code></li><li>Server: <code>10.10.20.10</code>، سرویس HTTPS روی 443</li><li>Access switch: VLAN 10، پورت <code>Gi1/0/5</code></li><li>کاربر: «صفحهٔ سامانه باز نمی‌شود؛ بقیه در همان اتاق سالم‌اند.»</li></ul>\n<p>گام‌های کنترل‌شده:</p>\n<ol><li><strong>E1 — link/NIC</strong>: کابل/Wi-Fi، carrier، speed/duplex، خطای CRC/retry. اگر link down است، IP و DNS را بررسی نکن.</li><li><strong>E2 — IP/mask/gateway</strong>: <code>ipconfig /all</code> یا <code>ip addr</code>؛ آدرس در VLAN درست؟ mask با subnet می‌خواند؟ gateway در همان subnet است؟ APIPA؟</li><li><strong>E2b — ARP/ND</strong>: <code>arp -a</code> یا <code>ip neigh</code>؛ gateway MAC resolve می‌شود؟ MAC تکراری/نوسانی؟</li><li><strong>E3 — DNS</strong>: <code>nslookup</code>/<code>dig</code> با server مشخص؛ نام به IP مورد انتظار می‌رسد؟ suffix درست است؟</li><li><strong>E4 — port</strong>: <code>Test-NetConnection host -Port 443</code> یا <code>nc -vz</code>؛ SYN پاسخ می‌گیرد؟ RST یا timeout؟</li><li><strong>E5 — route/policy/NAT</strong>: <code>tracert</code>/<code>traceroute</code>، route table، firewall log، NAT translation. مسیر برگشت هم دیده می‌شود؟</li><li><strong>E6 — app/TLS/auth</strong>: <code>curl -vk</code>، certificate، زمان، proxy/PAC، login، log سرویس.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>شاهد</th><th>اگر شکست بخورد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>E1</td><td>carrier/سرعت/duplex</td><td>کابل/پورت/Wi-Fi</td><td>کابل/پورت را عوض کن، تنظیم را ثبت کن</td></tr><tr><td>E2</td><td>IP/mask/gateway</td><td>DHCP/static/VLAN</td><td>lease را renew یا تنظیم را با تأیید اصلاح کن</td></tr><tr><td>E2b</td><td>ARP/ND</td><td>gateway/MAC تکراری</td><td>ARP cache را پاک کن، MAC را پیدا کن</td></tr><tr><td>E3</td><td>DNS answer</td><td>DNS/suffix/firewall</td><td>server درست را تست کن، suffix را بررسی کن</td></tr><tr><td>E4</td><td>TCP handshake</td><td>listener/policy</td><td><code>ss -lntp</code> و firewall log</td></tr><tr><td>E5</td><td>route/NAT/log</td><td>مسیر/ACL/NAT</td><td>route و return path را با هم ببین</td></tr><tr><td>E6</td><td>TLS/HTTP/auth</td><td>cert/time/proxy/app</td><td>cert/time/PAC/log را جدا کن</td></tr></tbody></table></div>\n<p><strong>قاعدهٔ طلایی:</strong> در هر گام فقط یک متغیر را عوض کن و قبل/بعد را ثبت کن. اگر همزمان DNS، proxy و firewall را تغییر دهی، دیگر نمی‌دانی کدام مؤثر بود.</p>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 650\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Endpoint stack and the five evidence points between a client and a service</title>\n  <desc id=\"desc\">A laptop contains applications, a TCP/IP stack and a NIC. It connects through an access switch with 802.1X to a default gateway and a server. DHCP, DNS and proxy services support the endpoint. Six numbered evidence points show where to verify link, address, gateway, name resolution, transport and application policy.</desc>\n  <defs>\n    <marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"5\" orient=\"auto\">\n      <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#334155\"/>\n    </marker>\n    <marker id=\"arrowBlue\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"5\" orient=\"auto\">\n      <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#1d4ed8\"/>\n    </marker>\n  </defs>\n  <rect width=\"1100\" height=\"650\" fill=\"#f8fafc\"/>\n  <text x=\"550\" y=\"34\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#0f172a\">Endpoint: where the user, the stack and the evidence meet</text>\n\n  <!-- endpoint -->\n  <rect x=\"40\" y=\"80\" width=\"320\" height=\"360\" rx=\"16\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/>\n  <text x=\"200\" y=\"110\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"17\" font-weight=\"700\" fill=\"#1e3a8a\">Endpoint 10.10.10.50/24</text>\n  <text x=\"200\" y=\"132\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#475569\">gateway 10.10.10.1 · DNS 10.10.10.53</text>\n\n  <rect x=\"70\" y=\"150\" width=\"260\" height=\"46\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#60a5fa\"/>\n  <text x=\"200\" y=\"170\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#1e3a8a\">Application / browser / agent</text>\n  <text x=\"200\" y=\"187\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">proxy, PAC, TLS trust, authentication</text>\n\n  <rect x=\"70\" y=\"206\" width=\"260\" height=\"46\" rx=\"8\" fill=\"#e0f2fe\" stroke=\"#38bdf8\"/>\n  <text x=\"200\" y=\"226\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#075985\">TCP/IP stack and sockets</text>\n  <text x=\"200\" y=\"243\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">IP, mask, route, ARP/ND, TCP/UDP</text>\n\n  <rect x=\"70\" y=\"262\" width=\"260\" height=\"46\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#94a3b8\"/>\n  <text x=\"200\" y=\"282\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#334155\">Driver and host firewall</text>\n  <text x=\"200\" y=\"299\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#475569\">allow/deny per app, profile, VPN</text>\n\n  <rect x=\"70\" y=\"318\" width=\"260\" height=\"46\" rx=\"8\" fill=\"#dcfce7\" stroke=\"#4ade80\"/>\n  <text x=\"200\" y=\"338\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#166534\">NIC: MAC, speed, duplex, VLAN</text>\n  <text x=\"200\" y=\"355\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">link state, carrier, offload, Wi-Fi</text>\n\n  <rect x=\"70\" y=\"382\" width=\"260\" height=\"38\" rx=\"8\" fill=\"#fef9c3\" stroke=\"#facc15\"/>\n  <text x=\"200\" y=\"406\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#854d0e\">Evidence E1–E6 begins here</text>\n\n  <!-- access switch -->\n  <rect x=\"420\" y=\"110\" width=\"240\" height=\"270\" rx=\"14\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"540\" y=\"140\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#115e59\">Access switch</text>\n  <text x=\"540\" y=\"162\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#475569\">VLAN 10 · access port Gi1/0/5</text>\n  <rect x=\"450\" y=\"180\" width=\"180\" height=\"44\" rx=\"8\" fill=\"#ccfbf1\" stroke=\"#5eead4\"/>\n  <text x=\"540\" y=\"199\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">802.1X / NAC / port security</text>\n  <text x=\"540\" y=\"215\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">identity, posture, MAC limit</text>\n  <rect x=\"450\" y=\"236\" width=\"180\" height=\"44\" rx=\"8\" fill=\"#f0fdfa\" stroke=\"#99f6e4\"/>\n  <text x=\"540\" y=\"255\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#115e59\">MAC table + VLAN</text>\n  <text x=\"540\" y=\"271\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">learn, age, forward, flood</text>\n  <rect x=\"450\" y=\"292\" width=\"180\" height=\"44\" rx=\"8\" fill=\"#f8fafc\" stroke=\"#cbd5e1\"/>\n  <text x=\"540\" y=\"311\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" font-weight=\"700\" fill=\"#334155\">Uplink trunk</text>\n  <text x=\"540\" y=\"327\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">VLAN 10, 20, 99 tagged</text>\n  <text x=\"540\" y=\"362\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#0f766e\">No IP routing decision here</text>\n\n  <!-- services -->\n  <rect x=\"420\" y=\"410\" width=\"240\" height=\"120\" rx=\"14\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"2\"/>\n  <text x=\"540\" y=\"438\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#5b21b6\">Supporting services</text>\n  <text x=\"540\" y=\"461\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">DHCP 10.10.10.10:67</text>\n  <text x=\"540\" y=\"481\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">DNS 10.10.10.53:53</text>\n  <text x=\"540\" y=\"501\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">Proxy / PAC · NTP · CA</text>\n\n  <!-- gateway -->\n  <rect x=\"740\" y=\"150\" width=\"150\" height=\"150\" rx=\"14\" fill=\"#ffffff\" stroke=\"#b45309\" stroke-width=\"2\"/>\n  <text x=\"815\" y=\"180\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#92400e\">Default gateway</text>\n  <text x=\"815\" y=\"202\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#475569\">10.10.10.1</text>\n  <text x=\"815\" y=\"228\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">ARP for MAC</text>\n  <text x=\"815\" y=\"247\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">route lookup</text>\n  <text x=\"815\" y=\"266\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">ACL / NAT / policy</text>\n\n  <!-- server -->\n  <rect x=\"930\" y=\"150\" width=\"130\" height=\"150\" rx=\"14\" fill=\"#ffffff\" stroke=\"#be123c\" stroke-width=\"2\"/>\n  <text x=\"995\" y=\"180\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#9f1239\">Server</text>\n  <text x=\"995\" y=\"203\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#475569\">10.10.20.10</text>\n  <text x=\"995\" y=\"230\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">listener :443</text>\n  <text x=\"995\" y=\"249\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">TLS certificate</text>\n  <text x=\"995\" y=\"268\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">app + DB</text>\n\n  <!-- paths -->\n  <line x1=\"330\" y1=\"340\" x2=\"418\" y2=\"300\" stroke=\"#1d4ed8\" stroke-width=\"3\" marker-end=\"url(#arrowBlue)\"/>\n  <line x1=\"660\" y1=\"250\" x2=\"738\" y2=\"225\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#arrow)\"/>\n  <line x1=\"890\" y1=\"225\" x2=\"928\" y2=\"225\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#arrow)\"/>\n  <line x1=\"540\" y1=\"380\" x2=\"540\" y2=\"408\" stroke=\"#7c3aed\" stroke-width=\"2\" stroke-dasharray=\"6 4\" marker-end=\"url(#arrow)\"/>\n\n  <!-- evidence badges -->\n  <circle cx=\"352\" cy=\"316\" r=\"14\" fill=\"#1d4ed8\"/>\n  <text x=\"352\" y=\"321\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"11\" font-weight=\"700\" fill=\"#ffffff\">E1</text>\n  <circle cx=\"690\" cy=\"234\" r=\"14\" fill=\"#0f766e\"/>\n  <text x=\"690\" y=\"239\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"11\" font-weight=\"700\" fill=\"#ffffff\">E3</text>\n  <circle cx=\"908\" cy=\"214\" r=\"14\" fill=\"#b45309\"/>\n  <text x=\"908\" y=\"219\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"11\" font-weight=\"700\" fill=\"#ffffff\">E5</text>\n  <circle cx=\"540\" cy=\"396\" r=\"14\" fill=\"#7c3aed\"/>\n  <text x=\"540\" y=\"401\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"11\" font-weight=\"700\" fill=\"#ffffff\">E2</text>\n\n  <!-- bottom legend -->\n  <rect x=\"40\" y=\"552\" width=\"1020\" height=\"70\" rx=\"10\" fill=\"#ffffff\" stroke=\"#cbd5e1\"/>\n  <text x=\"58\" y=\"576\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#0f172a\">Evidence ladder</text>\n  <text x=\"58\" y=\"599\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#334155\">E1 link/NIC → E2 IP/mask/gateway → E3 DNS/name → E4 TCP port/socket → E5 route/policy/NAT → E6 application/TLS/log</text>\n  <text x=\"58\" y=\"617\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#64748b\">A successful ping proves E1–E3 partially; it does not prove E4–E6.</text>\n</svg></div><figcaption>پشتهٔ endpoint و شش نقطهٔ شاهد از NIC تا application</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>جزء</th><th>آدرس/شناسه</th><th>نقش</th><th>شاهد</th></tr></thead><tbody><tr><td>PC1</td><td>10.10.10.50/24</td><td>endpoint مبدأ</td><td>IP config</td></tr><tr><td>Gateway</td><td>10.10.10.1</td><td>next-hop off-link</td><td>ARP/route</td></tr><tr><td>DNS</td><td>10.10.10.53</td><td>name resolution</td><td>query/answer</td></tr><tr><td>DHCP</td><td>10.10.10.10</td><td>lease</td><td>lease/log</td></tr><tr><td>Switch</td><td>VLAN 10، Gi1/0/5</td><td>access + 802.1X</td><td>MAC/port/auth</td></tr><tr><td>Server</td><td>10.10.20.10:443</td><td>endpoint مقصد</td><td>listener/TLS</td></tr><tr><td>Proxy</td><td>10.10.10.20:8080</td><td>policy/egress</td><td>PAC/log</td></tr></tbody></table></div>\n<p><strong>مسیر رفت:</strong> PC1 → access switch (VLAN 10) → gateway → route به 10.10.20.0/24 → server. <strong>مسیر برگشت:</strong> server → gateway → VLAN 10 → PC1. اگر route برگشت نباشد، SYN می‌رسد ولی SYN/ACK برنمی‌گردد؛ از دید endpoint این «timeout» است، نه «port closed».</p>\n<p><strong>نکتهٔ addressing:</strong> اگر mask PC1 اشتباه <code>255.255.255.0</code> باشد و server در <code>10.10.20.0/24</code> باشد، PC1 مقصد را off-link می‌بیند و به gateway می‌دهد؛ این درست است. اگر mask <code>255.255.0.0</code> باشد، PC1 تصور می‌کند server on-link است و ARP می‌زند؛ ARP در VLAN 10 جواب نمی‌گیرد و ارتباط قطع می‌شود. این تفاوت، یکی از رایج‌ترین خطاهای endpoint است.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>این Objective مفهومی است و پیکربندی شبکه لازم ندارد؛ «پیکربندی» در اینجا تنظیمات endpoint و رویهٔ ایمن بررسی است. هیچ تغییری روی دستگاه واقعی بدون تأیید و rollback انجام نده.</p>\n<div class=\"table-wrap\"><table><thead><tr><th>سیستم</th><th>IP/config</th><th>route</th><th>ARP/ND</th><th>socket/DNS</th></tr></thead><tbody><tr><td>Windows</td><td><code>ipconfig /all</code></td><td><code>route print</code></td><td><code>arp -a</code></td><td><code>Test-NetConnection</code>، <code>nslookup</code></td></tr><tr><td>Linux</td><td><code>ip addr</code>، <code>ip -6 addr</code></td><td><code>ip route</code></td><td><code>ip neigh</code></td><td><code>ss -lntp</code>، <code>dig</code></td></tr><tr><td>macOS</td><td><code>ifconfig</code>، <code>networksetup</code></td><td><code>netstat -rn</code></td><td><code>arp -an</code></td><td><code>nc -vz</code>، <code>scutil --dns</code></td></tr></tbody></table></div>\n<p><strong>رویهٔ تنظیم:</strong></p>\n<ol><li>برای endpoint ثابت، IP/mask/gateway/DNS را از IPAM بگیر و قبل از اعمال، تعارض را بررسی کن.</li><li>برای DHCP، reservation را با MAC واقعی بساز؛ MAC randomization را در Wi-Fi در نظر بگیر.</li><li>DNS suffix و proxy/PAC را از policy سازمان بگیر؛ PAC را روی endpoint و proxy log تست کن.</li><li>802.1X supplicant/certificate را قبل از rollout روی یک پورت lab تست کن.</li><li>MTU/VPN را با ping DF و TLS handshake تست کن.</li><li>تغییر را با ticket، backup تنظیمات و rollback ثبت کن.</li></ol>\n<p><strong>هشدار:</strong> <code>ipconfig /release</code> یا تغییر static روی endpoint کاربر می‌تواند ارتباط را قطع کند. در محیط تولید، ابتدا شاهد جمع کن، سپس با تأیید کاربر تغییر بده.</p>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>لایه</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td>carrier/speed</td><td>E1</td><td>link فیزیکی برقرار</td><td>IP/route</td></tr><tr><td><code>ipconfig /all</code></td><td>E2</td><td>IP/mask/gateway/DNS</td><td>دسترسی واقعی</td></tr><tr><td><code>arp -a</code></td><td>E2b</td><td>gateway در LAN resolve شد</td><td>route بیرونی</td></tr><tr><td><code>nslookup</code></td><td>E3</td><td>نام به IP رسید</td><td>سرویس/port</td></tr><tr><td><code>Test-NetConnection -Port 443</code></td><td>E4</td><td>TCP handshake</td><td>TLS/app</td></tr><tr><td><code>curl -vk</code></td><td>E6</td><td>TLS/HTTP response</td><td>مجوز کاربر</td></tr><tr><td>firewall/proxy log</td><td>E5/E6</td><td>allow/deny و policy</td><td>سالم بودن app</td></tr><tr><td>packet capture</td><td>E1–E6</td><td>جهت/محل drop</td><td>علت نهایی بدون تحلیل</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample evidence shape, not a real host\nC:\\&gt; ipconfig /all\nIPv4 Address. . . . . . . . . . . : 10.10.10.50\nSubnet Mask . . . . . . . . . . . : 255.255.255.0\nDefault Gateway . . . . . . . . . : 10.10.10.1\nDNS Servers . . . . . . . . . . . : 10.10.10.53\n\nC:\\&gt; nslookup intranet.example\nAddress: 10.10.20.10\n\nC:\\&gt; curl -vk https://intranet.example\n* Connected to intranet.example (10.10.20.10) port 443\n&lt; HTTP/1.1 200 OK</code></pre>\n<p><strong>اصل شاهد:</strong> خروجی را با timestamp و از دو نقطه بگیر: endpoint و network. اگر endpoint می‌گوید timeout ولی capture روی switch نشان می‌دهد SYN/ACK برگشته، مشکل احتمالاً host firewall/ proxy/ app است. اگر capture نشان می‌دهد SYN رفته و هیچ برنگشته، مسیر برگشت یا policy را ببین.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>فقط یک PC مشکل دارد</td><td>تنظیم محلی/duplicate IP/802.1X</td><td>IP config، ARP، auth log</td><td>تنظیم را با شاهد اصلاح کن</td></tr><tr><td>IP <code>169.254.x.x</code></td><td>DHCP fail/scope</td><td>lease/server log</td><td>DHCP/relay/scope را بررسی کن</td></tr><tr><td>نام resolve نمی‌شود</td><td>DNS/suffix/hosts</td><td><code>nslookup</code></td><td>DNS server/suffix را بررسی کن</td></tr><tr><td>ping IP کار می‌کند، URL نه</td><td>DNS/TLS/proxy</td><td><code>curl -v</code></td><td>لایه را جدا کن</td></tr><tr><td>ping کوچک کار می‌کند، TLS گیر می‌کند</td><td>MTU/PMTUD</td><td>ping DF/capture</td><td>MSS clamp/MTU را بررسی کن</td></tr><tr><td>فقط بعد از login خطا</td><td>802.1X/posture</td><td>switch auth log</td><td>identity/posture را بررسی کن</td></tr><tr><td>page portal می‌آید</td><td>captive portal</td><td>HTTP redirect</td><td>پذیرش/ورود را کامل کن</td></tr><tr><td>فقط در VPN مشکل</td><td>split tunnel/MTU/DNS</td><td>route table</td><td>tunnel route/MTU/DNS را ببین</td></tr><tr><td>زمان‌های عجیب</td><td>NTP/time skew</td><td><code>w32tm</code>/<code>chronyc</code></td><td>زمان را sync کن</td></tr><tr><td>MAC نوسان می‌کند</td><td>loop/randomization/VM clone</td><td>MAC table</td><td>پورت/MAC را پیدا کن</td></tr></tbody></table></div>\n<p><strong> duplicate IP</strong>: اگر دو دستگاه یک IPv4 داشته باشند، ARP پاسخ‌ها متناوب می‌شوند؛ ارتباط قطع/وصل می‌شود و logها متناقض‌اند. <code>arp -a</code> ممکن است MAC را عوض کند. راه‌حل: IP را از یک دستگاه بردار، MAC را با <code>show mac address-table</code> پیدا کن، رزرو/DHCP را اصلاح کن.</p>\n<p><strong>MTU black hole</strong>: ping با اندازهٔ کوچک موفق و با <code>-f -l 1472</code> ناموفق (Windows) یا <code>-M do -s</code> (Linux) نشانهٔ MTU است. ICMP type 3 code 4 اگر block شود، PMTUD کار نمی‌کند؛ MSS clamping روی روتر/L3 device راه‌حل رایج است.</p>\n<p><strong>captive portal</strong>: DNS ممکن است به IP portal پاسخ دهد و HTTP redirect شود؛ اگر HTTPS باشد، certificate mismatch دیده می‌شود. این را با DNS poisoning یا TLS خراب اشتباه نگیر؛ ابتدا portal را کامل کن.</p>\n<p><strong>802.1X</strong>: اگر پورت در VLAN quarantine باشد، IP از DHCP quarantine می‌گیرد و فقط به portal دسترسی دارد. <code>show authentication sessions</code> روی سوئیچ و supplicant log را با هم ببین.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<ul><li><strong>Hardening</strong>: patch OS/application، حذف سرویس‌های غیرضروری، host firewall، disk encryption، EDR.</li><li><strong>Least privilege</strong>: کاربر روزمره admin نباشد؛ نصب نرم‌افزار کنترل شود.</li><li><strong>802.1X + NAC</strong>: هویت دستگاه/کاربر و posture را قبل از access کامل بررسی کن؛ MAB برای دستگاه‌های بدون supplicant با آگاهی از ضعف امنیتی.</li><li><strong>Segmentation</strong>: VLAN/VRF/ACL بین کاربر، guest، IoT، مدیریت و سرور؛ endpoint کاربر نباید به مدیریت شبکه دسترسی آزاد داشته باشد.</li><li><strong>DHCP snooping / RA guard</strong>: از rogue DHCP و RA ناخواسته جلوگیری کن.</li><li><strong>DNS security</strong>: resolver معتبر، DNSSEC در صورت امکان، جلوگیری از DoH ناشناس در شبکهٔ سازمانی.</li><li><strong>TLS inspection</strong>: اگر انجام می‌شود، privacy/legal/CA trust و exceptionها را شفاف کن؛ inspection کور نمی‌تواند certificate pinning را بشکند.</li><li><strong>BYOD/Guest</strong>: onboarding جدا، captive portal، محدودیت bandwidth، جداسازی از LAN داخلی.</li><li><strong>Logging</strong>: endpoint، proxy، DNS، 802.1X و firewall با NTP همزمان؛ بدون timestamp مشترک، همبستگی ممکن نیست.</li><li><strong>Zero trust</strong>: به «داخل شبکه» اعتماد نکن؛ هر درخواست را با identity/device posture/context ارزیابی کن.</li></ul>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«ping کار می‌کند، پس application سالم است.»</td><td>ping فقط reachability است.</td></tr><tr><td>«DHCP اینترنت می‌دهد.»</td><td>DHCP فقط IP/gateway/DNS می‌دهد؛ route/NAT/policy جدا هستند.</td></tr><tr><td>«gateway همان DNS است.»</td><td>می‌توانند یکی باشند، اما نقش‌ها جدا هستند.</td></tr><tr><td>«APIPA یک آدرس معتبر است.»</td><td>169.254 نشانهٔ عدم دریافت DHCP است.</td></tr><tr><td>«duplicate IP کل شبکه را می‌خواباند.»</td><td>معمولاً یک host/segment را متناوب خراب می‌کند.</td></tr><tr><td>«IPv6 gateway ندارد.»</td><td>RA/default route دارد؛ link-local next-hop رایج است.</td></tr><tr><td>«proxy فقط مرورگر را تحت تأثیر می‌گذارد.»</td><td>PAC/سیستم‌عامل/برنامه‌ها هم می‌توانند استفاده کنند.</td></tr><tr><td>«endpoint فقط PC است.»</td><td>سرور، چاپگر، VM، container و IoT هم endpointاند.</td></tr><tr><td>«سرور endpoint نیست.»</td><td>هر مبدأ/مقصد flow یک endpoint است.</td></tr><tr><td>«MTU فقط مشکل روتر است.»</td><td>endpoint/DF/PMTUD/MSS هم دخیل‌اند.</td></tr><tr><td>«signal خوب یعنی Wi-Fi سالم.»</td><td>نویز/retry/congestion/roaming هم مهم‌اند.</td></tr></tbody></table></div>\n<p><strong>تصمیم آزمون:</strong> اگر سؤال گفت «فقط یک host» → endpoint local; «همه در یک VLAN» → gateway/uplink/VLAN؛ «نام resolve می‌شود ولی سرویس نه» → port/TLS/policy؛ «ping کوچک OK، بزرگ نه» → MTU؛ «بعد از login» → 802.1X/posture.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>endpoint مبدأ/مقصد نهایی flow است؛ نقش، نه اندازهٔ دستگاه.</li><li>شش لایهٔ endpoint: NIC، L2، L3/route، name، transport، app/trust.</li><li>IP/mask/gateway/DNS چهار تنظیم مستقل‌اند؛ mask تصمیم on-link را می‌سازد.</li><li>ARP/ND فقط برای next-hop در LAN است، نه route بین شبکه‌ها.</li><li>DHCP آدرس می‌دهد؛ DNS نام را resolve می‌کند؛ هیچ‌کدام مسیر/سرویس را تضمین نمی‌کنند.</li><li>socket با ۵-tuple شناخته می‌شود؛ ephemeral port سمت client است.</li><li>proxy/PAC، TLS، زمان، 802.1X، captive portal و VPN می‌توانند خارج از «شبکه» شکست بخورند.</li><li>MTU/PMTUD/MSS باعث خطاهای «کوچک OK، بزرگ نه» می‌شوند.</li><li>عیب‌یابی = نردبان شاهد E1–E6، یک متغیر در هر گام، ثبت قبل/بعد.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 v1.1 Exam Topics — &lt;https://www.cisco.com/c/en/us/training-exams/training/it-certifications/ccna-certification.html&gt;</td><td>Objective 1.1.f endpoints</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 2131 — Dynamic Host Configuration Protocol — &lt;https://www.rfc-editor.org/rfc/rfc2131.html&gt;</td><td>DHCP DORA/lease</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 4861 — Neighbor Discovery for IPv6 — &lt;https://www.rfc-editor.org/rfc/rfc4861.html&gt;</td><td>NDP/RA/DAD</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 9293 — Transmission Control Protocol — &lt;https://www.rfc-editor.org/rfc/rfc9293.html&gt;</td><td>TCP handshake/socket</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>IEEE 802.1X-2020 — &lt;https://standards.ieee.org/ieee/802.1X/7345/&gt;</td><td>port-based authentication</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>هیچ endpoint، سوئیچ، سرور یا firewall واقعی اجرا نشده است؛ خروجی‌ها <code>Designed — Not Run</code> هستند.</li><li>نام سیستم‌عامل/فرمان‌ها نمونه‌اند؛ نسخه، دسترسی و output واقعی می‌تواند متفاوت باشد.</li><li>URLها snapshot/hash نشده‌اند و <code>PROVENANCE_NOT_VERIFIED</code> هستند.</li><li>رفتار 802.1X، captive portal و PAC به پیاده‌سازی vendor و policy سازمان وابسته است.</li><li>این درس جایگزین مستندات vendor، IPAM و رویهٔ عملیاتی سازمان نیست؛ نقش آن ساختن مدل ذهنی و شاهد است.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <a href=\"ccna-v11-1.1.g.html\">Server: سرویس‌هایی که شبکه را زنده نگه می‌دارند</a> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Endpoint",
+   "fa": "Endpoint",
+   "simple": "مبدأ یا مقصد نهایی یک flow."
+  },
+  {
+   "term": "End system",
+   "fa": "End system",
+   "simple": "دستگاه دارای پشتهٔ کامل IP."
+  },
+  {
+   "term": "NIC",
+   "fa": "NIC",
+   "simple": "کارت/کنترلر شبکه و درایور."
+  },
+  {
+   "term": "MAC address",
+   "fa": "MAC address",
+   "simple": "شناسهٔ لایه ۲."
+  },
+  {
+   "term": "IP address",
+   "fa": "IP address",
+   "simple": "شناسهٔ لایه ۳."
+  },
+  {
+   "term": "Subnet mask",
+   "fa": "Subnet mask",
+   "simple": "مرز on-link."
+  },
+  {
+   "term": "Default gateway",
+   "fa": "Default gateway",
+   "simple": "hop بعدی برای مقاصد off-link."
+  },
+  {
+   "term": "On-link",
+   "fa": "On-link",
+   "simple": "مقصد در همان subnet."
+  },
+  {
+   "term": "ARP",
+   "fa": "ARP",
+   "simple": "نگاشت IPv4 به MAC."
+  },
+  {
+   "term": "NDP",
+   "fa": "NDP",
+   "simple": "discovery/ARP/DAD در IPv6."
+  },
+  {
+   "term": "DNS",
+   "fa": "DNS",
+   "simple": "نگاشت نام به آدرس."
+  },
+  {
+   "term": "DHCP",
+   "fa": "DHCP",
+   "simple": "تخصیص IP و تنظیمات."
+  },
+  {
+   "term": "Lease",
+   "fa": "Lease",
+   "simple": "مدت اعتبار آدرس DHCP."
+  },
+  {
+   "term": "APIPA",
+   "fa": "APIPA",
+   "simple": "آدرس خودکار 169.254/16."
+  },
+  {
+   "term": "Socket",
+   "fa": "Socket",
+   "simple": "IP + port + protocol."
+  },
+  {
+   "term": "Ephemeral port",
+   "fa": "Ephemeral port",
+   "simple": "port موقت سمت client."
+  },
+  {
+   "term": "Proxy",
+   "fa": "Proxy",
+   "simple": "واسط درخواست‌ها."
+  },
+  {
+   "term": "PAC",
+   "fa": "PAC",
+   "simple": "فایل policy انتخاب proxy."
+  },
+  {
+   "term": "802.1X",
+   "fa": "802.1X",
+   "simple": "احراز هویت لایه ۲."
+  },
+  {
+   "term": "NAC",
+   "fa": "NAC",
+   "simple": "کنترل دسترسی/وضعیت دستگاه."
+  },
+  {
+   "term": "Captive portal",
+   "fa": "Captive portal",
+   "simple": "صفحهٔ ورود پیش از دسترسی."
+  },
+  {
+   "term": "MTU",
+   "fa": "MTU",
+   "simple": "حداکثر اندازهٔ payload لایه ۲."
+  },
+  {
+   "term": "MSS",
+   "fa": "MSS",
+   "simple": "حداکثر اندازهٔ segment TCP."
+  },
+  {
+   "term": "Split tunnel",
+   "fa": "Split tunnel",
+   "simple": "انتخاب مسیر VPN بر اساس subnet."
+  },
+  {
+   "term": "Duplicate IP",
+   "fa": "Duplicate IP",
+   "simple": "دو دستگاه با یک IPv4."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>این Objective مفهومی است و پیکربندی شبکه لازم ندارد؛ «پیکربندی» در اینجا تنظیمات endpoint و رویهٔ ایمن بررسی است. هیچ تغییری روی دستگاه واقعی بدون تأیید و rollback انجام نده.</p>\n<div class=\"table-wrap\"><table><thead><tr><th>سیستم</th><th>IP/config</th><th>route</th><th>ARP/ND</th><th>socket/DNS</th></tr></thead><tbody><tr><td>Windows</td><td><code>ipconfig /all</code></td><td><code>route print</code></td><td><code>arp -a</code></td><td><code>Test-NetConnection</code>، <code>nslookup</code></td></tr><tr><td>Linux</td><td><code>ip addr</code>، <code>ip -6 addr</code></td><td><code>ip route</code></td><td><code>ip neigh</code></td><td><code>ss -lntp</code>، <code>dig</code></td></tr><tr><td>macOS</td><td><code>ifconfig</code>، <code>networksetup</code></td><td><code>netstat -rn</code></td><td><code>arp -an</code></td><td><code>nc -vz</code>، <code>scutil --dns</code></td></tr></tbody></table></div>\n<p><strong>رویهٔ تنظیم:</strong></p>\n<ol><li>برای endpoint ثابت، IP/mask/gateway/DNS را از IPAM بگیر و قبل از اعمال، تعارض را بررسی کن.</li><li>برای DHCP، reservation را با MAC واقعی بساز؛ MAC randomization را در Wi-Fi در نظر بگیر.</li><li>DNS suffix و proxy/PAC را از policy سازمان بگیر؛ PAC را روی endpoint و proxy log تست کن.</li><li>802.1X supplicant/certificate را قبل از rollout روی یک پورت lab تست کن.</li><li>MTU/VPN را با ping DF و TLS handshake تست کن.</li><li>تغییر را با ticket، backup تنظیمات و rollback ثبت کن.</li></ol>\n<p><strong>هشدار:</strong> <code>ipconfig /release</code> یا تغییر static روی endpoint کاربر می‌تواند ارتباط را قطع کند. در محیط تولید، ابتدا شاهد جمع کن، سپس با تأیید کاربر تغییر بده.</p><h4>۸. تأیید و شاهد</h4><div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>لایه</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td>carrier/speed</td><td>E1</td><td>link فیزیکی برقرار</td><td>IP/route</td></tr><tr><td><code>ipconfig /all</code></td><td>E2</td><td>IP/mask/gateway/DNS</td><td>دسترسی واقعی</td></tr><tr><td><code>arp -a</code></td><td>E2b</td><td>gateway در LAN resolve شد</td><td>route بیرونی</td></tr><tr><td><code>nslookup</code></td><td>E3</td><td>نام به IP رسید</td><td>سرویس/port</td></tr><tr><td><code>Test-NetConnection -Port 443</code></td><td>E4</td><td>TCP handshake</td><td>TLS/app</td></tr><tr><td><code>curl -vk</code></td><td>E6</td><td>TLS/HTTP response</td><td>مجوز کاربر</td></tr><tr><td>firewall/proxy log</td><td>E5/E6</td><td>allow/deny و policy</td><td>سالم بودن app</td></tr><tr><td>packet capture</td><td>E1–E6</td><td>جهت/محل drop</td><td>علت نهایی بدون تحلیل</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample evidence shape, not a real host\nC:\\&gt; ipconfig /all\nIPv4 Address. . . . . . . . . . . : 10.10.10.50\nSubnet Mask . . . . . . . . . . . : 255.255.255.0\nDefault Gateway . . . . . . . . . : 10.10.10.1\nDNS Servers . . . . . . . . . . . : 10.10.10.53\n\nC:\\&gt; nslookup intranet.example\nAddress: 10.10.20.10\n\nC:\\&gt; curl -vk https://intranet.example\n* Connected to intranet.example (10.10.20.10) port 443\n&lt; HTTP/1.1 200 OK</code></pre>\n<p><strong>اصل شاهد:</strong> خروجی را با timestamp و از دو نقطه بگیر: endpoint و network. اگر endpoint می‌گوید timeout ولی capture روی switch نشان می‌دهد SYN/ACK برگشته، مشکل احتمالاً host firewall/ proxy/ app است. اگر capture نشان می‌دهد SYN رفته و هیچ برنگشته، مسیر برگشت یا policy را ببین.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در یک VLAN، فقط یک PC نمی‌تواند به سرویس برسد و بقیه سالم‌اند. اولین شاهد کدام است؟",
+   "promptHtml": "در یک VLAN، فقط یک PC نمی‌تواند به سرویس برسد و بقیه سالم‌اند. اولین شاهد کدام است؟",
+   "options": [
+    "تنظیمات IP/mask/gateway و وضعیت 802.1X همان endpoint",
+    "جدول route اینترنت ISP",
+    "ظرفیت trunk بین دو سوئیچ مرکزی",
+    "پیکربندی DNS root server"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "وقتی فقط یک endpoint مشکل دارد، احتمال خطا در تنظیمات محلی، duplicate IP یا وضعیت احراز هویت همان پورت بیشتر است. route ISP، ظرفیت trunk مرکزی و DNS root برای همه یا گروهی از کاربران اثر می‌گذارند و با شاهد «فقط یک PC» سازگار نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "PC آدرس 169.254.12.7 گرفته است. این نشانهٔ چیست؟",
+   "promptHtml": "PC آدرس <code>169.254.12.7</code> گرفته است. این نشانهٔ چیست؟",
+   "options": [
+    "DNS پاسخ نداده است",
+    "DHCP آدرس نداده و APIPA فعال شده است",
+    "gateway MAC اشتباه است",
+    "TLS certificate منقضی است"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "بازهٔ 169.254.0.0/16 APIPA/link-local خودکار است و معمولاً وقتی DHCP پاسخ نمی‌دهد ظاهر می‌شود. DNS، gateway MAC و TLS می‌توانند مشکلات جدا ایجاد کنند، اما این آدرس به‌طور مستقیم به شکست تخصیص DHCP اشاره دارد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "نقش default gateway در endpoint چیست؟",
+   "promptHtml": "نقش default gateway در endpoint چیست؟",
+   "options": [
+    "تبدیل نام دامنه به IP",
+    "ذخیرهٔ گواهی TLS",
+    "فرستادن ترافیک مقاصد off-link به hop بعدی",
+    "تخصیص port ephemeral"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "endpoint ترافیک مقاصدی را که در subnet محلی نیستند به default gateway می‌دهد تا روتر مسیر بعدی را انتخاب کند. DNS نام را تبدیل می‌کند، TLS گواهی دارد و port ephemeral را stack محلی انتخاب می‌کند؛ هیچ‌کدام نقش gateway نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "نام دامنه resolve می‌شود، ping به IP جواب می‌دهد، اما اتصال HTTPS timeout می‌شود. کدام لایه را اول بررسی می‌کنی؟",
+   "promptHtml": "نام دامنه resolve می‌شود، ping به IP جواب می‌دهد، اما اتصال HTTPS timeout می‌شود. کدام لایه را اول بررسی می‌کنی؟",
+   "options": [
+    "subnet mask endpoint",
+    "DHCP lease time",
+    "ARP cache برای DNS",
+    "TCP port 443 و policy مسیر/برگشت"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "resolve شدن نام و ping موفق، بخشی از لایه‌های name و reachability را تأیید می‌کند؛ timeout در HTTPS بیشتر به listener، firewall/ACL یا مسیر برگشت مربوط است. mask، lease و ARP DNS با شاهدهای موجود کمتر سازگارند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "اگر mask یک host اشتباه بزرگ‌تر از subnet واقعی باشد، چه اتفاقی می‌افتد؟",
+   "promptHtml": "اگر mask یک host اشتباه بزرگ‌تر از subnet واقعی باشد، چه اتفاقی می‌افتد؟",
+   "options": [
+    "DNS همیشه از کار می‌افتد",
+    "host مقصد دور را on-link می‌بیند و ARP می‌زند",
+    "gateway خودکار اصلاح می‌شود",
+    "MAC address عوض می‌شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "mask بزرگ‌تر باعث می‌شود host مقصدی خارج از subnet واقعی را هم‌شبکه تصور کند؛ در نتیجه به‌جای gateway، ARP مقصد را می‌زند و پاسخ نمی‌گیرد. DNS، اصلاح خودکار gateway و تغییر MAC نتیجهٔ منطقی این خطا نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام جمله دربارهٔ IPv6 در endpoint درست است؟",
+   "promptHtml": "کدام جمله دربارهٔ IPv6 در endpoint درست است؟",
+   "options": [
+    "IPv6 به‌جای ARP از NDP استفاده می‌کند",
+    "IPv6 هیچ آدرس link-local ندارد",
+    "IPv6 فقط با DHCPv6 کار می‌کند",
+    "IPv6 broadcast دارد و NDP لازم نیست"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "IPv6 از Neighbor Discovery برای نگاشت next-hop، DAD و discovery استفاده می‌کند و ARP/broadcast IPv4 را ندارد. آدرس link-local بخشی جدایی‌ناپذیر IPv6 است؛ SLAAC و DHCPv6 هر دو ممکن‌اند؛ بنابراین سه گزینهٔ دیگر غلط‌اند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کاربر می‌تواند IP بگیرد اما فقط به صفحهٔ ورود مهمان دسترسی دارد. محتمل‌ترین علت چیست؟",
+   "promptHtml": "کاربر می‌تواند IP بگیرد اما فقط به صفحهٔ ورود مهمان دسترسی دارد. محتمل‌ترین علت چیست؟",
+   "options": [
+    "کابل شبکه قطع است",
+    "DNS root server down است",
+    "802.1X یا captive portal، endpoint را در وضعیت محدود نگه داشته است",
+    "MAC address تکراری نیست"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "در NAC/802.1X، پورت می‌تواند در VLAN quarantine بماند و فقط portal در دسترس باشد؛ captive portal هم می‌تواند تا ورود، دسترسی را محدود کند. کابل قطع با دریافت IP سازگار نیست؛ DNS root و نبود MAC تکراری توضیح این الگو نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "PAC در تنظیمات proxy چه کاری انجام می‌دهد؟",
+   "promptHtml": "PAC در تنظیمات proxy چه کاری انجام می‌دهد؟",
+   "options": [
+    "گواهی TLS را جایگزین می‌کند",
+    "آدرس IP را به‌صورت خودکار عوض می‌کند",
+    "DNS را رمزنگاری می‌کند",
+    "با JavaScript تصمیم می‌گیرد کدام درخواست از proxy برود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "PAC یک فایل policy است که معمولاً با JavaScript بر اساس URL/host تصمیم می‌گیرد درخواست مستقیم یا از proxy برود. جایگزینی گواهی، تغییر IP و رمزنگاری DNS کار PAC نیستند و به لایه‌های دیگر مربوط‌اند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "نشانهٔ کلاسیک duplicate IP در یک endpoint چیست؟",
+   "promptHtml": "نشانهٔ کلاسیک duplicate IP در یک endpoint چیست؟",
+   "options": [
+    "همهٔ DNS queries timeout می‌شوند",
+    "ارتباط متناوب قطع/وصل می‌شود و ARP دو MAC متفاوت نشان می‌دهد",
+    "فقط IPv6 کار نمی‌کند",
+    "switch تمام پورت‌ها را می‌بندد"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "دو دستگاه با یک IPv4 به ARPهای یکسان با MACهای متفاوت پاسخ می‌دهند؛ نتیجه ارتباط متناوب و ARP ناپایدار است. این وضعیت معمولاً کل DNS یا کل سوئیچ را نمی‌خواباند و به IPv6 مربوط نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "ping کوچک موفق است اما TLS handshake با بسته‌های بزرگ گیر می‌کند. محتمل‌ترین علت چیست؟",
+   "promptHtml": "ping کوچک موفق است اما TLS handshake با بسته‌های بزرگ گیر می‌کند. محتمل‌ترین علت چیست؟",
+   "options": [
+    "DNS suffix اشتباه",
+    "802.1X posture",
+    "MTU path کوچک‌تر و PMTUD مسدود",
+    "MAC randomization"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "الگوی «کوچک OK، بزرگ نه» به MTU/PMTUD اشاره دارد؛ اگر ICMP fragmentation-needed فیلتر شود، black hole رخ می‌دهد. suffix، posture و MAC randomization می‌توانند خطا بدهند اما این الگوی اندازه‌محور را توضیح نمی‌دهند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا capture روی endpoint و capture روی سوئیچ با هم ارزش دارند؟",
+   "promptHtml": "چرا capture روی endpoint و capture روی سوئیچ با هم ارزش دارند؟",
+   "options": [
+    "نشان می‌دهند بسته در کدام سمت drop/تغییر کرده است",
+    "ثابت می‌کنند application حتماً سالم است",
+    "جایگزین log firewall می‌شوند",
+    "نیاز به timestamp را حذف می‌کنند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "مقایسهٔ دو نقطهٔ capture جهت و محل drop را نشان می‌دهد؛ مثلاً SYN رفته ولی پاسخ برنگشته یا پاسخ رسیده ولی host آن را ندیده. capture سالم بودن application را ثابت نمی‌کند، جای log نیست و timestamp را بی‌اهمیت نمی‌کند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام جمله دربارهٔ «endpoint» درست است؟",
+   "promptHtml": "کدام جمله دربارهٔ «endpoint» درست است؟",
+   "options": [
+    "فقط لپ‌تاپ کاربر endpoint است",
+    "سرور هرگز endpoint نیست",
+    "endpoint فقط دستگاه‌های بی‌سیم‌اند",
+    "هر مبدأ یا مقصد flow، از جمله سرور و VM، endpoint است"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "endpoint نقش ارتباطی است: هر مبدأ/مقصد نهایی flow، حتی سرور، VM یا container، endpoint محسوب می‌شود. محدود کردن آن به لپ‌تاپ، حذف سرور یا فقط بی‌سیم، با تعریف مکانیزم سازگار نیست.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}

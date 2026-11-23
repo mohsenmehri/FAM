@@ -1,0 +1,358 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "academy-stage-zero-06-client-server-fa",
+ "objectiveId": "",
+ "kind": "foundation",
+ "track": "FAM Curriculum 5.0",
+ "course": "foundation",
+ "title": "Client، Server و سرویس",
+ "titleEn": "Clients, Servers, and Network Services",
+ "domain": "Foundation",
+ "source": "content/foundation/academy-stage-zero-06-client-server-fa.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 35,
+ "prerequisites": [
+  "academy-stage-zero-04-linux-cli-fa",
+  "academy-stage-zero-05-windows-cli-fa"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "academy-stage-zero-04-linux-cli-fa",
+   "academy-stage-zero-05-windows-cli-fa"
+  ],
+  "learningObjectives": [
+   "DNS",
+   "DHCP",
+   "socket",
+   "TCP",
+   "UDP",
+   "firewall",
+   "timeout",
+   "listener"
+  ]
+ },
+ "whyItMatters": "کاربری در مرورگر آدرس intranet.example را باز می‌کند و صفحه نمی‌آید. همکارش با ping 10.10.20.10 پاسخ می‌گیرد و می‌گوید «شبکه سالم است». این دو مشاهده با هم تناقض ندارند: ping فقط reachability در لایه IP را نشان می‌دهد؛ باز شدن صفحه به نام DNS، مسیر، پورت، سرویس و policy وابسته است. اگر یکی از این حلقه‌ها بشکند، شبکه «سالم» است ولی سرویس در دسترس نیست. این درس پایهٔ تفکر سرویس‌محور است: هر ارتباط شبکه‌ای یک client و یک server دارد، یک request و یک response، یک آدرس و یک port. درک این زنجیره باعث می‌شود بتوانی بگویی مشکل در name resolution است یا route یا process یا firewall. این مهارت پیش‌نیاز ",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>کاربری در مرورگر آدرس <code>intranet.example</code> را باز می‌کند و صفحه نمی‌آید. همکارش با <code>ping 10.10.20.10</code> پاسخ می‌گیرد و می‌گوید «شبکه سالم است». این دو مشاهده با هم تناقض ندارند: ping فقط reachability در لایه IP را نشان می‌دهد؛ باز شدن صفحه به نام DNS، مسیر، پورت، سرویس و policy وابسته است. اگر یکی از این حلقه‌ها بشکند، شبکه «سالم» است ولی سرویس در دسترس نیست.</p>\n<p>این درس پایهٔ تفکر سرویس‌محور است: هر ارتباط شبکه‌ای یک <strong>client</strong> و یک <strong>server</strong> دارد، یک <strong>request</strong> و یک <strong>response</strong>، یک <strong>آدرس</strong> و یک <strong>port</strong>. درک این زنجیره باعث می‌شود بتوانی بگویی مشکل در name resolution است یا route یا process یا firewall. این مهارت پیش‌نیاز همهٔ درس‌های بعدی است، از HTTP و DNS تا OSPF و امنیت.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>یک سرویس شبکه از پنج جزء ساخته می‌شود:</p>\n<ol><li><strong>Name</strong> — کاربر نام می‌بیند؛ DNS آن را به IP تبدیل می‌کند.</li><li><strong>Address/route</strong> — بسته باید از مبدأ به IP مقصد برسد و برگردد.</li><li><strong>Transport port</strong> — سرویس روی یک port مشخص گوش می‌دهد (مثلاً 443).</li><li><strong>Application process</strong> — برنامهٔ server باید در حال اجرا و listening باشد.</li><li><strong>Policy</strong> — firewall/ACL/Proxy باید ارتباط را مجاز کند.</li></ol>\n<p>هر جزء شاهد متفاوتی دارد. <code>ping</code> فقط جزء ۲ را می‌سنجد. <code>nslookup</code> جزء ۱؛ <code>ss</code>/<code>netstat</code> جزء ۳ و ۴؛ firewall log جزء ۵. اگر همه را «شبکه» بنامی، عیب‌یابی کور می‌شود.</p>\n<p><strong>Client</strong> درخواست را شروع می‌کند و معمولاً از یک port موقت (ephemeral) استفاده می‌کند. <strong>Server</strong> روی یک port شناخته‌شده listen می‌کند و پاسخ می‌دهد. یک دستگاه می‌تواند هم client باشد و هم server؛ نقش، نه سخت‌افزار را تعیین می‌کند، بلکه جهت درخواست/پاسخ.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>Client</td><td>آغازگر درخواست</td><td>«client فقط لپ‌تاپ است»</td></tr><tr><td>Server</td><td>ارائه‌دهندهٔ سرویس و listener</td><td>«server فقط سخت‌افزار بزرگ است»</td></tr><tr><td>Request/Response</td><td>الگوی تعامل سرویس</td><td>«همهٔ ارتباط‌ها bidrectional هم‌زمان‌اند»</td></tr><tr><td>IP address</td><td>آدرس لایه ۳</td><td>«IP همان نام سرویس است»</td></tr><tr><td>Port</td><td>شمارهٔ سرویس/سوکت</td><td>«port همان IP است»</td></tr><tr><td>Socket</td><td>ترکیب IP + port + protocol</td><td>«socket یک فایل است»</td></tr><tr><td>DNS</td><td>نگاشت نام به آدرس</td><td>«DNS تضمین می‌کند سرویس بالاست»</td></tr><tr><td>DHCP</td><td>تخصیص IP/gateway/DNS</td><td>«DHCP سرویس وب را اجرا می‌کند»</td></tr><tr><td>TCP</td><td>انتقال reliable/ordered</td><td>«TCP همیشه سریع‌تر است»</td></tr><tr><td>UDP</td><td>انتقال بدون connection</td><td>«UDP همیشه غیرقابل‌اعتماد است»</td></tr><tr><td>HTTP/HTTPS</td><td>پروتکل وب روی 80/443</td><td>«HTTPS فقط یک پورت است»</td></tr><tr><td>Listening</td><td>آمادهٔ پذیرش connection</td><td>«process روشن یعنی listener فعال است»</td></tr><tr><td>Firewall</td><td>policy allow/deny</td><td>«firewall همیشه malware را می‌بیند»</td></tr></tbody></table></div>\n<p><strong>مرز مهم:</strong> نام، آدرس، port و process چهار چیز جدا هستند. <code>intranet.example</code> می‌تواند resolve شود ولی IP اشتباه باشد؛ IP درست باشد ولی port 443 گوش ندهد؛ port گوش بدهد ولی firewall پاسخ را block کند؛ یا همه درست باشد ولی application خطا بدهد.</p>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. مسیر یک درخواست وب</h3>\n<p>کاربر <code>https://intranet.example</code> را باز می‌کند:</p>\n<ol><li>Client از DNS می‌پرسد <code>intranet.example</code> چه IP دارد.</li><li>DNS پاسخ <code>10.10.20.10</code> می‌دهد.</li><li>Client یک TCP connection به <code>10.10.20.10:443</code> باز می‌کند؛ port مبدأ ephemeral است.</li><li>Switch/router بسته را به server می‌رسانند.</li><li>Server process روی 443 listen می‌کند، TLS/HTTP را می‌پذیرد و پاسخ می‌دهد.</li><li>پاسخ از همان connection/session برمی‌گردد؛ firewall/state باید آن را مجاز کند.</li></ol>\n<p>اگر DNS پاسخ ندهد، client حتی یک بسته به server نمی‌فرستد. اگر route نباشد، SYN به server نمی‌رسد. اگر port listen نباشد، TCP RST می‌آید. اگر firewall drop کند، timeout می‌بینی. هر نشانه به یک لایه اشاره دارد. در عمل، همین تفاوت بین RST و timeout اولین سرنخ است: RST معمولاً یعنی بسته به host رسیده ولی listener/port پاسخ منفی داده؛ timeout بیشتر به route، firewall یا عدم پاسخ اشاره دارد.</p>\n<h3>۴.۲. TCP و UDP</h3>\n<p>TCP connection-oriented است، handshake دارد، ترتیب/retransmission را مدیریت می‌کند و برای HTTP/HTTPS/SSH مناسب است. UDP connectionless است، overhead کمتری دارد و برای DNS (در بسیاری از موارد)، VoIP، DHCP و streaming استفاده می‌شود. «Reliable» به معنای «سالم بودن محتوا» نیست؛ TLS/امضای دیجیتال لایه‌های دیگرند.</p>\n<h3>۴.۳. Service lifecycle</h3>\n<p>یک server باید process running، port listening، config معتبر، دسترسی به فایل/DB و ظرفیت داشته باشد. <code>systemctl status</code> یا <code>ps</code> می‌تواند process را نشان دهد؛ <code>ss -lntp</code> می‌تواند listener را نشان دهد. process روشن بدون listener کافی نیست. برعکس، listener بدون application سالم می‌تواند connection را بپذیرد و سپس خطا بدهد.</p>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریوی درس:</p>\n<ul><li>Client: <code>10.10.10.50</code></li><li>DNS: <code>10.10.10.53</code></li><li>Server: <code>10.10.20.10:443</code></li><li>Gateway: <code>10.10.10.1</code></li></ul>\n<ol><li>بررسی کن client IP/gateway/DNS دارد.</li><li>نام را resolve کن و IP جواب را با IP مورد انتظار مقایسه کن.</li><li>reachability به IP را با ping تست کن (فقط لایه ۳).</li><li>بررسی کن TCP port 443 روی server listen است.</li><li>با یک ابزار client (curl/browser) درخواست HTTPS بفرست.</li><li>log firewall/server را برای allow/deny و response ببین.</li><li>اگر خطا بود، بین name/route/port/process/policy تفکیک کن.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>شاهد</th><th>اگر شکست بخورد</th></tr></thead><tbody><tr><td>1</td><td><code>ipconfig</code>/<code>ip addr</code></td><td>DHCP/محلی</td></tr><tr><td>2</td><td><code>nslookup</code>/<code>dig</code></td><td>DNS/name</td></tr><tr><td>3</td><td><code>ping IP</code></td><td>route/L2</td></tr><tr><td>4</td><td><code>ss -lntp</code>/server config</td><td>process/port</td></tr><tr><td>5</td><td><code>curl -vk https://...</code></td><td>TLS/HTTP/app</td></tr><tr><td>6</td><td>firewall/server log</td><td>policy/app</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 650\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Client, DNS, server, and service path</title>\n  <desc id=\"desc\">A client asks DNS for the address of an intranet name, then opens a TCP connection to the web server on port 443. The switch and router forward the packets; the server application listens on the port and returns a response.</desc>\n  <rect width=\"1100\" height=\"650\" fill=\"#f6f8fc\"/>\n  <text x=\"550\" y=\"42\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"25\" font-weight=\"700\" fill=\"#14213d\">A request is a chain, not one box</text>\n  <text x=\"550\" y=\"70\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#4a5568\">Name resolution, routing, a listening port, and an application response are separate checks.</text>\n\n  <!-- Client -->\n  <rect x=\"50\" y=\"250\" width=\"210\" height=\"150\" rx=\"16\" fill=\"#eff6ff\" stroke=\"#2563eb\" stroke-width=\"4\"/>\n  <text x=\"155\" y=\"290\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#1e3a8a\">Client</text>\n  <text x=\"155\" y=\"318\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#1e40af\">browser / app</text>\n  <text x=\"155\" y=\"344\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#1e40af\">10.10.10.50</text>\n  <text x=\"155\" y=\"368\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#1e40af\">ephemeral port 51544</text>\n\n  <!-- DNS -->\n  <rect x=\"350\" y=\"110\" width=\"210\" height=\"130\" rx=\"16\" fill=\"#fff7ed\" stroke=\"#c2410c\" stroke-width=\"4\"/>\n  <text x=\"455\" y=\"146\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"21\" font-weight=\"700\" fill=\"#7c2d12\">DNS server</text>\n  <text x=\"455\" y=\"175\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#9a3412\">name → IP</text>\n  <text x=\"455\" y=\"200\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#9a3412\">intranet.example → 10.10.20.10</text>\n  <text x=\"455\" y=\"224\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#9a3412\">UDP/TCP 53</text>\n\n  <!-- Web server -->\n  <rect x=\"800\" y=\"250\" width=\"240\" height=\"160\" rx=\"16\" fill=\"#ecfdf5\" stroke=\"#0f766e\" stroke-width=\"4\"/>\n  <text x=\"920\" y=\"290\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#134e4a\">Web server</text>\n  <text x=\"920\" y=\"318\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#115e59\">10.10.20.10</text>\n  <text x=\"920\" y=\"344\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#115e59\">listening on TCP 443</text>\n  <text x=\"920\" y=\"370\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#115e59\">application must be running</text>\n  <text x=\"920\" y=\"394\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#115e59\">firewall policy must allow</text>\n\n  <!-- Network -->\n  <rect x=\"350\" y=\"330\" width=\"330\" height=\"160\" rx=\"18\" fill=\"#f8fafc\" stroke=\"#64748b\" stroke-width=\"3\"/>\n  <text x=\"515\" y=\"370\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#334155\">Switch + router</text>\n  <text x=\"515\" y=\"400\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#475569\">L2 forwarding inside VLAN</text>\n  <text x=\"515\" y=\"426\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#475569\">L3 routing between subnets</text>\n  <text x=\"515\" y=\"452\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#475569\">gateway 10.10.10.1</text>\n  <text x=\"515\" y=\"478\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#64748b\">reachability is not the same as service health</text>\n\n  <!-- DNS query -->\n  <path d=\"M260 285 C300 230 310 190 350 185\" stroke=\"#c2410c\" stroke-width=\"3\" stroke-dasharray=\"7 6\" fill=\"none\"/>\n  <text x=\"292\" y=\"224\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#9a3412\">1. DNS query</text>\n  <path d=\"M350 210 C310 230 300 250 260 268\" stroke=\"#c2410c\" stroke-width=\"3\" stroke-dasharray=\"7 6\" fill=\"none\"/>\n  <text x=\"320\" y=\"248\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#9a3412\">2. answer IP</text>\n\n  <!-- TCP -->\n  <path d=\"M260 340 C360 330 420 330 470 330\" stroke=\"#2563eb\" stroke-width=\"5\" fill=\"none\"/>\n  <path d=\"M680 330 C740 330 780 320 800 315\" stroke=\"#0f766e\" stroke-width=\"5\" fill=\"none\"/>\n  <text x=\"525\" y=\"315\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#1e40af\">3. TCP SYN to :443</text>\n  <text x=\"738\" y=\"305\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#0f766e\">4. response</text>\n\n  <!-- service lifecycle -->\n  <rect x=\"150\" y=\"540\" width=\"800\" height=\"55\" rx=\"12\" fill=\"#ffffff\" stroke=\"#cbd5e1\"/>\n  <text x=\"550\" y=\"573\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#334155\">Name resolves → route exists → port is listening → application responds → policy allows the return path.</text>\n</svg></div><figcaption>Client، DNS، سوئیچ/روتر و سرور وب؛ هر جزء شاهد جدا دارد</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>جزء</th><th>آدرس/port</th><th>نقش</th></tr></thead><tbody><tr><td>Client</td><td>10.10.10.50، ephemeral</td><td>آغازگر</td></tr><tr><td>DNS</td><td>10.10.10.53:53</td><td>name resolution</td></tr><tr><td>Gateway</td><td>10.10.10.1</td><td>route بین subnetها</td></tr><tr><td>Server</td><td>10.10.20.10:443</td><td>سرویس HTTPS</td></tr><tr><td>Switch</td><td>VLAN 10/20</td><td>forwarding L2</td></tr><tr><td>Firewall</td><td>policy</td><td>allow/deny</td></tr></tbody></table></div>\n<p><strong>نکته:</strong> اگر DNS در subnet دیگری است، client باید gateway داشته باشد. اگر client فقط IP دارد و gateway ندارد، DNS خارج از subnet کار نمی‌کند. اگر DNS پاسخ می‌دهد ولی server در subnet دیگری است، route برگشت هم لازم است.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>این درس پایه است و پیکربندی خاصی لازم ندارد. رویهٔ بررسی:</p>\n<ol><li>IP/gateway/DNS کلاینت را از تنظیمات OS یا DHCP lease بخوان.</li><li>با <code>nslookup</code> یا <code>dig</code> نام را resolve کن.</li><li>با <code>ping</code> IP مقصد را تست کن.</li><li>روی server، listener پورت را بررسی کن.</li><li>با <code>curl</code> درخواست واقعی بفرست و status/response را ببین.</li><li>logها را با timestamp مقایسه کن.</li></ol>\n<p>هیچ تغییری در DHCP/DNS/firewall بدون backup و rollback انجام نده. اگر روی سیستم واقعی کار می‌کنی، دستورهای تغییردهنده را فقط در محیط آزمایشی و با تأیید اجرا کن.</p>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th></tr></thead><tbody><tr><td>1</td><td>IP config</td><td>آدرس/ gateway/DNS</td></tr><tr><td>2</td><td>DNS answer</td><td>name resolution</td></tr><tr><td>3</td><td>ping</td><td>reachability L3</td></tr><tr><td>4</td><td>listener</td><td>سرویس روی port</td></tr><tr><td>5</td><td>curl/status</td><td>application response</td></tr><tr><td>6</td><td>log</td><td>policy/response</td></tr><tr><td>7</td><td>trace/capture</td><td>مسیر و محل شکست</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample evidence shape, not a real host\n$ nslookup intranet.example\nName: intranet.example\nAddress: 10.10.20.10\n\n$ curl -I https://intranet.example\nHTTP/1.1 200 OK</code></pre>\n<p>اگر <code>nslookup</code> جواب می‌دهد ولی <code>curl</code> timeout می‌شود، DNS را کنار بگذار و route/port/firewall را ببین. اگر <code>curl</code> سریع RST می‌گیرد، احتمالاً port listener نیست. اگر TLS error می‌گیرد، certificate/name/time را ببین.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>اولین شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>نام resolve نمی‌شود</td><td>DNS/name/gateway</td><td><code>nslookup</code></td><td>DNS/gateway را بررسی کن</td></tr><tr><td>ping IP کار می‌کند ولی URL نه</td><td>DNS/port/TLS</td><td><code>curl -v</code></td><td>لایه را جدا کن</td></tr><tr><td>timeout</td><td>route/firewall</td><td>traceroute/log</td><td>مسیر/policy</td></tr><tr><td>connection refused</td><td>listener نیست</td><td><code>ss -lntp</code></td><td>سرویس را بررسی کن</td></tr><tr><td>TLS error</td><td>cert/name/time</td><td><code>curl -vk</code></td><td>cert/time/trust</td></tr><tr><td>فقط بعضی کاربران</td><td>policy/DNS/route</td><td>log/compare</td><td>دامنه را محدود کن</td></tr></tbody></table></div>\n<p><strong>قاعده:</strong> اول بپرس «کدام شاهد را ندارم؟» و همان را اندازه بگیر. پاسخ گرفتن از ping ثابت نمی‌کند که سرویس وب سالم است؛ برعکس، خطای وب هم ثابت نمی‌کند که شبکه down است.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<ul><li>سرویس‌های عمومی را در DMZ/segment محدود قرار بده، نه در VLAN کاربران.</li><li>فقط port لازم را باز کن؛ default deny.</li><li>TLS و certificate معتبر، زمان درست و renewal را جدی بگیر.</li><li>سرویس را با least privilege اجرا کن؛ فایل/DB دسترسی محدود.</li><li>log، NTP و monitoring برای سرویس و firewall فعال باشد.</li><li>patch/backup/restore را قبل از exposure تست کن. همچنین نسخهٔ نرم‌افزار سرویس و وابستگی‌های آن را ثبت کن تا پس از تغییر، بازگشت به وضعیت پایدار ممکن باشد.</li><li>نام و DNS را از reachability جدا پایش کن؛ هر دو می‌توانند مستقل شکست بخورند.</li></ul>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«ping جواب داد، پس سرویس سالم است.»</td><td>ping فقط reachability است.</td></tr><tr><td>«DNS و DHCP یکی هستند.»</td><td>DNS نام را resolve می‌کند؛ DHCP آدرس می‌دهد.</td></tr><tr><td>«port 443 یعنی HTTPS سالم است.»</td><td>listener/process/cert هم لازم‌اند.</td></tr><tr><td>«TCP همیشه بهتر از UDP است.»</td><td>به نیاز application وابسته است.</td></tr><tr><td>«connection refused یعنی firewall.»</td><td>اغلب listener نیست؛ timeout بیشتر به firewall/route مربوط است.</td></tr><tr><td>«server فقط سخت‌افزار بزرگ است.»</td><td>نقش server به listener/request وابسته است.</td></tr><tr><td>«client فقط مصرف‌کننده است.»</td><td>client می‌تواند server هم باشد.</td></tr><tr><td>«نام resolve شد، پس مسیر هست.»</td><td>name و route دو لایهٔ جدا هستند.</td></tr></tbody></table></div>\n<p>در آزمون، اگر «ping کار می‌کند ولی وب نه» بود، DNS/port/TLS را بررسی کن. اگر «timeout» بود، route/firewall. اگر «connection refused» بود، listener. اگر «نام resolve نمی‌شود» بود، DNS/gateway.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>هر سرویس از name، address/route، port، process و policy ساخته می‌شود.</li><li>Client درخواست را شروع می‌کند؛ server روی port listen می‌کند.</li><li>DNS نام را به IP تبدیل می‌کند؛ DHCP آدرس/gateway/DNS می‌دهد.</li><li>ping فقط reachability لایه ۳ را نشان می‌دهد.</li><li>TCP و UDP trade-off دارند؛ «بهتر» بدون شرط معنا ندارد.</li><li>timeout، refused و TLS error به لایه‌های متفاوت اشاره دارند.</li><li>تأیید = resolve + route + listener + response + log.</li><li>امنیت سرویس = least privilege، patch، TLS، log و segmentation.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 v1.1 Exam Topics — &lt;https://www.cisco.com/c/en/us/training-exams/training/it-certifications/ccna-certification.html&gt;</td><td>پیش‌نیاز Foundation برای Network Fundamentals</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 9293 — Transmission Control Protocol — &lt;https://www.rfc-editor.org/rfc/rfc9293.html&gt;</td><td>TCP connection/state</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 1034 — Domain Names — &lt;https://www.rfc-editor.org/rfc/rfc1034.html&gt;</td><td>name resolution</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>این درس Foundation است و Objective رسمی Cisco نیست؛ نقش آن آماده‌سازی است.</li><li>هیچ host/server/firewall واقعی اجرا نشده است؛ نمونه‌ها <code>Designed — Not Run</code> هستند.</li><li>شماره portها پیش‌فرض‌اند و می‌توانند در طراحی تغییر کنند.</li><li>URLها snapshot/hash نشده‌اند و <code>PROVENANCE_NOT_VERIFIED</code> هستند.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <span class=\"pending-link\">Virtualization، Hypervisor و شبکهٔ ماشین مجازی — در انتظار تألیف</span> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Client",
+   "fa": "Client",
+   "simple": "آغازگر درخواست."
+  },
+  {
+   "term": "Server",
+   "fa": "Server",
+   "simple": "ارائه‌دهندهٔ سرویس/listener."
+  },
+  {
+   "term": "Request",
+   "fa": "Request",
+   "simple": "درخواست client."
+  },
+  {
+   "term": "Response",
+   "fa": "Response",
+   "simple": "پاسخ server."
+  },
+  {
+   "term": "IP address",
+   "fa": "IP address",
+   "simple": "آدرس لایه ۳."
+  },
+  {
+   "term": "Port",
+   "fa": "Port",
+   "simple": "شمارهٔ سرویس."
+  },
+  {
+   "term": "Socket",
+   "fa": "Socket",
+   "simple": "ترکیب IP/port/protocol."
+  },
+  {
+   "term": "DNS",
+   "fa": "DNS",
+   "simple": "نگاشت نام به آدرس."
+  },
+  {
+   "term": "DHCP",
+   "fa": "DHCP",
+   "simple": "تخصیص آدرس و تنظیمات."
+  },
+  {
+   "term": "TCP",
+   "fa": "TCP",
+   "simple": "انتقال reliable/ordered."
+  },
+  {
+   "term": "UDP",
+   "fa": "UDP",
+   "simple": "انتقال connectionless."
+  },
+  {
+   "term": "HTTP/HTTPS",
+   "fa": "HTTP/HTTPS",
+   "simple": "پروتکل وب."
+  },
+  {
+   "term": "Listening",
+   "fa": "Listening",
+   "simple": "آمادهٔ پذیرش connection."
+  },
+  {
+   "term": "Firewall",
+   "fa": "Firewall",
+   "simple": "کنترل policy."
+  },
+  {
+   "term": "Timeout",
+   "fa": "Timeout",
+   "simple": "نرسیدن پاسخ در زمان مقرر."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>این درس پایه است و پیکربندی خاصی لازم ندارد. رویهٔ بررسی:</p>\n<ol><li>IP/gateway/DNS کلاینت را از تنظیمات OS یا DHCP lease بخوان.</li><li>با <code>nslookup</code> یا <code>dig</code> نام را resolve کن.</li><li>با <code>ping</code> IP مقصد را تست کن.</li><li>روی server، listener پورت را بررسی کن.</li><li>با <code>curl</code> درخواست واقعی بفرست و status/response را ببین.</li><li>logها را با timestamp مقایسه کن.</li></ol>\n<p>هیچ تغییری در DHCP/DNS/firewall بدون backup و rollback انجام نده. اگر روی سیستم واقعی کار می‌کنی، دستورهای تغییردهنده را فقط در محیط آزمایشی و با تأیید اجرا کن.</p><h4>۸. تأیید و شاهد</h4><div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th></tr></thead><tbody><tr><td>1</td><td>IP config</td><td>آدرس/ gateway/DNS</td></tr><tr><td>2</td><td>DNS answer</td><td>name resolution</td></tr><tr><td>3</td><td>ping</td><td>reachability L3</td></tr><tr><td>4</td><td>listener</td><td>سرویس روی port</td></tr><tr><td>5</td><td>curl/status</td><td>application response</td></tr><tr><td>6</td><td>log</td><td>policy/response</td></tr><tr><td>7</td><td>trace/capture</td><td>مسیر و محل شکست</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample evidence shape, not a real host\n$ nslookup intranet.example\nName: intranet.example\nAddress: 10.10.20.10\n\n$ curl -I https://intranet.example\nHTTP/1.1 200 OK</code></pre>\n<p>اگر <code>nslookup</code> جواب می‌دهد ولی <code>curl</code> timeout می‌شود، DNS را کنار بگذار و route/port/firewall را ببین. اگر <code>curl</code> سریع RST می‌گیرد، احتمالاً port listener نیست. اگر TLS error می‌گیرد، certificate/name/time را ببین.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "وظیفهٔ DNS در باز کردن یک آدرس وب چیست؟",
+   "promptHtml": "وظیفهٔ DNS در باز کردن یک آدرس وب چیست؟",
+   "options": [
+    "تخصیص IP به کلاینت",
+    "رمزنگاری ترافیک HTTPS",
+    "تبدیل نام دامنه به آدرس IP",
+    "باز کردن port 443 روی server"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "DNS نام دامنه را به آدرس IP تبدیل می‌کند تا client بداند به کدام مقصد وصل شود. تخصیص IP کار DHCP است؛ رمزنگاری کار TLS؛ باز کردن port کار پیکربندی server/firewall است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کاربر نام سایت را باز می‌کند و صفحه نمی‌آید، اما ping 10.10.20.10 جواب می‌دهد. محتمل‌ترین لایهٔ اول برای بررسی چیست؟",
+   "promptHtml": "کاربر نام سایت را باز می‌کند و صفحه نمی‌آید، اما <code>ping 10.10.20.10</code> جواب می‌دهد. محتمل‌ترین لایهٔ اول برای بررسی چیست؟",
+   "options": [
+    "کابل شبکه، چون ping جواب داده است",
+    "DNS یا port/TLS سرویس، چون reachability IP برقرار است",
+    "TTL، چون ping جواب می‌دهد",
+    "MAC table، چون HTTP کار نمی‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "ping موفق نشان می‌دهد بسته به IP مقصد می‌رسد؛ بنابراین مشکل احتمالی در name resolution یا port/process/TLS است. کابل و reachability پایه با ping تأیید شده‌اند؛ TTL و MAC table توضیح مستقیم این تفاوت نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "سرویس HTTPS معمولاً روی کدام TCP port گوش می‌دهد؟",
+   "promptHtml": "سرویس HTTPS معمولاً روی کدام TCP port گوش می‌دهد؟",
+   "options": [
+    "22",
+    "53",
+    "80",
+    "443"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "HTTPS به‌طور پیش‌فرض روی TCP 443 است. پورت 22 معمولاً SSH، 53 DNS و 80 HTTP است. این شماره‌ها پیش‌فرض‌اند و می‌توانند در طراحی تغییر کنند، اما در آزمون مبنای تشخیص هستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "«server روی port 443 listen می‌کند» چه معنایی دارد؟",
+   "promptHtml": "«server روی port 443 listen می‌کند» چه معنایی دارد؟",
+   "options": [
+    "process سرویس روی آن port آمادهٔ پذیرش connection است",
+    "firewall همهٔ ترافیک را block کرده است",
+    "DNS پاسخ نام را می‌دهد",
+    "client یک port ephemeral گرفته است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "listening یعنی process به port bind شده و آمادهٔ accept کردن connection است. firewall block، DNS answer و ephemeral port مفاهیم جدا هستند و به‌تنهایی listener بودن را ثابت نمی‌کنند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "DHCP معمولاً کدام مجموعه را به client می‌دهد؟",
+   "promptHtml": "DHCP معمولاً کدام مجموعه را به client می‌دهد؟",
+   "options": [
+    "فقط نام دامنه",
+    "فقط MAC address",
+    "IP address، gateway و DNS (بسته به تنظیم)",
+    "گواهی TLS و کلید خصوصی"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "DHCP معمولاً IP، mask، gateway و DNS را تخصیص می‌دهد و می‌تواند optionهای دیگری هم بدهد. نام دامنه بخشی از DNS است؛ MAC آدرس لایه ۲ است؛ گواهی/کلید کار DHCP نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "موفقیت ping 10.10.20.10 کدام مورد را ثابت می‌کند؟",
+   "promptHtml": "موفقیت <code>ping 10.10.20.10</code> کدام مورد را ثابت می‌کند؟",
+   "options": [
+    "سرویس HTTPS سالم است",
+    "reachability لایه IP به آن آدرس برقرار است",
+    "DNS درست کار می‌کند",
+    "firewall همهٔ portها را مجاز کرده است"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "ping معمولاً ICMP echo است و فقط reachability لایه ۳ را نشان می‌دهد. سلامت HTTPS، صحت DNS و مجاز بودن همهٔ portها را ثابت نمی‌کند؛ هر کدام شاهد جداگانه دارند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "Socket در یک connection معمولاً از چه چیزی تشکیل می‌شود؟",
+   "promptHtml": "Socket در یک connection معمولاً از چه چیزی تشکیل می‌شود؟",
+   "options": [
+    "نام دامنه و MAC",
+    "VLAN و TTL",
+    "فقط IP address",
+    "IP address، port و protocol"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "socket ترکیبی از آدرس IP، port و protocol است که یک endpoint ارتباط را مشخص می‌کند. نام/MAC، VLAN/TTL و IP تنها بخشی از هویت connection هستند و به‌تنهایی socket را نمی‌سازند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام جمله دربارهٔ نقش client و server درست است؟",
+   "promptHtml": "کدام جمله دربارهٔ نقش client و server درست است؟",
+   "options": [
+    "server منتظر request می‌ماند و پاسخ می‌دهد",
+    "client همیشه سخت‌افزار بزرگ‌تری است",
+    "server هیچ‌وقت request نمی‌فرستد",
+    "client نمی‌تواند سرویس بدهد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "server معمولاً listener است که request را می‌پذیرد و response می‌دهد؛ client آغازگر است. اندازهٔ سخت‌افزار نقش را تعیین نمی‌کند؛ یک دستگاه می‌تواند هر دو نقش را در زمان‌های مختلف داشته باشد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "نقش firewall در مسیر سرویس چیست؟",
+   "promptHtml": "نقش firewall در مسیر سرویس چیست؟",
+   "options": [
+    "تبدیل نام به IP",
+    "تخصیص port ephemeral",
+    "اعمال policy allow/deny روی ترافیک",
+    "اجرای process سرویس"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "firewall با policy مشخص می‌کند چه ترافیکی مجاز/مسدود شود. DNS نام را تبدیل می‌کند؛ OS/client port ephemeral را انتخاب می‌کند؛ process سرویس را application اجرا می‌کند، نه firewall.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام گزینه دربارهٔ TCP و UDP درست است؟",
+   "promptHtml": "کدام گزینه دربارهٔ TCP و UDP درست است؟",
+   "options": [
+    "UDP همیشه reliable است",
+    "TCP connection-oriented و reliable/ordered است",
+    "TCP برای DNS اجباری است",
+    "UDP نمی‌تواند برای VoIP استفاده شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "TCP handshake، ترتیب و retransmission دارد؛ UDP connectionless و کم‌overhead است. UDP reliable نیست اما برای VoIP رایج است؛ DNS می‌تواند UDP یا TCP باشد، نه همیشه TCP.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "ping به IP سرور جواب می‌دهد، اما اتصال به port 443 «connection refused» می‌دهد. محتمل‌ترین علت چیست؟",
+   "promptHtml": "ping به IP سرور جواب می‌دهد، اما اتصال به port 443 «connection refused» می‌دهد. محتمل‌ترین علت چیست؟",
+   "options": [
+    "DNS نام را اشتباه resolve می‌کند",
+    "کابل شبکه قطع است",
+    "gateway وجود ندارد",
+    "سرویس روی آن port listen نمی‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "connection refused معمولاً یعنی بسته به host رسیده اما listener روی port نیست یا فعالانه رد می‌کند. DNS و کابل و gateway با ping موفق تا حد زیادی تأیید شده‌اند؛ این نشانه بیشتر به process/port مربوط است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "port ephemeral در سمت client چه نقشی دارد؟",
+   "promptHtml": "port ephemeral در سمت client چه نقشی دارد؟",
+   "options": [
+    "connection/flow محلی را شناسایی می‌کند",
+    "نام سرویس را resolve می‌کند",
+    "گواهی TLS را صادر می‌کند",
+    "VLAN را تعیین می‌کند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "client معمولاً یک port موقت برای شناسایی flow محلی انتخاب می‌کند تا پاسخ‌ها به همان socket برگردند. name resolution کار DNS، گواهی کار CA/TLS و VLAN کار لایه ۲ است.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}

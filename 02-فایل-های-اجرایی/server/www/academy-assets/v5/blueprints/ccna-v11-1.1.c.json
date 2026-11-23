@@ -1,0 +1,383 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccna-v11-1.1.c",
+ "objectiveId": "1.1.c",
+ "kind": "objective",
+ "track": "FAM Curriculum 5.0",
+ "course": "ccna-v11",
+ "title": "فایروال نسل جدید و IPS: عبور دادن یا متوقف کردن؟",
+ "titleEn": "Explain — next-generation firewalls and IPS",
+ "domain": "Network Fundamentals",
+ "source": "content/lessons/ccna-v11-1.1.c.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 50,
+ "prerequisites": [
+  "ccna-v11-1.1.a",
+  "ccna-v11-1.1.b"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "ccna-v11-1.1.a",
+   "ccna-v11-1.1.b"
+  ],
+  "learningObjectives": [
+   "stateful",
+   "NGFW",
+   "IPS",
+   "TLS",
+   "fail-open",
+   "asymmetric",
+   "policy",
+   "signature"
+  ]
+ },
+ "whyItMatters": "یک شرکت یک وب‌سرور عمومی در DMZ و شبکهٔ کاربران در داخل دارد. مدیر شبکه قاعدهٔ «HTTPS از اینترنت به وب‌سرور مجاز است» را روی فایروال اضافه می‌کند. چند روز بعد، سرور با یک exploit از طریق همان HTTPS درخواست‌های سالم آلوده می‌شود. فایروال درست کار کرده بود: پورت 443 مجاز بود. مشکل این است که «مجاز بودن پورت» با «سالم بودن محتوا» یکی نیست. یک فایروال نسل جدید (NGFW) می‌تواند policy را بر اساس application، user، direction و context بسازد؛ یک سیستم پیشگیری از نفوذ (IPS) می‌تواند محتوای همان ترافیک مجاز را از نظر signature یا anomaly بررسی و در صورت تطبیق، بسته را drop کند. این درس دو اشتباه رایج را",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>یک شرکت یک وب‌سرور عمومی در DMZ و شبکهٔ کاربران در داخل دارد. مدیر شبکه قاعدهٔ «HTTPS از اینترنت به وب‌سرور مجاز است» را روی فایروال اضافه می‌کند. چند روز بعد، سرور با یک exploit از طریق همان HTTPS درخواست‌های سالم آلوده می‌شود. فایروال درست کار کرده بود: پورت 443 مجاز بود. مشکل این است که «مجاز بودن پورت» با «سالم بودن محتوا» یکی نیست. یک فایروال نسل جدید (NGFW) می‌تواند policy را بر اساس application، user، direction و context بسازد؛ یک سیستم پیشگیری از نفوذ (IPS) می‌تواند محتوای همان ترافیک مجاز را از نظر signature یا anomaly بررسی و در صورت تطبیق، بسته را drop کند.</p>\n<p>این درس دو اشتباه رایج را اصلاح می‌کند:</p>\n<ul><li>«فایروال و IPS یکی هستند.» نه؛ فایروال policy دسترسی و state را مدیریت می‌کند، IPS محتوای ترافیک مجاز را بازرسی می‌کند.</li><li>«IPS همیشه بهتر است چون همه‌چیز را می‌بیند.» نه؛ IPS می‌تواند false positive بدهد، ترافیک رمزنگاری‌شده را نبیند، در حالت passive فقط alert بدهد و اگر در مسیر نباشد هیچ بسته‌ای را drop نمی‌کند.</li></ul>\n<p>هدف این درس این است که جای هر کنترل را در مسیر بسته تشخیص بدهی، بدانی stateful inspection چه چیزی را حل می‌کند و چه چیزی را نه، و بدانی برای تأیید یک policy چه شاهدی لازم است. در آزمون، سؤال‌ها معمولاً بین «allow/deny»، «drop/alert» و «stateful/stateless» جابه‌جا می‌شوند.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>مسیر ترافیک را به سه تصمیم جدا تقسیم کن:</p>\n<ol><li><strong>Policy decision</strong>: آیا این flow از نظر source، destination، application، user و direction مجاز است؟ این کار NGFW است.</li><li><strong>State decision</strong>: آیا این بسته بخشی از یک session معتبر است؟ فایروال stateful برای SYN خروجی state می‌سازد و پاسخ‌های return را بدون rule جداگانه مجاز می‌کند.</li><li><strong>Content decision</strong>: آیا بایت‌های همان flow الگوی حمله، malware، anomaly یا policy نقض‌کننده دارند؟ این کار IPS/IDS و سرویس‌های امنیتی محتواست.</li></ol>\n<p>یک NGFW مدرن می‌تواند هر سه را در یک پلتفرم ترکیب کند، اما این ترکیب باعث نمی‌شود مفاهیم یکی شوند. در طراحی و عیب‌یابی باید بدانی کدام کنترل کدام تصمیم را گرفته است؛ وگرنه با دیدن «allow» در log فایروال، ممکن است خیال کنی IPS هم ترافیک را تأیید کرده است.</p>\n<p><strong>Stateful</strong> یعنی دستگاه جدولی از sessionها دارد (پنج‌گانهٔ IP/port/protocol و وضعیت TCP). <strong>Stateless</strong> یعنی هر بسته مستقل بررسی می‌شود؛ ACL سادهٔ روتر معمولاً stateless است. <strong>IDS</strong> معمولاً passive است و فقط alert می‌دهد؛ <strong>IPS</strong> inline است و می‌تواند drop/reset کند. NGFW معمولاً stateful است و قابلیت application awareness دارد.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>NGFW</td><td>فایروال stateful با application/user awareness و معمولاً IPS/VPN/URL filtering</td><td>«NGFW فقط یک ACL گران‌تر است»</td></tr><tr><td>Stateful inspection</td><td>پیگیری session و اجازهٔ return traffic بر اساس state</td><td>«هر بسته را مستقل allow/deny می‌کند»</td></tr><tr><td>Stateless ACL</td><td>بررسی هر بسته بدون حافظهٔ session</td><td>«معادل stateful firewall است»</td></tr><tr><td>IPS</td><td>بازرسی محتوا/رفتار و توانایی جلوگیری inline</td><td>«فقط log تولید می‌کند»</td></tr><tr><td>IDS</td><td>تشخیص و alert، معمولاً خارج از مسیر</td><td>«می‌تواند بسته را drop کند»</td></tr><tr><td>Signature</td><td>الگوی شناخته‌شدهٔ حمله یا رفتار</td><td>«همهٔ حملات zero-day را می‌شناسد»</td></tr><tr><td>Anomaly</td><td>انحراف از رفتار عادی</td><td>«بدون false positive است»</td></tr><tr><td>Inline</td><td>دستگاه در مسیر ترافیک قرار دارد</td><td>«همیشه بدون تأخیر است»</td></tr><tr><td>Passive</td><td>دستگاه از ترافیک کپی می‌گیرد</td><td>«می‌تواند جلوگیری کند»</td></tr><tr><td>DMZ</td><td>segment محدود برای سرویس عمومی</td><td>«بخشی از LAN داخلی است»</td></tr><tr><td>TLS inspection</td><td>رمزگشایی/بازرمزگذاری برای بازرسی</td><td>«بدون هزینه و ریسک privacy است»</td></tr><tr><td>Fail-open</td><td>خرابی دستگاه باعث عبور ترافیک می‌شود</td><td>«همیشه امن‌تر است»</td></tr><tr><td>Fail-closed</td><td>خرابی دستگاه باعث قطع ترافیک می‌شود</td><td>«همیشه در دسترس‌تر است»</td></tr></tbody></table></div>\n<p><strong>مرز مهم:</strong> فایروال «اجازهٔ رسیدن» می‌دهد؛ IPS «سلامت محتوا» را بررسی می‌کند. یک policy ممکن است HTTPS را مجاز کند، اما IPS همان HTTPS را به دلیل exploit drop کند. برعکس، IPS ممکن است ترافیکی را سالم بداند که policy اصلاً نباید اجازه می‌داد. این دو کنترل مکمل‌اند، نه جایگزین.</p>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. Stateful firewall</h3>\n<p>وقتی client داخل شبکه به وب‌سرور اینترنت وصل می‌شود، فایروال SYN خروجی را می‌بیند، policy را بررسی می‌کند و state می‌سازد. پاسخ SYN-ACK از اینترنت بدون یک rule ورودی جداگانه مجاز می‌شود، چون بخشی از همان session است. اگر session timeout شود یا state از دست برود، پاسخ ممکن است drop شود. این رفتار در مسیریابی نامتقارن (asymmetric routing) مشکل‌ساز است: SYN از یک مسیر برود و پاسخ از مسیر دیگر برگردد، فایروال ممکن است state را نبیند.</p>\n<h3>۴.۲. Application awareness</h3>\n<p>NGFW می‌تواند فقط به پورت 443 اکتفا نکند و application را تشخیص دهد. مثلاً policy می‌گوید «فقط به سرویس SaaS مشخص، نه هر HTTPS». این قابلیت به signature/classification وابسته است و ممکن است با نسخهٔ application، TLS و پلتفرم تغییر کند. بنابراین «application-aware» یک قابلیت است، نه تضمین مطلق.</p>\n<h3>۴.۳. IPS inline</h3>\n<p>IPS بسته‌ها را در مسیر می‌بیند و stream را بازسازی می‌کند. اگر signature مطابقت کند، بسته به action policy (alert، drop، reset، quarantine) می‌رسد. IPS می‌تواند false positive داشته باشد؛ بنابراین actionها و exceptionها باید با شاهد و مالکیت business تنظیم شوند. IPS passive (یا IDS) فقط alert می‌دهد و برای جلوگیری به inline یا integration با فایروال نیاز دارد.</p>\n<h3>۴.۴. رمزنگاری</h3>\n<p>اگر ترافیک TLS باشد، IPS بدون رمزگشایی فقط metadata (IP، port، SNI در برخی موارد، حجم، زمان) را می‌بیند، نه payload را. TLS inspection با proxy/گواهی می‌تواند payload را ببیند، اما هزینهٔ privacy، legal، performance و trust دارد. در طراحی باید صریح بگویی چه ترافیکی رمزگشایی می‌شود و چه ترافیکی نه.</p>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریوی درس:</p>\n<ul><li>client داخلی: <code>10.10.10.50</code></li><li>وب‌سرور DMZ: <code>10.10.30.10:443</code></li><li>NGFW: outside/inside/DMZ</li><li>IPS inline بین NGFW و core</li></ul>\n<ol><li>client یک SYN به <code>10.10.30.10:443</code> می‌فرستد.</li><li>NGFW source/destination/application/direction را بررسی می‌کند؛ policy «HTTPS به DMZ» را match می‌کند و state می‌سازد.</li><li>IPS همان flow را بازرسی می‌کند؛ اگر signature سالم باشد، عبور می‌کند و log می‌شود.</li><li>وب‌سرور پاسخ می‌دهد. NGFW پاسخ را به‌عنوان return traffic همان session می‌شناسد؛ IPS دوباره محتوا را بررسی می‌کند.</li><li>اگر درخواست شامل exploit شناخته‌شده باشد، IPS می‌تواند بسته را drop کند؛ NGFW ممکن است همچنان session را «allowed» نشان دهد، چون تصمیم آن در لایهٔ policy بوده است.</li><li>اگر IPS در حالت passive باشد، فقط alert می‌دهد و بسته به سرور می‌رسد؛ این تفاوت حیاتی است.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>کنترل</th><th>تصمیم</th><th>شاهد</th></tr></thead><tbody><tr><td>1</td><td>NGFW</td><td>allow/deny flow</td><td>policy hit + session table</td></tr><tr><td>2</td><td>IPS inline</td><td>allow/drop محتوا</td><td>signature hit/drop counter</td></tr><tr><td>3</td><td>NGFW</td><td>return traffic</td><td>state/session</td></tr><tr><td>4</td><td>IPS</td><td>بازرسی پاسخ</td><td>log/alert</td></tr><tr><td>5</td><td>Core/DMZ</td><td>forwarding</td><td>route/MAC/ARP</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 650\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Next-generation firewall and inline IPS at the internet edge</title>\n  <desc id=\"desc\">Internet traffic enters a stateful next-generation firewall, then an inline IPS, then the core switch. The firewall enforces application-aware policy and keeps state; the IPS inspects packets and can drop malicious traffic. A DMZ web server and the user LAN are separate segments.</desc>\n  <rect width=\"1100\" height=\"650\" fill=\"#f6f8fc\"/>\n  <text x=\"550\" y=\"42\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"25\" font-weight=\"700\" fill=\"#14213d\">Two different controls on one path</text>\n  <text x=\"550\" y=\"70\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#4a5568\">The firewall decides who may talk; the IPS inspects what the allowed traffic contains.</text>\n\n  <!-- Internet -->\n  <rect x=\"40\" y=\"260\" width=\"160\" height=\"120\" rx=\"16\" fill=\"#eef2f7\" stroke=\"#64748b\" stroke-width=\"3\"/>\n  <text x=\"120\" y=\"305\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"21\" font-weight=\"700\" fill=\"#334155\">Internet</text>\n  <text x=\"120\" y=\"334\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#475569\">untrusted</text>\n  <text x=\"120\" y=\"358\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#475569\">203.0.113.10</text>\n\n  <!-- NGFW -->\n  <rect x=\"270\" y=\"225\" width=\"220\" height=\"190\" rx=\"18\" fill=\"#fff1f2\" stroke=\"#be123c\" stroke-width=\"4\"/>\n  <text x=\"380\" y=\"268\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#881337\">NGFW</text>\n  <text x=\"380\" y=\"298\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#9f1239\">stateful inspection</text>\n  <text x=\"380\" y=\"323\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#9f1239\">app-aware policy</text>\n  <text x=\"380\" y=\"348\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#9f1239\">NAT / VPN / logs</text>\n  <text x=\"380\" y=\"376\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#9f1239\">decides: allow, deny, inspect</text>\n\n  <!-- IPS -->\n  <rect x=\"560\" y=\"225\" width=\"200\" height=\"190\" rx=\"18\" fill=\"#fff7ed\" stroke=\"#c2410c\" stroke-width=\"4\"/>\n  <text x=\"660\" y=\"268\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#7c2d12\">IPS inline</text>\n  <text x=\"660\" y=\"298\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#9a3412\">signature / anomaly</text>\n  <text x=\"660\" y=\"323\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#9a3412\">packet inspection</text>\n  <text x=\"660\" y=\"348\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#9a3412\">drop / alert / reset</text>\n  <text x=\"660\" y=\"376\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#9a3412\">inspects allowed traffic</text>\n\n  <!-- Core -->\n  <rect x=\"830\" y=\"240\" width=\"220\" height=\"160\" rx=\"18\" fill=\"#ecfdf5\" stroke=\"#0f766e\" stroke-width=\"4\"/>\n  <text x=\"940\" y=\"282\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#134e4a\">Core switch</text>\n  <text x=\"940\" y=\"312\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#115e59\">segmentation</text>\n  <text x=\"940\" y=\"337\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#115e59\">LAN / DMZ routing</text>\n  <text x=\"940\" y=\"362\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#115e59\">policy boundary continues</text>\n\n  <!-- links -->\n  <line x1=\"200\" y1=\"320\" x2=\"270\" y2=\"320\" stroke=\"#be123c\" stroke-width=\"6\"/>\n  <line x1=\"490\" y1=\"320\" x2=\"560\" y2=\"320\" stroke=\"#c2410c\" stroke-width=\"6\"/>\n  <line x1=\"760\" y1=\"320\" x2=\"830\" y2=\"320\" stroke=\"#0f766e\" stroke-width=\"6\"/>\n\n  <!-- DMZ and LAN -->\n  <rect x=\"820\" y=\"470\" width=\"230\" height=\"90\" rx=\"14\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"935\" y=\"504\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"18\" font-weight=\"700\" fill=\"#134e4a\">DMZ · web 10.10.30.10</text>\n  <text x=\"935\" y=\"530\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#115e59\">public service, limited exposure</text>\n\n  <rect x=\"520\" y=\"470\" width=\"240\" height=\"90\" rx=\"14\" fill=\"#ffffff\" stroke=\"#2563eb\" stroke-width=\"2\"/>\n  <text x=\"640\" y=\"504\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"18\" font-weight=\"700\" fill=\"#1e3a8a\">LAN · users 10.10.10.0/24</text>\n  <text x=\"640\" y=\"530\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#1e40af\">internal clients, least privilege</text>\n\n  <path d=\"M940 400 C940 430 935 450 935 470\" stroke=\"#0f766e\" stroke-width=\"3\" stroke-dasharray=\"7 6\" fill=\"none\"/>\n  <path d=\"M900 470 C820 440 760 430 760 415\" stroke=\"#2563eb\" stroke-width=\"3\" stroke-dasharray=\"7 6\" fill=\"none\"/>\n\n  <!-- policy strip -->\n  <rect x=\"130\" y=\"565\" width=\"840\" height=\"52\" rx=\"12\" fill=\"#ffffff\" stroke=\"#cbd5e1\"/>\n  <text x=\"550\" y=\"597\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#334155\">Policy order matters: match source, destination, application, user, and action — then log the decision.</text>\n</svg></div><figcaption>NGFW و IPS inline در لبهٔ اینترنت؛ DMZ و LAN جدا</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>دستگاه/segment</th><th>آدرس/نقش</th><th>نکته</th></tr></thead><tbody><tr><td>Internet</td><td>untrusted</td><td>منبع ترافیک عمومی</td></tr><tr><td>NGFW outside</td><td>203.0.113.10</td><td>policy/NAT/VPN endpoint</td></tr><tr><td>NGFW inside</td><td>10.10.10.1/24</td><td>gateway کاربران</td></tr><tr><td>NGFW DMZ</td><td>10.10.30.1/24</td><td>gateway DMZ</td></tr><tr><td>IPS</td><td>inline/passive</td><td>بازرسی محتوا</td></tr><tr><td>Core switch</td><td>LAN/DMZ routing</td><td>segmentation داخلی</td></tr><tr><td>Web server</td><td>10.10.30.10:443</td><td>سرویس عمومی محدود</td></tr><tr><td>Client</td><td>10.10.10.50</td><td>کاربر داخلی</td></tr></tbody></table></div>\n<p><strong>نکتهٔ طراحی:</strong> DMZ باید از LAN جدا باشد. اگر وب‌سرور عمومی در همان VLAN کاربران باشد، یک compromise می‌تواند به کل LAN نزدیک شود. NGFW باید policy بین Internet→DMZ، LAN→DMZ و LAN→Internet را جدا نگه دارد؛ «allow any any» در هیچ‌کدام قابل قبول نیست.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>NGFWها CLI/GUI اختصاصی دارند و دستور یک vendor روی vendor دیگر کار نمی‌کند. بنابراین این درس یک <strong>رویهٔ policy</strong> می‌دهد، نه یک CLI جعلی. پلتفرم فرضی: یک NGFW سازمانی با policy first-match و IPS inline؛ جزئیات باید با مستندات همان محصول تطبیق داده شود.</p>\n<div class=\"table-wrap\"><table><thead><tr><th>ترتیب</th><th>Source</th><th>Destination</th><th>Application/Service</th><th>Action</th><th>Log</th></tr></thead><tbody><tr><td>1</td><td>Internet</td><td>DMZ web 10.10.30.10</td><td>HTTPS</td><td>allow + IPS inspect</td><td>yes</td></tr><tr><td>2</td><td>Internet</td><td>LAN 10.10.10.0/24</td><td>any</td><td>deny</td><td>yes</td></tr><tr><td>3</td><td>LAN</td><td>Internet</td><td>web/DNS/NTP</td><td>allow + IPS inspect</td><td>yes</td></tr><tr><td>4</td><td>LAN</td><td>DMZ web</td><td>HTTPS/API</td><td>allow + IPS inspect</td><td>yes</td></tr><tr><td>5</td><td>any</td><td>any</td><td>any</td><td>deny</td><td>yes</td></tr></tbody></table></div>\n<p><strong>قواعد:</strong></p>\n<ul><li>policy خاص قبل از policy عام؛ در platformهای first-match، ترتیب اجرایی است.</li><li>هر policy باید owner، reason، expiry/review date و log داشته باشد.</li><li>قبل از تغییر، config backup و rollback plan بگیر؛ بعد از تغییر، با ترافیک کنترل‌شده تست کن.</li><li>IPS actionها را از alert شروع کن و بعد از بررسی false positive به drop ارتقا بده.</li><li>برای TLS inspection، legal/privacy و trust chain را صریح مستند کن.</li></ul>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th></tr></thead><tbody><tr><td>1</td><td>policy hit counter</td><td>کدام rule match شد</td></tr><tr><td>2</td><td>session/state table</td><td>flow و return traffic</td></tr><tr><td>3</td><td>IPS alert/drop log</td><td>signature و action</td></tr><tr><td>4</td><td>benign test</td><td>policy ترافیک سالم را نمی‌شکند</td></tr><tr><td>5</td><td>malicious test fixture</td><td>IPS action واقعاً اعمال می‌شود</td></tr><tr><td>6</td><td>TLS inspection log</td><td>چه ترافیکی decrypt شده</td></tr><tr><td>7</td><td>config diff/backup</td><td>تغییر قابل بازگشت است</td></tr></tbody></table></div>\n<pre><code class=\"language-text\">! Designed — Not Run; vendor-neutral evidence shape, not a real log\nPolicy 12: LAN 10.10.10.50 -&gt; DMZ 10.10.30.10:443\n  action=allow; ips=inline; tls_inspection=yes; hit_count=184\n\nIPS: signature 1.2.3.4 &quot;example-web-exploit&quot; -&gt; drop\n  src=10.10.10.50 dst=10.10.30.10 sport=51544 dport=443</code></pre>\n<p>اگر فقط log فایروال را ببینی و IPS log را نبینی، نمی‌توانی بگویی محتوا سالم بوده است. اگر IPS drop می‌کند ولی policy hit وجود ندارد، احتمالاً ترافیک از مسیر دیگری عبور کرده یا policy اشتباه است. هر دو log باید با timestamp و flow ID به هم مرتبط شوند.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>اولین شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>ترافیک مجاز است اما IPS drop می‌کند</td><td>signature/action یا false positive</td><td>IPS log و signature ID</td><td>exception موقت با تأیید مالک</td></tr><tr><td>return traffic drop می‌شود</td><td>asymmetric routing یا state timeout</td><td>session table دو طرف</td><td>مسیر/state را هم‌راستا کن</td></tr><tr><td>HTTPS بازرسی نمی‌شود</td><td>TLS inspection خاموش/exception</td><td>policy و decrypt log</td><td>تصمیم privacy/legal و trust</td></tr><tr><td>IPS هیچ چیز نمی‌بیند</td><td>passive است یا در مسیر نیست</td><td>interface/mode</td><td>inline/span را درست کن</td></tr><tr><td>policy اشتباه match می‌شود</td><td>ترتیب first-match یا shadow rule</td><td>hit counter و policy order</td><td>rule را جابه‌جا/محدود کن</td></tr><tr><td>بعد از update، false positive زیاد شد</td><td>signature جدید/نسخه</td><td>release notes و log</td><td>rollback signature با شاهد</td></tr></tbody></table></div>\n<p><strong>روش عیب‌یابی:</strong> ابتدا مشخص کن آیا مشکل در <strong>policy</strong> است یا <strong>content</strong> یا <strong>state</strong> یا <strong>route</strong>. برای هر کدام یک شاهد متفاوت لازم است. تغییر هم‌زمان چند policy، تشخیص را غیرممکن می‌کند؛ هر تغییر را جدا و با rollback انجام بده.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<ul><li><strong>Defense in depth:</strong> NGFW، IPS، segmentation، endpoint protection و log/PKI لایه‌های جدا هستند؛ هیچ‌کدام جای دیگری را نمی‌گیرد.</li><li><strong>Least privilege:</strong> فقط سرویس لازم بین segmentها مجاز باشد؛ DMZ به LAN دسترسی پیش‌فرض نداشته باشد.</li><li><strong>Fail mode:</strong> fail-open دسترس‌پذیری را حفظ می‌کند اما امنیت را کاهش می‌دهد؛ fail-closed برعکس. انتخاب باید بر اساس business impact باشد، نه شعار.</li><li><strong>High availability:</strong> دو دستگاه با state sync می‌توانند از قطعی جلوگیری کنند، اما خودشان پیچیدگی و risk جدید دارند.</li><li><strong>Privacy:</strong> TLS inspection محتوای کاربر را می‌بیند؛ باید قانونی، شفاف و محدود باشد.</li><li><strong>Logging:</strong> بدون NTP و log متمرکز، correlation و forensics تقریباً غیرممکن است.</li><li><strong>Change control:</strong> policyها کد هستند؛ version، owner، review و test لازم دارند.</li></ul>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«فایروال و IPS یکی هستند.»</td><td>فایروال policy/state؛ IPS محتوا/جلوگیری.</td></tr><tr><td>«IDS می‌تواند بسته را drop کند.»</td><td>IDS passive است؛ IPS inline drop می‌کند.</td></tr><tr><td>«NGFW همهٔ malwareها را می‌بیند.»</td><td>به signature، TLS، نسخه و coverage وابسته است.</td></tr><tr><td>«stateful firewall با یک ACL ساده یکی است.»</td><td>stateful session/return traffic دارد؛ ACL ساده حافظه ندارد.</td></tr><tr><td>«HTTPS یعنی محتوا امن است.»</td><td>رمزنگاری، محتوا را از دید IPS پنهان می‌کند.</td></tr><tr><td>«fail-open همیشه امن‌تر است.»</td><td>دسترس‌پذیری را حفظ می‌کند، امنیت را کم می‌کند.</td></tr><tr><td>«IPS بدون false positive است.»</td><td>هر signature می‌تواند false positive بدهد.</td></tr><tr><td>«policy order مهم نیست.»</td><td>در first-match، ترتیب تعیین‌کننده است.</td></tr></tbody></table></div>\n<p>در آزمون، اگر گزینه‌ای گفت «IPS همیشه بهتر از firewall است» یا «IDS می‌تواند drop کند»، رد کن. اگر سؤال دربارهٔ ترافیک مجازِ آلوده بود، پاسخ معمولاً IPS/content inspection است، نه صرفاً ACL. اگر سؤال دربارهٔ return traffic بود، stateful firewall را در نظر بگیر.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>NGFW policy دسترسی را با state و application awareness اعمال می‌کند.</li><li>IPS محتوای ترافیک مجاز را بررسی و در حالت inline می‌تواند drop کند.</li><li>IDS passive فقط alert می‌دهد؛ IPS inline جلوگیری می‌کند.</li><li>stateful firewall پاسخ‌های session را مجاز می‌کند؛ asymmetric routing می‌تواند state را بشکند.</li><li>TLS inspection برای دیدن payload لازم است، اما هزینه و ریسک privacy دارد.</li><li>policy خاص قبل از عام، با log و owner و review.</li><li>تأیید = policy hit + state + IPS log + تست کنترل‌شده.</li><li>امنیت لایه‌ای است؛ NGFW جای endpoint و segmentation را نمی‌گیرد.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 v1.1 Exam Topics — &lt;https://www.cisco.com/c/en/us/training-exams/training/it-certifications/ccna-certification.html&gt;</td><td>1.0 Network Fundamentals، 1.1.c NGFW/IPS</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>NIST SP 800-41 Rev. 1 — Guidelines on Firewalls and Firewall Policy — &lt;https://csrc.nist.gov/pubs/sp/800/41/r1/final&gt;</td><td>firewall policy و architecture</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>NIST SP 800-94 — Guide to Intrusion Detection and Prevention Systems — &lt;https://csrc.nist.gov/pubs/sp/800/94/final&gt;</td><td>IDS/IPS concepts</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>این درس توسط Agent بازنویسی شده و تأیید معنایی خبرهٔ انسانی ندارد.</li><li>هیچ NGFW/IPS واقعی، GUI، lab یا ترافیک تولیدی اجرا نشده است؛ همهٔ نمونه‌ها <code>Designed — Not Run</code> هستند.</li><li>behavior دقیق state، application classification، TLS inspection و fail mode به vendor/platform/version وابسته است.</li><li>URLها snapshot/hash نشده‌اند و <code>PROVENANCE_NOT_VERIFIED</code> هستند.</li><li>این درس فقط مفاهیم پایه را پوشش می‌دهد؛ VPN، NAT، ACL و معماری امنیتی در درس‌های خودشان می‌آیند.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <a href=\"ccna-v11-1.1.d.html\">Access Point: پل بین بی‌سیم و کابل</a> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "NGFW",
+   "fa": "NGFW",
+   "simple": "فایروال نسل جدید با state، application awareness و سرویس‌های امنیتی."
+  },
+  {
+   "term": "Stateful inspection",
+   "fa": "Stateful inspection",
+   "simple": "پیگیری session و اجازهٔ return traffic."
+  },
+  {
+   "term": "Stateless ACL",
+   "fa": "Stateless ACL",
+   "simple": "ACL بدون حافظهٔ session."
+  },
+  {
+   "term": "IPS",
+   "fa": "IPS",
+   "simple": "سیستم پیشگیری از نفوذ inline با توان drop."
+  },
+  {
+   "term": "IDS",
+   "fa": "IDS",
+   "simple": "سیستم تشخیص نفوذ، معمولاً passive و alert-only."
+  },
+  {
+   "term": "Signature",
+   "fa": "Signature",
+   "simple": "الگوی شناخته‌شدهٔ حمله."
+  },
+  {
+   "term": "Anomaly detection",
+   "fa": "Anomaly detection",
+   "simple": "تشخیص انحراف از رفتار عادی."
+  },
+  {
+   "term": "Inline",
+   "fa": "Inline",
+   "simple": "قرار گرفتن در مسیر ترافیک."
+  },
+  {
+   "term": "Passive",
+   "fa": "Passive",
+   "simple": "دریافت کپی ترافیک بدون قرار گرفتن در مسیر."
+  },
+  {
+   "term": "DMZ",
+   "fa": "DMZ",
+   "simple": "segment محدود برای سرویس عمومی."
+  },
+  {
+   "term": "Policy",
+   "fa": "Policy",
+   "simple": "قاعدهٔ allow/deny/inspect."
+  },
+  {
+   "term": "First-match",
+   "fa": "First-match",
+   "simple": "اجرای اولین policy مطابق."
+  },
+  {
+   "term": "Session table",
+   "fa": "Session table",
+   "simple": "جدول flowهای فعال."
+  },
+  {
+   "term": "Asymmetric routing",
+   "fa": "Asymmetric routing",
+   "simple": "رفت و برگشت از مسیرهای متفاوت."
+  },
+  {
+   "term": "TLS inspection",
+   "fa": "TLS inspection",
+   "simple": "رمزگشایی و بازرسی ترافیک TLS."
+  },
+  {
+   "term": "False positive",
+   "fa": "False positive",
+   "simple": "هشدار/بلاک اشتباه برای ترافیک سالم."
+  },
+  {
+   "term": "Fail-open",
+   "fa": "Fail-open",
+   "simple": "عبور ترافیک در صورت خرابی کنترل."
+  },
+  {
+   "term": "Fail-closed",
+   "fa": "Fail-closed",
+   "simple": "قطع ترافیک در صورت خرابی کنترل."
+  },
+  {
+   "term": "Defense in depth",
+   "fa": "Defense in depth",
+   "simple": "چند لایه کنترل مستقل."
+  },
+  {
+   "term": "NAT",
+   "fa": "NAT",
+   "simple": "ترجمهٔ آدرس (در درس جداگانه)."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>NGFWها CLI/GUI اختصاصی دارند و دستور یک vendor روی vendor دیگر کار نمی‌کند. بنابراین این درس یک <strong>رویهٔ policy</strong> می‌دهد، نه یک CLI جعلی. پلتفرم فرضی: یک NGFW سازمانی با policy first-match و IPS inline؛ جزئیات باید با مستندات همان محصول تطبیق داده شود.</p>\n<div class=\"table-wrap\"><table><thead><tr><th>ترتیب</th><th>Source</th><th>Destination</th><th>Application/Service</th><th>Action</th><th>Log</th></tr></thead><tbody><tr><td>1</td><td>Internet</td><td>DMZ web 10.10.30.10</td><td>HTTPS</td><td>allow + IPS inspect</td><td>yes</td></tr><tr><td>2</td><td>Internet</td><td>LAN 10.10.10.0/24</td><td>any</td><td>deny</td><td>yes</td></tr><tr><td>3</td><td>LAN</td><td>Internet</td><td>web/DNS/NTP</td><td>allow + IPS inspect</td><td>yes</td></tr><tr><td>4</td><td>LAN</td><td>DMZ web</td><td>HTTPS/API</td><td>allow + IPS inspect</td><td>yes</td></tr><tr><td>5</td><td>any</td><td>any</td><td>any</td><td>deny</td><td>yes</td></tr></tbody></table></div>\n<p><strong>قواعد:</strong></p>\n<ul><li>policy خاص قبل از policy عام؛ در platformهای first-match، ترتیب اجرایی است.</li><li>هر policy باید owner، reason، expiry/review date و log داشته باشد.</li><li>قبل از تغییر، config backup و rollback plan بگیر؛ بعد از تغییر، با ترافیک کنترل‌شده تست کن.</li><li>IPS actionها را از alert شروع کن و بعد از بررسی false positive به drop ارتقا بده.</li><li>برای TLS inspection، legal/privacy و trust chain را صریح مستند کن.</li></ul><h4>۸. تأیید و شاهد</h4><div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th></tr></thead><tbody><tr><td>1</td><td>policy hit counter</td><td>کدام rule match شد</td></tr><tr><td>2</td><td>session/state table</td><td>flow و return traffic</td></tr><tr><td>3</td><td>IPS alert/drop log</td><td>signature و action</td></tr><tr><td>4</td><td>benign test</td><td>policy ترافیک سالم را نمی‌شکند</td></tr><tr><td>5</td><td>malicious test fixture</td><td>IPS action واقعاً اعمال می‌شود</td></tr><tr><td>6</td><td>TLS inspection log</td><td>چه ترافیکی decrypt شده</td></tr><tr><td>7</td><td>config diff/backup</td><td>تغییر قابل بازگشت است</td></tr></tbody></table></div>\n<pre><code class=\"language-text\">! Designed — Not Run; vendor-neutral evidence shape, not a real log\nPolicy 12: LAN 10.10.10.50 -&gt; DMZ 10.10.30.10:443\n  action=allow; ips=inline; tls_inspection=yes; hit_count=184\n\nIPS: signature 1.2.3.4 &quot;example-web-exploit&quot; -&gt; drop\n  src=10.10.10.50 dst=10.10.30.10 sport=51544 dport=443</code></pre>\n<p>اگر فقط log فایروال را ببینی و IPS log را نبینی، نمی‌توانی بگویی محتوا سالم بوده است. اگر IPS drop می‌کند ولی policy hit وجود ندارد، احتمالاً ترافیک از مسیر دیگری عبور کرده یا policy اشتباه است. هر دو log باید با timestamp و flow ID به هم مرتبط شوند.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "وظیفهٔ اصلی NGFW در این سناریو چیست؟",
+   "promptHtml": "وظیفهٔ اصلی NGFW در این سناریو چیست؟",
+   "options": [
+    "حذف malware از فایل‌های روی endpoint",
+    "جایگزینی کامل IPS با یک ACL ساده",
+    "اعمال policy دسترسی stateful و application-aware روی flow",
+    "رمزگشایی همهٔ ترافیک‌ها بدون سیاست privacy"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "NGFW تصمیم policy/state و در بسیاری از محصولات application awareness را انجام می‌دهد. حذف malware از endpoint کار endpoint protection است؛ ACL ساده stateful نیست؛ رمزگشایی همهٔ ترافیک‌ها بدون سیاست privacy قابل قبول نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "تفاوت کلیدی IPS inline با IDS passive چیست؟",
+   "promptHtml": "تفاوت کلیدی IPS inline با IDS passive چیست؟",
+   "options": [
+    "IDS همیشه سریع‌تر است",
+    "IPS می‌تواند بسته را در مسیر drop کند؛ IDS معمولاً فقط alert می‌دهد",
+    "IDS فقط برای ترافیک رمزنگاری‌شده است",
+    "IPS هیچ logای تولید نمی‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "IPS inline در مسیر قرار دارد و می‌تواند actionهایی مانند drop/reset اعمال کند؛ IDS passive کپی ترافیک را می‌بیند و معمولاً alert می‌دهد. گزینهٔ اول یک ادعای مطلق بدون شرط است؛ گزینهٔ سوم و چهارم با عملکرد واقعی این کنترل‌ها هم‌خوان نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "state table در فایروال stateful چه کمکی می‌کند؟",
+   "promptHtml": "state table در فایروال stateful چه کمکی می‌کند؟",
+   "options": [
+    "longest prefix match را سریع‌تر می‌کند",
+    "TTL را در هر بسته کم می‌کند",
+    "MAC table سوئیچ را جایگزین می‌کند",
+    "پاسخ‌های یک session معتبر را بدون rule جداگانه مجاز می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "state table پنج‌گانه و وضعیت session را نگه می‌دارد تا return traffic همان flow مجاز شود. longest prefix کار جدول route است؛ TTL کار forwarding L3؛ MAC table هم جدول سوئیچ L2 است. state table جای این جدول‌ها را نمی‌گیرد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام مورد از وظایف اصلی NGFW نیست؟",
+   "promptHtml": "کدام مورد از وظایف اصلی NGFW نیست؟",
+   "options": [
+    "پاک‌کردن malware از فایل‌های روی لپ‌تاپ کاربر",
+    "اعمال policy بر اساس source، destination و application",
+    "نگه‌داشتن state برای sessionهای TCP",
+    "تولید log برای تصمیم allow/deny"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "پاک‌سازی malware روی endpoint کار agent/EDR/antivirus است، نه وظیفهٔ اصلی NGFW. policy، state و logging از وظایف رایج NGFW هستند. NGFW ممکن است فایل را اسکن کند، اما جایگزین امنیت endpoint نمی‌شود.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "برای اینکه IPS محتوای یک flow HTTPS را ببیند، چه چیزی معمولاً لازم است؟",
+   "promptHtml": "برای اینکه IPS محتوای یک flow HTTPS را ببیند، چه چیزی معمولاً لازم است؟",
+   "options": [
+    "فقط باز کردن پورت 443",
+    "حذف state table",
+    "TLS inspection با رمزگشایی/بازرمزگذاری و سیاست مربوط",
+    "تبدیل IPS به حالت passive"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "payload در TLS رمزنگاری شده است؛ برای بازرسی محتوا باید traffic decrypt شود که با proxy/گواهی و سیاست privacy انجام می‌شود. باز کردن پورت 443 فقط policy دسترسی است؛ حذف state و passive شدن IPS دیدن payload را بهتر نمی‌کند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "به‌روزرسانی signature در IPS چه اثری دارد؟",
+   "promptHtml": "به‌روزرسانی signature در IPS چه اثری دارد؟",
+   "options": [
+    "همهٔ حملات zero-day را بدون false positive تشخیص می‌دهد",
+    "توان تشخیص الگوهای جدید را اضافه می‌کند، اما coverage کامل نیست",
+    "TTL را در ترافیک کاهش می‌دهد",
+    "NGFW را از stateful به stateless تبدیل می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "signature جدید الگوهای شناخته‌شده را اضافه می‌کند و ممکن است false positive هم داشته باشد؛ هیچ signature setای coverage کامل و بدون خطا ندارد. TTL و حالت stateful/stateless ربطی به به‌روزرسانی signature ندارند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "در مسیریابی نامتقارن، چرا یک فایروال stateful ممکن است پاسخ را drop کند؟",
+   "promptHtml": "در مسیریابی نامتقارن، چرا یک فایروال stateful ممکن است پاسخ را drop کند؟",
+   "options": [
+    "چون TTL در مسیر برگشت صفر می‌شود",
+    "چون MAC table سوئیچ پر می‌شود",
+    "چون IPS همیشه پاسخ‌ها را drop می‌کند",
+    "چون پاسخ از interface/مسیری می‌آید که state آن session را ندارد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "فایروال stateful پاسخ را با session table تطبیق می‌دهد؛ اگر مسیر برگشت از دستگاه دیگری عبور کند یا state را نبیند، ممکن است آن را بی‌ارتباط بداند و drop کند. TTL، MAC table و رفتار IPS علت مستقیم این حالت نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "در یک policy first-match، اگر rule عام «allow any» قبل از rule خاص «deny DMZ→LAN» باشد، چه اتفاقی می‌افتد؟",
+   "promptHtml": "در یک policy first-match، اگر rule عام «allow any» قبل از rule خاص «deny DMZ→LAN» باشد، چه اتفاقی می‌افتد؟",
+   "options": [
+    "rule عام اول match می‌شود و ترافیک مجاز می‌ماند",
+    "rule خاص برنده می‌شود، چون امن‌تر است",
+    "هیچ ruleای اجرا نمی‌شود",
+    "IPS به‌جای فایروال تصمیم می‌گیرد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "در first-match، اولین policy مطابق اجرا می‌شود و ruleهای بعدی بررسی نمی‌شوند؛ بنابراین rule عام می‌تواند rule خاص را shadow کند. امن‌تر بودن یا اولویت ذهنی، ترتیب اجرا را تغییر نمی‌دهد؛ IPS هم تصمیم policy فایروال را جایگزین نمی‌کند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "اگر IPS در حالت passive باشد، چه کاری انجام می‌دهد؟",
+   "promptHtml": "اگر IPS در حالت passive باشد، چه کاری انجام می‌دهد؟",
+   "options": [
+    "همهٔ بسته‌های مشکوک را drop می‌کند",
+    "state فایروال را بازنویسی می‌کند",
+    "کپی ترافیک را تحلیل و alert می‌دهد، اما در مسیر drop نیست",
+    "NAT را غیرفعال می‌کند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "حالت passive/IDS ترافیک را از کپی می‌بیند و alert می‌دهد؛ چون inline نیست، نمی‌تواند بسته را در مسیر اصلی drop کند. drop، بازنویسی state و NAT از وظایف این حالت نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "انتخاب fail-open در برابر fail-closed عمدتاً چه trade-offای است؟",
+   "promptHtml": "انتخاب fail-open در برابر fail-closed عمدتاً چه trade-offای است؟",
+   "options": [
+    "سرعت پردازش در برابر تعداد interface",
+    "دسترس‌پذیری در برابر امنیت",
+    "IPv4 در برابر IPv6",
+    "stateful در برابر stateless"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "fail-open در خرابی کنترل ترافیک را عبور می‌دهد و دسترس‌پذیری را حفظ می‌کند اما ممکن است امنیت را کاهش دهد؛ fail-closed ترافیک را قطع می‌کند و امنیت را حفظ می‌کند اما دسترس‌پذیری را قربانی می‌کند. گزینه‌های دیگر مفاهیم متفاوتی هستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام جمله دربارهٔ رابطهٔ NGFW و IPS درست است؟",
+   "promptHtml": "کدام جمله دربارهٔ رابطهٔ NGFW و IPS درست است؟",
+   "options": [
+    "NGFW جای IPS را می‌گیرد و دیگر نیازی به بازرسی محتوا نیست",
+    "IPS جای فایروال را می‌گیرد و policy دسترسی لازم نیست",
+    "هر دو فقط برای ترافیک بدون TLS کار می‌کنند",
+    "آن‌ها مکمل‌اند: یکی policy/state و دیگری بازرسی محتوا را انجام می‌دهد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "NGFW و IPS تصمیم‌های متفاوت و مکمل دارند؛ policy/state و بازرسی محتوا دو لایه‌اند. گزینهٔ اول و دوم یکی را جایگزین دیگری می‌کنند؛ گزینهٔ سوم یک محدودیت مطلق و نادرست برای هر دو می‌سازد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "برای تأیید اینکه یک policy امنیتی واقعاً کار می‌کند، کدام شاهد بهتر است؟",
+   "promptHtml": "برای تأیید اینکه یک policy امنیتی واقعاً کار می‌کند، کدام شاهد بهتر است؟",
+   "options": [
+    "ترافیک کنترل‌شدهٔ سالم و تست fixture مخرب، همراه با policy hit، session و IPS log",
+    "فقط وجود rule در config",
+    "فقط ping به آدرس فایروال",
+    "فقط تعداد interfaceهای up"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "تأیید واقعی به شاهد رفتاری نیاز دارد: ترافیک سالم باید عبور کند، تست مخرب باید مطابق policy drop/alert شود و logهای policy/state/IPS باید هم‌راستا باشند. وجود rule در config، ping به خود فایروال یا up بودن interfaceها اثبات عملکرد policy نیست.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}

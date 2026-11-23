@@ -1,0 +1,381 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccna-v11-1.1.b",
+ "objectiveId": "1.1.b",
+ "kind": "objective",
+ "track": "FAM Curriculum 5.0",
+ "course": "ccna-v11",
+ "title": "سوئیچ لایه ۲ و لایه ۳: مرز قاب و بسته",
+ "titleEn": "Explain — layer 2 and layer 3 switches",
+ "domain": "Network Fundamentals",
+ "source": "content/lessons/ccna-v11-1.1.b.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 45,
+ "prerequisites": [
+  "ccna-v11-1.1.a"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "ccna-v11-1.1.a"
+  ],
+  "learningObjectives": [
+   "VLAN",
+   "SVI",
+   "trunk",
+   "access port",
+   "ip routing",
+   "broadcast domain",
+   "router-on-a-stick",
+   "autostate"
+  ]
+ },
+ "whyItMatters": "در یک ساختمان اداری، دو VLAN وجود دارد: VLAN 10 برای کاربران با subnet 10.10.10.0/24 و VLAN 20 برای سرورها با subnet 10.10.20.0/24. هر دو VLAN روی یک سوئیچ دسترسی تعریف شده‌اند. کاربری می‌گوید «سرور را می‌بینم ولی به آن وصل نمی‌شوم»؛ همکارش می‌گوید «سوئیچ ما Layer 3 است، پس باید route کند». هر دو جمله ممکن است ناقص باشند: یک سوئیچ می‌تواند هم فریم را در VLAN جلو ببرد و هم بسته را بین VLANها route کند، اما این دو کار مکانیزم، جدول و پیش‌نیازهای متفاوتی دارند. اگر ip routing خاموش باشد یا SVI مربوط به VLAN حالت up نداشته باشد، دستگاه به‌ظاهر «L3 switch» است ولی هیچ routeای بین VLANها انجام نمی‌د",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>در یک ساختمان اداری، دو VLAN وجود دارد: <code>VLAN 10</code> برای کاربران با subnet <code>10.10.10.0/24</code> و <code>VLAN 20</code> برای سرورها با subnet <code>10.10.20.0/24</code>. هر دو VLAN روی یک سوئیچ دسترسی تعریف شده‌اند. کاربری می‌گوید «سرور را می‌بینم ولی به آن وصل نمی‌شوم»؛ همکارش می‌گوید «سوئیچ ما Layer 3 است، پس باید route کند». هر دو جمله ممکن است ناقص باشند: یک سوئیچ می‌تواند هم فریم را در VLAN جلو ببرد و هم بسته را بین VLANها route کند، اما این دو کار مکانیزم، جدول و پیش‌نیازهای متفاوتی دارند. اگر <code>ip routing</code> خاموش باشد یا SVI مربوط به VLAN حالت up نداشته باشد، دستگاه به‌ظاهر «L3 switch» است ولی هیچ routeای بین VLANها انجام نمی‌دهد.</p>\n<p>هدف این درس این است که بتوانی روی یک دستگاه واحد تشخیص بدهی:</p>\n<ul><li>چه زمانی یک قاب Ethernet در حال <strong>switching</strong> است و تصمیم بر اساس MAC و VLAN گرفته می‌شود؛</li><li>چه زمانی یک بستهٔ IP در حال <strong>routing</strong> است و TTL، جدول route و بازنویسی MAC وارد می‌شوند؛</li><li>SVI، routed port و access/trunk چه تفاوتی دارند؛</li><li>چرا «L3 switch» بودن یک برچسب بازاریابی است، نه یک وضعیت پیکربندی.</li></ul>\n<p>این تفکیک در آزمون و در عملیات لازم است. بسیاری از خطاهای «VLAN کار نمی‌کند» در واقع VLAN درست است ولی SVI، trunk یا <code>ip routing</code> ناقص است. برعکس، بسیاری از خطاهای «route وجود دارد» به MAC table یا VLAN اشتباه برمی‌گردند.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>یک سوئیچ لایه ۲ یک دستگاه <strong>transparent bridging</strong> است. فریم را می‌گیرد، MAC مقصد را در جدول MAC همان VLAN جست‌وجو می‌کند و آن را از پورت مناسب می‌فرستد. اگر MAC مقصد را نداند، در همان VLAN flood می‌کند. سوئیچ لایه ۲ TTL را نمی‌بیند، IP را route نمی‌کند و بین VLANها به‌خودی‌خود عبور نمی‌دهد.</p>\n<p>یک سوئیچ لایه ۳ همان switching را انجام می‌دهد، اما موتور IP forwarding هم دارد. برای route کردن بین VLANها معمولاً از <strong>SVI</strong> استفاده می‌کند: یک interface مجازی که به یک VLAN وصل است و آدرس IP gateway همان VLAN را دارد. وقتی PC1 در VLAN 10 می‌خواهد به SRV1 در VLAN 20 برسد، بسته را به gateway <code>10.10.10.1</code> (SVI10) می‌دهد؛ سوئیچ route متصل <code>10.10.20.0/24</code> را روی SVI20 پیدا می‌کند و بسته را با یک قاب جدید در VLAN 20 می‌فرستد.</p>\n<p>سه لایهٔ تصمیم را جدا کن:</p>\n<ol><li><strong>VLAN membership</strong>: فریم روی access port به کدام VLAN تعلق دارد؟ روی trunk، tag 802.1Q این را مشخص می‌کند.</li><li><strong>L2 forwarding</strong>: MAC مقصد در کدام پورت و کدام VLAN است؟ جدول MAC به ازای VLAN نگه داشته می‌شود.</li><li><strong>L3 forwarding</strong>: آیا مقصد IP در subnet دیگری است؟ کدام route و next hop؟ TTL کم می‌شود و MAC بازنویسی می‌شود.</li></ol>\n<p>اگر <code>ip routing</code> روی سوئیچ خاموش باشد، مرحلهٔ سوم انجام نمی‌شود؛ بستهٔ بین VLANها دور ریخته می‌شود، حتی اگر SVIها آدرس داشته باشند. اگر SVI10 down باشد، PC1 gateway خود را از دست می‌دهد؛ اما این لزوماً به معنای down بودن VLAN نیست. SVI وضعیت خود را از VLAN و پورت‌های active می‌گیرد؛ در بسیاری از پلتفرم‌ها SVI وقتی هیچ پورت active در VLAN نباشد down می‌شود.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>Layer 2 switch</td><td>فریم را بر اساس MAC و VLAN جلو می‌برد</td><td>«همهٔ سوئیچ‌ها route می‌کنند»</td></tr><tr><td>Layer 3 switch</td><td>سوئیچ با قابلیت IP forwarding</td><td>«هر پورت آن routed است»</td></tr><tr><td>SVI</td><td>interface مجازی Layer 3 متصل به یک VLAN</td><td>«SVI همان access port است»</td></tr><tr><td>Routed port</td><td>پورت فیزیکی با IP و بدون switching</td><td>«routed port باید VLAN داشته باشد»</td></tr><tr><td>Access port</td><td>پورت یک VLAN، بدون tag به host</td><td>«access port چند VLAN را tag می‌کند»</td></tr><tr><td>Trunk port</td><td>حمل چند VLAN با tag 802.1Q</td><td>«trunk یعنی uplink پرسرعت»</td></tr><tr><td>VLAN</td><td>broadcast domain لایه ۲</td><td>«VLAN همان subnet است»</td></tr><tr><td>MAC table</td><td>نگاشت MAC به پورت در هر VLAN</td><td>«یک جدول MAC برای همهٔ VLANها کافی است»</td></tr><tr><td><code>ip routing</code></td><td>فعال‌کردن forwarding بین subnetها</td><td>«با وجود SVI خودکار فعال است»</td></tr><tr><td>Native VLAN</td><td>VLAN قاب بدون tag روی trunk</td><td>«native VLAN همیشه VLAN 1 است»</td></tr><tr><td>Inter-VLAN routing</td><td>عبور بسته بین VLANها</td><td>«L2 switch آن را انجام می‌دهد»</td></tr><tr><td>Router-on-a-stick</td><td>روتر با subinterface برای چند VLAN</td><td>«همان SVI روی سوئیچ است»</td></tr></tbody></table></div>\n<p><strong>مرز مهم:</strong> VLAN و subnet مفاهیم مرتبط ولی یکسان نیستند. VLAN مرز broadcast لایه ۲ است؛ subnet مرز آدرس‌دهی لایه ۳. معمولاً به هر VLAN یک subnet می‌دهیم، اما این یک قرارداد طراحی است، نه تعریف. اگر دو VLAN در یک subnet باشند، می‌توانند آدرس‌های هم‌پوشان یا مبهم داشته باشند؛ طراحی حرفه‌ای این را نمی‌پذیرد.</p>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. مسیر یک فریم در L2</h3>\n<p>فرض کن PC1 روی <code>Gi1/0/10</code> در VLAN 10 است و SRV1 روی <code>Gi1/0/20</code> در VLAN 20. اگر PC1 فریمی با MAC مقصد SRV1 بفرستد، سوئیچ لایه ۲ آن را در VLAN 10 جست‌وجو می‌کند. MAC سرور در VLAN 10 نیست؛ پس سوئیچ فریم را در VLAN 10 flood می‌کند یا اگر MAC را در VLAN دیگر ببیند، آن را بین VLANها عبور نمی‌دهد. نتیجه: بدون یک مرز Layer 3، ارتباط برقرار نمی‌شود. این رفتار عمدی است، نه باگ.</p>\n<h3>۴.۲. مسیر یک بسته در L3</h3>\n<p>PC1 وقتی می‌بیند مقصد <code>10.10.20.10</code> خارج از <code>10.10.10.0/24</code> است، بسته را به gateway <code>10.10.10.1</code> می‌فرستد. MAC مقصد فریم، MAC SVI10 است. سوئیچ بسته را می‌گیرد، TTL را کم می‌کند، route متصل <code>10.10.20.0/24</code> را روی SVI20 پیدا می‌کند، برای SRV1 ARP می‌کند و قاب جدیدی در VLAN 20 می‌سازد. اینجاست که دستگاه هم switch کرده و هم route کرده است.</p>\n<h3>۴.۳. SVI در برابر routed port</h3>\n<ul><li><strong>SVI</strong> برای route کردن بین VLANها روی یک سوئیچ مناسب است. یک interface مجازی با IP gateway، وابسته به VLAN.</li><li><strong>Routed port</strong> یک پورت فیزیکی است که با <code>no switchport</code> به حالت Layer 3 می‌رود و IP مستقیم می‌گیرد. برای uplink بین دو دستگاه L3 یا اتصال به روتر مناسب است، نه برای اتصال host در VLAN.</li><li><strong>Router-on-a-stick</strong> یک روتر با یک لینک trunk و subinterfaceهای 802.1Q است. وقتی سوئیچ L3 نداریم یا می‌خواهیم policy را روی روتر متمرکز کنیم، گزینه است.</li></ul>\n<p>هیچ‌کدام «همیشه بهتر» نیست: SVI ساده‌تر و سریع‌تر است، اما failure domain و پیکربندی VLAN را به همان سوئیچ گره می‌زند؛ router-on-a-stick مرز روشن‌تری دارد اما لینک trunk را به نقطهٔ اشباع تبدیل می‌کند.</p>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریوی درس:</p>\n<ul><li>PC1: <code>10.10.10.50/24</code>، gateway <code>10.10.10.1</code></li><li>L3SW SVI10: <code>10.10.10.1/24</code></li><li>L3SW SVI20: <code>10.10.20.1/24</code></li><li>SRV1: <code>10.10.20.10/24</code>، gateway <code>10.10.20.1</code></li></ul>\n<ol><li>PC1 مقصد را خارج از subnet خود می‌بیند و MAC gateway <code>10.10.10.1</code> را ARP می‌کند.</li><li>فریم با VLAN 10 به access port می‌رسد. سوئیچ MAC مقصد SVI10 را می‌شناسد و بسته را به موتور L3 می‌دهد.</li><li>موتور L3 TTL را از 64 به 63 کم می‌کند و route متصل <code>10.10.20.0/24</code> را روی SVI20 انتخاب می‌کند.</li><li>سوئیچ برای <code>10.10.20.10</code> در VLAN 20 ARP می‌کند و MAC سرور را یاد می‌گیرد.</li><li>قاب جدید با VLAN 20 از access port سرور خارج می‌شود؛ MAC مبدأ SVI20 و MAC مقصد SRV1 است.</li><li>پاسخ سرور به gateway <code>10.10.20.1</code> می‌رود؛ سوئیچ route متصل VLAN 10 را انتخاب می‌کند و قاب جدید در VLAN 10 می‌سازد.</li></ol>\n<p>اگر PC1 و SRV1 در یک VLAN بودند، مرحلهٔ ۳ انجام نمی‌شد؛ سوئیچ فقط MAC را در همان VLAN جلو می‌برد و TTL تغییر نمی‌کرد. اگر <code>ip routing</code> خاموش بود، مرحلهٔ ۳ رد می‌شد و بسته دور انداخته می‌شد.</p>\n<div class=\"table-wrap\"><table><thead><tr><th>نقطه</th><th>VLAN</th><th>MAC مبدأ</th><th>MAC مقصد</th><th>TTL</th></tr></thead><tbody><tr><td>PC1 → L3SW</td><td>10</td><td>MAC PC1</td><td>MAC SVI10</td><td>64</td></tr><tr><td>L3SW → SRV1</td><td>20</td><td>MAC SVI20</td><td>MAC SRV1</td><td>63</td></tr><tr><td>SRV1 → L3SW</td><td>20</td><td>MAC SRV1</td><td>MAC SVI20</td><td>64</td></tr><tr><td>L3SW → PC1</td><td>10</td><td>MAC SVI10</td><td>MAC PC1</td><td>63</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 650\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Layer 2 switch versus Layer 3 switch with switched virtual interfaces</title>\n  <desc id=\"desc\">A Layer 3 switch routes between VLAN 10 and VLAN 20 through SVI 10.10.10.1 and SVI 10.10.20.1. A Layer 2-only switch keeps frames inside one VLAN and needs an external router or router-on-a-stick for inter-VLAN traffic.</desc>\n  <rect width=\"1100\" height=\"650\" fill=\"#f6f8fc\"/>\n  <text x=\"550\" y=\"42\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"25\" font-weight=\"700\" fill=\"#14213d\">One box, two forwarding roles</text>\n  <text x=\"550\" y=\"70\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#4a5568\">The same switch can forward frames inside a VLAN and route packets between VLANs.</text>\n\n  <!-- L3 switch -->\n  <rect x=\"365\" y=\"235\" width=\"370\" height=\"170\" rx=\"18\" fill=\"#fff7ed\" stroke=\"#c2410c\" stroke-width=\"4\"/>\n  <text x=\"550\" y=\"275\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"25\" font-weight=\"700\" fill=\"#7c2d12\">L3 switch</text>\n  <text x=\"550\" y=\"305\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#9a3412\">ip routing enabled</text>\n  <text x=\"550\" y=\"332\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#9a3412\">SVI10 10.10.10.1/24</text>\n  <text x=\"550\" y=\"357\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#9a3412\">SVI20 10.10.20.1/24</text>\n  <text x=\"550\" y=\"382\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#7c2d12\">TTL − 1 · longest-prefix lookup · L2 rewrite</text>\n\n  <!-- VLAN 10 -->\n  <rect x=\"60\" y=\"230\" width=\"230\" height=\"180\" rx=\"16\" fill=\"#eff6ff\" stroke=\"#2563eb\" stroke-width=\"3\"/>\n  <text x=\"175\" y=\"268\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"21\" font-weight=\"700\" fill=\"#1e3a8a\">VLAN 10 · users</text>\n  <text x=\"175\" y=\"298\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#1e40af\">10.10.10.0/24</text>\n  <text x=\"175\" y=\"326\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#1e40af\">PC1 10.10.10.50</text>\n  <text x=\"175\" y=\"352\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#1e40af\">gateway 10.10.10.1</text>\n  <text x=\"175\" y=\"380\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#1e40af\">access port Gi1/0/10</text>\n\n  <!-- VLAN 20 -->\n  <rect x=\"810\" y=\"230\" width=\"230\" height=\"180\" rx=\"16\" fill=\"#ecfdf5\" stroke=\"#0f766e\" stroke-width=\"3\"/>\n  <text x=\"925\" y=\"268\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"21\" font-weight=\"700\" fill=\"#134e4a\">VLAN 20 · servers</text>\n  <text x=\"925\" y=\"298\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#115e59\">10.10.20.0/24</text>\n  <text x=\"925\" y=\"326\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#115e59\">SRV1 10.10.20.10</text>\n  <text x=\"925\" y=\"352\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#115e59\">gateway 10.10.20.1</text>\n  <text x=\"925\" y=\"380\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#115e59\">access port Gi1/0/20</text>\n\n  <line x1=\"290\" y1=\"320\" x2=\"365\" y2=\"320\" stroke=\"#2563eb\" stroke-width=\"6\"/>\n  <line x1=\"735\" y1=\"320\" x2=\"810\" y2=\"320\" stroke=\"#0f766e\" stroke-width=\"6\"/>\n  <text x=\"327\" y=\"305\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#1d4ed8\">trunk / access</text>\n  <text x=\"772\" y=\"305\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#0f766e\">trunk / access</text>\n\n  <!-- L2-only comparison -->\n  <rect x=\"120\" y=\"485\" width=\"860\" height=\"105\" rx=\"14\" fill=\"#ffffff\" stroke=\"#94a3b8\" stroke-width=\"2\"/>\n  <text x=\"550\" y=\"518\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"18\" font-weight=\"700\" fill=\"#334155\">Layer 2-only switch</text>\n  <text x=\"550\" y=\"546\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#475569\">It forwards frames by MAC inside each VLAN, but it does not route between VLANs.</text>\n  <text x=\"550\" y=\"572\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#64748b\">Inter-VLAN traffic needs a router (or an L3 switch with routing enabled).</text>\n\n  <path d=\"M550 405 C550 445 550 455 550 485\" stroke=\"#c2410c\" stroke-width=\"3\" stroke-dasharray=\"8 7\" fill=\"none\"/>\n</svg></div><figcaption>سوئیچ L3 با SVI10 و SVI20؛ سوئیچ L2 فقط داخل VLAN جلو می‌برد</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>دستگاه</th><th>Interface</th><th>آدرس/VLAN</th><th>نقش</th></tr></thead><tbody><tr><td>PC1</td><td>NIC</td><td>10.10.10.50/24، VLAN 10</td><td>host کاربر</td></tr><tr><td>L3SW</td><td>SVI10</td><td>10.10.10.1/24</td><td>gateway VLAN 10</td></tr><tr><td>L3SW</td><td>SVI20</td><td>10.10.20.1/24</td><td>gateway VLAN 20</td></tr><tr><td>L3SW</td><td>Gi1/0/10</td><td>access VLAN 10</td><td>پورت PC1</td></tr><tr><td>L3SW</td><td>Gi1/0/20</td><td>access VLAN 20</td><td>پورت SRV1</td></tr><tr><td>SRV1</td><td>NIC</td><td>10.10.20.10/24، VLAN 20</td><td>host سرور</td></tr></tbody></table></div>\n<p>در این طراحی، L3SW هم سوئیچ access است و هم gateway. اگر یک سوئیچ لایه ۲ جداگانه بین PC و L3SW باشد، لینک بین آن‌ها باید trunk باشد و VLANها باید در دو طرف مجاز باشند. اگر trunk فقط VLAN 10 را مجاز کند، SRV1 در VLAN 20 از دید L3SW غایب است و route متصل SVI20 حتی با IP درست، ترافیک را دریافت نمی‌کند.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>پیکربندی زیر برای یک محیط آزمایشی ایزوله است. پلتفرم فرضی: Cisco Catalyst IOS-XE 17.9.x با <code>ip routing</code> و SVI. هیچ فرمانی روی دستگاه واقعی اجرا نشده است.</p>\n<pre><code class=\"language-cisco\">! lab only — isolated switch; verify platform/licence first\nL3SW(config)# ip routing\nL3SW(config)# vlan 10\nL3SW(config-vlan)# name USERS\nL3SW(config-vlan)# vlan 20\nL3SW(config-vlan)# name SERVERS\nL3SW(config)# interface vlan 10\nL3SW(config-if)# ip address 10.10.10.1 255.255.255.0\nL3SW(config-if)# no shutdown\nL3SW(config)# interface vlan 20\nL3SW(config-if)# ip address 10.10.20.1 255.255.255.0\nL3SW(config-if)# no shutdown\nL3SW(config)# interface GigabitEthernet1/0/10\nL3SW(config-if)# switchport mode access\nL3SW(config-if)# switchport access vlan 10\nL3SW(config)# interface GigabitEthernet1/0/20\nL3SW(config-if)# switchport mode access\nL3SW(config-if)# switchport access vlan 20</code></pre>\n<p><strong>ترتیب مهم:</strong> <code>ip routing</code> باید global فعال باشد؛ VLAN باید وجود داشته باشد؛ access port باید در VLAN درست باشد؛ SVI باید <code>no shutdown</code> باشد. روی برخی پلتفرم‌ها SVI تا وقتی هیچ پورت active در VLAN نباشد up نمی‌شود. اگر uplink به سوئیچ دیگر trunk است، باید <code>switchport trunk encapsulation dot1q</code> (در platformهای قدیمی‌تر) و <code>switchport trunk allowed vlan</code> بررسی شود.</p>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>فرمان</th><th>شاهد مورد انتظار</th></tr></thead><tbody><tr><td>1</td><td><code>show ip interface brief</code></td><td>SVI10/SVI20 up/up</td></tr><tr><td>2</td><td><code>show ip route</code></td><td>دو connected route برای 10.10.10.0/24 و 10.10.20.0/24</td></tr><tr><td>3</td><td><code>show vlan brief</code></td><td>VLAN 10/20 active و پورت‌های درست</td></tr><tr><td>4</td><td><code>show interfaces trunk</code></td><td>trunk (اگر وجود دارد) و allowed VLANها</td></tr><tr><td>5</td><td><code>show mac address-table vlan 10</code></td><td>MAC PC1 روی پورت access</td></tr><tr><td>6</td><td><code>ping 10.10.20.10</code> از PC1</td><td>forwarding و return path</td></tr><tr><td>7</td><td><code>traceroute 10.10.20.10</code></td><td>hop منطقی و مسیر</td></tr></tbody></table></div>\n<pre><code class=\"language-text\">! Designed — Not Run; sample expected output, not a device capture\nL3SW# show ip route\nCodes: L - local, C - connected, S - static\n      10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks\nC        10.10.10.0/24 is directly connected, Vlan10\nL        10.10.10.1/32 is directly connected, Vlan10\nC        10.10.20.0/24 is directly connected, Vlan20\nL        10.10.20.1/32 is directly connected, Vlan20</code></pre>\n<p>اگر <code>show ip route</code> routeهای connected را نشان می‌دهد ولی ping کار نمی‌کند، مشکل route نیست؛ VLAN membership، trunk، MAC/ARP یا ACL را بررسی کن. اگر routeها نیستند، اول <code>ip routing</code> و وضعیت SVI/VLAN را ببین؛ اضافه کردن static route برای subnetهای مستقیماً متصل، علامت مشکل را پنهان می‌کند.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>اولین شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>SVI IP دارد ولی down است</td><td>هیچ پورت active در VLAN نیست یا VLAN وجود ندارد</td><td><code>show vlan brief</code> و <code>show ip interface</code></td><td>VLAN/access port را درست کن</td></tr><tr><td>route بین VLANها نیست</td><td><code>ip routing</code> خاموش است</td><td>`show running-config</td><td>include ip routing`</td><td>فعال‌سازی با تأیید طراحی</td></tr><tr><td>PC به gateway نمی‌رسد</td><td>access port VLAN اشتباه یا SVI down</td><td>MAC table و VLAN brief</td><td>VLAN/port را اصلاح کن</td></tr><tr><td>فقط بعضی VLANها روی uplink کار می‌کنند</td><td>allowed VLAN روی trunk ناقص است</td><td><code>show interfaces trunk</code></td><td>allowed list را با design تطبیق بده</td></tr><tr><td>ARP ناقص است</td><td>host در VLAN/subnet اشتباه یا link down</td><td><code>show arp</code> و MAC table</td><td>addressing/link را بررسی کن</td></tr><tr><td>L2 switch بین دو دستگاه، route را قطع کرده</td><td>uplink access است نه trunk</td><td><code>show interfaces switchport</code></td><td>trunk/access را مطابق topology درست کن</td></tr></tbody></table></div>\n<p><strong>قاعده:</strong> اگر دو host در یک VLAN هستند و ارتباط ندارند، اول L2 را بررسی کن؛ اگر در دو VLAN هستند، L3 و SVI. اگر یک جهت کار می‌کند، return path و VLAN طرف مقابل را ببین. هیچ‌گاه <code>ip routing</code> را بدون بررسی policy و ACL فعال نکن؛ ممکن است مسیرهای ناخواسته بین segmentها باز شود.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<p>L3 switch معمولاً در distribution یا core قرار می‌گیرد و مرز بین VLANهاست؛ بنابراین ACL، policy و routing باید روی همان دستگاه طراحی شود. نکات کلیدی:</p>\n<ul><li>بین VLANها default deny یا ACL صریح داشته باش؛ «route دارد» به معنای «مجاز است» نیست.</li><li>مدیریت switch را در VLAN مدیریت جدا و با ACL محدود کن.</li><li><code>ip routing</code> را فقط برای subnetهایی فعال کن که واقعاً باید route شوند؛ route leak یک ریسک امنیتی است.</li><li>SVIها را با <code>no shutdown</code> و VLAN فعال نگه دار، اما پورت‌های بی‌استفاده را shutdown کن.</li><li>برای redundancy، FHRP یا طراحی L3 با ECMP را در نظر بگیر؛ یک SVI تنها یک نقطهٔ شکست است.</li><li>در لبه، routed port به firewall/ISP معمولاً امن‌تر و ساده‌تر از trunk به دستگاه دیگر است، اما به policy و platform وابسته است.</li></ul>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«L3 switch یعنی همهٔ پورت‌ها routed هستند.»</td><td>بستگی به پیکربندی دارد؛ پورت‌ها پیش‌فرض switchport هستند.</td></tr><tr><td>«با ساختن SVI، routing خودکار فعال می‌شود.»</td><td><code>ip routing</code> باید فعال باشد.</td></tr><tr><td>«SVI همیشه up است.»</td><td>به VLAN و پورت active وابسته است.</td></tr><tr><td>«VLAN همان subnet است.»</td><td>VLAN مرز L2، subnet مرز L3؛ معمولاً یک‌به‌یک طراحی می‌شوند.</td></tr><tr><td>«trunk برای سرعت بیشتر است.»</td><td>trunk برای حمل چند VLAN با tag است.</td></tr><tr><td>«MAC table بین VLANها مشترک است.»</td><td>جدول MAC به ازای VLAN نگه داشته می‌شود.</td></tr><tr><td>«L2 switch TTL را کم می‌کند.»</td><td>فقط دستگاه L3 که route می‌کند TTL را کاهش می‌دهد.</td></tr><tr><td>«routed port هم VLAN tag می‌زند.»</td><td>routed port بدون switching و بدون tag VLAN است.</td></tr></tbody></table></div>\n<p>در آزمون، اول مشخص کن فریم در حال L2 forwarding است یا بسته در حال L3 routing. سپس بپرس VLAN membership چیست، جدول MAC کدام VLAN را می‌بیند، SVI/routing فعال است یا نه. اگر گزینه‌ای «همهٔ پورت‌های L3 switch routed هستند» گفت، رد کن.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>سوئیچ L2 فریم را با MAC و VLAN جلو می‌برد و TTL را تغییر نمی‌دهد.</li><li>سوئیچ L3 همان switching را دارد و با <code>ip routing</code> بین subnetها route می‌کند.</li><li>SVI یک interface مجازی L3 برای VLAN است؛ routed port یک پورت فیزیکی L3.</li><li>SVI بدون VLAN فعال یا پورت active ممکن است down باشد.</li><li>بین VLANها، PC به gateway (SVI) می‌فرستد و MAC بازنویسی می‌شود.</li><li>trunk چند VLAN را tag می‌کند؛ access فقط یک VLAN.</li><li>L2-only برای inter-VLAN به روتر یا L3 switch نیاز دارد.</li><li>طراحی امن = route فقط بین segmentهای مجاز، ACL صریح و مدیریت جدا.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 v1.1 Exam Topics — &lt;https://www.cisco.com/c/en/us/training-exams/training/it-certifications/ccna-certification.html&gt;</td><td>1.0 Network Fundamentals، 1.1.b layer 2/3 switches</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>Cisco Catalyst Layer 2 Switching Configuration Guide — &lt;https://www.cisco.com/c/en/us/support/switches/index.html&gt;</td><td>VLAN، trunk، SVI و MAC learning</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>IEEE 802.1Q — &lt;https://standards.ieee.org/ieee/802.1Q/6844/&gt;</td><td>VLAN tagging</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>این درس توسط Agent بازنویسی شده و تأیید معنایی خبرهٔ انسانی ندارد.</li><li>هیچ IOS/IOS-XE، Lab، simulator یا شبکهٔ واقعی اجرا نشده است؛ همهٔ خروجی‌ها <code>Designed — Not Run</code> هستند.</li><li>رفتار SVI (autostate) و پشتیبانی از routed port به platform و نسخه وابسته است؛ قبل از اجرا باید بررسی شود.</li><li>URLها snapshot/hash نشده‌اند و وضعیت <code>PROVENANCE_NOT_VERIFIED</code> دارند.</li><li>این درس فقط L2/L3 switching پایه را پوشش می‌دهد؛ STP، EtherChannel، VRF و wireless در درس‌های خودشان می‌آیند.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <a href=\"ccna-v11-1.1.c.html\">فایروال نسل جدید و IPS: عبور دادن یا متوقف کردن؟</a> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Layer 2 switch",
+   "fa": "Layer 2 switch",
+   "simple": "دستگاه forwarding فریم بر اساس MAC و VLAN."
+  },
+  {
+   "term": "Layer 3 switch",
+   "fa": "Layer 3 switch",
+   "simple": "سوئیچ با موتور IP forwarding."
+  },
+  {
+   "term": "SVI",
+   "fa": "SVI",
+   "simple": "interface مجازی Layer 3 متصل به یک VLAN."
+  },
+  {
+   "term": "Routed port",
+   "fa": "Routed port",
+   "simple": "پورت فیزیکی Layer 3 بدون switching."
+  },
+  {
+   "term": "Access port",
+   "fa": "Access port",
+   "simple": "پورت یک VLAN برای host."
+  },
+  {
+   "term": "Trunk port",
+   "fa": "Trunk port",
+   "simple": "پورت حمل چند VLAN با tag 802.1Q."
+  },
+  {
+   "term": "802.1Q",
+   "fa": "802.1Q",
+   "simple": "استاندارد tagging VLAN روی Ethernet."
+  },
+  {
+   "term": "Native VLAN",
+   "fa": "Native VLAN",
+   "simple": "VLAN قاب بدون tag روی trunk."
+  },
+  {
+   "term": "VLAN",
+   "fa": "VLAN",
+   "simple": "broadcast domain لایه ۲."
+  },
+  {
+   "term": "Broadcast domain",
+   "fa": "Broadcast domain",
+   "simple": "محدودهٔ flood شدن broadcast."
+  },
+  {
+   "term": "MAC address table",
+   "fa": "MAC address table",
+   "simple": "نگاشت MAC به پورت در هر VLAN."
+  },
+  {
+   "term": "`ip routing`",
+   "fa": "`ip routing`",
+   "simple": "فرمان فعال‌سازی forwarding بین subnetها."
+  },
+  {
+   "term": "Inter-VLAN routing",
+   "fa": "Inter-VLAN routing",
+   "simple": "route کردن بسته بین VLANها."
+  },
+  {
+   "term": "Router-on-a-stick",
+   "fa": "Router-on-a-stick",
+   "simple": "روتر با subinterfaceهای 802.1Q."
+  },
+  {
+   "term": "Subinterface",
+   "fa": "Subinterface",
+   "simple": "interface منطقی روی یک interface فیزیکی."
+  },
+  {
+   "term": "Connected route",
+   "fa": "Connected route",
+   "simple": "route ساخته‌شده از interface فعال."
+  },
+  {
+   "term": "Default gateway",
+   "fa": "Default gateway",
+   "simple": "next hop برای مقاصد خارج از subnet."
+  },
+  {
+   "term": "TTL",
+   "fa": "TTL",
+   "simple": "شمارندهٔ hop که در دستگاه L3 کاهش می‌یابد."
+  },
+  {
+   "term": "MAC rewrite",
+   "fa": "MAC rewrite",
+   "simple": "بازنویسی MAC مبدأ/مقصد در هر hop L3."
+  },
+  {
+   "term": "STP",
+   "fa": "STP",
+   "simple": "پروتکل جلوگیری از loop لایه ۲ (در درس جداگانه)."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>پیکربندی زیر برای یک محیط آزمایشی ایزوله است. پلتفرم فرضی: Cisco Catalyst IOS-XE 17.9.x با <code>ip routing</code> و SVI. هیچ فرمانی روی دستگاه واقعی اجرا نشده است.</p>\n<pre><code class=\"language-cisco\">! lab only — isolated switch; verify platform/licence first\nL3SW(config)# ip routing\nL3SW(config)# vlan 10\nL3SW(config-vlan)# name USERS\nL3SW(config-vlan)# vlan 20\nL3SW(config-vlan)# name SERVERS\nL3SW(config)# interface vlan 10\nL3SW(config-if)# ip address 10.10.10.1 255.255.255.0\nL3SW(config-if)# no shutdown\nL3SW(config)# interface vlan 20\nL3SW(config-if)# ip address 10.10.20.1 255.255.255.0\nL3SW(config-if)# no shutdown\nL3SW(config)# interface GigabitEthernet1/0/10\nL3SW(config-if)# switchport mode access\nL3SW(config-if)# switchport access vlan 10\nL3SW(config)# interface GigabitEthernet1/0/20\nL3SW(config-if)# switchport mode access\nL3SW(config-if)# switchport access vlan 20</code></pre>\n<p><strong>ترتیب مهم:</strong> <code>ip routing</code> باید global فعال باشد؛ VLAN باید وجود داشته باشد؛ access port باید در VLAN درست باشد؛ SVI باید <code>no shutdown</code> باشد. روی برخی پلتفرم‌ها SVI تا وقتی هیچ پورت active در VLAN نباشد up نمی‌شود. اگر uplink به سوئیچ دیگر trunk است، باید <code>switchport trunk encapsulation dot1q</code> (در platformهای قدیمی‌تر) و <code>switchport trunk allowed vlan</code> بررسی شود.</p><h4>۸. تأیید و شاهد</h4><div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>فرمان</th><th>شاهد مورد انتظار</th></tr></thead><tbody><tr><td>1</td><td><code>show ip interface brief</code></td><td>SVI10/SVI20 up/up</td></tr><tr><td>2</td><td><code>show ip route</code></td><td>دو connected route برای 10.10.10.0/24 و 10.10.20.0/24</td></tr><tr><td>3</td><td><code>show vlan brief</code></td><td>VLAN 10/20 active و پورت‌های درست</td></tr><tr><td>4</td><td><code>show interfaces trunk</code></td><td>trunk (اگر وجود دارد) و allowed VLANها</td></tr><tr><td>5</td><td><code>show mac address-table vlan 10</code></td><td>MAC PC1 روی پورت access</td></tr><tr><td>6</td><td><code>ping 10.10.20.10</code> از PC1</td><td>forwarding و return path</td></tr><tr><td>7</td><td><code>traceroute 10.10.20.10</code></td><td>hop منطقی و مسیر</td></tr></tbody></table></div>\n<pre><code class=\"language-text\">! Designed — Not Run; sample expected output, not a device capture\nL3SW# show ip route\nCodes: L - local, C - connected, S - static\n      10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks\nC        10.10.10.0/24 is directly connected, Vlan10\nL        10.10.10.1/32 is directly connected, Vlan10\nC        10.10.20.0/24 is directly connected, Vlan20\nL        10.10.20.1/32 is directly connected, Vlan20</code></pre>\n<p>اگر <code>show ip route</code> routeهای connected را نشان می‌دهد ولی ping کار نمی‌کند، مشکل route نیست؛ VLAN membership، trunk، MAC/ARP یا ACL را بررسی کن. اگر routeها نیستند، اول <code>ip routing</code> و وضعیت SVI/VLAN را ببین؛ اضافه کردن static route برای subnetهای مستقیماً متصل، علامت مشکل را پنهان می‌کند.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در مسیر PC1 در VLAN 10 تا SRV1 در VLAN 20، کدام دستگاه TTL بستهٔ IP را کاهش می‌دهد؟",
+   "promptHtml": "در مسیر PC1 در VLAN 10 تا SRV1 در VLAN 20، کدام دستگاه TTL بستهٔ IP را کاهش می‌دهد؟",
+   "options": [
+    "سوئیچ لایه ۲ access، چون فریم را جلو می‌برد",
+    "hub بین دو سوئیچ، چون collision domain را می‌شکند",
+    "سوئیچ لایه ۳ که بسته را بین VLANها route می‌کند",
+    "کارت شبکهٔ PC1، چون بسته را می‌سازد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "TTL در دستگاه Layer 3 که بسته را route می‌کند کاهش می‌یابد؛ سوئیچ L2 و hub فقط فریم را جلو می‌برند و TTL را نمی‌بینند. گزینهٔ اول نقش L2 را اشتباه می‌داند؛ گزینهٔ چهارم TTL را به مبدأ نسبت می‌دهد، در حالی که کاهش در هر hop routing رخ می‌دهد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "سوئیچ لایه ۲ برای forwarding یک فریم unicast، اول از چه چیزی استفاده می‌کند؟",
+   "promptHtml": "سوئیچ لایه ۲ برای forwarding یک فریم unicast، اول از چه چیزی استفاده می‌کند؟",
+   "options": [
+    "جدول route و longest prefix",
+    "MAC مقصد و VLAN فریم در جدول MAC",
+    "TTL و checksum سرآیند IP",
+    "ARP cache برای همهٔ subnetها"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "سوئیچ L2 مقصد MAC را در جدول MAC همان VLAN جست‌وجو می‌کند و پورت خروجی را انتخاب می‌کند. جدول route و TTL مربوط به L3 هستند؛ ARP cache هم برای resolving next hop در L3 استفاده می‌شود، نه برای تصمیم اصلی forwarding فریم.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "SVI روی یک سوئیچ L3 دقیقاً چیست؟",
+   "promptHtml": "SVI روی یک سوئیچ L3 دقیقاً چیست؟",
+   "options": [
+    "یک پورت فیزیکی که با no switchport به L3 رفته است",
+    "یک VLAN tag روی trunk",
+    "یک جدول MAC مجزا برای VLAN",
+    "یک interface مجازی Layer 3 متصل به یک VLAN با آدرس IP"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "SVI یک interface منطقی است که به VLAN متصل می‌شود و معمولاً آدرس gateway همان VLAN را دارد. routed port یک پورت فیزیکی است؛ VLAN tag روی trunk یک برچسب است؛ جدول MAC هم جدول forwarding است، نه interface.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "روی L3SW هر دو SVI آدرس دارند، اما ip routing خاموش است. ارتباط بین VLAN 10 و VLAN 20 چه می‌شود؟",
+   "promptHtml": "روی L3SW هر دو SVI آدرس دارند، اما <code>ip routing</code> خاموش است. ارتباط بین VLAN 10 و VLAN 20 چه می‌شود؟",
+   "options": [
+    "برقرار نمی‌شود، چون forwarding بین subnetها غیرفعال است",
+    "برقرار می‌شود، چون SVIها آدرس دارند",
+    "برقرار می‌شود، اما فقط برای ping",
+    "فقط broadcast بین VLANها عبور می‌کند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "داشتن SVI و آدرس، routeهای connected را می‌سازد اما forwarding بین subnetها را فعال نمی‌کند؛ <code>ip routing</code> برای L3 forwarding لازم است. گزینهٔ دوم آدرس‌دهی را با routing اشتباه می‌گیرد؛ broadcast هم به‌طور طبیعی بین VLANها عبور نمی‌کند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "SVI10 آدرس IP دارد اما در show ip interface brief حالت down نشان می‌دهد. محتمل‌ترین علت چیست؟",
+   "promptHtml": "SVI10 آدرس IP دارد اما در <code>show ip interface brief</code> حالت down نشان می‌دهد. محتمل‌ترین علت چیست؟",
+   "options": [
+    "TTL روی سوئیچ تمام شده است",
+    "MAC table پر شده است",
+    "هیچ پورت active در VLAN 10 وجود ندارد یا VLAN فعال نیست",
+    "ARP cache خالی است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "در بسیاری از پلتفرم‌ها SVI وضعیت up را از VLAN فعال و وجود پورت active می‌گیرد؛ نبود هر دو باعث down شدن SVI می‌شود. TTL و MAC table و ARP می‌توانند بر forwarding اثر بگذارند، اما علت مستقیم down بودن SVI نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "PC1 و SRV1 هر دو در VLAN 10 هستند و از یک سوئیچ L2 عبور می‌کنند. کدام جمله درست است؟",
+   "promptHtml": "PC1 و SRV1 هر دو در VLAN 10 هستند و از یک سوئیچ L2 عبور می‌کنند. کدام جمله درست است؟",
+   "options": [
+    "بسته بین آن‌ها route می‌شود و TTL یک واحد کم می‌شود",
+    "فریم در همان VLAN جلو می‌رود و TTL تغییر نمی‌کند",
+    "برای ارتباط باید SVI20 ساخته شود",
+    "بدون trunk هیچ ارتباطی ممکن نیست"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "وقتی هر دو host در یک VLAN و یک broadcast domain هستند، سوئیچ L2 فریم را بر اساس MAC جلو می‌برد و TTL وارد تصمیم نمی‌شود. SVI20 برای VLAN دیگر است؛ trunk هم فقط وقتی لازم است که چند VLAN روی یک لینک حمل شوند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "وظیفهٔ اصلی trunk 802.1Q چیست؟",
+   "promptHtml": "وظیفهٔ اصلی trunk 802.1Q چیست؟",
+   "options": [
+    "افزایش سرعت پورت access",
+    "route کردن بین VLANها",
+    "کاهش TTL در هر فریم",
+    "حمل چند VLAN روی یک لینک با tag"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "trunk با tag 802.1Q مشخص می‌کند هر فریم متعلق به کدام VLAN است تا چند VLAN روی یک لینک فیزیکی حمل شوند. trunk خودش route نمی‌کند و TTL را کم نمی‌کند؛ افزایش سرعت هم هدف تعریف‌کنندهٔ آن نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "در show ip route، ردیف C 10.10.10.0/24 is directly connected, Vlan10 چه چیزی را نشان می‌دهد؟",
+   "promptHtml": "در <code>show ip route</code>، ردیف <code>C 10.10.10.0/24 is directly connected, Vlan10</code> چه چیزی را نشان می‌دهد؟",
+   "options": [
+    "route متصل ساخته‌شده از SVI10",
+    "route استاتیک به VLAN 10",
+    "route پیش‌فرض برای VLAN 10",
+    "route یادگرفته‌شده از OSPF"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "کد C یعنی connected و route از interface فعال SVI10 ساخته شده است. static با S و OSPF با O نشان داده می‌شود؛ default هم prefix صفر دارد. این ردیف فقط می‌گوید subnet مستقیماً متصل است، نه اینکه ACL یا forwarding بین VLANها مجاز است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا MAC table باید به ازای VLAN نگه داشته شود؟",
+   "promptHtml": "چرا MAC table باید به ازای VLAN نگه داشته شود؟",
+   "options": [
+    "چون MAC آدرس‌ها بین VLANها یکتا هستند",
+    "چون TTL در هر VLAN متفاوت است",
+    "چون یک MAC می‌تواند در VLANهای مختلف پورت متفاوت داشته باشد و forwarding باید محدود به VLAN بماند",
+    "چون ARP فقط در VLAN 1 کار می‌کند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "MAC forwarding در محدودهٔ VLAN انجام می‌شود؛ نگه‌داشتن جدول به ازای VLAN از leak شدن فریم به VLAN دیگر و اشتباه در پورت خروجی جلوگیری می‌کند. یکتایی MAC بین VLANها فرض نمی‌شود؛ TTL ربطی به جدول MAC ندارد؛ ARP هم به VLAN 1 محدود نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "تفاوت اصلی routed port و SVI چیست؟",
+   "promptHtml": "تفاوت اصلی routed port و SVI چیست؟",
+   "options": [
+    "routed port فقط برای trunk است",
+    "routed port یک پورت فیزیکی L3 بدون switching است؛ SVI یک interface مجازی متصل به VLAN",
+    "SVI فقط برای مدیریت است و route نمی‌کند",
+    "routed port همیشه TTL را کم نمی‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "routed port با <code>no switchport</code> به Layer 3 می‌رود و IP مستقیم می‌گیرد؛ SVI یک interface منطقی روی VLAN است. routed port برای trunk تعریف نمی‌شود؛ SVI می‌تواند gateway داده باشد؛ هر دو در forwarding L3 TTL را کم می‌کنند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "برای اینکه PC1 در VLAN 10 از SRV1 در VLAN 20 به‌عنوان gateway استفاده کند، کدام آدرس باید gateway PC1 باشد؟",
+   "promptHtml": "برای اینکه PC1 در VLAN 10 از SRV1 در VLAN 20 به‌عنوان gateway استفاده کند، کدام آدرس باید gateway PC1 باشد؟",
+   "options": [
+    "10.10.20.1، چون gateway سرور است",
+    "10.10.10.50، چون آدرس خود PC است",
+    "10.10.20.10، چون آدرس سرور است",
+    "10.10.10.1، چون SVI10 در subnet PC1 است"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "default gateway باید در همان subnet مبدأ باشد؛ PC1 ابتدا MAC gateway محلی را ARP می‌کند و سپس بسته را به آن می‌دهد. آدرس SVI20 در subnet دیگری است و PC1 نمی‌تواند مستقیماً برای آن ARP کند؛ آدرس سرور و آدرس خود PC هم gateway نیستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "اگر فقط یک سوئیچ L2 داشته باشیم و بخواهیم بین VLAN 10 و VLAN 20 route کنیم، کدام گزینه لازم است؟",
+   "promptHtml": "اگر فقط یک سوئیچ L2 داشته باشیم و بخواهیم بین VLAN 10 و VLAN 20 route کنیم، کدام گزینه لازم است؟",
+   "options": [
+    "یک مرز Layer 3 مانند روتر یا سوئیچ L3 با ip routing",
+    "فعال کردن TTL روی سوئیچ L2",
+    "تبدیل همهٔ پورت‌ها به trunk",
+    "حذف VLAN 20 و ادغام آن با VLAN 10"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "سوئیچ L2 به‌تنهایی بین VLANها route نمی‌کند؛ به یک دستگاه Layer 3 (روتر، router-on-a-stick یا L3 switch) نیاز است. TTL روی سوئیچ L2 تصمیم forwarding نمی‌سازد؛ trunk همهٔ پورت‌ها امن نیست و مشکل routing را حل نمی‌کند؛ ادغام VLANها طراحی را تغییر می‌دهد و جداسازی را از بین می‌برد.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}

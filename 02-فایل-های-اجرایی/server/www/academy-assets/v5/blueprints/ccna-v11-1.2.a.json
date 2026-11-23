@@ -1,0 +1,397 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccna-v11-1.2.a",
+ "objectiveId": "1.2.a",
+ "kind": "objective",
+ "track": "FAM Curriculum 5.0",
+ "course": "ccna-v11",
+ "title": "معماری two-tier: access و distribution",
+ "titleEn": "Describe — two-tier",
+ "domain": "1.0 Network Fundamentals",
+ "source": "content/lessons/ccna-v11-1.2.a.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 45,
+ "prerequisites": [
+  "ccna-v11-1.1.b",
+  "ccna-v11-1.1.f"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "ccna-v11-1.1.b",
+   "ccna-v11-1.1.f"
+  ],
+  "learningObjectives": [
+   "access",
+   "distribution",
+   "collapsed core",
+   "oversubscription",
+   "STP",
+   "FHRP",
+   "SVI",
+   "trunk",
+   "redundancy",
+   "STP",
+   "policy",
+   "management"
+  ]
+ },
+ "whyItMatters": "یک ساختمان اداری با ۲۰۰ کاربر، چهار سوئیچ در طبقات و دو سوئیچ مرکزی دارد. کاربران VLANهای داده/صدا، تلفن‌ها PoE، APها ترانک و دوربین‌ها VLAN جدا دارند. اگر هر چهار سوئیچ طبقه را مستقیم به یک سوئیچ بزرگ وصل کنیم، یک نقطهٔ خرابی می‌سازیم و سیاست‌های امنیتی را روی همان سوئیچ متمرکز می‌کنیم. اگر هر طبقه را به دو سوئیچ مرکزی وصل کنیم، افزونگی داریم اما باید STP، FHRP، مسیر برگشت و ظرفیت uplink را درست طراحی کنیم. معماری two-tier (دو لایه) دقیقاً برای همین تعادل است: لایهٔ access نزدیک کاربر، و لایهٔ distribution برای جمع‌کردن، مسیریابی بین VLANها، policy و اتصال به WAN/هسته. این معماری برای شبکه‌ها",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>یک ساختمان اداری با ۲۰۰ کاربر، چهار سوئیچ در طبقات و دو سوئیچ مرکزی دارد. کاربران VLANهای داده/صدا، تلفن‌ها PoE، APها ترانک و دوربین‌ها VLAN جدا دارند. اگر هر چهار سوئیچ طبقه را مستقیم به یک سوئیچ بزرگ وصل کنیم، یک نقطهٔ خرابی می‌سازیم و سیاست‌های امنیتی را روی همان سوئیچ متمرکز می‌کنیم. اگر هر طبقه را به دو سوئیچ مرکزی وصل کنیم، افزونگی داریم اما باید STP، FHRP، مسیر برگشت و ظرفیت uplink را درست طراحی کنیم.</p>\n<p>معماری <strong>two-tier</strong> (دو لایه) دقیقاً برای همین تعادل است: لایهٔ <strong>access</strong> نزدیک کاربر، و لایهٔ <strong>distribution</strong> برای جمع‌کردن، مسیریابی بین VLANها، policy و اتصال به WAN/هسته. این معماری برای شبکه‌های کوچک و متوسط بسیار رایج است و در آزمون CCNA باید بتوانی نقش هر لایه، محدودیت‌ها و نشانه‌های نیاز به لایهٔ سوم را توضیح دهی.</p>\n<p>نکتهٔ مهم: two-tier یک «طرح ثابت» نیست. در بعضی شبکه‌ها distribution و core در یک جفت سوئیچ ادغام می‌شوند (<strong>collapsed core</strong>). در بعضی دیگر دو لایه فقط منطقی‌اند و روی یک switch stack اجرا می‌شوند. آنچه ثابت است، <strong>تفکیک مسئولیت</strong> است: access دسترسی و لبه را می‌دهد؛ distribution aggregation، routing و policy را.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>دو لایه را مثل یک ساختمان ببین:</p>\n<ul><li><strong>Access</strong> = درِ ورودی هر واحد. هر endpoint از اینجا وارد می‌شود. کارهای آن: پورت access، PoE، VLAN، 802.1X/port security، STP edge، QoS edge، نرخ/ACL ورودی.</li><li><strong>Distribution</strong> = راهرو و نگهبانی مرکزی. کارهای آن: aggregation uplinkها، inter-VLAN routing (SVI)، policy/ACL، QoS trust boundary، route summarization، FHRP، اتصال به firewall/WAN/core.</li></ul>\n<p><strong>قاعدهٔ ذهنی:</strong> access «شبکهٔ محلی» را می‌سازد؛ distribution «بین شبکه‌ها» تصمیم می‌گیرد. اگر یک تصمیم به همهٔ VLANها/ساختمان‌ها مربوط است، جای آن distribution است، نه access.</p>\n<p>سه مدل رایج:</p>\n<ol><li><strong>Two-tier با distribution جدا</strong>: access → distribution → core/WAN. برای شبکهٔ متوسط با چند ساختمان.</li><li><strong>Collapsed core</strong>: distribution و core یکی‌اند. برای شبکهٔ کوچک‌تر که core جدا توجیه ندارد.</li><li><strong>Three-tier</strong>: access → distribution → core. وقتی تعداد بلوک‌ها/مسیرهای پرسرعت زیاد است.</li></ol>\n<p>two-tier معمولاً یک <strong>جفت distribution</strong> دارد، نه یکی. جفت بودن برای افزونگی و ظرفیت است، اما بدون طراحی درست می‌تواند loop، asymmetric routing و پیچیدگی FHRP بسازد.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>Access layer</td><td>اتصال endpointها</td><td>«access فقط سوئیچ ارزان است»</td></tr><tr><td>Distribution layer</td><td>aggregation/routing/policy</td><td>«distribution فقط uplink است»</td></tr><tr><td>Core layer</td><td>انتقال پرسرعت بین بلوک‌ها</td><td>«core همیشه لازم است»</td></tr><tr><td>Collapsed core</td><td>ادغام distribution/core</td><td>«collapsed core یعنی بدون افزونگی»</td></tr><tr><td>Oversubscription</td><td>نسبت ظرفیت access به uplink</td><td>«همهٔ پورت‌ها همیشه پر هستند»</td></tr><tr><td>Uplink</td><td>لینک access به distribution</td><td>«uplink همیشه یک کابل است»</td></tr><tr><td>Trunk</td><td>حمل چند VLAN</td><td>«trunk فقط بین سوئیچ‌هاست»</td></tr><tr><td>SVI</td><td>interface منطقی VLAN برای routing</td><td>«SVI همان access port است»</td></tr><tr><td>FHRP</td><td>redundancy gateway (HSRP/VRRP)</td><td>«FHRP جای STP را می‌گیرد»</td></tr><tr><td>STP</td><td>جلوگیری از loop لایه ۲</td><td>«STP مسیرینگ بین VLANهاست»</td></tr><tr><td>LACP</td><td>aggregation لینک</td><td>«LACP همیشه loop را حل می‌کند»</td></tr><tr><td>Asymmetric routing</td><td>مسیر رفت/برگشت متفاوت</td><td>«همیشه مشکل است»</td></tr><tr><td>Policy/ACL</td><td>کنترل ترافیک</td><td>«ACL فقط روی روتر است»</td></tr><tr><td>Management VLAN</td><td>دسترسی مدیریت</td><td>«VLAN 1 برای مدیریت امن است»</td></tr><tr><td>QoS trust boundary</td><td>نقطهٔ اعتماد به marking</td><td>«همهٔ پورت‌ها باید trust باشند»</td></tr></tbody></table></div>\n<p><strong>مرزهای مهم:</strong></p>\n<ul><li><strong>Redundancy ≠ load balancing.</strong> دو لینک می‌تواند یکی standby باشد؛ STP یکی را block می‌کند تا loop نشود.</li><li><strong>STP ≠ routing.</strong> STP loop لایه ۲ را می‌بندد؛ routing بین subnetها کار distribution است.</li><li><strong>FHRP ≠ STP.</strong> FHRP gateway مجازی می‌دهد؛ STP loop فیزیکی را مدیریت می‌کند.</li><li><strong>Trunk ≠ access.</strong> trunk چند VLAN را tag می‌کند؛ access یک VLAN بدون tag.</li><li><strong>Management VLAN ≠ VLAN 1.</strong> VLAN 1 پیش‌فرض است و برای مدیریت توصیه نمی‌شود.</li></ul>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. Access layer</h3>\n<p>کارهای access:</p>\n<ul><li><strong>Port access</strong>: یک VLAN برای داده، یک VLAN صدا (voice VLAN) روی همان پورت، یا trunk به AP.</li><li><strong>PoE</strong>: تأمین برق AP/phone/camera با بودجهٔ سوئیچ.</li><li><strong>802.1X/port security</strong>: احراز هویت/محدودیت MAC.</li><li><strong>STP edge</strong>: <code>PortFast</code>/<code>BPDU guard</code> روی پورت endpoint تا loop ناخواسته و انتظار STP کم شود.</li><li><strong>QoS edge</strong>: marking/queue برای voice/video؛ trust boundary معمولاً distribution است.</li><li><strong>DHCP snooping/DAI/RA guard</strong>: جلوگیری از rogue DHCP/ARP/RA.</li><li><strong>Storm control</strong>: محدودیت broadcast/multicast/unknown unicast.</li></ul>\n<p>access معمولاً <strong>بدون routing</strong> است؛ اما می‌تواند سوئیچ L3 با SVI داشته باشد (در طراحی collapsed core یا small branch). در two-tier کلاسیک، routing در distribution انجام می‌شود.</p>\n<h3>۴.۲. Distribution layer</h3>\n<p>کارهای distribution:</p>\n<ul><li><strong>Aggregation</strong>: جمع‌کردن uplinkهای access؛ اغلب ۱۰G/۲۵G/۴۰G.</li><li><strong>Inter-VLAN routing</strong>: SVI برای هر VLAN یا routed port؛ default gateway endpointها.</li><li><strong>Policy</strong>: ACL بین VLANها/segmentها، firewall/zone، QoS trust.</li><li><strong>FHRP</strong>: HSRP/VRRP برای gateway مجازی و failover.</li><li><strong>Route summarization</strong>: خلاصه‌کردن subnetها به سمت core/WAN.</li><li><strong>STP root</strong>: distributionها root bridgeprimary/secondary برای هر VLAN.</li><li><strong>WAN/firewall handoff</strong>: اتصال به edge، NAT، routing protocol.</li><li><strong>Management</strong>: SVI management، SSH/AAA، SNMP، syslog.</li></ul>\n<p><strong>SVI</strong> یک interface منطقی برای VLAN است: <code>interface Vlan10</code>، <code>ip address 10.10.10.1 255.255.255.0</code>. تا وقتی حداقل یک پورت در VLAN 10 up باشد، SVI می‌تواند up شود (autostate). اگر SVI down باشد، gateway VLAN از دست می‌رود.</p>\n<p><strong>Routed port</strong> (<code>no switchport</code>) یک پورت L3 است؛ برای uplink بین distribution/core یا زمانی که VLAN خاصی لازم نیست. <strong>SVI</strong> برای gateway چند VLAN روی یک سوئیچ L3 مناسب است.</p>\n<h3>۴.۳. افزونگی و STP</h3>\n<p>در two-tier، هر access معمولاً به هر دو distribution وصل است. این یک <strong>loop لایه ۲</strong> می‌سازد اگر هر دو لینک active باشند. STP یکی را block می‌کند (یا LACP/M-LAG هر دو را active می‌کند در طراحی‌های پیشرفته).</p>\n<ul><li><strong>STP root</strong>: distribution primary برای VLANها، secondary برای backup. root باید نزدیک distribution باشد، نه access.</li><li><strong>PortFast/BPDU guard</strong>: روی پورت endpoint؛ اگر BPDU دید، پورت را err-disable کند.</li><li><strong>Root guard</strong>: روی پورت‌های distribution به access، تا access root نشود.</li><li><strong>Loop guard</strong>: جلوگیری از loop ناشی از قطع BPDU.</li><li><strong>MST/RSTP</strong>: convergence سریع‌تر و mapping VLANها.</li></ul>\n<p><strong>LACP/EtherChannel</strong>: چند لینک فیزیکی به یک logical link تبدیل می‌شود. اگر به دو سوئیچ مستقل وصل شود، نیاز به <strong>M-LAG/vPC/stack</strong> دارد؛ EtherChannel ساده بین دو سوئیچ مستقل نمی‌تواند loop را حل کند.</p>\n<p><strong>FHRP</strong>: دو distribution یک IP مجازی و MAC مجازی می‌دهند. endpoint gateway را IP مجازی می‌بیند. اگر distribution فعال fail شود، standby نقش را می‌گیرد. پیش‌نیاز: هر دو SVI، لینک بین distributionها و tracking uplink درست.</p>\n<h3>۴.۴. ظرفیت و oversubscription</h3>\n<p><strong>Oversubscription</strong> نسبت مجموع ظرفیت پورت‌های access به ظرفیت uplink است. مثلاً ۴۸ پورت ۱G = ۴۸G ظرفیت، uplink دو ۱۰G = ۲۰G؛ نسبت 2.4:1. اگر همهٔ کاربران هم‌زمان حداکثر استفاده کنند، صف/latency می‌شود.</p>\n<p>طراحی معمول:</p>\n<ul><li>access 1G به endpoint، uplink 10G.</li><li>نسبت 2:1 تا 4:1 برای کاربران عادی؛ برای server/storage نسبت کمتر.</li><li>uplink دوگانه برای redundancy، نه فقط ظرفیت.</li><li>QoS/queue برای voice/video.</li></ul>\n<p><strong>East-West</strong> (ترافیک بین serverها) و <strong>North-South</strong> (به WAN) الگوهای متفاوتی دارند. two-tier برای north-south خوب است؛ اگر east-west سنگین شود، spine-leaf بهتر است.</p>\n<h3>۴.۵. مسیر و asymmetric routing</h3>\n<p>در two-tier با دو distribution و FHRP، ممکن است مسیر رفت از DIST-A و برگشت از DIST-B باشد. این <strong>asymmetric routing</strong> همیشه غلط نیست، اما برای stateful firewall/IPS می‌تواند مشکل‌ساز باشد؛ firewall state را در یک مسیر می‌بیند و برگشت را drop می‌کند.</p>\n<p>راه‌حل‌ها:</p>\n<ul><li>FHRP active/standby consistent برای VLANها.</li><li>routing metric/summary یکسان.</li><li>firewall در مسیر مشترک یا stateful clustering.</li><li>تست مسیر رفت/برگشت با traceroute از دو جهت.</li></ul>\n<p><strong>Route summarization</strong> بین distribution و core، جدول route را کوچک و convergence را ساده می‌کند؛ اما می‌تواند مسیرهای دور را به سمت اشتباه جذب کند. خلاصه باید دقیق و با blackhole در صورت لزوم باشد.</p>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریو: شرکت ۲۰۰ کاربر، ۴ access (ACC-1..4)، دو distribution (DIST-A/B)، firewall/WAN. VLAN 10 داده، 20 voice، 30 IoT، 99 management.</p>\n<ol><li><strong>نیازها</strong>: تعداد پورت، PoE، VLAN، throughput، redundancy، امنیت.</li><li><strong>لایه‌بندی</strong>: access برای endpoint، distribution برای SVI/policy/edge.</li><li><strong>آدرس‌دهی</strong>: subnet هر VLAN، gateway SVI، FHRP VIP.</li><li><strong>uplink</strong>: تعداد/سرعت، LACP/M-LAG، oversubscription.</li><li><strong>STP</strong>: root primary/secondary، PortFast/BPDU guard.</li><li><strong>FHRP</strong>: VIP، priority، preempt، tracking.</li><li><strong>policy</strong>: ACL بین VLANها، QoS trust، firewall handoff.</li><li><strong>management</strong>: VLAN 99، SSH/AAA، out-of-band.</li><li><strong>تأیید</strong>: ping بین VLANها، failover، traceroute دوطرفه، STP topology.</li></ol>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>تصمیم</th><th>شاهد</th></tr></thead><tbody><tr><td>نیاز</td><td>پورت/PoE/ظرفیت</td><td>inventory</td></tr><tr><td>لایه</td><td>access/distribution</td><td>topology</td></tr><tr><td>آدرس</td><td>subnet/SVI/VIP</td><td><code>show ip interface brief</code></td></tr><tr><td>uplink</td><td>LACP/STP</td><td><code>show etherchannel summary</code></td></tr><tr><td>STP</td><td>root</td><td><code>show spanning-tree</code></td></tr><tr><td>FHRP</td><td>VIP/priority</td><td><code>show standby</code></td></tr><tr><td>policy</td><td>ACL/QoS</td><td><code>show access-lists</code></td></tr><tr><td>management</td><td>VLAN 99</td><td>SSH/AAA</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 680\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Two-tier campus design: access switches dual-homed to a distribution pair</title>\n  <desc id=\"desc\">Four access switches serve endpoints, phones and access points. Each access switch has one link to distribution A and one to distribution B. The distribution pair performs inter-VLAN routing, policy, FHRP and the handoff to firewall and WAN. A callout lists oversubscription, STP, FHRP and management considerations.</desc>\n  <defs>\n    <marker id=\"ar\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"5\" orient=\"auto\">\n      <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#334155\"/>\n    </marker>\n  </defs>\n  <rect width=\"1100\" height=\"680\" fill=\"#f8fafc\"/>\n  <text x=\"550\" y=\"34\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#0f172a\">Two-tier campus: access for connection, distribution for policy and routing</text>\n\n  <!-- distribution -->\n  <rect x=\"360\" y=\"80\" width=\"380\" height=\"150\" rx=\"14\" fill=\"#ffffff\" stroke=\"#7c3aed\" stroke-width=\"2\"/>\n  <text x=\"550\" y=\"108\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#5b21b6\">Distribution layer</text>\n  <rect x=\"385\" y=\"124\" width=\"150\" height=\"82\" rx=\"10\" fill=\"#f5f3ff\" stroke=\"#c4b5fd\"/>\n  <text x=\"460\" y=\"148\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#5b21b6\">DIST-A</text>\n  <text x=\"460\" y=\"168\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">SVI 10.10.10.1</text>\n  <text x=\"460\" y=\"184\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">HSRP active</text>\n  <text x=\"460\" y=\"199\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">ACL / QoS trust</text>\n\n  <rect x=\"565\" y=\"124\" width=\"150\" height=\"82\" rx=\"10\" fill=\"#f5f3ff\" stroke=\"#c4b5fd\"/>\n  <text x=\"640\" y=\"148\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#5b21b6\">DIST-B</text>\n  <text x=\"640\" y=\"168\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">SVI 10.10.10.2</text>\n  <text x=\"640\" y=\"184\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">HSRP standby</text>\n  <text x=\"640\" y=\"199\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">same policy</text>\n  <line x1=\"535\" y1=\"165\" x2=\"563\" y2=\"165\" stroke=\"#7c3aed\" stroke-width=\"3\" stroke-dasharray=\"6 4\"/>\n\n  <!-- access -->\n  <rect x=\"60\" y=\"300\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"150\" y=\"326\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#115e59\">ACC-1</text>\n  <text x=\"150\" y=\"347\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 10,20,99</text>\n  <text x=\"150\" y=\"364\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">PoE · 802.1X</text>\n  <text x=\"150\" y=\"381\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">STP edge</text>\n\n  <rect x=\"280\" y=\"300\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"370\" y=\"326\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#115e59\">ACC-2</text>\n  <text x=\"370\" y=\"347\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 10,20,99</text>\n  <text x=\"370\" y=\"364\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">PoE · 802.1X</text>\n  <text x=\"370\" y=\"381\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">STP edge</text>\n\n  <rect x=\"520\" y=\"300\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"610\" y=\"326\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#115e59\">ACC-3</text>\n  <text x=\"610\" y=\"347\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 30,99</text>\n  <text x=\"610\" y=\"364\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">camera / IoT</text>\n  <text x=\"610\" y=\"381\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">port security</text>\n\n  <rect x=\"740\" y=\"300\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"2\"/>\n  <text x=\"830\" y=\"326\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#115e59\">ACC-4</text>\n  <text x=\"830\" y=\"347\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 10,20,99</text>\n  <text x=\"830\" y=\"364\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">AP / phone</text>\n  <text x=\"830\" y=\"381\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">PoE budget</text>\n\n  <!-- links access to dist -->\n  <line x1=\"200\" y1=\"300\" x2=\"430\" y2=\"232\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"230\" y1=\"300\" x2=\"600\" y2=\"232\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"380\" y1=\"300\" x2=\"450\" y2=\"232\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"420\" y1=\"300\" x2=\"620\" y2=\"232\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"610\" y1=\"300\" x2=\"470\" y2=\"232\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"660\" y1=\"300\" x2=\"650\" y2=\"232\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"830\" y1=\"300\" x2=\"490\" y2=\"232\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n  <line x1=\"860\" y1=\"300\" x2=\"670\" y2=\"232\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n\n  <!-- endpoints -->\n  <rect x=\"70\" y=\"450\" width=\"140\" height=\"60\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#60a5fa\"/>\n  <text x=\"140\" y=\"476\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#1e3a8a\">PC / phone</text>\n  <text x=\"140\" y=\"494\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">access port</text>\n\n  <rect x=\"290\" y=\"450\" width=\"140\" height=\"60\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#60a5fa\"/>\n  <text x=\"360\" y=\"476\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#1e3a8a\">AP</text>\n  <text x=\"360\" y=\"494\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">PoE + trunk</text>\n\n  <rect x=\"530\" y=\"450\" width=\"140\" height=\"60\" rx=\"8\" fill=\"#fee2e2\" stroke=\"#fca5a5\"/>\n  <text x=\"600\" y=\"476\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#991b1b\">Camera / IoT</text>\n  <text x=\"600\" y=\"494\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">VLAN 30</text>\n\n  <rect x=\"750\" y=\"450\" width=\"140\" height=\"60\" rx=\"8\" fill=\"#dcfce7\" stroke=\"#4ade80\"/>\n  <text x=\"820\" y=\"476\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"12\" fill=\"#166534\">Printer</text>\n  <text x=\"820\" y=\"494\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">static / reservation</text>\n\n  <!-- edge -->\n  <rect x=\"880\" y=\"110\" width=\"180\" height=\"110\" rx=\"12\" fill=\"#ffffff\" stroke=\"#b45309\" stroke-width=\"2\"/>\n  <text x=\"970\" y=\"138\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" font-weight=\"700\" fill=\"#92400e\">Edge / WAN</text>\n  <text x=\"970\" y=\"160\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">firewall 10.10.0.1</text>\n  <text x=\"970\" y=\"177\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">ISP A / ISP B</text>\n  <text x=\"970\" y=\"194\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"10\" fill=\"#334155\">NAT / policy</text>\n  <line x1=\"740\" y1=\"150\" x2=\"878\" y2=\"150\" stroke=\"#334155\" stroke-width=\"3\" marker-end=\"url(#ar)\"/>\n\n  <!-- notes -->\n  <rect x=\"40\" y=\"540\" width=\"1020\" height=\"100\" rx=\"12\" fill=\"#ffffff\" stroke=\"#cbd5e1\"/>\n  <text x=\"60\" y=\"566\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" font-weight=\"700\" fill=\"#0f172a\">Design checks</text>\n  <text x=\"60\" y=\"590\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">Uplink oversubscription · STP diameter and root · FHRP alignment · asymmetric routing · management VLAN · QoS trust boundary</text>\n  <text x=\"60\" y=\"612\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"11\" fill=\"#334155\">Dual-homing gives path redundancy, not automatic load sharing or a loop-free L2 topology without STP/M-LAG.</text>\n</svg></div><figcaption>چهار access دوگانه به جفت distribution، با SVI/FHRP و edge</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>دستگاه</th><th>نقش</th><th>آدرس/شناسه</th><th>نکته</th></tr></thead><tbody><tr><td>ACC-1/2/4</td><td>access</td><td>VLAN 10/20/99</td><td>PoE، 802.1X</td></tr><tr><td>ACC-3</td><td>access IoT</td><td>VLAN 30/99</td><td>port security</td></tr><tr><td>DIST-A</td><td>distribution</td><td>SVI 10.10.10.1</td><td>HSRP active</td></tr><tr><td>DIST-B</td><td>distribution</td><td>SVI 10.10.10.2</td><td>HSRP standby</td></tr><tr><td>VIP</td><td>gateway</td><td>10.10.10.254</td><td>endpoint gateway</td></tr><tr><td>Firewall</td><td>edge</td><td>10.10.0.1</td><td>NAT/policy</td></tr><tr><td>Management</td><td>VLAN 99</td><td>10.10.99.0/24</td><td>SSH/AAA</td></tr></tbody></table></div>\n<p><strong>نکته:</strong> VIP باید در همان subnet SVI باشد. endpointها VIP را gateway می‌گیرند، نه IP فیزیکی DIST-A/B. اگر VIP و SVI در subnet متفاوت باشند، ARP/proxy مشکل می‌شود.</p>\n<p><strong>مسیر نمونه:</strong> PC 10.10.10.50 → VIP 10.10.10.254 (DIST-A) → SVI VLAN 20 → server 10.10.20.10. برگشت: server → DIST-A/B → VLAN 10. اگر firewall بین VLANها باشد، ACL/state باید هر دو جهت را مجاز کند.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>پیکربندی نمونه برای درک، نه دستورالعمل تولیدی. <code>Designed — Not Run</code>.</p>\n<pre><code class=\"language-text\">! DIST-A (Cisco IOS-like; lab only)\nvlan 10\n name DATA\nvlan 20\n name VOICE\nvlan 99\n name MGMT\n!\ninterface Vlan10\n ip address 10.10.10.1 255.255.255.0\n standby 10 ip 10.10.10.254\n standby 10 priority 110\n standby 10 preempt\n!\ninterface GigabitEthernet1/0/1\n description UPLINK-TO-ACC-1\n switchport trunk encapsulation dot1q\n switchport mode trunk\n switchport trunk allowed vlan 10,20,99\n!\nspanning-tree vlan 10,20,30,99 root primary</code></pre>\n<div class=\"table-wrap\"><table><thead><tr><th>هدف</th><th>فرمان نمونه</th><th>نکته</th></tr></thead><tbody><tr><td>trunk</td><td><code>switchport mode trunk</code></td><td>allowed VLAN را محدود کن</td></tr><tr><td>SVI</td><td><code>interface Vlan10</code></td><td>autostate</td></tr><tr><td>FHRP</td><td><code>standby 10 ip ...</code></td><td>priority/preempt</td></tr><tr><td>STP root</td><td><code>spanning-tree vlan ... root primary</code></td><td>distribution</td></tr><tr><td>edge</td><td><code>spanning-tree portfast</code></td><td>فقط endpoint</td></tr><tr><td>BPDU guard</td><td><code>spanning-tree bpduguard enable</code></td><td>محافظت edge</td></tr><tr><td>management</td><td><code>interface Vlan99</code></td><td>ACL/SSH</td></tr></tbody></table></div>\n<p><strong>رویهٔ ایمن:</strong> قبل از تغییر trunk allowed VLAN، مطمئن شو VLAN management و voice در لیست است. قبل از FHRP، SVI و لینک بین distributionها را تست کن. بعد از تغییر STP root، topology و convergence را ببین.</p>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td><code>show spanning-tree</code></td><td>root/blocked port</td><td>routing</td></tr><tr><td><code>show standby</code></td><td>FHRP state/VIP</td><td>return path</td></tr><tr><td><code>show ip interface brief</code></td><td>SVI up</td><td>policy</td></tr><tr><td><code>show etherchannel summary</code></td><td>LACP bundle</td><td>oversubscription</td></tr><tr><td><code>traceroute</code> دوطرفه</td><td>مسیر رفت/برگشت</td><td>firewall state</td></tr><tr><td><code>show mac address-table</code></td><td>MAC learning</td><td>end-to-end</td></tr><tr><td>ping بین VLANها</td><td>routing/ACL</td><td>application</td></tr><tr><td>CPU/latency</td><td>ظرفیت</td><td>طراحی کلی</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample shape\nDIST-A# show standby brief\nInterface  Grp  Pri P State   Active          Standby\nVl10       10   110 P Active  local           10.10.10.2\n\nDIST-A# show spanning-tree vlan 10\nThis bridge is the root</code></pre>\n<p><strong>تأیید افزونگی:</strong> یکی از uplinkها را در lab قطع کن (یا shutdown با تأیید) و ببین FHRP/STP به‌درستی failover می‌شود. سپس برگردان و convergence/path را ثبت کن. بدون تست failover، «redundant» یک فرض است.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>دو VLAN ping نمی‌شوند</td><td>SVI/routing/ACL</td><td>SVI/route/ACL</td><td>لایه را جدا کن</td></tr><tr><td>فقط یک VLAN مشکل</td><td>trunk allowed/SVI</td><td><code>show interfaces trunk</code></td><td>VLAN را اضافه کن</td></tr><tr><td>loop/broadcast storm</td><td>STP/uplink</td><td>STP topology</td><td>loop را پیدا کن</td></tr><tr><td>failover کند</td><td>FHRP timer/tracking</td><td><code>show standby</code></td><td>timer/tracking</td></tr><tr><td>مسیر برگشت قطع</td><td>asymmetric/firewall</td><td>traceroute</td><td>state/path</td></tr><tr><td>uplink اشباع</td><td>oversubscription</td><td>interface counters</td><td>ظرفیت/QoS</td></tr><tr><td>management قطع</td><td>VLAN 99/ACL</td><td>SVI/ACL</td><td>دسترسی OOB</td></tr><tr><td>root اشتباه</td><td>STP priority</td><td><code>show spanning-tree</code></td><td>root را اصلاح کن</td></tr></tbody></table></div>\n<p><strong>SVI down:</strong> اگر VLAN هیچ پورت up نداشته باشد، SVI می‌تواند down شود. <code>show ip interface brief</code> و <code>show vlan brief</code> را با هم ببین. <strong>trunk allowed</strong>: اگر VLAN 20 در allowed نباشد، voice کار نمی‌کند ولی data ممکن است سالم باشد.</p>\n<p><strong>STP loop:</strong> نشانهٔ CPU بالا، MAC flapping، broadcast storm. <code>show spanning-tree</code> و <code>show mac address-table</code> را ببین؛ پورت مشکل‌دار را در lab shutdown کن. <strong>Root bridge</strong> باید distribution باشد؛ اگر access root شود، topology غیربهینه می‌شود.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<ul><li><strong>Segmentation</strong>: VLAN داده/صدا/IoT/مدیریت جدا؛ ACL بین آن‌ها.</li><li><strong>Management</strong>: VLAN 99، SSH/AAA، ACL به bastion؛ VLAN 1 نه.</li><li><strong>Edge</strong>: 802.1X/port security، DHCP snooping، DAI، RA guard، BPDU guard.</li><li><strong>STP</strong>: root guard روی distribution به access؛ BPDU guard روی endpoint.</li><li><strong>QoS</strong>: trust boundary در distribution؛ marking در edge.</li><li><strong>FHRP</strong>: authentication در HSRP/VRRP؛ priority/preempt آگاهانه.</li><li><strong>Trunk</strong>: allowed VLAN محدود؛ native VLAN جدا؛ <code>nonegotiate</code> در صورت پشتیبانی.</li><li><strong>Monitoring</strong>: syslog/SNMP/NetFlow؛ alert روی CPU/STP/loop.</li></ul>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«دو uplink یعنی load balancing.»</td><td>ممکن است standby/blocked باشد.</td></tr><tr><td>«STP routing را حل می‌کند.»</td><td>STP فقط loop لایه ۲.</td></tr><tr><td>«FHRP جای STP است.»</td><td>نقش‌ها جدا هستند.</td></tr><tr><td>«collapsed core بدون افزونگی است.»</td><td>می‌تواند جفت/stack باشد.</td></tr><tr><td>«همهٔ VLANها باید در trunk باشند.»</td><td>allowed VLAN را محدود کن.</td></tr><tr><td>«VLAN 1 برای مدیریت امن است.»</td><td>VLAN مدیریت جدا.</td></tr><tr><td>«oversubscription همیشه بد است.»</td><td>به الگوی ترافیک/SLA بستگی دارد.</td></tr><tr><td>«asymmetric routing همیشه غلط است.»</td><td>برای stateful firewall مشکل‌ساز است.</td></tr></tbody></table></div>\n<p><strong>تصمیم آزمون:</strong> access → endpoint/port؛ distribution → SVI/policy/FHRP؛ core اضافه → مقیاس/مسیر پرسرعت؛ loop → STP؛ gateway failover → FHRP؛ uplink ظرفیت → oversubscription/LACP.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>two-tier = access + distribution؛ core جدا ندارد.</li><li>access به endpoint خدمت می‌دهد: VLAN، PoE، 802.1X، STP edge.</li><li>distribution aggregation، SVI/routing، policy، FHRP و edge handoff را انجام می‌دهد.</li><li>دو distribution افزونگی می‌دهد، اما STP/FHRP/asymmetric routing را باید طراحی کرد.</li><li>oversubscription نسبت ظرفیت access به uplink است؛ به الگوی ترافیک بستگی دارد.</li><li>collapsed core ادغام distribution/core است؛ نه حذف افزونگی.</li><li>three-tier وقتی لازم است که مقیاس/مسیرهای پرسرعت core جدا را توجیه کنند.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 v1.1 Exam Topics — &lt;https://www.cisco.com/c/en/us/training-exams/training/it-certifications/ccna-certification.html&gt;</td><td>Objective 1.2.a two-tier</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>Cisco Campus LAN design guide — &lt;https://www.cisco.com/c/en/us/td/docs/solutions/CVD/Campus/cisco-campus-lan-wlan-design-guide.html&gt;</td><td>access/distribution roles</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>IEEE 802.1D/802.1w — &lt;https://standards.ieee.org/ieee/802.1D/6603/&gt;</td><td>STP/RSTP</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 5798 — VRRP — &lt;https://www.rfc-editor.org/rfc/rfc5798.html&gt;</td><td>FHRP concept</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>هیچ سوئیچ/شبکهٔ واقعی اجرا نشده است؛ خروجی‌ها <code>Designed — Not Run</code> هستند.</li><li>آدرس‌ها و نام‌ها نمونه‌اند؛ طراحی واقعی به نیازها بستگی دارد.</li><li>FHRP/STP behavior به vendor/platform/version وابسته است.</li><li>URLها snapshot/hash نشده‌اند و <code>PROVENANCE_NOT_VERIFIED</code> هستند.</li><li>این درس جایگزین طراحی دقیق ظرفیت، بررسی failover و مستندات vendor نیست.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <a href=\"ccna-v11-1.2.b.html\">معماری three-tier: core جدا از distribution</a> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Access layer",
+   "fa": "Access layer",
+   "simple": "لایهٔ اتصال endpoint."
+  },
+  {
+   "term": "Distribution layer",
+   "fa": "Distribution layer",
+   "simple": "aggregation/routing/policy."
+  },
+  {
+   "term": "Core layer",
+   "fa": "Core layer",
+   "simple": "انتقال پرسرعت."
+  },
+  {
+   "term": "Collapsed core",
+   "fa": "Collapsed core",
+   "simple": "ادغام distribution/core."
+  },
+  {
+   "term": "Oversubscription",
+   "fa": "Oversubscription",
+   "simple": "نسبت ظرفیت access/uplink."
+  },
+  {
+   "term": "Uplink",
+   "fa": "Uplink",
+   "simple": "لینک به لایهٔ بالاتر."
+  },
+  {
+   "term": "Trunk",
+   "fa": "Trunk",
+   "simple": "حمل چند VLAN."
+  },
+  {
+   "term": "SVI",
+   "fa": "SVI",
+   "simple": "interface منطقی VLAN."
+  },
+  {
+   "term": "Routed port",
+   "fa": "Routed port",
+   "simple": "پورت لایه ۳."
+  },
+  {
+   "term": "STP",
+   "fa": "STP",
+   "simple": "جلوگیری از loop."
+  },
+  {
+   "term": "Root bridge",
+   "fa": "Root bridge",
+   "simple": "مرجع STP."
+  },
+  {
+   "term": "PortFast",
+   "fa": "PortFast",
+   "simple": "edge سریع."
+  },
+  {
+   "term": "BPDU guard",
+   "fa": "BPDU guard",
+   "simple": "محافظت edge."
+  },
+  {
+   "term": "FHRP",
+   "fa": "FHRP",
+   "simple": "gateway افزونه."
+  },
+  {
+   "term": "HSRP/VRRP",
+   "fa": "HSRP/VRRP",
+   "simple": "پروتکل‌های FHRP."
+  },
+  {
+   "term": "VIP",
+   "fa": "VIP",
+   "simple": "IP مجازی gateway."
+  },
+  {
+   "term": "Asymmetric routing",
+   "fa": "Asymmetric routing",
+   "simple": "مسیر رفت/برگشت متفاوت."
+  },
+  {
+   "term": "LACP",
+   "fa": "LACP",
+   "simple": "aggregation لینک."
+  },
+  {
+   "term": "M-LAG/vPC",
+   "fa": "M-LAG/vPC",
+   "simple": "LAG چندسوئیچی."
+  },
+  {
+   "term": "QoS trust boundary",
+   "fa": "QoS trust boundary",
+   "simple": "نقطهٔ اعتماد marking."
+  },
+  {
+   "term": "Management VLAN",
+   "fa": "Management VLAN",
+   "simple": "VLAN مدیریت."
+  },
+  {
+   "term": "Route summarization",
+   "fa": "Route summarization",
+   "simple": "خلاصه‌سازی route."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>پیکربندی نمونه برای درک، نه دستورالعمل تولیدی. <code>Designed — Not Run</code>.</p>\n<pre><code class=\"language-text\">! DIST-A (Cisco IOS-like; lab only)\nvlan 10\n name DATA\nvlan 20\n name VOICE\nvlan 99\n name MGMT\n!\ninterface Vlan10\n ip address 10.10.10.1 255.255.255.0\n standby 10 ip 10.10.10.254\n standby 10 priority 110\n standby 10 preempt\n!\ninterface GigabitEthernet1/0/1\n description UPLINK-TO-ACC-1\n switchport trunk encapsulation dot1q\n switchport mode trunk\n switchport trunk allowed vlan 10,20,99\n!\nspanning-tree vlan 10,20,30,99 root primary</code></pre>\n<div class=\"table-wrap\"><table><thead><tr><th>هدف</th><th>فرمان نمونه</th><th>نکته</th></tr></thead><tbody><tr><td>trunk</td><td><code>switchport mode trunk</code></td><td>allowed VLAN را محدود کن</td></tr><tr><td>SVI</td><td><code>interface Vlan10</code></td><td>autostate</td></tr><tr><td>FHRP</td><td><code>standby 10 ip ...</code></td><td>priority/preempt</td></tr><tr><td>STP root</td><td><code>spanning-tree vlan ... root primary</code></td><td>distribution</td></tr><tr><td>edge</td><td><code>spanning-tree portfast</code></td><td>فقط endpoint</td></tr><tr><td>BPDU guard</td><td><code>spanning-tree bpduguard enable</code></td><td>محافظت edge</td></tr><tr><td>management</td><td><code>interface Vlan99</code></td><td>ACL/SSH</td></tr></tbody></table></div>\n<p><strong>رویهٔ ایمن:</strong> قبل از تغییر trunk allowed VLAN، مطمئن شو VLAN management و voice در لیست است. قبل از FHRP، SVI و لینک بین distributionها را تست کن. بعد از تغییر STP root، topology و convergence را ببین.</p><h4>۸. تأیید و شاهد</h4><div class=\"table-wrap\"><table><thead><tr><th>شاهد</th><th>چه چیزی را ثابت می‌کند</th><th>چه چیزی را ثابت نمی‌کند</th></tr></thead><tbody><tr><td><code>show spanning-tree</code></td><td>root/blocked port</td><td>routing</td></tr><tr><td><code>show standby</code></td><td>FHRP state/VIP</td><td>return path</td></tr><tr><td><code>show ip interface brief</code></td><td>SVI up</td><td>policy</td></tr><tr><td><code>show etherchannel summary</code></td><td>LACP bundle</td><td>oversubscription</td></tr><tr><td><code>traceroute</code> دوطرفه</td><td>مسیر رفت/برگشت</td><td>firewall state</td></tr><tr><td><code>show mac address-table</code></td><td>MAC learning</td><td>end-to-end</td></tr><tr><td>ping بین VLANها</td><td>routing/ACL</td><td>application</td></tr><tr><td>CPU/latency</td><td>ظرفیت</td><td>طراحی کلی</td></tr></tbody></table></div>\n<pre><code class=\"language-text\"># Designed — Not Run; sample shape\nDIST-A# show standby brief\nInterface  Grp  Pri P State   Active          Standby\nVl10       10   110 P Active  local           10.10.10.2\n\nDIST-A# show spanning-tree vlan 10\nThis bridge is the root</code></pre>\n<p><strong>تأیید افزونگی:</strong> یکی از uplinkها را در lab قطع کن (یا shutdown با تأیید) و ببین FHRP/STP به‌درستی failover می‌شود. سپس برگردان و convergence/path را ثبت کن. بدون تست failover، «redundant» یک فرض است.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "کار اصلی لایهٔ access در two-tier چیست؟",
+   "promptHtml": "کار اصلی لایهٔ access در two-tier چیست؟",
+   "options": [
+    "route summarization بین ساختمان‌ها",
+    "اتصال endpointها با VLAN/PoE/802.1X",
+    "NAT به اینترنت",
+    "انتخاب best path بین ISPها"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "access نقطهٔ ورود endpoint است و VLAN، PoE، 802.1X و STP edge را فراهم می‌کند. route summarization، NAT و انتخاب ISP معمولاً کار distribution/edge است، نه access.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام وظیفه معمولاً در distribution انجام می‌شود؟",
+   "promptHtml": "کدام وظیفه معمولاً در distribution انجام می‌شود؟",
+   "options": [
+    "inter-VLAN routing و policy",
+    "اتصال مستقیم چاپگر",
+    "تأمین PoE دوربین",
+    "یادگیری MAC روی پورت access"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "distribution SVI/routing، ACL/policy، FHRP و aggregation را انجام می‌دهد. اتصال چاپگر، PoE و یادگیری MAC در access رخ می‌دهند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا هر access به دو distribution وصل می‌شود؟",
+   "promptHtml": "چرا هر access به دو distribution وصل می‌شود؟",
+   "options": [
+    "برای افزایش تعداد VLAN",
+    "برای حذف نیاز به STP",
+    "برای افزونگی مسیر و تحمل خرابی",
+    "برای NAT کردن ترافیک"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "dual-homing مسیر جایگزین در خرابی distribution/uplink می‌دهد. تعداد VLAN را افزایش نمی‌دهد، STP را حذف نمی‌کند (ممکن است پیچیده‌تر کند) و NAT کار edge است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "۴۸ پورت ۱G access و دو uplink ۱۰G داریم. نسبت oversubscription تقریبی چیست؟",
+   "promptHtml": "۴۸ پورت ۱G access و دو uplink ۱۰G داریم. نسبت oversubscription تقریبی چیست؟",
+   "options": [
+    "1:1",
+    "48:1",
+    "0.5:1",
+    "2.4:1"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "ظرفیت access 48G و uplink 20G است؛ نسبت 48/20 = 2.4:1. گزینه‌های 1:1 و 0.5:1 ظرفیت بیش از حد، و 48:1 بسیار اغراق‌شده‌اند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "وظیفهٔ STP در two-tier چیست؟",
+   "promptHtml": "وظیفهٔ STP در two-tier چیست؟",
+   "options": [
+    "جلوگیری از loop لایه ۲ با block کردن مسیر افزونه",
+    "مسیریابی بین VLANها",
+    "تخصیص IP به endpoint",
+    "تأمین PoE"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "STP topology بدون loop می‌سازد و مسیرهای افزونه را block می‌کند. routing بین VLANها کار L3، IP کار DHCP و PoE کار برق است.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "FHRP چه مشکلی را حل می‌کند؟",
+   "promptHtml": "FHRP چه مشکلی را حل می‌کند؟",
+   "options": [
+    "loop لایه ۲",
+    "کمبود PoE",
+    "oversubscription uplink",
+    "gateway پیش‌فرض را در خرابی روتر فعال نگه می‌دارد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "FHRP یک VIP/MAC مجازی می‌دهد و در خرابی gateway فعال، standby نقش را می‌گیرد. loop، PoE و oversubscription مشکلات لایه‌های دیگرند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "SVI در distribution چه کاری انجام می‌دهد؟",
+   "promptHtml": "SVI در distribution چه کاری انجام می‌دهد؟",
+   "options": [
+    "پورت access برای چاپگر",
+    "gateway منطقی یک VLAN برای routing",
+    "لینک فیزیکی به ISP",
+    "ابزار PoE"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "SVI یک interface منطقی VLAN با IP است و به‌عنوان gateway/routing استفاده می‌شود. پورت access، لینک ISP و PoE نقش‌های متفاوتی دارند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چه زمانی three-tier به‌جای two-tier منطقی است؟",
+   "promptHtml": "چه زمانی three-tier به‌جای two-tier منطقی است؟",
+   "options": [
+    "وقتی فقط ۵ کاربر داریم",
+    "وقتی PoE لازم نیست",
+    "وقتی تعداد بلوک‌ها/مسیرهای پرسرعت زیاد است و core جدا توجیه دارد",
+    "وقتی VLAN نداریم"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "three-tier وقتی است که مقیاس/ترافیک بین بلوک‌ها به core جدا و پرسرعت نیاز دارد. شبکهٔ کوچک، نبود PoE یا نبود VLAN دلیل افزودن core نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا VLAN مدیریت جدا از VLAN کاربران توصیه می‌شود؟",
+   "promptHtml": "چرا VLAN مدیریت جدا از VLAN کاربران توصیه می‌شود؟",
+   "options": [
+    "برای افزایش PoE",
+    "برای محدودکردن دسترسی مدیریت و کاهش سطح حمله",
+    "برای حذف STP",
+    "برای افزایش oversubscription"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "VLAN مدیریت جدا با ACL/SSH/AAA دسترسی به تجهیزات را محدود می‌کند و سطح حمله را کم می‌کند. PoE، STP و oversubscription ارتباط مستقیمی با این جداسازی ندارند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "asymmetric routing در two-tier با firewall stateful چه مشکلی می‌سازد؟",
+   "promptHtml": "asymmetric routing در two-tier با firewall stateful چه مشکلی می‌سازد؟",
+   "options": [
+    "firewall ممکن است بستهٔ برگشت را در state نبیند و drop کند",
+    "STP root عوض می‌شود",
+    "PoE قطع می‌شود",
+    "VLAN 1 حذف می‌شود"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "firewall stateful مسیر رفت را ثبت می‌کند؛ اگر برگشت از مسیر/دستگاه دیگری بیاید، ممکن است state match نشود و drop شود. STP، PoE و VLAN 1 مفاهیم جدا هستند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "QoS trust boundary در two-tier معمولاً کجاست؟",
+   "promptHtml": "QoS trust boundary در two-tier معمولاً کجاست؟",
+   "options": [
+    "روی همهٔ پورت‌های endpoint",
+    "روی چاپگر",
+    "روی کابل",
+    "در distribution یا نزدیک آن"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "trust boundary جایی است که به marking ترافیک اعتماد می‌شود؛ معمولاً distribution یا edge، نه همهٔ endpointها. endpointها می‌توانند marking جعل کنند؛ چاپگر و کابل نقش trust boundary ندارند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "collapsed core یعنی چه؟",
+   "promptHtml": "collapsed core یعنی چه؟",
+   "options": [
+    "حذف کامل distribution",
+    "حذف STP",
+    "ادغام لایهٔ distribution و core در یک جفت/مجموعه",
+    "استفاده فقط از access"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "collapsed core یعنی distribution و core در همان تجهیزات/جفت ادغام می‌شوند تا شبکهٔ کوچک‌تر ساده شود. حذف distribution، STP یا access معنای آن نیست.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}

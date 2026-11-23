@@ -1,0 +1,381 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccna-v11-1.1.a",
+ "objectiveId": "1.1.a",
+ "kind": "objective",
+ "track": "FAM Curriculum 5.0",
+ "course": "ccna-v11",
+ "title": "روتر: تصمیم‌گیرندهٔ بین شبکه‌ها",
+ "titleEn": "Explain — routers",
+ "domain": "Network Fundamentals",
+ "source": "content/lessons/ccna-v11-1.1.a.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 45,
+ "prerequisites": [
+  "academy-stage-zero-06-client-server-fa"
+ ],
+ "beforeYouStart": {
+  "prerequisites": [
+   "academy-stage-zero-06-client-server-fa"
+  ],
+  "learningObjectives": [
+   "longest prefix",
+   "administrative distance",
+   "ARP",
+   "TTL",
+   "default gateway",
+   "next hop",
+   "routing table",
+   "MAC"
+  ]
+ },
+ "whyItMatters": "یک شعبهٔ کوچک دو شبکهٔ IPv4 دارد: شبکهٔ کاربران 10.10.10.0/24 و شبکهٔ سرورها 10.10.20.0/24. کامپیوتر کاربر با آدرس 10.10.10.50/24 و gateway 10.10.10.1 به سوئیچ وصل است. سرور فایل با آدرس 10.10.20.10/24 و gateway 10.10.20.1 روی سوئیچ دیگری است. هر دو سوئیچ به یک روتر به نام R1 وصل‌اند. LED همهٔ پورت‌ها سبز است، PC می‌تواند 10.10.10.1 را ping کند، اما به سرور نمی‌رسد. کاربر می‌گوید «شبکه قطع است» و همکارش می‌گوید «کابل‌ها سالم‌اند». هر دو می‌توانند درست بگویند؛ مشکل در لایه‌ای است که هیچ‌کدام هنوز اندازه‌گیری نکرده‌اند: مرز Layer 3 و تصمیم forwarding روتر. اگر این درس را به‌صورت حفظی بخوانی، ممک",
+ "sections": [
+  {
+   "id": "۱-مسئله-و-چرا",
+   "title": "۱. مسئله و چرا",
+   "html": "<p>یک شعبهٔ کوچک دو شبکهٔ IPv4 دارد: شبکهٔ کاربران <code>10.10.10.0/24</code> و شبکهٔ سرورها <code>10.10.20.0/24</code>. کامپیوتر کاربر با آدرس <code>10.10.10.50/24</code> و gateway <code>10.10.10.1</code> به سوئیچ وصل است. سرور فایل با آدرس <code>10.10.20.10/24</code> و gateway <code>10.10.20.1</code> روی سوئیچ دیگری است. هر دو سوئیچ به یک روتر به نام R1 وصل‌اند. LED همهٔ پورت‌ها سبز است، PC می‌تواند <code>10.10.10.1</code> را ping کند، اما به سرور نمی‌رسد. کاربر می‌گوید «شبکه قطع است» و همکارش می‌گوید «کابل‌ها سالم‌اند». هر دو می‌توانند درست بگویند؛ مشکل در لایه‌ای است که هیچ‌کدام هنوز اندازه‌گیری نکرده‌اند: <strong>مرز Layer 3 و تصمیم forwarding روتر</strong>.</p>\n<p>اگر این درس را به‌صورت حفظی بخوانی، ممکن است «روتر» را با «سوئیچ» اشتباه بگیری، default gateway را با DNS جابه‌جا کنی، یا برای رفع مشکل فوراً route اضافه کنی بدون اینکه بدانی بسته در کدام جهت گم شده است. هدف این درس این است که بتوانی از یک آدرس مبدأ و مقصد، مسیر تصمیم روتر را مرحله‌به‌مرحله بازسازی کنی: کدام interface وارد می‌شود، کدام جدول بررسی می‌شود، کدام next hop برنده است، چه فریم جدیدی ساخته می‌شود و کجا باید شاهد بگیری.</p>\n<p>این توانایی فقط برای آزمون نیست. در عملیات واقعی، وقتی دو subnet به هم نمی‌رسند، اولین مهارت این است که بین «نداشتن مسیر»، «مسیر برگشت نداشتن»، «ARP ناموفق»، «ACL»، «NAT» و «مشکل لایه ۲» تفکیک کنی. روتر یکی از معدود نقاطی است که این تفکیک در آن قابل مشاهده است.</p>"
+  },
+  {
+   "id": "۲-مدل-ذهنی",
+   "title": "۲. مدل ذهنی",
+   "html": "<p>روتر یک دستگاه <strong>Layer 3</strong> است که بستهٔ IP را از یک broadcast domain به broadcast domain دیگری منتقل می‌کند. هر interface فعال روتر معمولاً یک subnet و یک broadcast domain جدا دارد. PC1 که مقصدش خارج از <code>10.10.10.0/24</code> است، بسته را به gateway می‌دهد؛ نه مستقیماً به MAC سرور. R1 قاب Ethernet را از G0/0 می‌گیرد، لایه ۲ را جدا می‌کند، مقصد IP را در جدول routing جست‌وجو می‌کند، TTL را یک واحد کم می‌کند و برای interface خروجی یک <strong>قاب جدید</strong> می‌سازد.</p>\n<p>سه صفحهٔ ذهنی را از هم جدا نگه دار:</p>\n<ol><li><strong>Control plane</strong> مسیرها را یاد می‌گیرد یا پیکربندی می‌کند و RIB (Routing Information Base) را می‌سازد. connected route، static route و routeهای OSPF در این مرحله وارد می‌شوند.</li><li><strong>Data plane</strong> همان تصمیم را برای هر بسته اجرا می‌کند. در بسیاری از پلتفرم‌ها RIB به FIB (Forwarding Information Base) تبدیل می‌شود تا lookup سریع‌تر باشد.</li><li><strong>Management plane</strong> برای SSH، SNMP، syslog و مدیریت دستگاه است. اینکه SSH به روتر وصل می‌شود به این معنا نیست که data plane برای کاربران درست کار می‌کند؛ این دو مسیر و گاهی دو جدول جدا دارند.</li></ol>\n<p>قاعدهٔ اصلی forwarding این است: <strong>longest prefix match</strong> اولویت دارد، نه «قدیمی‌ترین route»، نه «کم‌هزینه‌ترین metric» و نه «آشناترین همسایه». اگر دو route دقیقاً یک prefix داشته باشند، ابتدا administrative distance (AD) و سپس metric همان پروتکل تصمیم می‌گیرد. default route با prefix <code>0.0.0.0/0</code> فقط «مسیر آخر» است؛ اگر route دقیق‌تری برای مقصد وجود داشته باشد، default انتخاب نمی‌شود.</p>\n<p>یک نکتهٔ مهم: روتر برای هر بسته یک قاب L2 جدید می‌سازد. MAC مبدأ و مقصد در هر hop عوض می‌شوند، اما IP مبدأ و مقصد تا مقصد نهایی ثابت می‌مانند (مگر NAT/پروکسی که موضوع درس‌های دیگر است). TTL نیز فقط در دستگاه‌های Layer 3 کاهش می‌یابد؛ سوئیچ لایه ۲ آن را تغییر نمی‌دهد.</p>"
+  },
+  {
+   "id": "۳-واژه-ها-و-مرزها",
+   "title": "۳. واژه‌ها و مرزها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>واژه</th><th>معنای دقیق</th><th>اشتباه رایج</th></tr></thead><tbody><tr><td>Router</td><td>دستگاه Layer 3 که بین subnetها forwarding می‌کند</td><td>«هر دستگاهی که چند پورت دارد روتر است»</td></tr><tr><td>Routing table / RIB</td><td>مجموعهٔ routeها با prefix، next hop، interface، AD و metric</td><td>«جدول MAC همان جدول route است»</td></tr><tr><td>FIB</td><td>نمای forwarding جدول route برای data plane</td><td>«FIB یک پروتکل routing است»</td></tr><tr><td>Broadcast domain</td><td>محدوده‌ای که یک broadcast در آن flood می‌شود</td><td>«هر پورت روتر یک broadcast domain نیست»</td></tr><tr><td>Default gateway</td><td>آدرس next-hop محلی برای مقاصد خارج از subnet</td><td>«gateway همان DNS server است»</td></tr><tr><td>Next hop</td><td>آدرس IP دستگاه بعدی در مسیر</td><td>«next hop همان مقصد نهایی است»</td></tr><tr><td>Connected route</td><td>route ساخته‌شده از interface با IP و link up</td><td>«connected route با static route یکی است»</td></tr><tr><td>Default route</td><td>route با prefix صفر برای مسیر آخر</td><td>«default route همیشه انتخاب می‌شود»</td></tr><tr><td>AD</td><td>اعتماد بین منابع مختلف route</td><td>«AD و metric یکی هستند»</td></tr><tr><td>Metric</td><td>هزینهٔ route در یک پروتکل</td><td>«metric بین همهٔ پروتکل‌ها قابل مقایسه است»</td></tr><tr><td>ARP</td><td>نگاشت IPv4 به MAC در یک subnet</td><td>«ARP تا سرور در subnet دیگر می‌رود»</td></tr><tr><td>TTL</td><td>شمارندهٔ hop در سرآیند IP</td><td>«سوئیچ لایه ۲ TTL را کم می‌کند»</td></tr></tbody></table></div>\n<p><strong>مرز مهم:</strong> روتر broadcast را بین interfaceها forwarding نمی‌کند. اگر یک broadcast در <code>10.10.10.0/24</code> ارسال شود، از R1 به <code>10.10.20.0/24</code> نمی‌رود. سوئیچ داخل یک VLAN آن را flood می‌کند. این تفاوت، دلیل اصلی جداسازی broadcast domain با روتر یا VLAN است.</p>"
+  },
+  {
+   "id": "۴-مکانیزم",
+   "title": "۴. مکانیزم",
+   "html": "<h3>۴.۱. از قاب تا تصمیم</h3>\n<p>وقتی قاب Ethernet به interface روتر می‌رسد، روتر ابتدا FCS را بررسی می‌کند. اگر قاب خراب باشد، دور انداخته می‌شود. اگر مقصد MAC معتبر باشد (MAC خود interface یا broadcast)، روتر قاب را جدا می‌کند و بستهٔ IP را به موتور forwarding می‌دهد. در IPv4، روتر TTL را بررسی می‌کند: اگر TTL صفر یا یک باشد، بسته را دور می‌ریزد و در حالت عادی ICMP Time Exceeded می‌فرستد. در غیر این صورت TTL را یک واحد کم می‌کند و checksum سرآیند را دوباره محاسبه می‌کند.</p>\n<p>سپس مقصد IP را در جدول route جست‌وجو می‌کند. نتیجه یکی از این حالت‌هاست:</p>\n<ul><li><strong>connected</strong>: مقصد مستقیماً روی یک interface فعال است؛ next hop خود مقصد است و ARP برای مقصد انجام می‌شود.</li><li><strong>next-hop مشخص</strong>: route می‌گوید بسته را به آدرس next hop بفرست؛ روتر باید next hop را با ARP به MAC تبدیل کند.</li><li><strong>default route</strong>: فقط اگر هیچ prefix دقیق‌تری نباشد.</li><li><strong>بدون route</strong>: بسته دور ریخته می‌شود و معمولاً ICMP Destination Unreachable برمی‌گردد.</li></ul>\n<h3>۴.۲. longest prefix، AD و metric</h3>\n<p>فرض کن جدول این routeها را دارد:</p>\n<pre><code class=\"language-text\">10.10.0.0/16      via 192.0.2.2\n10.10.20.0/24     connected, G0/1\n0.0.0.0/0         via 198.51.100.1</code></pre>\n<p>برای مقصد <code>10.10.20.10</code>، هر سه route ممکن است تطبیق داده شوند، اما <code>/24</code> طولانی‌ترین prefix است و برنده می‌شود. <code>/16</code> و <code>/0</code> فقط وقتی برنده‌اند که route دقیق‌تری وجود نداشته باشد.</p>\n<p>اگر دو route با همان prefix از منابع مختلف داشته باشیم، AD تصمیم می‌گیرد. مثلاً static با AD پیش‌فرض 1 قبل از OSPF با AD پیش‌فرض 110 نصب می‌شود. metric فقط وقتی مقایسه می‌شود که routeها از یک پروتکل باشند. پس «OSPF metric کمتر» به‌تنهایی دلیل برنده شدن در برابر static نیست.</p>\n<h3>۴.۳. ARP و بازنویسی MAC</h3>\n<p>روتر برای ارسال قاب روی interface خروجی به MAC مقصد لایه ۲ نیاز دارد. اگر next hop در همان subnet باشد، ARP request می‌فرستد: «MAC مربوط به <code>10.10.20.10</code> را چه کسی دارد؟» پاسخ در ARP cache ذخیره می‌شود. اگر next hop در subnet دیگری باشد، روتر به‌طور بازگشتی route آن next hop را حل می‌کند تا به یک next hop مستقیم برسد.</p>\n<p>در هر hop، روتر یک قاب با MAC مبدأ interface خروجی و MAC مقصد next hop می‌سازد. MAC مقصد نهایی (اگر در همان subnet بود) یا MAC next hop، متفاوت از MAC مبدأ اولیه است. به همین دلیل یک capture در دو طرف روتر، MACهای متفاوت ولی IPهای یکسان نشان می‌دهد.</p>"
+  },
+  {
+   "id": "۵-مسیر-گام-به-گام",
+   "title": "۵. مسیر گام‌به‌گام",
+   "html": "<p>سناریوی درس را با آدرس‌های دقیق دنبال کنیم:</p>\n<ul><li>PC1: <code>10.10.10.50/24</code>، gateway <code>10.10.10.1</code></li><li>R1 G0/0: <code>10.10.10.1/24</code></li><li>R1 G0/1: <code>10.10.20.1/24</code></li><li>SRV1: <code>10.10.20.10/24</code>، gateway <code>10.10.20.1</code></li></ul>\n<ol><li>PC1 می‌خواهد <code>10.10.20.10</code> را ping کند. چون مقصد خارج از <code>10.10.10.0/24</code> است، PC1 تصمیم می‌گیرد بسته را به default gateway بفرستد.</li><li>PC1 با ARP دنبال MAC آدرس <code>10.10.10.1</code> می‌گردد، نه MAC سرور. فریم با MAC مبدأ PC1 و MAC مقصد R1 ساخته می‌شود.</li><li>R1 قاب را روی G0/0 می‌گیرد، مقصد IP را در جدول route جست‌وجو می‌کند و route متصل <code>10.10.20.0/24</code> را روی G0/1 پیدا می‌کند.</li><li>R1 TTL را از 64 به 63 کاهش می‌دهد؛ IP مبدأ و مقصد را تغییر نمی‌دهد.</li><li>R1 برای مقصد <code>10.10.20.10</code> روی G0/1 ARP می‌کند و MAC سرور را یاد می‌گیرد. فریم جدید با MAC مبدأ R1 G0/1 و MAC مقصد SRV1 ساخته می‌شود.</li><li>SRV1 پاسخ را به gateway خود، <code>10.10.20.1</code>، می‌فرستد؛ زیرا مقصد <code>10.10.10.50</code> خارج از subnet سرور است.</li><li>R1 پاسخ را روی G0/1 می‌گیرد، route متصل <code>10.10.10.0/24</code> را روی G0/0 پیدا می‌کند، TTL را کم می‌کند و فریم جدیدی برای PC1 می‌سازد.</li></ol>\n<p>اگر هر مرحله را جدا اندازه‌گیری نکنی، ممکن است «ping نشدن» را به DNS یا کابل نسبت بدهی. در این مسیر، DNS هیچ نقشی ندارد؛ ما با IP کار می‌کنیم. کابل و LED هم فقط لایه ۱ را نشان می‌دهند.</p>\n<div class=\"table-wrap\"><table><thead><tr><th>نقطه</th><th>MAC مبدأ</th><th>MAC مقصد</th><th>IP مبدأ</th><th>IP مقصد</th><th>TTL</th></tr></thead><tbody><tr><td>PC1 → SW1</td><td>MAC PC1</td><td>MAC R1 G0/0</td><td>10.10.10.50</td><td>10.10.20.10</td><td>64</td></tr><tr><td>R1 G0/1 → SW2</td><td>MAC R1 G0/1</td><td>MAC SRV1</td><td>10.10.10.50</td><td>10.10.20.10</td><td>63</td></tr><tr><td>SRV1 → R1 G0/1</td><td>MAC SRV1</td><td>MAC R1 G0/1</td><td>10.10.20.10</td><td>10.10.10.50</td><td>64</td></tr><tr><td>R1 G0/0 → SW1</td><td>MAC R1 G0/0</td><td>MAC PC1</td><td>10.10.20.10</td><td>10.10.10.50</td><td>63</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "۶-توپولوژی-و-آدرس-دهی",
+   "title": "۶. توپولوژی و آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1100 650\" role=\"img\" aria-labelledby=\"title desc\">\n  <title id=\"title\">Router R1 as the Layer 3 boundary between two IPv4 subnets</title>\n  <desc id=\"desc\">PC1 at 10.10.10.50/24 uses R1 G0/0 10.10.10.1 as its default gateway. SRV1 at 10.10.20.10/24 uses R1 G0/1 10.10.20.1. A packet from PC1 to SRV1 crosses R1, where the Ethernet frame is rewritten and TTL is decremented by one.</desc>\n  <rect width=\"1100\" height=\"650\" fill=\"#f6f8fc\"/>\n  <text x=\"550\" y=\"44\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"26\" font-weight=\"700\" fill=\"#14213d\">R1: one router, two broadcast domains</text>\n  <text x=\"550\" y=\"74\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" fill=\"#4a5568\">Each interface terminates a different IPv4 subnet; R1 forwards between them.</text>\n\n  <!-- links -->\n  <line x1=\"360\" y1=\"310\" x2=\"230\" y2=\"310\" stroke=\"#2563eb\" stroke-width=\"6\"/>\n  <line x1=\"740\" y1=\"310\" x2=\"870\" y2=\"310\" stroke=\"#0f766e\" stroke-width=\"6\"/>\n  <line x1=\"155\" y1=\"370\" x2=\"155\" y2=\"500\" stroke=\"#64748b\" stroke-width=\"5\"/>\n  <line x1=\"945\" y1=\"370\" x2=\"945\" y2=\"500\" stroke=\"#64748b\" stroke-width=\"5\"/>\n\n  <text x=\"295\" y=\"292\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#1d4ed8\">10.10.10.0/24</text>\n  <text x=\"805\" y=\"292\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#0f766e\">10.10.20.0/24</text>\n\n  <!-- PC1 -->\n  <rect x=\"55\" y=\"500\" width=\"230\" height=\"90\" rx=\"14\" fill=\"#ffffff\" stroke=\"#64748b\" stroke-width=\"2\"/>\n  <text x=\"170\" y=\"535\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#0f172a\">PC1</text>\n  <text x=\"170\" y=\"561\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#334155\">10.10.10.50/24</text>\n  <text x=\"170\" y=\"583\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#475569\">gateway 10.10.10.1</text>\n\n  <!-- SRV1 -->\n  <rect x=\"830\" y=\"500\" width=\"230\" height=\"90\" rx=\"14\" fill=\"#ffffff\" stroke=\"#64748b\" stroke-width=\"2\"/>\n  <text x=\"945\" y=\"535\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#0f172a\">SRV1</text>\n  <text x=\"945\" y=\"561\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"15\" fill=\"#334155\">10.10.20.10/24</text>\n  <text x=\"945\" y=\"583\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#475569\">gateway 10.10.20.1</text>\n\n  <!-- SW1 -->\n  <rect x=\"230\" y=\"250\" width=\"130\" height=\"120\" rx=\"14\" fill=\"#eff6ff\" stroke=\"#2563eb\" stroke-width=\"3\"/>\n  <text x=\"295\" y=\"294\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#1e3a8a\">SW1</text>\n  <text x=\"295\" y=\"322\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#1e40af\">L2 access</text>\n  <text x=\"295\" y=\"345\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#1e40af\">Gi1/0/10 → PC1</text>\n\n  <!-- SW2 -->\n  <rect x=\"740\" y=\"250\" width=\"130\" height=\"120\" rx=\"14\" fill=\"#ecfdf5\" stroke=\"#0f766e\" stroke-width=\"3\"/>\n  <text x=\"805\" y=\"294\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#134e4a\">SW2</text>\n  <text x=\"805\" y=\"322\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#115e59\">L2 access</text>\n  <text x=\"805\" y=\"345\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"13\" fill=\"#115e59\">Gi1/0/10 → SRV1</text>\n\n  <!-- R1 -->\n  <rect x=\"360\" y=\"240\" width=\"380\" height=\"140\" rx=\"18\" fill=\"#fff7ed\" stroke=\"#c2410c\" stroke-width=\"4\"/>\n  <text x=\"550\" y=\"282\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"28\" font-weight=\"700\" fill=\"#7c2d12\">R1 · router</text>\n  <text x=\"550\" y=\"314\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" fill=\"#9a3412\">G0/0 10.10.10.1/24</text>\n  <text x=\"550\" y=\"340\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"16\" fill=\"#9a3412\">G0/1 10.10.20.1/24</text>\n  <text x=\"550\" y=\"366\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#7c2d12\">TTL − 1 · longest-prefix lookup · new frame</text>\n\n  <!-- path arrows -->\n  <path d=\"M170 500 C170 430 200 390 230 365\" fill=\"none\" stroke=\"#2563eb\" stroke-width=\"3\" stroke-dasharray=\"8 7\"/>\n  <path d=\"M360 290 C420 250 680 250 740 290\" fill=\"none\" stroke=\"#c2410c\" stroke-width=\"3\" stroke-dasharray=\"8 7\"/>\n  <path d=\"M870 365 C900 390 930 430 945 500\" fill=\"none\" stroke=\"#0f766e\" stroke-width=\"3\" stroke-dasharray=\"8 7\"/>\n\n  <!-- legend -->\n  <rect x=\"300\" y=\"590\" width=\"500\" height=\"40\" rx=\"10\" fill=\"#ffffff\" stroke=\"#cbd5e1\"/>\n  <text x=\"550\" y=\"616\" text-anchor=\"middle\" font-family=\"Arial, Tahoma, sans-serif\" font-size=\"14\" fill=\"#334155\">The switch forwards a frame inside one subnet; R1 routes a packet between subnets.</text>\n</svg></div><figcaption>R1 به‌عنوان مرز Layer 3 بین شبکهٔ کاربران و سرورها</figcaption></figure>\n<p>R1 دو interface دارد و هر interface در یک subnet جدا است. SW1 و SW2 فقط سوئیچ لایه ۲ هستند؛ آن‌ها MAC را یاد می‌گیرند و فریم را داخل همان broadcast domain جلو می‌برند، اما تصمیم بین <code>10.10.10.0/24</code> و <code>10.10.20.0/24</code> کار R1 است.</p>\n<div class=\"table-wrap\"><table><thead><tr><th>دستگاه</th><th>Interface</th><th>آدرس/prefix</th><th>نقش</th></tr></thead><tbody><tr><td>PC1</td><td>NIC</td><td>10.10.10.50/24</td><td>host مبدأ؛ gateway 10.10.10.1</td></tr><tr><td>SW1</td><td>Gi1/0/10</td><td>—</td><td>access به PC1</td></tr><tr><td>R1</td><td>G0/0</td><td>10.10.10.1/24</td><td>gateway شبکهٔ کاربران</td></tr><tr><td>R1</td><td>G0/1</td><td>10.10.20.1/24</td><td>gateway شبکهٔ سرورها</td></tr><tr><td>SW2</td><td>Gi1/0/10</td><td>—</td><td>access به SRV1</td></tr><tr><td>SRV1</td><td>NIC</td><td>10.10.20.10/24</td><td>host مقصد؛ gateway 10.10.20.1</td></tr></tbody></table></div>\n<p><strong>نکتهٔ آدرس‌دهی:</strong> هر دو interface روتر باید link up و آدرس‌دار باشند تا connected route ساخته شود. اگر G0/1 در حالت <code>administratively down</code> باشد، حتی با آدرس درست، route متصل <code>10.10.20.0/24</code> در جدول نمی‌آید و بسته به سرور دور ریخته می‌شود.</p>"
+  },
+  {
+   "id": "۷-پیکربندی-و-رویه",
+   "title": "۷. پیکربندی و رویه",
+   "html": "<p>در این Objective، پیکربندی فقط برای بازسازی یک محیط آزمایشی است؛ هیچ دستوری روی دستگاه واقعی اجرا نشده است. پلتفرم فرضی: Cisco IOS-XE 17.9.x، با دو interface routed و بدون NAT/ACL. پیکربندی باید با addressing و state لینک تأیید شود.</p>\n<pre><code class=\"language-cisco\">! lab only — isolated topology; no production device\nR1(config)# interface GigabitEthernet0/0\nR1(config-if)# description USERS-10.10.10.0/24\nR1(config-if)# ip address 10.10.10.1 255.255.255.0\nR1(config-if)# no shutdown\nR1(config-if)# exit\nR1(config)# interface GigabitEthernet0/1\nR1(config-if)# description SERVERS-10.10.20.0/24\nR1(config-if)# ip address 10.10.20.1 255.255.255.0\nR1(config-if)# no shutdown</code></pre>\n<p>روی PC1 و SRV1، آدرس، prefix و default gateway باید مطابق جدول تنظیم شود. اگر سوئیچ‌ها access port دارند، پورت PC1 و SRV1 باید در VLAN درست باشد؛ در این سناریوی ساده هر سوئیچ یک VLAN دارد و R1 روی همان VLAN آدرس دارد. اگر VLANهای متعدد اضافه شود، interface روتر باید trunk یا subinterface داشته باشد؛ این موضوع درس‌های VLAN است.</p>\n<p><strong>قبل از تغییر:</strong> خروجی <code>show running-config interface</code> و <code>show ip interface brief</code> را ثبت کن. <strong>بعد از تغییر:</strong> <code>show ip route</code> و <code>show arp</code> را بگیر. هیچ تغییر production بدون backup/rollback انجام نمی‌شود.</p>"
+  },
+  {
+   "id": "۸-تأیید-و-شاهد",
+   "title": "۸. تأیید و شاهد",
+   "html": "<p>تأیید را به ترتیب لایه انجام بده:</p>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>فرمان/شاهد</th><th>چه چیزی را ثابت می‌کند</th></tr></thead><tbody><tr><td>1</td><td><code>show ip interface brief</code></td><td>interface up/up و آدرس درست</td></tr><tr><td>2</td><td><code>show ip route</code></td><td>connected route برای هر دو subnet</td></tr><tr><td>3</td><td><code>show arp</code></td><td>نگاشت MAC برای gateway/next hop</td></tr><tr><td>4</td><td><code>ping 10.10.10.1</code> از PC1</td><td>مسیر PC تا gateway</td></tr><tr><td>5</td><td><code>ping 10.10.20.10</code> از PC1</td><td>forwarding و مسیر برگشت</td></tr><tr><td>6</td><td><code>traceroute 10.10.20.10</code></td><td>hop منطقی و مسیر</td></tr><tr><td>7</td><td><code>show ip interface G0/1</code></td><td>counters/errors و وضعیت interface</td></tr></tbody></table></div>\n<pre><code class=\"language-text\">! Designed — Not Run; sample expected output, not a device capture\nR1# show ip route\nCodes: L - local, C - connected, S - static, O - OSPF\n      10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks\nC        10.10.10.0/24 is directly connected, GigabitEthernet0/0\nL        10.10.10.1/32 is directly connected, GigabitEthernet0/0\nC        10.10.20.0/24 is directly connected, GigabitEthernet0/1\nL        10.10.20.1/32 is directly connected, GigabitEthernet0/1</code></pre>\n<p>خروجی بالا <strong>نمونهٔ طراحی‌شده</strong> است. اگر در محیط تو <code>L</code> یا <code>C</code> ظاهر نشد، اول link/address را بررسی کن؛ نباید با اضافه کردن static route آن را پنهان کنی. اگر ping gateway کار می‌کند ولی ping سرور نه، باید هم مسیر R1 به سرور و هم مسیر برگشت سرور به کاربر را ببینی. در بسیاری از موارد، یک طرف route دارد و طرف دیگر نه.</p>"
+  },
+  {
+   "id": "۹-عیب-یابی",
+   "title": "۹. عیب‌یابی",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>نشانه</th><th>علت محتمل</th><th>اولین شاهد</th><th>اقدام ایمن</th></tr></thead><tbody><tr><td>PC به gateway ping نمی‌دهد</td><td>VLAN/access، کابل، IP یا interface down</td><td><code>show ip interface brief</code> و MAC table</td><td>لینک/آدرس را اصلاح کن؛ route اضافه نکن</td></tr><tr><td>PC gateway را ping می‌کند، سرور را نه</td><td>R1 route به سرور یا مسیر برگشت ندارد</td><td><code>show ip route</code> روی R1 و SRV1</td><td>مسیر گم‌شده را با شاهد اضافه کن</td></tr><tr><td>R1 route دارد ولی ARP ناقص است</td><td>next hop در subnet نیست یا host خاموش است</td><td><code>show arp</code> و <code>ping</code> next hop</td><td>آدرس/لینک next hop را بررسی کن</td></tr><tr><td>یک جهت کار می‌کند، جهت دیگر نه</td><td>asymmetric/return route یا ACL</td><td>traceroute دوطرفه و counters</td><td>ACL/route برگشت را با شاهد بررسی کن</td></tr><tr><td>بعد از تغییر، TTL غیرمنتظره است</td><td>loop یا hop اضافه</td><td>traceroute و TTL capture</td><td>loop/route را پیدا کن؛ TTL را دستی عوض نکن</td></tr><tr><td><code>C</code> وجود ندارد</td><td>interface down یا mask اشتباه</td><td><code>show ip interface</code></td><td>state/address را درست کن</td></tr></tbody></table></div>\n<p><strong>قاعدهٔ عیب‌یابی:</strong> اول بپرس «بسته در کدام جهت و در کدام hop گم می‌شود؟» سپس شاهد بگیر. پاک کردن ARP یا اضافه کردن default route بدون شاهد، مشکل را جابه‌جا می‌کند و ممکن است یک failure جدید بسازد. اگر ACL یا NAT در مسیر است، آن‌ها را در درس‌های خودشان جدا بررسی کن؛ این درس فقط forwarding پایه را پوشش می‌دهد.</p>"
+  },
+  {
+   "id": "۱۰-امنیت-و-طراحی",
+   "title": "۱۰. امنیت و طراحی",
+   "html": "<p>روتر مرز اعتماد بین subnetهاست. هر ACL، NAT، firewall zone یا policy routing روی همین مرز اثر می‌گذارد؛ بنابراین قبل از تغییر route، بدان که بسته از کدام interface وارد و از کدام خارج می‌شود. یک ACL که در جهت اشتباه اعمال شود می‌تواند مسیر برگشت را قطع کند، در حالی که <code>show ip route</code> کاملاً سالم به نظر می‌رسد.</p>\n<p>برای مدیریت امن:</p>\n<ul><li>management access را از data plane جدا کن (VLAN مدیریت، ACL، SSH به‌جای Telnet).</li><li><code>ip http server</code> و سرویس‌های بی‌استفاده را خاموش کن؛ لاگ و NTP را فعال کن.</li><li>control-plane protection و rate-limit برای routing protocols را در طراحی جدی بگیر.</li><li>default route را فقط با سیاست مشخص توزیع کن؛ route leak می‌تواند ترافیک را به مسیر ناخواسته بفرستد.</li><li>برای دسترس‌پذیری gateway، FHRP را در نظر بگیر؛ یک روتر تنها یک نقطهٔ شکست است.</li></ul>\n<p>در طراحی، روتر را فقط وقتی بین subnetها بگذار که واقعاً به مرز Layer 3 نیاز داری. اگر تعداد VLANها و ترافیک زیاد است، L3 switch و SVI می‌تواند گزینه باشد؛ اما تصمیم به platform، scale، policy و مهارت عملیاتی وابسته است. هیچ‌کدام «همیشه بهتر» نیست.</p>"
+  },
+  {
+   "id": "۱۱-تله-ها-و-تصمیم-آزمون",
+   "title": "۱۱. تله‌ها و تصمیم آزمون",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>اشتباه</th><th>تصحیح</th></tr></thead><tbody><tr><td>«PC باید MAC سرور را ARP کند.»</td><td>برای مقصد خارج از subnet، PC ابتدا MAC gateway را ARP می‌کند.</td></tr><tr><td>«هر سه route تطبیق می‌شوند، پس metric تصمیم می‌گیرد.»</td><td>اول longest prefix؛ metric فقط بین routeهای هم‌prefix و هم‌منبع/پروتکل.</td></tr><tr><td>«default route همیشه انتخاب می‌شود.»</td><td>default فقط وقتی هیچ prefix دقیق‌تری نباشد.</td></tr><tr><td>«MAC تا انتها ثابت می‌ماند.»</td><td>در هر hop Layer 3، MAC مبدأ/مقصد بازنویسی می‌شود.</td></tr><tr><td>«TTL را سوئیچ هم کم می‌کند.»</td><td>سوئیچ لایه ۲ TTL را تغییر نمی‌دهد؛ روتر یک واحد کم می‌کند.</td></tr><tr><td>«ping به gateway یعنی routing سالم است.»</td><td>فقط مسیر تا gateway را ثابت می‌کند؛ مسیر برگشت و route مقصد جدا هستند.</td></tr><tr><td>«DNS مشکل دارد چون ping نمی‌شود.»</td><td>اگر با IP ping می‌کنی، DNS در مسیر نیست.</td></tr><tr><td>«connected route را باید static کرد.»</td><td>connected از interface up/address ساخته می‌شود؛ static جای آن نیست.</td></tr></tbody></table></div>\n<p>در آزمون، اگر سؤال «کدام route انتخاب می‌شود؟» است، اول prefixها را بنویس، سپس longest prefix، سپس AD و در نهایت metric. اگر سؤال «چرا ping جواب نمی‌دهد؟» است، مسیر رفت و برگشت را جدا بررسی کن. اگر گزینه‌ای می‌گوید «MAC مقصد در طول مسیر ثابت است»، بدون محاسبه رد می‌شود.</p>"
+  },
+  {
+   "id": "۱۲-جمع-بندی",
+   "title": "۱۲. جمع‌بندی",
+   "html": "<ul><li>روتر بین subnetها forwarding می‌کند؛ سوئیچ لایه ۲ داخل broadcast domain.</li><li>هر interface روتر معمولاً یک subnet و یک broadcast domain است.</li><li>PC برای مقصد خارج از subnet، بسته را به default gateway می‌فرستد و MAC gateway را ARP می‌کند.</li><li>longest prefix match اول تصمیم می‌گیرد؛ AD و metric فقط بعد از آن.</li><li>connected route از interface up و آدرس درست ساخته می‌شود.</li><li>در هر hop Layer 3، MAC بازنویسی و TTL یک واحد کم می‌شود؛ IPها ثابت می‌مانند.</li><li><code>ping</code> به gateway فقط یک بخش از مسیر را تأیید می‌کند.</li><li>عیب‌یابی درست = شاهد در هر hop، نه تغییر حدسی route.</li></ul>"
+  },
+  {
+   "id": "منابع-و-محدودیت-ها",
+   "title": "منابع و محدودیت‌ها",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع</th><th>بخش</th><th>وضعیت</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 v1.1 Exam Topics — &lt;https://www.cisco.com/c/en/us/training-exams/training/it-certifications/ccna-certification.html&gt;</td><td>1.0 Network Fundamentals، 1.1.a routers</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>RFC 791 — Internet Protocol — &lt;https://www.rfc-editor.org/rfc/rfc791.html&gt;</td><td>IPv4 forwarding، TTL و header checksum</td><td>PROVENANCE_NOT_VERIFIED</td></tr><tr><td>Cisco IOS IP Routing Configuration Guide — &lt;https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_static/configuration/15-mt/iproute-static-15-mt-book.html&gt;</td><td>Static routing و route selection</td><td>PROVENANCE_NOT_VERIFIED</td></tr></tbody></table></div>\n<p><strong>محدودیت‌های صریح:</strong></p>\n<ul><li>این درس توسط Agent بازنویسی شده و تأیید معنایی خبرهٔ انسانی ندارد.</li><li>هیچ IOS/IOS-XE، Lab، simulator یا شبکهٔ واقعی اجرا نشده است؛ همهٔ خروجی‌ها <code>Designed — Not Run</code> هستند.</li><li>URLها در سطح عنوان/بخش ثبت شده‌اند؛ snapshot، hash و page-level citation تأیید نشده است.</li><li>شمارهٔ interfaceها و آدرس‌ها برای آموزش انتخاب شده‌اند؛ platform، license و طراحی واقعی باید جداگانه بررسی شوند.</li><li>این درس فقط forwarding پایهٔ IPv4 را پوشش می‌دهد؛ NAT، ACL، IPv6، FHRP و routing protocolها در درس‌های خودشان می‌آیند.</li></ul>"
+  },
+  {
+   "id": "درس-بعدی",
+   "title": "درس بعدی",
+   "html": "<p>درس بعدی: <a href=\"ccna-v11-1.1.b.html\">سوئیچ لایه ۲ و لایه ۳: مرز قاب و بسته</a> — هنوز در Draft است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Router",
+   "fa": "Router",
+   "simple": "دستگاه Layer 3 که بسته را بین subnetها forwarding می‌کند."
+  },
+  {
+   "term": "Routing table (RIB)",
+   "fa": "Routing table (RIB)",
+   "simple": "جدول routeها با prefix، next hop، interface، AD و metric."
+  },
+  {
+   "term": "FIB",
+   "fa": "FIB",
+   "simple": "نمای forwarding جدول route برای data plane."
+  },
+  {
+   "term": "Control plane",
+   "fa": "Control plane",
+   "simple": "بخشی که routeها را یاد می‌گیرد و جدول را می‌سازد."
+  },
+  {
+   "term": "Data plane",
+   "fa": "Data plane",
+   "simple": "بخشی که بسته‌ها را بر اساس تصمیم forwarding جابه‌جا می‌کند."
+  },
+  {
+   "term": "Broadcast domain",
+   "fa": "Broadcast domain",
+   "simple": "محدوده‌ای که broadcast در آن flood می‌شود."
+  },
+  {
+   "term": "Default gateway",
+   "fa": "Default gateway",
+   "simple": "آدرس next-hop محلی برای مقاصد خارج از subnet."
+  },
+  {
+   "term": "Longest prefix match",
+   "fa": "Longest prefix match",
+   "simple": "انتخاب دقیق‌ترین prefix در جدول route."
+  },
+  {
+   "term": "Administrative distance (AD)",
+   "fa": "Administrative distance (AD)",
+   "simple": "میزان اعتماد به منبع route در مقایسهٔ منابع مختلف."
+  },
+  {
+   "term": "Metric",
+   "fa": "Metric",
+   "simple": "هزینهٔ route درون یک پروتکل routing."
+  },
+  {
+   "term": "Next hop",
+   "fa": "Next hop",
+   "simple": "آدرس IP دستگاه بعدی در مسیر."
+  },
+  {
+   "term": "Connected route",
+   "fa": "Connected route",
+   "simple": "route ساخته‌شده از interface فعال با آدرس IP."
+  },
+  {
+   "term": "Default route",
+   "fa": "Default route",
+   "simple": "route با prefix 0.0.0.0/0 برای مسیر آخر."
+  },
+  {
+   "term": "ARP",
+   "fa": "ARP",
+   "simple": "نگاشت IPv4 به MAC در یک subnet."
+  },
+  {
+   "term": "TTL",
+   "fa": "TTL",
+   "simple": "شمارندهٔ hop در سرآیند IP که در هر روتر کاهش می‌یابد."
+  },
+  {
+   "term": "MAC rewrite",
+   "fa": "MAC rewrite",
+   "simple": "تغییر MAC مبدأ/مقصد در هر hop Layer 3."
+  },
+  {
+   "term": "Broadcast",
+   "fa": "Broadcast",
+   "simple": "بستهٔ یک‌به‌همه در یک broadcast domain."
+  },
+  {
+   "term": "Transit",
+   "fa": "Transit",
+   "simple": "عبور ترافیک از دستگاهی بدون terminate کردن سرویس."
+  },
+  {
+   "term": "Return path",
+   "fa": "Return path",
+   "simple": "مسیر بستهٔ پاسخ از مقصد به مبدأ."
+  },
+  {
+   "term": "Asymmetric routing",
+   "fa": "Asymmetric routing",
+   "simple": "عبور رفت و برگشت از مسیرهای متفاوت."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ آزمایشگاه (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — این کاربرگ طراحی شده و روی تجهیز واقعی یا PNETLab اجرا نشده است.",
+   "html": "<h4>۷. پیکربندی و رویه</h4><p>در این Objective، پیکربندی فقط برای بازسازی یک محیط آزمایشی است؛ هیچ دستوری روی دستگاه واقعی اجرا نشده است. پلتفرم فرضی: Cisco IOS-XE 17.9.x، با دو interface routed و بدون NAT/ACL. پیکربندی باید با addressing و state لینک تأیید شود.</p>\n<pre><code class=\"language-cisco\">! lab only — isolated topology; no production device\nR1(config)# interface GigabitEthernet0/0\nR1(config-if)# description USERS-10.10.10.0/24\nR1(config-if)# ip address 10.10.10.1 255.255.255.0\nR1(config-if)# no shutdown\nR1(config-if)# exit\nR1(config)# interface GigabitEthernet0/1\nR1(config-if)# description SERVERS-10.10.20.0/24\nR1(config-if)# ip address 10.10.20.1 255.255.255.0\nR1(config-if)# no shutdown</code></pre>\n<p>روی PC1 و SRV1، آدرس، prefix و default gateway باید مطابق جدول تنظیم شود. اگر سوئیچ‌ها access port دارند، پورت PC1 و SRV1 باید در VLAN درست باشد؛ در این سناریوی ساده هر سوئیچ یک VLAN دارد و R1 روی همان VLAN آدرس دارد. اگر VLANهای متعدد اضافه شود، interface روتر باید trunk یا subinterface داشته باشد؛ این موضوع درس‌های VLAN است.</p>\n<p><strong>قبل از تغییر:</strong> خروجی <code>show running-config interface</code> و <code>show ip interface brief</code> را ثبت کن. <strong>بعد از تغییر:</strong> <code>show ip route</code> و <code>show arp</code> را بگیر. هیچ تغییر production بدون backup/rollback انجام نمی‌شود.</p><h4>۸. تأیید و شاهد</h4><p>تأیید را به ترتیب لایه انجام بده:</p>\n<div class=\"table-wrap\"><table><thead><tr><th>گام</th><th>فرمان/شاهد</th><th>چه چیزی را ثابت می‌کند</th></tr></thead><tbody><tr><td>1</td><td><code>show ip interface brief</code></td><td>interface up/up و آدرس درست</td></tr><tr><td>2</td><td><code>show ip route</code></td><td>connected route برای هر دو subnet</td></tr><tr><td>3</td><td><code>show arp</code></td><td>نگاشت MAC برای gateway/next hop</td></tr><tr><td>4</td><td><code>ping 10.10.10.1</code> از PC1</td><td>مسیر PC تا gateway</td></tr><tr><td>5</td><td><code>ping 10.10.20.10</code> از PC1</td><td>forwarding و مسیر برگشت</td></tr><tr><td>6</td><td><code>traceroute 10.10.20.10</code></td><td>hop منطقی و مسیر</td></tr><tr><td>7</td><td><code>show ip interface G0/1</code></td><td>counters/errors و وضعیت interface</td></tr></tbody></table></div>\n<pre><code class=\"language-text\">! Designed — Not Run; sample expected output, not a device capture\nR1# show ip route\nCodes: L - local, C - connected, S - static, O - OSPF\n      10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks\nC        10.10.10.0/24 is directly connected, GigabitEthernet0/0\nL        10.10.10.1/32 is directly connected, GigabitEthernet0/0\nC        10.10.20.0/24 is directly connected, GigabitEthernet0/1\nL        10.10.20.1/32 is directly connected, GigabitEthernet0/1</code></pre>\n<p>خروجی بالا <strong>نمونهٔ طراحی‌شده</strong> است. اگر در محیط تو <code>L</code> یا <code>C</code> ظاهر نشد، اول link/address را بررسی کن؛ نباید با اضافه کردن static route آن را پنهان کنی. اگر ping gateway کار می‌کند ولی ping سرور نه، باید هم مسیر R1 به سرور و هم مسیر برگشت سرور به کاربر را ببینی. در بسیاری از موارد، یک طرف route دارد و طرف دیگر نه.</p>"
+  },
+  "quiz": {
+   "title": "آزمون",
+   "instructions": "۱۲ پرسش؛ هر پاسخ فقط یک بار قفل می‌شود. توضیح در بازخورد نمایش داده می‌شود."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "PC1 با آدرس 10.10.10.50/24 می‌خواهد سرور 10.10.20.10 را ping کند. PC1 قبل از ارسال اولین فریم، MAC کدام آدرس را با ARP می‌خواهد؟",
+   "promptHtml": "PC1 با آدرس 10.10.10.50/24 می‌خواهد سرور 10.10.20.10 را ping کند. PC1 قبل از ارسال اولین فریم، MAC کدام آدرس را با ARP می‌خواهد؟",
+   "options": [
+    "MAC آدرس 10.10.20.10، چون مقصد نهایی سرور است",
+    "MAC آدرس 10.10.10.1، چون gateway در همان subnet است",
+    "MAC آدرس 10.10.20.1، چون gateway سرور است",
+    "MAC آدرس DNS server، چون نام سرور resolve می‌شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "مقصد 10.10.20.10 خارج از subnet مبدأ است؛ PC1 بسته را به default gateway می‌دهد و بنابراین MAC همان gateway محلی 10.10.10.1 را ARP می‌کند. گزینهٔ اول اشتباه است چون PC1 برای مقصد دور MAC نهایی را ARP نمی‌کند؛ گزینهٔ سوم gateway سرور است، نه gateway PC1.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "روتر برای مقصد 10.10.20.10 این routeها را دارد: 10.10.0.0/16 via 192.0.2.2، 10.10.20.0/24 connected، و default 0.0.0.0/0. کدام route برنده می‌شود؟",
+   "promptHtml": "روتر برای مقصد 10.10.20.10 این routeها را دارد: 10.10.0.0/16 via 192.0.2.2، 10.10.20.0/24 connected، و default 0.0.0.0/0. کدام route برنده می‌شود؟",
+   "options": [
+    "10.10.0.0/16، چون قدیمی‌تر و پایدارتر است",
+    "0.0.0.0/0، چون مسیر پیش‌فرض همیشه اولویت دارد",
+    "10.10.20.0/24، چون طولانی‌ترین prefix مطابق مقصد است",
+    "هر دو /16 و /24 به‌صورت ECMP نصب می‌شوند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "قاعدهٔ اول forwarding انتخاب طولانی‌ترین prefix است؛ /24 از /16 و /0 دقیق‌تر است. گزینهٔ اول و دوم اشتباه‌اند چون قبل از AD/metric باید longest prefix را مقایسه کرد؛ گزینهٔ چهارم هم غلط است چون prefixها برابر نیستند و ECMP فقط برای مسیرهای هم‌prefix و هم‌هزینه معنا دارد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "در مسیر PC1 → R1 → SRV1، کدام گزینه دربارهٔ آدرس‌های Layer 2 و Layer 3 درست است؟",
+   "promptHtml": "در مسیر PC1 → R1 → SRV1، کدام گزینه دربارهٔ آدرس‌های Layer 2 و Layer 3 درست است؟",
+   "options": [
+    "MAC مبدأ و مقصد در هر hop بازنویسی می‌شود، اما IP مبدأ و مقصد تا انتها ثابت می‌ماند",
+    "MAC مبدأ و مقصد تا انتها ثابت می‌ماند، اما IP در هر hop عوض می‌شود",
+    "هم MAC و هم IP در هر hop بازنویسی می‌شوند",
+    "MAC فقط در سوئیچ عوض می‌شود و روتر آن را تغییر نمی‌دهد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "هر hop Layer 3 یک قاب جدید با MAC interface خروجی و MAC next hop می‌سازد؛ در حالی که آدرس‌های IP مبدأ و مقصد بدون NAT ثابت می‌مانند. گزینهٔ دوم برعکس است؛ گزینهٔ سوم جابه‌جایی IP را اشتباه می‌داند؛ گزینهٔ چهارم نقش روتر در بازنویسی MAC را نادیده می‌گیرد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام جمله دربارهٔ TTL در این مسیر درست است؟",
+   "promptHtml": "کدام جمله دربارهٔ TTL در این مسیر درست است؟",
+   "options": [
+    "هم روتر و هم سوئیچ لایه ۲، TTL را یک واحد کم می‌کنند",
+    "روتر TTL را دو واحد کم می‌کند تا hop اضافه جبران شود",
+    "سوئیچ TTL را کم می‌کند، اما روتر آن را تغییر نمی‌دهد",
+    "روتر TTL را یک واحد کم می‌کند؛ سوئیچ لایه ۲ TTL را تغییر نمی‌دهد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "TTL بخشی از سرآیند IP است و فقط دستگاه‌های Layer 3 که بسته را route می‌کنند آن را کاهش می‌دهند. سوئیچ لایه ۲ فریم را جلو می‌برد و TTL را نمی‌بیند. گزینهٔ اول و سوم نقش سوئیچ را اشتباه می‌دانند؛ گزینهٔ دوم کاهش دو واحدی را بی‌دلیل فرض می‌کند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "PC1 به 10.10.10.1 پینگ دارد، اما به 10.10.20.10 پینگ ندارد. کدام شاهد را اول باید بررسی کنی؟",
+   "promptHtml": "PC1 به 10.10.10.1 پینگ دارد، اما به 10.10.20.10 پینگ ندارد. کدام شاهد را اول باید بررسی کنی؟",
+   "options": [
+    "فوراً default gateway را عوض کن، چون gateway پاسخ می‌دهد",
+    "مسیر R1 به 10.10.20.0/24 و مسیر برگشت SRV1 را بررسی کن",
+    "MAC table سوئیچ را پاک کن، چون احتمالاً MAC قدیمی است",
+    "DNS server را تغییر بده، چون نام سرور resolve نمی‌شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "پاسخ gateway فقط مسیر تا R1 را ثابت می‌کند؛ برای رسیدن به سرور باید route مقصد روی R1 و route برگشت روی SRV1 بررسی شود. گزینهٔ اول بدون شاهد تغییر می‌دهد، گزینهٔ سوم مشکل را به لایه ۲ نسبت می‌دهد بدون مدرک، و گزینهٔ چهارم بی‌ربط است چون با IP پینگ می‌کنیم.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "در خروجی show ip route، کد C کنار 10.10.10.0/24 چه معنایی دارد؟",
+   "promptHtml": "در خروجی <code>show ip route</code>، کد <code>C</code> کنار 10.10.10.0/24 چه معنایی دارد؟",
+   "options": [
+    "route به‌صورت static پیکربندی شده است",
+    "route پیش‌فرض است",
+    "route از interface متصل ساخته شده است",
+    "route از OSPF یاد گرفته شده است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "کد C مخفف connected است و وقتی interface آدرس دارد و up/up است ساخته می‌شود. static با S، default با S* یا مسیر صفر، و OSPF با O نشان داده می‌شود. گزینهٔ static اشتباه است چون route متصل خودکار ساخته می‌شود؛ گزینهٔ OSPF هم به پروتکل دیگری اشاره دارد.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "default route با prefix 0.0.0.0/0 در چه شرایطی انتخاب می‌شود؟",
+   "promptHtml": "default route با prefix 0.0.0.0/0 در چه شرایطی انتخاب می‌شود؟",
+   "options": [
+    "وقتی هیچ route دقیق‌تری برای مقصد وجود نداشته باشد",
+    "همیشه، چون prefix صفر کوتاه‌ترین است",
+    "قبل از routeهای /24، چون AD کمتری دارد",
+    "فقط وقتی metric آن از connected route کمتر باشد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "default route مسیر آخر است و فقط زمانی برنده می‌شود که هیچ prefix دقیق‌تری با مقصد تطبیق نداشته باشد. گزینهٔ دوم رابطهٔ برنده شدن با کوتاه‌ترین prefix را برعکس می‌گوید؛ گزینهٔ سوم ترتیب prefix و AD را قاطی می‌کند؛ گزینهٔ چهارم مقایسهٔ metric با connected را بی‌دلیل مطرح می‌کند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "برای یک prefix یکسان، static route با AD پیش‌فرض 1 و OSPF route با AD پیش‌فرض 110 وجود دارد. کدام نصب می‌شود؟",
+   "promptHtml": "برای یک prefix یکسان، static route با AD پیش‌فرض 1 و OSPF route با AD پیش‌فرض 110 وجود دارد. کدام نصب می‌شود؟",
+   "options": [
+    "OSPF، چون metric پروتکل routing همیشه اولویت دارد",
+    "هر دو، چون prefix یکسان است و ECMP می‌شوند",
+    "OSPF، چون protocol code آن در جدول جدیدتر است",
+    "Static، چون AD کمتری دارد؛ metric فقط داخل یک پروتکل مقایسه می‌شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "وقتی prefixها یکسان‌اند، AD منبع route تعیین‌کننده است و AD پایین‌تر static (1) بر OSPF (110) مقدم است. گزینهٔ اول metric را قبل از AD قرار می‌دهد؛ گزینهٔ دوم بدون equal-cost بودن، ECMP فرض می‌کند؛ گزینهٔ سوم ملاک درستی برای انتخاب route نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "چرا R1 برای ارسال بسته به next hop، به ARP نیاز دارد؟",
+   "promptHtml": "چرا R1 برای ارسال بسته به next hop، به ARP نیاز دارد؟",
+   "options": [
+    "برای تبدیل نام DNS به آدرس IP",
+    "برای تبدیل آدرس IP next hop به MAC روی interface خروجی",
+    "برای کاهش TTL پیش از ارسال",
+    "برای انتخاب longest prefix در جدول route"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "فریم Ethernet به MAC مقصد نیاز دارد؛ روتر آدرس IP next hop را با ARP به MAC همان next hop روی لینک خروجی نگاشت می‌کند. گزینهٔ اول کار DNS است، گزینهٔ سوم کار forwarding در سرآیند IP است، و گزینهٔ چهارم تصمیم جدول route است، نه هدف ARP.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "کدام مورد وظیفهٔ control plane است، نه data plane؟",
+   "promptHtml": "کدام مورد وظیفهٔ control plane است، نه data plane؟",
+   "options": [
+    "جابه‌جا کردن بسته بر اساس FIB",
+    "کاهش TTL در هر بسته",
+    "ساخت RIB با routeهای connected، static یا routing protocol",
+    "بازنویسی MAC مقصد روی interface خروجی"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "control plane مسیرها را یاد می‌گیرد و RIB را می‌سازد؛ data plane همان تصمیم را برای هر بسته اجرا می‌کند. گزینه‌های اول، دوم و چهارم کارهای forwarding در data plane هستند. این تفکیک مهم است چون خرابی یک مسیر مدیریتی لزوماً به معنای خرابی forwarding موجود نیست.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "سوئیچ لایه ۲ فریمی با MAC مقصد ناشناخته دریافت می‌کند. رفتار درست چیست؟",
+   "promptHtml": "سوئیچ لایه ۲ فریمی با MAC مقصد ناشناخته دریافت می‌کند. رفتار درست چیست؟",
+   "options": [
+    "فریم را در همان VLAN flood می‌کند، نه بین subnetها route",
+    "فریم را به default gateway می‌فرستد تا route کند",
+    "فریم را دور می‌ریزد چون MAC مقصد را نمی‌داند",
+    "TTL را کم می‌کند و سپس flood می‌کند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "سوئیچ برای MAC ناشناخته در همان broadcast domain/VLAN flood می‌کند و از پاسخ MAC یاد می‌گیرد. گزینهٔ دوم کار روتر است؛ گزینهٔ سوم باعث می‌شود ARP و ارتباط اولیه کار نکند؛ گزینهٔ چهارم TTL را بی‌دلیل وارد لایه ۲ می‌کند.",
+   "origin": "authored-5.0"
+  },
+  {
+   "title": "برای جدا کردن ترافیک کاربران و سرورها با حفظ دسترس‌پذیری کنترل‌شده، کدام طراحی پایه مناسب‌تر است؟",
+   "promptHtml": "برای جدا کردن ترافیک کاربران و سرورها با حفظ دسترس‌پذیری کنترل‌شده، کدام طراحی پایه مناسب‌تر است؟",
+   "options": [
+    "قرار دادن همهٔ دستگاه‌ها در یک subnet و حذف gateway",
+    "استفاده از یک سوئیچ بدون VLAN و اتکا به MAC table",
+    "افزودن یک hub بین دو سوئیچ برای کاهش broadcast",
+    "دو subnet جدا با یک مرز Layer 3 و policy مشخص روی روتر"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "دو subnet جدا با یک مرز Layer 3، broadcast domainها را جدا می‌کند و اجازه می‌دهد policy/ACL روی عبور بین آن‌ها اعمال شود. گزینهٔ اول جداسازی و کنترل را حذف می‌کند؛ گزینهٔ دوم بدون VLAN جداسازی L2 ایجاد نمی‌کند؛ hub هم broadcast domain را بزرگ‌تر و امنیت را بدتر می‌کند.",
+   "origin": "authored-5.0"
+  }
+ ],
+ "meta": {
+  "version": "5.0.0-draft.1",
+  "firstHeading": "۱. مسئله و چرا"
+ }
+}
