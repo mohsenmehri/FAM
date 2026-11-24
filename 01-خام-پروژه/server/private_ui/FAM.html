@@ -11291,14 +11291,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     const siteKind=selectField(grid,'eq-node-site-kind','نوع محل استقرار',catalog('siteKinds'),initial.siteKindId);
     const site=selectField(grid,'eq-node-site','نام محل',[],initial.siteId);
     const newSite=textField(grid,'eq-node-new-site','نام محل جدید');newSite.wrap.hidden=true;newSite.input.required=false;
-    const repopulate=(select,items,value,extra)=>{select.replaceChildren();const o=el('option','','انتخاب کنید…');o.value='';select.append(o);for(const item of [...items,{id:'__new__',name:extra}]){const o=el('option','',item.name);o.value=item.id;select.append(o);}select.value=items.some(i=>i.id===value)?value:'';};
+    const repopulate=(select,items,value,extra,emptyLabel='انتخاب کنید…')=>{select.replaceChildren();const o=el('option','',emptyLabel);o.value='';select.append(o);for(const item of [...items,{id:'__new__',name:extra}]){const o=el('option','',item.name);o.value=item.id;select.append(o);}select.value=items.some(i=>i.id===value)?value:'';};
     const toggleNew=(select,field)=>{field.wrap.hidden=select.value!=='__new__';field.input.required=!field.wrap.hidden;};
     const models=value=>{repopulate(model,catalog('models').filter(m=>m.typeId===type.value),value,'＋ تعریف مدل جدید');model.disabled=!type.value;toggleNew(model,newModel);};
     const sites=value=>{
       const isBranch=find('siteKinds',siteKind.value)?.kind==='branch';
-      repopulate(site,catalog('sites').filter(s=>s.siteKindId===siteKind.value),value,'＋ تعریف محل جدید');
-      site.closest('label').hidden=isBranch;site.disabled=!siteKind.value||isBranch;site.required=!isBranch;
-      if(isBranch){newSite.wrap.hidden=true;newSite.input.required=false;}else toggleNew(site,newSite);
+      repopulate(site,catalog('sites').filter(s=>s.siteKindId===siteKind.value),value,'＋ تعریف محل جدید',isBranch?'اختیاری (بدون محل مشخص)':'انتخاب کنید…');
+      site.closest('label').hidden=false;site.disabled=!siteKind.value;site.required=!isBranch;
+      toggleNew(site,newSite);
     };
     models(initial.modelId);sites(initial.siteId);
     type.addEventListener('change',()=>models(null));siteKind.addEventListener('change',()=>sites(null));
@@ -11317,8 +11317,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         };
         const modelId=model.value==='__new__'?define('models',newModel.input.value,{typeId:type.value}):model.value;
         const isBranch=find('siteKinds',siteKind.value)?.kind==='branch';
-        // Do not erase a legacy branch sub-location merely by editing its name.
-        const siteId=isBranch?(node?.siteKindId===siteKind.value?node.siteId:null):(site.value==='__new__'?define('sites',newSite.input.value,{siteKindId:siteKind.value}):site.value);
+        const siteId=site.value==='__new__'?define('sites',newSite.input.value,{siteKindId:siteKind.value}):(site.value||(isBranch?null:''));
         const item={id:node?.id||uid(),name:name.value.trim(),host:host.value.trim(),typeId:type.value,modelId,regionId:region.value,siteKindId:siteKind.value,siteId,...(node?.legacyPath?{legacyPath:node.legacyPath}:{})};
         save(M.upsertNode(next,item));close();render();
       }catch(e){error.textContent=e.name==='QuotaExceededError'?'فضای مرورگر کافی نیست؛ هیچ تغییری ذخیره نشد.':e.message;}

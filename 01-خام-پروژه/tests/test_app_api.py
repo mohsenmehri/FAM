@@ -1,8 +1,12 @@
 import json
 import os
+import sqlite3
 import sys
 import tempfile
+import threading
+import time
 import unittest
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,6 +15,8 @@ REPO_ROOT = PACKAGE_ROOT.parent
 SERVER_DIR = PACKAGE_ROOT / "server"
 if str(SERVER_DIR) not in sys.path:
     sys.path.insert(0, str(SERVER_DIR))
+
+import equipment_guard
 
 try:
     import app as fam_app_module
@@ -42,6 +48,24 @@ class FamPackagingTests(unittest.TestCase):
         dockerfile = (PACKAGE_ROOT / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("ld-linux-", dockerfile)
         self.assertIn("chmod 0755", dockerfile)
+
+    def test_compose_enables_trusted_proxy_and_nginx_forwarding(self):
+        raw_compose = (PACKAGE_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        self.assertIn('FAM_TRUST_PROXY: "1"', raw_compose)
+        delivery_dir = REPO_ROOT / "02-فایل-های-اجرایی"
+        if delivery_dir.is_dir():
+            delivery_compose = (delivery_dir / "docker-compose.yml").read_text(encoding="utf-8")
+            self.assertIn('FAM_TRUST_PROXY: "1"', delivery_compose)
+        raw_nginx = (PACKAGE_ROOT / "nginx.conf").read_text(encoding="utf-8")
+        self.assertIn("proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;", raw_nginx)
+        self.assertIn("proxy_set_header X-Forwarded-Proto https;", raw_nginx)
+
+    def test_fam_html_keeps_branch_site_selector_visible_and_optional(self):
+        html = (SERVER_DIR / "private_ui" / "FAM.html").read_text(encoding="utf-8")
+        self.assertIn("site.closest('label').hidden=false;site.disabled=!siteKind.value;site.required=!isBranch;", html)
+        self.assertIn("اختیاری (بدون محل مشخص)", html)
+        self.assertIn("site.value||(isBranch?null:'')", html)
+        self.assertNotIn("site.closest('label').hidden=isBranch", html)
 
 
 @unittest.skipUnless(HAS_FLASK, "Flask is not installed in this Python environment")
@@ -224,6 +248,487 @@ class FamAppApiTests(unittest.TestCase):
             environ_base=self.https_env,
         )
         self.assertEqual(locked.status_code, 429)
+
+
+@unittest.skipUnless(HAS_FLASK, "Flask is not installed in this Python environment")
+class FamProxyFixTests(unittest.TestCase):
+    ORIGIN = "https://fam-test.local"
+    ADMIN_PASSWORD = "TestAdminPassword!2026"
+
+    def _make_app(self, trust_proxy, trusted_proxies=None):
+        tmpdir = tempfile.TemporaryDirectory()
+        db_path = Path(tmpdir.name) / "proxy_test.sqlite3"
+        cfg = {
+            "TESTING": True,
+            "DB_PATH": str(db_path),
+            "PUBLIC_ORIGIN": self.ORIGIN,
+            "TRUST_PROXY": trust_proxy,
+        }
+        if trusted_proxies is not None:
+            cfg["TRUSTED_PROXIES"] = trusted_proxies
+        with patch.dict(
+            os.environ,
+            {
+                "FAM_DB": str(db_path),
+                "FAM_PUBLIC_ORIGIN": self.ORIGIN,
+                "FAM_INITIAL_PASSWORD": self.ADMIN_PASSWORD,
+            },
+        ):
+            app = fam_app_module.create_app(cfg)
+
+        @app.get("/_test_whoami")
+        def _whoami():
+            from flask import jsonify, request
+            return jsonify(
+                remote_addr=request.remote_addr,
+                scheme=request.scheme,
+                host=request.host,
+            )
+
+        return tmpdir, app
+
+    def test_proxy_headers_ignored_when_trust_proxy_disabled(self):
+        tmpdir, app = self._make_app(trust_proxy=False)
+        try:
+            client = app.test_client()
+            res = client.get(
+                "/_test_whoami",
+                headers={
+                    "Host": "fam-test.local",
+                    "X-Forwarded-For": "198.51.100.77",
+                    "X-Forwarded-Proto": "https",
+                    "X-Forwarded-Host": "evil.example",
+                },
+                environ_base={"REMOTE_ADDR": "172.18.0.2", "wsgi.url_scheme": "http"},
+            )
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertEqual(data["remote_addr"], "172.18.0.2")
+            self.assertEqual(data["scheme"], "http")
+            self.assertEqual(data["host"], "fam-test.local")
+        finally:
+            tmpdir.cleanup()
+
+    def test_trusted_proxy_uses_rightmost_hop_and_blocks_untrusted_peer_spoofing(self):
+        tmpdir, app = self._make_app(trust_proxy=True, trusted_proxies="127.0.0.0/8,172.16.0.0/12")
+        try:
+            client = app.test_client()
+            # Trusted nginx peer with spoofed leftmost X-Forwarded-For + X-Forwarded-Host:
+            # must pick the rightmost 1 hop (198.51.100.44) and ignore X-Forwarded-Host/Port/Prefix.
+            proxied = client.get(
+                "/_test_whoami",
+                headers={
+                    "Host": "fam-test.local",
+                    "X-Forwarded-For": "9.9.9.9, 198.51.100.44",
+                    "X-Forwarded-Proto": "https",
+                    "X-Forwarded-Host": "evil.example",
+                    "X-Forwarded-Port": "9999",
+                    "X-Forwarded-Prefix": "/evil",
+                },
+                environ_base={"REMOTE_ADDR": "172.18.0.2", "wsgi.url_scheme": "http"},
+            )
+            self.assertEqual(proxied.status_code, 200)
+            pdata = proxied.get_json()
+            self.assertEqual(pdata["remote_addr"], "198.51.100.44")
+            self.assertEqual(pdata["scheme"], "https")
+            self.assertEqual(pdata["host"], "fam-test.local")
+
+            # Untrusted direct peer spoofing X-Forwarded-For & X-Forwarded-Proto:
+            spoofed = client.get(
+                "/_test_whoami",
+                headers={
+                    "Host": "fam-test.local",
+                    "X-Forwarded-For": "1.2.3.4",
+                    "X-Forwarded-Proto": "https",
+                },
+                environ_base={"REMOTE_ADDR": "203.0.113.99", "wsgi.url_scheme": "http"},
+            )
+            self.assertEqual(spoofed.status_code, 200)
+            sdata = spoofed.get_json()
+            self.assertEqual(sdata["remote_addr"], "203.0.113.99")
+            self.assertEqual(sdata["scheme"], "http")
+        finally:
+            tmpdir.cleanup()
+
+    def test_rate_limit_isolates_clients_and_ignores_spoofed_xff_behind_trusted_proxy(self):
+        tmpdir, app = self._make_app(trust_proxy=True, trusted_proxies="172.16.0.0/12")
+        try:
+            client = app.test_client()
+            for i in range(10):
+                res = client.post(
+                    "/api/login",
+                    json={"username": "admin", "password": "wrong-password"},
+                    headers={
+                        "Origin": self.ORIGIN,
+                        "X-Forwarded-For": f"10.255.0.{i + 1}, 198.51.100.10",
+                        "X-Forwarded-Proto": "https",
+                    },
+                    environ_base={"REMOTE_ADDR": "172.18.0.2"},
+                )
+                self.assertEqual(res.status_code, 401)
+
+            blocked = client.post(
+                "/api/login",
+                json={"username": "admin", "password": self.ADMIN_PASSWORD},
+                headers={
+                    "Origin": self.ORIGIN,
+                    "X-Forwarded-For": "8.8.8.8, 198.51.100.10",
+                    "X-Forwarded-Proto": "https",
+                },
+                environ_base={"REMOTE_ADDR": "172.18.0.2"},
+            )
+            self.assertEqual(blocked.status_code, 429)
+
+            other_client = client.post(
+                "/api/login",
+                json={"username": "admin", "password": self.ADMIN_PASSWORD},
+                headers={
+                    "Origin": self.ORIGIN,
+                    "X-Forwarded-For": "198.51.100.11",
+                    "X-Forwarded-Proto": "https",
+                },
+                environ_base={"REMOTE_ADDR": "172.18.0.2"},
+            )
+            self.assertEqual(other_client.status_code, 200)
+        finally:
+            tmpdir.cleanup()
+
+
+class FamEquipmentConcurrencyTests(unittest.TestCase):
+    def test_resolve_max_concurrent_handles_invalid_zero_negative_and_bounds(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("FAM_EQUIPMENT_MAX_CONCURRENT", None)
+            self.assertEqual(equipment_guard.resolve_max_concurrent(), 8)
+            self.assertEqual(equipment_guard.resolve_max_concurrent(""), 8)
+            self.assertEqual(equipment_guard.resolve_max_concurrent("invalid"), 8)
+            self.assertEqual(equipment_guard.resolve_max_concurrent("3.5"), 8)
+            self.assertEqual(equipment_guard.resolve_max_concurrent("0"), 8)
+            self.assertEqual(equipment_guard.resolve_max_concurrent(0), 8)
+            self.assertEqual(equipment_guard.resolve_max_concurrent("-5"), 8)
+            self.assertEqual(equipment_guard.resolve_max_concurrent(-10), 8)
+            self.assertEqual(equipment_guard.resolve_max_concurrent("1"), 1)
+            self.assertEqual(equipment_guard.resolve_max_concurrent("16"), 16)
+            self.assertEqual(equipment_guard.resolve_max_concurrent("32"), 32)
+            self.assertEqual(equipment_guard.resolve_max_concurrent("33"), 32)
+            self.assertEqual(equipment_guard.resolve_max_concurrent(999), 32)
+
+        with patch.dict(os.environ, {"FAM_EQUIPMENT_MAX_CONCURRENT": "4"}):
+            self.assertEqual(equipment_guard.resolve_max_concurrent(), 4)
+        with patch.dict(os.environ, {"FAM_EQUIPMENT_MAX_CONCURRENT": "-2"}):
+            self.assertEqual(equipment_guard.resolve_max_concurrent(), 8)
+        with patch.dict(os.environ, {"FAM_EQUIPMENT_MAX_CONCURRENT": "64"}):
+            self.assertEqual(equipment_guard.resolve_max_concurrent(), 32)
+        with patch.dict(os.environ, {"FAM_EQUIPMENT_MAX_CONCURRENT": "not-an-int"}):
+            self.assertEqual(equipment_guard.resolve_max_concurrent(), 8)
+
+    def test_per_host_exclusive_lock_preserved(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            guard = equipment_guard.EquipmentGuard(Path(tmpdir) / "guard.sqlite3", maximum=8)
+            with guard.admit("10.10.10.1"):
+                with self.assertRaises(equipment_guard.AdmissionError) as ctx:
+                    with guard.admit("10.10.10.1"):
+                        pass
+                self.assertEqual(ctx.exception.code, "equipment_busy")
+            # Released cleanly
+            with guard.admit("10.10.10.1"):
+                pass
+
+    def test_multithreaded_global_concurrency_cap_race(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {"FAM_EQUIPMENT_MAX_CONCURRENT": "3"}):
+                guard = equipment_guard.EquipmentGuard(Path(tmpdir) / "race.sqlite3")
+            self.assertEqual(guard.maximum, 3)
+
+            total_threads = 8
+            barrier = threading.Barrier(total_threads)
+            state_lock = threading.Lock()
+            active = 0
+            peak_active = 0
+            admitted = []
+            busy = []
+            errors = []
+
+            def worker(idx):
+                nonlocal active, peak_active
+                host = f"10.20.0.{idx + 1}"
+                try:
+                    barrier.wait(timeout=5)
+                    with guard.admit(host):
+                        with state_lock:
+                            active += 1
+                            if active > peak_active:
+                                peak_active = active
+                            admitted.append(host)
+                        time.sleep(0.08)
+                        with state_lock:
+                            active -= 1
+                except equipment_guard.AdmissionError as err:
+                    busy.append((host, err.code))
+                except BaseException as exc:  # pragma: no cover
+                    errors.append(exc)
+
+            threads = [threading.Thread(target=worker, args=(i,)) for i in range(total_threads)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=10)
+
+            self.assertEqual(errors, [])
+            self.assertEqual(len(admitted), 3)
+            self.assertEqual(len(busy), 5)
+            self.assertTrue(all(code == "equipment_busy" for _, code in busy))
+            self.assertEqual(peak_active, 3)
+            self.assertEqual(active, 0)
+
+            # Verify all leases were released after the burst
+            with guard.admit("10.20.0.1"), guard.admit("10.20.0.2"), guard.admit("10.20.0.3"):
+                pass
+
+    @unittest.skipUnless(HAS_FLASK, "Flask is not installed in this Python environment")
+    def test_app_wires_fam_equipment_max_concurrent_from_env(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "cfg.sqlite3"
+            with patch.dict(
+                os.environ,
+                {
+                    "FAM_DB": str(db_path),
+                    "FAM_PUBLIC_ORIGIN": "https://fam-test.local",
+                    "FAM_EQUIPMENT_MAX_CONCURRENT": "5",
+                },
+            ):
+                app = fam_app_module.create_app({"TESTING": True, "DB_PATH": str(db_path), "PUBLIC_ORIGIN": "https://fam-test.local"})
+            self.assertEqual(app.extensions["equipment_guard"].maximum, 5)
+
+
+@unittest.skipUnless(HAS_FLASK, "Flask is not installed in this Python environment")
+class FamEquipmentAuditAndBranchSiteTests(unittest.TestCase):
+    ORIGIN = "https://fam-test.local"
+    ADMIN_PASSWORD = "TestAdminPassword!2026"
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tmpdir.name) / "audit_fam.sqlite3"
+        self.env_patch = patch.dict(
+            os.environ,
+            {
+                "FAM_DB": str(self.db_path),
+                "FAM_PUBLIC_ORIGIN": self.ORIGIN,
+                "FAM_INITIAL_PASSWORD": self.ADMIN_PASSWORD,
+                "FAM_EQUIPMENT_OPS_ENABLED": "1",
+            },
+        )
+        self.env_patch.start()
+        self.app = fam_app_module.create_app(
+            {
+                "TESTING": True,
+                "DB_PATH": str(self.db_path),
+                "PUBLIC_ORIGIN": self.ORIGIN,
+                "EQUIPMENT_OPS_ENABLED": True,
+            }
+        )
+        self.client = self.app.test_client()
+        self.https_env = {"wsgi.url_scheme": "https", "HTTP_HOST": "fam-test.local"}
+
+    def tearDown(self):
+        self.env_patch.stop()
+        self.tmpdir.cleanup()
+
+    def _login(self, username, password):
+        res = self.client.post(
+            "/api/login",
+            json={"username": username, "password": password},
+            headers={"Origin": self.ORIGIN},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(res.status_code, 200)
+        return res.get_json()
+
+    def test_audit_records_success_failure_without_secrets_enforces_admin_and_is_append_only(self):
+        admin_login = self._login("admin", self.ADMIN_PASSWORD)
+        admin_csrf = admin_login["csrf"]
+
+        # Create a non-admin operator who holds equipment-operations, equipment-scan,
+        # equipment-audit, and clear-history — must STILL be forbidden from /api/equipment/audit.
+        users_res = self.client.get("/api/users", environ_base=self.https_env).get_json()
+        op_id = "operator-0001-test"
+        op_pw = "OperatorPass!2026"
+        new_users = users_res["users"] + [
+            {
+                "id": op_id,
+                "username": "netop",
+                "name": "Network Operator",
+                "enabled": True,
+                "regions": ["1"],
+                "sheets": [],
+                "categories": ["equipment"],
+                "permissions": [
+                    "view-history",
+                    "clear-history",
+                    "equipment-operations",
+                    "equipment-scan",
+                    "equipment-audit",
+                ],
+                "equipmentScope": {
+                    "types": ["*"],
+                    "models": ["*"],
+                    "regions": ["*"],
+                    "siteKinds": ["*"],
+                    "sites": ["*"],
+                },
+                "password": op_pw,
+            }
+        ]
+        save_users = self.client.post(
+            "/api/users",
+            json={"revision": users_res["revision"], "users": new_users},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": admin_csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(save_users.status_code, 200)
+
+        secret_pw = "SuperSecretDevicePass!99"
+        secret_enable = "EnableSecret!88"
+        cli_snippet = "Fa0/1   up   up   CLIENT-PORT-SECRET-DESC"
+
+        # 1) Mocked SSH success + failure under operator session
+        op_login = self._login("netop", op_pw)
+        op_csrf = op_login["csrf"]
+
+        with patch("equipment_ops._execute") as mock_exec:
+            mock_exec.return_value = {
+                "ok": True,
+                "output": f"Interface Status Protocol Description\n{cli_snippet}\n",
+                "redacted": False,
+            }
+            ok_res = self.client.post(
+                "/api/equipment/descriptions",
+                json={
+                    "host": "10.10.20.5",
+                    "username": "netuser",
+                    "password": secret_pw,
+                    "enable": secret_enable,
+                },
+                headers={"Origin": self.ORIGIN, "X-FAM-CSRF": op_csrf},
+                environ_base=self.https_env,
+            )
+            self.assertEqual(ok_res.status_code, 200)
+
+            mock_exec.return_value = {"ok": False, "error": "authentication_failed"}
+            fail_res = self.client.post(
+                "/api/equipment/check",
+                json={
+                    "host": "10.10.20.6",
+                    "username": "netuser",
+                    "password": secret_pw,
+                },
+                headers={"Origin": self.ORIGIN, "X-FAM-CSRF": op_csrf},
+                environ_base=self.https_env,
+            )
+            self.assertEqual(fail_res.status_code, 502)
+
+        # Operator cannot read /api/equipment/audit even with equipment-audit permission
+        op_audit = self.client.get(
+            "/api/equipment/audit",
+            headers={"X-FAM-CSRF": op_csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(op_audit.status_code, 403)
+
+        # Operator calling /api/history/clear cannot affect equipment_audit
+        clear_res = self.client.post(
+            "/api/history/clear",
+            json={"confirm": True},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": op_csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(clear_res.status_code, 200)
+
+        # Admin reads /api/equipment/audit and verifies contents
+        self._login("admin", self.ADMIN_PASSWORD)
+        admin_csrf = self.client.get("/api/session", environ_base=self.https_env).get_json()["csrf"]
+        admin_clear = self.client.post(
+            "/api/history/clear",
+            json={"confirm": True},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": admin_csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(admin_clear.status_code, 200)
+
+        audit_res = self.client.get(
+            "/api/equipment/audit?limit=50",
+            headers={"X-FAM-CSRF": admin_csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(audit_res.status_code, 200)
+        audit_body = audit_res.get_json()
+        self.assertEqual(audit_body["total"], 2)
+        serialized = json.dumps(audit_body)
+        for sensitive in (secret_pw, secret_enable, cli_snippet, "CLIENT-PORT-SECRET-DESC", "netuser"):
+            self.assertNotIn(sensitive, serialized)
+
+        items = audit_body["items"]
+        self.assertEqual(items[0]["operation"], "status")
+        self.assertEqual(items[0]["host"], "10.10.20.6")
+        self.assertEqual(items[0]["outcome"], "failed")
+        self.assertEqual(items[0]["code"], "authentication_failed")
+        self.assertEqual(items[0]["username"], "netop")
+
+        self.assertEqual(items[1]["operation"], "descriptions")
+        self.assertEqual(items[1]["host"], "10.10.20.5")
+        self.assertEqual(items[1]["outcome"], "success")
+        self.assertEqual(items[1]["code"], "ok")
+        self.assertEqual(items[1]["username"], "netop")
+
+        # Verify SQLite append-only triggers reject UPDATE and DELETE
+        with sqlite3.connect(self.db_path) as db:
+            with self.assertRaises(sqlite3.DatabaseError):
+                db.execute("UPDATE equipment_audit SET outcome='success'")
+            with self.assertRaises(sqlite3.DatabaseError):
+                db.execute("DELETE FROM equipment_audit")
+
+    def test_branch_equipment_supports_optional_and_selected_site(self):
+        admin_login = self._login("admin", self.ADMIN_PASSWORD)
+        csrf = admin_login["csrf"]
+        eq_state = self.client.get("/api/equipment/state", environ_base=self.https_env).get_json()
+        inv = eq_state["inventory"]
+        inv["catalog"]["sites"].append({"id": "branch-site-1", "name": "شعبه مرکزی", "siteKindId": "kind-branch"})
+        inv["nodes"] = [
+            {
+                "id": "node-branch-no-site",
+                "name": "Branch Switch No Site",
+                "host": "10.30.1.1",
+                "typeId": "type-switch",
+                "modelId": "model-2960",
+                "regionId": "region-1",
+                "siteKindId": "kind-branch",
+                "siteId": None,
+            },
+            {
+                "id": "node-branch-with-site",
+                "name": "Branch Switch With Site",
+                "host": "10.30.1.2",
+                "typeId": "type-switch",
+                "modelId": "model-2960",
+                "regionId": "region-1",
+                "siteKindId": "kind-branch",
+                "siteId": "branch-site-1",
+            },
+        ]
+        save_res = self.client.post(
+            "/api/equipment/state",
+            json={
+                "revision": eq_state["revision"],
+                "requestId": str(uuid.uuid4()),
+                "kind": "inventory",
+                "value": inv,
+            },
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(save_res.status_code, 200)
+        saved_nodes = {n["id"]: n for n in save_res.get_json()["inventory"]["nodes"]}
+        self.assertIsNone(saved_nodes["node-branch-no-site"]["siteId"])
+        self.assertEqual(saved_nodes["node-branch-with-site"]["siteId"], "branch-site-1")
 
 
 if __name__ == "__main__":

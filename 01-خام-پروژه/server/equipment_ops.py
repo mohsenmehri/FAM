@@ -17,16 +17,17 @@ import os
 from pathlib import Path
 import re
 import secrets
+import sqlite3
 import subprocess
 import time
 
-from flask import g, jsonify
+from flask import g, jsonify, request
 try:
     from .equipment_probe import descriptions_table, ProbeError, ENV_PASSTHROUGH
-    from .equipment_guard import EquipmentGuard, AdmissionError
+    from .equipment_guard import EquipmentGuard, AdmissionError, resolve_max_concurrent
 except ImportError:
     from equipment_probe import descriptions_table, ProbeError, ENV_PASSTHROUGH
-    from equipment_guard import EquipmentGuard, AdmissionError
+    from equipment_guard import EquipmentGuard, AdmissionError, resolve_max_concurrent
 
 INTERFACE = re.compile(r"[A-Za-z][A-Za-z0-9/.-]{0,63}\Z")
 # Same allowlist as equipment_probe.USERNAME: the name is passed to ssh.exe -l
@@ -269,11 +270,152 @@ def _ports_or_fail(result, fail):
     return sorted(ports, key=lambda item: item["interface"])
 
 
-def register_equipment_ops(app, *, data, fail, allowed):
+ALLOWED_AUDIT_OPERATIONS = frozenset({
+    "status", "inspect", "descriptions", "diagnose", "recover",
+    "mac-plan", "mac-apply", "replacement-plan", "replacement-apply",
+    "group-plan", "group-apply",
+})
+
+ALLOWED_AUDIT_CODES = frozenset({
+    "ok", "equipment_busy", "ticket_consumed", "ticket_invalid", "disabled_503",
+    "enable_required", "enable_failed", "enable_unconfirmed",
+    "authentication_failed", "connection_timeout", "connection_failed",
+    "status_unreadable", "descriptions_unreadable", "diagnosis_unreadable",
+    "unsupported_platform", "post_validation_failed",
+    "mac_recovery_unavailable", "mac_preflight", "mac_not_violation",
+    "mac_changed", "mac_unsupported_platform", "mac_quarantined", "mac_uncertain",
+    "replacement_preflight", "replacement_sticky", "replacement_changed",
+    "replacement_quarantined", "replacement_uncertain",
+    "group_preflight", "group_old_port_active", "group_changed",
+    "group_quarantined", "group_uncertain", "recovery_uncertain",
+    "unknown_error",
+})
+
+
+class EquipmentAuditStore:
+    """Append-only SQLite store for equipment SSH operation metadata.
+
+    Stores only timestamp, FAM user identity, operation name, target IPv4,
+    outcome ('success'/'failed'), and a static allowlisted outcome code.
+    Never stores device credentials, tickets, or CLI output.
+    """
+
+    def __init__(self, path):
+        self.path = str(path)
+        db = sqlite3.connect(self.path, timeout=5)
+        try:
+            db.execute("PRAGMA busy_timeout=5000")
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS equipment_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    at INTEGER NOT NULL,
+                    user_id TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    operation TEXT NOT NULL,
+                    host TEXT NOT NULL,
+                    outcome TEXT NOT NULL CHECK(outcome IN ('success', 'failed')),
+                    code TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_equipment_audit_at
+                    ON equipment_audit(at DESC, id DESC);
+                CREATE TRIGGER IF NOT EXISTS equipment_audit_no_update
+                    BEFORE UPDATE ON equipment_audit
+                    BEGIN
+                        SELECT RAISE(ABORT, 'equipment_audit is append-only');
+                    END;
+                CREATE TRIGGER IF NOT EXISTS equipment_audit_no_delete
+                    BEFORE DELETE ON equipment_audit
+                    BEGIN
+                        SELECT RAISE(ABORT, 'equipment_audit is append-only');
+                    END;
+            """)
+            db.commit()
+        finally:
+            db.close()
+
+    def record(self, user, operation, host, ok, code="ok"):
+        if operation not in ALLOWED_AUDIT_OPERATIONS:
+            raise ValueError("invalid audit operation")
+        clean_host = str(ipaddress.IPv4Address(host))
+        outcome = "success" if ok else "failed"
+        safe_code = code if code in ALLOWED_AUDIT_CODES else ("ok" if ok else "unknown_error")
+        user_id = str(user.get("id", ""))[:80]
+        username = str(user.get("username", ""))[:80]
+        now_ms = int(time.time() * 1000)
+        db = sqlite3.connect(self.path, timeout=5)
+        try:
+            db.execute("PRAGMA busy_timeout=5000")
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "INSERT INTO equipment_audit(at, user_id, username, operation, host, outcome, code) VALUES(?,?,?,?,?,?,?)",
+                (now_ms, user_id, username, operation, clean_host, outcome, safe_code),
+            )
+            db.commit()
+        finally:
+            db.close()
+
+    def list_recent(self, *, limit=50, host=None, operation=None):
+        clauses = []
+        params = []
+        if host is not None:
+            clauses.append("host=?")
+            params.append(str(ipaddress.IPv4Address(host)))
+        if operation is not None:
+            if operation not in ALLOWED_AUDIT_OPERATIONS:
+                raise ValueError("invalid operation filter")
+            clauses.append("operation=?")
+            params.append(operation)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        db = sqlite3.connect(self.path, timeout=5)
+        db.row_factory = sqlite3.Row
+        try:
+            db.execute("PRAGMA busy_timeout=5000")
+            total = db.execute(f"SELECT COUNT(*) FROM equipment_audit{where}", params).fetchone()[0]
+            rows = db.execute(
+                f"SELECT id, at, user_id, username, operation, host, outcome, code FROM equipment_audit{where} ORDER BY id DESC LIMIT ?",
+                [*params, limit],
+            ).fetchall()
+        finally:
+            db.close()
+        return {
+            "total": total,
+            "items": [
+                {
+                    "id": row["id"],
+                    "at": row["at"],
+                    "userId": row["user_id"],
+                    "username": row["username"],
+                    "operation": row["operation"],
+                    "host": row["host"],
+                    "outcome": row["outcome"],
+                    "code": row["code"],
+                }
+                for row in rows
+            ],
+        }
+
+
+def register_equipment_ops(app, *, data, fail, allowed, audit_allowed=None):
     """Register authenticated browser endpoints for direct server-to-device SSH."""
 
-    guard = EquipmentGuard(app.config['DB_PATH'])
+    guard = EquipmentGuard(
+        app.config['DB_PATH'],
+        maximum=resolve_max_concurrent(app.config.get('EQUIPMENT_MAX_CONCURRENT')),
+    )
     app.extensions['equipment_guard'] = guard
+    audit_store = EquipmentAuditStore(app.config['DB_PATH'])
+    app.extensions['equipment_audit'] = audit_store
+    can_read_audit = audit_allowed if audit_allowed is not None else (lambda _user: False)
+
+    def _result_code(result, fallback="unknown_error"):
+        if isinstance(result, dict):
+            code = result.get("error")
+            if isinstance(code, str) and code in ALLOWED_AUDIT_CODES:
+                return code
+        return fallback
+
+    def record_audit(operation, host, ok, code="ok"):
+        audit_store.record(g.user, operation, host, ok, code)
 
     def run(payload, ticket=None):
         try:
@@ -288,6 +430,33 @@ def register_equipment_ops(app, *, data, fail, allowed):
         if not allowed(g.user,operation=operation,host=host):
             fail(403, "مجوز مدیریت تجهیزات لازم است.")
 
+    @app.get("/api/equipment/audit")
+    def equipment_audit_list():
+        if not app.config["EQUIPMENT_OPS_ENABLED"]:
+            fail(404, "مدیریت تجهیزات فعال نشده است.")
+        if not can_read_audit(g.user):
+            fail(403, "مجوز مشاهدهٔ گزارش ممیزی تجهیزات ندارید.")
+        raw_limit = request.args.get("limit", "50")
+        try:
+            limit = int(raw_limit, 10)
+        except ValueError:
+            fail(400, "پارامتر limit معتبر نیست.")
+        if not 1 <= limit <= 200:
+            fail(400, "مقدار limit باید بین ۱ تا ۲۰۰ باشد.")
+        host_filter = request.args.get("host")
+        if host_filter is not None:
+            try:
+                addr = ipaddress.IPv4Address(host_filter.strip())
+            except ValueError:
+                fail(400, "فیلتر IP معتبر نیست.")
+            if not any(addr in net for net in ALLOWED_IPV4_NETWORKS):
+                fail(400, "فیلتر IP خارج از شبکه‌های مجاز است.")
+            host_filter = str(addr)
+        op_filter = request.args.get("operation")
+        if op_filter is not None and op_filter not in ALLOWED_AUDIT_OPERATIONS:
+            fail(400, "فیلتر عملیات معتبر نیست.")
+        return jsonify(audit_store.list_recent(limit=limit, host=host_filter, operation=op_filter))
+
     @app.post("/api/equipment/check")
     def equipment_check():
         authorize()
@@ -298,7 +467,12 @@ def register_equipment_ops(app, *, data, fail, allowed):
             fail(400, _input_failure(exc))
         authorize("status",value["host"])
         result = run({"operation": "status", **value})
-        ports = _ports_or_fail(result, fail)
+        try:
+            ports = _ports_or_fail(result, fail)
+        except Exception:
+            record_audit("status", value["host"], False, _result_code(result, "post_validation_failed"))
+            raise
+        record_audit("status", value["host"], True, "ok")
         tickets = {item["interface"]: _ticket(app, user_id=g.user["id"], host=value["host"], username=value["username"], interface=item["interface"]) for item in ports}
         return jsonify(host=value["host"], source="server-ssh", checkedAt=int(time.time()*1000), errDisabledPorts=ports, recoveryTickets=tickets)
 
@@ -310,7 +484,12 @@ def register_equipment_ops(app, *, data, fail, allowed):
         except ValueError as exc:fail(400,_input_failure(exc))
         authorize('status',value['host'])
         result=run({'operation':'inspect',**value})
-        ports=_ports_or_fail(result,fail)
+        try:
+            ports=_ports_or_fail(result,fail)
+        except Exception:
+            record_audit('inspect', value['host'], False, _result_code(result, 'post_validation_failed'))
+            raise
+        record_audit('inspect', value['host'], True, 'ok')
         description={'error':_failure({'error':'descriptions_unreadable'})}
         raw=result.get('descriptions')
         if isinstance(raw,dict) and raw.get('ok') is True:
@@ -332,9 +511,14 @@ def register_equipment_ops(app, *, data, fail, allowed):
         except ValueError as exc:fail(400,_input_failure(exc))
         authorize('descriptions',value['host'])
         result=run({'operation':'descriptions',**value})
-        if not isinstance(result,dict) or result.get('ok') is not True:fail(428 if isinstance(result,dict) and result.get('error')=='enable_required' else 429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
+        if not isinstance(result,dict) or result.get('ok') is not True:
+            record_audit('descriptions', value['host'], False, _result_code(result))
+            fail(428 if isinstance(result,dict) and result.get('error')=='enable_required' else 429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
         try:output,redacted=descriptions_table(result.get('output'),value['username'],value['password'],value.get('enable',''))
-        except ProbeError:fail(502,_failure({'error':'descriptions_unreadable'}))
+        except ProbeError:
+            record_audit('descriptions', value['host'], False, 'descriptions_unreadable')
+            fail(502,_failure({'error':'descriptions_unreadable'}))
+        record_audit('descriptions', value['host'], True, 'ok')
         return jsonify(host=value['host'],source='server-ssh',checkedAt=int(time.time()*1000),command='show interfaces description',output=output,redacted=redacted or result.get('redacted') is True)
 
     @app.post('/api/equipment/diagnose')
@@ -346,6 +530,7 @@ def register_equipment_ops(app, *, data, fail, allowed):
         authorize('diagnose',value['host'])
         result=run({'operation':'diagnose',**value})
         if not isinstance(result,dict) or result.get('ok') is not True:
+            record_audit('diagnose', value['host'], False, _result_code(result))
             fail(429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
         try:
             if __package__:from .equipment_diagnostics import validate_report
@@ -353,7 +538,10 @@ def register_equipment_ops(app, *, data, fail, allowed):
             report=validate_report(result.get('report'))
             if report['client']!={'ip':value['clientIp'],'mac':value['clientMac']}:raise ValueError('wrong client')
             if any(secret.casefold() in json.dumps(report).casefold() for secret in _secrets(value)):raise ValueError('sensitive output')
-        except (ValueError,TypeError,KeyError):fail(502,_failure({'error':'diagnosis_unreadable'}))
+        except (ValueError,TypeError,KeyError):
+            record_audit('diagnose', value['host'], False, 'diagnosis_unreadable')
+            fail(502,_failure({'error':'diagnosis_unreadable'}))
+        record_audit('diagnose', value['host'], True, 'ok')
         return jsonify(host=value['host'],source='server-ssh',checkedAt=int(time.time()*1000),report=report)
 
     @app.post("/api/equipment/recover")
@@ -400,6 +588,7 @@ def register_equipment_ops(app, *, data, fail, allowed):
         authorize('status',value['host']);authorize('recover',value['host'])
         result=run({'operation':'mac-plan',**value})
         if not isinstance(result,dict) or result.get('ok') is not True:
+            record_audit('mac-plan', value['host'], False, _result_code(result))
             if isinstance(result,dict) and result.get('error')=='mac_recovery_unavailable':
                 fail(503,'بازیابی MAC در این نصب موجود نیست و در دسترس قرار نگرفته است.')
             fail(428 if isinstance(result,dict) and result.get('error')=='enable_required' else 429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
@@ -409,7 +598,10 @@ def register_equipment_ops(app, *, data, fail, allowed):
             if set(result)!={'ok','plan'}:raise ValueError('result')
             plan=mac_recovery.validate_plan(result['plan'])
             if plan['interface']!=value['interface']:raise ValueError('target')
-        except (ValueError,TypeError,KeyError):fail(502,_failure({'error':'mac_preflight'}))
+        except (ValueError,TypeError,KeyError):
+            record_audit('mac-plan', value['host'], False, 'mac_preflight')
+            fail(502,_failure({'error':'mac_preflight'}))
+        record_audit('mac-plan', value['host'], True, 'ok')
         context='mac-recovery:'+plan['planHash']
         ticket=_ticket(app,user_id=g.user['id'],host=value['host'],username=value['username'],interface=value['interface'],context=context)
         return jsonify(host=value['host'],source='server-ssh',plan=plan,ticket=ticket)
@@ -420,6 +612,7 @@ def register_equipment_ops(app, *, data, fail, allowed):
         authorize('status',value['host']);authorize('recover',value['host'])
         ticket=value.pop('ticket');context='mac-recovery:'+value['planHash']
         if not _verify_ticket(app,ticket,user_id=g.user['id'],host=value['host'],username=value['username'],interface=value['interface'],context=context):
+            record_audit('mac-apply', value['host'], False, 'ticket_invalid')
             fail(409,'تأیید این پورت منقضی یا نامعتبر است؛ دوباره پیش‌بررسی کنید.')
         result=run({'operation':'mac-apply',**value},ticket)
         code=result.get('error') if isinstance(result,dict) else None
@@ -429,7 +622,9 @@ def register_equipment_ops(app, *, data, fail, allowed):
         except (ValueError,TypeError,KeyError):
             safe={'equipment_busy','ticket_consumed','mac_changed','mac_not_violation','mac_preflight','mac_unsupported_platform','mac_quarantined','enable_required','enable_failed','enable_unconfirmed'}
             code=code if code in safe else 'mac_uncertain'
+            record_audit('mac-apply', value['host'], False, code)
             return jsonify(error=_failure({'error':code}),code=code,requiresRecheck=True), (429 if code=='equipment_busy' else 409 if code in ('ticket_consumed','mac_changed') else 502)
+        record_audit('mac-apply', value['host'], True, 'ok')
         return jsonify(host=value['host'],source='server-ssh',interface=value['interface'],state=result['state'],protectionPreserved=True)
 
     def replacement_input(apply=False):
@@ -453,14 +648,19 @@ def register_equipment_ops(app, *, data, fail, allowed):
         authorize('recover');value=replacement_input()
         authorize('status',value['host']);authorize('recover',value['host'])
         result=run({'operation':'replacement-plan',**value})
-        if not isinstance(result,dict) or result.get('ok') is not True:fail(428 if isinstance(result,dict) and result.get('error')=='enable_required' else 429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
+        if not isinstance(result,dict) or result.get('ok') is not True:
+            record_audit('replacement-plan', value['host'], False, _result_code(result))
+            fail(428 if isinstance(result,dict) and result.get('error')=='enable_required' else 429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
         try:
             if __package__:from . import equipment_replacement as r
             else:import equipment_replacement as r
             plan=r.validate_plan(result.get('plan'))
             if plan['interface']!=value['interface'] or plan['staticIp']!=value['staticIp']:raise ValueError('target')
             if any(secret.casefold() in json.dumps(plan).casefold() for secret in _secrets(value)):raise ValueError('secret')
-        except (ValueError,TypeError,KeyError):fail(502,_failure({'error':'replacement_preflight'}))
+        except (ValueError,TypeError,KeyError):
+            record_audit('replacement-plan', value['host'], False, 'replacement_preflight')
+            fail(502,_failure({'error':'replacement_preflight'}))
+        record_audit('replacement-plan', value['host'], True, 'ok')
         context='replacement:'+str(int(value['staticIp']))+':'+plan['planHash']
         ticket=_ticket(app,user_id=g.user['id'],host=value['host'],username=value['username'],interface=value['interface'],context=context)
         return jsonify(host=value['host'],source='server-ssh',plan=plan,ticket=ticket)
@@ -516,8 +716,11 @@ def register_equipment_ops(app, *, data, fail, allowed):
         # this exact classic-2960 profile is unsupported. Other failures never
         # trigger a fallback or an authentication retry.
         if isinstance(result,dict) and result.get('error')=='unsupported_platform':
+            record_audit('group-plan', value['host'], False, 'unsupported_platform')
             return jsonify(error=_failure(result),code='unsupported_platform'),502
-        if not isinstance(result,dict) or result.get('ok') is not True:fail(428 if isinstance(result,dict) and result.get('error')=='enable_required' else 429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
+        if not isinstance(result,dict) or result.get('ok') is not True:
+            record_audit('group-plan', value['host'], False, _result_code(result))
+            fail(428 if isinstance(result,dict) and result.get('error')=='enable_required' else 429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
         try:
             if __package__:from . import equipment_group as group
             else:import equipment_group as group
@@ -527,7 +730,10 @@ def register_equipment_ops(app, *, data, fail, allowed):
             # a digest; it has no raw-output/free-text field. Substring-searching
             # serialized JSON for credentials also searches keys/literals and
             # rejected perfectly valid short, letters-only credentials.
-        except (ValueError,TypeError,KeyError):fail(502,_failure({'error':'group_preflight'}))
+        except (ValueError,TypeError,KeyError):
+            record_audit('group-plan', value['host'], False, 'group_preflight')
+            fail(502,_failure({'error':'group_preflight'}))
+        record_audit('group-plan', value['host'], True, 'ok')
         context='group:'+value['mode']+':'+str(int(value['staticIp']))+':'+plan['planHash']
         ticket=_ticket(app,user_id=g.user['id'],host=value['host'],username=value['username'],interface=','.join(value['interfaces']),context=context)
         return jsonify(host=value['host'],source='server-ssh',plan=plan,ticket=ticket)
