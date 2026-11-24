@@ -66,6 +66,21 @@
           } catch (e) {
             return false;
           }
+        },
+        async evaluateQuiz(lessonId, answers) {
+          if (!lessonId || !Array.isArray(answers)) return null;
+          try {
+            const response = await fetch('/api/academy/quiz/evaluate', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+              body: JSON.stringify({ lessonId, answers })
+            });
+            if (!response.ok) return null;
+            return await response.json();
+          } catch (e) {
+            return null;
+          }
         }
       };
     })();
@@ -209,7 +224,8 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 @media(max-width:650px){.fa-topbar{align-items:flex-start}.fa-brand{margin-bottom:4px}.fa-nav{width:100%;overflow-x:auto;flex-wrap:nowrap}.fa-nav .btn{white-space:nowrap}.fa-path-grid{grid-template-columns:1fr}.fa-hero{padding:20px}.fa-hero h1{font-size:30px}.fa-stat{padding:11px}.fa-stat strong{font-size:18px}.fa-lesson-row{align-items:flex-start;flex-wrap:wrap}.fa-lesson-row button{margin-right:46px}}
 @media(prefers-reduced-motion:no-preference){.fa-path-card{transition:transform .2s,border-color .2s}.fa-path-card:hover{transform:translateY(-3px);border-color:#7b9cff77}}
 </style>
-  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261123e">
+  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261123f">
+  <link rel="stylesheet" href="/academy-assets/academy-sim.css?v=20261123f">
 </head>
 <body>
   <header class="topbar fa-topbar">
@@ -221,6 +237,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     <button class="btn" id="btn-paths">مسیرهای یادگیری</button>
     <button class="btn" id="btn-tree">درخت جامع آکادمی</button>
     <button class="btn" id="btn-lessons">فهرست درس‌ها</button>
+    <button class="btn" id="btn-simulators">شبیه‌ساز و آزمایشگاه IOS</button>
     <button class="btn" id="btn-blueprint">درس نمونه</button>
     <button class="btn" id="btn-coverage">پوشش فرمان‌های IOS</button>
     <button class="btn" id="btn-glossary">واژه‌نامه</button>
@@ -231,9 +248,11 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 
   <main class="container" id="app-root"></main>
 
-  <script src="/academy-assets/lesson-engine.js?v=20261123e"></script>
-  <script src="/academy-assets/academy-catalog.js?v=20261123e"></script>
-  <script src="/academy-assets/academy-journey.js?v=20261123e"></script>
+  <script src="/academy-assets/lesson-engine.js?v=20261123f"></script>
+  <script src="/academy-assets/academy-catalog.js?v=20261123f"></script>
+  <script src="/academy-assets/academy-sim-engine.js?v=20261123f"></script>
+  <script src="/academy-assets/academy-sim-ui.js?v=20261123f"></script>
+  <script src="/academy-assets/academy-journey.js?v=20261123f"></script>
   <script nonce="__FAM_CSP_NONCE__">
 (() => {
   'use strict';
@@ -276,6 +295,14 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       if (restoreInitialHash && location.hash === '#/glossary') {
         restoreInitialHash = false;
         await window.FamAcademyCatalog.renderGlossaryDirectory(root, catalog, openBlueprint, () => { location.hash = '#/dashboard'; });
+        return;
+      }
+      if (restoreInitialHash && (location.hash === '#/simulators' || location.hash === '#/labs')) {
+        restoreInitialHash = false;
+        window.FamAcademySimUI?.render(root, {
+          tab: location.hash === '#/labs' ? 'labs' : 'protocols',
+          onBack: () => { location.hash = '#/dashboard'; }
+        });
         return;
       }
       window.FamAcademyCatalog.renderDashboard(root, catalog, openBlueprint);
@@ -322,6 +349,9 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       else if (kind === 'lessons') window.FamAcademyCatalog.renderLessonsIndex(root, catalog, openBlueprint, goHome);
       else if (kind === 'coverage') await window.FamAcademyCatalog.renderCommandCoverage(root, catalog, openBlueprint, goHome);
       else if (kind === 'glossary') await window.FamAcademyCatalog.renderGlossaryDirectory(root, catalog, openBlueprint, goHome);
+      else if (kind === 'simulators' || kind === 'labs') {
+        window.FamAcademySimUI?.render(root, { tab: kind === 'labs' ? 'labs' : 'protocols', onBack: goHome });
+      }
     } catch (error) {
       if (root.dataset.loadSequence !== requestId) return;
       const errEl = document.createElement('div');
@@ -372,11 +402,14 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     else if (location.hash === '#/lessons') openDirectoryView('lessons');
     else if (location.hash === '#/coverage') openDirectoryView('coverage');
     else if (location.hash === '#/glossary') openDirectoryView('glossary');
+    else if (location.hash === '#/simulators') openDirectoryView('simulators');
+    else if (location.hash === '#/labs') openDirectoryView('labs');
   });
   document.getElementById('btn-paths').onclick = () => loadCatalog();
   document.getElementById('btn-tree').onclick = () => openDirectoryView('tree');
   document.getElementById('btn-back-paths').onclick = () => loadCatalog();
   document.getElementById('btn-lessons').onclick = () => openDirectoryView('lessons');
+  document.getElementById('btn-simulators').onclick = () => openDirectoryView('simulators');
   document.getElementById('btn-coverage').onclick = () => openDirectoryView('coverage');
   document.getElementById('btn-glossary').onclick = () => openDirectoryView('glossary');
   document.getElementById('btn-blueprint').onclick = async () => {
@@ -992,7 +1025,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   });
 })();
 </script>
-  <script src="/academy-assets/academy-reference-shell.js?v=20261123e"></script>
+  <script src="/academy-assets/academy-reference-shell.js?v=20261123f"></script>
 </body>
 
 </html>

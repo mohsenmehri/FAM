@@ -253,6 +253,22 @@ class AcademyContentTests(unittest.TestCase):
         self.assertIn("le-notebook-save", lesson_js)
         self.assertIn("#/tree", shell_js)
 
+    def test_interactive_simulator_and_ios_lab_assets_are_wired(self):
+        academy_html = (PACKAGE_ROOT / "server" / "private_ui" / "academy.html").read_text(encoding="utf-8")
+        shell_js = (ASSET_ROOT / "academy-reference-shell.js").read_text(encoding="utf-8")
+        catalog_js = (ASSET_ROOT / "academy-catalog.js").read_text(encoding="utf-8")
+        lesson_js = (ASSET_ROOT / "lesson-engine.js").read_text(encoding="utf-8")
+
+        for filename in ("academy-sim-engine.js", "academy-sim-ui.js", "academy-sim.css"):
+            self.assertTrue((ASSET_ROOT / filename).is_file(), f"{filename} missing")
+            self.assertIn(filename, academy_html)
+
+        for token in ('id="btn-simulators"', '#/simulators', '#/labs', 'evaluateQuiz'):
+            self.assertIn(token, academy_html)
+        self.assertIn("#/simulators", shell_js)
+        self.assertIn("#/simulators", catalog_js)
+        self.assertIn("evaluateQuiz", lesson_js)
+
 
 if __name__ == "__main__":
     unittest.main()

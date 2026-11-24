@@ -226,6 +226,65 @@ class FamAppApiTests(unittest.TestCase):
         self.assertIn("fam3.progress.v1", academy_html)
         self.assertIn('"allowedViews":{"panel":true,"equipment":true}', academy_html)
 
+        # Server-side Academy quiz grading: CSRF, validation, and accurate scoring
+        no_csrf_quiz = self.client.post(
+            "/api/academy/quiz/evaluate",
+            json={"lessonId": "ccna-v11-1.1.a", "answers": [0] * 12},
+            headers={"Origin": self.ORIGIN},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(no_csrf_quiz.status_code, 403)
+
+        bad_lesson = self.client.post(
+            "/api/academy/quiz/evaluate",
+            json={"lessonId": "../etc/passwd", "answers": [0]},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(bad_lesson.status_code, 400)
+
+        bp_path = PACKAGE_ROOT / "server" / "www" / "academy-assets" / "v5" / "blueprints" / "ccna-v11-1.1.a.json"
+        bp_data = json.loads(bp_path.read_text(encoding="utf-8"))
+        correct_answers = [q["correctIndex"] for q in bp_data["interactiveQuiz"]]
+
+        perfect_quiz = self.client.post(
+            "/api/academy/quiz/evaluate",
+            json={"lessonId": "ccna-v11-1.1.a", "answers": correct_answers},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(perfect_quiz.status_code, 200)
+        pdata = perfect_quiz.get_json()
+        self.assertTrue(pdata["ok"])
+        self.assertEqual(pdata["total"], 12)
+        self.assertEqual(pdata["correct"], 12)
+        self.assertEqual(pdata["score10"], 10)
+        self.assertEqual(pdata["scorePct"], 100)
+        self.assertTrue(pdata["passed"])
+
+        partial_answers = list(correct_answers)
+        partial_answers[0] = (correct_answers[0] + 1) % 4
+        partial_answers[1] = None
+        partial_quiz = self.client.post(
+            "/api/academy/quiz/evaluate",
+            json={"lessonId": "ccna-v11-1.1.a", "answers": partial_answers},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(partial_quiz.status_code, 200)
+        part = partial_quiz.get_json()
+        self.assertEqual(part["correct"], 10)
+        self.assertEqual(part["incorrect"], 1)
+        self.assertEqual(part["unanswered"], 1)
+
+        bad_choice = self.client.post(
+            "/api/academy/quiz/evaluate",
+            json={"lessonId": "ccna-v11-1.1.a", "answers": [99] + correct_answers[1:]},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(bad_choice.status_code, 400)
+
         # Create custom users with restricted permissions and verify /academy allowedViews
         users_state = self.client.get("/api/users", environ_base=self.https_env)
         self.assertEqual(users_state.status_code, 200)

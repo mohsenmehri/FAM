@@ -632,20 +632,56 @@
     const quizQuestions = getQuizQuestions(bp);
     if (quiz && Array.isArray(quizQuestions)) {
       const result = quiz.querySelector('.lesson-quiz-result');
-      quiz.querySelector('[data-quiz-grade]').onclick = () => {
-        let correct = 0, incorrect = 0, unanswered = 0;
-        quizQuestions.forEach((q, i) => {
+      const gradeBtnEl = quiz.querySelector('[data-quiz-grade]');
+      gradeBtnEl.onclick = async () => {
+        const answers = quizQuestions.map((_, i) => {
           const selected = quiz.querySelector(`input[name="lesson-question-${i}"]:checked`);
-          const feedback = quiz.querySelector(`[data-feedback="${i}"]`);
-          if (!selected) unanswered++;
-          const isCorrect = selected && Number(selected.value) === q.answer;
-          if (isCorrect) correct++; else if (selected) incorrect++;
-          feedback.textContent = `${!selected ? 'بدون پاسخ' : isCorrect ? 'درست' : 'نادرست'} — پاسخ صحیح: ${q.options?.[q.answer] || 'نامشخص'}. ${q.explanation || ''}`;
-          if (q.explanationHtml) feedback.insertAdjacentHTML('beforeend', q.explanationHtml);
-          feedback.className = `lesson-quiz-feedback ${isCorrect ? 'is-correct' : 'is-incorrect'}`;
-          feedback.hidden = false;
+          return selected ? Number(selected.value) : null;
         });
-        result.textContent = `نمره: ${Number((correct * 10 / quizQuestions.length).toFixed(2))} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered}`;
+        gradeBtnEl.disabled = true;
+        let serverEval = null;
+        try {
+          const lessonKey = bp.lessonId || bp.id;
+          if (lessonKey && window.FamAcademyBridge && typeof window.FamAcademyBridge.evaluateQuiz === 'function') {
+            serverEval = await window.FamAcademyBridge.evaluateQuiz(lessonKey, answers);
+          }
+        } catch (_) {
+          serverEval = null;
+        } finally {
+          gradeBtnEl.disabled = false;
+        }
+
+        let correct = 0, incorrect = 0, unanswered = 0;
+        if (serverEval && serverEval.ok && Array.isArray(serverEval.items) && serverEval.items.length === quizQuestions.length) {
+          correct = serverEval.correct;
+          incorrect = serverEval.incorrect;
+          unanswered = serverEval.unanswered;
+          serverEval.items.forEach((item, i) => {
+            const q = quizQuestions[i];
+            const feedback = quiz.querySelector(`[data-feedback="${i}"]`);
+            const label = !item.answered ? 'بدون پاسخ' : item.correct ? 'درست' : 'نادرست';
+            const rightText = item.correctOption || q.options?.[q.answer] || 'نامشخص';
+            feedback.textContent = `${label} — پاسخ صحیح: ${rightText}. ${item.explanation || q.explanation || ''}`;
+            const expHtml = item.explanationHtml || q.explanationHtml;
+            if (expHtml) feedback.insertAdjacentHTML('beforeend', expHtml);
+            feedback.className = `lesson-quiz-feedback ${item.correct ? 'is-correct' : 'is-incorrect'}`;
+            feedback.hidden = false;
+          });
+          result.textContent = `نمره: ${serverEval.score10} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered} (تأیید سرور)`;
+        } else {
+          quizQuestions.forEach((q, i) => {
+            const selected = quiz.querySelector(`input[name="lesson-question-${i}"]:checked`);
+            const feedback = quiz.querySelector(`[data-feedback="${i}"]`);
+            if (!selected) unanswered++;
+            const isCorrect = selected && Number(selected.value) === q.answer;
+            if (isCorrect) correct++; else if (selected) incorrect++;
+            feedback.textContent = `${!selected ? 'بدون پاسخ' : isCorrect ? 'درست' : 'نادرست'} — پاسخ صحیح: ${q.options?.[q.answer] || 'نامشخص'}. ${q.explanation || ''}`;
+            if (q.explanationHtml) feedback.insertAdjacentHTML('beforeend', q.explanationHtml);
+            feedback.className = `lesson-quiz-feedback ${isCorrect ? 'is-correct' : 'is-incorrect'}`;
+            feedback.hidden = false;
+          });
+          result.textContent = `نمره: ${Number((correct * 10 / quizQuestions.length).toFixed(2))} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered}`;
+        }
       };
       quiz.querySelector('[data-quiz-retry]').onclick = () => {
         quiz.querySelectorAll('input:checked').forEach(input => { input.checked = false; });

@@ -897,6 +897,71 @@ def create_app(config=None):
                           ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at''',
                        (user['id'],payload,int(time.time()*1000)))
         return jsonify(ok=True)
+
+    @app.post('/api/academy/quiz/evaluate')
+    def evaluate_academy_quiz():
+        body=data()
+        if not isinstance(body,dict):fail(400,'بدنهٔ درخواست آزمون معتبر نیست.')
+        lesson_id=body.get('lessonId')
+        answers=body.get('answers')
+        if not isinstance(lesson_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,120}',lesson_id):
+            fail(400,'شناسهٔ درس معتبر نیست.')
+        if not isinstance(answers,list) or len(answers)>100:
+            fail(400,'فهرست پاسخ‌های آزمون معتبر نیست.')
+        with connect() as db:
+            user_and_session(db)
+        blueprints_dir=(ROOT/'www'/'academy-assets'/'v5'/'blueprints').resolve()
+        candidate=(blueprints_dir/f'{lesson_id}.json').resolve()
+        bp_path=candidate if candidate.parent==blueprints_dir and candidate.is_file() else None
+        if bp_path is None:
+            for item in sorted(blueprints_dir.glob('*.json')):
+                try:
+                    loaded=json.loads(item.read_text(encoding='utf-8'))
+                except Exception:
+                    continue
+                if loaded.get('lessonId')==lesson_id or loaded.get('id')==lesson_id:
+                    bp_path=item
+                    break
+        if bp_path is None:
+            fail(404,'آزمون این درس در سرور یافت نشد.')
+        bp=json.loads(bp_path.read_text(encoding='utf-8'))
+        questions=bp.get('interactiveQuiz')
+        if not isinstance(questions,list) or not questions:
+            questions=((bp.get('stages') or {}).get('quiz') or {}).get('questions') or []
+        if not isinstance(questions,list) or not questions:
+            fail(404,'برای این درس سؤال فعالی ثبت نشده است.')
+        if len(answers)!=len(questions):
+            fail(400,'تعداد پاسخ‌ها با تعداد سؤال‌های درس برابر نیست.')
+        correct=0;incorrect=0;unanswered=0;items=[]
+        for idx,(q,ans) in enumerate(zip(questions,answers)):
+            options=q.get('options') if isinstance(q,dict) and isinstance(q.get('options'),list) else []
+            right_idx=q.get('correctIndex') if isinstance(q,dict) and 'correctIndex' in q else (q.get('answer') if isinstance(q,dict) else None)
+            if type(right_idx) is not int:right_idx=-1
+            if ans is None:
+                unanswered+=1
+                items.append({
+                    'index':idx,'answered':False,'selectedIndex':None,'correctIndex':right_idx,
+                    'correct':False,'correctOption':options[right_idx] if 0<=right_idx<len(options) else '',
+                    'explanation':q.get('explanation','') if isinstance(q,dict) else '',
+                    'explanationHtml':q.get('explanationHtml','') if isinstance(q,dict) else ''
+                })
+                continue
+            if type(ans) is not int or ans<0 or ans>=len(options):
+                fail(400,'گزینهٔ انتخاب‌شده در آزمون معتبر نیست.')
+            is_ok=(ans==right_idx)
+            if is_ok:correct+=1
+            else:incorrect+=1
+            items.append({
+                'index':idx,'answered':True,'selectedIndex':ans,'correctIndex':right_idx,
+                'correct':is_ok,'correctOption':options[right_idx] if 0<=right_idx<len(options) else '',
+                'explanation':q.get('explanation','') if isinstance(q,dict) else '',
+                'explanationHtml':q.get('explanationHtml','') if isinstance(q,dict) else ''
+            })
+        total=len(questions)
+        score10=round(correct*10/total,2)
+        score_pct=round(correct*100/total)
+        return jsonify(ok=True,lessonId=lesson_id,total=total,correct=correct,incorrect=incorrect,
+                       unanswered=unanswered,score10=score10,scorePct=score_pct,passed=score_pct>=70,items=items)
     @app.post('/api/login')
     def login():
         value=data();name=str(value.get('username','')).strip().lower();pw=value.get('password','')
