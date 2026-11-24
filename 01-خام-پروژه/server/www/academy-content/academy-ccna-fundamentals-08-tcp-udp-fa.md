@@ -37,7 +37,7 @@ Client                              Server
 
 این توالی یک مدل آموزشی از شروع موفق است؛ نتیجهٔ یک Packet Capture واقعی نیست.
 
-![نمودار آموزشی قابل ویرایش، اجرا‌نشده](academy-images/nf-08-tcp-handshake.svg)
+![نمودار آموزشی قابل ویرایش، اجرا‌نشده](images/nf-08-tcp-handshake.svg)
 
 ## ۴. سناریو: سرویس وب و پرس‌وجوی DNS
 

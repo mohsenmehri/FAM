@@ -19,7 +19,7 @@ Router معمولاً DHCP Broadcast را بین Subnetها Route نمی‌کن�
 
 **طرح PNETLab ایزوله، طراحی‌شده و اجرا‌نشده:** R1 یک رابط DHCP Client به یک DHCP Server آزمایشی و مجزا دارد؛ رابط دوم Gateway کلاینت‌هاست و Relay را به DHCP Server در Subnet سوم می‌فرستد. DHCP Server راه دور و پاسخ‌دهی‌اش باید در محیط واقعی تنظیم شود. به اینترنت یا ISP واقعی وصل نشوید.
 
-![نمودار قابل ویرایش DHCP Client و Relay؛ اجرا‌نشده](academy-images/is-06-dhcp-relay.svg)
+![نمودار قابل ویرایش DHCP Client و Relay؛ اجرا‌نشده](images/is-06-dhcp-relay.svg)
 
 | گره/Interface | IPv4 نمونه | نقش/پارامتر |
 |---|---|---|

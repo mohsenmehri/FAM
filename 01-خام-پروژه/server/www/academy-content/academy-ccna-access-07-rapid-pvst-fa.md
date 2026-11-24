@@ -64,7 +64,7 @@ Priority در خروجی = Priority پیکربندی‌شده + VLAN ID
 
 برای انتخاب Designated روی هر سگمنت، Root Path Cost کمتر برنده است؛ سپس Bridge ID کمتر، و در صورت تساوی Port ID فرستنده تعیین‌کننده است. هزینهٔ هر لینک به روش محاسبه (**Path Cost Method**) و سرعت/تنظیمات پلتفرم وابسته است. در روش **Short** (۱۶ بیتی) لینک 1 Gbps هزینهٔ `4` و در روش **Long** (۳۲ بیتی) هزینهٔ `20000` دارد. مقدار واقعی را از خروجی `show spanning-tree` بخوانید، به‌جای فرض کردن.
 
-![نمودار قابل ویرایش Rapid PVST+ و انتخاب Root Bridge؛ اجرا‌نشده](academy-images/na-07-stp.svg)
+![نمودار قابل ویرایش Rapid PVST+ و انتخاب Root Bridge؛ اجرا‌نشده](images/na-07-stp.svg)
 
 ## ۴. حالت‌های پورت
 

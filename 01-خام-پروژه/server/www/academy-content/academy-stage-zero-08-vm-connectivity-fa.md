@@ -24,7 +24,7 @@ Host-only در تنظیم عادی VirtualBox یک شبکه بین Host و Guest
 
 منابع رسمی بازبینی‌شده در ۲۰۲۶-۱۱-۲۰: [مستند VirtualBox 7.2.0](https://download.virtualbox.org/virtualbox/7.2.0/UserManual.pdf)، [سازگاری Host و Guest در راهنمای Oracle 7.2](https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/Introduction.html)، [شبکهٔ Host-only در راهنمای Oracle](https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/networkingdetails.html)، و [نصب پایهٔ Ubuntu Server](https://documentation.ubuntu.com/server/tutorial/basic-installation). برای دانلود از منابع رسمی و اعتبارسنجی checksum و امضای منتشرشده توسط عرضه‌کننده استفاده کنید؛ فایل ISO دانلود یا بررسی نشده است.
 
-![توپولوژی پیشنهادی Host-only](academy-images/stage-zero-08-host-only.svg)
+![توپولوژی پیشنهادی Host-only](images/stage-zero-08-host-only.svg)
 
 | مورد | مقدار طراحی‌شده، اجرا‌نشده |
 |---|---|

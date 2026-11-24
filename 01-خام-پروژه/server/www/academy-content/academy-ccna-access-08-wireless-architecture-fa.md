@@ -26,7 +26,7 @@
 
 نام AP Mode و قابلیت‌ها بین خانواده‌های WLC/Software فرق دارد؛ در شبکهٔ واقعی Command/GUI Guide همان نسخه را بخوانید. انتخاب حالت به محل AP، VLAN، Data Path، ظرفیت و سیاست ترافیک بستگی دارد.
 
-![نمودار قابل ویرایش معماری Wireless؛ اجرا‌نشده](academy-images/na-08-wireless.svg)
+![نمودار قابل ویرایش معماری Wireless؛ اجرا‌نشده](images/na-08-wireless.svg)
 
 ## ۲. سناریوی طراحی‌شده
 

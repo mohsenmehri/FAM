@@ -158,7 +158,7 @@ vlan {{ vlan.id }}
  name {{ vlan.name }}
 ```
 
-![نمودار قابل ویرایش Automation؛ اجرا‌نشده](academy-images/aut-01-automation.svg)
+![نمودار قابل ویرایش Automation؛ اجرا‌نشده](images/aut-01-automation.svg)
 
 | مؤلفه | نقش |
 |---|---|

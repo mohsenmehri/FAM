@@ -61,7 +61,7 @@ HTTP گذرواژه را با **Basic Authentication** می‌فرستد که Ba
 
 اگر Cloud یا مسیر اینترنت قطع شود، Device ممکن است State محلیِ قبلی را برای بخشی از Forwarding ادامه دهد، اما این **تضمین همگانی نیست**؛ Update، Auth، Client جدید، Policy پویا و Telemetry می‌توانند متفاوت رفتار کنند. مستند نسخه و Fail Mode واقعی را بررسی کنید؛ «Cloud Managed» به معنی این نیست که همهٔ Data در Cloud می‌گذرد یا Device حتماً کار می‌کند.
 
-![نمودار قابل ویرایش روش‌های دسترسی مدیریتی؛ اجرا‌نشده](academy-images/na-09-management.svg)
+![نمودار قابل ویرایش روش‌های دسترسی مدیریتی؛ اجرا‌نشده](images/na-09-management.svg)
 
 ## ۲. جدول کامل پیکربندی دسترسی
 

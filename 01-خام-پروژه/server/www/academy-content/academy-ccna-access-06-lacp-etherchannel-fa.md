@@ -10,7 +10,7 @@
 
 پیش از تشکیل گروه، ویژگی‌های لازم پورت‌ها مانند سرعت، Duplex، نوع لایهٔ ۲/۳ و در حالت L2 پارامترهای Trunk/VLAN باید با الزام پلتفرم سازگار باشند. PAgP و Static `on` جایگزین LACP در این کاربرگ نیستند.
 
-![نمودار قابل ویرایش EtherChannel؛ اجرا‌نشده](academy-images/na-06-lacp.svg)
+![نمودار قابل ویرایش EtherChannel؛ اجرا‌نشده](images/na-06-lacp.svg)
 
 ## ۲. کاربرگ A — EtherChannel لایهٔ ۲
 

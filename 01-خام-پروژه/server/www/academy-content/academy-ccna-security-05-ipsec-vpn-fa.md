@@ -46,7 +46,7 @@ Remote Access: Client ══ IPsec/IKEv2 ══ Gateway ─ Policy/Route ─ س�
 
 **PNETLab مستقل، طراحی‌شده و اجرا‌نشده:** دو سایت با شبکه‌های `10.10.0.0/24` و `10.20.0.0/24`، دو روتر مرزی با آدرس‌های عمومی فرضی `198.51.100.1` و `203.0.113.1`، و تونل IPsec در Tunnel Mode با IKEv2 و PSK. هیچ پیکربندی اجرا یا تونلی برقرار نشده است.
 
-![نمودار قابل ویرایش IPsec؛ اجرا‌نشده](academy-images/sec-05-ipsec.svg)
+![نمودار قابل ویرایش IPsec؛ اجرا‌نشده](images/sec-05-ipsec.svg)
 
 ## ۴. Verification طراحی‌شده
 
