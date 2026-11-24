@@ -21,7 +21,7 @@
 
   async function loadBank() {
     if (bankCache) return bankCache;
-    const res = await fetch('/academy-assets/academy-placement-questions.json?v=20261123h', { credentials: 'same-origin', cache: 'no-store' });
+    const res = await fetch('/academy-assets/academy-placement-questions.json?v=20261123i', { credentials: 'same-origin', cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     bankCache = await res.json();
     return bankCache;

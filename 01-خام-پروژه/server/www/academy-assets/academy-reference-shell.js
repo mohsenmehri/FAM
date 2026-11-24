@@ -96,7 +96,7 @@
   const pathMeter=el('div','meter'); const pathFill=el('i'); pathMeter.append(pathFill);
   const pathMeta=el('div','side-path-meta','');
   pathCard.append(pathMeter,pathMeta);
-  fetch('/academy-assets/curriculum-catalog.json?v=20261123h',{cache:'no-store'})
+  fetch('/academy-assets/curriculum-catalog.json?v=20261123i',{cache:'no-store'})
     .then(response=>{if(!response.ok)throw new Error('catalog unavailable');return response.json();})
     .then(catalog=>{
       const total=(catalog.paths||[]).reduce((sum,path)=>sum+(path.courses||[]).reduce((courseSum,course)=>courseSum+(course.lessons||[]).length,0),0);

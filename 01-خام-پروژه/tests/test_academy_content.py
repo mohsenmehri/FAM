@@ -303,6 +303,12 @@ class AcademyContentTests(unittest.TestCase):
         }
         self.assertEqual(covered_faculties, {"f0", "f1", "f2", "f3", "f4", "f5", "f6"})
 
+        journey_js = (ASSET_ROOT / "academy-journey.js").read_text(encoding="utf-8")
+        self.assertIn('name="facultyId"', journey_js)
+        self.assertIn("journey-faculty-grid", journey_js)
+        self.assertIn("journey-go-exam", journey_js)
+        self.assertNotIn("کدام مسیر را دنبال می‌کنی؟", journey_js)
+
 
 if __name__ == "__main__":
     unittest.main()
