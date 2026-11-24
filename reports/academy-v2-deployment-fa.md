@@ -1,6 +1,6 @@
 # استقرار FAM Academy v2 روی VM — دستورات ترمینال
 
-این دستورات **روی ترمینال VM** اجرا میشوند، نه در محیط Arena. فرض میشود کلید خصوصی GitHub روی VM موجود است و مسیر نصب FAM همان `~/FAM-Linux-Lab` است. شاخه `arena/5473d411-fam` از قبل به GitHub push شده است؛ `main` را checkout نکنید.
+این دستورات **روی ترمینال VM** اجرا میشوند، نه در محیط Arena. فرض میشود کلید خصوصی GitHub روی VM موجود است و مسیر نصب FAM همان `~/FAM-Linux-Lab` است. شاخه `arena/5473d411-fam` ساخته و به GitHub push شده است؛ `main` بدون تغییر مانده و نباید checkout شود.
 
 ## متغیرها و پیشفرضها
 
@@ -27,8 +27,10 @@ ssh -T git@github.com
 
 ```bash
 git ls-remote "$REPO" "refs/heads/$BRANCH"
+REMOTE_COMMIT="$(git ls-remote "$REPO" "refs/heads/$BRANCH" | cut -f1)"
 git clone --branch "$BRANCH" --single-branch "$REPO" "$SRC"
-git -C "$SRC" log -1 --oneline
+git -C "$SRC" log -3 --oneline
+test "$(git -C "$SRC" rev-parse HEAD)" = "$REMOTE_COMMIT" && echo 'clone HEAD matches remote branch'
 test -f "$SRC/01-خام-پروژه/server/www/academy-content/v1/manifest.json"
 test -f "$SRC/01-خام-پروژه/server/private_ui/academy.html"
 ```

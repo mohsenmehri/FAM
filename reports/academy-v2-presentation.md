@@ -4,10 +4,11 @@
 وضعیت کلی: **PASS / قابل ارائه برای دموی فردا**
 شاخه / HEAD: `arena/5473d411-fam` / `430b4212d1edd4a290c7da578c3372c604d983dd`
 `main` / `origin/main`: `430b4212d1edd4a290c7da578c3372c604d983dd` / `430b4212d1edd4a290c7da578c3372c604d983dd` — بدون تغییر
+بروزرسانی: نسخه v2 در **قالب موجود آکادمی FAM** ادغام، روی شاخه فعال Commit/Push و دستورات استقرار VM در `reports/academy-v2-deployment-fa.md` اضافه شد. شاخه remote ساخته شد؛ `main` همچنان بدون تغییر است.
 
 ## ۱. خلاصه اجرایی
 
-آکادمی قدیمی بازسازی نشده و ۱۴۳ فایل حذفشده قبلی بازگردانده نشدند. یک Vertical Slice کامل و نسخهدار v1 از صفر ساخته شد: داشبورد RTL، ۲۳ مسیر، ۵ دوره متصل و قابل ارائه، ۱۰ درس کامل ۱۶بخشی، ۳ شبیهساز واقعی با منطق قابل تست، ۲ لاب شبیهسازیشده، آزمون/نتیجه، پیشرفت، API نسخهدار، Validator و تستهای خودکار. محتوای ۱۸ دوره دیگر صادقانه بهعنوان نقشه راه P1 علامتگذاری شده تا درس ضعیف/تکراری تولید نشود.
+آکادمی قدیمی بازسازی نشده و ۱۴۳ فایل حذفشده قبلی بازگردانده نشدند. یک Vertical Slice کامل و نسخهدار v1 از صفر ساخته شد و سپس داخل پوسته قالب موجود FAM (`academy-reference-ui.css`، sidebar/topbar/section-head، پل تم و لینک بازگشت به FAM) قرار گرفت: داشبورد RTL، ۲۳ مسیر، ۵ دوره متصل و قابل ارائه، ۱۰ درس کامل ۱۶بخشی، ۳ شبیهساز واقعی با منطق قابل تست، ۲ لاب شبیهسازیشده، آزمون/نتیجه، پیشرفت، API نسخهدار، Validator و تستهای خودکار. محتوای ۱۸ دوره دیگر صادقانه بهعنوان نقشه راه P1 علامتگذاری شده تا درس ضعیف/تکراری تولید نشود.
 
 مانیفست مستقل v1: `37` فایل محتوایی + خود `manifest.json` = ۳۸ فایل روی دیسک؛ `aggregateSha256=2bf847e997730d831c9bc14f042d6afd5470a5b85b642d08eb9ddbbdf75f2594`.
 مانیفست ریشه بدون تغییر: SHA-256 `4e6e209a453aa48b1d5390151d3b8ed4654605977c43f66dd5cd0556c04365d3`؛ ۲۱۳ ورودی / ۱۴۳ missing مربوط به حذفهای حفظشده / ۴ mismatch مربوط به فایلهای tracked تغییرکرده / ۰ خطای ساختاری.
@@ -21,6 +22,7 @@
 | اعتبارسنجی | `tools/validate_academy_v2.py` | ساختار، لینکها، IDها، ترتیب مسیرها، Quiz، لابها، هشها، RTL/Responsive، CJK/Secret |
 | موتور خالص | `server/www/academy-assets/academy-engine.js` | `arpResolve`, `vlanForward`, `ospfAdjacency`, quiz, lab state؛ بدون DOM/شبکه/دستگاه |
 | رابط کاربری | `server/www/academy-assets/academy-v2.{css,js}` + `server/private_ui/academy.html` | SPA vanilla RTL، مسیرها، درس مرحلهای، شبیهساز، لاب، آزمون، پیشرفت |
+| قالب FAM | `server/www/academy-assets/academy-reference-ui.css` + لایه سازگاری v2 | حفظ پوسته آکادمی FAM، sidebar/topbar/section-head، منوی جمعشو، تم روشن/تیره، لینکهای بازگشت به بخشهای FAM |
 | Runtime تولیدی | `server/app.py` | کلید ایزوله `famAcademyV2.progress.v1` و ۸ endpoint `/api/academy/v2/*` روی درخت v1 |
 | Preview امن | `server/academy_preview_server.py` | سرور stdlib بدون Flask برای ارائه و تست HTTP؛ بدون ذخیرهسازی progress و بدون اتصال تجهیز |
 | تستها | `tests/test_academy_content.py`, `tests/test_academy_v2_api.py`, `tests/test_academy_v2_engine.test.mjs`, `tests/test_academy_v2_ui.test.mjs` | محتوا/API/موتور/جریان end-to-end UI |
@@ -29,6 +31,7 @@
 ## ۳. قابلیتهای آماده
 
 - داشبورد حرفهای RTL/تاریک/Responsive با ۳ breakpoint (`1100px`, `820px`, `480px`)، ۱۴ قانون grid و جداسازی LTR برای کد/ترمینال.
+- ادغام با قالب موجود آکادمی FAM: CSS مرجع قدیمی حفظ شد؛ `academy-v2.js` پوسته `.app-shell`، sidebar، topbar، section-head، breadcrumb، ناوبری موبایل، دکمه تم و لینک `/app` را میسازد، بدون اجرای `academy-reference-shell.js` قدیمی.
 - ۲۳ مسیر با ترتیب ۱..۲۳، پیشنیاز/مسیر بعدی معتبر، اهداف و سطح؛ ۲۳ دوره شامل ۵ دوره live و ۱۸ دوره P1 شفاف.
 - ۱۰ درس واقعی هرکدام ۱۶ بخش: مفهوم، عمیق، دیاگرام، مثال، سناریو، دستورات، تشریح خطبهخط، خروجی Sample/Simulated، اشتباهات، عیبیابی، نکات، تفاوت نسخه/استاندارد، خلاصه، منابع، آزمون، گام بعد.
 - ۳ شبیهساز تعاملی: ARP/MAC discovery (`arpResolve`)، VLAN/802.1Q Trunk (`vlanForward`)، OSPF adjacency (`ospfAdjacency`)؛ پارامترها تصمیم و جدول بستهها را تغییر میدهند.
@@ -46,13 +49,13 @@
 - **تست بصری مرورگر**: Chromium/Playwright/Selenium نصب نیست؛ عکسبرداری/پیکسلتست/کلیک واقعی مرورگر انجام نشد. بهجای آن `academy-v2.js` واقعی در DOM-shim اجرا و مسیر کامل تست شد.
 - **Runtime Flask**: بسته Flask در محیط موجود نیست؛ ۱۲ تست وابسته به Flask بهصورت `skipped` گزارش شدند. قرارداد `app.py` بهصورت استاتیک/AST تست شد و معادل API readonly/quiz روی Preview واقعی HTTP اجرا شد.
 - **Preview stateless**: در سرور Preview پیشرفت فقط در localStorage مرورگر ذخیره میشود و عمداً روی دیسک/DB نوشته نمیشود.
-- هیچ Commit، Push، PR، Merge، تغییر شاخه، تغییر `main`، بازنویسی `MANIFEST.sha256` ریشه، تغییر عملیاتی Nginx/VM/Docker یا اتصال به تجهیز انجام نشد.
+- Commit/Push فقط روی شاخه فعال `arena/5473d411-fam` انجام شد؛ شاخه remote ساخته شد. هیچ PR، Merge، تغییر شاخه، تغییر `main`، بازنویسی `MANIFEST.sha256` ریشه، اجرای عملیاتی Nginx/VM/Docker توسط Arena یا اتصال به تجهیز انجام نشد. دستورات استقرار در `reports/academy-v2-deployment-fa.md` ارائه شدهاند.
 
 ## ۵. نتایج واقعی تستها
 
 | تست | نتیجه واقعی |
 |---|---|
-| `python3 -B tools/validate_academy_v2.py` | **PASS**؛ ۱۴ دسته بررسی، ۰ خطا |
+| `python3 -B tools/validate_academy_v2.py` | **PASS**؛ ۱۵ دسته بررسی، ۰ خطا |
 | `python3 -B -m unittest discover -s tests -p "test_*.py" -v` | **Ran 49 tests … OK (skipped=12)** |
 | `node --test tests/test_academy_v2_engine.test.mjs` | **8 pass / 0 fail** |
 | `node --check academy-engine.js` و `node --check academy-v2.js` | **هر دو exit 0** |
@@ -110,7 +113,7 @@ python3 -B tools/run_academy_v2_tests.py
   - `01-خام-پروژه/server/private_ui/academy.html`
   - `01-خام-پروژه/tests/test_academy_content.py`
   - `01-خام-پروژه/tests/test_app_api.py`
-- **فایلهای جدید untracked**: `52` مورد:
+- **فایلهای جدید اضافهشده به شاخه**: `53` مورد (پس از Commit دیگر untracked نیستند):
 
   - `01-خام-پروژه/server/academy_preview_server.py`
   - `01-خام-پروژه/server/www/academy-assets/academy-engine.js`
@@ -161,6 +164,7 @@ python3 -B tools/run_academy_v2_tests.py
   - `01-خام-پروژه/tools/run_academy_v2_tests.py`
   - `01-خام-پروژه/tools/validate_academy_v2.py`
   - `reports/academy-v2-baseline.md`
+  - `reports/academy-v2-deployment-fa.md`
   - `reports/academy-v2-presentation.md`
   - `reports/academy-v2-test-logs.txt`
   - `reports/academy-v2-verification.md`
