@@ -5,6 +5,7 @@ idempotent receipts; no last-writer-wins or automatic conflict overwrite.
 import copy
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import math
@@ -18,6 +19,7 @@ import uuid
 from contextlib import contextmanager, closing
 from datetime import datetime
 from flask import Flask, request, jsonify, g, redirect, send_file, has_app_context, current_app, send_from_directory
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 try:
     from .account_policy import is_custom_user, may_manage_users
@@ -491,6 +493,44 @@ class ClosingConnection(sqlite3.Connection):
         try:return super().__exit__(*args)
         finally:self.close()
 
+_DEFAULT_TRUSTED_PROXIES = '127.0.0.0/8,::1/128,172.16.0.0/12'
+
+def _parse_trusted_proxies(raw):
+    text = _DEFAULT_TRUSTED_PROXIES if raw is None else str(raw)
+    networks = []
+    for part in re.split(r'[\s,]+', text.strip()):
+        if not part:
+            continue
+        networks.append(ipaddress.ip_network(part, strict=False))
+    return tuple(networks)
+
+class _TrustedProxyMiddleware:
+    """Apply ProxyFix (1 nginx hop) only when REMOTE_ADDR is a trusted proxy."""
+
+    def __init__(self, wsgi_app, trusted_networks):
+        self.raw_app = wsgi_app
+        self.proxied_app = ProxyFix(wsgi_app, x_for=1, x_proto=1, x_host=0, x_port=0, x_prefix=0)
+        self.trusted_networks = tuple(trusted_networks)
+
+    def _is_trusted_peer(self, remote_addr):
+        if not remote_addr or not isinstance(remote_addr, str):
+            return False
+        addr_text = remote_addr.strip()
+        if addr_text.startswith('[') and ']' in addr_text:
+            addr_text = addr_text[1:addr_text.index(']')]
+        if '%' in addr_text:
+            addr_text = addr_text.split('%', 1)[0]
+        try:
+            addr = ipaddress.ip_address(addr_text)
+        except ValueError:
+            return False
+        return any(addr in net for net in self.trusted_networks)
+
+    def __call__(self, environ, start_response):
+        if self._is_trusted_peer(environ.get('REMOTE_ADDR')):
+            return self.proxied_app(environ, start_response)
+        return self.raw_app(environ, start_response)
+
 def create_app(config=None):
     app=Flask(__name__,static_folder=None)
     app.json.ensure_ascii=False
@@ -498,10 +538,13 @@ def create_app(config=None):
     app.config.update(DB_PATH=os.environ.get('FAM_DB',str(ROOT/'private'/'fam.sqlite3')),
       PUBLIC_ORIGIN=os.environ.get('FAM_PUBLIC_ORIGIN',''), COOKIE_SECURE=True,
       MAX_CONTENT_LENGTH=32*1024*1024, TESTING=False,
+      TRUST_PROXY=os.environ.get('FAM_TRUST_PROXY','0')=='1',
+      TRUSTED_PROXIES=os.environ.get('FAM_TRUSTED_PROXIES', _DEFAULT_TRUSTED_PROXIES),
       # Equipment Management is an explicit FAM capability. The SSH helper runs
       # on the FAM server itself and connects directly to the device with
       # ssh.exe; the legacy VDI connector broker stays disabled.
       EQUIPMENT_OPS_ENABLED=os.environ.get('FAM_EQUIPMENT_OPS_ENABLED','0')=='1',
+      EQUIPMENT_MAX_CONCURRENT=os.environ.get('FAM_EQUIPMENT_MAX_CONCURRENT'),
       EQUIPMENT_CONNECTOR_ENABLED=False,
       EQUIPMENT_PYTHON=os.environ.get('FAM_EQUIPMENT_PYTHON',str(ROOT/'.venv'/'Scripts'/'python.exe') if os.name=='nt' else str(ROOT/'.venv'/'bin'/'python3')),
       EQUIPMENT_HELPER=str(ROOT/'equipment_probe.py'),
@@ -516,6 +559,8 @@ def create_app(config=None):
       # lower it through FAM_PASSWORD_MIN_LENGTH until the policy is final).
       PASSWORD_MIN_LENGTH=password_min_length())
     if config:app.config.update(config)
+    if app.config.get('TRUST_PROXY'):
+        app.wsgi_app = _TrustedProxyMiddleware(app.wsgi_app, _parse_trusted_proxies(app.config.get('TRUSTED_PROXIES')))
     if not app.config['PUBLIC_ORIGIN']:raise RuntimeError('Set FAM_PUBLIC_ORIGIN to the HTTPS origin (no trailing slash).')
     if not app.config['TESTING'] and not app.config['PUBLIC_ORIGIN'].startswith('https://'):raise RuntimeError('Production requires HTTPS.')
     dbpath=Path(app.config['DB_PATH']).resolve()
@@ -1122,7 +1167,7 @@ def create_app(config=None):
         return True
 
     if register_equipment_ops is not None:
-        register_equipment_ops(app, data=data, fail=fail, allowed=equipment_allowed)
+        register_equipment_ops(app, data=data, fail=fail, allowed=equipment_allowed, audit_allowed=may_manage_users)
     return app
 
 if __name__=='__main__':

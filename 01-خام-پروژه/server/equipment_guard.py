@@ -5,9 +5,16 @@ full tickets, commands, results or jobs. Leases outlive the 160s maximum replace
 """
 from contextlib import contextmanager
 import hashlib
+import logging
+import os
 import secrets
 import sqlite3
 import time
+
+LOGGER = logging.getLogger(__name__)
+DEFAULT_MAX_CONCURRENT = 8
+MIN_CONCURRENT = 1
+MAX_CONCURRENT = 32
 
 
 class AdmissionError(Exception):
@@ -15,10 +22,39 @@ class AdmissionError(Exception):
         self.code = code
 
 
+def resolve_max_concurrent(raw=None, default=DEFAULT_MAX_CONCURRENT):
+    """Parse FAM_EQUIPMENT_MAX_CONCURRENT safely within [1, 32]."""
+    value = os.environ.get('FAM_EQUIPMENT_MAX_CONCURRENT') if raw is None else raw
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return default
+    if isinstance(value, bool):
+        LOGGER.warning('Invalid FAM_EQUIPMENT_MAX_CONCURRENT boolean value; using default %d', default)
+        return default
+    try:
+        parsed = int(value.strip(), 10) if isinstance(value, str) else int(value) if type(value) is int else None
+    except ValueError:
+        parsed = None
+    if parsed is None:
+        LOGGER.warning('Invalid FAM_EQUIPMENT_MAX_CONCURRENT=%r; using default %d', value, default)
+        return default
+    if parsed < MIN_CONCURRENT:
+        LOGGER.warning('FAM_EQUIPMENT_MAX_CONCURRENT=%d below %d; using default %d', parsed, MIN_CONCURRENT, default)
+        return default
+    if parsed > MAX_CONCURRENT:
+        LOGGER.warning('FAM_EQUIPMENT_MAX_CONCURRENT=%d above %d; clamping to %d', parsed, MAX_CONCURRENT, MAX_CONCURRENT)
+        return MAX_CONCURRENT
+    return parsed
+
+
 class EquipmentGuard:
-    def __init__(self, path, maximum=2):
+    def __init__(self, path, maximum=None):
         self.path = str(path)
-        self.maximum = maximum
+        if maximum is None:
+            self.maximum = resolve_max_concurrent()
+        else:
+            if type(maximum) is not int or not MIN_CONCURRENT <= maximum <= MAX_CONCURRENT:
+                raise ValueError(f'maximum must be an integer between {MIN_CONCURRENT} and {MAX_CONCURRENT}')
+            self.maximum = maximum
         with self.connect() as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS equipment_used_tickets(digest TEXT PRIMARY KEY,expires INTEGER NOT NULL);
@@ -27,8 +63,8 @@ class EquipmentGuard:
 
     @contextmanager
     def connect(self):
-        db = sqlite3.connect(self.path, timeout=2)
-        db.execute('PRAGMA busy_timeout=2000')
+        db = sqlite3.connect(self.path, timeout=5)
+        db.execute('PRAGMA busy_timeout=5000')
         try:
             with db:
                 yield db
