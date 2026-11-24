@@ -1,0 +1,214 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "academy-stage-zero-01-osi-tcpip-fa",
+ "id": "academy-stage-zero-01-osi-tcpip-fa",
+ "objectiveId": "Term1-01",
+ "kind": "foundation",
+ "track": "FAM Curriculum 5.0",
+ "course": "c5-stage-zero",
+ "title": "جلسه اول: مدل‌های OSI و TCP/IP — نقشهٔ کامل سفر بسته در شبکه",
+ "titleEn": "OSI & TCP/IP Models: Encapsulation, Protocol Analysis & Layer Troubleshooting",
+ "domain": "دانشکده صفر · ترم اول (هفته اول: مبانی)",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Authored — Term 1 Flagship Session",
+ "estimatedMinutes": 120,
+ "prerequisites": [],
+ "beforeYouStart": {
+  "prerequisites": [],
+  "learningObjectives": [
+   "درک تفاوت و تناظر دقیق مدل ۷لایهٔ OSI و مدل ۴/۵لایهٔ TCP/IP",
+   "ردیابی کامل Encapsulation و Decapsulation از داده تا بیت روی سیم",
+   "شناخت PDU در هر لایه (Data, Segment, Packet, Frame, Bits) و نقش Header/Trailer",
+   "کاربرد عملی مدل لایه‌ای در بررسی خروجی Cisco IOS، Wireshark و عیب‌یابی شبکه"
+  ]
+ },
+ "whyItMatters": "وقتی یک کاربر گزارش می‌دهد «سایت داخلی شرکت باز نمی‌شود»، اولین واکنش یک فرد تازه‌کار حدس زدن تصادفی است؛ اما یک مهندس شبکه مسئله را به ۷ لایهٔ مشخص می‌شکند: آیا مشکل در لینک فیزیکی است (لایه ۱)، مک‌آدرس و سوئیچ (لایه ۲)، IP و مسیریابی (لایه ۳)، پورت TCP/UDP (لایه ۴) یا HTTP/DNS (لایه ۷)؟ مدل‌های OSI و TCP/IP نقشهٔ جراحی شبکه هستند؛ بدون این نقشه، تمام دستورات Cisco IOS و خروجی‌های Wireshark فقط متن‌های پراکنده به نظر می‌رسند.",
+ "topology": {
+  "devices": [
+   { "id": "PC1", "type": "host", "x": 60, "y": 140, "ip": "192.168.10.50/24", "gw": "192.168.10.1", "vlan": 10, "port": "NIC" },
+   { "id": "SW1", "type": "switch", "x": 220, "y": 140 },
+   { "id": "R1", "type": "router", "x": 380, "y": 140 },
+   { "id": "SRV1", "type": "server", "x": 540, "y": 140, "ip": "10.20.30.10/24", "gw": "10.20.30.1", "vlan": 30, "port": "eth0" }
+  ],
+  "links": [
+   { "a": "PC1:eth0", "b": "SW1:Gi0/1", "vlan": 10 },
+   { "a": "SW1:Gi0/24", "b": "R1:Gi0/0" },
+   { "a": "R1:Gi0/1", "b": "SRV1:eth0" }
+  ]
+ },
+ "sections": [
+  {
+   "id": "هدف-و-پیش-نیاز",
+   "title": "۱. هدف درس و پیش‌نیازها",
+   "html": "<div class=\"lesson-callout\"><strong>اصل این جلسه:</strong> مدل OSI و TCP/IP یک بحث حفظی برای امتحان نیست؛ این دو مدل زبان مشترک عیب‌یابی، طراحی شبکه، پیکربندی تجهیزات سیسکو و تحلیل بسته با Wireshark هستند.</div>\n<p><strong>هدف دقیق درس:</strong> در پایان این جلسه باید بتوانید برای هر ارتباط شبکه (مانند بازکردن یک صفحهٔ وب یا زدن دستور <code>ping</code>)، مسیر داده را در تمام لایه‌ها رسم کنید، واحد دادهٔ هر لایه (PDU) را نام ببرید، هدرهای اضافه‌شده در مبدأ و حذف‌شده در مقصد را تشخیص دهید، و با دستورات Cisco IOS و فیلترهای Wireshark محل دقیق خطا را پیدا کنید.</p>\n<div class=\"table-wrap\"><table><thead><tr><th>مولفه</th><th>مقدار در استاندارد آکادمی</th></tr></thead><tbody><tr><td>جایگاه در درخت آموزشی</td><td>دانشکده صفر · هفتهٔ اول · جلسهٔ ۱ از ۳۰</td></tr><tr><td>پیش‌نیازها</td><td>آشنایی پایه با مفهوم کامپیوتر و آدرس IP (بدون پیش‌نیاز قبلی در ترم ۱)</td></tr><tr><td>مدت مطالعهٔ استاندارد</td><td>۱۲۰ دقیقه (۲۰ دق مرور/آمادگی + ۳۵ دق مفهوم + ۵۰ دق آزمایشگاه + ۱۵ دق مستندسازی)</td></tr><tr><td>چهار خروجی الزامی</td><td>۱) درک OSI و TCP/IP · ۲) دستورات لایه ۱ تا ۴ در IOS · ۳) تحلیل آزمایشگاه و Wireshark · ۴) عیب‌یابی خطای لایه‌ای</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "چرا-معماری-لایه-ای",
+   "title": "۲. چرا شبکه را لایه‌لایه طراحی کرده‌اند؟",
+   "html": "<p>تصور کنید در یک شرکت تولیدی، اگر بخش نرم‌افزار مجبور بود بداند کابل مخابراتی از مس ساخته شده یا فیبر نوری، و کارت شبکه چطور ولتاژ صفر و یک تولید می‌کند، با هر تغییر تکنولوژی (مثلاً مهاجرت از کابل شبکه به Wi-Fi) باید کل مرورگر و سیستم‌عامل را از نو می‌نوشتند!</p>\n<p><strong>راه‌حل مهندسی: جداسازی وظایف (Modularity / Separation of Concerns).</strong> هر لایه یک قرارداد شفاف با لایهٔ بالایی و پایینی خود دارد و به جزئیات داخلی سایر لایه‌ها کاری ندارد:</p>\n<ul><li>وقتی کابل اترنت را با Wi-Fi عوض می‌کنید، فقط <strong>لایهٔ ۱ و ۲</strong> تغییر می‌کنند؛ IP و TCP و مرورگر هیچ تغییری نمی‌بینند.</li><li>وقتی از IPv4 به IPv6 مهاجرت می‌کنید، <strong>لایهٔ ۳</strong> عوض می‌شود ولی کابل فیبر و پروتکل HTTP همچنان کار می‌کنند.</li><li>در عیب‌یابی، می‌توانید با یک تست ساده (مثلاً <code>show interfaces</code> یا <code>ping</code>) نیمی از لایه‌ها را یکجا تبرئه یا متهم کنید.</li></ul>"
+  },
+  {
+   "id": "ساختار-۷-لایه-OSI",
+   "title": "۳. کالبدشکافی ۷ لایهٔ مدل OSI",
+   "html": "<p>مدل مرجع <strong>OSI (Open Systems Interconnection)</strong> ارتباط بین دو سیستم را به ۷ لایهٔ مجزا تقسیم می‌کند. لایه‌های ۷ تا ۵ بیشتر به نرم‌افزار و دادهٔ کاربر مربوط‌اند (Host Layers) و لایه‌های ۴ تا ۱ به انتقال مطمئن و فیزیکی در شبکه (Media/Transport Layers):</p>\n<div class=\"table-wrap\"><table><thead><tr><th>شماره</th><th>نام لایه</th><th>PDU</th><th>وظیفهٔ اصلی</th><th>تجهیزات / مثال پروتکل</th></tr></thead><tbody><tr><td>۷</td><td><strong>Application</strong></td><td>Data</td><td>واسط نرم‌افزار شبکه (نه خود برنامه، بلکه پروتکل ارتباطی آن)</td><td>HTTP/HTTPS, DNS, SSH, DHCP, SNMP</td></tr><tr><td>۶</td><td><strong>Presentation</strong></td><td>Data</td><td>فرمت داده، کدگذاری کاراکتر، فشرده‌سازی و رمزنگاری</td><td>TLS/SSL, UTF-8, JPEG, JSON, ASCII</td></tr><tr><td>۵</td><td><strong>Session</strong></td><td>Data</td><td>ایجاد، مدیریت، همگام‌سازی و پایان نشست ارتباطی بین دو برنامه</td><td>NetBIOS, RPC, SQL Session, کنترل دیالوگ</td></tr><tr><td>۴</td><td><strong>Transport</strong></td><td>Segment / Datagram</td><td>ارتباط Process-to-Process با شماره پورت، کنترل خطا و جریان</td><td>TCP (مطمئن) و UDP (سریع/بدون اتصال)</td></tr><tr><td>۳</td><td><strong>Network</strong></td><td>Packet</td><td>آدرس‌دهی منطقی و مسیریابی بین شبکه‌های مختلف</td><td>Router, L3 Switch · IPv4, IPv6, ICMP, OSPF</td></tr><tr><td>۲</td><td><strong>Data Link</strong></td><td>Frame</td><td>آدرس‌دهی فیزیکی (MAC)، تشخیص خطا (FCS) و دسترسی به رسانه</td><td>Switch, Bridge · Ethernet (802.3), ARP, 802.11</td></tr><tr><td>۱</td><td><strong>Physical</strong></td><td>Bits</td><td>ارسال و دریافت بیت‌های خام به‌صورت سیگنال الکتریکی، نوری یا رادیویی</td><td>Cable (UTP/Fiber), Hub, Repeater, NIC PHY</td></tr></tbody></table></div>\n<p><strong>نکتهٔ کلیدی آزمون و عملیات:</strong> عبارت «لایه ۲ سوئیچ است و لایه ۳ روتر» یک قاعدهٔ پایه است، اما به خاطر بسپارید که <strong>لایه ۲ فقط آدرس MAC و داخل یک VLAN را می‌فهمد</strong>؛ هر وقت نیاز به عبور از مرز یک Subnet به Subnet دیگر باشد، حتماً پای لایه ۳ (Router یا L3 Switch) وسط است.</p>"
+  },
+  {
+   "id": "مدل-TCP-IP-و-تطبیق",
+   "title": "۴. مدل عملی TCP/IP و مقایسهٔ دقیق با OSI",
+   "html": "<p>در حالی که مدل OSI یک <strong>مدل مرجع تئوریک و آموزشی</strong> برای دسته‌بندی استانداردهاست، اینترنت واقعی و شبکه‌های سازمانی امروز بر اساس <strong>مدل TCP/IP</strong> (مجموعه پروتکل‌های IETF) پیاده‌سازی شده‌اند. در منابع امتحانی جدید سیسکو، معمولاً مدل ۵لایهٔ به‌روزشدهٔ TCP/IP در کنار مدل ۴لایهٔ کلاسیک تدریس می‌شود:</p>\n<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 980 470\" role=\"img\" aria-labelledby=\"osi-title osi-desc\"><title id=\"osi-title\">OSI 7-Layer vs TCP/IP Model Comparison</title><desc id=\"osi-desc\">Side-by-side mapping between OSI layers 7 to 1 and TCP/IP 4-layer and 5-layer models with PDU names.</desc><rect width=\"980\" height=\"470\" rx=\"16\" fill=\"#0b1324\"/><text x=\"490\" y=\"38\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"22\" font-weight=\"700\" fill=\"#f8fafc\">مقایسهٔ مدل مرجع OSI با مدل عملی TCP/IP</text><text x=\"490\" y=\"62\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#94a3b8\">تطبیق لایه‌ها، واحد داده (PDU) و پروتکل‌های کلیدی</text><text x=\"210\" y=\"94\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#60a5fa\">مدل OSI (۷ لایه)</text><text x=\"515\" y=\"94\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#34d399\">مدل TCP/IP (۵ لایهٔ مدرن)</text><text x=\"800\" y=\"94\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#c084fc\">PDU / آدرس کلیدی</text><rect x=\"70\" y=\"110\" width=\"280\" height=\"42\" rx=\"8\" fill=\"#172554\" stroke=\"#3b82f6\"/><text x=\"210\" y=\"136\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#eff6ff\">7. Application</text><rect x=\"70\" y=\"158\" width=\"280\" height=\"42\" rx=\"8\" fill=\"#172554\" stroke=\"#3b82f6\"/><text x=\"210\" y=\"184\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#eff6ff\">6. Presentation</text><rect x=\"70\" y=\"206\" width=\"280\" height=\"42\" rx=\"8\" fill=\"#172554\" stroke=\"#3b82f6\"/><text x=\"210\" y=\"232\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#eff6ff\">5. Session</text><rect x=\"70\" y=\"256\" width=\"280\" height=\"44\" rx=\"8\" fill=\"#1e3a5f\" stroke=\"#38bdf8\"/><text x=\"210\" y=\"283\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#e0f2fe\">4. Transport</text><rect x=\"70\" y=\"306\" width=\"280\" height=\"44\" rx=\"8\" fill=\"#14532d\" stroke=\"#22c55e\"/><text x=\"210\" y=\"333\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#dcfce7\">3. Network</text><rect x=\"70\" y=\"356\" width=\"280\" height=\"44\" rx=\"8\" fill=\"#3f2b12\" stroke=\"#f59e0b\"/><text x=\"210\" y=\"383\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#fef3c7\">2. Data Link</text><rect x=\"70\" y=\"406\" width=\"280\" height=\"44\" rx=\"8\" fill=\"#3b1829\" stroke=\"#ec4899\"/><text x=\"210\" y=\"433\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#fce7f3\">1. Physical</text><rect x=\"375\" y=\"110\" width=\"280\" height=\"138\" rx=\"10\" fill=\"#064e3b\" stroke=\"#34d399\" stroke-width=\"2\"/><text x=\"515\" y=\"174\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#ecfdf5\">Application</text><text x=\"515\" y=\"198\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"12\" fill=\"#a7f3d0\">HTTP, DNS, SSH, TLS, JSON</text><rect x=\"375\" y=\"256\" width=\"280\" height=\"44\" rx=\"8\" fill=\"#0f3d4c\" stroke=\"#22d3ee\"/><text x=\"515\" y=\"283\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#cffafe\">Transport (TCP / UDP)</text><rect x=\"375\" y=\"306\" width=\"280\" height=\"44\" rx=\"8\" fill=\"#14532d\" stroke=\"#4ade80\"/><text x=\"515\" y=\"333\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#dcfce7\">Internet (IPv4 / IPv6)</text><rect x=\"375\" y=\"356\" width=\"280\" height=\"44\" rx=\"8\" fill=\"#3f2b12\" stroke=\"#fbbf24\"/><text x=\"515\" y=\"383\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#fef3c7\">Data Link (Ethernet / Wi-Fi)</text><rect x=\"375\" y=\"406\" width=\"280\" height=\"44\" rx=\"8\" fill=\"#3b1829\" stroke=\"#f472b6\"/><text x=\"515\" y=\"433\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"14\" fill=\"#fce7f3\">Physical (Bits / Copper / Fiber)</text><rect x=\"680\" y=\"110\" width=\"240\" height=\"138\" rx=\"10\" fill=\"#1e1b4b\" stroke=\"#818cf8\"/><text x=\"800\" y=\"174\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"15\" font-weight=\"700\" fill=\"#e0e7ff\">Data (Payload)</text><text x=\"800\" y=\"198\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"12\" fill=\"#c7d2fe\">فرمت و پیام برنامه</text><rect x=\"680\" y=\"256\" width=\"240\" height=\"44\" rx=\"8\" fill=\"#1e1b4b\" stroke=\"#818cf8\"/><text x=\"800\" y=\"283\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#e0e7ff\">Segment / Datagram (Port)</text><rect x=\"680\" y=\"306\" width=\"240\" height=\"44\" rx=\"8\" fill=\"#1e1b4b\" stroke=\"#818cf8\"/><text x=\"800\" y=\"333\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#e0e7ff\">Packet (IP Address)</text><rect x=\"680\" y=\"356\" width=\"240\" height=\"44\" rx=\"8\" fill=\"#1e1b4b\" stroke=\"#818cf8\"/><text x=\"800\" y=\"383\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#e0e7ff\">Frame (MAC + FCS)</text><rect x=\"680\" y=\"406\" width=\"240\" height=\"44\" rx=\"8\" fill=\"#1e1b4b\" stroke=\"#818cf8\"/><text x=\"800\" y=\"433\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#e0e7ff\">Bits (0 / 1 Signal)</text></svg></div><figcaption>لایه‌های ۵، ۶ و ۷ مدل OSI در مدل عملی TCP/IP در یک لایهٔ Application ادغام می‌شوند.</figcaption></figure>\n<p>در مدل ۴لایهٔ قدیمی‌تر TCP/IP، لایه‌های ۱ و ۲ نیز با هم یک لایه به نام <strong>Network Access (Link)</strong> نامیده می‌شدند. اما مهندسان شبکه در عمل برای تفکیک خطای کابل/فیبر (لایه ۱) از خطای سوئیچ/VLAN/MAC (لایه ۲) همواره از نام‌گذاری ۵لایه یا شمارهٔ لایه‌های OSI (مثلاً L1، L2، L3، L4) استفاده می‌کنند.</p>"
+  },
+  {
+   "id": "مکانیزم-Encapsulation",
+   "title": "۵. مکانیزم Encapsulation و Decapsulation",
+   "html": "<p>وقتی داده از کامپیوتر مبدأ ارسال می‌شود، از بالا به پایین حرکت می‌کند و هر لایه اطلاعات کنترلی خود را در قالب یک <strong>Header</strong> (و در لایهٔ ۲ همچنین <strong>Trailer / FCS</strong>) به آن اضافه می‌کند. به این فرایند <strong>کپسوله‌سازی (Encapsulation)</strong> می‌گویند.</p>\n<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 980 280\" role=\"img\" aria-labelledby=\"enc-title enc-desc\"><title id=\"enc-title\">Encapsulation from Data to Ethernet Frame</title><desc id=\"enc-desc\">Shows TCP Header + Data forming a Segment, IP Header forming a Packet, and L2 Ethernet Header + FCS Trailer forming a Frame.</desc><rect width=\"980\" height=\"280\" rx=\"16\" fill=\"#0b1324\"/><text x=\"490\" y=\"34\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#f8fafc\">فرآیند گام‌به‌گام Encapsulation تا رسیدن به قاب اترنت</text><rect x=\"590\" y=\"62\" width=\"260\" height=\"38\" rx=\"6\" fill=\"#1e3a8a\" stroke=\"#60a5fa\"/><text x=\"720\" y=\"86\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#fff\">HTTP Data (Application Payload)</text><rect x=\"470\" y=\"114\" width=\"116\" height=\"38\" rx=\"6\" fill=\"#0e7490\" stroke=\"#22d3ee\"/><text x=\"528\" y=\"138\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"12\" fill=\"#fff\">TCP Header (Ports)</text><rect x=\"590\" y=\"114\" width=\"260\" height=\"38\" rx=\"6\" fill=\"#1e3a8a\" stroke=\"#60a5fa\"/><text x=\"720\" y=\"138\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#fff\">Data (Segment)</text><rect x=\"340\" y=\"166\" width=\"126\" height=\"38\" rx=\"6\" fill=\"#15803d\" stroke=\"#4ade80\"/><text x=\"403\" y=\"190\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"12\" fill=\"#fff\">IP Header (Src/Dst IP)</text><rect x=\"470\" y=\"166\" width=\"380\" height=\"38\" rx=\"6\" fill=\"#134e4a\" stroke=\"#2dd4bf\"/><text x=\"660\" y=\"190\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#fff\">TCP Segment (IP Packet)</text><rect x=\"180\" y=\"218\" width=\"156\" height=\"40\" rx=\"6\" fill=\"#b45309\" stroke=\"#fbbf24\"/><text x=\"258\" y=\"243\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"12\" fill=\"#fff\">L2 Header (Src/Dst MAC)</text><rect x=\"340\" y=\"218\" width=\"510\" height=\"40\" rx=\"6\" fill=\"#14532d\" stroke=\"#4ade80\"/><text x=\"595\" y=\"243\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"13\" fill=\"#fff\">IP Packet inside Ethernet Frame</text><rect x=\"854\" y=\"218\" width=\"86\" height=\"40\" rx=\"6\" fill=\"#991b1b\" stroke=\"#f87171\"/><text x=\"897\" y=\"243\" text-anchor=\"middle\" font-family=\"Tahoma, Arial, sans-serif\" font-size=\"12\" fill=\"#fff\">FCS Trailer</text></svg></div><figcaption>هر لایه فقط هدر خودش را می‌خواند و بقیهٔ محتوا را به‌عنوان Payload به لایهٔ دیگر می‌سپارد.</figcaption></figure>\n<ul><li><strong>قانون طلایی Hop-by-Hop vs End-to-End:</strong> آدرس‌های <strong>IP مبدأ و مقصد</strong> از ابتدا تا انتهای مسیر (End-to-End، مگر در صورت وجود NAT) ثابت می‌مانند؛ اما آدرس‌های <strong>MAC مبدأ و مقصد</strong> در هر روتر (Hop-by-Hop) بازنویسی می‌شوند.</li><li><strong>فرایند Decapsulation:</strong> در دستگاه مقصد، بسته از پایین به بالا می‌رود؛ کارت شبکه FCS را چک می‌کند، لایه ۲ هدر اترنت را برمی‌دارد و بسته را به IP می‌دهد، لایه ۳ IP را چک می‌کند و Segment را به TCP تحویل می‌دهد تا در نهایت داده به پورت برنامهٔ مقصد برسد.</li></ul>"
+  },
+  {
+   "id": "تحلیل-پروتکل-و-سفر-بسته",
+   "title": "۶. تحلیل پروتکل: ردیابی یک درخواست واقعی HTTP در شبکه",
+   "html": "<p>فرض کنید کاربر روی <code>PC1</code> (<code>192.168.10.50/24</code>) آدرس وب‌سرور سازمانی <code>10.20.30.10</code> روی پورت <code>80</code> را باز می‌کند. ببینیم در هر نقطه از توپولوژی، چه فیلدهایی در بسته وجود دارد:</p>\n<div class=\"table-wrap\"><table><thead><tr><th>نقطهٔ عبور</th><th>لایهٔ فعال تجهیز</th><th>MAC مبدأ ← MAC مقصد</th><th>IP مبدأ ← IP مقصد</th><th>پورت مبدأ ← پورت مقصد</th></tr></thead><tbody><tr><td>خروج از PC1 به سمت SW1</td><td>لایه ۱ تا ۷ (End Host)</td><td><code>AA:AA (PC1)</code> ← <code>R1-G0/0</code></td><td><code>192.168.10.50</code> ← <code>10.20.30.10</code></td><td><code>TCP 51422</code> ← <code>TCP 80</code></td></tr><tr><td>عبور از SW1 به R1</td><td>فقط لایه ۱ و ۲ (Switch)</td><td>بدون تغییر (همان MAC جدول)</td><td>بدون تغییر (سوئیچ L2 هدر IP را نمی‌بیند)</td><td>بدون تغییر</td></tr><tr><td>تصمیم‌گیری داخل R1</td><td>لایه ۱، ۲ و ۳ (Router)</td><td>حذف فریم ورودی + ساخت فریم جدید</td><td><code>TTL</code> یک واحد کم می‌شود (مثلاً ۶۴→۶۳)</td><td>بدون تغییر</td></tr><tr><td>خروج از R1 G0/1 به SRV1</td><td>لایه ۳ به ۲ و ۱</td><td><code>R1-G0/1</code> ← <code>SS:SS (SRV1)</code></td><td><code>192.168.10.50</code> ← <code>10.20.30.10</code></td><td><code>TCP 51422</code> ← <code>TCP 80</code></td></tr></tbody></table></div>\n<p><strong>چرا PC1 در خط اول MAC مقصد را آدرس <code>R1-G0/0</code> گذاشت نه MAC سرور را؟</strong> چون با مقایسهٔ IP مقصد (<code>10.20.30.10</code>) با Subnet Mask خود (<code>/24</code>) متوجه شد سرور خارج از شبکهٔ <code>192.168.10.0/24</code> است؛ پس از طریق پروتکل <strong>ARP</strong> فقط MAC مربوط به Default Gateway یعنی <code>192.168.10.1</code> را پرسید.</p>"
+  },
+  {
+   "id": "توپولوژی-و-نقشه-ارتباط",
+   "title": "۷. توپولوژی آزمایشگاه و طرح آدرس‌دهی",
+   "html": "<figure><div class=\"diagram\"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 980 260\" role=\"img\" aria-labelledby=\"topo-t topo-d\"><title id=\"topo-t\">Session 1 Lab Topology: PC1 - SW1 - R1 - SRV1</title><desc id=\"topo-d\">PC1 in 192.168.10.0/24 connected to SW1 Gi0/1, SW1 Gi0/24 to R1 Gi0/0, and R1 Gi0/1 to SRV1 in 10.20.30.0/24.</desc><rect width=\"980\" height=\"260\" rx=\"16\" fill=\"#0b1324\"/><line x1=\"185\" y1=\"130\" x2=\"345\" y2=\"130\" stroke=\"#38bdf8\" stroke-width=\"4\"/><line x1=\"465\" y1=\"130\" x2=\"615\" y2=\"130\" stroke=\"#34d399\" stroke-width=\"4\"/><line x1=\"735\" y1=\"130\" x2=\"835\" y2=\"130\" stroke=\"#a78bfa\" stroke-width=\"4\"/><text x=\"265\" y=\"114\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#93c5fd\">eth0 ↔ Gi0/1 (VLAN 10)</text><text x=\"540\" y=\"114\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#6ee7b7\">Gi0/24 ↔ Gi0/0</text><text x=\"785\" y=\"114\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#ddd6fe\">Gi0/1 ↔ eth0</text><rect x=\"45\" y=\"85\" width=\"140\" height=\"90\" rx=\"12\" fill=\"#1e293b\" stroke=\"#38bdf8\" stroke-width=\"2\"/><text x=\"115\" y=\"118\" text-anchor=\"middle\" font-family=\"Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#f8fafc\">PC1</text><text x=\"115\" y=\"142\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#cbd5e1\">192.168.10.50/24</text><text x=\"115\" y=\"160\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#94a3b8\">GW: 192.168.10.1</text><rect x=\"345\" y=\"85\" width=\"120\" height=\"90\" rx=\"12\" fill=\"#172554\" stroke=\"#60a5fa\" stroke-width=\"2\"/><text x=\"405\" y=\"122\" text-anchor=\"middle\" font-family=\"Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#f8fafc\">SW1</text><text x=\"405\" y=\"146\" text-anchor=\"middle\" font-family=\"Tahoma, sans-serif\" font-size=\"12\" fill=\"#93c5fd\">Layer 2 Switch</text><rect x=\"615\" y=\"85\" width=\"120\" height=\"90\" rx=\"12\" fill=\"#3f2b12\" stroke=\"#f59e0b\" stroke-width=\"2\"/><text x=\"675\" y=\"118\" text-anchor=\"middle\" font-family=\"Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#fff7ed\">R1</text><text x=\"675\" y=\"140\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#fde68a\">G0/0: .10.1</text><text x=\"675\" y=\"158\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#fde68a\">G0/1: .30.1</text><rect x=\"835\" y=\"85\" width=\"110\" height=\"90\" rx=\"12\" fill=\"#1e1b4b\" stroke=\"#a78bfa\" stroke-width=\"2\"/><text x=\"890\" y=\"118\" text-anchor=\"middle\" font-family=\"Tahoma, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#f8fafc\">SRV1</text><text x=\"890\" y=\"142\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"12\" fill=\"#ddd6fe\">10.20.30.10/24</text><text x=\"890\" y=\"160\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"11\" fill=\"#c4b5fd\">HTTP :80</text></svg></div><figcaption>تفکیک مرز لایه ۲ (PC1 ↔ SW1 ↔ R1 G0/0) و مرز لایه ۳ (روتر R1 بین دو Subnet)</figcaption></figure>\n<div class=\"table-wrap\"><table><thead><tr><th>تجهیز</th><th>رابط</th><th>آدرس IP / Mask</th><th>درگاه پیش‌فرض</th><th>لایهٔ تصمیم‌گیر</th></tr></thead><tbody><tr><td>PC1</td><td>eth0</td><td><code>192.168.10.50/24</code></td><td><code>192.168.10.1</code></td><td>L1–L7 (Host)</td></tr><tr><td>SW1</td><td>Gi0/1, Gi0/24</td><td>بدون IP مدیریتی در مسیر داده</td><td>—</td><td>L1–L2 (MAC Forwarding)</td></tr><tr><td>R1</td><td>Gi0/0</td><td><code>192.168.10.1/24</code></td><td>—</td><td>L1–L3 (Routing)</td></tr><tr><td>R1</td><td>Gi0/1</td><td><code>10.20.30.1/24</code></td><td>—</td><td>L1–L3 (Routing)</td></tr><tr><td>SRV1</td><td>eth0</td><td><code>10.20.30.10/24</code></td><td><code>10.20.30.1</code></td><td>L1–L7 (Server)</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "دستورات-Cisco-IOS",
+   "title": "۸. دستورات Cisco IOS متناظر با هر لایه",
+   "html": "<p>وقتی به یک سوئیچ یا روتر سیسکو متصل می‌شوید، هر دستور مستقیماً به یکی از لایه‌های OSI نگاه می‌کند. حفظ کردن دستورات بدون دانستن لایهٔ مربوطه بی‌فایده است:</p>\n<pre><code class=\"language-cisco\">! لایه ۱ و ۲ (وضعیت فیزیکی لینک و خطاهای فریم روی سوئیچ یا روتر)\nshow interfaces GigabitEthernet0/0\nshow ip interface brief\n\n! لایه ۲ (جدول مک‌آدرس سوئیچ و جدول همسایگان لایه ۲)\nshow mac address-table\nshow cdp neighbors detail\n\n! لایه ۳ (جدول ARP برای تبدیل IP به MAC و جدول مسیریابی)\nshow ip arp\nshow ip route\nping 10.20.30.10 source 192.168.10.1\ntraceroute 10.20.30.10\n\n! لایه ۴ (سوکت‌ها و نشست‌های فعال TCP روی دستگاه)\nshow tcp brief\nshow control-plane host open-ports</code></pre>\n<div class=\"table-wrap\"><table><thead><tr><th>خروجی دستور <code>show ip interface brief</code></th><th>معنا در مدل OSI</th></tr></thead><tbody><tr><td><code>Status: administratively down, Protocol: down</code></td><td>پورت با <code>shutdown</code> خاموش است (لایه ۱ متوقف).</td></tr><tr><td><code>Status: down, Protocol: down</code></td><td>مشکل فیزیکی لایه ۱: کابل قطع، پورت مقابل خاموش یا SFP ناسازگار.</td></tr><tr><td><code>Status: up, Protocol: down</code></td><td>لایه ۱ برقرار است اما لایه ۲ (مثل عدم تطابق کپسوله‌سازی/Keepalive) مشکل دارد.</td></tr><tr><td><code>Status: up, Protocol: up</code></td><td>لایه ۱ و لایه ۲ هر دو سالم‌اند؛ آماده برای لایه ۳ (IP).</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "تحلیل-Wireshark",
+   "title": "۹. مشاهدهٔ واقعی لایه‌ها در Wireshark",
+   "html": "<p>در ابزار <strong>Wireshark</strong> دقیقاً ساختار معکوس Encapsulation را در پنل میانی (Packet Details) می‌بینید؛ از لایهٔ ۱ تا لایهٔ ۷ به‌صورت درختی باز می‌شود:</p>\n<pre><code class=\"language-text\">! Designed — Not Run; sample Wireshark tree structure\nFrame 12: 74 bytes on wire (592 bits)             --> Layer 1 (Physical byte/bit count)\nEthernet II, Src: aa:bb:cc:00:01:00, Dst: 00:1e:bd:10:00:01  --> Layer 2 (Frame &amp; MAC)\nInternet Protocol Version 4, Src: 192.168.10.50, Dst: 10.20.30.10, TTL: 64  --> Layer 3 (Packet)\nTransmission Control Protocol, Src Port: 51422, Dst Port: 80, Flags: [SYN]  --> Layer 4 (Segment)\nHypertext Transfer Protocol (GET / HTTP/1.1)     --> Layer 7 (Application Data)</code></pre>\n<p><strong>فیلترهای نمایشی ضروری در Wireshark برای تمرین امروز:</strong></p>\n<ul><li>فقط لایه ۲ (ARP): <code>arp</code></li><li>فقط لایه ۳ (ICMP / IP): <code>icmp || ip.addr == 192.168.10.50</code></li><li>فقط لایه ۴ (TCP Handshake): <code>tcp.port == 80 &amp;&amp; tcp.flags.syn == 1</code></li><li>فقط لایه ۷ (درخواست‌های وب): <code>http.request</code></li></ul>"
+  },
+  {
+   "id": "ازمایشگاه-گام-به-گام",
+   "title": "۱۰. آزمایشگاه عملی گام‌به‌گام (Lab)",
+   "html": "<p class=\"lesson-quiz-warning\">وضعیت آزمایشگاه: <strong>Designed — Not Run (اجرا نشده)</strong>. این سناریو برای اجرا در Packet Tracer یا PNETLab/EVE-NG آماده شده است تا خروجی واقعی هر لایه را خودتان ثبت کنید.</p>\n<pre><code class=\"language-cisco\">! پیکربندی روتر R1 برای تفکیک دو لایه ۳ مختلف\nR1(config)# interface GigabitEthernet0/0\nR1(config-if)# description TO-SW1-USERS\nR1(config-if)# ip address 192.168.10.1 255.255.255.0\nR1(config-if)# no shutdown\nR1(config-if)# exit\nR1(config)# interface GigabitEthernet0/1\nR1(config-if)# description TO-SRV1\nR1(config-if)# ip address 10.20.30.1 255.255.255.0\nR1(config-if)# no shutdown</code></pre>\n<ol><li><strong>لایه ۱ و ۲ روی SW1:</strong> با <code>show interfaces status</code> مطمئن شوید پورت‌های <code>Gi0/1</code> و <code>Gi0/24</code> هر دو <code>connected</code> هستند، سپس با <code>show mac address-table</code> یادگیری MAC آدرس <code>PC1</code> را ببینید.</li><li><strong>بررسی لایه ۳ و ARP:</strong> از <code>PC1</code> دستور <code>ping 192.168.10.1</code> را اجرا کنید و در Wireshark یا <code>show ip arp</code> روی R1 ببینید ابتدا بستهٔ ARP برای پیدا کردن MAC روتر ارسال می‌شود.</li><li><strong>عبور از مرز روتر:</strong> از <code>PC1</code> دستور <code>ping 10.20.30.10</code> و سپس درخواست HTTP به پورت ۸۰ بزنید. بسته‌ها را در دو سمت R1 مقایسه کنید: MACها تغییر کرده‌اند اما IPها ثابت مانده‌اند.</li><li><strong>مقایسهٔ TTL:</strong> در Wireshark روی لینک <code>PC1-SW1</code> و لینک <code>R1-SRV1</code> مقدار <code>TTL</code> را بخوانید؛ روی لینک دوم دقیقاً ۱ واحد کمتر است.</li></ol>"
+  },
+  {
+   "id": "عیب-یابی-عملی",
+   "title": "۱۱. عیب‌یابی لایه به لایه (Troubleshooting)",
+   "html": "<p>در بخش عیب‌یابی این جلسه، یک خطای عمدی روی مسیر ایجاد می‌کنیم تا مهارت تفکیک لایه‌ها تثبیت شود:</p>\n<div class=\"table-wrap\"><table><thead><tr><th>سناریوی خطای عمدی</th><th>نشانه در کاربر</th><th>فرمان تشخیص</th><th>لایهٔ مقصر و راه‌حل</th></tr></thead><tbody><tr><td>تنظیم اشتباه Gateway روی PC1 به <code>192.168.10.254</code></td><td>پینگ <code>192.168.10.1</code> کار می‌کند ولی <code>10.20.30.10</code> کار نمی‌کند و حتی ARP برای <code>10.254</code> بی‌پاسخ می‌ماند.</td><td><code>ipconfig /all</code> یا <code>ip route</code> روی کلاینت + بررسی Wireshark برای ARP بی‌پاسخ.</td><td><strong>لایه ۳ (انتخاب دروازهٔ خروجی):</strong> اصلاح Gateway روی PC1 به <code>192.168.10.1</code>.</td></tr><tr><td>خاموش بودن <code>Gi0/1</code> روی R1</td><td>PC1 به <code>192.168.10.1</code> پینگ دارد اما از R1 به سمت <code>SRV1</code> هیچ بسته‌ای رد نمی‌شود.</td><td><code>show ip interface brief</code> و <code>show ip route</code> روی R1 (مسیر <code>10.20.30.0/24</code> غایب است).</td><td><strong>لایه ۱ (و اثرش روی لایه ۳):</strong> اجرای <code>no shutdown</code> روی <code>Gi0/1</code>.</td></tr><tr><td>بسته بودن سرویس وب (Port 80) روی SRV1</td><td><code>ping 10.20.30.10</code> موفق است اما مرورگر خطای Connection Refused می‌دهد.</td><td><code>show tcp brief</code> / <code>ss -tlnp</code> روی سرور و مشاهدهٔ بستهٔ <code>TCP RST</code> در Wireshark.</td><td><strong>لایه ۴ و ۷:</strong> شبکه سالم است؛ سرویس وب روی پورت ۸۰ باید راه‌اندازی شود.</td></tr></tbody></table></div>"
+  },
+  {
+   "id": "تمرین-مستقل",
+   "title": "۱۲. تمرین مستقل دانشجو",
+   "html": "<p>بدون نگاه کردن به پاسخ‌ها، این سه مسئله را روی کاغذ یا در دفترچهٔ مستندسازی حل کنید:</p>\n<ol><li>یک کاربر آدرس <code>https://portal.lab.local</code> را وارد می‌کند. نام ببرید به‌ترتیب از بالا به پایین چه اتفاقی در لایه‌های <strong>۷، ۶، ۴، ۳، ۲ و ۱</strong> می‌افتد (با ذکر PDU هر لایه).</li><li>اگر <code>ping 8.8.8.8</code> موفق باشد ولی بازکردن وب‌سایت‌ها با نام دامنه شکست بخورد، کدام لایه‌ها را از نظر سلامت تأیید کرده‌اید و خطا در کدام لایه است؟</li><li>چرا اگر سوئیچ لایه ۲ خراب شود، ارتباط داخل Subnet قطع می‌شود؛ اما اگر Gateway قطع شود ارتباط داخل Subnet همچنان کار می‌کند؟</li></ol>"
+  },
+  {
+   "id": "مستندسازی-و-جمع-بندی",
+   "title": "۱۳. مستندسازی و جمع‌بندی جلسه اول",
+   "html": "<p><strong>چک‌لیست مستندسازی ۱۵ دقیقهٔ پایانی روز:</strong> در کادر یادداشت پایین همین صفحه، خلاصهٔ خودتان از ۷ لایه، ۳ فرمان کلیدی Cisco IOS که امروز یاد گرفتید و یک خطای واقعی که می‌توانید با تفکیک لایه تشخیص دهید را بنویسید و ذخیره کنید.</p>\n<ul><li>مدل OSI با ۷ لایه بهترین نقشه برای <strong>آموزش و عیب‌یابی</strong> است؛ مدل TCP/IP معماری واقعی <strong>پروتکل‌های اینترنت</strong> است.</li><li>در ارسال داده (Encapsulation): <code>Data → Segment (L4) → Packet (L3) → Frame (L2) → Bits (L1)</code>.</li><li><strong>آدرس MAC</strong> محلی (Hop-by-Hop) است و در هر روتر عوض می‌شود؛ <strong>آدرس IP</strong> سراسری (End-to-End) است.</li><li>هرگز قبل از چک کردن لایه ۱ و ۲ (<code>show ip interface brief</code>) سراغ تغییر جدول مسیریابی نروید؛ همیشه از پایین به بالا یا بالا به پایین به‌صورت نظام‌مند بررسی کنید.</li></ul>"
+  },
+  {
+   "id": "منابع-جلسه-اول",
+   "title": "۱۴. منابع مرجع و مسیر ادامه",
+   "html": "<div class=\"table-wrap\"><table><thead><tr><th>منبع مرجع</th><th>کاربرد در این جلسه</th></tr></thead><tbody><tr><td>Cisco CCNA 200-301 Official Cert Guide — Ch. 1–2</td><td>مبانی مدل TCP/IP، OSI و Encapsulation</td></tr><tr><td>RFC 1122 &amp; RFC 791</td><td>ساختار معماری لایه‌ای اینترنت و هدر IPv4</td></tr><tr><td>Wireshark User Guide — Packet Details</td><td>تطبیق پنجرهٔ تحلیل بسته با لایه‌های ۱ تا ۷</td></tr></tbody></table></div>\n<p><strong>گام بعدی در ترم اول:</strong> در جلسهٔ ۲ به‌طور تخصصی سراغ <strong>Encapsulation، ساختار کامل Ethernet Frame و جدول MAC در سوئیچ</strong> می‌رویم.</p>"
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه عملی جلسه اول: ردیابی لایه ۱ تا ۷ در توپولوژی PC1–SW1–R1–SRV1",
+   "html": "<p class=\"lesson-quiz-warning\">وضعیت آزمایشگاه: <strong>Designed — Not Run (اجرا نشده)</strong>. پس از پیاده‌سازی در Packet Tracer یا PNETLab، خروجی دستورات زیر را با جدول تطبیق دهید.</p><pre><code class=\"language-cisco\">! R1 Baseline Config\ninterface GigabitEthernet0/0\n ip address 192.168.10.1 255.255.255.0\n no shutdown\ninterface GigabitEthernet0/1\n ip address 10.20.30.1 255.255.255.0\n no shutdown\n\n! Verification Commands\nshow ip interface brief\nshow mac address-table\nshow ip arp\nshow ip route\nshow tcp brief</code></pre>"
+  },
+  "quiz": {
+   "title": "آزمون تسلط جلسه اول (۱۲ سؤال)",
+   "instructions": "برای قبولی مطابق استاندارد آکادمی، حداقل نمرهٔ ۸۵٪ (۱۰ از ۱۲ پاسخ صحیح) هدف‌گذاری شده است."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "کدام واحد داده (PDU) مربوط به لایهٔ ۲ مدل OSI است؟",
+   "options": ["Segment", "Packet", "Frame", "Datagram"],
+   "correctIndex": 2,
+   "explanationHtml": "<p>در لایهٔ ۲ (Data Link)، بستهٔ IP درون یک <strong>Frame (قاب)</strong> با هدر MAC و Trailer خطایابی (FCS) قرار می‌گیرد.</p>"
+  },
+  {
+   "title": "کدام لایه‌های مدل OSI در مدل عملی TCP/IP در لایهٔ Application ادغام شده‌اند؟",
+   "options": ["لایه‌های ۱، ۲ و ۳", "لایه‌های ۵، ۶ و ۷", "لایه‌های ۳، ۴ و ۵", "لایه‌های ۴ و ۵"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>لایه‌های <strong>Session (5)</strong>، <strong>Presentation (6)</strong> و <strong>Application (7)</strong> مدل OSI در مدل TCP/IP به‌صورت یکجا در لایهٔ Application قرار می‌گیرند.</p>"
+  },
+  {
+   "title": "وقتی یک بسته از PC1 به سروری در Subnet دیگر از طریق یک روتر عبور می‌کند، کدام مورد در هر Hop تغییر می‌کند؟",
+   "options": ["آدرس IP مبدأ و مقصد", "شماره پورت TCP مقصد", "آدرس MAC مبدأ و مقصد", "نام دامنهٔ DNS"],
+   "correctIndex": 2,
+   "explanationHtml": "<p>روتر فریم لایه ۲ را باز می‌کند و هنگام ارسال از رابط خروجی، یک <strong>قاب جدید با MAC مبدأ و مقصد جدید</strong> می‌سازد؛ در حالی که IP مبدأ و مقصد (بدون NAT) ثابت می‌مانند.</p>"
+  },
+  {
+   "title": "در خروجی دستور <code>show ip interface brief</code> عبارت <code>Status: up, Protocol: down</code> به چه معناست؟",
+   "options": ["کابل شبکه قطع است", "لایه ۱ سالم است اما لایه ۲ برقرار نشده است", "آدرس IP تکراری است", "فایروال پورت ۸۰ را بسته است"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>ستون اول (Status) نشان‌دهندهٔ سلامت فیزیکی <strong>لایه ۱</strong> و ستون دوم (Protocol) نشان‌دهندهٔ سلامت پروتکل <strong>لایه ۲</strong> است.</p>"
+  },
+  {
+   "title": "کدام لایه مسئول اضافه کردن شماره پورت (Port Number) و انتخاب بین TCP یا UDP است؟",
+   "options": ["Network (لایه ۳)", "Transport (لایه ۴)", "Session (لایه ۵)", "Data Link (لایه ۲)"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>لایهٔ <strong>Transport (لایه ۴)</strong> مسئول تحویل Process-to-Process با استفاده از شماره پورت‌هاست.</p>"
+  },
+  {
+   "title": "وقتی PC1 می‌خواهد با سرور 10.20.30.10 در یک شبکهٔ دیگر ارتباط بگیرد، ARP Request برای پیدا کردن MAC چه دستگاهی ارسال می‌شود؟",
+   "options": ["مستقیماً برای MAC سرور 10.20.30.10", "برای MAC آدرس Default Gateway یعنی 192.168.10.1", "برای MAC سوئیچ SW1", "برای سرور DNS"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>پروتکل ARP از مرز روتر عبور نمی‌کند؛ بنابراین کلاینت همیشه برای مقاصد خارج از Subnet خود، MAC مربوط به <strong>Default Gateway</strong> را از طریق ARP پیدا می‌کند.</p>"
+  },
+  {
+   "title": "اگر <code>ping 10.20.30.10</code> موفق باشد اما مرورگر نتواند صفحهٔ وب را باز کند، کدام بخش شبکه قطعاً سالم است؟",
+   "options": ["فقط لایه ۷", "لایه‌های ۱، ۲ و ۳ در مسیر رفت و برگشت", "فقط سرویس وب روی پورت ۸۰", "فقط DNS"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>موفقیت <code>ping</code> ثابت می‌کند دسترسی لایه‌های <strong>۱، ۲ و ۳</strong> بین مبدأ و مقصد برقرار است و مشکل به احتمال زیاد در لایه ۴ (پورت/فایروال) یا لایه ۷ (سرویس وب/DNS) است.</p>"
+  },
+  {
+   "title": "کدام گزینه ترتیب صحیح Encapsulation از بالا به پایین است؟",
+   "options": ["Data → Packet → Segment → Frame → Bits", "Data → Segment → Packet → Frame → Bits", "Frame → Packet → Segment → Data → Bits", "Packet → Frame → Segment → Data → Bits"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>داده در لایه ۷ (Data) ← در لایه ۴ (Segment) ← در لایه ۳ (Packet) ← در لایه ۲ (Frame) ← در لایه ۱ (Bits).</p>"
+  },
+  {
+   "title": "نقش Trailer (فیلد FCS) در انتهای قاب اترنت چیست؟",
+   "options": ["مسیریابی بین دو شبکه", "تشخیص خطای انتقال فریم در لایه ۲", "رمزنگاری ترافیک وب", "تخصیص شماره پورت مبدأ"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>فیلد <strong>FCS (Frame Check Sequence)</strong> در لایه ۲ با الگوریتم CRC سلامت فریم دریافتی را بررسی می‌کند و فریم‌های خراب را دور می‌اندازد.</p>"
+  },
+  {
+   "title": "کدام لایهٔ مدل OSI مسئول رمزنگاری (Encryption) و قالب‌بندی استاندارد داده مانند UTF-8 است؟",
+   "options": ["Session", "Presentation", "Network", "Physical"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>لایهٔ ۶ یا <strong>Presentation</strong> مسئول فرمت داده، فشرده‌سازی و رمزنگاری است.</p>"
+  },
+  {
+   "title": "برای دیدن نشست‌ها و پورت‌های باز TCP روی یک روتر Cisco IOS از کدام دستور استفاده می‌شود؟",
+   "options": ["show mac address-table", "show tcp brief", "show cdp neighbors", "show interfaces status"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>دستور <code>show tcp brief</code> وضعیت نشست‌های TCP در لایهٔ ۴ را نمایش می‌دهد.</p>"
+  },
+  {
+   "title": "چرا در عیب‌یابی شبکه‌های مدرن مدل ۵لایهٔ TCP/IP یا ۷لایهٔ OSI را به‌کار می‌برند؟",
+   "options": ["برای حفظ کردن نام پروتکل‌ها در امتحان", "برای جداسازی منطقی خطاها و آزمایش لایه‌به‌لایه با شواهد CLI و Packet", "برای حذف نیاز به آدرس IP", "چون روتر فقط در لایه ۱ کار می‌کند"],
+   "correctIndex": 1,
+   "explanationHtml": "<p>مزیت اصلی مدل لایه‌ای، جداسازی مسائل (Separation of Concerns) است تا با چند آزمایش مشخص بتوانیم خطا را به یک لایه محدود کنیم.</p>"
+  }
+ ],
+ "glossary": [
+  { "term": "OSI Model", "fa": "مدل مرجع ۷لایهٔ OSI", "simple": "مدل استاندارد ۷لایه برای درک، آموزش و عیب‌یابی شبکه‌های کامپیوتری." },
+  { "term": "TCP/IP Model", "fa": "مدل عملی TCP/IP", "simple": "معماری عملی شبکه‌های مدرن و اینترنت با لایه‌های Application، Transport، Internet، Data Link و Physical." },
+  { "term": "PDU", "fa": "Protocol Data Unit", "simple": "واحد داده در هر لایه: Data، Segment، Packet، Frame و Bits." },
+  { "term": "Encapsulation", "fa": "کپسوله‌سازی", "simple": "افزودن هدر هر لایه به داده هنگام حرکت از بالا به پایین در دستگاه مبدأ." },
+  { "term": "Decapsulation", "fa": "بازکردن کپسوله‌سازی", "simple": "حذف و بررسی هدر هر لایه هنگام حرکت از پایین به بالا در دستگاه مقصد." },
+  { "term": "Header", "fa": "سرآیند", "simple": "اطلاعات کنترلی که هر لایه به ابتدای دادهٔ لایهٔ بالاتر اضافه می‌کند." },
+  { "term": "FCS", "fa": "Frame Check Sequence", "simple": "فیلد انتهای قاب لایه ۲ برای تشخیص خراب شدن بیت‌ها در مسیر." },
+  { "term": "Segment", "fa": "سگمنت (لایه ۴)", "simple": "واحد داده در لایه Transport شامل هدر TCP و شماره پورت‌ها." },
+  { "term": "Packet", "fa": "بسته (لایه ۳)", "simple": "واحد داده در لایه Network شامل آدرس IP مبدأ و مقصد." },
+  { "term": "Frame", "fa": "قاب (لایه ۲)", "simple": "واحد داده در لایه Data Link شامل MAC مبدأ، MAC مقصد و FCS." },
+  { "term": "MAC Address", "fa": "آدرس فیزیکی لایه ۲", "simple": "شناسهٔ ۴۸بیتی کارت شبکه برای تحویل قاب در یک شبکهٔ محلی." },
+  { "term": "IP Address", "fa": "آدرس منطقی لایه ۳", "simple": "آدرس سلسله‌مراتبی برای مسیریابی بسته‌ها بین شبکه‌های مختلف." },
+  { "term": "ARP", "fa": "Address Resolution Protocol", "simple": "پروتکل پیدا کردن آدرس MAC متناظر با یک IPv4 در همان شبکهٔ محلی." },
+  { "term": "Default Gateway", "fa": "درگاه پیش‌فرض", "simple": "آدرس روتری که بسته‌های خارج از Subnet محلی به آن سپرده می‌شوند." },
+  { "term": "TTL", "fa": "Time To Live", "simple": "شمارندهٔ در هدر IP که در هر روتر ۱ واحد کم می‌شود تا از حلقهٔ بی‌نهایت جلوگیری شود." },
+  { "term": "Port Number", "fa": "شماره پورت (لایه ۴)", "simple": "عددی ۱۶بیتی برای تفکیک سرویس‌ها و برنامه‌های مختلف روی یک میزبان (مثل پورت ۸۰ برای HTTP)." },
+  { "term": "Wireshark", "fa": "ابزار تحلیل بسته", "simple": "ابزار مشاهده و کالبدشکافی دقیق ترافیک لایه ۱ تا ۷ در شبکه." }
+ ]
+}

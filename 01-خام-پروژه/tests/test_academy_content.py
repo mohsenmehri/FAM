@@ -215,6 +215,44 @@ class AcademyContentTests(unittest.TestCase):
         self.assertIn(':root:not([data-theme="light"])', ui_css)
         self.assertIn("view:'chooser'", fam_html)
 
+    def test_master_curriculum_tree_and_session_one_contract(self):
+        tree_path = ASSET_ROOT / "academy-curriculum-tree.json"
+        self.assertTrue(tree_path.is_file(), "academy-curriculum-tree.json must exist")
+        tree = json.loads(tree_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(len(tree.get("fourOutputs", [])), 4)
+        self.assertEqual(len(tree.get("facultiesSummary", [])), 7)
+        self.assertEqual(len(tree.get("facultyOneCCNA", {}).get("domains", [])), 6)
+        self.assertEqual(len(tree.get("facultyOneCCNA", {}).get("labs", [])), 25)
+        self.assertEqual(len(tree.get("facultyTwoAdvanced", {}).get("courses", [])), 4)
+        self.assertEqual(len(tree.get("facultyTwoAdvanced", {}).get("labs", [])), 12)
+        self.assertEqual(len(tree.get("facultyThreeCCNP", {}).get("concentrations", [])), 6)
+        self.assertEqual(len(tree.get("facultyFourSpecialties", {}).get("tracks", [])), 8)
+        self.assertEqual(len(tree.get("facultyExpertCCIE", {}).get("tracks", [])), 7)
+        self.assertEqual(len(tree.get("facultyArchitectureCCDE", {}).get("topics", [])), 20)
+        self.assertEqual(tree.get("dailySchedule", {}).get("totalMinutes"), 120)
+        self.assertEqual(len(tree.get("dailySchedule", {}).get("weekly", [])), 7)
+        self.assertEqual(len(tree.get("labInfrastructure", {}).get("tools", [])), 11)
+        self.assertEqual(tree.get("evaluation", {}).get("passingScore"), 85)
+        self.assertEqual(len(tree.get("eightYearTimeline", [])), 8)
+        self.assertEqual(len(tree.get("sessionStandard", [])), 11)
+        self.assertEqual(len(tree.get("graduationCriteria", [])), 10)
+
+        first_id = tree.get("termOne30DayPlan", {}).get("firstSessionId")
+        self.assertEqual(first_id, "academy-stage-zero-01-osi-tcpip-fa")
+        self.assertIn(first_id, [l["id"] for _, _, l in self.records])
+
+        academy_html = (PACKAGE_ROOT / "server" / "private_ui" / "academy.html").read_text(encoding="utf-8")
+        catalog_js = (ASSET_ROOT / "academy-catalog.js").read_text(encoding="utf-8")
+        lesson_js = (ASSET_ROOT / "lesson-engine.js").read_text(encoding="utf-8")
+        shell_js = (ASSET_ROOT / "academy-reference-shell.js").read_text(encoding="utf-8")
+        for token in ('id="btn-tree"', '#/tree'):
+            self.assertIn(token, academy_html)
+        self.assertIn("renderAcademyTree", catalog_js)
+        self.assertIn("lesson-toc", lesson_js)
+        self.assertIn("le-notebook-save", lesson_js)
+        self.assertIn("#/tree", shell_js)
+
 
 if __name__ == "__main__":
     unittest.main()

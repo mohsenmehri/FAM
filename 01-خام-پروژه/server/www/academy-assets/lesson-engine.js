@@ -391,40 +391,100 @@
     const stageIcons = { concept:'M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2ZM9 21h6', example:'M5 3h14v18H5z M8 7h8M8 11h8M8 15h5', practice:'M4 20l4-1 11-11-3-3L5 16z M14 7l3 3', lab:'M9 3v7l-5 8a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-8V3 M8 3h8 M7 16h10', quiz:'M9 9a3 3 0 1 1 5 2c-1 .8-2 1-2 3 M12 18h.01 M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20', summary:'M5 4h14v17H5z M8 8h8 M8 12h8 M8 16h5' };
     const stageIcon = (id, index) => stageIcons[id] ? `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${stageIcons[id]}"/></svg>` : String(index + 1);
 
+    const LESSON_VIEW_KEY = 'fam_academy_lesson_view';
+    const LESSON_NOTES_KEY = 'fam_academy_lesson_notes_v1';
+    let viewMode = 'article';
+    try {
+      const savedMode = localStorage.getItem(LESSON_VIEW_KEY);
+      if (savedMode === 'stepper' || savedMode === 'article') viewMode = savedMode;
+    } catch (_) {}
+    const loadNote = (id) => {
+      try {
+        const bNotes = window.FamAcademyBridge?.progress?.labs?.notes?.[id];
+        if (typeof bNotes === 'string') return bNotes;
+        const map = JSON.parse(localStorage.getItem(LESSON_NOTES_KEY) || '{}');
+        return typeof map[id] === 'string' ? map[id] : '';
+      } catch (_) { return ''; }
+    };
+    const saveNote = (id, text) => {
+      try {
+        const map = JSON.parse(localStorage.getItem(LESSON_NOTES_KEY) || '{}');
+        map[id] = text;
+        localStorage.setItem(LESSON_NOTES_KEY, JSON.stringify(map));
+      } catch (_) {}
+      const br = window.FamAcademyBridge;
+      if (br && typeof br.saveProgress === 'function') {
+        br.progress = br.progress || {};
+        br.progress.labs = br.progress.labs || {};
+        br.progress.labs.notes = br.progress.labs.notes || {};
+        br.progress.labs.notes[id] = text;
+        br.saveProgress();
+      }
+    };
+    const isStaged = hasStages(bp) > 0;
+    const savedNote = loadNote(bp.lessonId);
+
     container.innerHTML = `
-      <div class="lesson-layout lesson-reference-unit">
+      <div class="lesson-layout lesson-reference-unit" data-view-mode="${viewMode}">
         <header class="unit-head lesson-unit-head">
           <div class="lesson-unit-heading">
             <div>
-              <div class="kicker">${escapeHtml(bp.track || '')} · درس</div>
+              <div class="kicker">${escapeHtml(bp.domain || bp.track || '')} · درس</div>
               <span class="badge">${escapeHtml(bp.track || '')} · ${escapeHtml(bp.lessonId || '')}</span>
               <h1>${escapeHtml(bp.title || '')}</h1>
-              <p class="lesson-unit-meta">${sections.length} بخش آموزشی · برای رفتن به هر بخش روی نام آن بزنید</p>
+              <p class="lesson-unit-meta">${sections.length} بخش آموزشی${bp.estimatedMinutes ? ' · زمان استاندارد: ' + escapeHtml(String(bp.estimatedMinutes)) + ' دقیقه' : ''} · ساختار شفاف یک‌صفحه‌ای و گام‌به‌گام</p>
             </div>
             <div class="lesson-unit-actions">
               ${opts.onBackToCatalog ? '<button id="le-back-cat" class="btn" type="button">بازگشت به مسیرها</button>' : ''}
+              ${isStaged ? `<button id="le-mode-toggle" type="button" class="btn" aria-pressed="${viewMode === 'stepper'}">${viewMode === 'article' ? 'نمای گام‌به‌گام' : 'نمای مقالهٔ یکپارچه'}</button>` : ''}
               <button id="fam-glossary-toggle" type="button" class="btn glossary-toggle" aria-pressed="true">واژه‌نامه: روشن</button>
               <button id="le-complete-btn" class="btn ${done ? '' : 'primary'}" type="button">${done ? '✅ تکمیل شده (لغو تکمیل)' : 'علامت‌گذاری به‌عنوان تکمیل‌شده'}</button>
             </div>
           </div>
         </header>
-        ${hasStages(bp) ? `
-          <nav id="le-stage-bar" class="stepper lesson-stepper" aria-label="بخش‌های درس">
+        ${isStaged ? `
+          <nav id="le-stage-bar" class="stepper lesson-stepper"${viewMode === 'article' ? ' hidden' : ''} aria-label="بخش‌های درس">
             ${sections.map((s, idx) => `<button type="button" id="side-sec-${escapeHtml(s.id)}" class="stepper-item le-stage-pill" data-stage-idx="${idx}" data-stage-id="${escapeHtml(s.id)}" aria-label="بخش ${idx + 1}: ${escapeHtml(s.title)}"><span class="stepper-dot">${stageIcon(s.id, idx)}</span><span class="stepper-label">${escapeHtml(stageLabels[s.id] || s.title)}</span></button>`).join('')}
           </nav>` : ''}
-        <div class="lesson-content">
-          ${sections.map((s, idx) => {
-            const hiddenStyle = (hasStages(bp) && idx !== 0) ? ' style="display:none"' : '';
-            return `<article id="sec-${s.id}" class="card le-stage-card" data-stage-idx="${idx}"${hiddenStyle}><header class="lesson-stage-heading"><span class="lesson-stage-number">${idx + 1}</span><div><span class="lesson-stage-caption">بخش ${idx + 1} از ${sections.length}</span><h2>${escapeHtml(s.title)}</h2></div></header><div class="lesson-stage-content">${s.html}</div></article>`;
-          }).join('')}
-          ${hasStages(bp) ? `
-          <div class="step-foot lesson-step-foot">
-            <button id="le-stage-prev" class="btn" type="button">بخش قبلی</button>
-            <button id="le-stage-next" class="btn primary" type="button">بخش بعدی</button>
-          </div>` : ''}
-          <div class="lesson-adjacent">
-            <button id="le-prev-btn" class="btn" ${adj.prev ? '' : 'disabled'}>درس قبلی${adj.prev ? ': ' + escapeHtml(adj.prev.title) : ''}</button>
-            <button id="le-next-btn" class="btn" ${adj.next ? '' : 'disabled'}>${adj.next ? 'درس بعدی: ' + escapeHtml(adj.next.title) : 'درس بعدی'}</button>
+        <div class="lesson-article-grid">
+          <aside class="lesson-toc" aria-label="فهرست مطالب درس">
+            <div class="lesson-toc-card">
+              <div class="lesson-toc-title">فهرست مطالب این جلسه</div>
+              <nav class="lesson-toc-list">
+                ${sections.map((s, idx) => `<a href="#sec-${escapeHtml(s.id)}" class="lesson-toc-link" data-toc-idx="${idx}"><span class="lesson-toc-num">${idx + 1}</span><span>${escapeHtml(s.title)}</span></a>`).join('')}
+                <a href="#sec-notebook" class="lesson-toc-link"><span class="lesson-toc-num">✎</span><span>دفترچهٔ مستندسازی شما</span></a>
+              </nav>
+            </div>
+          </aside>
+          <div class="lesson-content lesson-article-body">
+            ${sections.map((s, idx) => {
+              const hiddenStyle = (isStaged && viewMode === 'stepper' && idx !== 0) ? ' style="display:none"' : '';
+              return `<article id="sec-${s.id}" class="card le-stage-card" data-stage-idx="${idx}"${hiddenStyle}><header class="lesson-stage-heading"><span class="lesson-stage-number">${idx + 1}</span><div><span class="lesson-stage-caption">بخش ${idx + 1} از ${sections.length}</span><h2>${escapeHtml(s.title)}</h2></div></header><div class="lesson-stage-content">${s.html}</div></article>`;
+            }).join('')}
+            <article id="sec-notebook" class="card lesson-notebook-card">
+              <header class="lesson-stage-heading">
+                <span class="lesson-stage-number">✎</span>
+                <div>
+                  <span class="lesson-stage-caption">گام ۱۱ استاندارد آکادمی (۱۵ دقیقه پایانی)</span>
+                  <h2>دفترچهٔ مستندسازی شخصی این جلسه</h2>
+                </div>
+              </header>
+              <p class="muted" style="margin:0 0 10px">خلاصهٔ مفاهیم، دستورات کلیدی و یافته‌های آزمایشگاه خود را اینجا بنویسید تا در حساب کاربری شما ذخیره شود:</p>
+              <textarea id="le-notebook-input" class="lesson-notebook-textarea" rows="5" placeholder="مثال: امروز تفاوت MAC و IP را در حرکت بسته از R1 دیدم...">${escapeHtml(savedNote)}</textarea>
+              <div class="lesson-notebook-actions">
+                <button id="le-notebook-save" type="button" class="btn primary">ذخیرهٔ مستندات جلسه</button>
+                <span id="le-notebook-status" class="muted" aria-live="polite"></span>
+              </div>
+            </article>
+            ${isStaged ? `
+            <div class="step-foot lesson-step-foot"${viewMode === 'article' ? ' hidden' : ''}>
+              <button id="le-stage-prev" class="btn" type="button">بخش قبلی</button>
+              <button id="le-stage-next" class="btn primary" type="button">بخش بعدی</button>
+            </div>` : ''}
+            <div class="lesson-adjacent">
+              <button id="le-prev-btn" class="btn" ${adj.prev ? '' : 'disabled'}>درس قبلی${adj.prev ? ': ' + escapeHtml(adj.prev.title) : ''}</button>
+              <button id="le-next-btn" class="btn" ${adj.next ? '' : 'disabled'}>${adj.next ? 'درس بعدی: ' + escapeHtml(adj.next.title) : 'درس بعدی'}</button>
+            </div>
           </div>
         </div>
       </div>`;
@@ -433,8 +493,44 @@
     if (backBtn && opts.onBackToCatalog) backBtn.onclick = opts.onBackToCatalog;
     setupGlossaryToggle(container);
 
+    container.querySelectorAll('.lesson-stage-content pre').forEach((pre) => {
+      if (pre.parentElement?.classList.contains('lesson-code-wrap')) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'lesson-code-wrap';
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'lesson-copy-btn';
+      copyBtn.textContent = 'کپی کد';
+      copyBtn.onclick = async () => {
+        const txt = pre.textContent || '';
+        try {
+          await navigator.clipboard.writeText(txt);
+          copyBtn.textContent = 'کپی شد ✓';
+        } catch (_) {
+          copyBtn.textContent = 'آماده کپی';
+        }
+        setTimeout(() => { copyBtn.textContent = 'کپی کد'; }, 1500);
+      };
+      pre.parentNode.insertBefore(wrap, pre);
+      wrap.appendChild(copyBtn);
+      wrap.appendChild(pre);
+    });
+
+    const noteBtn = container.querySelector('#le-notebook-save');
+    const noteInput = container.querySelector('#le-notebook-input');
+    const noteStatus = container.querySelector('#le-notebook-status');
+    if (noteBtn && noteInput) {
+      noteBtn.onclick = () => {
+        saveNote(bp.lessonId, noteInput.value || '');
+        if (noteStatus) noteStatus.textContent = 'یادداشت با موفقیت ذخیره شد ✓';
+      };
+    }
+
     let activeStageIdx = 0;
-    const isStaged = hasStages(bp) > 0;
+    const rootLayout = container.querySelector('.lesson-layout');
+    const stageBar = container.querySelector('#le-stage-bar');
+    const stepFoot = container.querySelector('.lesson-step-foot');
+    const modeToggle = container.querySelector('#le-mode-toggle');
     const updateStageProgress = () => {
       if (!isStaged) return;
       container.querySelectorAll('.le-stage-pill').forEach((pill, i) => {
@@ -444,18 +540,50 @@
         else pill.removeAttribute('aria-current');
       });
     };
+    const applyViewMode = (mode) => {
+      viewMode = mode;
+      try { localStorage.setItem(LESSON_VIEW_KEY, mode); } catch (_) {}
+      if (rootLayout) rootLayout.setAttribute('data-view-mode', mode);
+      if (stageBar) stageBar.hidden = mode !== 'stepper';
+      if (stepFoot) stepFoot.hidden = mode !== 'stepper';
+      if (modeToggle) {
+        modeToggle.setAttribute('aria-pressed', String(mode === 'stepper'));
+        modeToggle.textContent = mode === 'article' ? 'نمای گام‌به‌گام' : 'نمای مقالهٔ یکپارچه';
+      }
+      container.querySelectorAll('.le-stage-card').forEach((card, i) => {
+        card.style.display = (mode === 'article' || i === activeStageIdx) ? 'block' : 'none';
+      });
+    };
     const setActiveStage = (nextIdx) => {
       if (!isStaged) return;
       activeStageIdx = Math.max(0, Math.min(sections.length - 1, nextIdx));
-      container.querySelectorAll('.le-stage-card').forEach((card, i) => {
-        card.style.display = i === activeStageIdx ? 'block' : 'none';
-      });
+      if (viewMode === 'stepper') {
+        container.querySelectorAll('.le-stage-card').forEach((card, i) => {
+          card.style.display = i === activeStageIdx ? 'block' : 'none';
+        });
+      }
       const prevS = container.querySelector('#le-stage-prev');
       const nextS = container.querySelector('#le-stage-next');
       if (prevS) prevS.disabled = activeStageIdx === 0;
       if (nextS) nextS.disabled = activeStageIdx === sections.length - 1;
       updateStageProgress();
     };
+    if (modeToggle && isStaged) {
+      modeToggle.onclick = () => {
+        applyViewMode(viewMode === 'article' ? 'stepper' : 'article');
+        if (viewMode === 'stepper') setActiveStage(activeStageIdx);
+      };
+    }
+    container.querySelectorAll('.lesson-toc-link[data-toc-idx]').forEach((link) => {
+      link.addEventListener('click', (e) => {
+        const idx = Number(link.dataset.tocIdx);
+        if (viewMode === 'stepper' && isStaged) {
+          e.preventDefault();
+          setActiveStage(idx);
+          container.querySelector('#le-stage-bar')?.scrollIntoView({ block: 'start' });
+        }
+      });
+    });
     if (isStaged) {
       container.querySelectorAll('.le-stage-pill').forEach((pill, i) => {
         pill.onclick = () => {
@@ -471,6 +599,7 @@
       };
       if (prevS) prevS.onclick = () => goToStage(activeStageIdx - 1);
       if (nextS) nextS.onclick = () => goToStage(activeStageIdx + 1);
+      applyViewMode(viewMode);
       setActiveStage(0);
     }
 

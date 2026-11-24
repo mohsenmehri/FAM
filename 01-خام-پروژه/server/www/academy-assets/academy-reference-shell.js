@@ -5,7 +5,7 @@
   if (!root || document.querySelector('.app-shell')) return;
 
   const oldHeader = document.querySelector('.fa-topbar');
-  const oldButtons = ['btn-paths','btn-lessons','btn-blueprint','btn-coverage','btn-glossary','btn-back-paths']
+  const oldButtons = ['btn-paths','btn-tree','btn-lessons','btn-blueprint','btn-coverage','btn-glossary','btn-back-paths']
     .map($).filter(Boolean);
   const stageBar = $('fam-stage4-bar');
   const searchWrap = $('s4-search-wrap');
@@ -68,9 +68,10 @@
   nav.setAttribute('aria-label','ناوبری اصلی');
   const navItems=[
     ['home','خانه','نمای کلی آکادمی','home','home'],
+    ['tree','درخت جامع آکادمی','۹ دانشکده تا CCIE و CCDE','route','tree'],
     ['paths','مسیرهای یادگیری','Curriculum 5.0','route','paths'],
     ['lessons','درس‌ها','مطالعه و ادامه درس','book','lessons'],
-    ['sample','درس نمونه VLAN','نمونهٔ محتوای آموزشی','book','sample'],
+    ['sample','جلسه ۱: OSI و TCP/IP','اولین درس ترم اول','book','sample'],
     ['planner','برنامه مطالعه','نقشه راه و برنامه‌ریزی','chart','planner'],
     ['progress','پیشرفت من','هدف، برنامه و درس‌های تکمیل‌شده','chart','progress'],
     ['glossary','واژه‌نامه','اصطلاحات شبکه','glossary','glossary'],
@@ -165,9 +166,9 @@
   oldHeader?.remove();
 
   function setActive(action){
-    const group=action==='home'?'home':action==='paths'?'paths':action==='lessons'?'lessons':action==='sample'?'sample':action==='coverage'?'coverage':action==='glossary'?'glossary':action==='progress'?'progress':'planner';
+    const group=action==='home'?'home':action==='tree'?'tree':action==='paths'?'paths':action==='lessons'?'lessons':action==='sample'?'sample':action==='coverage'?'coverage':action==='glossary'?'glossary':action==='progress'?'progress':'planner';
     for(const [id,a] of navLinks){const active=id===group;a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
-    const labels={home:'خانه',paths:'مسیرهای یادگیری',lessons:'فهرست درس‌ها',sample:'درس نمونه',planner:'برنامه مطالعه',progress:'پیشرفت من',glossary:'واژه‌نامه',coverage:'پوشش فرمان‌های IOS'};
+    const labels={home:'خانه',tree:'درخت جامع آکادمی',paths:'مسیرهای یادگیری',lessons:'فهرست درس‌ها',sample:'جلسه ۱: OSI و TCP/IP',planner:'برنامه مطالعه',progress:'پیشرفت من',glossary:'واژه‌نامه',coverage:'پوشش فرمان‌های IOS'};
     crumbs.replaceChildren(el('span','crumb current',labels[group]||'آکادمی'));
     document.title=(labels[group]||'آکادمی')+' — FAM Academy';
   }
@@ -178,7 +179,11 @@
   }
   function action(action){
     setActive(action);
-    if(action==='paths'){
+    if(action==='tree'){
+      if(location.hash !== '#/tree') location.hash = '#/tree'; else clickExisting('btn-tree');
+      root.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+    else if(action==='paths'){
       if(location.hash !== '#/paths') location.hash = '#/paths'; else { location.hash = '#/dashboard'; location.hash = '#/paths'; }
       root.scrollIntoView({behavior:'smooth',block:'start'});
     }
@@ -258,6 +263,7 @@
   function syncActiveFromHash(){
     const h=location.hash;
     if(h==='#/progress')setActive('progress');
+    else if(h==='#/tree')setActive('tree');
     else if(h==='#/paths')setActive('paths');
     else if(h==='#/lessons')setActive('lessons');
     else if(h==='#/coverage')setActive('coverage');

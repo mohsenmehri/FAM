@@ -49,9 +49,10 @@
           <aside class="reference-summary"><span class="journey-kicker">YOUR PROGRESS</span><h3>پیشرفت مسیر</h3><div class="reference-ring" style="--progress:${pct}%"><span><strong>${pct}٪</strong><small>تکمیل مسیر</small></span></div><p>${done} از ${target.length} درس تکمیل شده</p><button class="journey-link" data-journey-action="progress">مشاهده پیشرفت ←</button></aside>
         </section>
         <section class="reference-track"><div class="journey-heading"><div><h2>مسیر یادگیری</h2><p>${esc(chosen?.title || '')}</p></div><button class="journey-link" data-journey-path="${esc(chosen?.id || '')}">مشاهده کامل ←</button></div><div class="journey-track" aria-label="نمایی از مسیر یادگیری">${nodes.map((l,i) => `<button class="journey-node ${completed.has(l.id) ? 'is-done' : next?.id === l.id ? 'is-current' : ''}" data-journey-lesson="${esc(l.id)}"><span class="journey-node-dot">${completed.has(l.id) ? '✓' : lessonIcon(l.id)}</span><strong>${esc(l.title)}</strong><small>${completed.has(l.id) ? 'تکمیل‌شده' : next?.id === l.id ? 'گام پیشنهادی' : ready(l) ? 'آمادهٔ مطالعه' : 'پیش‌نیاز دارد'}</small></button>`).join('')}</div></section>
-        <section class="reference-cards"><article class="reference-next"><span class="journey-kicker">UP NEXT</span><h2>درس بعدی</h2>${next ? `<div class="reference-next-content"><span class="reference-topic-icon">✥</span><div><h3>${esc(next.title)}</h3><p>درس را با توضیح، مثال و تمرین‌های مرتبط دنبال کن.</p><button class="journey-primary small" data-journey-lesson="${esc(next.id)}">شروع درس ←</button></div></div>` : '<p>درس آمادهٔ جدیدی در این مسیر نیست.</p>'}</article><article class="reference-plan"><span class="journey-kicker">YOUR ROUTINE</span><h2>برنامه مطالعه</h2><p>هدف روزانه</p><div class="reference-plan-number">${Number(profile.minutesPerDay) || 45} <small>دقیقه</small></div><p>${Number(profile.daysPerWeek) || 5} روز در هفته</p><button class="journey-link" data-journey-action="profile">ویرایش برنامه ←</button></article></section>
-        <section class="journey-paths"><div class="journey-heading"><div><h2>مسیرهای آموزشی</h2><p>از مبانی شبکه تا مباحث پیشرفتهٔ سازمانی</p></div></div><div class="journey-path-grid">${paths.map((p,i) => { const prog=calcPathProgress(p,completed); return `<article class="journey-path"><span class="journey-path-mark">${i?'✳':'⌘'}</span><div><small>${esc(p.code)} · ${esc(p.level)}</small><h3>${esc(p.title)}</h3><p>${prog.done} از ${prog.total} درس تکمیل شده</p></div><button class="journey-link" data-open-path="${esc(p.id)}">نقشهٔ مسیر ←</button></article>`; }).join('')}</div></section>
+        <section class="reference-cards"><article class="reference-next"><span class="journey-kicker">UP NEXT</span><h2>درس بعدی</h2>${next ? `<div class="reference-next-content"><span class="reference-topic-icon">✥</span><div><h3>${esc(next.title)}</h3><p>درس را با توضیح، مثال و تمرین‌های مرتبط دنبال کن.</p><button class="journey-primary small" data-journey-lesson="${esc(next.id)}">شروع درس ←</button></div></div>` : '<p>درس آمادهٔ جدیدی در این مسیر نیست.</p>'}</article><article class="reference-plan"><span class="journey-kicker">YOUR ROUTINE</span><h2>برنامه استاندارد روزانه آکادمی</h2><p>پیشنهاد روزانه: ۱۲۰ دقیقه</p><div class="reference-plan-number">${Number(profile.minutesPerDay) || 120} <small>دقیقه</small></div><p>۲۰ مرور + ۳۵ مفهوم + ۵۰ لابراتوار + ۱۵ مستندسازی</p><div class="academy-inline-links"><button class="journey-link" data-journey-action="profile">ویرایش برنامه ←</button><button class="journey-link" data-open-tree="1">درخت جامع ۹ دانشکده ←</button></div></article></section>
+        <section class="journey-paths"><div class="journey-heading"><div><h2>مسیرهای آموزشی و درخت جامع آکادمی</h2><p>از مبانی شبکه و جلسهٔ اول ترم ۱ تا CCNA، CCNP، هشت تخصص، CCIE و CCDE</p></div><button type="button" class="fa-action primary" data-open-tree="1">باز کردن درخت جامع ۱۷بخشی ←</button></div><div class="journey-path-grid">${paths.map((p,i) => { const prog=calcPathProgress(p,completed); return `<article class="journey-path"><span class="journey-path-mark">${i?'✳':'⌘'}</span><div><small>${esc(p.code)} · ${esc(p.level)}</small><h3>${esc(p.title)}</h3><p>${prog.done} از ${prog.total} درس تکمیل شده</p></div><button class="journey-link" data-open-path="${esc(p.id)}">نقشهٔ مسیر ←</button></article>`; }).join('')}</div></section>
       </div>`;
+    container.querySelectorAll('[data-open-tree]').forEach(btn => { btn.onclick = () => { location.hash = '#/tree'; }; });
     container.querySelectorAll('[data-open-path], [data-journey-path]').forEach(btn => { btn.onclick = () => {
       const path = paths.find(p => p.id === (btn.dataset.openPath || btn.dataset.journeyPath));
       if (path) renderPathRoadmap(container, path, () => renderDashboard(container, catalog, onOpenLesson), onOpenLesson, catalog);
@@ -401,6 +402,258 @@
     draw();
   }
 
+  let treeCache = null;
+  async function loadAcademyTree() {
+    if (treeCache) return treeCache;
+    const res = await fetch('/academy-assets/academy-curriculum-tree.json', { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    treeCache = await res.json();
+    return treeCache;
+  }
+
+  async function renderAcademyTree(container, catalog, onOpenLesson, onBack) {
+    container.innerHTML = '<div class="fa-loading">در حال بارگذاری درخت جامع آکادمی سیسکو…</div>';
+    let tree;
+    try {
+      tree = await loadAcademyTree();
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state"><h3>خطا در دریافت درخت آکادمی</h3><p>${esc(err.message)}</p></div>`;
+      return;
+    }
+
+    const allLessons = (catalog?.paths || []).flatMap(p => (p.courses || []).flatMap(c => c.lessons || []));
+    const findLesson = id => allLessons.find(l => l.id === id);
+    const DAILY_KEY = 'fam_academy_daily_routine_v1';
+    const todayKey = new Date().toISOString().slice(0, 10);
+    let dailyState = {};
+    try {
+      const saved = JSON.parse(localStorage.getItem(DAILY_KEY) || '{}');
+      if (saved.date === todayKey && saved.checks) dailyState = saved.checks;
+    } catch {}
+
+    let activeTab = 'faculties';
+    let activeFaculty = 'f0';
+    let activeTrack = tree.facultyFourSpecialties?.tracks?.[0]?.id || 'enterprise';
+
+    const renderTabContent = () => {
+      if (activeTab === 'faculties') {
+        const f0 = tree.facultyZero;
+        const f1 = tree.facultyOneCCNA;
+        const f2 = tree.facultyTwoAdvanced;
+        const f3 = tree.facultyThreeCCNP;
+        const f4 = tree.facultyFourSpecialties;
+        const f5 = tree.facultyExpertCCIE;
+        const f6 = tree.facultyArchitectureCCDE;
+        const fMap = {
+          f0: `
+            <div class="tree-detail-card">
+              <div class="tree-detail-head"><span class="tag">${esc(f0.duration)}</span><h2>${esc(f0.title)}</h2></div>
+              <p>${esc(f0.intro)}</p>
+              <div class="lesson-callout"><strong>آزمون ورودی:</strong> ${esc(f0.entryExam.summary)}</div>
+              <div class="table-wrap"><table><thead><tr><th>هفته</th><th>مباحث</th><th>خروجی</th></tr></thead><tbody>${f0.weeks.map(w => `<tr><td>هفته ${esc(w.week)}</td><td>${esc(w.topics)}</td><td>${esc(w.output)}</td></tr>`).join('')}</tbody></table></div>
+              <div class="tree-cta-row"><button type="button" class="fa-action primary" data-tree-lesson="academy-stage-zero-01-osi-tcpip-fa">شروع جلسه اول: OSI و TCP/IP ←</button></div>
+            </div>`,
+          f1: `
+            <div class="tree-detail-card">
+              <div class="tree-detail-head"><span class="tag">${esc(f1.duration)} · ${esc(f1.examCode)}</span><h2>${esc(f1.title)}</h2></div>
+              <div class="tree-domain-grid">${f1.domains.map(d => `<article class="tree-subcard"><h3>${esc(d.title)}</h3><ul>${d.topics.map(t => `<li>${esc(t)}</li>`).join('')}</ul></article>`).join('')}</div>
+              <h3 class="tree-subhead">۲۵ آزمایشگاه الزامی CCNA</h3>
+              <div class="tree-pill-grid">${f1.labs.map(l => `<span class="tree-pill">${esc(l)}</span>`).join('')}</div>
+              <div class="tree-capstone">
+                <h3>${esc(f1.capstone.title)}</h3>
+                <ul>${f1.capstone.requirements.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+                <p><strong>شرط عبور:</strong> ${f1.capstone.passCriteria.map(esc).join(' | ')}</p>
+              </div>
+            </div>`,
+          f2: `
+            <div class="tree-detail-card">
+              <div class="tree-detail-head"><span class="tag">${esc(f2.duration)}</span><h2>${esc(f2.title)}</h2></div>
+              <p>${esc(f2.goal)}</p>
+              <div class="tree-domain-grid">${f2.courses.map(c => `<article class="tree-subcard"><h3>${esc(c.title)}</h3><ul>${c.topics.map(t => `<li>${esc(t)}</li>`).join('')}</ul></article>`).join('')}</div>
+              <h3 class="tree-subhead">۱۲ آزمایشگاه تخصصی دانشکده ۲</h3>
+              <div class="tree-pill-grid">${f2.labs.map((l, i) => `<span class="tree-pill">${i + 1}. ${esc(l)}</span>`).join('')}</div>
+              <div class="tree-capstone"><h3>پروژه نهایی دانشکده ۲</h3><p>${esc(f2.capstone)}</p></div>
+            </div>`,
+          f3: `
+            <div class="tree-detail-card">
+              <div class="tree-detail-head"><span class="tag">${esc(f3.duration)} · ${esc(f3.coreExam)}</span><h2>${esc(f3.title)}</h2></div>
+              <h3 class="tree-subhead">آزمون اصلی: ${esc(f3.coreExam)}</h3>
+              <div class="table-wrap"><table><thead><tr><th>حوزه</th><th>مباحث</th></tr></thead><tbody>${f3.encorDomains.map(d => `<tr><td><strong>${esc(d.domain)}</strong></td><td>${esc(d.topics)}</td></tr>`).join('')}</tbody></table></div>
+              <h3 class="tree-subhead">آزمون‌های تخصصی انتخابی (Concentrations)</h3>
+              <div class="table-wrap"><table><thead><tr><th>کد آزمون</th><th>تخصص</th><th>وضعیت پیشنهاد</th></tr></thead><tbody>${f3.concentrations.map(c => `<tr><td dir="ltr"><code>${esc(c.code)}</code></td><td>${esc(c.focus)}</td><td>${c.recommended ? '<span class="status status-done">پیشنهاد اول آکادمی</span>' : 'انتخابی'}</td></tr>`).join('')}</tbody></table></div>
+              <div class="lesson-callout"><strong>پیشنهاد آکادمی:</strong> ${esc(f3.recommendation)}</div>
+              <div class="tree-capstone"><h3>پروژه CCNP Enterprise</h3><p>${esc(f3.capstone)}</p></div>
+            </div>`,
+          f4: (() => {
+            const cur = f4.tracks.find(t => t.id === activeTrack) || f4.tracks[0];
+            return `
+            <div class="tree-detail-card">
+              <div class="tree-detail-head"><span class="tag">${esc(f4.duration)}</span><h2>${esc(f4.title)}</h2></div>
+              <div class="tree-track-tabs">${f4.tracks.map(t => `<button type="button" class="tree-track-btn ${t.id === cur.id ? 'active' : ''}" data-select-track="${esc(t.id)}">${esc(t.number)} ${esc(t.title.replace('دانشکده ', ''))}</button>`).join('')}</div>
+              <article class="tree-track-panel">
+                <div class="tree-detail-head"><span class="tag" dir="ltr">${esc(cur.certs)}</span><h3>${esc(cur.number)} ${esc(cur.title)} — ${esc(cur.subtitle)}</h3></div>
+                <div class="tree-two-col">
+                  <div class="tree-subcard"><h4>فهرست دروس</h4><ul>${cur.courses.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>
+                  <div class="tree-subcard"><h4>آزمایشگاه‌ها</h4><ul>${cur.labs.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>
+                </div>
+                <div class="tree-capstone"><h4>پروژه نهایی شاخه</h4><p>${esc(cur.project)}</p></div>
+              </article>
+            </div>`;
+          })(),
+          f5: `
+            <div class="tree-detail-card">
+              <div class="tree-detail-head"><span class="tag">${esc(f5.duration)}</span><h2>${esc(f5.title)}</h2></div>
+              <p>${esc(f5.description)}</p>
+              <div class="table-wrap"><table><thead><tr><th>مسیر CCIE</th><th>آزمون Core</th><th>آزمون عملی</th></tr></thead><tbody>${f5.tracks.map(t => `<tr><td><strong>${esc(t.track)}</strong></td><td dir="ltr"><code>${esc(t.core)}</code></td><td>${esc(t.lab)}</td></tr>`).join('')}</tbody></table></div>
+              <h3 class="tree-subhead">استاندارد آمادگی CCIE</h3>
+              <ul>${f5.standards.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+            </div>`,
+          f6: `
+            <div class="tree-detail-card">
+              <div class="tree-detail-head"><span class="tag">${esc(f6.duration)}</span><h2>${esc(f6.title)}</h2></div>
+              <p><strong>مسیر مدرک:</strong> ${esc(f6.exam)}</p>
+              <h3 class="tree-subhead">۲۰ سرفصل تخصصی CCDE</h3>
+              <div class="tree-pill-grid">${f6.topics.map(t => `<span class="tree-pill">${esc(t)}</span>`).join('')}</div>
+              <div class="tree-capstone"><h3>پروژه پایانی معماری</h3><p>${esc(f6.capstone)}</p></div>
+            </div>`
+        };
+
+        return `
+          <section class="tree-overview-strip">
+            <div class="tree-stat"><span>ساعت روزانه</span><strong>${esc(tree.overview.dailyHours)}</strong></div>
+            <div class="tree-stat"><span>ساعت هفتگی</span><strong>${esc(tree.overview.weeklyHours)}</strong></div>
+            <div class="tree-stat"><span>زبان آموزش</span><strong>${esc(tree.overview.language)}</strong></div>
+            <div class="tree-stat"><span>روش آموزش</span><strong>${esc(tree.overview.method)}</strong></div>
+            <div class="tree-stat"><span>چشم‌انداز جامع</span><strong>۶ تا ۸ سال</strong></div>
+          </section>
+          <section class="tree-outputs-card">
+            <h3>۴ خروجی الزامی هر مبحث در آکادمی</h3>
+            <div class="tree-four-grid">${tree.fourOutputs.map(o => `<article class="tree-subcard"><span class="tag">خروجی ${o.id}</span><h4>${esc(o.title)}</h4><p>${esc(o.desc)}</p></article>`).join('')}</div>
+          </section>
+          <section class="tree-faculties-wrap">
+            <h3>جدول کلان دانشکده‌ها (برای مشاهده جزئیات کامل، روی هر دانشکده بزنید)</h3>
+            <div class="tree-faculty-tabs">${tree.facultiesSummary.map(f => `<button type="button" class="tree-faculty-btn ${activeFaculty === f.id ? 'active' : ''}" data-select-faculty="${esc(f.id)}"><small>دانشکده ${esc(f.number)} · ${esc(f.duration)}</small><strong>${esc(f.title)}</strong></button>`).join('')}</div>
+            ${fMap[activeFaculty] || fMap.f0}
+          </section>`;
+      }
+
+      if (activeTab === 'term1') {
+        const t1 = tree.termOne30DayPlan;
+        return `
+          <section class="tree-detail-card">
+            <div class="tree-detail-head"><span class="tag">۳۰ روز / ۳۰ جلسه</span><h2>${esc(t1.title)}</h2></div>
+            <p>${esc(tree.facultyZero.intro)} — <strong>${esc(tree.facultyZero.entryExam.summary)}</strong></p>
+            <div class="tree-cta-row"><button type="button" class="fa-action primary" data-tree-lesson="${esc(t1.firstSessionId)}">شروع جلسه اول: OSI و TCP/IP ←</button></div>
+            <div class="tree-domain-grid">${t1.weeks.map(w => `
+              <article class="tree-subcard">
+                <h3>${esc(w.title)}</h3>
+                <ol class="tree-session-list">${w.sessions.map(s => {
+                  const found = s.lessonId ? findLesson(s.lessonId) : null;
+                  return `<li><span>${esc(s.title)}</span>${found?.blueprint ? `<button type="button" class="journey-link" data-tree-lesson="${esc(found.id)}">باز کردن درس ←</button>` : '<small class="muted">برنامه ترم ۱</small>'}</li>`;
+                }).join('')}</ol>
+              </article>`).join('')}</div>
+          </section>`;
+      }
+
+      if (activeTab === 'routine') {
+        const ds = tree.dailySchedule;
+        const doneMins = ds.blocks.filter(b => dailyState[b.id]).reduce((sum, b) => sum + b.minutes, 0);
+        return `
+          <section class="tree-detail-card">
+            <div class="tree-detail-head"><span class="tag">۱۴ ساعت در هفته · ${ds.totalMinutes} دقیقه در روز</span><h2>برنامه زمان‌بندی روزانه و هفتگی</h2></div>
+            <div class="lesson-callout"><strong>پیشرفت امروز (${todayKey}):</strong> ${doneMins} از ${ds.totalMinutes} دقیقه تکمیل شده است.</div>
+            <div class="tree-four-grid">${ds.blocks.map(b => `
+              <label class="tree-subcard tree-routine-check">
+                <input type="checkbox" data-daily-block="${esc(b.id)}" ${dailyState[b.id] ? 'checked' : ''}/>
+                <div>
+                  <span class="tag">${b.minutes} دقیقه</span>
+                  <h4>${esc(b.title)}</h4>
+                  <p>${esc(b.desc)}</p>
+                </div>
+              </label>`).join('')}</div>
+            <h3 class="tree-subhead">برنامهٔ هفتگی آکادمی (شنبه تا جمعه)</h3>
+            <div class="table-wrap"><table><thead><tr><th>روز</th><th>برنامهٔ اجرایی</th></tr></thead><tbody>${ds.weekly.map(w => `<tr><td><strong>${esc(w.day)}</strong></td><td>${esc(w.activity)}</td></tr>`).join('')}</tbody></table></div>
+            <h3 class="tree-subhead">استاندارد ۱۱مرحله‌ای تدریس هر جلسه</h3>
+            <div class="tree-pill-grid">${tree.sessionStandard.map(st => `<span class="tree-pill">${esc(st)}</span>`).join('')}</div>
+          </section>`;
+      }
+
+      if (activeTab === 'labs') {
+        const li = tree.labInfrastructure;
+        const ev = tree.evaluation;
+        return `
+          <section class="tree-detail-card">
+            <h2>زیرساخت آزمایشگاهی و استاندارد ارزیابی</h2>
+            <div class="lesson-callout"><strong>قانون طلایی آکادمی:</strong> ${esc(li.rule)}</div>
+            <h3 class="tree-subhead">ابزارهای آزمایشگاهی (۱۱ ابزار)</h3>
+            <div class="tree-four-grid">${li.tools.map(t => `<article class="tree-subcard"><strong dir="ltr">${esc(t.name)}</strong><p>${esc(t.use)}</p></article>`).join('')}</div>
+            <h3 class="tree-subhead">استاندارد ارزیابی (حداقل نمرهٔ قبولی: ${ev.passingScore} از ۱۰۰)</h3>
+            <div class="table-wrap"><table><thead><tr><th>بخش ارزیابی</th><th>سهم نمره</th></tr></thead><tbody>${ev.weights.map(w => `<tr><td>${esc(w.name)}</td><td><strong>${esc(w.weight)}</strong></td></tr>`).join('')}</tbody></table></div>
+            <p class="muted">${esc(ev.note)}</p>
+            <h3 class="tree-subhead">معیار نهایی موفقیت و فارغ‌التحصیلی</h3>
+            <ul>${tree.graduationCriteria.map(g => `<li>${esc(g)}</li>`).join('')}</ul>
+          </section>`;
+      }
+
+      const res = tree.resources;
+      return `
+        <section class="tree-detail-card">
+          <h2>برنامهٔ زمانی جامع ۸ ساله و کتابخانهٔ منابع رسمی</h2>
+          <div class="table-wrap"><table><thead><tr><th>سال</th><th>هدف اصلی</th></tr></thead><tbody>${tree.eightYearTimeline.map(y => `<tr><td><strong>${esc(y.year)}</strong></td><td>${esc(y.goal)}</td></tr>`).join('')}</tbody></table></div>
+          <div class="lesson-callout"><strong>نکتهٔ مهم نسخه‌های CCNA:</strong> ${esc(res.ccnaVersionNote)}</div>
+          <h3 class="tree-subhead">منابع رسمی سیسکو</h3>
+          <div class="tree-four-grid">${res.items.map(r => `<article class="tree-subcard"><h4>${esc(r.name)}</h4><p>${esc(r.desc)}</p><a class="journey-link" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">مشاهده منبع ↗</a></article>`).join('')}</div>
+        </section>`;
+    };
+
+    const draw = () => {
+      container.innerHTML = `
+        <div class="fa-dashboard academy-tree-page">
+          <div class="academy-directory-head">
+            <div>
+              <span class="journey-kicker">MASTER CURRICULUM TREE</span>
+              <h1>${esc(tree.title)}</h1>
+              <p>${esc(tree.subtitle)} — ${esc(tree.philosophy)}</p>
+            </div>
+            ${onBack ? '<button type="button" class="fa-action" id="acad-tree-back">← بازگشت به خانه آکادمی</button>' : ''}
+          </div>
+          <nav class="segmented tree-main-tabs" role="tablist" aria-label="بخش‌های درخت آکادمی">
+            <button type="button" class="${activeTab === 'faculties' ? 'active' : ''}" data-tree-tab="faculties">۹ دانشکده و ۸ تخصص</button>
+            <button type="button" class="${activeTab === 'term1' ? 'active' : ''}" data-tree-tab="term1">ترم اول ۳۰ روزه</button>
+            <button type="button" class="${activeTab === 'routine' ? 'active' : ''}" data-tree-tab="routine">برنامه ۲ ساعته و ۱۱ گام</button>
+            <button type="button" class="${activeTab === 'labs' ? 'active' : ''}" data-tree-tab="labs">لابراتوار و ارزیابی</button>
+            <button type="button" class="${activeTab === 'roadmap8y' ? 'active' : ''}" data-tree-tab="roadmap8y">نقشه ۸ ساله و منابع</button>
+          </nav>
+          <div class="tree-stage">${renderTabContent()}</div>
+        </div>`;
+
+      if (onBack) container.querySelector('#acad-tree-back').onclick = onBack;
+      container.querySelectorAll('[data-tree-tab]').forEach(btn => {
+        btn.onclick = () => { activeTab = btn.dataset.treeTab; draw(); };
+      });
+      container.querySelectorAll('[data-select-faculty]').forEach(btn => {
+        btn.onclick = () => { activeFaculty = btn.dataset.selectFaculty; draw(); };
+      });
+      container.querySelectorAll('[data-select-track]').forEach(btn => {
+        btn.onclick = () => { activeTrack = btn.dataset.selectTrack; draw(); };
+      });
+      container.querySelectorAll('[data-tree-lesson]').forEach(btn => {
+        btn.onclick = () => {
+          const lesson = findLesson(btn.dataset.treeLesson);
+          if (lesson?.blueprint) onOpenLesson(lesson.blueprint);
+        };
+      });
+      container.querySelectorAll('[data-daily-block]').forEach(chk => {
+        chk.onchange = () => {
+          dailyState[chk.dataset.dailyBlock] = chk.checked;
+          try { localStorage.setItem(DAILY_KEY, JSON.stringify({ date: todayKey, checks: dailyState })); } catch {}
+          draw();
+        };
+      });
+    };
+    draw();
+  }
+
   window.FamAcademyCatalog = {
     getCompletedSet,
     calcCourseProgress,
@@ -409,6 +662,7 @@
     renderPathRoadmap,
     renderLessonsIndex,
     renderCommandCoverage,
-    renderGlossaryDirectory
+    renderGlossaryDirectory,
+    renderAcademyTree
   };
 })();
