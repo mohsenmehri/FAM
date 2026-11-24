@@ -34,38 +34,142 @@
     const target = (chosen?.courses || []).flatMap(c => c.lessons || []);
     const assessed = new Set(window.FamAcademyBridge?.progress?.selfAssessed || []);
     const ready = item => (item.prerequisites || []).every(id => completed.has(id) || assessed.has(id));
-    const next = target.find(l => !completed.has(l.id) && l.blueprint && ready(l)) || all.find(l => !completed.has(l.id) && l.blueprint && ready(l));
+
+    const faculties = window.FamAcademyPlacement?.FACULTIES || [];
+    const activeFaculty = window.FamAcademyPlacement?.getActiveFaculty
+      ? window.FamAcademyPlacement.getActiveFaculty()
+      : { id: 'f0', tier: 0, badge: 'دانشکده ۰ · ۱ ماه', title: 'ارزیابی و تکمیل مبانی', note: 'شروع از مبانی شبکه' };
+
+    const preferCcna = (activeFaculty.tier || 0) >= 1;
+    const next = (preferCcna && target.find(l => !completed.has(l.id) && l.id.startsWith('ccna-') && l.blueprint))
+      || target.find(l => !completed.has(l.id) && l.blueprint && ready(l))
+      || all.find(l => !completed.has(l.id) && l.blueprint && ready(l))
+      || all.find(l => l.blueprint);
+
     const done = target.filter(l => completed.has(l.id)).length;
     const pct = target.length ? Math.round(done / target.length * 100) : 0;
     const user = window.FamAcademyBridge?.user?.username || '';
-    const greeting = user && user !== 'e2e-test-user' ? `سلام، ${esc(user)}` : 'سلام، یادگیرندهٔ شبکه';
-    const level = ({ beginner:'تازه شروع می‌کنم', intermediate:'با مبانی آشنا هستم', advanced:'تجربهٔ عملی دارم' })[profile.level] || 'سطح خود را انتخاب کنید';
-    const nodes = target.slice(0, 6);
+    const greeting = user && user !== 'e2e-test-user' ? `خوش آمدی، ${esc(user)}` : 'خوش آمدی، مهندس آیندهٔ شبکه';
+    const modeLabel = profile.placementMode === 'exam' ? 'تشخیص داده‌شده با آزمون تعیین سطح هوشمند' : 'انتخاب دستی سطح';
+    const mins = Number(profile.minutesPerDay) || 120;
+
+    const stepperHtml = faculties.map(f => {
+      const isCurrent = f.id === activeFaculty.id;
+      const isPassed = f.tier < (activeFaculty.tier || 0);
+      const badgeText = isCurrent ? 'سطح فعال شما' : isPassed ? '✓ پشت‌سر گذاشته‌شده' : 'مرحلهٔ بعدی';
+      return `<button type="button" class="fam-step-card ${isCurrent ? 'is-current' : isPassed ? 'is-passed' : ''}" data-pick-stage="${esc(f.id)}">
+        <div class="fam-faculty-top"><span class="fam-faculty-badge">${esc(f.badge)}</span><small>${badgeText}</small></div>
+        <strong>${esc(f.title)}</strong>
+        <small>${esc(f.note)}</small>
+      </button>`;
+    }).join('');
+
     container.innerHTML = `
-      <div class="fa-dashboard journey-dashboard reference-home">
-        <section class="reference-hero">
-          <div class="reference-welcome"><span class="journey-kicker">FAM NETWORK ACADEMY</span><h1>${greeting.replace('سلام،','خوش آمدی،')}</h1><h2>مسیر یادگیری‌ات ادامه دارد</h2><p>هر روز یک قدم به شبکه‌کار حرفه‌ای شدن نزدیک‌تری.</p><div class="reference-pill"><span>${esc(chosen?.code || 'Curriculum 5.0')}</span><i></i>${esc(level)} <b>▥</b></div><div>${next ? '<button class="journey-primary" id="fa-continue">ادامه یادگیری <span>←</span></button>' : '<span>درس آمادهٔ جدیدی در این مسیر نیست.</span>'}</div><button class="journey-text-btn" data-journey-action="profile">تنظیم مسیر و برنامه ↗</button></div>
-          <div class="reference-route-art" aria-hidden="true"><svg viewBox="0 0 520 450" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="route-light" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#6ea8ff"/><stop offset=".53" stop-color="#35c992"/><stop offset="1" stop-color="#6ea8ff"/></linearGradient><filter id="route-glow"><feGaussianBlur stdDeviation="7"/></filter></defs><path d="M460 435 C200 390 230 360 285 330 S345 290 285 260 S210 230 270 205 S310 175 255 155 S200 130 235 110 S255 85 220 68 S220 48 237 40" fill="none" stroke="url(#route-light)" stroke-width="15" opacity=".55" filter="url(#route-glow)"/><path d="M460 435 C200 390 230 360 285 330 S345 290 285 260 S210 230 270 205 S310 175 255 155 S200 130 235 110 S255 85 220 68 S220 48 237 40" fill="none" stroke="url(#route-light)" stroke-width="4"/><circle cx="285" cy="330" r="14" fill="#4ce0d7" opacity=".4"/><circle cx="285" cy="330" r="5" fill="#ddfffd"/><path d="M237 40V4l27 10-27 12" fill="#2f6fe4" stroke="#b7d4ff" stroke-width="2"/></svg></div>
-          <aside class="reference-summary"><span class="journey-kicker">YOUR PROGRESS</span><h3>پیشرفت مسیر</h3><div class="reference-ring" style="--progress:${pct}%"><span><strong>${pct}٪</strong><small>تکمیل مسیر</small></span></div><p>${done} از ${target.length} درس تکمیل شده</p><button class="journey-link" data-journey-action="progress">مشاهده پیشرفت ←</button></aside>
+      <div class="fam-clean-wrap">
+        <section class="fam-dash-status" aria-label="وضعیت سطح فعال">
+          <div class="fam-dash-status-info">
+            <span class="fam-kicker">ACTIVE LEVEL · ${esc(modeLabel)}</span>
+            <strong>${esc(activeFaculty.badge)} — ${esc(activeFaculty.title)}</strong>
+            <span>${esc(activeFaculty.note)} · برنامهٔ روزانه: ${mins} دقیقه</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="fam-btn-secondary" id="fam-change-level">تغییر دستی سطح</button>
+            <button type="button" class="fam-btn-primary" id="fam-retake-placement">آزمون تعیین سطح هوشمند</button>
+          </div>
         </section>
-        <section class="reference-track"><div class="journey-heading"><div><h2>مسیر یادگیری</h2><p>${esc(chosen?.title || '')}</p></div><button class="journey-link" data-journey-path="${esc(chosen?.id || '')}">مشاهده کامل ←</button></div><div class="journey-track" aria-label="نمایی از مسیر یادگیری">${nodes.map((l,i) => `<button class="journey-node ${completed.has(l.id) ? 'is-done' : next?.id === l.id ? 'is-current' : ''}" data-journey-lesson="${esc(l.id)}"><span class="journey-node-dot">${completed.has(l.id) ? '✓' : lessonIcon(l.id)}</span><strong>${esc(l.title)}</strong><small>${completed.has(l.id) ? 'تکمیل‌شده' : next?.id === l.id ? 'گام پیشنهادی' : ready(l) ? 'آمادهٔ مطالعه' : 'پیش‌نیاز دارد'}</small></button>`).join('')}</div></section>
-        <section class="reference-cards"><article class="reference-next"><span class="journey-kicker">UP NEXT</span><h2>درس بعدی</h2>${next ? `<div class="reference-next-content"><span class="reference-topic-icon">✥</span><div><h3>${esc(next.title)}</h3><p>درس را با توضیح، مثال و تمرین‌های مرتبط دنبال کن.</p><button class="journey-primary small" data-journey-lesson="${esc(next.id)}">شروع درس ←</button></div></div>` : '<p>درس آمادهٔ جدیدی در این مسیر نیست.</p>'}</article><article class="reference-plan"><span class="journey-kicker">YOUR ROUTINE</span><h2>برنامه استاندارد روزانه آکادمی</h2><p>پیشنهاد روزانه: ۱۲۰ دقیقه</p><div class="reference-plan-number">${Number(profile.minutesPerDay) || 120} <small>دقیقه</small></div><p>۲۰ مرور + ۳۵ مفهوم + ۵۰ لابراتوار + ۱۵ مستندسازی</p><div class="academy-inline-links"><button class="journey-link" data-journey-action="profile">ویرایش برنامه ←</button><button class="journey-link" data-open-tree="1">درخت جامع ۹ دانشکده ←</button><button class="journey-link" data-open-sim="1">شبیه‌ساز و آزمایشگاه IOS ←</button></div></article></section>
-        <section class="journey-paths"><div class="journey-heading"><div><h2>مسیرهای آموزشی و درخت جامع آکادمی</h2><p>از مبانی شبکه و جلسهٔ اول ترم ۱ تا CCNA، CCNP، هشت تخصص، CCIE و CCDE</p></div><button type="button" class="fa-action primary" data-open-tree="1">باز کردن درخت جامع ۱۷بخشی ←</button></div><div class="journey-path-grid">${paths.map((p,i) => { const prog=calcPathProgress(p,completed); return `<article class="journey-path"><span class="journey-path-mark">${i?'✳':'⌘'}</span><div><small>${esc(p.code)} · ${esc(p.level)}</small><h3>${esc(p.title)}</h3><p>${prog.done} از ${prog.total} درس تکمیل شده</p></div><button class="journey-link" data-open-path="${esc(p.id)}">نقشهٔ مسیر ←</button></article>`; }).join('')}</div></section>
+
+        <section class="fam-dash-next" aria-label="قدم بعدی">
+          <div>
+            <span class="fam-kicker">YOUR NEXT STEP · قدم بعدی همین الان</span>
+            <h1>${greeting}</h1>
+            <p>${next
+              ? `بر اساس سطح فعلی تو (${esc(activeFaculty.title)})، بهترین درس برای ادامه «<strong>${esc(next.title)}</strong>» است.`
+              : 'تمام درس‌های آمادهٔ این مسیر را تکمیل کرده‌اید؛ می‌توانید در شبیه‌ساز IOS تمرین کنید یا درخت کامل دانشکده‌ها را ببینید.'
+            }</p>
+            <div class="fam-dash-cta-row">
+              ${next ? '<button type="button" class="fam-btn-primary" id="fa-continue">شروع / ادامهٔ درس ←</button>' : ''}
+              <button type="button" class="fam-btn-secondary" data-open-sim="1">شبیه‌ساز پروتکل و ترمینال IOS</button>
+              <button type="button" class="fam-btn-secondary" data-open-paths="1">مشاهدهٔ کل ${target.length} درس آماده</button>
+            </div>
+          </div>
+          <aside class="fam-dash-ring-card">
+            <span class="fam-kicker">PROGRESS</span>
+            <div class="reference-ring" style="--progress:${pct}%"><span><strong>${pct}٪</strong><small>تکمیل درس‌ها</small></span></div>
+            <small style="color:var(--c-text-2)">${done} از ${target.length} درس تکمیل شده</small>
+            <button type="button" class="journey-link" data-journey-action="progress">جزئیات پیشرفت ←</button>
+          </aside>
+        </section>
+
+        <section style="display:grid;gap:12px">
+          <div class="journey-heading">
+            <div>
+              <h2>مسیر ۷ دانشکدهٔ آکادمی (از صفر تا CCIE و CCDE)</h2>
+              <p>روی هر دانشکده کلیک کنید تا سطح شما روی آن تنظیم شود یا نقشهٔ کامل ۱۷بخشی آن را ببینید.</p>
+            </div>
+            <button type="button" class="fam-btn-secondary" data-open-tree="1">نمایش درخت کامل دانشکده‌ها ←</button>
+          </div>
+          <div class="fam-stepper-grid">${stepperHtml}</div>
+        </section>
+
+        <section class="fam-quick-cards">
+          <article class="fam-quick-card">
+            <div>
+              <span class="fam-kicker">LESSONS</span>
+              <h3>فهرست درس‌ها و نقشه‌راه</h3>
+              <p>مرور مرحله‌به‌مرحلهٔ ۱۴ درس تعاملی فعلی با آزمون پایان درس و ثبت در سرور.</p>
+            </div>
+            <button type="button" class="fam-btn-secondary" data-open-lessons="1">باز کردن درس‌ها ←</button>
+          </article>
+          <article class="fam-quick-card">
+            <div>
+              <span class="fam-kicker">LAB SANDBOX</span>
+              <h3>شبیه‌ساز شبکه و ترمینال IOS</h3>
+              <p>تمرین زندهٔ ARP، VLAN/Trunk، OSPF و اجرای دستورات Cisco IOS بدون تجهیزات واقعی.</p>
+            </div>
+            <button type="button" class="fam-btn-secondary" data-open-sim="1">ورود به آزمایشگاه ←</button>
+          </article>
+          <article class="fam-quick-card">
+            <div>
+              <span class="fam-kicker">REFERENCE</span>
+              <h3>فرمان‌های IOS و واژه‌نامه</h3>
+              <p>مرجع دستورات Cisco IOS و واژه‌نامهٔ فارسی-انگلیسی مفاهیم شبکه.</p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="fam-btn-secondary" data-open-coverage="1">فرمان‌های IOS</button>
+              <button type="button" class="fam-btn-secondary" data-open-glossary="1">واژه‌نامه</button>
+            </div>
+          </article>
+        </section>
       </div>`;
+
+    container.querySelector('#fam-change-level')?.addEventListener('click', () => { location.hash = '#/placement'; });
+    container.querySelector('#fam-retake-placement')?.addEventListener('click', () => {
+      if (window.FamAcademyPlacement?.renderPlacementView) {
+        window.FamAcademyPlacement.renderPlacementView(container, {
+          startExam: true,
+          onComplete: () => { location.hash = '#/dashboard'; renderDashboard(container, catalog, onOpenLesson); },
+          onCancel: () => renderDashboard(container, catalog, onOpenLesson)
+        });
+      } else {
+        location.hash = '#/placement';
+      }
+    });
+    container.querySelectorAll('[data-pick-stage]').forEach(btn => {
+      btn.onclick = async () => {
+        const fid = btn.dataset.pickStage;
+        const prev = window.FamAcademyBridge?.progress || { completed: [], labs: {} };
+        const prof = { ...(prev.profile || {}), onboardingComplete: true, goal: 'fam-c5', facultyId: fid, placementMode: 'manual' };
+        await window.FamAcademyBridge?.saveProgress({ ...prev, completed: [...completed], profile: prof });
+        renderDashboard(container, catalog, onOpenLesson);
+      };
+    });
     container.querySelectorAll('[data-open-tree]').forEach(btn => { btn.onclick = () => { location.hash = '#/tree'; }; });
     container.querySelectorAll('[data-open-sim]').forEach(btn => { btn.onclick = () => { location.hash = '#/simulators'; }; });
-    container.querySelectorAll('[data-open-path], [data-journey-path]').forEach(btn => { btn.onclick = () => {
-      const path = paths.find(p => p.id === (btn.dataset.openPath || btn.dataset.journeyPath));
-      if (path) renderPathRoadmap(container, path, () => renderDashboard(container, catalog, onOpenLesson), onOpenLesson, catalog);
-    }; });
-    container.querySelectorAll('[data-journey-lesson]').forEach(btn => { btn.onclick = () => {
-      const lesson = all.find(l => l.id === btn.dataset.journeyLesson);
-      if (lesson?.blueprint) onOpenLesson(lesson.blueprint);
-    }; });
-    container.querySelectorAll('[data-journey-action]').forEach(btn => { btn.onclick = () => {
-      if (btn.dataset.journeyAction === 'profile') window.FamJourney?.openProfile();
-      else location.hash = '#/progress';
-    }; });
+    container.querySelectorAll('[data-open-paths]').forEach(btn => { btn.onclick = () => { location.hash = '#/paths'; }; });
+    container.querySelectorAll('[data-open-lessons]').forEach(btn => { btn.onclick = () => { location.hash = '#/lessons'; }; });
+    container.querySelectorAll('[data-open-coverage]').forEach(btn => { btn.onclick = () => { location.hash = '#/coverage'; }; });
+    container.querySelectorAll('[data-open-glossary]').forEach(btn => { btn.onclick = () => { location.hash = '#/glossary'; }; });
+    container.querySelectorAll('[data-journey-action]').forEach(btn => { btn.onclick = () => { location.hash = '#/progress'; }; });
     const continueBtn = container.querySelector('#fa-continue');
     if (continueBtn && next) continueBtn.onclick = () => onOpenLesson(next.blueprint);
   }

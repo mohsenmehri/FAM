@@ -962,6 +962,77 @@ def create_app(config=None):
         score_pct=round(correct*100/total)
         return jsonify(ok=True,lessonId=lesson_id,total=total,correct=correct,incorrect=incorrect,
                        unanswered=unanswered,score10=score10,scorePct=score_pct,passed=score_pct>=70,items=items)
+
+    @app.post('/api/academy/placement/evaluate')
+    def evaluate_academy_placement():
+        body=data()
+        if not isinstance(body,dict):fail(400,'بدنهٔ درخواست تعیین سطح معتبر نیست.')
+        answers=body.get('answers')
+        if not isinstance(answers,(dict,list)):fail(400,'فهرست پاسخ‌های آزمون تعیین سطح معتبر نیست.')
+        with connect() as db:
+            user_and_session(db)
+        q_path=(ROOT/'www'/'academy-assets'/'academy-placement-questions.json').resolve()
+        if not q_path.is_file():fail(404,'بانک سؤال تعیین سطح یافت نشد.')
+        bank=json.loads(q_path.read_text(encoding='utf-8'))
+        faculties=bank.get('faculties') or []
+        questions=bank.get('questions') or []
+        if not questions or not faculties:fail(500,'ساختار بانک سؤال تعیین سطح معتبر نیست.')
+        if isinstance(answers,list) and len(answers)!=len(questions):
+            fail(400,'تعداد پاسخ‌ها با تعداد سؤال‌های تعیین سطح برابر نیست.')
+        tier_stats={f['tier']:{'id':f['id'],'tier':f['tier'],'badge':f['badge'],'title':f['title'],'duration':f['duration'],'correct':0,'total':0} for f in faculties}
+        total_correct=0;items=[]
+        for idx,q in enumerate(questions):
+            qid=q['id']
+            options=q.get('options') or []
+            right_idx=q.get('correctIndex',-1)
+            sel=answers[idx] if isinstance(answers,list) else answers.get(qid)
+            if sel is not None and (type(sel) is not int or sel<0 or sel>=len(options)):
+                fail(400,'گزینهٔ انتخاب‌شده در آزمون تعیین سطح معتبر نیست.')
+            tier=int(q.get('tier',0))
+            if tier not in tier_stats:
+                tier_stats[tier]={'id':q.get('facultyId',f'f{tier}'),'tier':tier,'badge':'','title':'','duration':'','correct':0,'total':0}
+            tier_stats[tier]['total']+=1
+            is_ok=(sel==right_idx)
+            if is_ok:
+                total_correct+=1
+                tier_stats[tier]['correct']+=1
+            items.append({
+                'id':qid,'tier':tier,'topic':q.get('topic',''),
+                'answered':sel is not None,'selectedIndex':sel,'correctIndex':right_idx,
+                'correct':is_ok,'correctOption':options[right_idx] if 0<=right_idx<len(options) else '',
+                'explanation':q.get('explanation','')
+            })
+        ordered_tiers=sorted(tier_stats.keys())
+        rec_tier=ordered_tiers[0]
+        weak_tiers=[]
+        for t in ordered_tiers:
+            st=tier_stats[t]
+            c,tot=st['correct'],st['total']
+            if tot>0 and c==tot:
+                rec_tier=min(ordered_tiers[-1],t+1)
+            elif tot>0 and c*2>=tot and (t+1 in tier_stats) and tier_stats[t+1]['total']>0 and tier_stats[t+1]['correct']==tier_stats[t+1]['total']:
+                weak_tiers.append(st['title'])
+                rec_tier=t+1
+            else:
+                rec_tier=t
+                if c<tot:weak_tiers.append(st['title'])
+                break
+        breakdown=[]
+        for t in ordered_tiers:
+            st=tier_stats[t]
+            c,tot=st['correct'],st['total']
+            status='mastered' if tot>0 and c==tot else ('partial' if c>0 else 'gap')
+            breakdown.append({**st,'status':status})
+        rec_faculty=next((f for f in faculties if f['tier']==rec_tier),faculties[0])
+        total_q=len(questions)
+        score_pct=round(total_correct*100/total_q) if total_q else 0
+        summary_fa=(
+            f"بر اساس تحلیل مرحله‌به‌مرحلهٔ پاسخ‌های شما ({total_correct} از {total_q} پاسخ صحیح)، "
+            f"نقطهٔ شروع پیشنهادی شما «{rec_faculty['badge']} — {rec_faculty['title']}» است."
+        )
+        return jsonify(ok=True,recommendedFaculty=rec_faculty,recommendedTier=rec_tier,
+                       totalCorrect=total_correct,totalQuestions=total_q,scorePct=score_pct,
+                       tierBreakdown=breakdown,weakTiers=weak_tiers,summaryFa=summary_fa,items=items)
     @app.post('/api/login')
     def login():
         value=data();name=str(value.get('username','')).strip().lower();pw=value.get('password','')

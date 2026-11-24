@@ -285,6 +285,70 @@ class FamAppApiTests(unittest.TestCase):
         )
         self.assertEqual(bad_choice.status_code, 400)
 
+        # Smart multi-tier placement exam evaluation
+        no_csrf_place = self.client.post(
+            "/api/academy/placement/evaluate",
+            json={"answers": {}},
+            headers={"Origin": self.ORIGIN},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(no_csrf_place.status_code, 403)
+
+        qbank_path = PACKAGE_ROOT / "server" / "www" / "academy-assets" / "academy-placement-questions.json"
+        qbank = json.loads(qbank_path.read_text(encoding="utf-8"))
+        all_right = {q["id"]: q["correctIndex"] for q in qbank["questions"]}
+        all_wrong = {q["id"]: (q["correctIndex"] + 1) % 4 for q in qbank["questions"]}
+
+        # 1. All wrong -> f0
+        res_f0 = self.client.post(
+            "/api/academy/placement/evaluate",
+            json={"answers": all_wrong},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(res_f0.status_code, 200)
+        self.assertEqual(res_f0.get_json()["recommendedFaculty"]["id"], "f0")
+
+        # 2. Lucky guess on f6 while missing f0 -> still starts at f0
+        lucky_f6 = dict(all_wrong)
+        for q in qbank["questions"]:
+            if q["tier"] == 6:
+                lucky_f6[q["id"]] = q["correctIndex"]
+        res_lucky = self.client.post(
+            "/api/academy/placement/evaluate",
+            json={"answers": lucky_f6},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(res_lucky.status_code, 200)
+        self.assertEqual(res_lucky.get_json()["recommendedFaculty"]["id"], "f0")
+
+        # 3. f0 + f1 mastered, f2 partial (1/2) -> recommends f2
+        mid_answers = dict(all_wrong)
+        for q in qbank["questions"]:
+            if q["tier"] in (0, 1):
+                mid_answers[q["id"]] = q["correctIndex"]
+        mid_answers["p-f2-1"] = qbank["questions"][4]["correctIndex"]
+        res_f2 = self.client.post(
+            "/api/academy/placement/evaluate",
+            json={"answers": mid_answers},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(res_f2.status_code, 200)
+        self.assertEqual(res_f2.get_json()["recommendedFaculty"]["id"], "f2")
+
+        # 4. All 14 correct -> f6
+        res_f6 = self.client.post(
+            "/api/academy/placement/evaluate",
+            json={"answers": all_right},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(res_f6.status_code, 200)
+        self.assertEqual(res_f6.get_json()["recommendedFaculty"]["id"], "f6")
+        self.assertEqual(res_f6.get_json()["scorePct"], 100)
+
         # Create custom users with restricted permissions and verify /academy allowedViews
         users_state = self.client.get("/api/users", environ_base=self.https_env)
         self.assertEqual(users_state.status_code, 200)

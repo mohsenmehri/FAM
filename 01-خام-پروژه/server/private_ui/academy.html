@@ -42,11 +42,11 @@
             profile: payload?.profile && typeof payload.profile === 'object' && !Array.isArray(payload.profile) ? {
               ...(this.progress?.profile || {}),
               ...payload.profile,
-              level: ['beginner', 'intermediate', 'advanced'].includes(payload.profile.level) ? payload.profile.level : 'beginner',
+              level: ['beginner', 'intermediate', 'advanced'].includes(payload.profile.level) ? payload.profile.level : (this.progress?.profile?.level || 'beginner'),
               goal: typeof payload.profile.goal === 'string' && payload.profile.goal ? payload.profile.goal : 'fam-c5',
-              minutesPerDay: Number.isFinite(Number(payload.profile.minutesPerDay)) ? Number(payload.profile.minutesPerDay) : 45,
-              daysPerWeek: Number.isFinite(Number(payload.profile.daysPerWeek)) ? Number(payload.profile.daysPerWeek) : 5
-            } : undefined
+              minutesPerDay: Number.isFinite(Number(payload.profile.minutesPerDay)) ? Number(payload.profile.minutesPerDay) : 120,
+              daysPerWeek: Number.isFinite(Number(payload.profile.daysPerWeek)) ? Number(payload.profile.daysPerWeek) : 7
+            } : (this.progress?.profile || undefined)
           };
           try {
             localStorage.setItem('fam_academy_progress_v1', JSON.stringify(safe.completed));
@@ -75,6 +75,21 @@
               credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
               body: JSON.stringify({ lessonId, answers })
+            });
+            if (!response.ok) return null;
+            return await response.json();
+          } catch (e) {
+            return null;
+          }
+        },
+        async evaluatePlacement(answers) {
+          if (!answers || typeof answers !== 'object') return null;
+          try {
+            const response = await fetch('/api/academy/placement/evaluate', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+              body: JSON.stringify({ answers })
             });
             if (!response.ok) return null;
             return await response.json();
@@ -224,8 +239,9 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 @media(max-width:650px){.fa-topbar{align-items:flex-start}.fa-brand{margin-bottom:4px}.fa-nav{width:100%;overflow-x:auto;flex-wrap:nowrap}.fa-nav .btn{white-space:nowrap}.fa-path-grid{grid-template-columns:1fr}.fa-hero{padding:20px}.fa-hero h1{font-size:30px}.fa-stat{padding:11px}.fa-stat strong{font-size:18px}.fa-lesson-row{align-items:flex-start;flex-wrap:wrap}.fa-lesson-row button{margin-right:46px}}
 @media(prefers-reduced-motion:no-preference){.fa-path-card{transition:transform .2s,border-color .2s}.fa-path-card:hover{transform:translateY(-3px);border-color:#7b9cff77}}
 </style>
-  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261123f">
-  <link rel="stylesheet" href="/academy-assets/academy-sim.css?v=20261123f">
+  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261123g">
+  <link rel="stylesheet" href="/academy-assets/academy-sim.css?v=20261123g">
+  <link rel="stylesheet" href="/academy-assets/academy-placement.css?v=20261123g">
 </head>
 <body>
   <header class="topbar fa-topbar">
@@ -235,6 +251,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   </a>
   <div class="nav-actions fa-nav">
     <button class="btn" id="btn-paths">مسیرهای یادگیری</button>
+    <button class="btn" id="btn-placement">انتخاب سطح و تعیین سطح</button>
     <button class="btn" id="btn-tree">درخت جامع آکادمی</button>
     <button class="btn" id="btn-lessons">فهرست درس‌ها</button>
     <button class="btn" id="btn-simulators">شبیه‌ساز و آزمایشگاه IOS</button>
@@ -248,11 +265,12 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 
   <main class="container" id="app-root"></main>
 
-  <script src="/academy-assets/lesson-engine.js?v=20261123f"></script>
-  <script src="/academy-assets/academy-catalog.js?v=20261123f"></script>
-  <script src="/academy-assets/academy-sim-engine.js?v=20261123f"></script>
-  <script src="/academy-assets/academy-sim-ui.js?v=20261123f"></script>
-  <script src="/academy-assets/academy-journey.js?v=20261123f"></script>
+  <script src="/academy-assets/lesson-engine.js?v=20261123g"></script>
+  <script src="/academy-assets/academy-placement.js?v=20261123g"></script>
+  <script src="/academy-assets/academy-catalog.js?v=20261123g"></script>
+  <script src="/academy-assets/academy-sim-engine.js?v=20261123g"></script>
+  <script src="/academy-assets/academy-sim-ui.js?v=20261123g"></script>
+  <script src="/academy-assets/academy-journey.js?v=20261123g"></script>
   <script nonce="__FAM_CSP_NONCE__">
 (() => {
   'use strict';
@@ -305,6 +323,22 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
         });
         return;
       }
+      if (restoreInitialHash && location.hash === '#/placement') {
+        restoreInitialHash = false;
+        window.FamAcademyPlacement?.renderPlacementView(root, {
+          onComplete: () => { location.hash = '#/dashboard'; loadCatalog(); },
+          onCancel: () => { location.hash = '#/dashboard'; }
+        });
+        return;
+      }
+      if (restoreInitialHash && (!location.hash || location.hash === '#/dashboard') && !window.FamAcademyBridge?.progress?.profile?.onboardingComplete && window.FamAcademyPlacement?.renderPlacementView) {
+        restoreInitialHash = false;
+        window.FamAcademyPlacement.renderPlacementView(root, {
+          onComplete: () => { location.hash = '#/dashboard'; loadCatalog(); },
+          onCancel: () => { window.FamAcademyCatalog.renderDashboard(root, catalog, openBlueprint); }
+        });
+        return;
+      }
       window.FamAcademyCatalog.renderDashboard(root, catalog, openBlueprint);
       if (openSelectedPath || (restoreInitialHash && location.hash === '#/paths')) {
         restoreInitialHash = false;
@@ -317,9 +351,6 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
         restoreInitialHash = false;
         window.FamJourney.renderProgress();
         return;
-      }
-      if (restoreInitialHash && (!location.hash || location.hash === '#/dashboard') && !window.FamAcademyBridge?.progress?.profile?.onboardingComplete) {
-        window.FamJourney.openProfile({first:true});
       }
       if (restoreInitialHash) {
         restoreInitialHash = false;
@@ -351,6 +382,11 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       else if (kind === 'glossary') await window.FamAcademyCatalog.renderGlossaryDirectory(root, catalog, openBlueprint, goHome);
       else if (kind === 'simulators' || kind === 'labs') {
         window.FamAcademySimUI?.render(root, { tab: kind === 'labs' ? 'labs' : 'protocols', onBack: goHome });
+      } else if (kind === 'placement') {
+        window.FamAcademyPlacement?.renderPlacementView(root, {
+          onComplete: () => { location.hash = '#/dashboard'; loadCatalog(); },
+          onCancel: goHome
+        });
       }
     } catch (error) {
       if (root.dataset.loadSequence !== requestId) return;
@@ -404,8 +440,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     else if (location.hash === '#/glossary') openDirectoryView('glossary');
     else if (location.hash === '#/simulators') openDirectoryView('simulators');
     else if (location.hash === '#/labs') openDirectoryView('labs');
+    else if (location.hash === '#/placement') openDirectoryView('placement');
   });
   document.getElementById('btn-paths').onclick = () => loadCatalog();
+  document.getElementById('btn-placement').onclick = () => openDirectoryView('placement');
   document.getElementById('btn-tree').onclick = () => openDirectoryView('tree');
   document.getElementById('btn-back-paths').onclick = () => loadCatalog();
   document.getElementById('btn-lessons').onclick = () => openDirectoryView('lessons');
@@ -439,7 +477,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     table { display: block !important; max-width: 100% !important; overflow-x: auto !important; }
     [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
   }
-  #fam-stage4-bar { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px auto 0; max-width: 1400px; padding: 0 16px; }
+  #fam-stage4-bar { display: none; }
   @media (max-width: 768px) {
     #fam-stage4-bar { width: 100%; max-width: 100%; padding: 0 10px; box-sizing: border-box; }
     #s4-toggle-btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: center; }
@@ -1025,7 +1063,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   });
 })();
 </script>
-  <script src="/academy-assets/academy-reference-shell.js?v=20261123f"></script>
+  <script src="/academy-assets/academy-reference-shell.js?v=20261123g"></script>
 </body>
 
 </html>

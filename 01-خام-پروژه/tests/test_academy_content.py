@@ -269,6 +269,30 @@ class AcademyContentTests(unittest.TestCase):
         self.assertIn("#/simulators", catalog_js)
         self.assertIn("evaluateQuiz", lesson_js)
 
+    def test_two_mode_placement_and_clean_academy_redesign_are_wired(self):
+        academy_html = (PACKAGE_ROOT / "server" / "private_ui" / "academy.html").read_text(encoding="utf-8")
+        shell_js = (ASSET_ROOT / "academy-reference-shell.js").read_text(encoding="utf-8")
+        q_path = ASSET_ROOT / "academy-placement-questions.json"
+
+        self.assertTrue(q_path.is_file())
+        self.assertTrue((ASSET_ROOT / "academy-placement.js").is_file())
+        self.assertTrue((ASSET_ROOT / "academy-placement.css").is_file())
+
+        bank = json.loads(q_path.read_text(encoding="utf-8"))
+        faculties = bank.get("faculties", [])
+        questions = bank.get("questions", [])
+        self.assertEqual([f["id"] for f in faculties], ["f0", "f1", "f2", "f3", "f4", "f5", "f6"])
+        self.assertEqual(len(questions), 14)
+        for q in questions:
+            self.assertEqual(len(q.get("options", [])), 4)
+            self.assertIsInstance(q.get("correctIndex"), int)
+            self.assertTrue(0 <= q["correctIndex"] < 4)
+            self.assertTrue(q.get("explanation"))
+
+        for token in ('academy-placement.js', 'academy-placement.css', '#/placement', 'evaluatePlacement'):
+            self.assertIn(token, academy_html)
+        self.assertIn("#/placement", shell_js)
+
 
 if __name__ == "__main__":
     unittest.main()

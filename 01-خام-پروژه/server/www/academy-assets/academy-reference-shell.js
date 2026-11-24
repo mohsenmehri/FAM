@@ -5,7 +5,7 @@
   if (!root || document.querySelector('.app-shell')) return;
 
   const oldHeader = document.querySelector('.fa-topbar');
-  const oldButtons = ['btn-paths','btn-tree','btn-lessons','btn-simulators','btn-blueprint','btn-coverage','btn-glossary','btn-back-paths']
+  const oldButtons = ['btn-paths','btn-placement','btn-tree','btn-lessons','btn-simulators','btn-blueprint','btn-coverage','btn-glossary','btn-back-paths']
     .map($).filter(Boolean);
   const stageBar = $('fam-stage4-bar');
   const searchWrap = $('s4-search-wrap');
@@ -67,16 +67,15 @@
   const nav=el('nav','side-nav');
   nav.setAttribute('aria-label','ناوبری اصلی');
   const navItems=[
-    ['home','خانه','نمای کلی آکادمی','home','home'],
-    ['tree','درخت جامع آکادمی','۹ دانشکده تا CCIE و CCDE','route','tree'],
-    ['paths','مسیرهای یادگیری','Curriculum 5.0','route','paths'],
-    ['lessons','درس‌ها','مطالعه و ادامه درس','book','lessons'],
-    ['simulators','شبیه‌ساز و آزمایشگاه IOS','پروتکل‌ها و ترمینال تعاملی','chart','simulators'],
-    ['sample','جلسه ۱: OSI و TCP/IP','اولین درس ترم اول','book','sample'],
-    ['planner','برنامه مطالعه','نقشه راه و برنامه‌ریزی','chart','planner'],
-    ['progress','پیشرفت من','هدف، برنامه و درس‌های تکمیل‌شده','chart','progress'],
-    ['glossary','واژه‌نامه','اصطلاحات شبکه','glossary','glossary'],
-    ['coverage','پوشش فرمان‌های IOS','مرجع فرمان‌ها','book','coverage']
+    ['home','خانه و مسیر فعلی','گام بعدی و وضعیت سطح شما','home','home'],
+    ['placement','تعیین سطح و دانشکده','انتخاب دستی یا آزمون ۴گزینه‌ای','chart','placement'],
+    ['paths','نقشهٔ درس‌های آماده','پیش‌نیازها و ترتیب مطالعه','route','paths'],
+    ['lessons','فهرست درس‌ها','جست‌وجو و مطالعهٔ درس‌ها','book','lessons'],
+    ['simulators','شبیه‌ساز و آزمایشگاه IOS','ARP، VLAN، OSPF و ترمینال','chart','simulators'],
+    ['tree','درخت جامع ۷ دانشکده','از مبانی تا CCIE و CCDE','route','tree'],
+    ['progress','پیشرفت و برنامهٔ من','برنامهٔ روزانه و درس‌های کامل‌شده','chart','progress'],
+    ['coverage','پوشش فرمان‌های IOS','مرجع دستورات سیسکو','book','coverage'],
+    ['glossary','واژه‌نامه','اصطلاحات شبکه','glossary','glossary']
   ];
   const navLinks=new Map();
   for(const [id,label,hint,ico,action] of navItems){
@@ -120,10 +119,10 @@
   const topActions=el('div','top-actions');
   const search=el('button','search-trigger'); search.type='button'; search.setAttribute('aria-label','جست‌وجو');
   search.append(icon('search',16),el('span','','جست‌وجو'),el('kbd','','Ctrl K'));
-  const streak=el('a','top-chip'); streak.href='#fam-stage4-panel'; streak.append(el('span','','برنامه مطالعه'));
+  const streak=el('a','top-chip'); streak.href='#/placement'; streak.append(el('span','','تغییر سطح / تعیین سطح'));
   const theme=el('button','icon-btn theme-toggle'); theme.type='button';
   const help=el('button','icon-btn'); help.type='button'; help.setAttribute('aria-label','راهنمای آکادمی'); help.title='راهنمای آکادمی'; help.append(icon('help',18));
-  const progress=el('a','icon-btn'); progress.href='#fam-stage4-panel'; progress.setAttribute('aria-label','پیشرفت و برنامه مطالعه'); progress.title='پیشرفت و برنامه مطالعه'; progress.append(icon('user',18));
+  const progress=el('a','icon-btn'); progress.href='#/progress'; progress.setAttribute('aria-label','پیشرفت و برنامه مطالعه'); progress.title='پیشرفت و برنامه مطالعه'; progress.append(icon('user',18));
   topActions.append(search,streak,theme,help,progress);
   topbar.append(menuButton,topTitle,mobileBrand,crumbs,topActions);
 
@@ -156,10 +155,10 @@
   for(const node of [stageBar,planner]) if(node) appMain.append(node);
 
   const bottom=el('nav','bottom-nav'); bottom.setAttribute('aria-label','ناوبری اصلی موبایل');
-  const bottomActions=[['home','خانه'],['paths','مسیرها'],['lessons','درس‌ها'],['planner','برنامه'],['coverage','IOS']];
+  const bottomActions=[['home','خانه'],['placement','تعیین سطح'],['lessons','درس‌ها'],['simulators','شبیه‌ساز'],['tree','دانشکده‌ها']];
   for(const [action,label] of bottomActions){
     const a=el('a',''); a.href='#'+action; a.dataset.action=action;
-    a.append(icon(action==='planner'?'chart':action==='coverage'?'book':action==='paths'?'route':action==='lessons'?'book':'home',20),el('span','',label));
+    a.append(icon(action==='placement'||action==='simulators'?'chart':action==='tree'?'route':action==='lessons'?'book':'home',20),el('span','',label));
     bottom.append(a);
   }
   shell.append(sidebar,appMain,bottom);
@@ -167,9 +166,9 @@
   oldHeader?.remove();
 
   function setActive(action){
-    const group=action==='home'?'home':action==='tree'?'tree':action==='paths'?'paths':action==='lessons'?'lessons':action==='simulators'?'simulators':action==='sample'?'sample':action==='coverage'?'coverage':action==='glossary'?'glossary':action==='progress'?'progress':'planner';
+    const group=action==='home'?'home':action==='placement'?'placement':action==='tree'?'tree':action==='paths'?'paths':action==='lessons'?'lessons':action==='simulators'?'simulators':action==='coverage'?'coverage':action==='glossary'?'glossary':action==='progress'?'progress':'home';
     for(const [id,a] of navLinks){const active=id===group;a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
-    const labels={home:'خانه',tree:'درخت جامع آکادمی',paths:'مسیرهای یادگیری',lessons:'فهرست درس‌ها',simulators:'شبیه‌ساز و آزمایشگاه IOS',sample:'جلسه ۱: OSI و TCP/IP',planner:'برنامه مطالعه',progress:'پیشرفت من',glossary:'واژه‌نامه',coverage:'پوشش فرمان‌های IOS'};
+    const labels={home:'خانه و مسیر فعلی',placement:'انتخاب سطح و آزمون تعیین سطح',tree:'درخت جامع ۷ دانشکده',paths:'نقشهٔ درس‌های آماده',lessons:'فهرست درس‌ها',simulators:'شبیه‌ساز و آزمایشگاه IOS',progress:'پیشرفت و برنامهٔ من',glossary:'واژه‌نامه',coverage:'پوشش فرمان‌های IOS'};
     crumbs.replaceChildren(el('span','crumb current',labels[group]||'آکادمی'));
     document.title=(labels[group]||'آکادمی')+' — FAM Academy';
   }
@@ -180,7 +179,11 @@
   }
   function action(action){
     setActive(action);
-    if(action==='tree'){
+    if(action==='placement'){
+      if(location.hash !== '#/placement') location.hash = '#/placement'; else clickExisting('btn-placement');
+      root.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+    else if(action==='tree'){
       if(location.hash !== '#/tree') location.hash = '#/tree'; else clickExisting('btn-tree');
       root.scrollIntoView({behavior:'smooth',block:'start'});
     }
@@ -268,6 +271,7 @@
   function syncActiveFromHash(){
     const h=location.hash;
     if(h==='#/progress')setActive('progress');
+    else if(h==='#/placement')setActive('placement');
     else if(h==='#/tree')setActive('tree');
     else if(h==='#/paths')setActive('paths');
     else if(h==='#/lessons')setActive('lessons');
@@ -277,7 +281,7 @@
     else if(h==='#/dashboard'||!h)setActive('home');
   }
   window.addEventListener('hashchange', syncActiveFromHash);
-  streak.addEventListener('click',(event)=>{event.preventDefault();action('planner');});
+  streak.addEventListener('click',(event)=>{event.preventDefault();action('placement');});
   syncActiveFromHash();
   const s4Toggle=$('s4-toggle-btn');
   if(s4Toggle)s4Toggle.addEventListener('click',()=>{setActive('planner');}, {once:false});
