@@ -5,9 +5,8 @@
   if (!root || document.querySelector('.app-shell')) return;
 
   const oldHeader = document.querySelector('.fa-topbar');
-  const oldButtons = ['btn-paths','btn-blueprint','btn-coverage','btn-back-paths']
+  const oldButtons = ['btn-paths','btn-lessons','btn-blueprint','btn-coverage','btn-glossary','btn-back-paths']
     .map($).filter(Boolean);
-  const famBack = oldHeader?.querySelector('.fa-back') || null;
   const stageBar = $('fam-stage4-bar');
   const searchWrap = $('s4-search-wrap');
   const planner = $('fam-stage4-panel');
@@ -127,13 +126,21 @@
   topbar.append(menuButton,topTitle,mobileBrand,crumbs,topActions);
 
   const sectionHead=el('section','academy-section-head');
+  sectionHead.setAttribute('aria-label','جابه‌جایی بین بخش‌های FAM');
   const heading=el('div','academy-section-heading');
   heading.append(el('span','academy-head-mark','FAM'));
-  const headingCopy=el('div'); headingCopy.append(el('h2','','آکادمی مهندسی شبکه'),el('div','academy-section-sub','FAM ACADEMY · NETWORK ENGINEERING'));
+  const userName=window.FamAcademyBridge?.user?.username||'';
+  const subText='NETWORK ENGINEERING ACADEMY'+(userName?' · '+userName:'');
+  const headingCopy=el('div'); headingCopy.append(el('h2','','بخش فعال: آکادمی فام'),el('div','academy-section-sub',subText));
   heading.append(headingCopy);
+  const allowedViews=window.FamAcademyBridge?.allowedViews||{panel:true,equipment:true};
   const sectionActions=el('div','academy-section-actions');
-  for(const [href,label] of [['/app#/panel','پایگاه داده ←'],['/app#/equipment/inventory','مدیریت تجهیزات ←'],['/app','انتخاب بخش']]){
-    const link=el('a','academy-section-switch',label);link.href=href;sectionActions.append(link);
+  const switchTargets=[];
+  if(allowedViews.panel!==false)switchTargets.push(['/app#/panel','پایگاه داده ←','academy-section-switch academy-section-switch-primary','academy-to-database']);
+  if(allowedViews.equipment!==false)switchTargets.push(['/app#/equipment/home','مدیریت تجهیزات ←','academy-section-switch academy-section-switch-primary','academy-to-equipment']);
+  switchTargets.push(['/app#/chooser','انتخاب بخش','academy-section-switch','academy-workspace-picker']);
+  for(const [href,label,cls,id] of switchTargets){
+    const link=el('a',cls,label);link.href=href;link.id=id;sectionActions.append(link);
   }
   const hiddenTools=el('div','sr-only');hiddenTools.hidden=true;
   for(const button of oldButtons)hiddenTools.append(button);
@@ -141,8 +148,10 @@
 
   root.className='page';
   root.removeAttribute('style');
-  appMain.append(topbar,sectionHead,root,hiddenTools);
-  for(const node of [stageBar,searchWrap,planner]) if(node) appMain.append(node);
+  appMain.append(topbar,sectionHead);
+  if(searchWrap)appMain.append(searchWrap);
+  appMain.append(root,hiddenTools);
+  for(const node of [stageBar,planner]) if(node) appMain.append(node);
 
   const bottom=el('nav','bottom-nav'); bottom.setAttribute('aria-label','ناوبری اصلی موبایل');
   const bottomActions=[['home','خانه'],['paths','مسیرها'],['lessons','درس‌ها'],['planner','برنامه'],['coverage','IOS']];
@@ -158,7 +167,7 @@
   function setActive(action){
     const group=action==='home'?'home':action==='paths'?'paths':action==='lessons'?'lessons':action==='sample'?'sample':action==='coverage'?'coverage':action==='glossary'?'glossary':action==='progress'?'progress':'planner';
     for(const [id,a] of navLinks){const active=id===group;a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}
-    const labels={home:'خانه',paths:'مسیرهای یادگیری',lessons:'درس‌ها',sample:'درس نمونه VLAN',planner:'برنامه مطالعه',glossary:'واژه‌نامه',coverage:'پوشش فرمان‌های IOS'};
+    const labels={home:'خانه',paths:'مسیرهای یادگیری',lessons:'فهرست درس‌ها',sample:'درس نمونه',planner:'برنامه مطالعه',progress:'پیشرفت من',glossary:'واژه‌نامه',coverage:'پوشش فرمان‌های IOS'};
     crumbs.replaceChildren(el('span','crumb current',labels[group]||'آکادمی'));
     document.title=(labels[group]||'آکادمی')+' — FAM Academy';
   }
@@ -173,15 +182,28 @@
       if(location.hash !== '#/paths') location.hash = '#/paths'; else { location.hash = '#/dashboard'; location.hash = '#/paths'; }
       root.scrollIntoView({behavior:'smooth',block:'start'});
     }
-    else if(action==='home'||action==='lessons'){
+    else if(action==='home'){
       if(location.hash !== '#/dashboard') location.hash = '#/dashboard'; else clickExisting('btn-paths');
       root.scrollIntoView({behavior:'smooth',block:'start'});
     }
-    else if(action==='progress') { if(location.hash !== '#/progress') location.hash='#/progress'; else window.FamJourney?.renderProgress(); root.scrollIntoView({behavior:'smooth',block:'start'}); }
-    else if(action==='coverage'){clickExisting('btn-coverage');root.scrollIntoView({behavior:'smooth',block:'start'});}
+    else if(action==='lessons'){
+      if(location.hash !== '#/lessons') location.hash = '#/lessons'; else clickExisting('btn-lessons');
+      root.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+    else if(action==='progress'){
+      if(location.hash !== '#/progress') location.hash='#/progress'; else window.FamJourney?.renderProgress();
+      root.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+    else if(action==='coverage'){
+      if(location.hash !== '#/coverage') location.hash = '#/coverage'; else clickExisting('btn-coverage');
+      root.scrollIntoView({behavior:'smooth',block:'start'});
+    }
     else if(action==='sample'){clickExisting('btn-blueprint');root.scrollIntoView({behavior:'smooth',block:'start'});}
     else if(action==='planner'){clickExisting('s4-toggle-btn');showPlanner();}
-    else if(action==='glossary'){showPlanner('s4-glossary-card');}
+    else if(action==='glossary'){
+      if(location.hash !== '#/glossary') location.hash = '#/glossary'; else clickExisting('btn-glossary');
+      root.scrollIntoView({behavior:'smooth',block:'start'});
+    }
   }
   shell.addEventListener('click',(event)=>{
     const a=event.target.closest('[data-action]');
@@ -233,15 +255,26 @@
     if(!dialog.open)dialog.showModal();
   });
   progress.addEventListener('click',(event)=>{event.preventDefault();action('progress');});
-  window.addEventListener('hashchange', () => { if(location.hash === '#/progress') setActive('progress'); else if(location.hash === '#/dashboard') setActive('home'); else if(location.hash === '#/paths') setActive('paths'); });
+  function syncActiveFromHash(){
+    const h=location.hash;
+    if(h==='#/progress')setActive('progress');
+    else if(h==='#/paths')setActive('paths');
+    else if(h==='#/lessons')setActive('lessons');
+    else if(h==='#/coverage')setActive('coverage');
+    else if(h==='#/glossary')setActive('glossary');
+    else if(h==='#/dashboard'||!h)setActive('home');
+  }
+  window.addEventListener('hashchange', syncActiveFromHash);
   streak.addEventListener('click',(event)=>{event.preventDefault();action('planner');});
-  setActive(location.hash === '#/progress' ? 'progress' : 'home');
+  syncActiveFromHash();
   const s4Toggle=$('s4-toggle-btn');
   if(s4Toggle)s4Toggle.addEventListener('click',()=>{setActive('planner');}, {once:false});
   const progressText=$('s4-progress-text');
-  const observer=progressText?new MutationObserver(()=>{
-    const m=progressText.textContent||'';
+  function syncSidebarProgress(){
+    const m=progressText?.textContent||'';
     if(m){pathFill.style.width=(m.match(/\((\d+)٪\)/)?.[1]||'0')+'%';}
-  }):null;
+  }
+  const observer=progressText?new MutationObserver(syncSidebarProgress):null;
   if(observer&&progressText)observer.observe(progressText,{childList:true,subtree:true,characterData:true});
+  window.addEventListener('fam-academy-progress-updated',()=>{setTimeout(syncSidebarProgress,0);});
 })();

@@ -197,6 +197,24 @@ class AcademyContentTests(unittest.TestCase):
                     self.assertIn(content_root.resolve(), target.parents)
                     self.assertTrue(target.is_file())
 
+    def test_academy_shell_exposes_section_switcher_and_directory_views(self):
+        server_root = PACKAGE_ROOT / "server"
+        academy_html = (server_root / "private_ui" / "academy.html").read_text(encoding="utf-8")
+        shell_js = (ASSET_ROOT / "academy-reference-shell.js").read_text(encoding="utf-8")
+        catalog_js = (ASSET_ROOT / "academy-catalog.js").read_text(encoding="utf-8")
+        ui_css = (ASSET_ROOT / "academy-reference-ui.css").read_text(encoding="utf-8")
+        fam_html = (server_root / "private_ui" / "FAM.html").read_text(encoding="utf-8")
+
+        for token in ('id="btn-lessons"', 'id="btn-coverage"', 'id="btn-glossary"', '#/lessons', '#/coverage', '#/glossary'):
+            self.assertIn(token, academy_html)
+        for token in ('/app#/panel', '/app#/equipment/home', '/app#/chooser', 'allowedViews', 'fam-academy-progress-updated'):
+            self.assertIn(token, shell_js)
+        for fn in ('renderLessonsIndex', 'renderCommandCoverage', 'renderGlossaryDirectory'):
+            self.assertIn(fn, catalog_js)
+        self.assertNotIn('.academy-section-head { display:none; }', ui_css)
+        self.assertIn(':root:not([data-theme="light"])', ui_css)
+        self.assertIn("view:'chooser'", fam_html)
+
 
 if __name__ == "__main__":
     unittest.main()

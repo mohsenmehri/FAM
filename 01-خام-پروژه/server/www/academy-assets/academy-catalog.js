@@ -136,5 +136,279 @@
       };
     });
   }
-  window.FamAcademyCatalog = { getCompletedSet, calcCourseProgress, calcPathProgress, renderDashboard, renderPathRoadmap };
+
+  const blueprintCache = new Map();
+  async function loadAllBlueprints(catalog) {
+    const entries = [];
+    for (const path of (catalog?.paths || [])) {
+      for (const course of (path.courses || [])) {
+        for (const lesson of (course.lessons || [])) {
+          if (lesson.blueprint) entries.push({ path, course, lesson });
+        }
+      }
+    }
+    return Promise.all(entries.map(async entry => {
+      const url = entry.lesson.blueprint;
+      if (!blueprintCache.has(url)) {
+        try {
+          const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+          blueprintCache.set(url, res.ok ? await res.json() : null);
+        } catch {
+          blueprintCache.set(url, null);
+        }
+      }
+      return { ...entry, bp: blueprintCache.get(url) };
+    }));
+  }
+
+  function decodeHtmlEntities(text) {
+    const ta = document.createElement('textarea');
+    ta.innerHTML = text;
+    return ta.value;
+  }
+
+  function extractCommandsFromBlueprint(bp) {
+    if (!bp) return [];
+    const blocks = [];
+    const chunks = [];
+    if (Array.isArray(bp.sections)) {
+      for (const s of bp.sections) if (typeof s?.html === 'string') chunks.push({ section: s.title || '', html: s.html });
+    }
+    if (bp.stages && typeof bp.stages === 'object') {
+      for (const s of Object.values(bp.stages)) if (typeof s?.html === 'string') chunks.push({ section: s.title || 'آزمایشگاه', html: s.html });
+    }
+    const seen = new Set();
+    for (const chunk of chunks) {
+      const matches = chunk.html.matchAll(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi);
+      for (const m of matches) {
+        const clean = decodeHtmlEntities(m[1].replace(/<[^>]+>/g, '')).trim();
+        if (!clean || seen.has(clean)) continue;
+        seen.add(clean);
+        blocks.push({ section: chunk.section, code: clean });
+      }
+    }
+    return blocks;
+  }
+
+  function renderLessonsIndex(container, catalog, onOpenLesson, onBack) {
+    const completed = getCompletedSet();
+    const assessed = new Set(window.FamAcademyBridge?.progress?.selfAssessed || []);
+    const paths = catalog?.paths || [];
+    const allLessons = paths.flatMap(p => (p.courses || []).flatMap(c => (c.lessons || []).map(l => ({ ...l, path: p, course: c }))));
+    const total = allLessons.length;
+    const doneCount = allLessons.filter(l => completed.has(l.id)).length;
+    const pct = total ? Math.round((doneCount / total) * 100) : 0;
+    let activeFilter = 'all';
+    let query = '';
+
+    const ready = l => (l.prerequisites || []).every(id => completed.has(id) || assessed.has(id));
+    container.innerHTML = `
+      <div class="fa-dashboard academy-directory">
+        <div class="academy-directory-head">
+          <div>
+            <span class="journey-kicker">CURRICULUM LIBRARY</span>
+            <h1>فهرست کامل درس‌ها</h1>
+            <p>${doneCount.toLocaleString('fa-IR')} از ${total.toLocaleString('fa-IR')} درس تکمیل‌شده (${pct.toLocaleString('fa-IR')}٪)</p>
+          </div>
+          ${onBack ? '<button type="button" class="fa-action" id="acad-lib-back">← بازگشت به خانه آکادمی</button>' : ''}
+        </div>
+        <div class="academy-directory-toolbar">
+          <div class="segmented" role="tablist" aria-label="فیلتر وضعیت درس">
+            <button type="button" class="active" data-lib-filter="all">همه (${total.toLocaleString('fa-IR')})</button>
+            <button type="button" data-lib-filter="ready">آمادهٔ مطالعه</button>
+            <button type="button" data-lib-filter="done">تکمیل‌شده (${doneCount.toLocaleString('fa-IR')})</button>
+            <button type="button" data-lib-filter="locked">دارای پیش‌نیاز</button>
+          </div>
+          <label class="search-box">
+            <input type="search" id="acad-lib-search" placeholder="فیلتر عنوان یا کلیدواژه درس…">
+          </label>
+        </div>
+        <div id="acad-lib-list"></div>
+      </div>`;
+    if (onBack) container.querySelector('#acad-lib-back').onclick = onBack;
+    const listEl = container.querySelector('#acad-lib-list');
+    const searchEl = container.querySelector('#acad-lib-search');
+
+    function draw() {
+      const q = query.trim().toLowerCase();
+      const blocks = [];
+      for (const path of paths) {
+        for (const course of (path.courses || [])) {
+          const items = (course.lessons || []).filter(lesson => {
+            const isDone = completed.has(lesson.id);
+            const isReady = ready(lesson);
+            if (activeFilter === 'done' && !isDone) return false;
+            if (activeFilter === 'ready' && (isDone || !isReady)) return false;
+            if (activeFilter === 'locked' && (isDone || isReady)) return false;
+            if (!q) return true;
+            const hay = [lesson.title, lesson.titleEn, lesson.summary, ...(lesson.keywords || []), course.title].filter(Boolean).join(' ').toLowerCase();
+            return hay.includes(q);
+          });
+          if (!items.length) continue;
+          blocks.push(`<section class="fa-course">
+            <div class="fa-course-head"><h3>${esc(course.title)}</h3><small>${items.length.toLocaleString('fa-IR')} درس</small></div>
+            <div class="fa-lesson-list">${items.map((lesson, idx) => {
+              const isDone = completed.has(lesson.id);
+              const isReady = ready(lesson);
+              const badge = isDone ? '<span class="status status-done">تکمیل‌شده</span>' : isReady ? '<span class="status status-progress">آمادهٔ مطالعه</span>' : '<span class="status status-locked">پیش‌نیاز دارد</span>';
+              const mins = lesson.estimatedMinutes ? `${Number(lesson.estimatedMinutes).toLocaleString('fa-IR')} دقیقه` : '';
+              return `<div class="fa-lesson-row">
+                <span class="fa-lesson-num">${String(idx + 1).padStart(2, '0')}</span>
+                <div class="fa-lesson-info"><strong>${esc(lesson.title)}</strong><small>${esc(lesson.summary || '')}</small></div>
+                ${badge}
+                ${mins ? `<span class="tag">${mins}</span>` : ''}
+                <button type="button" class="fa-action ${isDone ? '' : 'primary'}" data-lib-open="${esc(lesson.blueprint || '')}">${isDone ? 'مرور درس' : 'شروع درس'} ←</button>
+              </div>`;
+            }).join('')}</div>
+          </section>`);
+        }
+      }
+      listEl.innerHTML = blocks.length ? blocks.join('') : '<div class="empty-state"><h3>درسی با این فیلتر یافت نشد</h3><p>فیلتر یا عبارت جست‌وجو را تغییر دهید.</p></div>';
+      listEl.querySelectorAll('[data-lib-open]').forEach(btn => {
+        btn.onclick = () => { if (btn.dataset.libOpen) onOpenLesson(btn.dataset.libOpen); };
+      });
+    }
+    container.querySelectorAll('[data-lib-filter]').forEach(btn => {
+      btn.onclick = () => {
+        activeFilter = btn.dataset.libFilter;
+        container.querySelectorAll('[data-lib-filter]').forEach(b => b.classList.toggle('active', b === btn));
+        draw();
+      };
+    });
+    searchEl.addEventListener('input', () => { query = searchEl.value; draw(); });
+    draw();
+  }
+
+  async function renderCommandCoverage(container, catalog, onOpenLesson, onBack) {
+    container.innerHTML = '<div class="fa-loading">در حال گردآوری مرجع فرمان‌های Cisco IOS از درس‌ها…</div>';
+    const loaded = await loadAllBlueprints(catalog);
+    const items = [];
+    for (const entry of loaded) {
+      for (const cmd of extractCommandsFromBlueprint(entry.bp)) {
+        items.push({ lesson: entry.lesson, course: entry.course, section: cmd.section, code: cmd.code });
+      }
+    }
+    let query = '';
+    container.innerHTML = `
+      <div class="fa-dashboard academy-directory">
+        <div class="academy-directory-head">
+          <div>
+            <span class="journey-kicker">CISCO IOS COMMAND REFERENCE</span>
+            <h1>مرجع و پوشش فرمان‌های IOS</h1>
+            <p>${items.length.toLocaleString('fa-IR')} بلوک فرمان عملی استخراج‌شده از ${loaded.length.toLocaleString('fa-IR')} درس آموزشی</p>
+          </div>
+          ${onBack ? '<button type="button" class="fa-action" id="acad-cov-back">← بازگشت به خانه آکادمی</button>' : ''}
+        </div>
+        <div class="academy-directory-toolbar">
+          <label class="search-box">
+            <input type="search" id="acad-cov-search" placeholder="جست‌وجوی فرمان یا مبحث (مثلاً ospf، vlan، show ip route، switchport)…">
+          </label>
+        </div>
+        <div id="acad-cov-list" class="academy-cmd-grid"></div>
+      </div>`;
+    if (onBack) container.querySelector('#acad-cov-back').onclick = onBack;
+    const listEl = container.querySelector('#acad-cov-list');
+    const searchEl = container.querySelector('#acad-cov-search');
+
+    function draw() {
+      const q = query.trim().toLowerCase();
+      const filtered = q ? items.filter(it => (it.code + ' ' + it.lesson.title + ' ' + it.section).toLowerCase().includes(q)) : items;
+      if (!filtered.length) {
+        listEl.innerHTML = '<div class="empty-state"><h3>فرمانی با این عبارت یافت نشد</h3><p>عبارت دیگری مانند interface یا show وارد کنید.</p></div>';
+        return;
+      }
+      listEl.innerHTML = filtered.map((it, idx) => `
+        <article class="fa-course academy-cmd-card">
+          <div class="fa-course-head">
+            <div><h3>${esc(it.lesson.title)}</h3><small>${esc(it.section || it.course.title)}</small></div>
+            <div class="actions">
+              <button type="button" class="fa-action" data-copy-cmd="${idx}">کپی فرمان</button>
+              <button type="button" class="fa-action primary" data-open-cmd="${esc(it.lesson.blueprint)}">باز کردن درس ←</button>
+            </div>
+          </div>
+          <pre class="cli-block" dir="ltr"><code>${esc(it.code)}</code></pre>
+        </article>`).join('');
+      listEl.querySelectorAll('[data-open-cmd]').forEach(btn => {
+        btn.onclick = () => onOpenLesson(btn.dataset.openCmd);
+      });
+      listEl.querySelectorAll('[data-copy-cmd]').forEach(btn => {
+        btn.onclick = async () => {
+          const item = filtered[Number(btn.dataset.copyCmd)];
+          if (!item) return;
+          try { await navigator.clipboard.writeText(item.code); btn.textContent = 'کپی شد ✓'; setTimeout(() => { btn.textContent = 'کپی فرمان'; }, 1400); } catch {}
+        };
+      });
+    }
+    searchEl.addEventListener('input', () => { query = searchEl.value; draw(); });
+    draw();
+  }
+
+  async function renderGlossaryDirectory(container, catalog, onOpenLesson, onBack) {
+    container.innerHTML = '<div class="fa-loading">در حال گردآوری واژه‌نامهٔ تخصصی شبکه…</div>';
+    const loaded = await loadAllBlueprints(catalog);
+    const terms = new Map();
+    for (const entry of loaded) {
+      for (const g of (entry.bp?.glossary || [])) {
+        if (!g?.term) continue;
+        const key = g.term.toLowerCase();
+        if (!terms.has(key)) terms.set(key, { ...g, lesson: entry.lesson });
+      }
+    }
+    const sorted = [...terms.values()].sort((a, b) => a.term.localeCompare(b.term));
+    let query = '';
+    container.innerHTML = `
+      <div class="fa-dashboard academy-directory">
+        <div class="academy-directory-head">
+          <div>
+            <span class="journey-kicker">NETWORKING GLOSSARY</span>
+            <h1>واژه‌نامهٔ جامع شبکه</h1>
+            <p>${sorted.length.toLocaleString('fa-IR')} اصطلاح تخصصی از تمام درس‌های Curriculum 5.0</p>
+          </div>
+          ${onBack ? '<button type="button" class="fa-action" id="acad-glo-back">← بازگشت به خانه آکادمی</button>' : ''}
+        </div>
+        <div class="academy-directory-toolbar">
+          <label class="search-box">
+            <input type="search" id="acad-glo-search" placeholder="جست‌وجوی اصطلاح انگلیسی یا فارسی (مثلاً ARP، VLAN، Broadcast)…">
+          </label>
+        </div>
+        <div id="acad-glo-list" class="academy-glossary-grid"></div>
+      </div>`;
+    if (onBack) container.querySelector('#acad-glo-back').onclick = onBack;
+    const listEl = container.querySelector('#acad-glo-list');
+    const searchEl = container.querySelector('#acad-glo-search');
+
+    function draw() {
+      const q = query.trim().toLowerCase();
+      const filtered = q ? sorted.filter(g => [g.term, g.fa, g.simple, g.lesson?.title].filter(Boolean).join(' ').toLowerCase().includes(q)) : sorted;
+      if (!filtered.length) {
+        listEl.innerHTML = '<div class="empty-state"><h3>اصطلاحی یافت نشد</h3><p>واژهٔ دیگری را جست‌وجو کنید.</p></div>';
+        return;
+      }
+      listEl.innerHTML = filtered.map(g => `
+        <article class="card academy-glossary-card">
+          <div class="academy-glossary-top">
+            <strong dir="ltr">${esc(g.term)}</strong>
+            <span class="tag">${esc(g.fa || '')}</span>
+          </div>
+          <p>${esc(g.simple || g.fa || '')}</p>
+          ${g.lesson?.blueprint ? `<button type="button" class="journey-link" data-glo-open="${esc(g.lesson.blueprint)}">مطالعه در: ${esc(g.lesson.title)} ←</button>` : ''}
+        </article>`).join('');
+      listEl.querySelectorAll('[data-glo-open]').forEach(btn => {
+        btn.onclick = () => onOpenLesson(btn.dataset.gloOpen);
+      });
+    }
+    searchEl.addEventListener('input', () => { query = searchEl.value; draw(); });
+    draw();
+  }
+
+  window.FamAcademyCatalog = {
+    getCompletedSet,
+    calcCourseProgress,
+    calcPathProgress,
+    renderDashboard,
+    renderPathRoadmap,
+    renderLessonsIndex,
+    renderCommandCoverage,
+    renderGlossaryDirectory
+  };
 })();

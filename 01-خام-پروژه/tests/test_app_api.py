@@ -222,7 +222,46 @@ class FamAppApiTests(unittest.TestCase):
 
         academy_res = self.client.get("/academy", environ_base=self.https_env)
         self.assertEqual(academy_res.status_code, 200)
-        self.assertIn("fam3.progress.v1", academy_res.get_data(as_text=True))
+        academy_html = academy_res.get_data(as_text=True)
+        self.assertIn("fam3.progress.v1", academy_html)
+        self.assertIn('"allowedViews":{"panel":true,"equipment":true}', academy_html)
+
+        # Create custom users with restricted permissions and verify /academy allowedViews
+        users_state = self.client.get("/api/users", environ_base=self.https_env)
+        self.assertEqual(users_state.status_code, 200)
+        users_payload = users_state.get_json()
+        users_list = list(users_payload["users"])
+        users_list.extend([
+            {
+                "id": "eq-only-user-01",
+                "username": "eq_only_user",
+                "name": "Equipment Only",
+                "enabled": True,
+                "regions": [],
+                "sheets": [],
+                "categories": [],
+                "permissions": ["equipment-operations"],
+                "password": "EqUserPass!2026",
+            },
+            {
+                "id": "db-only-user-01",
+                "username": "db_only_user",
+                "name": "Database Only",
+                "enabled": True,
+                "regions": [],
+                "sheets": [],
+                "categories": [],
+                "permissions": ["view-sheets"],
+                "password": "DbUserPass!2026",
+            },
+        ])
+        save_users_res = self.client.post(
+            "/api/users",
+            json={"revision": users_payload["revision"], "users": users_list},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(save_users_res.status_code, 200)
 
         asset_res = self.client.get("/academy-assets/curriculum-catalog.json", environ_base=self.https_env)
         try:
@@ -234,6 +273,42 @@ class FamAppApiTests(unittest.TestCase):
             "/api/logout",
             json={},
             headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(out.status_code, 200)
+
+        eq_login = self.client.post(
+            "/api/login",
+            json={"username": "eq_only_user", "password": "EqUserPass!2026"},
+            headers={"Origin": self.ORIGIN},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(eq_login.status_code, 200)
+        eq_academy = self.client.get("/academy", environ_base=self.https_env)
+        self.assertEqual(eq_academy.status_code, 200)
+        self.assertIn('"allowedViews":{"panel":false,"equipment":true}', eq_academy.get_data(as_text=True))
+        self.client.post(
+            "/api/logout",
+            json={},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": eq_login.get_json()["csrf"]},
+            environ_base=self.https_env,
+        )
+
+        db_login = self.client.post(
+            "/api/login",
+            json={"username": "db_only_user", "password": "DbUserPass!2026"},
+            headers={"Origin": self.ORIGIN},
+            environ_base=self.https_env,
+        )
+        self.assertEqual(db_login.status_code, 200)
+        db_academy = self.client.get("/academy", environ_base=self.https_env)
+        self.assertEqual(db_academy.status_code, 200)
+        self.assertIn('"allowedViews":{"panel":true,"equipment":false}', db_academy.get_data(as_text=True))
+
+        out = self.client.post(
+            "/api/logout",
+            json={},
+            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": db_login.get_json()["csrf"]},
             environ_base=self.https_env,
         )
         self.assertEqual(out.status_code, 200)

@@ -829,7 +829,23 @@ def create_app(config=None):
         progress = json.loads(row['payload']) if row else {}
         if not isinstance(progress, dict):
             fail(500, 'وضعیت آکادمی معتبر نیست؛ با مدیر سامانه تماس بگیرید.')
-        bootstrap = {'userName': user['name'], 'csrf': session['csrf'], 'progress': progress}
+        bootstrap = {
+            'userName': user['name'],
+            'csrf': session['csrf'],
+            'progress': progress,
+            'allowedViews': {
+                'panel': bool(
+                    (DATA_PERMISSIONS & set(user['permissions']))
+                    if is_custom_user(user)
+                    else user['role'] in (1, 2, 3, 4)
+                ),
+                'equipment': bool(
+                    ('equipment-operations' in user['permissions'] or 'manage-users' in user['permissions'])
+                    if is_custom_user(user)
+                    else user['role'] <= 2
+                ),
+            },
+        }
         encoded = json.dumps(bootstrap, ensure_ascii=True, separators=(',', ':'))
         encoded = encoded.replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
         page = (ROOT/'private_ui'/'academy.html').read_text(encoding='utf-8')
