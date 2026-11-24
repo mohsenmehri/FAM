@@ -8,7 +8,7 @@
   const profile = () => current().profile || {};
   async function getCatalog() {
     if (!catalog) {
-      const res = await fetch('/academy-assets/curriculum-catalog.json', { cache:'no-store' });
+      const res = await fetch('/academy-assets/curriculum-catalog.json?v=20261123h', { cache:'no-store' });
       if (!res.ok) throw new Error('کاتالوگ در دسترس نیست');
       catalog = await res.json();
     }

@@ -26,12 +26,22 @@
     (path.courses || []).forEach(course => { const p = calcCourseProgress(course, completed); done += p.done; total += p.total; });
     return { done, total, pct: total ? Math.round(done / total * 100) : 0 };
   }
+  function resolveFacultyId(lesson, course) {
+    if (lesson?.facultyId) return lesson.facultyId;
+    if (course?.facultyId) return course.facultyId;
+    const id = String(lesson?.id || '');
+    if (id.startsWith('ccna-')) return 'f1';
+    const m = id.match(/^fam-(f\d)-/);
+    if (m) return m[1];
+    return 'f0';
+  }
+
   function renderDashboard(container, catalog, onOpenLesson) {
     const completed = getCompletedSet(), paths = catalog?.paths || [];
     const profile = window.FamAcademyBridge?.progress?.profile || {};
-    const all = paths.flatMap(p => (p.courses || []).flatMap(c => c.lessons || []));
     const chosen = paths.find(p => p.id === profile.goal) || paths[0];
-    const target = (chosen?.courses || []).flatMap(c => c.lessons || []);
+    const allWithMeta = paths.flatMap(p => (p.courses || []).flatMap(c => (c.lessons || []).map(l => ({ ...l, _facultyId: resolveFacultyId(l, c) }))));
+    const target = (chosen?.courses || []).flatMap(c => (c.lessons || []).map(l => ({ ...l, _facultyId: resolveFacultyId(l, c) })));
     const assessed = new Set(window.FamAcademyBridge?.progress?.selfAssessed || []);
     const ready = item => (item.prerequisites || []).every(id => completed.has(id) || assessed.has(id));
 
@@ -40,13 +50,15 @@
       ? window.FamAcademyPlacement.getActiveFaculty()
       : { id: 'f0', tier: 0, badge: 'دانشکده ۰ · ۱ ماه', title: 'ارزیابی و تکمیل مبانی', note: 'شروع از مبانی شبکه' };
 
-    const preferCcna = (activeFaculty.tier || 0) >= 1;
-    const next = (preferCcna && target.find(l => !completed.has(l.id) && l.id.startsWith('ccna-') && l.blueprint))
+    const activeFacultyLessons = target.filter(l => l._facultyId === activeFaculty.id && l.blueprint);
+    const next = activeFacultyLessons.find(l => !completed.has(l.id) && ready(l))
+      || activeFacultyLessons.find(l => !completed.has(l.id))
       || target.find(l => !completed.has(l.id) && l.blueprint && ready(l))
-      || all.find(l => !completed.has(l.id) && l.blueprint && ready(l))
-      || all.find(l => l.blueprint);
+      || activeFacultyLessons[0]
+      || allWithMeta.find(l => l.blueprint);
 
     const done = target.filter(l => completed.has(l.id)).length;
+    const facDone = activeFacultyLessons.filter(l => completed.has(l.id)).length;
     const pct = target.length ? Math.round(done / target.length * 100) : 0;
     const user = window.FamAcademyBridge?.user?.username || '';
     const greeting = user && user !== 'e2e-test-user' ? `خوش آمدی، ${esc(user)}` : 'خوش آمدی، مهندس آیندهٔ شبکه';
@@ -56,13 +68,32 @@
     const stepperHtml = faculties.map(f => {
       const isCurrent = f.id === activeFaculty.id;
       const isPassed = f.tier < (activeFaculty.tier || 0);
-      const badgeText = isCurrent ? 'سطح فعال شما' : isPassed ? '✓ پشت‌سر گذاشته‌شده' : 'مرحلهٔ بعدی';
+      const fLessons = target.filter(l => l._facultyId === f.id);
+      const fDoneCount = fLessons.filter(l => completed.has(l.id)).length;
+      const badgeText = isCurrent ? 'سطح فعال شما' : isPassed ? '✓ پشت‌سر گذاشته‌شده' : 'انتخاب سطح';
       return `<button type="button" class="fam-step-card ${isCurrent ? 'is-current' : isPassed ? 'is-passed' : ''}" data-pick-stage="${esc(f.id)}">
         <div class="fam-faculty-top"><span class="fam-faculty-badge">${esc(f.badge)}</span><small>${badgeText}</small></div>
         <strong>${esc(f.title)}</strong>
         <small>${esc(f.note)}</small>
+        <small style="color:var(--c-brand);font-weight:700">${fDoneCount.toLocaleString('fa-IR')} از ${fLessons.length.toLocaleString('fa-IR')} درس تکمیل‌شده</small>
       </button>`;
     }).join('');
+
+    const activeLessonsHtml = activeFacultyLessons.length
+      ? activeFacultyLessons.map((lesson, idx) => {
+          const isDone = completed.has(lesson.id);
+          const isReady = ready(lesson);
+          const badge = isDone ? '<span class="status status-done">تکمیل‌شده</span>' : isReady ? '<span class="status status-progress">آمادهٔ مطالعه</span>' : '<span class="status status-locked">پیش‌نیاز پیشنهادی</span>';
+          const minsBadge = lesson.estimatedMinutes ? `<span class="tag">${Number(lesson.estimatedMinutes).toLocaleString('fa-IR')} دقیقه</span>` : '';
+          return `<div class="fa-lesson-row">
+            <span class="fa-lesson-num">${String(idx + 1).padStart(2, '0')}</span>
+            <div class="fa-lesson-info"><strong>${esc(lesson.title)}</strong><small>${esc(lesson.summary || '')}</small></div>
+            ${badge}
+            ${minsBadge}
+            <button type="button" class="fa-action ${isDone ? '' : 'primary'}" data-dash-open="${esc(lesson.blueprint)}">${isDone ? 'مرور درس' : 'شروع درس'} ←</button>
+          </div>`;
+        }).join('')
+      : '<div class="empty-state"><h3>درسی برای این دانشکده ثبت نشده است</h3></div>';
 
     container.innerHTML = `
       <div class="fam-clean-wrap">
@@ -70,7 +101,7 @@
           <div class="fam-dash-status-info">
             <span class="fam-kicker">ACTIVE LEVEL · ${esc(modeLabel)}</span>
             <strong>${esc(activeFaculty.badge)} — ${esc(activeFaculty.title)}</strong>
-            <span>${esc(activeFaculty.note)} · برنامهٔ روزانه: ${mins} دقیقه</span>
+            <span>${esc(activeFaculty.note)} · پیشرفت این دانشکده: ${facDone.toLocaleString('fa-IR')} از ${activeFacultyLessons.length.toLocaleString('fa-IR')} درس · برنامهٔ روزانه: ${mins.toLocaleString('fa-IR')} دقیقه</span>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button type="button" class="fam-btn-secondary" id="fam-change-level">تغییر دستی سطح</button>
@@ -89,22 +120,33 @@
             <div class="fam-dash-cta-row">
               ${next ? '<button type="button" class="fam-btn-primary" id="fa-continue">شروع / ادامهٔ درس ←</button>' : ''}
               <button type="button" class="fam-btn-secondary" data-open-sim="1">شبیه‌ساز پروتکل و ترمینال IOS</button>
-              <button type="button" class="fam-btn-secondary" data-open-paths="1">مشاهدهٔ کل ${target.length} درس آماده</button>
+              <button type="button" class="fam-btn-secondary" data-open-paths="1">مشاهدهٔ کل ${target.length.toLocaleString('fa-IR')} درس آماده</button>
             </div>
           </div>
           <aside class="fam-dash-ring-card">
             <span class="fam-kicker">PROGRESS</span>
-            <div class="reference-ring" style="--progress:${pct}%"><span><strong>${pct}٪</strong><small>تکمیل درس‌ها</small></span></div>
-            <small style="color:var(--c-text-2)">${done} از ${target.length} درس تکمیل شده</small>
+            <div class="reference-ring" style="--progress:${pct}%"><span><strong>${pct.toLocaleString('fa-IR')}٪</strong><small>تکمیل کل مسیر</small></span></div>
+            <small style="color:var(--c-text-2)">${done.toLocaleString('fa-IR')} از ${target.length.toLocaleString('fa-IR')} درس تکمیل شده</small>
             <button type="button" class="journey-link" data-journey-action="progress">جزئیات پیشرفت ←</button>
           </aside>
+        </section>
+
+        <section class="fa-course" style="margin:0" aria-label="درس‌های دانشکده فعال">
+          <div class="fa-course-head">
+            <div>
+              <h2 style="margin:0;font-size:1.1rem">درس‌های دانشکدهٔ فعال شما: ${esc(activeFaculty.title)}</h2>
+              <small>${facDone.toLocaleString('fa-IR')} از ${activeFacultyLessons.length.toLocaleString('fa-IR')} درس این دانشکده تکمیل‌شده</small>
+            </div>
+            <button type="button" class="fam-btn-secondary" data-open-lessons="1">مشاهدهٔ همهٔ ${target.length.toLocaleString('fa-IR')} درس ←</button>
+          </div>
+          <div class="fa-lesson-list">${activeLessonsHtml}</div>
         </section>
 
         <section style="display:grid;gap:12px">
           <div class="journey-heading">
             <div>
               <h2>مسیر ۷ دانشکدهٔ آکادمی (از صفر تا CCIE و CCDE)</h2>
-              <p>روی هر دانشکده کلیک کنید تا سطح شما روی آن تنظیم شود یا نقشهٔ کامل ۱۷بخشی آن را ببینید.</p>
+              <p>روی هر دانشکده کلیک کنید تا سطح شما بلافاصله روی آن تنظیم شود و درس‌های همان دانشکده را ببینید.</p>
             </div>
             <button type="button" class="fam-btn-secondary" data-open-tree="1">نمایش درخت کامل دانشکده‌ها ←</button>
           </div>
@@ -116,7 +158,7 @@
             <div>
               <span class="fam-kicker">LESSONS</span>
               <h3>فهرست درس‌ها و نقشه‌راه</h3>
-              <p>مرور مرحله‌به‌مرحلهٔ ۱۴ درس تعاملی فعلی با آزمون پایان درس و ثبت در سرور.</p>
+              <p>مرور مرحله‌به‌مرحلهٔ ${target.length.toLocaleString('fa-IR')} درس تعاملی در ۷ دانشکده با آزمایشگاه و آزمون پایان درس.</p>
             </div>
             <button type="button" class="fam-btn-secondary" data-open-lessons="1">باز کردن درس‌ها ←</button>
           </article>
@@ -157,11 +199,16 @@
     container.querySelectorAll('[data-pick-stage]').forEach(btn => {
       btn.onclick = async () => {
         const fid = btn.dataset.pickStage;
+        const level = fid === 'f0' ? 'beginner' : (fid === 'f1' || fid === 'f2' ? 'intermediate' : 'advanced');
         const prev = window.FamAcademyBridge?.progress || { completed: [], labs: {} };
-        const prof = { ...(prev.profile || {}), onboardingComplete: true, goal: 'fam-c5', facultyId: fid, placementMode: 'manual' };
+        const prof = { ...(prev.profile || {}), onboardingComplete: true, goal: 'fam-c5', facultyId: fid, currentStage: fid, level, placementMode: 'manual' };
         await window.FamAcademyBridge?.saveProgress({ ...prev, completed: [...completed], profile: prof });
         renderDashboard(container, catalog, onOpenLesson);
+        window.scrollTo({ top: 0, behavior: 'auto' });
       };
+    });
+    container.querySelectorAll('[data-dash-open]').forEach(btn => {
+      btn.onclick = () => onOpenLesson(btn.dataset.dashOpen);
     });
     container.querySelectorAll('[data-open-tree]').forEach(btn => { btn.onclick = () => { location.hash = '#/tree'; }; });
     container.querySelectorAll('[data-open-sim]').forEach(btn => { btn.onclick = () => { location.hash = '#/simulators'; }; });
@@ -172,6 +219,7 @@
     container.querySelectorAll('[data-journey-action]').forEach(btn => { btn.onclick = () => { location.hash = '#/progress'; }; });
     const continueBtn = container.querySelector('#fa-continue');
     if (continueBtn && next) continueBtn.onclick = () => onOpenLesson(next.blueprint);
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }
   function renderPathRoadmap(container, path, onBack, onOpenLesson, catalog) {
     const completed = getCompletedSet(), prog = calcPathProgress(path, completed);
@@ -180,7 +228,13 @@
     const lessons = (path.courses || []).flatMap(c => c.lessons || []);
     const assessed = new Set(window.FamAcademyBridge?.progress?.selfAssessed || []);
     const ready = l => (l.prerequisites || []).every(id => completed.has(id) || assessed.has(id));
-    const next = lessons.find(l => !completed.has(l.id) && ready(l) && l.blueprint) || lessons.find(l => !completed.has(l.id)) || lessons[0];
+    const activeFacultyId = window.FamAcademyPlacement?.getActiveFaculty?.()?.id || 'f0';
+    const facultyLessons = lessons.filter(l => resolveFacultyId(l) === activeFacultyId);
+    const next = facultyLessons.find(l => !completed.has(l.id) && ready(l) && l.blueprint)
+      || facultyLessons.find(l => !completed.has(l.id) && l.blueprint)
+      || lessons.find(l => !completed.has(l.id) && ready(l) && l.blueprint)
+      || lessons.find(l => !completed.has(l.id))
+      || lessons[0];
     const cols = 4, stepX = 210, stepY = 150, rows = Math.ceil(lessons.length / cols), graphWidth = 850, graphHeight = Math.max(230, rows * stepY + 60);
     const point = i => ({ x: 110 + (i % cols) * stepX, y: 65 + Math.floor(i / cols) * stepY });
     const lines = lessons.flatMap((l,i) => (l.prerequisites || []).map(id => {
@@ -300,11 +354,14 @@
     const completed = getCompletedSet();
     const assessed = new Set(window.FamAcademyBridge?.progress?.selfAssessed || []);
     const paths = catalog?.paths || [];
-    const allLessons = paths.flatMap(p => (p.courses || []).flatMap(c => (c.lessons || []).map(l => ({ ...l, path: p, course: c }))));
+    const allLessons = paths.flatMap(p => (p.courses || []).flatMap(c => (c.lessons || []).map(l => ({ ...l, path: p, course: c, _facultyId: resolveFacultyId(l, c) }))));
     const total = allLessons.length;
     const doneCount = allLessons.filter(l => completed.has(l.id)).length;
     const pct = total ? Math.round((doneCount / total) * 100) : 0;
+    const faculties = window.FamAcademyPlacement?.FACULTIES || [];
+    const activeFac = window.FamAcademyPlacement?.getActiveFaculty?.();
     let activeFilter = 'all';
+    let facultyFilter = 'all';
     let query = '';
 
     const ready = l => (l.prerequisites || []).every(id => completed.has(id) || assessed.has(id));
@@ -313,27 +370,36 @@
         <div class="academy-directory-head">
           <div>
             <span class="journey-kicker">CURRICULUM LIBRARY</span>
-            <h1>فهرست کامل درس‌ها</h1>
-            <p>${doneCount.toLocaleString('fa-IR')} از ${total.toLocaleString('fa-IR')} درس تکمیل‌شده (${pct.toLocaleString('fa-IR')}٪)</p>
+            <h1>فهرست کامل درس‌ها در ۷ دانشکده</h1>
+            <p>${doneCount.toLocaleString('fa-IR')} از ${total.toLocaleString('fa-IR')} درس تکمیل‌شده (${pct.toLocaleString('fa-IR')}٪)${activeFac ? ` · سطح فعال شما: <strong>${esc(activeFac.badge)}</strong>` : ''}</p>
           </div>
           ${onBack ? '<button type="button" class="fa-action" id="acad-lib-back">← بازگشت به خانه آکادمی</button>' : ''}
         </div>
-        <div class="academy-directory-toolbar">
-          <div class="segmented" role="tablist" aria-label="فیلتر وضعیت درس">
-            <button type="button" class="active" data-lib-filter="all">همه (${total.toLocaleString('fa-IR')})</button>
-            <button type="button" data-lib-filter="ready">آمادهٔ مطالعه</button>
-            <button type="button" data-lib-filter="done">تکمیل‌شده (${doneCount.toLocaleString('fa-IR')})</button>
-            <button type="button" data-lib-filter="locked">دارای پیش‌نیاز</button>
+        <div class="academy-directory-toolbar" style="flex-direction:column;align-items:stretch;gap:10px">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">
+            <div class="segmented" role="tablist" aria-label="فیلتر وضعیت درس">
+              <button type="button" class="active" data-lib-filter="all">همه (${total.toLocaleString('fa-IR')})</button>
+              <button type="button" data-lib-filter="ready">آمادهٔ مطالعه</button>
+              <button type="button" data-lib-filter="done">تکمیل‌شده (${doneCount.toLocaleString('fa-IR')})</button>
+              <button type="button" data-lib-filter="locked">دارای پیش‌نیاز</button>
+            </div>
+            <label class="search-box">
+              <input type="search" id="fam-lessons-search" placeholder="جست‌وجوی درس، مبحث یا کلیدواژه (مثلاً BGP، EVPN، OSPF، Subnet)…">
+            </label>
           </div>
-          <label class="search-box">
-            <input type="search" id="acad-lib-search" placeholder="فیلتر عنوان یا کلیدواژه درس…">
-          </label>
+          <div class="segmented" role="tablist" aria-label="فیلتر بر اساس دانشکده" style="flex-wrap:wrap">
+            <button type="button" class="active" data-lib-faculty="all">همهٔ ۷ دانشکده</button>
+            ${faculties.map(f => {
+              const cnt = allLessons.filter(l => l._facultyId === f.id).length;
+              return `<button type="button" data-lib-faculty="${esc(f.id)}">${esc(f.badge.split('·')[0].trim())} (${cnt.toLocaleString('fa-IR')})</button>`;
+            }).join('')}
+          </div>
         </div>
         <div id="acad-lib-list"></div>
       </div>`;
     if (onBack) container.querySelector('#acad-lib-back').onclick = onBack;
     const listEl = container.querySelector('#acad-lib-list');
-    const searchEl = container.querySelector('#acad-lib-search');
+    const searchEl = container.querySelector('#fam-lessons-search');
 
     function draw() {
       const q = query.trim().toLowerCase();
@@ -341,6 +407,8 @@
       for (const path of paths) {
         for (const course of (path.courses || [])) {
           const items = (course.lessons || []).filter(lesson => {
+            const fid = resolveFacultyId(lesson, course);
+            if (facultyFilter !== 'all' && fid !== facultyFilter) return false;
             const isDone = completed.has(lesson.id);
             const isReady = ready(lesson);
             if (activeFilter === 'done' && !isDone) return false;
@@ -351,8 +419,9 @@
             return hay.includes(q);
           });
           if (!items.length) continue;
-          blocks.push(`<section class="fa-course">
-            <div class="fa-course-head"><h3>${esc(course.title)}</h3><small>${items.length.toLocaleString('fa-IR')} درس</small></div>
+          const isFacCourse = activeFac && (course.facultyId === activeFac.id);
+          blocks.push(`<section class="fa-course" ${isFacCourse ? 'style="border-color:var(--c-brand)"' : ''}>
+            <div class="fa-course-head"><h3>${esc(course.title)} ${isFacCourse ? '<span class="tag tag-brand">دانشکده فعال</span>' : ''}</h3><small>${items.length.toLocaleString('fa-IR')} درس</small></div>
             <div class="fa-lesson-list">${items.map((lesson, idx) => {
               const isDone = completed.has(lesson.id);
               const isReady = ready(lesson);
@@ -369,7 +438,7 @@
           </section>`);
         }
       }
-      listEl.innerHTML = blocks.length ? blocks.join('') : '<div class="empty-state"><h3>درسی با این فیلتر یافت نشد</h3><p>فیلتر یا عبارت جست‌وجو را تغییر دهید.</p></div>';
+      listEl.innerHTML = blocks.length ? blocks.join('') : '<div class="empty-state"><h3>درسی با این فیلتر یافت نشد</h3><p>فیلتر دانشکده یا عبارت جست‌وجو را تغییر دهید.</p></div>';
       listEl.querySelectorAll('[data-lib-open]').forEach(btn => {
         btn.onclick = () => { if (btn.dataset.libOpen) onOpenLesson(btn.dataset.libOpen); };
       });
@@ -378,6 +447,13 @@
       btn.onclick = () => {
         activeFilter = btn.dataset.libFilter;
         container.querySelectorAll('[data-lib-filter]').forEach(b => b.classList.toggle('active', b === btn));
+        draw();
+      };
+    });
+    container.querySelectorAll('[data-lib-faculty]').forEach(btn => {
+      btn.onclick = () => {
+        facultyFilter = btn.dataset.libFaculty;
+        container.querySelectorAll('[data-lib-faculty]').forEach(b => b.classList.toggle('active', b === btn));
         draw();
       };
     });
@@ -526,7 +602,7 @@
       return;
     }
 
-    const allLessons = (catalog?.paths || []).flatMap(p => (p.courses || []).flatMap(c => c.lessons || []));
+    const allLessons = (catalog?.paths || []).flatMap(p => (p.courses || []).flatMap(c => (c.lessons || []).map(l => ({ ...l, _facultyId: resolveFacultyId(l, c) }))));
     const findLesson = id => allLessons.find(l => l.id === id);
     const DAILY_KEY = 'fam_academy_daily_routine_v1';
     const todayKey = new Date().toISOString().slice(0, 10);
@@ -537,8 +613,17 @@
     } catch {}
 
     let activeTab = 'faculties';
-    let activeFaculty = 'f0';
+    let activeFaculty = window.FamAcademyPlacement?.getActiveFaculty?.()?.id || 'f0';
     let activeTrack = tree.facultyFourSpecialties?.tracks?.[0]?.id || 'enterprise';
+
+    const renderFacultyLessonsBox = fid => {
+      const fLessons = allLessons.filter(l => l._facultyId === fid && l.blueprint);
+      if (!fLessons.length) return '';
+      return `<div class="tree-subcard" style="margin-top:12px">
+        <h4>درس‌های تعاملی آماده در این دانشکده (${fLessons.length.toLocaleString('fa-IR')} درس)</h4>
+        <div class="tree-cta-row" style="margin-top:8px">${fLessons.map(l => `<button type="button" class="fa-action primary" data-tree-lesson="${esc(l.id)}">${esc(l.title)} ←</button>`).join('')}</div>
+      </div>`;
+    };
 
     const renderTabContent = () => {
       if (activeTab === 'faculties') {
@@ -639,6 +724,7 @@
             <h3>جدول کلان دانشکده‌ها (برای مشاهده جزئیات کامل، روی هر دانشکده بزنید)</h3>
             <div class="tree-faculty-tabs">${tree.facultiesSummary.map(f => `<button type="button" class="tree-faculty-btn ${activeFaculty === f.id ? 'active' : ''}" data-select-faculty="${esc(f.id)}"><small>دانشکده ${esc(f.number)} · ${esc(f.duration)}</small><strong>${esc(f.title)}</strong></button>`).join('')}</div>
             ${fMap[activeFaculty] || fMap.f0}
+            ${renderFacultyLessonsBox(activeFaculty)}
           </section>`;
       }
 

@@ -148,7 +148,7 @@ class AcademyContentTests(unittest.TestCase):
                 self.assertTrue(local_path.is_file())
 
     def test_served_curriculum_is_curriculum_5_0_only(self):
-        prefixes = ("ccna-v11-", "ccna-v20-", "academy-stage-zero-")
+        prefixes = ("ccna-v11-", "ccna-v20-", "academy-stage-zero-", "fam-f")
         self.assertEqual([p["id"] for p in self.catalog["paths"]], ["fam-c5"])
         for _, _, lesson in self.records:
             with self.subTest(lesson=lesson["id"]):
@@ -289,9 +289,19 @@ class AcademyContentTests(unittest.TestCase):
             self.assertTrue(0 <= q["correctIndex"] < 4)
             self.assertTrue(q.get("explanation"))
 
-        for token in ('academy-placement.js', 'academy-placement.css', '#/placement', 'evaluatePlacement'):
+        for token in ('academy-placement.js', 'academy-placement.css', '#/placement', 'evaluatePlacement', 'needsInitialPlacement', 'startsWith(\'#/\')'):
             self.assertIn(token, academy_html)
         self.assertIn("#/placement", shell_js)
+
+        ui_css = (ASSET_ROOT / "academy-reference-ui.css").read_text(encoding="utf-8")
+        self.assertIn("position: sticky !important;", ui_css)
+        self.assertIn("position: static !important;", ui_css)
+
+        covered_faculties = {
+            lesson.get("facultyId") or course.get("facultyId")
+            for _, course, lesson in self.records
+        }
+        self.assertEqual(covered_faculties, {"f0", "f1", "f2", "f3", "f4", "f5", "f6"})
 
 
 if __name__ == "__main__":

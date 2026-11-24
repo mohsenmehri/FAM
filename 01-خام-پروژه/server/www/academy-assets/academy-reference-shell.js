@@ -96,7 +96,7 @@
   const pathMeter=el('div','meter'); const pathFill=el('i'); pathMeter.append(pathFill);
   const pathMeta=el('div','side-path-meta','');
   pathCard.append(pathMeter,pathMeta);
-  fetch('/academy-assets/curriculum-catalog.json?v=20261123c',{cache:'no-store'})
+  fetch('/academy-assets/curriculum-catalog.json?v=20261123h',{cache:'no-store'})
     .then(response=>{if(!response.ok)throw new Error('catalog unavailable');return response.json();})
     .then(catalog=>{
       const total=(catalog.paths||[]).reduce((sum,path)=>sum+(path.courses||[]).reduce((courseSum,course)=>courseSum+(course.lessons||[]).length,0),0);
@@ -177,45 +177,48 @@
     if(planner){planner.classList.add('open');planner.scrollIntoView({behavior:'smooth',block:'start'});}
     if(target){const node=$(target);if(node)node.scrollIntoView({behavior:'smooth',block:'center'});}
   }
+  function scrollTopClean(){
+    window.scrollTo({top:0,behavior:'auto'});
+  }
   function action(action){
     setActive(action);
     if(action==='placement'){
       if(location.hash !== '#/placement') location.hash = '#/placement'; else clickExisting('btn-placement');
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
     else if(action==='tree'){
       if(location.hash !== '#/tree') location.hash = '#/tree'; else clickExisting('btn-tree');
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
     else if(action==='paths'){
       if(location.hash !== '#/paths') location.hash = '#/paths'; else { location.hash = '#/dashboard'; location.hash = '#/paths'; }
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
     else if(action==='home'){
       if(location.hash !== '#/dashboard') location.hash = '#/dashboard'; else clickExisting('btn-paths');
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
     else if(action==='lessons'){
       if(location.hash !== '#/lessons') location.hash = '#/lessons'; else clickExisting('btn-lessons');
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
     else if(action==='simulators'){
       if(location.hash !== '#/simulators') location.hash = '#/simulators'; else clickExisting('btn-simulators');
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
     else if(action==='progress'){
       if(location.hash !== '#/progress') location.hash='#/progress'; else window.FamJourney?.renderProgress();
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
     else if(action==='coverage'){
       if(location.hash !== '#/coverage') location.hash = '#/coverage'; else clickExisting('btn-coverage');
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
-    else if(action==='sample'){clickExisting('btn-blueprint');root.scrollIntoView({behavior:'smooth',block:'start'});}
+    else if(action==='sample'){clickExisting('btn-blueprint');scrollTopClean();}
     else if(action==='planner'){clickExisting('s4-toggle-btn');showPlanner();}
     else if(action==='glossary'){
       if(location.hash !== '#/glossary') location.hash = '#/glossary'; else clickExisting('btn-glossary');
-      root.scrollIntoView({behavior:'smooth',block:'start'});
+      scrollTopClean();
     }
   }
   shell.addEventListener('click',(event)=>{
@@ -239,7 +242,13 @@
       const collapsed=shell.classList.toggle('academy-menu-collapsed');syncMenu(!collapsed);
     }
   });
-  search.addEventListener('click',()=>{const input=$('s4-search');if(input){input.focus();input.scrollIntoView({behavior:'smooth',block:'center'});}});
+  search.addEventListener('click',()=>{
+    if(location.hash !== '#/lessons') location.hash = '#/lessons';
+    setTimeout(()=>{
+      const input=$('fam-lessons-search')||$('s4-search');
+      if(input){input.focus();scrollTopClean();}
+    },60);
+  });
   document.addEventListener('keydown',(event)=>{
     if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();search.click();}
   });
@@ -290,7 +299,17 @@
     const m=progressText?.textContent||'';
     if(m){pathFill.style.width=(m.match(/\((\d+)٪\)/)?.[1]||'0')+'%';}
   }
+  const FAC_SHORT={f0:'دانشکده ۰ · مبانی',f1:'دانشکده ۱ · CCNA',f2:'دانشکده ۲ · R&S',f3:'دانشکده ۳ · CCNP',f4:'دانشکده ۴ · تخصصی',f5:'دانشکده ۵ · CCIE',f6:'دانشکده ۶ · CCDE'};
+  function syncFacultyChip(){
+    const stage=window.FamAcademyBridge?.progress?.profile?.currentStage||'';
+    const done=Boolean(window.FamAcademyBridge?.progress?.profile?.onboardingComplete);
+    const label=(done&&FAC_SHORT[stage])?`سطح فعال: ${FAC_SHORT[stage]}`:'انتخاب سطح / آزمون تعیین سطح';
+    const sp=streak.querySelector('span');
+    if(sp)sp.textContent=label;
+    streak.classList.toggle('lit', !done);
+  }
+  syncFacultyChip();
   const observer=progressText?new MutationObserver(syncSidebarProgress):null;
   if(observer&&progressText)observer.observe(progressText,{childList:true,subtree:true,characterData:true});
-  window.addEventListener('fam-academy-progress-updated',()=>{setTimeout(syncSidebarProgress,0);});
+  window.addEventListener('fam-academy-progress-updated',()=>{setTimeout(()=>{syncSidebarProgress();syncFacultyChip();},0);});
 })();

@@ -21,7 +21,7 @@
 
   async function loadBank() {
     if (bankCache) return bankCache;
-    const res = await fetch('/academy-assets/academy-placement-questions.json?v=20261123g', { credentials: 'same-origin', cache: 'no-store' });
+    const res = await fetch('/academy-assets/academy-placement-questions.json?v=20261123h', { credentials: 'same-origin', cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     bankCache = await res.json();
     return bankCache;
@@ -30,7 +30,7 @@
   function getActiveFaculty() {
     const profile = window.FamAcademyBridge?.progress?.profile || {};
     const list = bankCache?.faculties || DEFAULT_FACULTIES;
-    const fid = profile.facultyId;
+    const fid = profile.facultyId || profile.currentStage;
     if (fid) {
       const found = list.find((f) => f.id === fid);
       if (found) return found;
@@ -125,6 +125,7 @@
       onboardingComplete: true,
       goal: 'fam-c5',
       facultyId,
+      currentStage: facultyId,
       placementMode,
       level: mapFacultyToLevel(facultyId),
       minutesPerDay: Number(minutesPerDay) || Number(existingProfile.minutesPerDay) || 120,
@@ -438,6 +439,7 @@
     };
 
     draw();
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   window.FamAcademyPlacement = {
