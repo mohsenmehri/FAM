@@ -1,0 +1,218 @@
+{
+  "schemaVersion": "fam-academy-v1",
+  "id": "l07-static-routing",
+  "title": "Routing Table، Longest Prefix Match و Static Route",
+  "level": "متوسط",
+  "durationMinutes": 50,
+  "order": 7,
+  "status": "live",
+  "courseId": "c04-routing-ospf",
+  "chapterId": "p07-ospf-ch01",
+  "pathId": "p07-ospf",
+  "summary": "ساختار جدول مسیریابی، ترتیب تصمیمگیری و پیکربندی مسیرهای Static امن را بررسی میکنیم.",
+  "objectives": [
+    "خواندن یک Route Entry",
+    "توضیح Longest Prefix Match",
+    "پیکربندی Next-hop و Floating Static"
+  ],
+  "prerequisites": [
+    "l05-ipv4-subnetting"
+  ],
+  "sections": {
+    "concept": {
+      "title": "توضیح مفهومی",
+      "body": [
+        "روتر هنگام دریافت Packet، مقصد را باPrefixهای جدول مسیریابی مقایسه میکند؛ دقیقترین Prefix برنده میشود، حتی اگر Administrative Distance مسیر دیگری کمتر باشد."
+      ]
+    },
+    "deepDive": {
+      "title": "توضیح عمیق",
+      "body": [
+        "ترتیب تصمیم به این شکل است: ابتدا Longest Prefix Match، سپس در میان مسیرهای همprefix، کمترین AD و سپس Metric. مسیر Connected بر Static و Dynamic مقدم است. Static Route برای مقاصد مشخص و پایدار مناسب است، ولی در توپولوژیهای بزرگ نگهداری دستی خطاخیز میشود."
+      ]
+    },
+    "diagram": {
+      "title": "دیاگرام و نمایش بصری",
+      "body": [
+        "دو مسیر به سمت 203.0.113.0/24؛ longest prefix قبل از AD تصمیم میگیرد."
+      ],
+      "path": "/academy-content/v1/assets/diagrams/l07-static-routing.svg"
+    },
+    "realExample": {
+      "title": "مثال واقعی",
+      "body": [
+        "دو مسیر `203.0.113.0/24 via 192.0.2.1` و `203.0.113.0/25 via 198.51.100.1` وجود دارد. برای مقصد `203.0.113.10` مسیر /25 انتخاب میشود، چون دقیقتر است."
+      ]
+    },
+    "scenario": {
+      "title": "سناریوی عملی",
+      "body": [
+        "در تمرین، Prefixها و AD را تغییر دهید و مسیر منتخب را پیشبینی کنید؛ سپس با Packet Journey مسیر طیشده را مقایسه کنید."
+      ]
+    },
+    "commands": {
+      "title": "دستورات مرتبط Cisco IOS",
+      "body": [
+        "دستورات مرتبط Cisco IOS در ادامه آمدهاند؛ نحو دقیق باید با نسخه پلتفرم هدف تطبیق داده شود."
+      ],
+      "commands": [
+        {
+          "command": "ip route 203.0.113.0 255.255.255.0 192.0.2.1",
+          "explain": "مسیر Static به شبکه مستند از طریق Next-hop."
+        },
+        {
+          "command": "ip route 203.0.113.0 255.255.255.0 198.51.100.1 200",
+          "explain": "Floating Static با AD=200 بهعنوان پشتیبان."
+        },
+        {
+          "command": "show ip route static",
+          "explain": "نمایش مسیرهای Static و AD آنها."
+        }
+      ]
+    },
+    "commandWalkthrough": {
+      "title": "توضیح خطبهخط دستورات",
+      "body": [
+        "هر خط دستور و اثر آن بر Data Plane یا Control Plane توضیح داده شده است."
+      ],
+      "lines": [
+        {
+          "line": "ip route ... 192.0.2.1",
+          "explain": "یک مسیر با AD پیشفرض ۱ ایجاد میکند."
+        },
+        {
+          "line": "ip route ... 198.51.100.1 200",
+          "explain": "همان Prefix با AD بدتر فقط در صورت حذف مسیر اصلی وارد جدول میشود."
+        }
+      ]
+    },
+    "sampleOutput": {
+      "title": "خروجی نمونه",
+      "body": [
+        "خروجی زیر توسط Simulator داخلی FAM Academy تولید شده و صرفاً نمونهای آموزشی با برچسب Sample/Simulated است."
+      ],
+      "label": "Sample / Simulated — Internal Simulator",
+      "lines": [
+        "Sample / Simulated — Internal Simulator",
+        "S    203.0.113.0/24 [1/0] via 192.0.2.1",
+        "S    203.0.113.0/24 [200/0] via 198.51.100.1 (floating, inactive)"
+      ]
+    },
+    "commonMistakes": {
+      "title": "خطاهای رایج",
+      "body": [
+        "مقایسه AD پیش از Prefix",
+        "Next-hop خارج از شبکه Connected",
+        "فراموشکردن مسیر برگشت"
+      ]
+    },
+    "troubleshooting": {
+      "title": "روش Troubleshooting",
+      "body": [
+        "`show ip route <prefix>` و `show ip cef <prefix>` را مقایسه کنید.",
+        "مسیر رفت و برگشت را جداگانه بررسی کنید؛ نبود مسیر برگشت علت رایج یکطرفهشدن ارتباط است."
+      ]
+    },
+    "keyPoints": {
+      "title": "نکات مهم",
+      "body": [
+        "Longest Prefix Match اولویت اول است.",
+        "AD فقط بین مسیرهای همprefix مقایسه میشود.",
+        "Static Route مسیر برگشت هم نیاز دارد."
+      ]
+    },
+    "versionNotes": {
+      "title": "استاندارد، نسخه و رفتار Vendor",
+      "body": [
+        "مقادیر پیشفرض AD در Cisco متفاوت از برخی vendorهاست؛ مثلاً Connected=0 و Static=1 در IOS رایج است. همیشه مستند نسخه هدف را بررسی کنید."
+      ]
+    },
+    "summary": {
+      "title": "جمع بندی",
+      "body": [
+        "ساختار جدول مسیریابی، ترتیب تصمیمگیری و پیکربندی مسیرهای Static امن را بررسی میکنیم."
+      ]
+    },
+    "references": {
+      "title": "منابع معتبر",
+      "body": [
+        "RFC 791 — Internet Protocol",
+        "RFC 4632 — Classless Inter-domain Routing (CIDR)",
+        "RFC 5737 — IPv4 Address Blocks Reserved for Documentation",
+        "Cisco IOS XE Configuration Guides — Switching, Routing and Security sections"
+      ]
+    },
+    "quiz": {
+      "title": "آزمون کوتاه",
+      "body": [
+        "آزمون کوتاه شامل پرسشهای سناریومحور است؛ پاسخ تشریحی پس از ثبت نمایش داده میشود."
+      ]
+    },
+    "nextSteps": {
+      "title": "گام بعد",
+      "body": [
+        "پس از این درس، مسیر زیر پیشنهاد میشود: l08-ospf-neighbor-formation"
+      ]
+    }
+  },
+  "references": [
+    "RFC791",
+    "RFC4632",
+    "RFC5737",
+    "CISCO_IOS_XE"
+  ],
+  "quiz": [
+    {
+      "id": "q1",
+      "prompt": "کدام معیار ابتدا در انتخاب مسیر بررسی میشود؟",
+      "options": [
+        "Administrative Distance",
+        "Metric",
+        "Longest Prefix Match",
+        "نام اینترفیس"
+      ],
+      "answerIndex": 2,
+      "explanation": "اول دقیقترین Prefix، سپس AD/Metric.",
+      "points": 1
+    },
+    {
+      "id": "q2",
+      "prompt": "AD=200 روی Static Route دوم چه کاربردی دارد؟",
+      "options": [
+        "افزایش امنیت",
+        "Floating Backup",
+        "تغییر MTU",
+        "فعالکردن OSPF"
+      ],
+      "answerIndex": 1,
+      "explanation": "تا زمانی که مسیر بهتر موجود است، مسیر با AD بالاتر inactive میماند.",
+      "points": 1
+    },
+    {
+      "id": "q3",
+      "prompt": "علت رایج یکطرفهشدن ارتباط با Static Route چیست؟",
+      "options": [
+        "کمبود ARP",
+        "نبود مسیر برگشت",
+        "فعالبودن CDP",
+        "MTU بزرگ"
+      ],
+      "answerIndex": 1,
+      "explanation": "روتر مقصد باید مسیری به سمت مبدأ داشته باشد.",
+      "points": 1
+    }
+  ],
+  "diagramPath": "/academy-content/v1/assets/diagrams/l07-static-routing.svg",
+  "assetRefs": [
+    "/academy-content/v1/assets/diagrams/l07-static-routing.svg"
+  ],
+  "simulationIds": [],
+  "labIds": [],
+  "exerciseId": "ex07-longest-match",
+  "nextLessonIds": [
+    "l08-ospf-neighbor-formation"
+  ],
+  "contentPath": "/academy-content/v1/lessons/l07-static-routing.json",
+  "apiPath": "/api/academy/v2/lesson/l07-static-routing",
+  "version": "2026.11.24-p0"
+}

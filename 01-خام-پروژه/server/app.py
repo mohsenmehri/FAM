@@ -51,9 +51,20 @@ ROOT = Path(__file__).resolve().parent
 ACADEMY_STORAGE_KEYS = frozenset({
     'fam4.learn.v1', 'fam3.progress.v1', 'fam3.lab.v1', 'fam3.profile.v1',
     'fam3.level.v1', 'fam3.tour.v1', 'fam3.topo.positions', 'fam3.tab.v1',
-    'fam.academy.theme',
+    'fam.academy.theme', 'famAcademyV2.progress.v1',
 })
 SYSTEM = {'CONTROL_PANEL','SYSTEM_SEARCH_INDEX','SYSTEM_SHEET_CONFIG','SYSTEM_DATA_DICTIONARY','CHANGE_LOG','SEARCH_RESULTS','SYSTEM_KEYS','SYSTEM_UNDO_BUFFER','SYSTEM_NAVIGATOR'}
+ACADEMY_V2_ROOT = ROOT/'www'/'academy-content'/'v1'
+ACADEMY_V2_ID = re.compile(r'^[a-z0-9-]+$')
+def academy_v2_file(*parts):
+    """Return an existing file strictly inside the versioned v1 content tree."""
+    base = ACADEMY_V2_ROOT.resolve()
+    target = base.joinpath(*parts).resolve()
+    if base != target and base not in target.parents:
+        return None
+    return target if target.is_file() else None
+
+
 EPHEMERAL = SYSTEM - {'SYSTEM_SHEET_CONFIG', 'SYSTEM_KEYS'}
 META = {'SYSTEM_SHEET_CONFIG', 'SYSTEM_KEYS'}
 # `/api/state` may append this display-only log for authorised history users.
@@ -792,9 +803,9 @@ def create_app(config=None):
         return private_html_response(page)
     @app.get('/academy-assets/<path:filename>')
     def academy_assets(filename):
-        # Client assets stay behind the same FAM session as /academy; login.html
-        # only loads /login.css and /login.js.
-        if Path(filename).suffix.lower() not in {'.css', '.js', '.json', '.jpg', '.jpeg', '.png', '.webp'}:
+        # Client assets stay behind the same FAM session as /academy.
+        rel = Path(filename)
+        if rel.is_absolute() or '..' in rel.parts or rel.suffix.lower() not in {'.css', '.js', '.json', '.jpg', '.jpeg', '.png', '.webp', '.svg'}:
             fail(404, 'فایل مورد نظر یافت نشد.')
         with connect() as db:
             user_and_session(db)
@@ -802,22 +813,99 @@ def create_app(config=None):
 
     @app.get('/academy-content/<path:filename>')
     def academy_content(filename):
-        # Course documents and diagrams stay behind the same FAM session as /academy.
-        if filename != 'catalog.json' and not (
-                re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*\.md', filename) or
-                re.fullmatch(r'images/[a-z0-9]+(?:-[a-z0-9]+)*\.svg', filename)):
+        # Only the independently manifested, versioned v1 tree is served.
+        rel = Path(filename)
+        if rel.is_absolute() or '..' in rel.parts or not rel.parts or rel.parts[0] != 'v1':
+            fail(404, 'فایل مورد نظر یافت نشد.')
+        if rel.suffix.lower() not in {'.json', '.md', '.svg', '.css', '.js', '.png', '.jpg', '.jpeg', '.webp'}:
+            fail(404, 'فایل مورد نظر یافت نشد.')
+        base = (ROOT/'www'/'academy-content').resolve()
+        target = (base/rel).resolve()
+        if base != target and base not in target.parents:
             fail(404, 'فایل مورد نظر یافت نشد.')
         with connect() as db:
             user_and_session(db)
-        response = send_from_directory(ROOT/'www'/'academy-content', filename, max_age=0)
-        if filename.endswith('.md'):
-            response.headers['Content-Type'] = 'text/markdown; charset=utf-8'
-        elif filename.endswith('.svg'):
+        response = send_from_directory(base, str(rel), max_age=0)
+        if rel.suffix.lower() == '.svg':
             response.headers['Content-Security-Policy'] = (
                 "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; "
                 "script-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
             response.headers['Content-Disposition'] = 'inline'
+        elif rel.suffix.lower() == '.md':
+            response.headers['Content-Type'] = 'text/markdown; charset=utf-8'
         return response
+
+    @app.get('/api/academy/v2/health')
+    def academy_v2_health():
+        # The /api/ guard already enforced an authenticated session for GET.
+        return jsonify(ok=True, service='flask', schemaVersion='fam-academy-v1', contentVersion='2026.11.24-p0')
+
+    @app.get('/api/academy/v2/catalog')
+    def academy_v2_catalog():
+        p = academy_v2_file('catalog.json')
+        if not p: fail(404, 'کاتالوگ آکادمی یافت نشد.')
+        return jsonify(json.loads(p.read_text(encoding='utf-8')))
+
+    @app.get('/api/academy/v2/exercises')
+    def academy_v2_exercises():
+        p = academy_v2_file('exercises.json')
+        if not p: fail(404, 'تمرینهای آکادمی یافت نشد.')
+        return jsonify(json.loads(p.read_text(encoding='utf-8')))
+
+    @app.get('/api/academy/v2/references')
+    def academy_v2_references():
+        p = academy_v2_file('references.json')
+        if not p: fail(404, 'منابع آکادمی یافت نشد.')
+        return jsonify(json.loads(p.read_text(encoding='utf-8')))
+
+    @app.get('/api/academy/v2/lesson/<lesson_id>')
+    def academy_v2_lesson(lesson_id):
+        if not ACADEMY_V2_ID.fullmatch(lesson_id): fail(404, 'درس یافت نشد.')
+        p = academy_v2_file('lessons', lesson_id + '.json')
+        if not p: fail(404, 'درس یافت نشد.')
+        return jsonify(json.loads(p.read_text(encoding='utf-8')))
+
+    @app.get('/api/academy/v2/simulation/<sim_id>')
+    def academy_v2_simulation(sim_id):
+        if not ACADEMY_V2_ID.fullmatch(sim_id): fail(404, 'شبیهساز یافت نشد.')
+        p = academy_v2_file('simulations', sim_id + '.json')
+        if not p: fail(404, 'شبیهساز یافت نشد.')
+        return jsonify(json.loads(p.read_text(encoding='utf-8')))
+
+    @app.get('/api/academy/v2/lab/<lab_id>')
+    def academy_v2_lab(lab_id):
+        if not ACADEMY_V2_ID.fullmatch(lab_id): fail(404, 'آزمایشگاه یافت نشد.')
+        p = academy_v2_file('labs', lab_id + '.json')
+        if not p: fail(404, 'آزمایشگاه یافت نشد.')
+        return jsonify(json.loads(p.read_text(encoding='utf-8')))
+
+    @app.post('/api/academy/v2/quiz/<lesson_id>')
+    def academy_v2_quiz(lesson_id):
+        # The /api/ guard enforces Origin + CSRF + session for this POST.
+        if not ACADEMY_V2_ID.fullmatch(lesson_id): fail(404, 'درس یافت نشد.')
+        p = academy_v2_file('lessons', lesson_id + '.json')
+        if not p: fail(404, 'درس یافت نشد.')
+        body = request.get_json(silent=True) or {}
+        answers = body.get('answers') if isinstance(body, dict) else None
+        if not isinstance(answers, list): fail(400, 'پاسخهای آزمون معتبر نیست.')
+        lesson = json.loads(p.read_text(encoding='utf-8'))
+        quiz = lesson.get('quiz', [])
+        details = []
+        correct = 0
+        for i, q in enumerate(quiz):
+            options = q.get('options', [])
+            given = answers[i] if i < len(answers) else None
+            good = isinstance(given, int) and not isinstance(given, bool) and 0 <= given < len(options) and given == q.get('answerIndex')
+            if good: correct += 1
+            details.append({
+                'id': q.get('id'), 'prompt': q.get('prompt'), 'given': given,
+                'correctIndex': q.get('answerIndex'), 'correct': good,
+                'explanation': q.get('explanation', ''), 'options': options,
+            })
+        total = len(quiz)
+        return jsonify(ok=True, total=total, correct=correct,
+                       score=round(100*correct/total) if total else 0,
+                       details=details, label='Sample / Simulated — Internal Simulator')
 
     @app.get('/academy')
     def academy():
@@ -829,7 +917,7 @@ def create_app(config=None):
         progress = json.loads(row['payload']) if row else {}
         if not isinstance(progress, dict):
             fail(500, 'وضعیت آکادمی معتبر نیست؛ با مدیر سامانه تماس بگیرید.')
-        bootstrap = {'userName': user['name'], 'csrf': session['csrf'], 'progress': progress}
+        bootstrap = {'userName': user['name'], 'csrf': session['csrf'], 'progress': progress, 'academyVersion': 'v2', 'contentVersion': '2026.11.24-p0', 'previewMode': False}
         encoded = json.dumps(bootstrap, ensure_ascii=True, separators=(',', ':'))
         encoded = encoded.replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
         page = (ROOT/'private_ui'/'academy.html').read_text(encoding='utf-8')

@@ -1,0 +1,223 @@
+{
+  "schemaVersion": "fam-academy-v1",
+  "id": "l09-ospf-spf-cost",
+  "title": "OSPF SPF، Cost و انتخاب مسیر",
+  "level": "متوسط",
+  "durationMinutes": 50,
+  "order": 9,
+  "status": "live",
+  "courseId": "c04-routing-ospf",
+  "chapterId": "p07-ospf-ch02",
+  "pathId": "p07-ospf",
+  "summary": "الگوریتم Dijkstra، محاسبه Cost و اثر Bandwidth Reference را روی مسیر منتخب بررسی میکنیم.",
+  "objectives": [
+    "توضیح LSDB بهعنوان_graph",
+    "محاسبه Cost تجمعی",
+    "پیشبینی اثر `auto-cost reference-bandwidth`"
+  ],
+  "prerequisites": [
+    "l08-ospf-neighbor-formation"
+  ],
+  "sections": {
+    "concept": {
+      "title": "توضیح مفهومی",
+      "body": [
+        "وقتی adjacency به Full رسید، روترها LSAها را در LSDB نگه میدارند. SPF یک گراف از روترها و لینکها میسازد و کوتاهترین مسیر را با جمع Costها محاسبه میکند."
+      ]
+    },
+    "deepDive": {
+      "title": "توضیح عمیق",
+      "body": [
+        "در Cisco، Cost پیشفرض هر لینک `reference-bandwidth / interface-bandwidth` است و Reference پیشفرض ۱۰۰Mbps است؛ بنابراین FastEthernet و GigabitEthernet هر دو Cost=1 میگیرند مگر اینکه Reference را بالا ببرید. OSPF فقط مسیرهای درون Area را با SPF کامل محاسبه میکند و بین Areaها از Summary LSA و قواعد ABR استفاده میشود."
+      ]
+    },
+    "diagram": {
+      "title": "دیاگرام و نمایش بصری",
+      "body": [
+        "گراف سه روتر؛ مسیر مستقیم Cost=10 و مسیر دو Hopـه Cost=2+2=4 برنده است."
+      ],
+      "path": "/academy-content/v1/assets/diagrams/l09-ospf-spf-cost.svg"
+    },
+    "realExample": {
+      "title": "مثال واقعی",
+      "body": [
+        "R1 به R4 یا مستقیم از R2 با Cost 20 میرسد یا از R3 با Cost 4. SPF مسیر دوم را انتخاب میکند، حتی تعداد Hopها بیشتر است."
+      ]
+    },
+    "scenario": {
+      "title": "سناریوی عملی",
+      "body": [
+        "در تمرین، Reference Bandwidth را از 100 به 10000 تغییر دهید و ببینید Cost لینکهای سریع چگونه متمایز میشود."
+      ]
+    },
+    "commands": {
+      "title": "دستورات مرتبط Cisco IOS",
+      "body": [
+        "دستورات مرتبط Cisco IOS در ادامه آمدهاند؛ نحو دقیق باید با نسخه پلتفرم هدف تطبیق داده شود."
+      ],
+      "commands": [
+        {
+          "command": "router ospf 1",
+          "explain": "ورود به پیکربندی فرایند OSPF."
+        },
+        {
+          "command": "auto-cost reference-bandwidth 10000",
+          "explain": "تنظیم Reference به ۱۰Gbps؛ باید در تمام روترهای Area یکسان باشد."
+        },
+        {
+          "command": "show ip ospf interface brief",
+          "explain": "نمایش Cost و وضعیت اینترفیسها."
+        },
+        {
+          "command": "show ip route ospf",
+          "explain": "نمایش مسیرهای یادگرفتهشده از OSPF."
+        }
+      ]
+    },
+    "commandWalkthrough": {
+      "title": "توضیح خطبهخط دستورات",
+      "body": [
+        "هر خط دستور و اثر آن بر Data Plane یا Control Plane توضیح داده شده است."
+      ],
+      "lines": [
+        {
+          "line": "auto-cost reference-bandwidth 10000",
+          "explain": "عدد بر حسب Mbps است و محاسبه Cost را تغییر میدهد."
+        },
+        {
+          "line": "show ip route ospf",
+          "explain": "ستون `[110/cost]` شامل AD=110 و Cost نهایی است."
+        }
+      ]
+    },
+    "sampleOutput": {
+      "title": "خروجی نمونه",
+      "body": [
+        "خروجی زیر توسط Simulator داخلی FAM Academy تولید شده و صرفاً نمونهای آموزشی با برچسب Sample/Simulated است."
+      ],
+      "label": "Sample / Simulated — Internal Simulator",
+      "lines": [
+        "Sample / Simulated — Internal Simulator",
+        "O    203.0.113.0/24 [110/4] via 198.51.100.2, 00:00:12, Gi0/0"
+      ]
+    },
+    "commonMistakes": {
+      "title": "خطاهای رایج",
+      "body": [
+        "تغییر Reference فقط روی یک روتر",
+        "مقایسه Hop Count بهجای Cost",
+        "فراموشکردن تفاوت Intra-area و Inter-area"
+      ]
+    },
+    "troubleshooting": {
+      "title": "روش Troubleshooting",
+      "body": [
+        "`show ip ospf database` و `show ip ospf interface` را با هم ببینید.",
+        "اگر Costها غیرمنتظرهاند، Reference Bandwidth همه روترها را مقایسه کنید."
+      ]
+    },
+    "keyPoints": {
+      "title": "نکات مهم",
+      "body": [
+        "OSPF مسیر را با جمع Cost انتخاب میکند.",
+        "AD مسیر OSPF در IOS معمولاً ۱۱۰ است.",
+        "Reference Bandwidth باید در سراسر Area یکسان باشد."
+      ]
+    },
+    "versionNotes": {
+      "title": "استاندارد، نسخه و رفتار Vendor",
+      "body": [
+        "RFC 2328 متریک استاندارد را تعریف میکند، ولی فرمول پیشفرض Reference/Bandwidth رفتار vendor است. در OSPFv3 و شبکههای Multi-Area قواعد اضافی وجود دارد."
+      ]
+    },
+    "summary": {
+      "title": "جمع بندی",
+      "body": [
+        "الگوریتم Dijkstra، محاسبه Cost و اثر Bandwidth Reference را روی مسیر منتخب بررسی میکنیم."
+      ]
+    },
+    "references": {
+      "title": "منابع معتبر",
+      "body": [
+        "RFC 2328 — OSPF Version 2",
+        "Cisco IOS XE Configuration Guides — Switching, Routing and Security sections",
+        "RFC 5737 — IPv4 Address Blocks Reserved for Documentation"
+      ]
+    },
+    "quiz": {
+      "title": "آزمون کوتاه",
+      "body": [
+        "آزمون کوتاه شامل پرسشهای سناریومحور است؛ پاسخ تشریحی پس از ثبت نمایش داده میشود."
+      ]
+    },
+    "nextSteps": {
+      "title": "گام بعد",
+      "body": [
+        "پس از این درس، مسیر زیر پیشنهاد میشود: l10-acl-filtering"
+      ]
+    }
+  },
+  "references": [
+    "RFC2328",
+    "CISCO_IOS_XE",
+    "RFC5737"
+  ],
+  "quiz": [
+    {
+      "id": "q1",
+      "prompt": "معیار اصلی OSPF برای انتخاب کوتاهترین مسیر چیست؟",
+      "options": [
+        "Hop Count",
+        "جمع Cost لینکها",
+        "تعداد LSA",
+        "AD مقصد"
+      ],
+      "answerIndex": 1,
+      "explanation": "Dijkstra کمترین Cost تجمعی را پیدا میکند.",
+      "points": 1
+    },
+    {
+      "id": "q2",
+      "prompt": "[110/4] در خروجی `show ip route ospf` یعنی چه؟",
+      "options": [
+        "AD=4 و Cost=110",
+        "AD=110 و Cost=4",
+        "4 Hop و 110ms",
+        "Area 110"
+      ],
+      "answerIndex": 1,
+      "explanation": "عدد اول AD و دوم Cost است.",
+      "points": 1
+    },
+    {
+      "id": "q3",
+      "prompt": "چرا Reference Bandwidth باید یکسان باشد؟",
+      "options": [
+        "برای جلوگیری از Loop",
+        "برای محاسبه Cost سازگار",
+        "برای فعالکردن DR",
+        "برای کاهش Hello"
+      ],
+      "answerIndex": 1,
+      "explanation": "در غیر این صورت روترها یک لینک را با Cost متفاوت میبینند.",
+      "points": 1
+    }
+  ],
+  "diagramPath": "/academy-content/v1/assets/diagrams/l09-ospf-spf-cost.svg",
+  "assetRefs": [
+    "/academy-content/v1/assets/diagrams/l09-ospf-spf-cost.svg"
+  ],
+  "simulationIds": [
+    "sim-ospf-neighbor"
+  ],
+  "labIds": [
+    "lab-ospf-single-area"
+  ],
+  "exerciseId": "ex09-spf-cost",
+  "nextLessonIds": [
+    "l10-acl-filtering"
+  ],
+  "contentPath": "/academy-content/v1/lessons/l09-ospf-spf-cost.json",
+  "apiPath": "/api/academy/v2/lesson/l09-ospf-spf-cost",
+  "version": "2026.11.24-p0"
+}

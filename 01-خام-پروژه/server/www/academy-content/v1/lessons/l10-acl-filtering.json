@@ -1,0 +1,232 @@
+{
+  "schemaVersion": "fam-academy-v1",
+  "id": "l10-acl-filtering",
+  "title": "ACL Packet Filtering و Wildcard Mask",
+  "level": "متوسط",
+  "durationMinutes": 55,
+  "order": 10,
+  "status": "live",
+  "courseId": "c05-network-security",
+  "chapterId": "p11-acl-security-ch01",
+  "pathId": "p11-acl-security",
+  "summary": "منطق Top-down ACL، Standard/Extended و محل اعمال آنها را با سناریوی امن تحلیل میکنیم.",
+  "objectives": [
+    "تفسیر ACE و Implicit Deny",
+    "محاسبه Wildcard Mask",
+    "انتخاب محل مناسب Standard و Extended ACL"
+  ],
+  "prerequisites": [
+    "l05-ipv4-subnetting",
+    "l07-static-routing"
+  ],
+  "sections": {
+    "concept": {
+      "title": "توضیح مفهومی",
+      "body": [
+        "ACL فهرستی ترتیبی از قواعد permit/deny است. اولین قانون منطبق اعمال میشود و در انتها یک Implicit Deny وجود دارد که در خروجی نمایش داده نمیشود."
+      ]
+    },
+    "deepDive": {
+      "title": "توضیح عمیق",
+      "body": [
+        "Standard ACL فقط Source IP را بررسی میکند و بهتر است نزدیک مقصد اعمال شود تا مسیرهای دیگر ناخواسته بسته نشوند. Extended ACL میتواند Source، Destination، Protocol و Port را بررسی کند و معمولاً نزدیک مبدأ قرار میگیرد تا ترافیک غیرمجاز زودتر حذف شود. Wildcard Mask برعکس Subnet Mask است: بیت ۱ یعنی «اهمیتی ندارد»."
+      ]
+    },
+    "diagram": {
+      "title": "دیاگرام و نمایش بصری",
+      "body": [
+        "یک Extended ACL نزدیک مبدأ، ترافیک Telnet را پیش از ورود به Backbone حذف میکند."
+      ],
+      "path": "/academy-content/v1/assets/diagrams/l10-acl-filtering.svg"
+    },
+    "realExample": {
+      "title": "مثال واقعی",
+      "body": [
+        "برای جلوگیری از Telnet کاربران 192.0.2.0/24 به سرور 203.0.113.10، Extended ACL نزدیک مبدأ نوشته میشود و در انتها `permit ip any any` بقیه ترافیک را مجاز میکند."
+      ]
+    },
+    "scenario": {
+      "title": "سناریوی عملی",
+      "body": [
+        "در تمرین، ترتیب ACEها را جابهجا کنید تا ببینید چگونه یک `permit ip any any` زودهنگام، قانون deny بعدی را بیه اثر میکند."
+      ]
+    },
+    "commands": {
+      "title": "دستورات مرتبط Cisco IOS",
+      "body": [
+        "دستورات مرتبط Cisco IOS در ادامه آمدهاند؛ نحو دقیق باید با نسخه پلتفرم هدف تطبیق داده شود."
+      ],
+      "commands": [
+        {
+          "command": "ip access-list extended EDGE-IN",
+          "explain": "ساخت یک Named Extended ACL."
+        },
+        {
+          "command": "deny tcp 192.0.2.0 0.0.0.255 host 203.0.113.10 eq 23",
+          "explain": "مسدودکردن Telnet از سابنت کاربران به سرور مستند."
+        },
+        {
+          "command": "permit ip any any",
+          "explain": "مجازکردن سایر ترافیکها پس از قانون deny."
+        },
+        {
+          "command": "interface GigabitEthernet0/0",
+          "explain": "انتخاب اینترفیس ورودی نزدیک مبدأ."
+        },
+        {
+          "command": "ip access-group EDGE-IN in",
+          "explain": "اعمال ACL در جهت Inbound."
+        },
+        {
+          "command": "show access-lists EDGE-IN",
+          "explain": "نمایش شمارندهها و ترتیب قواعد."
+        }
+      ]
+    },
+    "commandWalkthrough": {
+      "title": "توضیح خطبهخط دستورات",
+      "body": [
+        "هر خط دستور و اثر آن بر Data Plane یا Control Plane توضیح داده شده است."
+      ],
+      "lines": [
+        {
+          "line": "deny tcp ... eq 23",
+          "explain": "Wildcard `0.0.0.255` یعنی ۲۴ بیت اول دقیق و octet آخر آزاد است."
+        },
+        {
+          "line": "permit ip any any",
+          "explain": "بدون این خط، Implicit Deny بقیه ترافیک را حذف میکند."
+        },
+        {
+          "line": "ip access-group EDGE-IN in",
+          "explain": "جهت اعمال بسیار مهم است؛ in یعنی بستهها پیش از تصمیم Routing بررسی میشوند."
+        }
+      ]
+    },
+    "sampleOutput": {
+      "title": "خروجی نمونه",
+      "body": [
+        "خروجی زیر توسط Simulator داخلی FAM Academy تولید شده و صرفاً نمونهای آموزشی با برچسب Sample/Simulated است."
+      ],
+      "label": "Sample / Simulated — Internal Simulator",
+      "lines": [
+        "Sample / Simulated — Internal Simulator",
+        "Extended IP access list EDGE-IN",
+        "10 deny tcp 192.0.2.0 0.0.0.255 host 203.0.113.10 eq telnet (3 matches)",
+        "20 permit ip any any (17 matches)"
+      ]
+    },
+    "commonMistakes": {
+      "title": "خطاهای رایج",
+      "body": [
+        "قراردادن `permit any` پیش از deny",
+        "فراموشکردن Implicit Deny",
+        "استفاده از Subnet Mask بهجای Wildcard"
+      ]
+    },
+    "troubleshooting": {
+      "title": "روش Troubleshooting",
+      "body": [
+        "`show access-lists` شمارندهها را نشان میدهد؛ اگر قانون درست افزایش نمییابد، جهت یا محل ACL اشتباه است.",
+        "تست را با یک منبع و مقصد مشخص آغاز کنید، سپس قواعد را محدود کنید."
+      ]
+    },
+    "keyPoints": {
+      "title": "نکات مهم",
+      "body": [
+        "اولین Match تصمیم نهایی است.",
+        "Standard ACL نزدیک مقصد؛ Extended ACL نزدیک مبدأ.",
+        "Wildcard بیت ۱ یعنی Wildcard/Ignore."
+      ]
+    },
+    "versionNotes": {
+      "title": "استاندارد، نسخه و رفتار Vendor",
+      "body": [
+        "منطق ACE در مستندات Cisco توضیح داده شده؛ نحو Named ACL و شماره خطوط بین IOS و IOS XE تفاوتهای جزئی دارد. ACLهای IPv6 ساختار جداگانه دارند."
+      ]
+    },
+    "summary": {
+      "title": "جمع بندی",
+      "body": [
+        "منطق Top-down ACL، Standard/Extended و محل اعمال آنها را با سناریوی امن تحلیل میکنیم."
+      ]
+    },
+    "references": {
+      "title": "منابع معتبر",
+      "body": [
+        "Cisco IOS XE Configuration Guides — Switching, Routing and Security sections",
+        "RFC 5737 — IPv4 Address Blocks Reserved for Documentation",
+        "RFC 793 — Transmission Control Protocol"
+      ]
+    },
+    "quiz": {
+      "title": "آزمون کوتاه",
+      "body": [
+        "آزمون کوتاه شامل پرسشهای سناریومحور است؛ پاسخ تشریحی پس از ثبت نمایش داده میشود."
+      ]
+    },
+    "nextSteps": {
+      "title": "گام بعد",
+      "body": [
+        "پس از این درس، مسیر زیر پیشنهاد میشود: پایان مسیر فعلی؛ بازگشت به داشبورد و انتخاب مسیر بعدی."
+      ]
+    }
+  },
+  "references": [
+    "CISCO_IOS_XE",
+    "RFC5737",
+    "RFC793"
+  ],
+  "quiz": [
+    {
+      "id": "q1",
+      "prompt": "آخرین قاعده نادیده در یک ACL IPv4 Cisco چیست؟",
+      "options": [
+        "permit any",
+        "deny any",
+        "log all",
+        "reset counters"
+      ],
+      "answerIndex": 1,
+      "explanation": "Implicit Deny همه ترافیک باقیمانده را حذف میکند.",
+      "points": 1
+    },
+    {
+      "id": "q2",
+      "prompt": "Wildcard متناظر /24 چیست؟",
+      "options": [
+        "255.255.255.0",
+        "0.0.0.255",
+        "0.0.0.0",
+        "255.255.0.0"
+      ],
+      "answerIndex": 1,
+      "explanation": "بیتهای صفر یعنی دقیق، بیتهای یک یعنی آزاد.",
+      "points": 1
+    },
+    {
+      "id": "q3",
+      "prompt": "Extended ACL معمولاً کجا اعمال میشود؟",
+      "options": [
+        "نزدیک مبدأ",
+        "نزدیک مقصد",
+        "روی سوئیچ لایه ۲",
+        "فقط روی Loopback"
+      ],
+      "answerIndex": 0,
+      "explanation": "چون میتواند مقصد و پورت را تشخیص دهد، حذف زودهنگام ترافیک بهینهتر است.",
+      "points": 1
+    }
+  ],
+  "diagramPath": "/academy-content/v1/assets/diagrams/l10-acl-filtering.svg",
+  "assetRefs": [
+    "/academy-content/v1/assets/diagrams/l10-acl-filtering.svg"
+  ],
+  "simulationIds": [],
+  "labIds": [],
+  "exerciseId": "ex10-acl-order",
+  "nextLessonIds": [],
+  "contentPath": "/academy-content/v1/lessons/l10-acl-filtering.json",
+  "apiPath": "/api/academy/v2/lesson/l10-acl-filtering",
+  "version": "2026.11.24-p0"
+}

@@ -1,0 +1,178 @@
+{
+  "id": "lab-ospf-single-area",
+  "title": "آزمایشگاه OSPF Single-Area بین دو روتر",
+  "lessonIds": [
+    "l08-ospf-neighbor-formation",
+    "l09-ospf-spf-cost"
+  ],
+  "scenario": "دو روتر R1 و R2 روی یک لینک مستند 192.0.2.0/30 در Area 0 همسایه میشوند و شبکه Loopback یکدیگر را یاد میگیرند.",
+  "objectives": [
+    "آدرسدهی اینترفیسها",
+    "فعالکردن OSPF",
+    "بررسی Full adjacency",
+    "مشاهده مسیر OSPF"
+  ],
+  "executionMode": "internal-simulator",
+  "realDeviceConnection": false,
+  "status": "live",
+  "topology": {
+    "summary": "R1 و R2 از طریق Gi0/0؛ Loopbackها شبکههای 198.51.100.0/24 و 203.0.113.0/24 را اعلام میکنند.",
+    "diagramPath": "/academy-content/v1/assets/diagrams/lab-ospf-single-area.svg",
+    "devices": [
+      "R1",
+      "R2"
+    ]
+  },
+  "addressingTable": [
+    {
+      "device": "R1",
+      "interface": "Gi0/0",
+      "address": "192.0.2.1",
+      "mask": "255.255.255.252",
+      "gateway": "-",
+      "area": "0"
+    },
+    {
+      "device": "R1",
+      "interface": "Loopback0",
+      "address": "198.51.100.1",
+      "mask": "255.255.255.0",
+      "gateway": "-",
+      "area": "0"
+    },
+    {
+      "device": "R2",
+      "interface": "Gi0/0",
+      "address": "192.0.2.2",
+      "mask": "255.255.255.252",
+      "gateway": "-",
+      "area": "0"
+    },
+    {
+      "device": "R2",
+      "interface": "Loopback0",
+      "address": "203.0.113.1",
+      "mask": "255.255.255.0",
+      "gateway": "-",
+      "area": "0"
+    }
+  ],
+  "equipment": [
+    "۲ روتر با پشتیبانی OSPFv2",
+    "یک لینک Point-to-Point",
+    "Simulator داخلی FAM Academy"
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "آدرسدهی R1",
+      "commands": [
+        "enable",
+        "configure terminal",
+        "hostname R1",
+        "interface GigabitEthernet0/0",
+        "ip address 192.0.2.1 255.255.255.252",
+        "no shutdown",
+        "exit",
+        "interface Loopback0",
+        "ip address 198.51.100.1 255.255.255.0",
+        "exit"
+      ],
+      "expectedState": "اینترفیسهای R1 آدرس گرفتهاند."
+    },
+    {
+      "id": "s2",
+      "title": "فعالکردن OSPF",
+      "commands": [
+        "router ospf 1",
+        "network 192.0.2.0 0.0.0.3 area 0",
+        "network 198.51.100.0 0.0.0.255 area 0",
+        "end"
+      ],
+      "expectedState": "فرایند OSPF شبکههای متصل را اعلام میکند."
+    },
+    {
+      "id": "s3",
+      "title": "پیکربندی R2",
+      "commands": [
+        "configure terminal",
+        "hostname R2",
+        "interface GigabitEthernet0/0",
+        "ip address 192.0.2.2 255.255.255.252",
+        "no shutdown",
+        "exit",
+        "interface Loopback0",
+        "ip address 203.0.113.1 255.255.255.0",
+        "exit",
+        "router ospf 1",
+        "network 192.0.2.0 0.0.0.3 area 0",
+        "network 203.0.113.0 0.0.0.255 area 0",
+        "end"
+      ],
+      "expectedState": "R2 نیز در Area 0 قرار دارد."
+    },
+    {
+      "id": "s4",
+      "title": "بررسی همسایگی",
+      "commands": [
+        "show ip ospf neighbor",
+        "show ip route ospf"
+      ],
+      "expectedState": "همسایگی FULL و مسیر OSPF دیده میشود."
+    },
+    {
+      "id": "s5",
+      "title": "سناریوی خرابی",
+      "commands": [
+        "configure terminal",
+        "router ospf 1",
+        "network 192.0.2.0 0.0.0.3 area 1",
+        "end",
+        "show ip ospf neighbor"
+      ],
+      "expectedState": "Area mismatch باعث عدم تشکیل adjacency میشود."
+    }
+  ],
+  "expectedOutput": {
+    "label": "Sample / Simulated — Internal Simulator",
+    "lines": [
+      "Neighbor ID  Pri  State   Dead Time  Address     Interface",
+      "203.0.113.1   1   FULL/DR 00:00:34  192.0.2.2   Gi0/0",
+      "O 203.0.113.0/24 [110/2] via 192.0.2.2"
+    ]
+  },
+  "reviewQuestions": [
+    "چرا Process ID الزاماً یکسان نیست ولی Area ID باید یکسان باشد؟",
+    "کدام خروجی نشاندهنده LSDB synchronized است؟",
+    "MTU mismatch در کدام حالت ظاهر میشود؟"
+  ],
+  "failureScenario": "Area ID یک سر از 0 به 1 تغییر میکند.",
+  "troubleshooting": [
+    "`show ip ospf interface` و `show ip ospf neighbor` را مقایسه کنید.",
+    "سپس لاگ تغییر adjacency را بررسی کنید."
+  ],
+  "successCriteria": [
+    "چهار مرحله نخست اجرا شود",
+    "خروجی `show ip ospf neighbor` حالت FULL داشته باشد",
+    "هیچ اتصال به تجهیز واقعی برقرار نشود"
+  ],
+  "references": [
+    "RFC2328",
+    "CISCO_IOS_XE",
+    "RFC5737"
+  ],
+  "futureIntegration": {
+    "enabled": false,
+    "pnetlab": "planned",
+    "eveNg": "planned",
+    "realDevices": "disabled",
+    "note": "Future adapter can map these steps to PNETLab/EVE-NG, but it is not enabled here."
+  },
+  "schemaVersion": "fam-academy-v1",
+  "contentPath": "/academy-content/v1/labs/lab-ospf-single-area.json",
+  "apiPath": "/api/academy/v2/lab/lab-ospf-single-area",
+  "assetRefs": [
+    "/academy-content/v1/assets/diagrams/lab-ospf-single-area.svg"
+  ],
+  "version": "2026.11.24-p0"
+}

@@ -1,0 +1,171 @@
+{
+  "id": "lab-vlan-trunk",
+  "title": "آزمایشگاه VLAN و Trunk روی دو سوئیچ",
+  "lessonIds": [
+    "l03-vlan-access-ports",
+    "l04-trunk-8021q"
+  ],
+  "scenario": "دو کلاینت در VLAN 10 و VLAN 20 به دو سوئیچ متصلاند و لینک بین سوئیچها باید فقط VLANهای تعیینشده را حمل کند.",
+  "objectives": [
+    "ساخت VLANها",
+    "تخصیص پورتهای Access",
+    "پیکربندی Trunk و Allowed List",
+    "بررسی Native VLAN"
+  ],
+  "executionMode": "internal-simulator",
+  "realDeviceConnection": false,
+  "status": "live",
+  "topology": {
+    "summary": "SW1 و SW2 از طریق Gi0/24؛ PC-A روی Gi0/1 و PC-B روی Gi0/2.",
+    "diagramPath": "/academy-content/v1/assets/diagrams/lab-vlan-trunk.svg",
+    "devices": [
+      "SW1",
+      "SW2",
+      "PC-A",
+      "PC-B"
+    ]
+  },
+  "addressingTable": [
+    {
+      "device": "PC-A",
+      "interface": "NIC",
+      "address": "192.0.2.10",
+      "mask": "255.255.255.0",
+      "gateway": "192.0.2.1",
+      "vlan": "10"
+    },
+    {
+      "device": "PC-B",
+      "interface": "NIC",
+      "address": "192.0.2.20",
+      "mask": "255.255.255.0",
+      "gateway": "192.0.2.1",
+      "vlan": "20"
+    },
+    {
+      "device": "SW1",
+      "interface": "Vlan99",
+      "address": "192.0.2.2",
+      "mask": "255.255.255.0",
+      "gateway": "-",
+      "vlan": "99"
+    }
+  ],
+  "equipment": [
+    "۲ سوئیچ لایه ۲ با پشتیبانی 802.1Q",
+    "۲ کلاینت",
+    "کابلهای Ethernet",
+    "Simulator داخلی FAM Academy"
+  ],
+  "steps": [
+    {
+      "id": "s1",
+      "title": "ساخت VLANها",
+      "commands": [
+        "enable",
+        "configure terminal",
+        "vlan 10",
+        "name Users",
+        "vlan 20",
+        "name Servers",
+        "vlan 99",
+        "name Management"
+      ],
+      "expectedState": "VLAN 10، 20 و 99 ایجاد شدهاند."
+    },
+    {
+      "id": "s2",
+      "title": "تخصیص پورت Access",
+      "commands": [
+        "interface GigabitEthernet0/1",
+        "switchport mode access",
+        "switchport access vlan 10",
+        "no shutdown",
+        "exit",
+        "interface GigabitEthernet0/2",
+        "switchport mode access",
+        "switchport access vlan 20",
+        "no shutdown",
+        "exit"
+      ],
+      "expectedState": "Gi0/1 در VLAN 10 و Gi0/2 در VLAN 20 است."
+    },
+    {
+      "id": "s3",
+      "title": "پیکربندی Trunk",
+      "commands": [
+        "interface GigabitEthernet0/24",
+        "switchport mode trunk",
+        "switchport trunk allowed vlan 10,20,99",
+        "switchport trunk native vlan 99",
+        "no shutdown",
+        "end"
+      ],
+      "expectedState": "Trunk با Allowed List و Native VLAN 99 فعال است."
+    },
+    {
+      "id": "s4",
+      "title": "اعتبارسنجی",
+      "commands": [
+        "show vlan brief",
+        "show interfaces trunk",
+        "show interfaces status"
+      ],
+      "expectedState": "خروجیها VLANها، Trunk و وضعیت پورتها را نشان میدهند."
+    },
+    {
+      "id": "s5",
+      "title": "سناریوی خرابی",
+      "commands": [
+        "configure terminal",
+        "interface GigabitEthernet0/24",
+        "switchport trunk allowed vlan 10,99",
+        "end",
+        "show interfaces trunk"
+      ],
+      "expectedState": "VLAN 20 دیگر در Allowed List نیست و ترافیک آن از Trunk عبور نمیکند."
+    }
+  ],
+  "expectedOutput": {
+    "label": "Sample / Simulated — Internal Simulator",
+    "lines": [
+      "VLAN 10 Users active Gi0/1",
+      "VLAN 20 Servers active Gi0/2",
+      "Gi0/24 on 802.1q trunking native 99",
+      "Allowed VLANs: 10,20,99"
+    ]
+  },
+  "reviewQuestions": [
+    "چرا VLAN 20 در مرحله خرابی دیگر عبور نمیکند؟",
+    "اگر Native VLAN دو سر متفاوت باشد چه رخ میدهد؟",
+    "برای ارتباط PC-A و PC-B چه لایهای لازم است؟"
+  ],
+  "failureScenario": "Allowed VLAN List در یک سر Trunk فاقد VLAN 20 است.",
+  "troubleshooting": [
+    "`show interfaces trunk` را در هر دو سوئیچ مقایسه کنید.",
+    "سپس `show vlan brief` و پورت Access مربوطه را بررسی کنید."
+  ],
+  "successCriteria": [
+    "هر چهار مرحله نخست اجرا شود",
+    "خروجی `show interfaces trunk` شامل VLAN 10، 20 و 99 باشد",
+    "هیچ اتصال به تجهیز واقعی برقرار نشود"
+  ],
+  "references": [
+    "IEEE8021Q",
+    "CISCO_IOS_XE"
+  ],
+  "futureIntegration": {
+    "enabled": false,
+    "pnetlab": "planned",
+    "eveNg": "planned",
+    "realDevices": "disabled",
+    "note": "This mission uses an internal simulator only; no SSH/Telnet or operational connection is opened."
+  },
+  "schemaVersion": "fam-academy-v1",
+  "contentPath": "/academy-content/v1/labs/lab-vlan-trunk.json",
+  "apiPath": "/api/academy/v2/lab/lab-vlan-trunk",
+  "assetRefs": [
+    "/academy-content/v1/assets/diagrams/lab-vlan-trunk.svg"
+  ],
+  "version": "2026.11.24-p0"
+}

@@ -68,6 +68,24 @@ class FamPackagingTests(unittest.TestCase):
         self.assertNotIn("site.closest('label').hidden=isBranch", html)
 
 
+    def test_academy_v2_runtime_contract_is_statically_present(self):
+        import ast
+        source = (SERVER_DIR / "app.py").read_text(encoding="utf-8")
+        ast.parse(source, filename="app.py")
+        self.assertIn("'famAcademyV2.progress.v1'", source)
+        for legacy_key in ("fam4.learn.v1", "fam3.progress.v1", "fam3.lab.v1", "fam.academy.theme"):
+            self.assertIn("'" + legacy_key + "'", source)
+        self.assertIn("ACADEMY_V2_ROOT", source)
+        self.assertNotIn("curriculum-catalog.json", source)
+        for endpoint in (
+            "/api/academy/v2/health", "/api/academy/v2/catalog", "/api/academy/v2/exercises",
+            "/api/academy/v2/lesson/<lesson_id>", "/api/academy/v2/simulation/<sim_id>",
+            "/api/academy/v2/lab/<lab_id>", "/api/academy/v2/quiz/<lesson_id>",
+        ):
+            self.assertIn(endpoint, source)
+        self.assertIn("parts[0] != 'v1'", source)
+
+
 @unittest.skipUnless(HAS_FLASK, "Flask is not installed in this Python environment")
 class FamAppApiTests(unittest.TestCase):
     ORIGIN = "https://fam-test.local"
@@ -125,9 +143,11 @@ class FamAppApiTests(unittest.TestCase):
             "/api/equipment/state",
             "/api/real/status",
             "/academy",
-            "/academy-assets/curriculum-catalog.json",
-            "/academy-assets/lesson-engine.js",
-            "/academy-content/catalog.json",
+            "/academy-assets/academy-v2.js",
+            "/academy-assets/academy-engine.js",
+            "/academy-content/v1/catalog.json",
+            "/api/academy/v2/catalog",
+            "/api/academy/v2/health",
         ):
             r = self.client.get(path, environ_base=self.https_env)
             self.assertEqual(r.status_code, 401, f"Expected 401 for {path}")
@@ -139,7 +159,7 @@ class FamAppApiTests(unittest.TestCase):
 
         r_prog = self.client.post(
             "/api/academy/progress",
-            json={"changes": {"fam3.progress.v1": "{}"}},
+            json={"changes": {"famAcademyV2.progress.v1": "{}"}},
             headers={"Origin": self.ORIGIN},
             environ_base=self.https_env,
         )
@@ -197,7 +217,7 @@ class FamAppApiTests(unittest.TestCase):
 
         no_csrf = self.client.post(
             "/api/academy/progress",
-            json={"changes": {"fam3.progress.v1": "{}"}},
+            json={"changes": {"famAcademyV2.progress.v1": "{}"}},
             headers={"Origin": self.ORIGIN},
             environ_base=self.https_env,
         )
@@ -213,7 +233,7 @@ class FamAppApiTests(unittest.TestCase):
 
         with_csrf = self.client.post(
             "/api/academy/progress",
-            json={"changes": {"fam3.progress.v1": json.dumps({"done": ["intro"]})}},
+            json={"changes": {"famAcademyV2.progress.v1": json.dumps({"done": ["intro"]})}},
             headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
             environ_base=self.https_env,
         )
@@ -222,9 +242,17 @@ class FamAppApiTests(unittest.TestCase):
 
         academy_res = self.client.get("/academy", environ_base=self.https_env)
         self.assertEqual(academy_res.status_code, 200)
-        self.assertIn("fam3.progress.v1", academy_res.get_data(as_text=True))
+        self.assertIn("famAcademyV2.progress.v1", academy_res.get_data(as_text=True))
+        self.assertIn("academy-v2.js", academy_res.get_data(as_text=True))
+        for v2_path in ("/api/academy/v2/catalog", "/api/academy/v2/health", "/api/academy/v2/exercises"):
+            v2_res = self.client.get(v2_path, environ_base=self.https_env)
+            self.assertEqual(v2_res.status_code, 200, v2_path)
+        lesson_id = "l01-osi-tcpip-encapsulation"
+        lesson_res = self.client.get("/api/academy/v2/lesson/" + lesson_id, environ_base=self.https_env)
+        self.assertEqual(lesson_res.status_code, 200)
+        self.assertEqual(lesson_res.get_json().get("id"), lesson_id)
 
-        asset_res = self.client.get("/academy-assets/curriculum-catalog.json", environ_base=self.https_env)
+        asset_res = self.client.get("/academy-assets/academy-v2.js", environ_base=self.https_env)
         try:
             self.assertEqual(asset_res.status_code, 200)
         finally:
@@ -450,28 +478,47 @@ class FamEquipmentConcurrencyTests(unittest.TestCase):
             total_threads = 8
             barrier = threading.Barrier(total_threads)
             state_lock = threading.Lock()
+            attempt_lock = threading.Lock()
+            release = threading.Event()
+            attempts = 0
             active = 0
             peak_active = 0
             admitted = []
             busy = []
             errors = []
 
+            def mark_attempt():
+                # Hold the first three leases until every thread has attempted
+                # admission; otherwise a fast worker can release before the
+                # remaining threads race, making the expected 3/5 split flaky.
+                nonlocal attempts
+                with attempt_lock:
+                    attempts += 1
+                    if attempts == total_threads:
+                        release.set()
+
             def worker(idx):
                 nonlocal active, peak_active
                 host = f"10.20.0.{idx + 1}"
                 try:
                     barrier.wait(timeout=5)
-                    with guard.admit(host):
+                    try:
+                        with guard.admit(host):
+                            with state_lock:
+                                active += 1
+                                if active > peak_active:
+                                    peak_active = active
+                                admitted.append(host)
+                            mark_attempt()
+                            if not release.wait(timeout=10):
+                                errors.append(TimeoutError("admission handshake timed out"))
+                            time.sleep(0.01)
+                            with state_lock:
+                                active -= 1
+                    except equipment_guard.AdmissionError as err:
                         with state_lock:
-                            active += 1
-                            if active > peak_active:
-                                peak_active = active
-                            admitted.append(host)
-                        time.sleep(0.08)
-                        with state_lock:
-                            active -= 1
-                except equipment_guard.AdmissionError as err:
-                    busy.append((host, err.code))
+                            busy.append((host, err.code))
+                        mark_attempt()
                 except BaseException as exc:  # pragma: no cover
                     errors.append(exc)
 

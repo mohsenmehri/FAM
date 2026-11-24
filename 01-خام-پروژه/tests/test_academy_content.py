@@ -1,21 +1,41 @@
-"""Integrity tests for the active, served FAM Academy curriculum.
+"""FAM Academy v2 content and UI contract tests.
 
-These tests verify source-data consistency only. They do not claim IOS, PNETLab,
-visual-browser, or live-LAB execution.
+The legacy curriculum-catalog/blueprint tests were replaced because that content
+was intentionally retired. This suite validates the versioned v1 curriculum,
+independent manifest, links, RTL shell, pure engine, preview server and the
+preservation of the 143 prior deletions. It uses only stdlib and Node's syntax
+checker; no Flask, jsonschema, browser or network dependency is required.
 """
 from __future__ import annotations
 
+import ast
+import hashlib
 import json
 from html.parser import HTMLParser
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import sys
 import unittest
 import xml.etree.ElementTree as ET
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+TOOLS_ROOT = PACKAGE_ROOT / "tools"
 WEB_ROOT = PACKAGE_ROOT / "server" / "www"
-ASSET_ROOT = WEB_ROOT / "academy-assets"
-CATALOG_PATH = ASSET_ROOT / "curriculum-catalog.json"
+ASSETS = WEB_ROOT / "academy-assets"
+CONTENT = WEB_ROOT / "academy-content"
+V1 = CONTENT / "v1"
+PRIVATE_UI = PACKAGE_ROOT / "server" / "private_ui"
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+import validate_academy_v2 as validator  # noqa: E402
+
+VALIDATION = validator.validate(PACKAGE_ROOT)
+CATALOG = json.loads((V1 / "catalog.json").read_text(encoding="utf-8"))
+EXERCISES = json.loads((V1 / "exercises.json").read_text(encoding="utf-8"))["exercises"]
+REFERENCES = json.loads((V1 / "references.json").read_text(encoding="utf-8"))
+MANIFEST = json.loads((V1 / "manifest.json").read_text(encoding="utf-8"))
 
 
 class AssetParser(HTMLParser):
@@ -25,178 +45,286 @@ class AssetParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         for key, value in attrs:
-            if key in {"src", "href"} and value and value.startswith("/academy-assets/"):
+            if key in {"src", "href"} and value and value.startswith(("/academy-assets/", "/academy-content/")):
                 self.assets.append(value.split("?", 1)[0].split("#", 1)[0])
 
 
-def blueprint_path(lesson) -> Path:
-    """Resolve the blueprint from the catalog reference (works for any subfolder)."""
-    return ASSET_ROOT / lesson["blueprint"].removeprefix("/academy-assets/")
+def web_file(web: str) -> Path:
+    if web.startswith("/academy-assets/"):
+        return ASSETS / web[len("/academy-assets/"):]
+    if web.startswith("/academy-content/"):
+        return CONTENT / web[len("/academy-content/"):]
+    raise ValueError(web)
 
 
-def walk_strings(value):
+def all_json_strings(value):
     if isinstance(value, str):
         yield value
     elif isinstance(value, dict):
         for child in value.values():
-            yield from walk_strings(child)
+            yield from all_json_strings(child)
     elif isinstance(value, list):
         for child in value:
-            yield from walk_strings(child)
+            yield from all_json_strings(child)
 
 
-class AcademyContentTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-        cls.records = []
-        for path in cls.catalog.get("paths", []):
-            for course in path.get("courses", []):
-                for lesson in course.get("lessons", []):
-                    cls.records.append((path, course, lesson))
+class AcademyV2ContentTests(unittest.TestCase):
+    def test_validator_reports_no_errors(self):
+        self.assertTrue(VALIDATION["ok"], "\n".join(VALIDATION["errors"]))
+        self.assertGreaterEqual(len(VALIDATION["checks"]), 14)
 
-    def test_catalog_has_unique_ids_and_resolvable_prerequisites(self):
-        lesson_ids = [lesson["id"] for _, _, lesson in self.records]
-        self.assertTrue(lesson_ids, "active catalog must contain lessons")
-        self.assertEqual(len(lesson_ids), len(set(lesson_ids)), "lesson IDs must be unique")
-        known = set(lesson_ids)
-        for _, _, lesson in self.records:
-            for prerequisite in lesson.get("prerequisites", []):
-                with self.subTest(lesson=lesson["id"], prerequisite=prerequisite):
-                    self.assertIn(prerequisite, known)
+    def test_catalog_counts_and_version_contract(self):
+        self.assertEqual(CATALOG["schemaVersion"], "fam-academy-v1")
+        self.assertEqual(CATALOG["contentVersion"], "2026.11.24-p0")
+        self.assertEqual(CATALOG["language"], "fa")
+        self.assertEqual(CATALOG["direction"], "rtl")
+        self.assertEqual(CATALOG["storageKey"], "famAcademyV2.progress.v1")
+        counts = VALIDATION["counts"]
+        self.assertEqual(counts["paths"], 23)
+        self.assertEqual(counts["courses"], 23)
+        self.assertEqual(counts["liveCourses"], 5)
+        self.assertEqual(counts["plannedCourses"], 18)
+        self.assertEqual(counts["lessons"], 10)
+        self.assertEqual(counts["simulations"], 3)
+        self.assertEqual(counts["labs"], 2)
+        self.assertEqual(counts["exercises"], 10)
 
-    def test_every_catalog_reference_resolves_to_matching_blueprint(self):
-        for _, _, lesson in self.records:
-            reference = lesson.get("blueprint", "")
-            self.assertTrue(reference.startswith("/academy-assets/"), lesson["id"])
-            relative = reference.removeprefix("/academy-assets/")
-            blueprint_path = (ASSET_ROOT / relative).resolve()
-            self.assertIn(ASSET_ROOT.resolve(), blueprint_path.parents, lesson["id"])
-            self.assertTrue(blueprint_path.is_file(), lesson["id"])
-            blueprint = json.loads(blueprint_path.read_text(encoding="utf-8"))
-            self.assertEqual(blueprint.get("id") or blueprint.get("lessonId"), lesson["id"])
-            self.assertGreaterEqual(len(json.dumps(blueprint, ensure_ascii=False)), 1000)
+    def test_paths_have_unique_ids_sequential_order_and_valid_relations(self):
+        paths = CATALOG["paths"]
+        ids = {p["id"] for p in paths}
+        self.assertEqual(len(ids), 23)
+        self.assertEqual([p["order"] for p in paths], list(range(1, 24)))
+        by_id = {p["id"]: p for p in paths}
+        for p in paths:
+            self.assertGreaterEqual(len(p["objectives"]), 3)
+            self.assertTrue(p["prerequisites"] or p["id"] == "p01-network-fundamentals")
+            for q in p["prerequisites"]:
+                self.assertIn(q, ids)
+                self.assertLess(by_id[q]["order"], p["order"])
+            for q in p["nextPaths"]:
+                self.assertIn(q, ids)
+                self.assertGreater(by_id[q]["order"], p["order"])
 
-    def test_each_current_lesson_has_a_lab_and_assessment(self):
-        for _, _, lesson in self.records:
-            blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
-            stages = blueprint.get("stages", {})
-            self.assertIsInstance(stages, dict, lesson["id"])
-            self.assertIn("lab", stages, lesson["id"])
-            questions = stages.get("quiz", {}).get("questions", []) or blueprint.get("interactiveQuiz", [])
-            self.assertGreaterEqual(len(questions), 1, lesson["id"])
+    def test_live_courses_are_connected_to_lessons_and_clearly_distinguished_from_roadmap(self):
+        lesson_ids = {l["id"] for l in CATALOG["lessons"]}
+        live = [c for c in CATALOG["courses"] if c["status"] == "live"]
+        planned = [c for c in CATALOG["courses"] if c["status"] == "planned"]
+        self.assertEqual(len(live), 5)
+        self.assertEqual(len(planned), 18)
+        for c in live:
+            self.assertTrue(c.get("objectives"))
+            self.assertTrue(c.get("prerequisites") or c["id"] == "c01-network-fundamentals")
+            referenced = [lid for ch in c["chapters"] for lid in ch.get("lessonIds", [])]
+            self.assertTrue(referenced)
+            self.assertTrue(set(referenced) <= lesson_ids)
+        for c in planned:
+            self.assertEqual(c["status"], "planned")
+            self.assertTrue(all(ch["status"] == "planned" for ch in c["chapters"]))
 
-    def test_quiz_answers_and_explanations_are_well_formed(self):
-        for _, _, lesson in self.records:
-            blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
-            interactive = blueprint.get("interactiveQuiz", [])
-            questions = (
-                interactive if interactive else
-                blueprint.get("stages", {}).get("quiz", {}).get("questions", [])
-            )
-            for index, question in enumerate(questions, start=1):
-                with self.subTest(lesson=lesson["id"], question=index):
-                    options = question.get("options", [])
-                    answer = question.get("answer", question.get("correctIndex"))
-                    self.assertGreaterEqual(len(options), 2)
-                    self.assertIsInstance(answer, int)
-                    self.assertGreaterEqual(answer, 0)
-                    self.assertLess(answer, len(options))
-                    self.assertTrue(question.get("explanation") or question.get("explanationHtml"))
-
-    def test_structured_topology_links_point_to_declared_devices(self):
-        for _, _, lesson in self.records:
-            blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
-            topology = blueprint.get("topology", {})
-            devices = topology.get("devices", []) if isinstance(topology, dict) else []
-            ids = {str(device.get("id")) for device in devices if isinstance(device, dict)}
-            for link in topology.get("links", []) if isinstance(topology, dict) else []:
-                for side in ("a", "b"):
-                    endpoint = str(link.get(side, "")).split(":", 1)[0]
-                    with self.subTest(lesson=lesson["id"], endpoint=endpoint):
-                        self.assertIn(endpoint, ids)
-
-    def test_inline_svg_markup_is_paired_and_has_a_viewbox(self):
-        for _, _, lesson in self.records:
-            blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
-            serialized = json.dumps(blueprint, ensure_ascii=False)
-            starts = len(re.findall(r"<svg\b", serialized, flags=re.IGNORECASE))
-            ends = len(re.findall(r"</svg\s*>", serialized, flags=re.IGNORECASE))
-            svg_sources = [
-                svg
-                for value in walk_strings(blueprint)
-                for svg in re.findall(r"<svg\b[\s\S]*?</svg\s*>", value, flags=re.IGNORECASE)
-            ]
+    def test_every_lesson_has_sixteen_non_empty_sections_and_unique_core_text(self):
+        required = {
+            "concept", "deepDive", "diagram", "realExample", "scenario", "commands",
+            "commandWalkthrough", "sampleOutput", "commonMistakes", "troubleshooting",
+            "keyPoints", "versionNotes", "summary", "references", "quiz", "nextSteps",
+        }
+        concepts, deeps, summaries = [], [], []
+        for summary in CATALOG["lessons"]:
+            lesson = json.loads((V1 / "lessons" / (summary["id"] + ".json")).read_text(encoding="utf-8"))
             with self.subTest(lesson=lesson["id"]):
-                self.assertEqual(starts, ends)
-                if starts:
-                    self.assertRegex(serialized, r"viewBox\s*=\s*\\?[\"']")
-                    self.assertEqual(len(svg_sources), starts)
-                    for svg_index, svg_source in enumerate(svg_sources, start=1):
-                        with self.subTest(lesson=lesson["id"], svg=svg_index):
-                            ET.fromstring(svg_source)
+                self.assertEqual(lesson["status"], "live")
+                self.assertGreaterEqual(lesson["durationMinutes"], 20)
+                self.assertGreaterEqual(len(lesson["objectives"]), 3)
+                sections = lesson["sections"]
+                self.assertTrue(required <= set(sections))
+                self.assertEqual(len(sections), 16)
+                for key, section in sections.items():
+                    self.assertTrue(section.get("title"), key)
+                    self.assertTrue(section.get("body"), key)
+                self.assertIn("Sample", sections["sampleOutput"]["label"])
+                self.assertIn("Simulated", sections["sampleOutput"]["label"])
+                self.assertTrue(sections["sampleOutput"]["lines"])
+                concepts.append(sections["concept"]["body"][0])
+                deeps.append(sections["deepDive"]["body"][0])
+                summaries.append(sections["summary"]["body"][0])
+        for values in (concepts, deeps, summaries):
+            self.assertEqual(len(set(values)), 10, "filler or duplicate lesson text detected")
 
-    def test_academy_ui_references_existing_local_assets(self):
-        page = PACKAGE_ROOT / "server" / "private_ui" / "academy.html"
-        parser = AssetParser()
-        parser.feed(page.read_text(encoding="utf-8"))
-        self.assertTrue(parser.assets)
-        for reference in parser.assets:
-            local_path = (WEB_ROOT / reference.lstrip("/")).resolve()
-            with self.subTest(reference=reference):
-                self.assertIn(WEB_ROOT.resolve(), local_path.parents)
-                self.assertTrue(local_path.is_file())
-
-    def test_served_curriculum_is_curriculum_5_0_only(self):
-        prefixes = ("ccna-v11-", "ccna-v20-", "academy-stage-zero-")
-        self.assertEqual([p["id"] for p in self.catalog["paths"]], ["fam-c5"])
-        for _, _, lesson in self.records:
+    def test_quiz_answers_options_explanations_and_api_paths_are_valid(self):
+        for summary in CATALOG["lessons"]:
+            lesson = json.loads((V1 / "lessons" / (summary["id"] + ".json")).read_text(encoding="utf-8"))
             with self.subTest(lesson=lesson["id"]):
-                self.assertTrue(lesson["id"].startswith(prefixes), lesson["id"])
-                self.assertTrue(lesson["blueprint"].startswith("/academy-assets/v5/blueprints/"))
+                self.assertEqual(lesson["apiPath"], "/api/academy/v2/lesson/" + lesson["id"])
+                self.assertGreaterEqual(len(lesson["quiz"]), 3)
+                for q in lesson["quiz"]:
+                    self.assertGreaterEqual(len(q["options"]), 2)
+                    self.assertIsInstance(q["answerIndex"], int)
+                    self.assertGreaterEqual(q["answerIndex"], 0)
+                    self.assertLess(q["answerIndex"], len(q["options"]))
+                    self.assertTrue(q["explanation"])
+                for ref in lesson["references"]:
+                    self.assertIn(ref, REFERENCES)
+                self.assertIn(lesson["exerciseId"], {e["id"] for e in EXERCISES})
 
-    def test_every_lesson_carries_the_sixteen_section_contract(self):
-        for _, _, lesson in self.records:
-            blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
-            with self.subTest(lesson=lesson["id"]):
-                self.assertGreaterEqual(len(blueprint.get("sections", [])), 14, lesson["id"])
-                self.assertEqual(blueprint.get("evidence"), "Designed — Not Run", lesson["id"])
-                self.assertGreaterEqual(len(blueprint.get("glossary", [])), 15, lesson["id"])
-                quiz = blueprint.get("interactiveQuiz", [])
-                self.assertEqual(len(quiz), 12, lesson["id"])
-                for index, question in enumerate(quiz, start=1):
-                    with self.subTest(lesson=lesson["id"], question=index):
-                        self.assertEqual(len(question.get("options", [])), 4)
-                        self.assertIsInstance(question.get("correctIndex"), int)
-                        self.assertTrue(question.get("explanationHtml"))
+    def test_all_web_paths_and_declared_assets_resolve_inside_versioned_tree(self):
+        for p in sorted(V1.rglob("*.json")):
+            text = p.read_text(encoding="utf-8")
+            for match in re.findall(r"/academy-(?:content|assets)/[A-Za-z0-9_./-]+", text):
+                target = web_file(match.rstrip(".,;:)\"'"))
+                with self.subTest(file=p.relative_to(V1).as_posix(), path=match):
+                    self.assertTrue(target.is_file(), match)
+                    self.assertIn(WEB_ROOT.resolve(), target.resolve().parents)
 
-    def test_unexecuted_lab_status_is_explicit_for_every_lesson(self):
-        status_pattern = re.compile(
-            r"اجرا\s*نشده|اجرا\s*و\s*تأیید\s*نشده|not\s+(?:yet\s+)?executed",
-            re.IGNORECASE,
+    def test_all_generated_diagrams_are_well_formed_svg(self):
+        diagrams = sorted((V1 / "assets" / "diagrams").glob("*.svg"))
+        self.assertGreaterEqual(len(diagrams), 10)
+        for diagram in diagrams:
+            with self.subTest(diagram=diagram.name):
+                root = ET.fromstring(diagram.read_text(encoding="utf-8"))
+                self.assertEqual(root.tag, "{http://www.w3.org/2000/svg}svg")
+                self.assertIn("viewBox", root.attrib)
+                self.assertNotIn("<script", diagram.read_text(encoding="utf-8").lower())
+
+    def test_simulations_use_known_engine_logic_and_declare_limits(self):
+        expected = {"arpResolve", "vlanForward", "ospfAdjacency"}
+        for sim in CATALOG["simulations"]:
+            data = json.loads((V1 / "simulations" / (sim["id"] + ".json")).read_text(encoding="utf-8"))
+            with self.subTest(sim=data["id"]):
+                self.assertIn(data["logic"], expected)
+                self.assertGreaterEqual(len(data["parameters"]), 3)
+                self.assertGreaterEqual(len(data["steps"]), 4)
+                self.assertTrue(data["limitations"])
+                self.assertTrue(web_file(data["diagramPath"]).is_file())
+                self.assertTrue(data["lessonIds"])
+
+    def test_labs_are_designed_for_internal_simulator_only(self):
+        for lab in CATALOG["labs"]:
+            data = json.loads((V1 / "labs" / (lab["id"] + ".json")).read_text(encoding="utf-8"))
+            with self.subTest(lab=data["id"]):
+                self.assertEqual(data["executionMode"], "internal-simulator")
+                self.assertIs(data["realDeviceConnection"], False)
+                self.assertFalse(data["futureIntegration"]["enabled"])
+                self.assertGreaterEqual(len(data["steps"]), 5)
+                self.assertTrue(data["addressingTable"])
+                self.assertTrue(data["reviewQuestions"])
+                self.assertTrue(data["failureScenario"])
+                self.assertTrue(data["troubleshooting"])
+                self.assertTrue(data["successCriteria"])
+                self.assertIn("Sample", data["expectedOutput"]["label"])
+                self.assertIn("Simulated", data["expectedOutput"]["label"])
+
+    def test_independent_manifest_matches_every_generated_file(self):
+        files = []
+        for p in sorted(V1.rglob("*")):
+            if p.is_file() and p.name != "manifest.json":
+                files.append({"path": p.relative_to(V1).as_posix(), "size": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()})
+        self.assertEqual(MANIFEST["fileCount"], len(files))
+        manifest_map = {f["path"]: f for f in MANIFEST["files"]}
+        for f in files:
+            self.assertEqual(manifest_map[f["path"]]["sha256"], f["sha256"], f["path"])
+            self.assertEqual(manifest_map[f["path"]]["size"], f["size"], f["path"])
+        aggregate = hashlib.sha256(("\n".join(f"{f['size']}|{f['sha256']}|{f['path']}" for f in files)).encode()).hexdigest()
+        self.assertEqual(MANIFEST["aggregateSha256"], aggregate)
+
+    def test_root_manifest_is_unchanged_and_deleted_legacy_paths_are_not_restored(self):
+        root_manifest = PACKAGE_ROOT / "MANIFEST.sha256"
+        self.assertEqual(
+            hashlib.sha256(root_manifest.read_bytes()).hexdigest(),
+            "4e6e209a453aa48b1d5390151d3b8ed4654605977c43f66dd5cd0556c04365d3",
         )
-        for _, _, lesson in self.records:
-            blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
-            lab = blueprint.get("stages", {}).get("lab", {})
-            self.assertIsInstance(lab, dict, lesson["id"])
-            self.assertTrue(lab.get("title") or lab.get("html") or lab.get("pnetlabTopology"), lesson["id"])
-            evidence = json.dumps(lab, ensure_ascii=False)
-            with self.subTest(lesson=lesson["id"]):
-                self.assertTrue(status_pattern.search(evidence), "lab must say it has not been run")
+        for legacy in (
+            CONTENT / "catalog.json",
+            ASSETS / "curriculum-catalog.json",
+            ASSETS / "v5" / "blueprints",
+        ):
+            self.assertFalse(legacy.exists(), legacy)
+        self.assertFalse([p for p in CONTENT.iterdir() if p.is_file()], "no unversioned content files allowed")
 
-    def test_academy_content_markdown_images_resolve(self):
-        content_root = WEB_ROOT / "academy-content"
-        md_files = sorted(content_root.glob("*.md"))
-        self.assertTrue(md_files)
-        for md_file in md_files:
-            text = md_file.read_text(encoding="utf-8")
-            self.assertNotIn("](academy-images/", text, md_file.name)
-            for match in re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text):
-                target = (content_root / match).resolve()
-                with self.subTest(md=md_file.name, image=match):
-                    self.assertIn(content_root.resolve(), target.parents)
-                    self.assertTrue(target.is_file())
+    def test_html_shell_is_rtl_responsive_and_references_existing_v2_assets(self):
+        html = (PRIVATE_UI / "academy.html").read_text(encoding="utf-8")
+        self.assertIn('lang="fa"', html)
+        self.assertIn('dir="rtl"', html)
+        self.assertIn('name="viewport"', html)
+        self.assertEqual(html.count("__FAM_CSP_NONCE__"), 1)
+        self.assertEqual(html.count("__FAM_ACADEMY_BOOTSTRAP__"), 1)
+        self.assertNotIn("curriculum-catalog.json", html)
+        parser = AssetParser()
+        parser.feed(html)
+        self.assertTrue(parser.assets)
+        for asset in parser.assets:
+            with self.subTest(asset=asset):
+                self.assertTrue(web_file(asset).is_file())
+        for required in ("academy-engine.js", "academy-v2.js", "academy-v2.css", "academy-reference-ui.css", "famAcademyV2.progress.v1"):
+            self.assertIn(required, html)
+        self.assertIn('data-theme="dark"', html)
+        self.assertIn("fam.academy.theme", html)
+        self.assertIn("fam.ui.theme", html)
+
+    def test_css_and_spa_use_responsive_rtl_and_new_versioned_api(self):
+        css = (ASSETS / "academy-v2.css").read_text(encoding="utf-8")
+        js = (ASSETS / "academy-v2.js").read_text(encoding="utf-8")
+        engine = (ASSETS / "academy-engine.js").read_text(encoding="utf-8")
+        self.assertIn("direction: rtl", css)
+        self.assertIn("@media", css)
+        self.assertEqual(css.count("{"), css.count("}"))
+        self.assertIn("/api/academy/v2/catalog", js)
+        self.assertIn("famAcademyV2.progress.v1", js)
+        for route in ("#/dashboard", "#/paths", "#/progress", "#/course/", "#/lesson/", "#/sim/", "#/lab/", "#/quiz/"):
+            self.assertIn(route, js)
+        for fn in ("arpResolve", "vlanForward", "ospfAdjacency", "evaluateQuiz", "createLabState", "runLabCommand"):
+            self.assertIn(fn, engine)
+        self.assertNotIn("fetch('http", js.lower())
+        for shell in ("app-shell", "academy-section-head", "academy-menu-toggle", "theme-toggle", 'href="/app"'):
+            self.assertIn(shell, js)
+        self.assertIn("FAM Academy shell integration", css)
+        self.assertIn('html[data-theme="light"]', css)
+        self.assertTrue((ASSETS / "academy-reference-ui.css").is_file())
+
+    def test_no_cjk_contamination_or_obvious_secret_patterns_in_new_files(self):
+        cjk = re.compile(r"[\u3400-\u9fff]")
+        secrets = [
+            re.compile(r"BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY", re.I),
+            re.compile(r"AKIA[0-9A-Z]{16}"),
+            re.compile(r"(?:password|passwd|secret|api[_-]?token|private[_-]?key)\s*[:=]\s*['\"][^'\"]{6,}['\"]", re.I),
+        ]
+        scan = list(V1.rglob("*")) + [
+            PRIVATE_UI / "academy.html",
+            ASSETS / "academy-v2.css",
+            ASSETS / "academy-v2.js",
+            ASSETS / "academy-engine.js",
+            PACKAGE_ROOT / "server" / "academy_preview_server.py",
+        ]
+        for p in scan:
+            if not p.is_file():
+                continue
+            text = p.read_text(encoding="utf-8")
+            with self.subTest(file=p.relative_to(PACKAGE_ROOT).as_posix()):
+                self.assertIsNone(cjk.search(text), "unexpected CJK characters")
+                for pattern in secrets:
+                    self.assertIsNone(pattern.search(text), "possible secret pattern")
+
+    def test_python_sources_and_javascript_syntax_are_valid(self):
+        for p in (
+            TOOLS_ROOT / "build_academy_v2_content.py",
+            TOOLS_ROOT / "validate_academy_v2.py",
+            PACKAGE_ROOT / "server" / "app.py",
+            PACKAGE_ROOT / "server" / "academy_preview_server.py",
+        ):
+            with self.subTest(file=p.relative_to(PACKAGE_ROOT).as_posix()):
+                ast.parse(p.read_text(encoding="utf-8"), filename=str(p))
+        node = shutil.which("node")
+        if node:
+            for p in (ASSETS / "academy-engine.js", ASSETS / "academy-v2.js"):
+                result = subprocess.run([node, "--check", str(p)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_json_schemas_are_present_and_define_required_contracts(self):
+        for name in ("catalog.schema.json", "lesson.schema.json", "simulation.schema.json", "lab.schema.json"):
+            schema = json.loads((V1 / "schemas" / name).read_text(encoding="utf-8"))
+            with self.subTest(schema=name):
+                self.assertIn("$schema", schema)
+                self.assertIn("required", schema)
+                self.assertIn("properties", schema)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)

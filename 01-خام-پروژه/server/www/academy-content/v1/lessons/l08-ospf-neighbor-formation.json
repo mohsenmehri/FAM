@@ -1,0 +1,228 @@
+{
+  "schemaVersion": "fam-academy-v1",
+  "id": "l08-ospf-neighbor-formation",
+  "title": "OSPF Neighbor Formation و ماشین حالتها",
+  "level": "متوسط",
+  "durationMinutes": 60,
+  "order": 8,
+  "status": "live",
+  "courseId": "c04-routing-ospf",
+  "chapterId": "p07-ospf-ch01",
+  "pathId": "p07-ospf",
+  "summary": "از Hello تا Full، شرایط همسایگی، DR/BDR و mismatchهای متداول را گامبهگام تحلیل میکنیم.",
+  "objectives": [
+    "نامبردن حالتهای Neighbor",
+    "تشخیص پارامترهای لازم برای adjacency",
+    "توضیح نقش DR/BDR در Broadcast"
+  ],
+  "prerequisites": [
+    "l07-static-routing"
+  ],
+  "sections": {
+    "concept": {
+      "title": "توضیح مفهومی",
+      "body": [
+        "OSPF قبل از تبادل LSA باید همسایگی بسازد. Hello Packet پارامترهایی مانند Area ID، Timers، Authentication و Router ID را حمل میکند؛ ناسازگاری در همان ابتدا جلوی پیشروی را میگیرد."
+      ]
+    },
+    "deepDive": {
+      "title": "توضیح عمیق",
+      "body": [
+        "حالتها معمولاً Down، Attempt/Init، 2-Way، ExStart، Exchange، Loading و Full هستند. در شبکه Broadcast، DR/BDR انتخاب میشود و روترهای DROther با یکدیگر فقط تا 2-Way میروند، ولی با DR/BDR به Full میرسند. MTU mismatch اغلب در ExStart/Exchange متوقف میکند."
+      ]
+    },
+    "diagram": {
+      "title": "دیاگرام و نمایش بصری",
+      "body": [
+        "ماشین حالت OSPF و پارامترهایی که باید دو سر یکسان باشند."
+      ],
+      "path": "/academy-content/v1/assets/diagrams/l08-ospf-neighbor-formation.svg"
+    },
+    "realExample": {
+      "title": "مثال واقعی",
+      "body": [
+        "دو روتر در Area 0 با Hello=10 و Dead=40 و MTU=1500 به Full میرسند. اگر Area یک سر 1 باشد، حالت در Init/2-Way متوقف میشود."
+      ]
+    },
+    "scenario": {
+      "title": "سناریوی عملی",
+      "body": [
+        "شبیهساز OSPF Area، Timer، Auth و MTU را تغییرپذیر میکند؛ هر mismatch دقیقاً در مرحله متناظر گزارش میشود."
+      ]
+    },
+    "commands": {
+      "title": "دستورات مرتبط Cisco IOS",
+      "body": [
+        "دستورات مرتبط Cisco IOS در ادامه آمدهاند؛ نحو دقیق باید با نسخه پلتفرم هدف تطبیق داده شود."
+      ],
+      "commands": [
+        {
+          "command": "router ospf 1",
+          "explain": "فعالکردن فرایند OSPF با Process ID محلی ۱."
+        },
+        {
+          "command": "network 192.0.2.0 0.0.0.255 area 0",
+          "explain": "فعالکردن OSPF روی اینترفیسهای منطبق با شبکه مستند."
+        },
+        {
+          "command": "passive-interface GigabitEthernet0/1",
+          "explain": "جلوگیری از ارسال Hello روی پورت کاربران بدون حذف شبکه از Advertisement."
+        },
+        {
+          "command": "show ip ospf neighbor",
+          "explain": "بررسی حالت همسایگی و DR/BDR."
+        }
+      ]
+    },
+    "commandWalkthrough": {
+      "title": "توضیح خطبهخط دستورات",
+      "body": [
+        "هر خط دستور و اثر آن بر Data Plane یا Control Plane توضیح داده شده است."
+      ],
+      "lines": [
+        {
+          "line": "router ospf 1",
+          "explain": "Process ID محلی است و لازم نیست دو روتر یکسان باشد."
+        },
+        {
+          "line": "network ... area 0",
+          "explain": "Wildcard Mask مشخص میکند کدام اینترفیسها Hello بفرستند."
+        },
+        {
+          "line": "show ip ospf neighbor",
+          "explain": "FULL/DR یا FULL/BDR یعنی LSDB همزمان شده است."
+        }
+      ]
+    },
+    "sampleOutput": {
+      "title": "خروجی نمونه",
+      "body": [
+        "خروجی زیر توسط Simulator داخلی FAM Academy تولید شده و صرفاً نمونهای آموزشی با برچسب Sample/Simulated است."
+      ],
+      "label": "Sample / Simulated — Internal Simulator",
+      "lines": [
+        "Sample / Simulated — Internal Simulator",
+        "Neighbor ID  Pri  State   Dead Time  Address      Interface",
+        "198.51.100.2  1   FULL/DR 00:00:34   192.0.2.2    Gi0/0"
+      ]
+    },
+    "commonMistakes": {
+      "title": "خطاهای رایج",
+      "body": [
+        "یکسان پنداشتن Process ID و Area ID",
+        "عدم تطابق Hello/Dead",
+        "MTU متفاوت روی لینک"
+      ]
+    },
+    "troubleshooting": {
+      "title": "روش Troubleshooting",
+      "body": [
+        "`show ip ospf interface` برای Timer/Area/MTU و `show ip ospf neighbor` برای State را مقایسه کنید.",
+        "لاگ `%OSPF-5-ADJCHG` نقطه شکست adjacency را نشان میدهد."
+      ]
+    },
+    "keyPoints": {
+      "title": "نکات مهم",
+      "body": [
+        "Process ID محلی است؛ Area ID باید مشترک باشد.",
+        "Hello/Dead و Auth و MTU باید سازگار باشند.",
+        "در Broadcast، DROtherها با هم Full نمیشوند."
+      ]
+    },
+    "versionNotes": {
+      "title": "استاندارد، نسخه و رفتار Vendor",
+      "body": [
+        "RFC 2328 OSPFv2 و RFC 5340 OSPFv3 را تعریف میکنند. رفتار `network` در IOS XE و نحوه پشتیبانی Authentication بین نسخهها ممکن است متفاوت باشد."
+      ]
+    },
+    "summary": {
+      "title": "جمع بندی",
+      "body": [
+        "از Hello تا Full، شرایط همسایگی، DR/BDR و mismatchهای متداول را گامبهگام تحلیل میکنیم."
+      ]
+    },
+    "references": {
+      "title": "منابع معتبر",
+      "body": [
+        "RFC 2328 — OSPF Version 2",
+        "RFC 5340 — OSPF for IPv6",
+        "Cisco IOS XE Configuration Guides — Switching, Routing and Security sections"
+      ]
+    },
+    "quiz": {
+      "title": "آزمون کوتاه",
+      "body": [
+        "آزمون کوتاه شامل پرسشهای سناریومحور است؛ پاسخ تشریحی پس از ثبت نمایش داده میشود."
+      ]
+    },
+    "nextSteps": {
+      "title": "گام بعد",
+      "body": [
+        "پس از این درس، مسیر زیر پیشنهاد میشود: l09-ospf-spf-cost"
+      ]
+    }
+  },
+  "references": [
+    "RFC2328",
+    "RFC5340",
+    "CISCO_IOS_XE"
+  ],
+  "quiz": [
+    {
+      "id": "q1",
+      "prompt": "کدام پارامتر لازم نیست دو سر OSPF یکسان باشد؟",
+      "options": [
+        "Area ID",
+        "Hello Interval",
+        "Process ID",
+        "Dead Interval"
+      ],
+      "answerIndex": 2,
+      "explanation": "Process ID فقط محلی است.",
+      "points": 1
+    },
+    {
+      "id": "q2",
+      "prompt": "MTU Mismatch معمولاً adjacency را در کدام مرحله متوقف میکند؟",
+      "options": [
+        "Down",
+        "2-Way",
+        "ExStart/Exchange",
+        "Full"
+      ],
+      "answerIndex": 2,
+      "explanation": "تبادل DBD به MTU حساس است.",
+      "points": 1
+    },
+    {
+      "id": "q3",
+      "prompt": "در شبکه Broadcast، DROther با DROther دیگر معمولاً چه حالتی دارد؟",
+      "options": [
+        "Full",
+        "2-Way",
+        "Loading",
+        "Attempt"
+      ],
+      "answerIndex": 1,
+      "explanation": "فقط با DR/BDR به Full میرسند.",
+      "points": 1
+    }
+  ],
+  "diagramPath": "/academy-content/v1/assets/diagrams/l08-ospf-neighbor-formation.svg",
+  "assetRefs": [
+    "/academy-content/v1/assets/diagrams/l08-ospf-neighbor-formation.svg"
+  ],
+  "simulationIds": [
+    "sim-ospf-neighbor"
+  ],
+  "labIds": [
+    "lab-ospf-single-area"
+  ],
+  "exerciseId": "ex08-ospf-states",
+  "nextLessonIds": [
+    "l09-ospf-spf-cost"
+  ],
+  "contentPath": "/academy-content/v1/lessons/l08-ospf-neighbor-formation.json",
+  "apiPath": "/api/academy/v2/lesson/l08-ospf-neighbor-formation",
+  "version": "2026.11.24-p0"
+}
