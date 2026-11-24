@@ -30,7 +30,7 @@
 
 **PNETLab مستقل، طراحی‌شده و اجرا‌نشده:** یک کنترلر فرضی، یک AP با Join موفق، VLAN 30 برای WLAN، DHCP برای `10.30.0.0/24` و SSID `LAB-WPA2` با WPA2 Personal. کلاینت فرضی `10.30.0.50` می‌گیرد.
 
-![نمودار قابل ویرایش WLAN در GUI؛ اجرا‌نشده](academy-images/sec-10-wlan-gui.svg)
+![نمودار قابل ویرایش WLAN در GUI؛ اجرا‌نشده](images/sec-10-wlan-gui.svg)
 
 ## ۴. Verification طراحی‌شده
 

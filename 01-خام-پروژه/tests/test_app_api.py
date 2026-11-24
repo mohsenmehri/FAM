@@ -125,6 +125,8 @@ class FamAppApiTests(unittest.TestCase):
             "/api/equipment/state",
             "/api/real/status",
             "/academy",
+            "/academy-assets/curriculum-catalog.json",
+            "/academy-assets/lesson-engine.js",
             "/academy-content/catalog.json",
         ):
             r = self.client.get(path, environ_base=self.https_env)
@@ -221,6 +223,12 @@ class FamAppApiTests(unittest.TestCase):
         academy_res = self.client.get("/academy", environ_base=self.https_env)
         self.assertEqual(academy_res.status_code, 200)
         self.assertIn("fam3.progress.v1", academy_res.get_data(as_text=True))
+
+        asset_res = self.client.get("/academy-assets/curriculum-catalog.json", environ_base=self.https_env)
+        try:
+            self.assertEqual(asset_res.status_code, 200)
+        finally:
+            asset_res.close()
 
         out = self.client.post(
             "/api/logout",
@@ -729,6 +737,68 @@ class FamEquipmentAuditAndBranchSiteTests(unittest.TestCase):
         saved_nodes = {n["id"]: n for n in save_res.get_json()["inventory"]["nodes"]}
         self.assertIsNone(saved_nodes["node-branch-no-site"]["siteId"])
         self.assertEqual(saved_nodes["node-branch-with-site"]["siteId"], "branch-site-1")
+
+    def test_diagnose_and_mac_recovery_apply_return_428_on_enable_required(self):
+        admin_login = self._login("admin", self.ADMIN_PASSWORD)
+        csrf = admin_login["csrf"]
+        with patch("equipment_ops._execute") as mock_exec:
+            mock_exec.return_value = {"ok": False, "error": "enable_required"}
+            diag_res = self.client.post(
+                "/api/equipment/diagnose",
+                json={
+                    "host": "10.10.20.5",
+                    "username": "netuser",
+                    "password": "SwitchPass!2026",
+                    "clientIp": "10.10.20.99",
+                    "clientMac": "",
+                },
+                headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+                environ_base=self.https_env,
+            )
+            self.assertEqual(diag_res.status_code, 428)
+
+            valid_plan = {
+                "interface": "Fa0/1",
+                "reason": "psecure-violation",
+                "macPolicy": "clear-and-relearn",
+                "maximum": 1,
+                "total": 1,
+                "violations": 2,
+                "planHash": "a" * 64,
+            }
+            mock_exec.side_effect = [
+                {"ok": True, "plan": valid_plan},
+                {"ok": False, "error": "enable_required"},
+            ]
+            plan_res = self.client.post(
+                "/api/equipment/mac-recovery/plan",
+                json={
+                    "host": "10.10.20.5",
+                    "username": "netuser",
+                    "password": "SwitchPass!2026",
+                    "interface": "Fa0/1",
+                },
+                headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+                environ_base=self.https_env,
+            )
+            self.assertEqual(plan_res.status_code, 200)
+            ticket = plan_res.get_json()["ticket"]
+
+            apply_res = self.client.post(
+                "/api/equipment/mac-recovery/apply",
+                json={
+                    "host": "10.10.20.5",
+                    "username": "netuser",
+                    "password": "SwitchPass!2026",
+                    "interface": "Fa0/1",
+                    "planHash": "a" * 64,
+                    "ticket": ticket,
+                },
+                headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+                environ_base=self.https_env,
+            )
+            self.assertEqual(apply_res.status_code, 428)
+            self.assertEqual(apply_res.get_json().get("code"), "enable_required")
 
 
 if __name__ == "__main__":

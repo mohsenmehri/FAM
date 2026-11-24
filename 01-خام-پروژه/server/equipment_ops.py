@@ -531,7 +531,7 @@ def register_equipment_ops(app, *, data, fail, allowed, audit_allowed=None):
         result=run({'operation':'diagnose',**value})
         if not isinstance(result,dict) or result.get('ok') is not True:
             record_audit('diagnose', value['host'], False, _result_code(result))
-            fail(429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
+            fail(428 if isinstance(result,dict) and result.get('error')=='enable_required' else 429 if isinstance(result,dict) and result.get('error')=='equipment_busy' else 502,_failure(result))
         try:
             if __package__:from .equipment_diagnostics import validate_report
             else:from equipment_diagnostics import validate_report
@@ -623,7 +623,7 @@ def register_equipment_ops(app, *, data, fail, allowed, audit_allowed=None):
             safe={'equipment_busy','ticket_consumed','mac_changed','mac_not_violation','mac_preflight','mac_unsupported_platform','mac_quarantined','enable_required','enable_failed','enable_unconfirmed'}
             code=code if code in safe else 'mac_uncertain'
             record_audit('mac-apply', value['host'], False, code)
-            return jsonify(error=_failure({'error':code}),code=code,requiresRecheck=True), (429 if code=='equipment_busy' else 409 if code in ('ticket_consumed','mac_changed') else 502)
+            return jsonify(error=_failure({'error':code}),code=code,requiresRecheck=True), (428 if code=='enable_required' else 429 if code=='equipment_busy' else 409 if code in ('ticket_consumed','mac_changed') else 502)
         record_audit('mac-apply', value['host'], True, 'ok')
         return jsonify(host=value['host'],source='server-ssh',interface=value['interface'],state=result['state'],protectionPreserved=True)
 

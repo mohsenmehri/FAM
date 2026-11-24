@@ -333,16 +333,16 @@
     const hosts = (bp.topology?.devices || []).filter(d => d.ip);
     const list = [];
     if (bp.beforeYouStart?.length) {
-      list.push({ id: 'before', title: 'پیش‌نیازها (Before You Start)', html: `<ul style="margin:6px 0 0 18px;font-size:13px">${bp.beforeYouStart.map(x => `<li>${x}</li>`).join('')}</ul>` });
+      list.push({ id: 'before', title: 'پیش‌نیازها (Before You Start)', html: `<ul style="margin:6px 0 0 18px;font-size:13px">${bp.beforeYouStart.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` });
     }
     if (bp.whyItMatters) {
-      list.push({ id: 'why', title: 'چرا این مبحث مهم است؟ (Why It Matters)', html: `<p style="margin:6px 0 0;font-size:13px;line-height:1.7">${bp.whyItMatters}</p>` });
+      list.push({ id: 'why', title: 'چرا این مبحث مهم است؟ (Why It Matters)', html: `<p style="margin:6px 0 0;font-size:13px;line-height:1.7">${escapeHtml(bp.whyItMatters)}</p>` });
     }
     if (bp.objectives?.length) {
-      list.push({ id: 'obj', title: 'اهداف یادگیری (Learning Objectives)', html: `<ul style="margin:6px 0 0 18px;font-size:13px">${bp.objectives.map(o => `<li>${o}</li>`).join('')}</ul>` });
+      list.push({ id: 'obj', title: 'اهداف یادگیری (Learning Objectives)', html: `<ul style="margin:6px 0 0 18px;font-size:13px">${bp.objectives.map(o => `<li>${escapeHtml(o)}</li>`).join('')}</ul>` });
     }
     if (bp.concept) {
-      list.push({ id: 'concept', title: 'مفهوم پایه (Concept)', html: `<p style="margin:6px 0 0;font-size:13px;line-height:1.7">${bp.concept}</p>` });
+      list.push({ id: 'concept', title: 'مفهوم پایه (Concept)', html: `<p style="margin:6px 0 0;font-size:13px;line-height:1.7">${escapeHtml(bp.concept)}</p>` });
     }
     if (bp.visualDomains?.length) {
       list.push({ id: 'visual', title: 'توضیح تصویری (Visual Explanation)', html: `<div style="margin-top:8px">${renderVisualSvg(bp)}</div>` });
@@ -351,25 +351,25 @@
       list.push({ id: 'topo', title: 'توپولوژی شبکه (Network Topology)', html: `<div style="margin-top:8px">${renderTopologySvg(bp)}</div>` });
     }
     if (hosts.length) {
-      list.push({ id: 'addr', title: 'جدول آدرس‌دهی (Addressing Plan — Layer 2 Only)', html: `<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;direction:ltr;text-align:left"><thead><tr style="border-bottom:1px solid #334155;color:#94a3b8"><th>Device</th><th>Port</th><th>VLAN</th><th>IP / Mask</th><th>Gateway</th></tr></thead><tbody>${hosts.map(h => `<tr style="border-bottom:1px solid #1e293b"><td>${h.id}</td><td>${h.port}</td><td>${h.vlan}</td><td>${h.ip}</td><td>${h.gw}</td></tr>`).join('')}</tbody></table>` });
+      list.push({ id: 'addr', title: 'جدول آدرس‌دهی (Addressing Plan — Layer 2 Only)', html: `<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:12px;direction:ltr;text-align:left"><thead><tr style="border-bottom:1px solid #334155;color:#94a3b8"><th>Device</th><th>Port</th><th>VLAN</th><th>IP / Mask</th><th>Gateway</th></tr></thead><tbody>${hosts.map(h => `<tr style="border-bottom:1px solid #1e293b"><td>${escapeHtml(h.id)}</td><td>${escapeHtml(h.port)}</td><td>${escapeHtml(h.vlan)}</td><td>${escapeHtml(h.ip)}</td><td>${escapeHtml(h.gw)}</td></tr>`).join('')}</tbody></table>` });
     }
     if (bp.configuration?.length) {
-      list.push({ id: 'cfg', title: 'پیکربندی کامل و توضیح خط‌به‌خط دستورات', html: `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">${bp.configuration.map(c => `<div dir="ltr" style="display:flex;justify-content:space-between;align-items:center;gap:12px;background:#06090f;padding:6px 10px;border-radius:6px;font-size:12px"><code style="color:#34d399;text-align:left">${c.cmd}</code><span dir="rtl" style="color:#94a3b8;text-align:right">${c.explain}</span></div>`).join('')}</div>` });
+      list.push({ id: 'cfg', title: 'پیکربندی کامل و توضیح خط‌به‌خط دستورات', html: `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">${bp.configuration.map(c => `<div dir="ltr" style="display:flex;justify-content:space-between;align-items:center;gap:12px;background:#06090f;padding:6px 10px;border-radius:6px;font-size:12px"><code style="color:#34d399;text-align:left">${escapeHtml(c.cmd)}</code><span dir="rtl" style="color:#94a3b8;text-align:right">${escapeHtml(c.explain)}</span></div>`).join('')}</div>` });
     }
     if (bp.verification) {
-      list.push({ id: 'verify', title: 'بررسی و خروجی مورد انتظار (Verification)', html: `<pre style="direction:ltr;text-align:left;background:#06090f;padding:10px;border-radius:6px;font-size:11px;color:#bae6fd;margin-top:6px;overflow-x:auto">${bp.verification.command}\n\n${bp.verification.expectedOutput}</pre>` });
+      list.push({ id: 'verify', title: 'بررسی و خروجی مورد انتظار (Verification)', html: `<pre style="direction:ltr;text-align:left;background:#06090f;padding:10px;border-radius:6px;font-size:11px;color:#bae6fd;margin-top:6px;overflow-x:auto">${escapeHtml(bp.verification.command)}\n\n${escapeHtml(bp.verification.expectedOutput)}</pre>` });
     }
     if (bp.troubleshooting?.length) {
-      list.push({ id: 'tshoot', title: 'عیب‌یابی (Troubleshooting)', html: bp.troubleshooting.map(t => `<div style="font-size:12px;margin-top:8px;padding:8px;background:#06090f;border-radius:6px"><strong>نشانه:</strong> ${t.symptom}<br/><strong>علت:</strong> ${t.cause}<br/><strong>راه‌حل:</strong> ${t.fix}</div>`).join('') });
+      list.push({ id: 'tshoot', title: 'عیب‌یابی (Troubleshooting)', html: bp.troubleshooting.map(t => `<div style="font-size:12px;margin-top:8px;padding:8px;background:#06090f;border-radius:6px"><strong>نشانه:</strong> ${escapeHtml(t.symptom)}<br/><strong>علت:</strong> ${escapeHtml(t.cause)}<br/><strong>راه‌حل:</strong> ${escapeHtml(t.fix)}</div>`).join('') });
     }
     if (bp.practiceExercise?.steps?.length) {
-      list.push({ id: 'practice', title: bp.practiceExercise.title || 'تمرین عملی (Practice Exercise)', html: `<ol style="margin:6px 0 0 18px;font-size:13px">${bp.practiceExercise.steps.map(s => `<li>${s}</li>`).join('')}</ol>` });
+      list.push({ id: 'practice', title: bp.practiceExercise.title || 'تمرین عملی (Practice Exercise)', html: `<ol style="margin:6px 0 0 18px;font-size:13px">${bp.practiceExercise.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>` });
     }
     if (bp.knowledgeCheck?.length) {
-      list.push({ id: 'quiz', title: 'آزمون ارزیابی (Knowledge Check)', html: `<div id="le-quiz" style="margin-top:8px;display:flex;flex-direction:column;gap:12px">${bp.knowledgeCheck.map((q, qi) => `<div style="padding:8px;background:#06090f;border-radius:6px"><div style="font-size:12px;font-weight:700;margin-bottom:6px">${qi + 1}. ${q.q}</div>${q.options.map((opt, oi) => `<label style="display:block;font-size:12px;cursor:pointer;margin:3px 0"><input type="radio" name="le-q-${qi}" value="${oi}"/> ${opt}</label>`).join('')}<div id="le-q-fb-${qi}" style="font-size:11px;margin-top:4px"></div></div>`).join('')}<button id="le-grade-btn" class="btn primary" style="align-self:flex-start">بررسی پاسخ‌ها</button><div id="le-quiz-res" style="font-size:13px;font-weight:700"></div></div>` });
+      list.push({ id: 'quiz', title: 'آزمون ارزیابی (Knowledge Check)', html: `<div id="le-quiz" style="margin-top:8px;display:flex;flex-direction:column;gap:12px">${bp.knowledgeCheck.map((q, qi) => `<div style="padding:8px;background:#06090f;border-radius:6px"><div style="font-size:12px;font-weight:700;margin-bottom:6px">${qi + 1}. ${escapeHtml(q.q)}</div>${q.options.map((opt, oi) => `<label style="display:block;font-size:12px;cursor:pointer;margin:3px 0"><input type="radio" name="le-q-${qi}" value="${oi}"/> ${escapeHtml(opt)}</label>`).join('')}<div id="le-q-fb-${qi}" style="font-size:11px;margin-top:4px"></div></div>`).join('')}<button id="le-grade-btn" class="btn primary" style="align-self:flex-start">بررسی پاسخ‌ها</button><div id="le-quiz-res" style="font-size:13px;font-weight:700"></div></div>` });
     }
     if (bp.finalChallenge) {
-      list.push({ id: 'challenge', title: 'چالش نهایی (Final Challenge)', html: `<p style="font-size:12px;margin:6px 0 0">${bp.finalChallenge}</p>` });
+      list.push({ id: 'challenge', title: 'چالش نهایی (Final Challenge)', html: `<p style="font-size:12px;margin:6px 0 0">${escapeHtml(bp.finalChallenge)}</p>` });
     }
     return list.map((s, idx) => ({ ...s, num: idx + 1 }));
   }
@@ -493,9 +493,9 @@
     if (outline) {
       outline.innerHTML = lessonSections.map((section, index) => {
         const heading = section.querySelector('strong');
-        const label = (heading?.textContent || section.id).replace(/^\\s*\\d+(?:\\s*(?:&|-)\\s*\\d+)?\\s*[.\\u06D4]?\\s*/, '').trim();
+        const label = (heading?.textContent || section.id).replace(/^\s*\d+(?:\s*(?:&|-)\s*\d+)?\s*[.\u06D4]?\s*/, '').trim();
         if (heading) heading.textContent = `${index + 1}. ${label}`;
-        return `<a href="#${section.id}" style="font-size:12px;color:#cbd5e1;text-decoration:none;padding:5px 8px;border-radius:6px;background:#06090f;border:1px solid #1e293b">${index + 1}. ${label}</a>`;
+        return `<a href="#${escapeHtml(section.id)}" style="font-size:12px;color:#cbd5e1;text-decoration:none;padding:5px 8px;border-radius:6px;background:#06090f;border:1px solid #1e293b">${index + 1}. ${escapeHtml(label)}</a>`;
       }).join('');
     }
 
@@ -646,7 +646,6 @@
     renderUnreadyLesson,
     renderVisualSvg,
     renderTopologySvg,
-    buildSections,
     isLessonDone,
     toggleLessonDone,
     getAdjacentLessons,

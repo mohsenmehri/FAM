@@ -159,7 +159,7 @@ ping <remote-vtep-ip> size 1550 df-bit
 
 **انتظار طراحی:** PC-A و PC-B با وجود این‌که به دو Edge فیزیکی مختلف متصل‌اند، در VNI یکسان و یک **Broadcast Domain** منطقی قرار می‌گیرند و در صورت تکمیل پیکربندی و مسیرها می‌توانند به هم برسند. نمودار، Prefixهای Underlay را نشان نمی‌دهد؛ از آن نمی‌توان هم‌Subnet یا متفاوت‌بودن آن‌ها را نتیجه گرفت.
 
-![نمودار قابل ویرایش Overlay و Underlay؛ اجرا‌نشده](academy-images/aut-03-fabric.svg)
+![نمودار قابل ویرایش Overlay و Underlay؛ اجرا‌نشده](images/aut-03-fabric.svg)
 
 ## ۷. کاربرگ مستقل PNETLab
 

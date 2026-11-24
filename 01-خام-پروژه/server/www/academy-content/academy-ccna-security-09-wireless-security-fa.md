@@ -31,7 +31,7 @@
 
 **PNETLab مستقل، طراحی‌شده و اجرا‌نشده:** یک WLAN سازمانی با SSID `CORP-WIFI`، احراز هویت 802.1X و RADIUS فرضی؛ یک WLAN مهمان با PSK جدا و جداسازی ترافیک. هیچ کنترلر، AP یا RADIUS واقعی در دسترس نبوده است.
 
-![نمودار قابل ویرایش امنیت Wireless؛ اجرا‌نشده](academy-images/sec-09-wireless.svg)
+![نمودار قابل ویرایش امنیت Wireless؛ اجرا‌نشده](images/sec-09-wireless.svg)
 
 ## ۳. نکات طراحی
 

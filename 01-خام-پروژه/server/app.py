@@ -792,9 +792,12 @@ def create_app(config=None):
         return private_html_response(page)
     @app.get('/academy-assets/<path:filename>')
     def academy_assets(filename):
-        # Public client assets are served by the app release, not stale nginx files.
+        # Client assets stay behind the same FAM session as /academy; login.html
+        # only loads /login.css and /login.js.
         if Path(filename).suffix.lower() not in {'.css', '.js', '.json', '.jpg', '.jpeg', '.png', '.webp'}:
             fail(404, 'فایل مورد نظر یافت نشد.')
+        with connect() as db:
+            user_and_session(db)
         return send_from_directory(ROOT/'www'/'academy-assets', filename, max_age=0)
 
     @app.get('/academy-content/<path:filename>')

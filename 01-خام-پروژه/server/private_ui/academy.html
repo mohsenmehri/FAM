@@ -267,7 +267,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       }
     } catch (error) {
       if (root.dataset.loadSequence !== requestId) return;
-      root.innerHTML = '<div class="fa-error">بارگذاری آکادمی انجام نشد: ' + String(error.message || error) + '</div>';
+      const errEl = document.createElement('div');
+      errEl.className = 'fa-error';
+      errEl.textContent = 'بارگذاری آکادمی انجام نشد: ' + String(error.message || error);
+      root.replaceChildren(errEl);
     }
   }
 
@@ -297,7 +300,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       });
     } catch (error) {
       if (root.dataset.loadSequence !== requestId) return;
-      root.innerHTML = '<div class="fa-error">باز کردن درس ناموفق بود: ' + String(error.message || error) + '</div>';
+      const errEl = document.createElement('div');
+      errEl.className = 'fa-error';
+      errEl.textContent = 'باز کردن درس ناموفق بود: ' + String(error.message || error);
+      root.replaceChildren(errEl);
     }
   }
 
@@ -310,7 +316,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   document.getElementById('btn-back-paths').onclick = () => loadCatalog();
   document.getElementById('btn-blueprint').onclick = async () => {
     try {
-      const response = await fetch('/academy-assets/curriculum-catalog.json', { cache: 'no-store' });
+      const response = await fetch('/academy-assets/curriculum-catalog.json', { credentials: 'same-origin', cache: 'no-store' });
       const cat = await response.json();
       const first = (cat.paths || []).flatMap(x => (x.courses || []).flatMap(c => c.lessons || [])).find(l => l.blueprint);
       if (first) openBlueprint(first.blueprint);
@@ -603,7 +609,9 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       unmet.forEach(pid => {
         const row = document.createElement("div");
         row.className = "s4-item";
-        row.innerHTML = "<strong>" + (lMap.get(pid)?.title || pid) + "</strong>";
+        const labelEl = document.createElement("strong");
+        labelEl.textContent = lMap.get(pid)?.title || pid;
+        row.appendChild(labelEl);
         const btns = document.createElement("div");
         btns.style.display = "flex"; btns.style.gap = "6px";
         const b1 = document.createElement("button"); b1.className = "btn"; b1.textContent = "این مبحث را بلدم";
@@ -693,7 +701,9 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     sa.innerHTML = s4.selfAssessed.length ? "" : "<span style=opacity:0.7>موردی ثبت نشده است.</span>";
     s4.selfAssessed.forEach(id => {
       const row = document.createElement("div"); row.className = "s4-item";
-      row.innerHTML = `<span>${lMap.get(id)?.title || id}</span>`;
+      const span = document.createElement("span");
+      span.textContent = lMap.get(id)?.title || id;
+      row.appendChild(span);
       const b = document.createElement("button"); b.className = "btn"; b.textContent = "لغو خودارزیابی";
       b.onclick = () => { s4.selfAssessed = s4.selfAssessed.filter(x => x !== id); saveS4(); renderS4(); };
       row.appendChild(b); sa.appendChild(row);
@@ -764,7 +774,15 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
           document.getElementById("s4-modal-title").textContent = item.term + " — " + item.fa;
           document.getElementById("s4-modal-target").textContent = item.simple || item.fa;
           const list = document.getElementById("s4-modal-list");
-          list.innerHTML = item.relatedLessonId ? `<div class="s4-item"><span>درس مرتبط: ${item.relatedLessonId}</span></div>` : "";
+          list.replaceChildren();
+          if (item.relatedLessonId) {
+            const rel = document.createElement("div");
+            rel.className = "s4-item";
+            const span = document.createElement("span");
+            span.textContent = "درس مرتبط: " + item.relatedLessonId;
+            rel.appendChild(span);
+            list.appendChild(rel);
+          }
           m.classList.add("open");
         };
         wrap.appendChild(btn);
@@ -827,14 +845,15 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     const q = inp.value.trim().toLowerCase();
     const track = sel.value;
     if (!catCache) {
-      try { catCache = await (await fetch("/academy-assets/curriculum-catalog.json?v=20261123c")).json(); } catch { return; }
+      try { catCache = await (await fetch("/academy-assets/curriculum-catalog.json?v=20261123c", { credentials: "same-origin", cache: "no-store" })).json(); } catch { return; }
     }
     if (!q && track === "ALL") {
       resBox.style.display = "none";
-      resBox.innerHTML = "";
+      resBox.replaceChildren();
       return;
     }
-    const hits = [];
+    const frag = document.createDocumentFragment();
+    let hitCount = 0;
     for (const p of (catCache.paths || [])) {
       if (track !== "ALL" && p.id !== track) continue;
       for (const c of (p.courses || [])) {
@@ -842,17 +861,39 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
           const hay = [l.title, l.titleEn, l.id, l.summary, l.description, c.title, ...(Array.isArray(l.keywords) ? l.keywords : [])]
             .filter(Boolean).join(" ").toLowerCase();
           if (!q || hay.includes(q)) {
-            const desc = l.summary || l.description || c.title;
-            hits.push(`<div style="padding:8px 10px;border-bottom:1px solid rgba(148,163,184,0.15);"><a href="#${l.id}" class="s4-search-hit" data-lesson="${l.id}" style="color:#38bdf8;text-decoration:none;font-weight:700;display:block;">${l.title}</a><div style="font-size:0.78rem;opacity:0.85;">${p.title} · ${c.title}</div><div style="font-size:0.78rem;opacity:0.7;">${desc}</div></div>`);
+            hitCount++;
+            const row = document.createElement("div");
+            row.style.cssText = "padding:8px 10px;border-bottom:1px solid rgba(148,163,184,0.15);";
+            const link = document.createElement("a");
+            link.href = "#" + l.id;
+            link.className = "s4-search-hit";
+            link.dataset.lesson = l.id;
+            link.style.cssText = "color:#38bdf8;text-decoration:none;font-weight:700;display:block;";
+            link.textContent = l.title;
+            link.addEventListener("click", () => { resBox.style.display = "none"; });
+            const meta = document.createElement("div");
+            meta.style.cssText = "font-size:0.78rem;opacity:0.85;";
+            meta.textContent = p.title + " · " + c.title;
+            const summary = document.createElement("div");
+            summary.style.cssText = "font-size:0.78rem;opacity:0.7;";
+            summary.textContent = l.summary || l.description || c.title;
+            row.append(link, meta, summary);
+            frag.appendChild(row);
           }
         }
       }
     }
-    resBox.innerHTML = hits.length ? hits.join("") : "<div id=\"s4-search-empty\" style=\"opacity:0.75;padding:6px;\">موردی یافت نشد.</div>";
+    resBox.replaceChildren();
+    if (hitCount) {
+      resBox.appendChild(frag);
+    } else {
+      const empty = document.createElement("div");
+      empty.id = "s4-search-empty";
+      empty.style.cssText = "opacity:0.75;padding:6px;";
+      empty.textContent = "موردی یافت نشد.";
+      resBox.appendChild(empty);
+    }
     resBox.style.display = "block";
-    resBox.querySelectorAll(".s4-search-hit").forEach(a => {
-      a.addEventListener("click", () => { resBox.style.display = "none"; });
-    });
   }
 
   inp.addEventListener("input", runFilter);

@@ -6,7 +6,7 @@
 
 یادگیری MAC از مبدأ، Aging، تصمیم Forwarding بر اساس مقصد و VLAN، Flooding و خواندن مقدماتی جدول MAC را با یک سناریو توضیح دهید. تفاوت جدول MAC با ARP و Routing Table را بشناسید.
 
-![نمودار قابل ویرایش: یادگیری MAC از مبدأ، Flooding و Forwarding؛ اجرا‌نشده](academy-images/nf-15-mac-table.svg)
+![نمودار قابل ویرایش: یادگیری MAC از مبدأ، Flooding و Forwarding؛ اجرا‌نشده](images/nf-15-mac-table.svg)
 
 ## ۱. Frame و جدول MAC
 

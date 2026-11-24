@@ -23,7 +23,7 @@
 - **BGP (B)** — مسیر BGP.
 - **RIP (R)** — مسیر RIP.
 
-![نمودار قابل ویرایش خواندن جدول Routing؛ اجرا‌نشده](academy-images/ic-01-routing-table.svg)
+![نمودار قابل ویرایش خواندن جدول Routing؛ اجرا‌نشده](images/ic-01-routing-table.svg)
 
 ## ۲. اجزای یک ردیف
 

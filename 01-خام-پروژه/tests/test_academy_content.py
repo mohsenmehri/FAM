@@ -184,6 +184,19 @@ class AcademyContentTests(unittest.TestCase):
             with self.subTest(lesson=lesson["id"]):
                 self.assertTrue(status_pattern.search(evidence), "lab must say it has not been run")
 
+    def test_academy_content_markdown_images_resolve(self):
+        content_root = WEB_ROOT / "academy-content"
+        md_files = sorted(content_root.glob("*.md"))
+        self.assertTrue(md_files)
+        for md_file in md_files:
+            text = md_file.read_text(encoding="utf-8")
+            self.assertNotIn("](academy-images/", text, md_file.name)
+            for match in re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text):
+                target = (content_root / match).resolve()
+                with self.subTest(md=md_file.name, image=match):
+                    self.assertIn(content_root.resolve(), target.parents)
+                    self.assertTrue(target.is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,7 @@ CDP و LLDP را در نقش کشف همسایهٔ مستقیم مقایسه ک�
 [SW1 Gi0/1] ───── Ethernet ───── [Gi0/1 SW2]
 ```
 
-![نمودار قابل ویرایش CDP و LLDP؛ اجرا‌نشده](academy-images/na-05-discovery.svg)
+![نمودار قابل ویرایش CDP و LLDP؛ اجرا‌نشده](images/na-05-discovery.svg)
 
 ## ۳. پیکربندی پیشنهادی
 

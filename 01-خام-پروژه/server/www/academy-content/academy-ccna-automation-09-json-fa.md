@@ -171,7 +171,7 @@ else:
 
 3. این ساختار دفاعی (**Defensive Parsing**) تفاوت بین Scriptی است که در Production کار می‌کند و Scriptی که فقط روی دادهٔ نمونه کار می‌کند.
 
-![نمودار قابل ویرایش JSON؛ اجرا‌نشده](academy-images/aut-09-json.svg)
+![نمودار قابل ویرایش JSON؛ اجرا‌نشده](images/aut-09-json.svg)
 
 ## ۶. کاربرگ مستقل JSON و Parsing (بدون نیاز به PNETLab)
 

@@ -156,7 +156,7 @@ for switch in access_switches:
 | SW1–SW3 | `10.10.0.11-13` (VLAN 99) | Data Plane |
 | PC-A..C | DHCP در VLAN 10 | کاربران |
 
-![نمودار قابل ویرایش Controller-Based؛ اجرا‌نشده](academy-images/aut-02-controller.svg)
+![نمودار قابل ویرایش Controller-Based؛ اجرا‌نشده](images/aut-02-controller.svg)
 
 **سناریوی طراحی‌شده (اجرا نشده):** در مدل سنتی، `vlan 10` روی SW1 و SW2 ساخته شده ولی روی SW3 فراموش شده. باید با `show vlan brief` روی هر سه سوییچ پیدا شود — کاری که در ۲۰۰ سوییچ عملی نیست. در مدل Controller-Based، سیاست یک‌جا تعریف می‌شود و خطای «فراموش شد» ساختاری حذف می‌شود. **این تفاوت است، نه این‌که کنترلر جادو می‌کند.**
 

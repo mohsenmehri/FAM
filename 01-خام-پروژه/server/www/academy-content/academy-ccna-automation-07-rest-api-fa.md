@@ -183,7 +183,7 @@ Content-Type: application/json
 | اعتبارنامهٔ نامعتبر/منقضی | معمولاً **401 Unauthorized** | روش احراز و زمان/وضعیت Token را بررسی کنید |
 | درخواست ممنوع طبق سیاست | ممکن است **403 Forbidden** باشد | نقش، Scope و سیاست API را بررسی کنید |
 
-![نمودار قابل ویرایش REST؛ اجرا‌نشده](academy-images/aut-07-rest.svg)
+![نمودار قابل ویرایش REST؛ اجرا‌نشده](images/aut-07-rest.svg)
 
 ## ۷. کاربرگ مستقل PNETLab
 

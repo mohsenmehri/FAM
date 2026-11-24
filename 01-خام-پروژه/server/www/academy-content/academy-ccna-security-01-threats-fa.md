@@ -35,7 +35,7 @@
 
 **PNETLab مستقل، طراحی‌شده و اجرا‌نشده:** شبکهٔ کوچک با روتر مرزی، سوییچ دسترسی و دو کلاینت. یک Vulnerability فرضی (Telnet فعال و Community پیش‌فرض SNMP) شناسایی و Mitigation برای هر دو طراحی می‌شود. هیچ اسکن یا حملهٔ واقعی انجام نشده است.
 
-![نمودار قابل ویرایش Threat و Mitigation؛ اجرا‌نشده](academy-images/sec-01-threats.svg)
+![نمودار قابل ویرایش Threat و Mitigation؛ اجرا‌نشده](images/sec-01-threats.svg)
 
 ## ۴. روش ارزیابی ریسک
 

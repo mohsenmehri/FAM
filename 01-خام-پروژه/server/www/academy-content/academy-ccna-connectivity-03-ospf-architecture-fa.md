@@ -48,7 +48,7 @@ OSPF یک پروتکل **Link-State** است. هر روتر:
 
 ماندن در `ExStart` یا `Exchange` معمولاً نشانهٔ **MTU ناهماهنگ** است. ماندن در `Init` یعنی Hello یک‌طرفه است. ماندن در `2-WAY` در Broadcast طبیعی است، ولی در Point-to-Point غیرطبیعی و نشانهٔ مشکل است.
 
-![نمودار قابل ویرایش همسایگی OSPF نقطه‌به‌نقطه؛ اجرا‌نشده](academy-images/ic-03-ospf-p2p.svg)
+![نمودار قابل ویرایش همسایگی OSPF نقطه‌به‌نقطه؛ اجرا‌نشده](images/ic-03-ospf-p2p.svg)
 
 ## ۴. تفاوت آدرس‌دهی Interface و فرمان network
 

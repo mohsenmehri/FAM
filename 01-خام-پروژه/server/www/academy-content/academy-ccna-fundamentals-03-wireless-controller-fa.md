@@ -20,7 +20,7 @@
 
 در AP مستقل/Autonomous بعضی Policyها محلی‌اند؛ در Lightweight/CAPWAP یا Cloud-managed بخشی از مدیریت/کنترل می‌تواند بیرون AP باشد. Mode، مسیر داده و Fail Mode را از طراحی محصول بخوانید؛ این دسته‌ها در همهٔ Vendorها دقیقاً هم‌نام/هم‌رفتار نیستند.
 
-![نمودار مفهومی قابل ویرایش؛ اجرا نشده](academy-images/nf-03-wireless.svg)
+![نمودار مفهومی قابل ویرایش؛ اجرا نشده](images/nf-03-wireless.svg)
 
 ## ۲. مسیر ساده‌شده
 

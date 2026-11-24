@@ -39,7 +39,7 @@ Gateway for PC-A: 10.10.0.254 (HSRP virtual IP)
 | R2 Gi0/1 | `192.0.2.2/30` | Other end of lab link |
 | R2 Loopback0 | `203.0.113.10/32` | Test destination; not an external network |
 
-![نمودار قابل ویرایش HSRP؛ اجرا‌نشده](academy-images/ic-06-fhrp.svg)
+![نمودار قابل ویرایش HSRP؛ اجرا‌نشده](images/ic-06-fhrp.svg)
 
 ## ۳. پیکربندی پیشنهادی HSRP
 
