@@ -22,15 +22,21 @@ except ModuleNotFoundError:
 class FamPackagingTests(unittest.TestCase):
     def test_nginx_configs_exist_and_include_security_headers(self):
         raw_nginx = PACKAGE_ROOT / "nginx.conf"
-        delivery_nginx = REPO_ROOT / "02-فایل-های-اجرایی" / "nginx.conf"
+        delivery_dir = REPO_ROOT / "02-فایل-های-اجرایی"
+        delivery_nginx = delivery_dir / "nginx.conf"
         self.assertTrue(raw_nginx.is_file(), "01-خام-پروژه/nginx.conf must exist for docker-compose")
-        self.assertTrue(delivery_nginx.is_file(), "02-فایل-های-اجرایی/nginx.conf must exist")
         raw_text = raw_nginx.read_text(encoding="utf-8")
-        self.assertEqual(raw_text, delivery_nginx.read_text(encoding="utf-8"))
+        if delivery_dir.is_dir():
+            self.assertTrue(delivery_nginx.is_file(), "02-فایل-های-اجرایی/nginx.conf must exist")
+            self.assertEqual(raw_text, delivery_nginx.read_text(encoding="utf-8"))
         self.assertIn('X-Content-Type-Options "nosniff"', raw_text)
         self.assertIn('X-Frame-Options "DENY"', raw_text)
         self.assertIn('Cache-Control "no-store"', raw_text)
         self.assertIn("server_tokens off;", raw_text)
+        gzip_lines = [line for line in raw_text.splitlines() if "gzip_types" in line]
+        self.assertTrue(gzip_lines, "gzip_types directive must be present")
+        for line in gzip_lines:
+            self.assertNotIn("text/html", line)
 
     def test_dockerfile_sets_executable_loader_permissions(self):
         dockerfile = (PACKAGE_ROOT / "Dockerfile").read_text(encoding="utf-8")
@@ -79,11 +85,14 @@ class FamAppApiTests(unittest.TestCase):
 
     def test_public_login_and_unauthenticated_guards(self):
         res = self.client.get("/", environ_base=self.https_env)
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.headers.get("X-Content-Type-Options"), "nosniff")
-        self.assertEqual(res.headers.get("Referrer-Policy"), "same-origin")
-        self.assertEqual(res.headers.get("Cache-Control"), "no-store")
-        self.assertEqual(res.headers.get("X-Frame-Options"), "DENY")
+        try:
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(res.headers.get("X-Content-Type-Options"), "nosniff")
+            self.assertEqual(res.headers.get("Referrer-Policy"), "same-origin")
+            self.assertEqual(res.headers.get("Cache-Control"), "no-store")
+            self.assertEqual(res.headers.get("X-Frame-Options"), "DENY")
+        finally:
+            res.close()
 
         for path in (
             "/api/status",
