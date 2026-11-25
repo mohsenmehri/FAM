@@ -350,10 +350,10 @@
         '              switchport access vlan <id> | switchport voice vlan <id> | switchport nonegotiate',
         '              switchport trunk native vlan <id> | switchport trunk allowed vlan [add] <id,id>',
         '  ساخت VLAN: vlan <id> -> name <NAME>',
-        '  بررسی زنده: show ip interface brief | show interfaces status | show vlan brief',
+        '  بررسی زنده: show running-config | show ip interface brief | show interfaces status | show vlan brief',
         '              show interfaces trunk | show interfaces Gi0/3 switchport | ping <ip> | traceroute <ip>',
         '۲) خروجی‌های نمونهٔ ثابت (برای آشنایی با ظاهر جدول؛ با تغییرات شما عوض نمی‌شوند):',
-        '  show arp | show ip route | show running-config | show mac address-table | show spanning-tree | ...'
+        '  show arp | show ip route | show mac address-table | show ip ospf neighbor | show ip bgp summary'
       ].join('\n');
     } else if (inConfigMode && !isDoExec && isExecCheckCmd) {
       reply = `% Invalid input detected in config mode.\n(راهنما: در Cisco IOS، در حالت تنظیمات برای اجرای show یا ping یا ابتدا با end به R1# برگردید یا قبل از دستور کلمهٔ do بنویسید؛ مثلاً: do ${cmd})`;
@@ -471,6 +471,29 @@
         iface.allowedVlans = ids.sort((a, b) => a - b);
         reply = `لیست مجاز ترانک جایگزین شد: ${iface.allowedVlans.join(',') || 'none'}`;
       }
+    } else if (low === 'show running-config' || low === 'sh run') {
+      const lines = ['Building configuration...', '', 'Current configuration:', '!', 'hostname R1', '!'];
+      Object.keys(sim.vlans).map(Number).sort((a, b) => a - b).filter(v => v !== 1).forEach(vid => {
+        lines.push(`vlan ${vid}`, ` name ${sim.vlans[vid].name}`, '!');
+      });
+      Object.entries(sim.interfaces).forEach(([name, inf]) => {
+        lines.push(`interface ${name}`);
+        if (inf.ip && inf.ip !== 'unassigned') lines.push(` ip address ${inf.ip} 255.255.255.0`);
+        if (inf.mode === 'access') {
+          lines.push(' switchport mode access');
+          if (inf.accessVlan !== 1) lines.push(` switchport access vlan ${inf.accessVlan}`);
+          if (inf.voiceVlan) lines.push(` switchport voice vlan ${inf.voiceVlan}`);
+          if (inf.nonegotiate) lines.push(' switchport nonegotiate');
+        } else if (inf.mode === 'trunk') {
+          lines.push(' switchport trunk encapsulation dot1q', ' switchport mode trunk');
+          if (inf.nativeVlan !== 1) lines.push(` switchport trunk native vlan ${inf.nativeVlan}`);
+          lines.push(` switchport trunk allowed vlan ${inf.allowedVlans.join(',')}`);
+        }
+        if (!inf.adminUp) lines.push(' shutdown');
+        lines.push('!');
+      });
+      lines.push('end');
+      reply = lines.join('\n');
     } else if (low === 'show ip interface brief' || low === 'sh ip int br') {
       const lines = ['Interface              IP-Address      OK? Method Status                Protocol'];
       Object.entries(sim.interfaces).forEach(([name, inf]) => {
@@ -1191,7 +1214,7 @@
     const b7 = el('div', 'step-block');
     b7.appendChild(el('span', 'step-tag', 'بخش ۷ · آزمایشگاه عملی (Lab)'));
     b7.appendChild(el('h2', '', lessonObj.lab.title));
-    const simNote = el('p', '', 'مرز شبیه‌ساز: در این ترمینال، دستورات پیکربندی پورت (Gi0/0..7، shutdown/no shutdown)، ساخت و نام‌گذاری VLAN، تنظیمات Access/Trunk، و دستورات show ip interface brief / show interfaces status / show vlan brief / show interfaces trunk / switchport / ping / traceroute به‌صورت زنده و وضعیت‌دار به تغییرات شما واکنش می‌دهند (در حالت تنظیمات از end یا پیشوند do استفاده کنید). سایر دستورات مانند show arp یا show ip route صرفاً خروجی نمونهٔ ثابت نمایش می‌دهند و با علامت [خروجی نمونهٔ ثابت] مشخص می‌شوند.');
+    const simNote = el('p', '', 'مرز شبیه‌ساز: در این ترمینال، دستورات پیکربندی پورت (Gi0/0..7، shutdown/no shutdown)، ساخت و نام‌گذاری VLAN، تنظیمات Access/Trunk، و دستورات show running-config / show ip interface brief / show interfaces status / show vlan brief / show interfaces trunk / switchport / ping / traceroute به‌صورت زنده و وضعیت‌دار به تغییرات شما واکنش می‌دهند (در حالت تنظیمات از end یا پیشوند do استفاده کنید). سایر دستورات مانند show arp یا show ip route صرفاً خروجی نمونهٔ ثابت نمایش می‌دهند و با علامت [خروجی نمونهٔ ثابت] مشخص می‌شوند.');
     simNote.style.fontSize = '12.5px';
     simNote.style.color = '#93c5fd';
     b7.appendChild(simNote);
