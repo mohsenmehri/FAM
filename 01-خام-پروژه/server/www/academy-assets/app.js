@@ -448,11 +448,11 @@
       reply = `کپسوله‌سازی 802.1Q روی ${sim.activeIf} تایید شد.`;
     } else if (low === 'switchport nonegotiate' && sim.mode === 'if' && sim.activeIf) {
       const inf = sim.interfaces[sim.activeIf];
-      if (inf.mode !== 'trunk') {
-        reply = `% Command rejected: An interface whose trunk encapsulation is not set to trunk cannot be configured to nonegotiate (روی پورت static access خودکار DTP خاموش است؛ دستور switchport nonegotiate ویژهٔ پورت trunk است).`;
+      if (inf.mode === 'routed') {
+        reply = `% Command rejected: ${sim.activeIf} is a routed interface (دستور switchport nonegotiate روی پورت لایه ۳ مجاز نیست؛ در سوئیچ‌های Catalyst مانند 2960 این دستور در حالت static access یا trunk معتبر است و در مد dynamic رد می‌شود).`;
       } else {
         inf.nonegotiate = true;
-        reply = `مذاکره خودکار DTP روی ترانک ${sim.activeIf} خاموش شد.`;
+        reply = `مذاکرهٔ DTP روی ${sim.activeIf} (حالت ${inf.mode === 'trunk' ? 'trunk' : 'static access'}) غیرفعال شد.`;
       }
     } else if (/^switchport access vlan \d+$/.test(low) && sim.mode === 'if' && sim.activeIf) {
       const vid = parseInt(low.split(' ').pop(), 10);
@@ -497,6 +497,7 @@
             lines.push(' switchport mode access');
             if (inf.accessVlan !== 1) lines.push(` switchport access vlan ${inf.accessVlan}`);
             if (inf.voiceVlan) lines.push(` switchport voice vlan ${inf.voiceVlan}`);
+            if (inf.nonegotiate) lines.push(' switchport nonegotiate');
           } else if (inf.mode === 'trunk') {
             lines.push(' switchport trunk encapsulation dot1q', ' switchport mode trunk');
             if (inf.nonegotiate) lines.push(' switchport nonegotiate');
