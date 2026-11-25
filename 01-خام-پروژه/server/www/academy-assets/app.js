@@ -800,6 +800,33 @@
         });
         b3.appendChild(ul);
       }
+      if (Array.isArray(sec.bullets)) {
+        const ul = el('ul', 'step-list');
+        sec.bullets.forEach(bt => {
+          const li = el('li');
+          appendRichText(li, bt, lessonObj.id);
+          ul.appendChild(li);
+        });
+        b3.appendChild(ul);
+      }
+      if (sec.think && sec.think.q) {
+        const tb = el('div', 'think-box');
+        const tq = el('div', 'think-q');
+        appendRichText(tq, '🤔 مکث فعال: ' + sec.think.q, lessonObj.id);
+        tb.appendChild(tq);
+        const btn = el('button', 'btn btn-ghost', 'نمایش استدلال و پاسخ');
+        btn.type = 'button';
+        btn.style.fontSize = '12px';
+        const ta = el('div', 'think-a');
+        appendRichText(ta, sec.think.a || '', lessonObj.id);
+        btn.addEventListener('click', () => {
+          const opened = ta.classList.toggle('open');
+          btn.textContent = opened ? 'بستن پاسخ' : 'نمایش استدلال و پاسخ';
+        });
+        tb.appendChild(btn);
+        tb.appendChild(ta);
+        b3.appendChild(tb);
+      }
     });
 
     if (lessonObj.table && Array.isArray(lessonObj.table.headers) && Array.isArray(lessonObj.table.rows)) {
@@ -872,7 +899,7 @@
 
     // ۵: دستورات Cisco IOS
     const b5 = el('div', 'step-block');
-    b5.appendChild(el('span', 'step-tag', 'بخش ۵ · دستورات کلیدی Cisco IOS'));
+    b5.appendChild(el('span', 'step-tag', 'بخش ۵ · دستورات کلیدی Cisco IOS (چرا، ساختار و تفسیر خروجی)'));
     lessonObj.iosCommands.forEach(c => {
       const box = el('div', 'mini-info');
       box.style.marginBottom = '10px';
@@ -880,7 +907,26 @@
       const pre = el('pre', 'cli-out', c.out);
       pre.style.margin = '6px 0';
       box.appendChild(pre);
-      box.appendChild(el('p', '', c.note));
+      const noteP = el('p');
+      appendRichText(noteP, c.note, lessonObj.id);
+      box.appendChild(noteP);
+      if (c.why || c.anatomy || c.lookFor || c.ifUnexpected) {
+        const det = el('div', 'cmd-details');
+        const rows = [
+          ['چرا اجرا می‌شود:', c.why],
+          ['معنای بخش‌های دستور:', c.anatomy],
+          ['در خروجی دنبال چه بگردیم:', c.lookFor],
+          ['اگر نتیجه متفاوت بود:', c.ifUnexpected]
+        ];
+        rows.forEach(([lbl, val]) => {
+          if (!val) return;
+          const r = el('div', 'cmd-detail-row');
+          r.appendChild(el('b', '', lbl));
+          appendRichText(r, val, lessonObj.id);
+          det.appendChild(r);
+        });
+        box.appendChild(det);
+      }
       b5.appendChild(box);
     });
     host.appendChild(b5);
@@ -935,16 +981,74 @@
     const b8 = el('div', 'step-block');
     b8.appendChild(el('span', 'step-tag', 'بخش ۸ · عیب‌یابی سناریوی خطا (Troubleshooting)'));
     const tb = el('div', 'trouble-box');
-    tb.appendChild(el('p', '', lessonObj.troubleshooting.fault));
-    tb.appendChild(el('p', '', 'تحلیل ریشه‌ای: ' + lessonObj.troubleshooting.analysis));
-    tb.appendChild(el('p', '', 'راه‌حل اصلاحی: ' + lessonObj.troubleshooting.fix));
+    const tf = el('p'); appendRichText(tf, lessonObj.troubleshooting.fault, lessonObj.id); tb.appendChild(tf);
+    const ta8 = el('p'); appendRichText(ta8, 'تحلیل ریشه‌ای: ' + lessonObj.troubleshooting.analysis, lessonObj.id); tb.appendChild(ta8);
+    const tx8 = el('p'); appendRichText(tx8, 'راه‌حل اصلاحی: ' + lessonObj.troubleshooting.fix, lessonObj.id); tb.appendChild(tx8);
     b8.appendChild(tb);
+    if (Array.isArray(lessonObj.misconceptions) && lessonObj.misconceptions.length) {
+      b8.appendChild(el('h2', '', 'اشتباهات و سوءبرداشت‌های رایج (و روش تشخیص آن‌ها)'));
+      const mg = el('div', 'mis-grid');
+      lessonObj.misconceptions.forEach(m => {
+        const mc = el('div', 'mis-card');
+        mc.appendChild(el('b', '', '⚠️ سوءبرداشت: ' + m.myth));
+        const mp1 = el('p'); appendRichText(mp1, 'چرا اشتباه است و واقعیت چیست: ' + m.reality, lessonObj.id); mc.appendChild(mp1);
+        if (m.howToSpot) {
+          const mp2 = el('p'); appendRichText(mp2, 'چطور خودت تشخیص بدهی: ' + m.howToSpot, lessonObj.id); mc.appendChild(mp2);
+        }
+        mg.appendChild(mc);
+      });
+      b8.appendChild(mg);
+    }
     host.appendChild(b8);
 
     // ۹: تمرین مستقل
     const b9 = el('div', 'step-block');
-    b9.appendChild(el('span', 'step-tag', 'بخش ۹ · تمرین مستقل دانشجو'));
-    b9.appendChild(el('p', '', lessonObj.exercise));
+    b9.appendChild(el('span', 'step-tag', 'بخش ۹ · تمرین مستقل دانشجو (از ساده تا چالشی)'));
+    if (Array.isArray(lessonObj.exercises) && lessonObj.exercises.length) {
+      const exl = el('div', 'ex-list');
+      lessonObj.exercises.forEach((ex, idx) => {
+        const ec = el('div', 'ex-card');
+        const eh = el('div', 'ex-head');
+        eh.appendChild(el('b', '', 'تمرین ' + toFa(idx + 1)));
+        if (ex.level) eh.appendChild(el('span', 'ex-lvl', ex.level));
+        ec.appendChild(eh);
+        const ep = el('p'); appendRichText(ep, ex.task, lessonObj.id); ec.appendChild(ep);
+        const acts = el('div', 'ex-actions');
+        const revBox = el('div', 'ex-reveal');
+        if (ex.hint) {
+          const hBtn = el('button', 'btn btn-ghost', 'راهنمای حل');
+          hBtn.type = 'button'; hBtn.style.fontSize = '12px';
+          hBtn.addEventListener('click', () => {
+            revBox.textContent = '';
+            const hb = el('b', '', 'راهنما: ');
+            revBox.appendChild(hb);
+            appendRichText(revBox, ex.hint, lessonObj.id);
+            revBox.classList.add('open');
+          });
+          acts.appendChild(hBtn);
+        }
+        if (ex.solution) {
+          const sBtn = el('button', 'btn btn-ghost', 'پاسخ تشریحی');
+          sBtn.type = 'button'; sBtn.style.fontSize = '12px';
+          sBtn.addEventListener('click', () => {
+            revBox.textContent = '';
+            const sb = el('b', '', 'پاسخ تشریحی: ');
+            revBox.appendChild(sb);
+            appendRichText(revBox, ex.solution, lessonObj.id);
+            revBox.classList.add('open');
+          });
+          acts.appendChild(sBtn);
+        }
+        ec.appendChild(acts);
+        ec.appendChild(revBox);
+        exl.appendChild(ec);
+      });
+      b9.appendChild(exl);
+    } else {
+      const exP = el('p');
+      appendRichText(exP, lessonObj.exercise, lessonObj.id);
+      b9.appendChild(exP);
+    }
     host.appendChild(b9);
 
     // ۱۰: آزمون درس (با ارزیابی و حدنصاب ۸۵٪)
@@ -1024,6 +1128,26 @@
     b11.appendChild(saveNoteBtn);
     b11.appendChild(noteMsg);
     host.appendChild(b11);
+
+    if (lessonObj.bridge) {
+      const br = el('div', 'bridge-box');
+      br.appendChild(el('b', '', '🔗 پیوند به درس‌های دیگر و ادامه مسیر'));
+      if (lessonObj.bridge.whereUsed) {
+        const p1 = el('p'); appendRichText(p1, 'کجا به کار می‌آید: ' + lessonObj.bridge.whereUsed, lessonObj.id); br.appendChild(p1);
+      }
+      if (lessonObj.bridge.nextQuestion) {
+        const p2 = el('p'); appendRichText(p2, 'پرسش پیش روی ما برای درس بعد: ' + lessonObj.bridge.nextQuestion, lessonObj.id); br.appendChild(p2);
+      }
+      if (lessonObj.bridge.nextId && ACADEMY.lessons[lessonObj.bridge.nextId]) {
+        const nLesson = ACADEMY.lessons[lessonObj.bridge.nextId];
+        const nb = el('button', 'btn btn-primary', 'رفتن به درس بعدی: ' + nLesson.title + ' ←');
+        nb.type = 'button';
+        nb.style.justifySelf = 'start';
+        nb.addEventListener('click', () => openLessonById(lessonObj.bridge.nextId));
+        br.appendChild(nb);
+      }
+      host.appendChild(br);
+    }
   }
 
   /* ---------- رندر ۷ دانشکده و ۸ تخصص ---------- */
