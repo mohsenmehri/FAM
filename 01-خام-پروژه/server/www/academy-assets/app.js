@@ -439,15 +439,21 @@
       reply = '% ابتدا با interface <name> یک پورت را انتخاب کنید (یا در آزمایشگاه درس ۱: configure terminal -> interface Gi0/2 -> no shutdown).';
     } else if (low === 'switchport mode access' && sim.mode === 'if' && sim.activeIf) {
       sim.interfaces[sim.activeIf].mode = 'access';
-      reply = `پورت ${sim.activeIf} به حالت static access تنظیم شد.`;
+      sim.interfaces[sim.activeIf].nonegotiate = false;
+      reply = `پورت ${sim.activeIf} به حالت static access تنظیم شد (مذاکرهٔ DTP غیرفعال شد).`;
     } else if (low === 'switchport mode trunk' && sim.mode === 'if' && sim.activeIf) {
       sim.interfaces[sim.activeIf].mode = 'trunk';
       reply = `پورت ${sim.activeIf} به حالت trunk تنظیم شد.`;
     } else if (low === 'switchport trunk encapsulation dot1q' && sim.mode === 'if' && sim.activeIf) {
       reply = `کپسوله‌سازی 802.1Q روی ${sim.activeIf} تایید شد.`;
     } else if (low === 'switchport nonegotiate' && sim.mode === 'if' && sim.activeIf) {
-      sim.interfaces[sim.activeIf].nonegotiate = true;
-      reply = `مذاکره خودکار DTP روی ${sim.activeIf} خاموش شد.`;
+      const inf = sim.interfaces[sim.activeIf];
+      if (inf.mode !== 'trunk') {
+        reply = `% Command rejected: An interface whose trunk encapsulation is not set to trunk cannot be configured to nonegotiate (روی پورت static access خودکار DTP خاموش است؛ دستور switchport nonegotiate ویژهٔ پورت trunk است).`;
+      } else {
+        inf.nonegotiate = true;
+        reply = `مذاکره خودکار DTP روی ترانک ${sim.activeIf} خاموش شد.`;
+      }
     } else if (/^switchport access vlan \d+$/.test(low) && sim.mode === 'if' && sim.activeIf) {
       const vid = parseInt(low.split(' ').pop(), 10);
       if (!sim.vlans[vid]) sim.vlans[vid] = { name: `VLAN${String(vid).padStart(4, '0')}`, status: 'active' };
@@ -491,9 +497,9 @@
             lines.push(' switchport mode access');
             if (inf.accessVlan !== 1) lines.push(` switchport access vlan ${inf.accessVlan}`);
             if (inf.voiceVlan) lines.push(` switchport voice vlan ${inf.voiceVlan}`);
-            if (inf.nonegotiate) lines.push(' switchport nonegotiate');
           } else if (inf.mode === 'trunk') {
             lines.push(' switchport trunk encapsulation dot1q', ' switchport mode trunk');
+            if (inf.nonegotiate) lines.push(' switchport nonegotiate');
             if (inf.nativeVlan !== 1) lines.push(` switchport trunk native vlan ${inf.nativeVlan}`);
             lines.push(` switchport trunk allowed vlan ${inf.allowedVlans.join(',')}`);
           }
@@ -554,7 +560,7 @@
           'Switchport: Enabled',
           `Administrative Mode: ${inf.mode === 'trunk' ? 'trunk' : 'static access'}`,
           `Operational Mode: ${inf.mode === 'trunk' ? 'trunk' : 'static access'}`,
-          `Negotiation of Trunking: ${inf.nonegotiate ? 'Off' : 'On'}`,
+          `Negotiation of Trunking: ${(inf.mode === 'access' || inf.nonegotiate) ? 'Off' : 'On'}`,
           `Access Mode VLAN: ${inf.accessVlan} (${vName})`,
           `Trunking Native Mode VLAN: ${inf.nativeVlan}`,
           `Voice VLAN: ${inf.voiceVlan ? inf.voiceVlan : 'none'}`
