@@ -909,12 +909,6 @@ body.dash{background:var(--bg2);display:flex;min-height:100vh}
 .bridge-box p{margin:0;font-size:13.5px;line-height:1.9;color:#e2e8f0}
 
 
-
-body.site #landingShell { display: block; }
-body.site #dashShell { display: none !important; }
-body.dash #landingShell { display: none !important; }
-body.dash #dashShell { display: flex; width: 100%; min-height: 100vh; }
-
 </style>
 </head>
 <body class="site">
@@ -3179,157 +3173,216 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
     "s11": {
       "id": "s11",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "معماری Leaf-Spine چیست؟ راهنمای کامل Spine-and-Leaf، ECMP و VXLAN EVPN",
-      "lead": "چرا تمام دیتاسنترهای بزرگ دنیا از آمازون و گوگل تا بانک‌ها، معماری قدیمی سه‌لایه و STP را دور انداختند و به معماری دو‌لایه Spine-and-Leaf با VXLAN EVPN مهاجرت کردند؟ این درس راهنمای جامع و کامل معماری دیتاسنتر مدرن است.",
-      "goal": "درک عمیق علت پیدایش Leaf-Spine (ترافیک East-West)، قانون عدم اتصال Leaf به Leaf و Spine به Spine، توزیع بار لایه ۳ با ECMP و معماری کامل VXLAN BGP EVPN (Anycast Gateway و L2/L3 VNI).",
-      "prereq": "تسلط بر OSPF/BGP، STP، VLAN و مفاهیم دیتاسنتر (درس ۱۰، STP و Nexus).",
+      "title": "معماری Leaf-Spine چیست؟ راهنمای کامل Clos، ECMP و VXLAN BGP EVPN",
+      "lead": "چرا دیتاسنترهای مدرن از معماری کلاسیک سه‌لایه و Spanning Tree فاصله گرفتند و به ساختار دولایهٔ **Leaf-Spine** با **VXLAN BGP EVPN** مهاجرت کردند؟ در شبکه‌های قدیمی بخش اصلی ترافیک بین کاربر بیرونی و سرور (`North-South`) بود، اما با میکروسرویس‌ها، پایگاه‌های دادهٔ توزیع‌شده و کلاسترهای محاسباتی، حجم عظیمی از ترافیک درون خود دیتاسنتر بین سرور به سرور (`East-West`) حرکت می‌کند—که STP و گلوگاه لایهٔ Aggregation توان پاسخ‌گویی با تاخیر قابل‌پیش‌بینی به آن را ندارند!",
+      "goal": "درک معماری **Clos (Leaf-Spine)** و دلیل ممنوعیت اتصال `Leaf-to-Leaf` و `Spine-to-Spine`، توزیع بار لایه ۳ با **ECMP**، ساختار **VXLAN (`UDP 4789`, `VNID`, سربار MTU)**، کنترل‌پلین **MP-BGP EVPN (`Type-2`, `Type-3`, `Type-5`)**، و **Distributed Anycast Gateway**.",
+      "prereq": "آشنایی با BGP، OSPF/IS-IS، STP و Nexus NX-OS (`ccnp_enc_arch` و `spec_dc_nx`).",
       "sections": [
         {
-          "h": "۱. تغییر الگوی ترافیک دیتاسنتر: از North-South به انفجار East-West",
+          "h": "۱. چرا ساختار کلاسیک در ترافیک East-West شکست می‌خورد و قوانین Clos چیست؟",
           "p": [
-            "در شبکه‌های قدیمی، ۸۰٪ ترافیک از سمت کاربر بیرون می‌آمد، وارد دیتاسنتر می‌شد و برمی‌گشت (North-South). اما امروز با میکروسرویس‌ها، دیتابیس‌های توزیع‌شده، بکاپ، رپلیکیشن ماشین‌های مجازی و کلاسترهای هوش مصنوعی، بیش از ۸۰٪ کل ترافیک درون خود دیتاسنتر بین سرور به سرور (East-West) می‌چرخد! معماری قدیمی Access/Aggregation/Core چون با STP نیمی از لینک‌ها را مسدود می‌کرد و در Aggregation گلوگاه می‌ساخت، دیگر توان حمل این حجم ترافیک با تأخیر ثابت را نداشت."
-          ]
-        },
-        {
-          "h": "۲. قوانین طلایی ساختار فیزیکی Spine-and-Leaf (معماری Clos)",
-          "p": [
-            "توپولوژی Leaf-Spine برگرفته از شبکه مخابراتی غیرمسدودکننده Charles Clos در سال ۱۹۵۳ است و ۳ قانون آهنین دارد:"
+            "در یک دیتاسنتر امروزی بخش بزرگی از جریان‌های داده میان سرورهای رک‌های مختلف (**East-West**) رخ می‌دهد: یک درخواست وب ساده ممکن است ده‌ها فراخوانی داخلی به سرویس‌های احراز هویت، کش و دیتابیس بزند! در توپولوژی کلاسیک لایه ۲، هم STP نیمی از مسیرها را مسدود می‌کرد و هم جابه‌جایی بار میان رک‌ها متغیر بود. معماری **Leaf-Spine (الهام‌گرفته از شبکهٔ مخابراتی Clos)** سه اصل ساختاری دقیق دارد:"
           ],
           "bullets": [
-            "۱. تمام سرورها، فایروال‌ها و روترهای خروجی WAN (به اسم Border Leaf) فقط به سوئیچ‌های Leaf وصل می‌شوند؛ هیچ سروری هرگز مستقیم به Spine وصل نمی‌شود!",
-            "۲. هر سوئیچ Leaf با لینک‌های پرسرعت (۴۰/۱۰۰/۴۰۰G) دقیقاً به تک‌تک سوئیچ‌های Spine متصل می‌شود (Full Bipartite Mesh).",
-            "۳. هیچ دو سوئیچ Leaf مستقیماً به هم وصل نمی‌شوند و هیچ دو سوئیچ Spine هم به هم وصل نمی‌شوند! تمام لینک‌های بین Leaf و Spine در لایه ۳ (Routed Links با OSPF، IS-IS یا eBGP Underlay) کار می‌کنند — پس کلمه STP در کل ستون فقرات دیتاسنتر برای همیشه محو می‌شود و همه لینک‌ها ۱۰۰٪ با ECMP (Equal-Cost Multi-Path) هم‌زمان کار می‌کنند!"
+            "**هر سوئیچ `Leaf` به تمام سوئیچ‌های `Spine` متصل است (Full-Mesh Bipartite):** تمام لینک‌های میان Leaf و Spine لایه ۳ (`Routed`) و هم‌زمان با **ECMP** فعالند؛ هیچ پورتی توسط STP بلاک نمی‌شود.",
+            "**ممنوعیت اتصال `Leaf-to-Leaf` و `Spine-to-Spine`:** سوئیچ‌های Leaf مستقیم به هم وصل نمی‌شوند (و Spineها هم به هم وصل نمی‌شوند)؛ در نتیجه هر سرور در یک Leaf تا هر سرور در Leaf دیگر همیشه دقیقاً **دو پرش (`Leaf -> Spine -> Leaf`)** فاصله دارد که تاخیر قابل‌پیش‌بینی می‌سازد (در یک Leaf هم `۱` پرش).",
+            "**مقیاس‌پذیری خطی پهنای باند:** اگر ترافیک East-West افزایش یافت، با افزودن یک سوئیچ `Spine` جدید و کشیدن لینک به Leafها پهنای باند کل دیتاسنتر بالا می‌رود؛ و اگر رک جدید اضافه شد، یک `Leaf` تازه به Spineها وصل می‌شود (`Border Leaf` هم اتصال دیتاسنتر به WAN/فایروال بیرونی است)."
           ]
         },
         {
-          "h": "۳. چرا VXLAN به تنهایی کافی نیست و چگونه BGP EVPN کنترل هوشمند آن می‌شود؟",
+          "h": "۲. چرا روی Leaf-Spine لایه ۳ به `VXLAN + MP-BGP EVPN` نیاز داریم؟",
           "p": [
-            "وقتی زیرساخت بین Leaf و Spine تماماً لایه ۳ شد، یک چالش فوری پیش می‌آید: ماشین‌های مجازی (VM) باید بتوانند بدون تغییر آدرس IP از رک ۱ (پشت Leaf-1) به رک ۴۰ (پشت Leaf-40) مهاجرت زنده (vMotion) کنند! برای عبور دادن فریم‌های لایه ۲ از روی شبکه لایه ۳، فریم‌ها را در VXLAN (UDP پورت ۴۷۸۹ با ۲۴ بیت VNI یعنی ۱۶ میلیون سگمنت) کپسوله می‌کنیم و هر Leaf نقش VTEP (نقطه شروع و پایان تونل VXLAN) را می‌گیرد.",
-            "در VXLAN قدیمی (Flood-and-Learn)، وقتی Leaf-1 نمی‌دانست MAC مقصد کجاست مجبور بود Multicast Flood بفرستد که مقیاس‌پذیر نبود. امروز استاندارد صنعتی کل دنیا **VXLAN BGP EVPN (RFC 7432 / 8365)** است: هر سوئیچ Leaf از طریق پروتکل MP-BGP EVPN به محض روشن شدن یک سرور، هم آدرس MAC و هم آدرس IP آن (EVPN Type-2 Route) را به کنترل‌کننده (Spine به عنوان BGP Route Reflector) اعلام می‌کند! پس تمام Leafها دقیقاً از قبل می‌دانند هر MAC/IP پشت کدام VTEP است و دیگر نیازی به سیل ARP نیست (ARP Suppression)! به علاوه تمام Leafها با داشتن یک آدرس IP و MAC دروازه پیش‌فرض یکسان (Distributed Anycast Gateway)، مسیریابی بهینه را دقیقاً در نزدیک‌ترین Leaf انجام می‌دهند."
+            "یک چالش بزرگ وجود دارد: اگر زیرساخت (`Underlay`) بین Leaf و Spine کاملاً لایه ۳ باشد، پس اگر یک ماشین مجازی (`VM`) با IP `10.10.20.50` و VLAN 20 از رک ۱ (زیر `Leaf-1`) به رک ۸ (زیر `Leaf-8`) جابه‌جا (`vMotion`) شود چطور همان ساب‌نت و Gateway را نگه می‌دارد؟ پاسخ **Overlay مبتنی بر VXLAN BGP EVPN (RFC 7348 و RFC 7432/8365)** است:"
+          ],
+          "steps": [
+            "**Data Plane — کپسوله‌سازی `VXLAN (UDP 4789)`:** سوئیچ Leaf مبدأ (**VTEP**) کل فریم اترنت اصلیِ سرور را داخل بستهٔ `UDP 4789` با یک شناسهٔ **۲۴-بیتی به نام `VNID`** (تا حدود ۱۶ میلیون سگمنت به جای محدودیت ۴۰۹۴ تایی VLAN!) می‌گذارد و به IP لایه ۳ِ VTEP مقصد روی Underlay می‌فرستد. *(نکتهٔ مهم عملیاتی: کپسوله‌سازی VXLAN بسته به وجود تگ VLAN حدود **`50` تا `54` بایت سربار** اضافه می‌کند؛ بنابراین حتماً **MTU در کل Underlay (`Leaf-Spine`)** باید بزرگ‌تر تنظیم شود—مثلاً `9216`—تا بسته‌ها تکه (`Fragment`) نشوند یا نیفتند!)*",
+            "**Control Plane — `MP-BGP EVPN` (خداحافظی با Flood-and-Learn کورکورانه):** به‌جای یادگیری با Flooding مثل گذشته، هر VTEP اطلاعات MAC و IP سرورهای متصل به خود را با پیام‌های استاندارد **BGP EVPN** اعلام می‌کند: **`Route Type 2`** (تبلیغ ترکیب `MAC + IP` یک سرور برای توزیع سریع و جلوگیری از ARP Broadcast در کل دیتاسنتر)، **`Route Type 3`** (لیست VTEPهای علاقه‌مند به ترافیک Broadcast/Multicast یک VNID به نام `IMET`) و **`Route Type 5`** (تبلیغ پیشوندهای IP کامل مثل `/24` بین VRFهای مختلف).",
+            "**`L2 VNI` در برابر `L3 VNI` و `Distributed Anycast Gateway`:** تمام سوئیچ‌های Leaf برای هر VLAN یک آدرس Gateway و یک **Anycast Gateway MAC یکسان** دارند؛ پس هر VM در هر کجای دیتاسنتر که بنشیند Gateway دقیقاً در اولین Leaf خودش پاسخ می‌دهد (بدون Hairpinning!). اگر مبدأ و مقصد در یک ساب‌نت باشند با **`L2 VNI`** و اگر در دو ساب‌نت مختلف داخل یک Tenant/VRF باشند با **`L3 VNI`** به‌صورت **Symmetric IRB** در همان Leafها مسیریابی می‌شوند."
+          ],
+          "think": {
+            "q": "در یک Fabric جدید `Leaf-Spine VXLAN EVPN`، همسایگی‌های BGP EVPN برقرارند و پینگِ پایه بین `Loopback0`های `Leaf-1` و `Leaf-2` با بسته‌های کوچک سالم است؛ اما به محض انتقال فایل بزرگ یا ترافیک با سایز `1500` بایت بین دو سرور در دو Leaf مختلف، ارتباط قطع می‌شود یا شدیدا کند است! محتمل‌ترین علت چیست؟",
+            "a": "**کم بودن `MTU` در لینک‌های `Underlay` بین Leaf و Spine!** اگر لینک‌های Underlay روی `MTU = 1500` پیش‌فرض مانده باشند، یک فریم `1500` بایتیِ سرور پس از کپسوله‌سازی در `VXLAN` به حدود **`1550` بایت** می‌رسد؛ و چون بسته‌های VXLAN معمولاً با بیت `DF` فرستاده می‌شوند یا سخت‌افزار به دنبال تکه کردن آن‌ها نمی‌رود، بسته‌های بزرگ ترافیک واقعی می‌افتند در حالی که پینگ‌های کوچک `64` بایتی همچنان موفقند! راه‌حل: تنظیم **Jumbo MTU (`9216`)** روی تمام لینک‌های Underlay."
+          }
+        },
+        {
+          "h": "۳. توازن بین سادگی Underlay و پیچیدگی EVPN",
+          "p": [
+            "در پیاده‌سازی‌های متوسط، طراحی Underlay (با `OSPF` یا `IS-IS` یا `eBGP` ساده) باید تا حد امکان یکنواخت و ساده بماند تا تنها بار تغییر سرورها روی Overlay (`MP-BGP EVPN` با Spineها به‌عنوان Route Reflector) باشد. فراموش نکنید اگر کنترل‌پلین Underlay مختل شود یا MTU لینک‌های Spine ناهماهنگ باشد، کل Overlay نیز آسیب می‌بیند."
           ]
         }
       ],
-      "protocolAnalysis": [
-        "در Underlay: لینک‌های Leaf-to-Spine با /30 یا /31 و پروتکل OSPF/BGP با ECMP فعال کار می‌کنند.",
-        "در Overlay: بسته‌های لایه ۲ سرور داخل هدر VXLAN + UDP (پورت 4789) + IP (بین VTEPهای Leaf مبدأ و مقصد) کپسوله می‌شوند."
-      ],
-      "iosCommands": [
-        {
-          "cmd": "show ip route",
-          "out": "O    10.255.0.2/32 [110/2] via 10.1.1.2\n                     [110/2] via 10.1.2.2",
-          "note": "توزیع ترافیک روی دو مسیر برابر (ECMP) به سمت Spine1 و Spine2"
-        },
-        {
-          "cmd": "show ip ospf neighbor",
-          "out": "10.255.1.1  1  FULL/ -  00:00:32  10.1.1.2  Eth1/1\n10.255.1.2  1  FULL/ -  00:00:34  10.1.2.2  Eth1/2",
-          "note": "همسایگی لایه ۳ روی لینک‌های P2P به تمام Spineها"
-        }
-      ],
-      "diagramSvg": "leafspine",
-      "lab": {
-        "title": "آزمایشگاه جلسه ۱۱ (Data Center): بررسی ECMP در شبکه Underlay Leaf-Spine",
-        "steps": [
-          "۱. دستور show ip route را در ترمینال بزنید تا نصب دو مسیر برابر ECMP به سمت Spineها را ببینید.",
-          "۲. دستور show ip ospf neighbor را برای تایید ارتباط تمام Leafها با Spineها اجرا کنید."
-        ],
-        "verifyCmds": [
-          "show ip route",
-          "show ip ospf neighbor"
-        ]
-      },
-      "troubleshooting": {
-        "fault": "خرابی عمدی: ترافیک فقط از یک Spine عبور می‌کند و لینک Spine دوم بدون استفاده مانده است (عدم توازن ECMP).",
-        "analysis": "یا هزینه (Cost/Metric) در دو لینک برابر نیست، یا maximum-paths در تنظیمات OSPF/BGP روی ۱ مانده و یا لینک Spine دوم از نظر MTU/Interface دارای خطا است.",
-        "fix": "مقدار maximum-paths 4 را در OSPF/BGP فعال کرده و یکسان بودن IP MTU (معمولاً 9216 در دیتاسنتر برای سربار VXLAN) را در هر دو لینک تایید کنید."
-      },
-      "exercise": "توضیح دهید چرا در معماری Leaf-Spine با وجود چندین مسیر موازی بین سوئیچ‌ها، دیگر نیازی به مسدودسازی لینک توسط Spanning Tree نیست؟",
-      "quiz": [
-        {
-          "q": "در معماری استاندارد Leaf-Spine، سوئیچ‌های Leaf به کجا متصل می‌شوند؟",
-          "opts": [
-            "فقط به Leafهای مجاور",
-            "به تمام سوئیچ‌های Spine (Full-Mesh) و سرورها",
-            "مستقیم به Core Router بدون Spine",
-            "فقط به یک Spine واحد"
-          ],
-          "ans": 1,
-          "exp": "در Leaf-Spine تمام Leafها به همهٔ Spineها متصل هستند و هیچ ارتباط مستقیمی بین Leafها وجود ندارد."
-        },
-        {
-          "q": "نقش EVPN در ترکیب با VXLAN روی معماری Leaf-Spine چیست؟",
-          "opts": [
-            "جایگزینی کابل فیبر نوری",
-            "ایفای نقش Control Plane استاندارد بر پایه BGP برای توزیع MAC و IP",
-            "خاموش کردن ECMP",
-            "فقط مانیتورینگ SNMP"
-          ],
-          "ans": 1,
-          "exp": "BGP EVPN کنترل‌پلین استاندارد VXLAN است که یادگیری MAC/IP را بدون Flooding غیرضروری انجام می‌دهد."
-        },
-        {
-          "q": "اصلی‌ترین مزیت جایگزینی لینک‌های لایه ۲ STP با لایه ۳ IP Fabric بین Leaf و Spine چیست؟",
-          "opts": [
-            "استفاده همزمان از تمام مسیرها با ECMP و حذف Loop لایه ۲",
-            "حذف آدرس IP از شبکه",
-            "کاهش سرعت پورت‌ها",
-            "اجباری کردن Hub"
-          ],
-          "ans": 0,
-          "exp": "در لایه ۳ تمام لینک‌های موازی با ECMP فعال می‌شوند و هیچ پهنای باندی توسط STP مسدود نمی‌شود."
-        }
-      ],
+      "analogy": "دیتاسنتر قدیمی مثل شهر سنتی با خیابان‌های تنگ و یک میدان مرکزی است که هر وقت بار شرق به غرب زیاد شود میدان قفل می‌شود؛ **Leaf-Spine** مثل **شبکهٔ آزادراهی دوطبقه (Clos)** است که هر محله (`Leaf`) مستقیم به تمام پل‌های هوایی (`Spine`) رمپ دارد و همیشه با دو حرکت به هر محلهٔ دیگر می‌رسد. اضافه کردن **`VXLAN EVPN`** مثل قرار دادن خطوط ویژهٔ مترو روی این آزادراه‌هاست تا هر مسافر (`VM`) در هر محلهٔ شهر سوار شود همان شماره کارت و ایستگاه مرجع محلی (`Anycast Gateway`) را داشته باشد. محل شکست تشبیه اینجاست: اگر ارتفاع سقف تونل‌های آزادراه (`MTU Underlay`) برای کامیون‌های دارای کانتینر `VXLAN (+50B)` بلندتر (`9216`) ساخته نشود، خودروهای سواری کوچک (`Ping`) رد می‌شوند ولی بار واقعی (`1500B`) به سقف می‌خورد و می‌افتد!",
       "table": {
-        "title": "مقایسه جامع معماری دیتاسنتر سنتی (۳ لایه + STP) در برابر Leaf-Spine + VXLAN EVPN",
+        "title": "مقایسهٔ کلیدی انواع مسیر در کنترل‌پلین MP-BGP EVPN و نقش VNIها",
         "headers": [
-          "شاخص طراحی",
-          "معماری قدیمی ۳ لایه (STP + vPC)",
-          "معماری مدرن Leaf-Spine (ECMP + VXLAN EVPN)"
+          "نوع مسیر / شناسه",
+          "کاربرد دقیق در VXLAN EVPN",
+          "اثر عملیاتی در دیتاسنتر"
         ],
         "rows": [
           [
-            "بهره‌وری از لینک‌ها",
-            "بخش زیادی توسط STP مسدود؛ توزیع بار محدود",
-            "۱۰۰٪ لینک‌های بین Leaf و Spine هم‌زمان فعال با ECMP"
+            "`EVPN Type 2` (`MAC/IP`)",
+            "تبلیغ آدرس MAC (و اختیاری IP) هر میزبان از VTEP مبدأ",
+            "کاهش شدید ARP Flooding با `ARP Suppression` در Leaf"
           ],
           [
-            "مقیاس جداسازی شبکه",
-            "محدود به ۴۰۹۴ VLAN (تگ ۱۲ بیتی 802.1Q)",
-            "بیش از ۱۶ میلیون VNI (تگ ۲۴ بیتی VXLAN) + VRFهای ایزوله"
+            "`EVPN Type 3` (`IMET`)",
+            "ساخت درخت/لیست ارسال ترافیک BUM (Broadcast/Unknown/Multicast)",
+            "تعیین VTEPهای عضو یک L2 VNI بدون اتکا به Multicast Underlay (Ingress Replication)"
           ],
           [
-            "تأخیر (Latency) بین دو سرور",
-            "متغیر (بسته به محل Root Bridge و تعداد پرش‌ها)",
-            "کاملاً ثابت و پیش‌بینی‌پذیر (همیشه ۲ هاپ: Leaf-Spine-Leaf)"
+            "`EVPN Type 5` (`IP Prefix`)",
+            "تبلیغ زیرشبکه‌های IP (مانند ارتباط با شبکه‌های بیرونی از Border Leaf)",
+            "جداسازی کامل مسیرهای خارجی از جدول MACهای داخلی"
           ],
           [
-            "جلوگیری از ترافیک Broadcast/ARP",
-            "سیل‌سازی ARP در کل VLAN",
-            "ARP Suppression هوشمند توسط کنترل‌پلین BGP EVPN"
-          ],
-          [
-            "مقیاس‌پذیری افقی",
-            "نیازمند تعویض شاسی هسته با مدل بزرگ‌تر",
-            "اضافه کردن آسان Leaf برای پورت جدید یا Spine برای پهنای باند"
+            "`L2 VNI` در برابر `L3 VNI`",
+            "`L2 VNI` به ازای هر VLAN؛ `L3 VNI` یکتا به ازای هر `VRF/Tenant`",
+            "انجام روتینگ متقارن (`Symmetric IRB`) در همان Leaf مبدأ/مقصد"
           ]
         ]
       },
       "faq": [
         {
-          "q": "اگر در Leaf-Spine بین Leaf-1 و Leaf-2 از طریق ۲ یا ۴ سوئیچ Spine مسیر برابر داریم، آیا بسته یک تماس دچار اختلال ترتیب می‌شود؟",
-          "a": "خیر! الگوریتم ECMP در سخت‌افزار سوئیچ بر اساس هش ۵ فیلد ثابت هر جریان (Source/Dest IP, Source/Dest Port, Protocol) تصمیم می‌گیرد؛ بنابراین بسته‌های یک نشست خاص همیشه از یک Spine مشخص می‌روند تا ترتیب حفظ شود، ولی نشست‌های مختلف بین کل Spineها پخش می‌شوند."
+          "q": "آیا برای راه‌اندازی **VXLAN EVPN** حتماً باید در Underlay پروتکل `Multicast (PIM)` برای ترافیک BUM داشته باشیم؟",
+          "a": "خیر؛ دو روش برای ترافیک BUM (Broadcast, Unknown Unicast, Multicast) در VXLAN وجود دارد: ۱) **Multicast Underlay** (با PIM BiDir/ASM که برای دیتاسنترهای بسیار بزرگ کارایی بالایی دارد)؛ و ۲) **Ingress Replication (Head-End Replication)** بر پایهٔ پیام‌های **`EVPN Type 3`** که ترافیک BUM را به‌صورت کپی‌های Unicast به VTEPهای عضو همان VNID می‌فرستد و Underlay را بسیار ساده‌تر می‌کند."
         },
         {
-          "q": "تفاوت L2 VNI و L3 VNI در VXLAN BGP EVPN چیست؟",
-          "a": "L2 VNI معادل یک VLAN است برای ارتباط بین سرورهای هم‌سابنت در رک‌های مختلف (Bridging)؛ اما وقتی سرور در VNI 10010 بخواهد با سرور در VNI 10020 داخل همان شرکت (Tenant VRF) صحبت کند، از L3 VNI اختصاص‌یافته به آن VRF در مدل Symmetric IRB روت می‌شود."
-        },
-        {
-          "q": "آیا برای VXLAN باید مقدار MTU پورت‌های بین Leaf و Spine را افزایش دهیم؟",
-          "a": "بله، حتماً! سرآیند VXLAN حدود ۵۰ تا ۵۴ بایت اضافه می‌کند (۱۴ بایت اترنت بیرونی + ۲۰ بایت IP + ۸ بایت UDP + ۸ بایت VXLAN). بنابراین در تمام لینک‌های Underlay بین Leaf و Spine همیشه Jumbo Frame با mtu 9216 تنظیم می‌کنیم تا هیچ Fragmentation رخ ندهد."
+          "q": "چرا در **Anycast Gateway** تمام سوئیچ‌های Leaf یک آدرس `MAC` مجازی یکسان دارند؟",
+          "a": "اگر `VM-1` پس از جابه‌جایی از `Leaf-1` به `Leaf-2` بخواهد بسته به Default Gateway خود (`10.10.20.1`) بفرستد، در کش ARP خودش MAC گیت‌وی را دارد؛ یکسان بودن Anycast Gateway MAC روی تمام Leafها باعث می‌شود فریم بدون نیاز به انتظار انقضای ARP یا تغییر تنظیمات VM، بلافاصله توسط `Leaf-2` دریافت و روت شود."
         }
       ],
-      "analogy": "یک ساختمان قدیمی ۳ طبقه با پله‌های تنگ و درهای بسته (STP) را تصور کنید: هر وقت سروری در طبقه اول می‌خواهد با سرور دیگری حرف بزند (ترافیک East-West)، باید از پله‌ها برود تا پشت‌بام (Core) و برگردد! اما معماری Leaf-Spine مثل یک مجتمع با ۲ سالن تمام‌شفاف است: تمام سرورها به سوئیچ‌های ردیف پایین (Leaf) وصل‌اند، و هر Leaf مستقیماً با چند پل پرسرعت (۴۰/۱۰۰/۴۰۰ گیگابیت) به تک‌تک سوئیچ‌های ردیف بالا (Spine) وصل است. نتیجه: هر سروری در دیتاسنتر بخواهد با هر سرور دیگری صحبت کند، دقیقاً با یک مسافت ثابت و یکسان (فقط ۲ پرش: Leaf -> Spine -> Leaf) و با حداکثر سرعت هم‌زمان در همه پل‌ها (ECMP) به مقصد می‌رسد!",
-      "ciscoRef": "Cisco Data Center Spine-and-Leaf Architecture Design Overview & Cisco Nexus 9000 VXLAN BGP EVPN Configuration Guide",
-      "summary": "معماری Leaf-Spine با رعایت ۳ قانون ساده (سرور فقط به Leaf، هر Leaf به تمام Spineها، بدون اتصال هم‌سطح) و ترکیب ECMP لایه ۳ + VXLAN BGP EVPN، تاخیر ثابت دوهاپ، ۱۰۰٪ بهره‌وری لینک، ۱۶ میلیون شبکه ایزوله و Distributed Anycast Gateway را برای دیتاسنترهای ابری و هوش مصنوعی فراهم می‌کند."
+      "summary": "معماری **Leaf-Spine (Clos)** با حذف STP و فعال‌سازی هم‌زمان **ECMP** بین تمام Leafها و Spineها (بدون اتصال Leaf-to-Leaf و Spine-to-Spine)، تاخیر یکنواخت ۲-پرشی برای ترافیک **East-West** فراهم می‌کند. روی این بستر لایه ۳ (با **Jumbo MTU** برای حدود ۵۰–۵۴ بایت سربار)، **`VXLAN (UDP 4789, 24-bit VNID)`** و کنترل‌پلین **`MP-BGP EVPN` (`Type-2/3/5`)** همراه **`L2/L3 VNI`** و **`Distributed Anycast Gateway`** تحرک‌پذیری کامل سرورها را در مقیاس دیتاسنتر می‌سازند.",
+      "ciscoRef": "Cisco Nexus 9000 Series NX-OS VXLAN EVPN Configuration Guide (RFC 7348 & RFC 7432/8365)",
+      "protocolAnalysis": [
+        "در مدل **Symmetric Integrated Routing and Bridging (`Symmetric IRB`)**، ترافیک بین دو VLAN متفاوت در یک VRF ابتدا روی Leaf مبدأ از `L2 VNI` مبدأ به `L3 VNI` مشترکِ آن VRF روت می‌شود، در Underlay به Leaf مقصد می‌رسد و در آنجا از `L3 VNI` به `L2 VNI` مقصد تحویل می‌گردد—برخلاف مدل قدیمی Asymmetric، در این روش هر Leaf فقط جدول VLANهای محلی خودش را نگه می‌دارد.",
+        "در کپسوله‌سازی **VXLAN** روی لینک‌های اترنت Underlay (۱۴ بایت Ethernet + ۲۰ بایت Outer IP + ۸ بایت UDP + ۸ بایت هدر VXLAN = **۵۰ بایت** بدون تگ VLAN و **۵۴ بایت** با تگ 802.1Q)، هر بستهٔ `1500` بایتی به `1550/1554` بایت می‌رسد که نیازمند افزایش MTU در تمام زنجیرهٔ Underlay است."
+      ],
+      "iosCommands": [
+        {
+          "cmd": "show bgp l2vpn evpn summary",
+          "out": "BGP router identifier 10.255.0.11, local AS number 65100\nNeighbor        V    AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd\n10.255.0.1      4 65100     842     839       64    0    0 04:12:18       48",
+          "note": "بررسی سلامت نشست‌های کنترل‌پلین EVPN با سوئیچ‌های Spine (Route Reflector). [نکتهٔ شبیه‌ساز: دستور `show bgp l2vpn evpn summary` در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تست زنده نیازمند Nexus 9000v در CML/EVE-NG است.]",
+          "why": "تایید برقراری همسایگی `l2vpn evpn` بین Leaf VTEP و Spine RR و دریافت مسیرهای EVPN (`Type-2/3/5`).",
+          "anatomy": "آدرس Loopback همسایهٔ Spine، AS، زمان برقراری و تعداد پیشوندهای EVPN دریافت‌شده در `State/PfxRcd`.",
+          "lookFor": "ثبت وضعیت عددی در `State/PfxRcd` (نه `Active/Idle`) برای تمام Spineها.",
+          "ifUnexpected": "اگر نشست بالا نیامد، تنظیم `address-family l2vpn evpn` و `send-community both` در هر دو سمت Leaf و Spine بررسی شوند."
+        },
+        {
+          "cmd": "show nve peers",
+          "out": "Interface Peer-IP                                 State LearnType Uptime   Router-Mac\n--------- --------------------------------------- ----- --------- -------- -----------------\nnve1      10.255.0.12                             Up    CP        04:10:05 0200.0000.0012",
+          "note": "مشاهدهٔ VTEPهای همتای شناخته‌شده روی اینترفیس `nve1`. [نکتهٔ شبیه‌ساز: دستور مرجع غیرشبیه‌سازی‌شده.]",
+          "why": "تایید اینکه VTEP همتا در وضعیت `Up` است و از طریق کنترل‌پلین (`LearnType: CP` یعنی BGP EVPN) یاد گرفته شده است.",
+          "anatomy": "نام اینترفیس `nve1`، IP لوپ‌بک VTEP همتا، وضعیت `Up`، نوع یادگیری (`CP` در برابر `DP`) و `Router-Mac` تک‌پخشی.",
+          "lookFor": "وضعیت `Up` و `LearnType: CP` برای VTEPهای حاضر در Fabric.",
+          "ifUnexpected": "اگر `nve1` نیست یا همتا دیده نمی‌شود، دسترسی Underlay بین Loopbackهای VTEP (و تست `ping <peer> df-bit` برای MTU) بررسی گردد."
+        },
+        {
+          "cmd": "show ip route",
+          "out": "Codes: C - connected, S - static, O - OSPF, B - BGP\nO    10.255.0.2/32 [110/2] via 10.10.0.2, 00:12:41, GigabitEthernet0/0",
+          "note": "دستور نمونه در شبیه‌ساز داخلی برای مشاهدهٔ ساختار کلی جدول مسیریابی لایه ۳.",
+          "why": "در معماری Leaf-Spine، سلامت و وجود مسیرهای ECMP در Underlay پیش‌نیاز هر گونه فعالیت Overlay VXLAN است.",
+          "anatomy": "پیشوند، کد پروتکل (`O` برای OSPF)، Next-Hop و اینترفیس خروجی.",
+          "lookFor": "پایداری مسیرهای `/32` مربوط به Loopbackهای VTEP در Underlay.",
+          "ifUnexpected": "نبود مسیر Loopback همتا در جدول Underlay مانع بالا آمدن نشست EVPN و NVE می‌شود."
+        }
+      ],
+      "diagramSvg": "leafspine",
+      "lab": {
+        "title": "آزمایشگاه آماده‌سازی سگمنت‌های سرور/VTEP و بررسی لینک روت‌شدهٔ Underlay در شبیه‌ساز + سناریوی مرجع EVPN",
+        "steps": [
+          "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `interface nve1`، `vn-segment`، `address-family l2vpn evpn` و `mtu 9216` را اجرا نمی‌کند (برای آزمایش زنده از `Nexus 9000v` در CML یا EVE-NG استفاده کنید). در اینجا تفکیک نقش پورت Uplink لایه ۳ (`Gi0/0` به Spine و `Loopback0` به‌عنوان VTEP Source) از پورت‌های سرور روی Leaf (`Gi0/6`, `Gi0/7` در `VLAN 110` و `VLAN 120` با ترانک `Gi0/1`) در شبیه‌ساز را زنده اجرا می‌کنیم.",
+          "۲. با `enable` وارد شوید و با `show ip interface brief` و `show interfaces status` تفکیک پورت‌های `routed` (`Gi0/0`, `Lo0`) از پورت‌های سوئیچی را ببینید.",
+          "۳. نقش‌های یک سوئیچ Leaf نمونه را در شبیه‌ساز مستند و تنظیم کنید: `configure terminal` -> `interface Gi0/0` -> `description UNDERLAY-TO-SPINE-ECMP` -> `interface Loopback0` -> `description VTEP-NVE1-SOURCE` -> `vlan 110` -> `name L2VNI_10110_WEB` -> `vlan 120` -> `name L2VNI_10120_APP` -> `exit` -> `interface Gi0/6` -> `description SRV-WEB-01` -> `switchport mode access` -> `switchport access vlan 110` -> `switchport nonegotiate` -> `interface Gi0/7` -> `description SRV-APP-01` -> `switchport mode access` -> `switchport access vlan 120` -> `switchport nonegotiate` -> `no shutdown` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 110,120` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces trunk`، `show interfaces Gi0/6 switchport` و `show running-config` تایید کنید که `VLAN 110/120` ساخته شده و روی `Gi0/6`/`Gi0/7` (با `nonegotiate`) و `Gi0/1` ثبت شده‌اند.",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (قطعه‌فرمان مرجع VXLAN BGP EVPN روی Nexus 9000 — وابسته به پیش‌نیازهای توپولوژی کامل؛ پلتفرم مرجع: Cisco NX-OS 9.x/10.x):** **پیش‌نیازها و فرمان‌ها:** زیرساخت Underlay (`OSPF`/`IS-IS`) بین دو Leaf (`Lo0: 10.255.0.11`, `10.255.0.12`) و Spineها برقرار بوده، روی همهٔ لینک‌های Underlay مقدار **`mtu 9216`** تنظیم شده، و همسایگی `l2vpn evpn` با Spine RR برقرار است. روی Leaf: `feature nv overlay` -> `feature vn-segment-vlan-based` -> `nv overlay evpn` -> `fabric forwarding anycast-gateway-mac 0200.0000.9999`؛ نگاشت VLAN به VNID: `vlan 110` -> `vn-segment 10110`؛ رابط Anycast Gateway: `interface Vlan110` -> `vrf member TENANT_A` -> `ip address 10.110.0.1/24` -> `fabric forwarding mode anycast-gateway`؛ و اینترفیس تونل: `interface nve1` -> `source-interface loopback0` -> `host-reachability protocol bgp` -> `member vni 10110` -> `ingress-replication protocol bgp`؛ و در `evpn`: `evpn` -> `vni 10110 l2` -> `rd auto` -> `route-target both auto`. سپس `show bgp l2vpn evpn summary`، `show nve peers` و تست پینگِ بدون تکه شدن بین VTEPها (`ping 10.255.0.12 packet-size 1554 df-bit`) را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** وضعیت `Up` و `LearnType: CP` در `show nve peers`، عدد غیرصفر مسیرها در `show bgp l2vpn evpn summary` (در حضور سرورهای تبلیغ‌شده)، و موفقیت پینگ سایز بزرگ با `df-bit`. **نشانهٔ شکست:** سقوط پینگ سایز `1554` با `df-bit` (نبود Jumbo MTU روی Underlay) یا `Active` ماندن نشست EVPN. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط ساختار پایهٔ پورت/VLANها را ذخیره کرد و هیچ تونل NVE/VXLAN یا BGP EVPN اجرا نمی‌کند."
+        ],
+        "verifyCmds": [
+          "enable",
+          "show ip interface brief",
+          "show vlan brief",
+          "show interfaces trunk",
+          "show running-config"
+        ]
+      },
+      "troubleshooting": {
+        "fault": "در یک دیتاسنتر **Leaf-Spine + VXLAN EVPN** جدید، تمام نشست‌های BGP EVPN (`show bgp l2vpn evpn summary`) و اینترفیس‌های `nve1` (`show nve peers`) وضعیت `Up` دارند؛ از سرور A روی `Leaf-1` پینگ سبک (`64` بایت) به سرور B روی `Leaf-2` با موفقیت جواب می‌دهد، اما انتقال دادهٔ واقعی (`HTTPS / SMB / SSH` با بسته‌های کامل) به محض شروع ارتباط گیر می‌کند و قطع می‌شود!",
+        "analysis": "پینگ استاندارد کوچک (`64` بایت) پس از اضافه شدن ~۵۰–۵۴ بایت سربار VXLAN تنها ~۱۱۸ بایت می‌شود و از لینک‌های Underlay دارای `MTU = 1500` عبور می‌کند؛ اما بسته‌های واقعی `1500` بایتی سرور پس از اضافه شدن هدر `VXLAN + Outer IP + UDP` به **`1550+` بایت** می‌رسند و در لینک‌های Underlay (بین Leaf و Spine) که `MTU` آن‌ها روی `9216` افزایش داده نشده، **Drop** می‌شوند!",
+        "fix": "تایید مشکل با تست `ping <VTEP_Peer_IP> packet-size 1554 df-bit source <Lo0>` روی Nexus، و افزایش **`mtu 9216`** (Jumbo MTU) روی تمام لینک‌های فیزیکی و Port-Channelهای بین Leafها و Spineها."
+      },
+      "misconceptions": [
+        {
+          "myth": "در معماری **Leaf-Spine** اگر پهنای باند کم آمد، کافی است مستقیم بین دو سوئیچ `Leaf` پرمصرف یک کابل فیبر بکشیم تا سریع‌تر به هم برسند.",
+          "reality": "اتصال مستقیم `Leaf-to-Leaf` ساختار متقارن **Clos** را می‌شکند، محاسبات هم‌طولی مسیر و ECMP را برهم می‌زند و یکنواختی تاخیر ۲-پرشی را خراب می‌کند؛ برای افزایش ظرفیت باید لینک به `Spine`ها یا تعداد `Spine`ها را اضافه کرد.",
+          "howToSpot": "بررسی نقشه‌های فیزیکی و `show cdp/lldp neighbors` روی Leafها که فقط باید به `Spine`ها (یا سرورها/Border) متصل باشند."
+        },
+        {
+          "myth": "در VXLAN روی زیرساخت `1500` بایتی هیچ نیازی به تغییر MTU نیست چون روترها خودشان بسته‌ها را Fragment می‌کنند.",
+          "reality": "سوئیچ‌های دیتاسنتر برای نرخ خطی (Line-Rate) تمایلی به Fragmentation بسته‌های VXLAN در سخت‌افزار ندارند و بسیاری بسته‌های سرور با `DF=1` می‌آیند؛ بدون **Jumbo MTU** در Underlay ترافیک با سایز استاندارد به سرعت مختل می‌شود.",
+          "howToSpot": "اجرای `ping <VTEP_IP> df-bit packet-size 1554` بین VTEPها."
+        }
+      ],
+      "exercise": "یک دیتاسنتر با ۶ سوئیچ `Leaf` و ۲ سوئیچ `Spine` روی لینک‌های `100G` دارید که هر Leaf به هر دو Spine متصل است. الف) از یک سرور زیر `Leaf-1` تا یک سرور زیر `Leaf-5` بسته چند پرش می‌زند؟ ب) اگر سرور `10.110.0.50` با فریم `1500` بایتی به همتای خود روی `Leaf-5` بسته بفرستد، حداقل MTU مورد نیاز روی لینک‌های Underlay (بدون تگ 802.1Q روی Underlay) چقدر است و چرا `mtu 9216` می‌گذاریم؟",
+      "exercises": [
+        {
+          "level": "ساده",
+          "task": "در پیام‌های کنترل‌پلین **MP-BGP EVPN**، تفاوت وظیفهٔ **`Route Type 2`** و **`Route Type 3`** و **`Route Type 5`** را در یک جمله برای هر کدام بنویسید.",
+          "hint": "میزبان (MAC/IP) در برابر ترافیک BUM در برابر پیشوندهای IP ساب‌نت.",
+          "solution": "- **`Type 2`:** تبلیغ آدرس `MAC` (و در صورت وجود `IP`) هر میزبان متصل به VTEP.\n- **`Type 3`:** اعلام عضویت VTEP در یک `VNID` برای ساخت لیست ارسال ترافیک `BUM` (`IMET`).\n- **`Type 5`:** تبلیغ پیشوندهای کامل شبکهٔ IP (مانند `/24` یا خلاصه‌مسیرهای خارجی) برای مسیریابی لایه ۳ بین بخش‌ها."
+        },
+        {
+          "level": "متوسط",
+          "task": "چرا در یک دیتاسنتر مدرن **`Distributed Anycast Gateway`** جلوی مشکل Hairpinning را می‌گیرد و شرط اصلی کارکرد بی‌نقص آن هنگام `vMotion` یک ماشین مجازی بین دو Leaf چیست؟",
+          "hint": "هم‌زمان وجود داشتن همان IP گیت‌وی و همان **Anycast MAC** روی تمام Leafها.",
+          "solution": "در `Distributed Anycast Gateway`, هر سوئیچ Leaf به‌صورت محلی نقش Default Gateway تمام VLANهای محلی خود را بازی می‌کند؛ بنابراین اگر سرور A روی `Leaf-1` بخواهد به ساب‌نت دیگر روی همان `Leaf-1` یا `Leaf-5` برود، همان در گام اول روت می‌شود (نه عبور تا یک هستهٔ مرکزی). شرط حیاتی برای `vMotion` بدون قطع ارتباط: **یکسان بودن دقیق IP و Virtual Anycast MAC گیت‌وی در تمام Leafها** (`fabric forwarding anycast-gateway-mac ...`)."
+        },
+        {
+          "level": "چالشی",
+          "task": "محاسبات کامل بخش `exercise` بالا را بنویسید: تعداد پرش بین دو Leaf، تعداد کل لینک‌های بین ۶ Leaf و ۲ Spine، حداقل MTU لایه ۳ بدون تگ برای بستهٔ `1500` بایتی پس از کپسوله‌سازی VXLAN، و توضیح اینکه چرا در یک شبکهٔ واقعی به جای `1550` دقیق، از **`MTU = 9216`** در کل Underlay استفاده می‌کنند.",
+          "hint": "مسیر `Leaf-1 -> Spine -> Leaf-5` چند گره میانی دارد؟ کپسوله‌سازی VXLAN حداقل ۵۰ بایت (`20 Outer IP + 8 UDP + 8 VXLAN + 14 Inner Eth`) اضافه می‌کند.",
+          "solution": "۱) **تعداد پرش و لینک‌ها:** از سرور زیر `Leaf-1` تا سرور زیر `Leaf-5` بسته از **`Leaf-1 -> Spine -> Leaf-5`** عبور می‌کند (۲ پرش بین‌سوئیچی با تاخیر ثابت). کل لینک‌های Fabric: `6 × 2 = 12` لینک `100G` (با ظرفیت `200G` ECMP برای هر Leaf به سمت Spineها).\n۲) **حداقل MTU لایه ۳ روی Underlay (بدون تگ بیرونی):** بستهٔ IP سرور (`1500B`) + هدر Ethernet داخلی (`14B`) + هدر `VXLAN` (`8B`) + `UDP` (`8B`) + `Outer IP` (`20B`) = **`1550` بایت** (و اگر زیرینترفیس‌های تگ‌دار `802.1Q` در Underlay یا تگ داخلی حفظ شود تا `1554–1558` بایت هم می‌رسد).\n۳) **چرا `MTU 9216` می‌گذارند:** تا علاوه‌بر پوشش کامل سربار ۵۰–۵۴ بایتی VXLAN بدون خطر Fragmentation، پشتیبانی از **Jumbo Frames (`9000B`)** ماشین‌های مجازی و ترافیک ذخیره‌سازی/رپلیکیشن سرورها نیز با حاشیهٔ ایمنی کامل تامین شود."
+        }
+      ],
+      "quiz": [
+        {
+          "q": "در معماری **Leaf-Spine (Clos)** چرا سوئیچ‌های `Leaf` نباید مستقیم به همدیگر (`Leaf-to-Leaf`) وصل شوند؟",
+          "opts": [
+            "چون کابل فیبر بین دو Leaf کار نمی‌کند",
+            "چون تمام پورت‌های Leaf فقط برای سرورهای ویندوز است",
+            "چون اتصال `Leaf-to-Leaf` تقارن معماری Clos، یکنواختی تعداد پرش (تاخیر پیش‌بینی‌پذیر) و توزیع متوازن ECMP را می‌شکند",
+            "چون پروتکل OSPF اجازهٔ اتصال دو سوئیچ را نمی‌دهد"
+          ],
+          "ans": 2,
+          "exp": "اصل معماری Clos تساوی فاصلهٔ هر Leaf تا تمام Leafهای دیگر از طریق لایهٔ Spine با ECMP است."
+        },
+        {
+          "q": "اگر در یک شبکهٔ **VXLAN EVPN** بسته‌های کوچک `Ping` عبور کنند ولی ترافیک عادی `1500` بایتی بین سرورهای دو Leaf قطع شود، اولین فرضیهٔ فنی کدام است؟",
+          "opts": [
+            "نبود پروتکل DHCP روی شبکه",
+            "خرابی سرور DNS",
+            "کم بودن سرعت پورت‌های مدیریت `mgmt0`",
+            "فراموش شدن افزایش **`MTU`** در لینک‌های Underlay برای پوشش حدود ۵۰–۵۴ بایت سربار کپسوله‌سازی VXLAN"
+          ],
+          "ans": 3,
+          "exp": "کپسوله‌سازی VXLAN حدود ۵۰–۵۴ بایت سربار اضافه می‌کند؛ در صورتی که Underlay همچنان `MTU 1500` باشد بسته‌های `1500B` پس از VXLAN به `1550+` بایت رسیده و می‌افتند."
+        },
+        {
+          "q": "کدام نوع پیام در **MP-BGP EVPN** برای تبلیغ آدرس‌های `MAC` و `IP` تک‌تک ماشین‌های مجازی و کاهش Broadcast ناشی از ARP استفاده می‌شود؟",
+          "opts": [
+            "`EVPN Route Type 2 (MAC/IP Advertisement Route)`",
+            "`EVPN Route Type 1`",
+            "`EVPN Route Type 3 (IMET)`",
+            "`EVPN Route Type 5 (IP Prefix)`"
+          ],
+          "ans": 0,
+          "exp": "`Route Type 2` اطلاعات `MAC/IP` هر میزبان را به سایر VTEPها تبلیغ می‌کند تا سوئیچ‌های Leaf بتوانند `ARP Suppression` را محلی انجام دهند."
+        }
+      ],
+      "bridge": {
+        "whereUsed": "در دیتاسنترهای مدرن سازمانی، ابری و سرویس‌پروایدرها روی Nexus 9000.",
+        "nextQuestion": "حالا که زیرساخت `Leaf-Spine` و `VXLAN EVPN` را در حالت دستی (`NX-OS Standalone`) دیدیم، چطور تمام این Fabric صدسوئیچی را به‌صورت متمرکز و سیاست‌محور (**Policy-Driven**) با خوشهٔ کنترلر **APIC** و مدل منطقی **Tenant / VRF / Bridge Domain / EPG / Contract** مدیریت کنیم؟ این دنیای **Cisco ACI** در درس بعدی است!",
+        "nextId": "spec_dc_aci"
+      }
     },
     "s12": {
       "id": "s12",
@@ -13096,7 +13149,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         {
           "cmd": "show sdwan app-route stats",
           "out": "app-route statistics 10.255.0.12 10.255.0.14\n remote-system-ip  local-color  remote-color  mean-loss  mean-latency  mean-jitter\n 10.255.0.14       mpls         mpls          0.00%      18            2\n 10.255.0.14       biz-internet biz-internet  2.40%      95            18",
-          "note": "مشاهدهٔ آمار لحظه‌ای و میانگین کیفیت مسیر (`Loss / Latency / Jitter`) برای ارزیابی SLA در AAR. [نکتهٔ شبیه‌ساز: دستور مرجع غیرشبیه‌سازی‌شده روی cEdge.]",
+          "note": "نمایش خلاصه‌شده و ساده‌شدهٔ آموزشی برای درک شاخص‌های کیفیت مسیر (`Loss / Latency / Jitter`) در AAR (نه خروجی عین CLI در نسخهٔ مشخص؛ در خروجی کامل Cisco SD-WAN، جدول `app-route statistics` به تفکیک هر تونل، پورت، شاخص‌های sla-class و بازه‌های زمانی نمایش داده می‌شود). [نکتهٔ شبیه‌ساز: دستور مرجع غیرشبیه‌سازی‌شده روی cEdge.]",
           "why": "چون `show sdwan bfd sessions` به‌تنهایی فقط برقراری نشست `up` را نشان می‌دهد؛ برای تشخیص رعایت یا نقض آستانهٔ `sla-class` باید خروجی `show sdwan app-route stats` بررسی شود.",
           "anatomy": "آدرس System-IP مقصد، رنگ‌های مبدأ/مقصد و مقادیر `mean-loss`, `mean-latency`, `mean-jitter`.",
           "lookFor": "ماندن اعداد هر رنگ زیر آستانهٔ تعریف‌شده در `sla-class` (و وجود حداقل یک رنگ/مسیر جایگزین معتبر هنگام نقض SLA).",
@@ -14648,9 +14701,9 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         },
         {
           "level": "چالشی",
-          "task": "از نظر پشتیبانی پروتکل و **محاسبهٔ سربار هدر**، **`VTI` (`tunnel mode ipsec ipv4`)** را با **`GRE over IPsec`** (هم در حالت `Transport Mode` روی GRE و هم در حالت `Tunnel Mode`) مقایسه کنید؛ و توضیح دهید چرا در تونل `IKEv2` برای Remote Access با `EAP` تعداد پیام‌ها بیش از ۴ پیام است.",
-          "hint": "VTI برای IP unicast و IP multicast کار می‌کند (نیاز به GRE فقط برای ترافیک غیر-IP است)؛ GRE یک هدر ۴ بایتی اضافه دارد و اگر GRE over IPsec را در Tunnel Mode بگذارید یک هدر IP بیرونی ۲۰ بایتی هم اضافه می‌شود.",
-          "solution": "۱) **پشتیبانی ترافیک:** `VTI` ترافیک **IP Unicast و IP Multicast** را مستقیم (بسته به مدل/نسخهٔ IOS/IOS-XE) می‌برد و برای IP Multicast نیازی به GRE ندارد؛ `GRE over IPsec` برای ترافیک **غیر-IP** (مانند MPLS/IS-IS) یا قابلیت‌های ویژهٔ GRE لازم است.\n۲) **مقایسهٔ سربار دقیق دو کپسوله‌سازی برای یک بستهٔ IP کاربر با طول `P`:**\n   - **`VTI` (`Tunnel Mode`):** `New Outer IP (20B)` + `ESP (Header/IV/Padding/ICV)` + `Inner IP+Payload (P)` -> هیچ هدر GRE وجود ندارد.\n   - **`GRE over IPsec` (`Transport Mode` روی GRE):** `Delivery IP (20B)` + `ESP` + **`GRE (4B)`** + `Inner IP+Payload (P)` -> دقیقاً **۴ بایت هدر GRE** بیشتر از VTI (اگر در `GRE over IPsec` به‌جای `Transport Mode` به اشتباه از **`Tunnel Mode`** استفاده شود، یک هدر IP دیگر هم اضافه می‌شود یعنی **`20B IP + 4B GRE = 24` بایت سربار هدر اضافی** نسبت به حالت بهینه!).\n۳) **تعداد پیام‌های IKEv2 با EAP:** طبق **RFC 7296**، چهار پیام (`IKE_SA_INIT` + `IKE_AUTH`) فقط برای حالت پایه با `PSK`/گواهینامه است؛ هنگام استفاده از **EAP** در Remote Access VPN، فاز `IKE_AUTH` شامل چندین رفت‌وبرگشت اضافی برای مبادلهٔ پیام‌های EAP با سرور RADIUS/ISE خواهد بود."
+          "task": "از نظر پشتیبانی پروتکل و **اختلاف هدرهای فرض‌شده پیش از Padding و گزینه‌های اضافی**، **`VTI` (`tunnel mode ipsec ipv4`)** را با **`GRE over IPsec`** (`Transport Mode` روی GRE و نیز `Tunnel Mode`) مقایسه کنید، یک مثال عددی با فرض کامل بنویسید، و توضیح دهید چرا در تونل `IKEv2` برای Remote Access با `EAP` تعداد پیام‌ها بیش از ۴ پیام است.",
+          "hint": "VTI ترافیک IP unicast و IP multicast را مستقیم می‌برد (GRE فقط برای غیر-IP لازم است). مقایسهٔ ۴ بایت و ۲۴ بایت مربوط به اختلاف هدرهای پایه (۴B GRE و ۲۰B IP+۴B GRE) پیش از محاسبهٔ Padding، گزینه‌های GRE و NAT-T است.",
+          "solution": "۱) **پشتیبانی ترافیک:** `VTI` ترافیک **IP Unicast و IP Multicast** را مستقیم (بسته به مدل/نسخهٔ IOS/IOS-XE) می‌برد و برای IP Multicast نیازی به GRE ندارد؛ `GRE over IPsec` برای ترافیک **غیر-IP** (مانند MPLS/IS-IS) یا قابلیت‌های ویژهٔ GRE لازم است.\n۲) **مقایسهٔ دقیق هدرهای فرض‌شده و مثال عددی:**\n   - **فرض‌های مثال:** بستهٔ IPv4 داخلی کاربر بدون Option با طول `P = 1400` بایت، رمزنگاری مشترک `AES-GCM-256` (هدر/ICV یکسان)، بدون گزینه‌های GRE (`Key/Sequence`) و بدون `NAT-T` (کپسوله‌سازی مستقیم ESP، پیش از هر گونه Padding).\n   - **حالت ۱ (`VTI — Tunnel Mode`):** یک هدر IP بیرونی (`20B`) + سربار ESP + بستهٔ داخلی `1400B` (هیچ هدر GRE وجود ندارد).\n   - **حالت ۲ (`GRE over IPsec — Transport Mode`):** هدر IP بیرونی (`20B`) + سربار ESP + **هدر پایهٔ GRE (`4B`)** + بستهٔ داخلی `1400B` -> اختلاف هدرهای پایه **۴ بایت** بیشتر از VTI.\n   - **حالت ۳ (`GRE over IPsec — Tunnel Mode`):** هدر IP بیرونی (`20B`) + سربار ESP + **هدر IP کپسولهٔ GRE (`20B`) + هدر پایهٔ GRE (`4B`)** + بستهٔ داخلی `1400B` -> اختلاف هدرهای پایه **۲۴ بایت** بیشتر از VTI.\n   *(نکتهٔ بسیار مهم: اعداد `۴` و `۲۴` بایت صرفاً **اختلاف هدرهای فرض‌شده پیش از محاسبهٔ Padding الگوریتم ESP، گزینه‌های اختیاری GRE و سربار ۸ بایتی `UDP 4500` در `NAT-T`** هستند و روی سیم طول نهایی بسته متأثر از Padding هم خواهد بود.)*\n۳) **تعداد پیام‌های IKEv2 با EAP:** طبق **RFC 7296**، چهار پیام (`IKE_SA_INIT` + `IKE_AUTH`) فقط برای حالت پایه با `PSK`/گواهینامه است؛ هنگام استفاده از **EAP** در Remote Access VPN، فاز `IKE_AUTH` شامل چندین رفت‌وبرگشت اضافی برای پیام‌های EAP با سرور RADIUS/ISE خواهد بود."
         }
       ],
       "quiz": [
@@ -14691,505 +14744,865 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "bridge": {
         "whereUsed": "در اتصال امن شعب به دفتر مرکزی/ابر (Site-to-Site) و اتصال کاربران دورکار (Cisco Secure Client).",
         "nextQuestion": "در ادامهٔ مسیر تخصص Security (`f4`)، پس از شبکهٔ امن و VPN، چطور تهدیدات سطح وب، ایمیل، Endpoint و امنیت ابری (SSE / Umbrella) را به این زیرساخت وصل کنیم؟ این مأموریت درس‌های بعدی در دانشکدهٔ ۴ است!",
-        "nextId": "spec_sec_adv"
+        "nextId": "spec_sec_ise"
       }
     },
     "spec_sec_ise": {
       "id": "spec_sec_ise",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۲ Security: Cisco ISE (RADIUS/TACACS+/NAC/Posture) و TrustSec",
-      "lead": "اگر کسی کابل شبکه را از سوکت پشت تلفن یا پریز اتاق جلسات بکشد و به لپ‌تاپش وصل کند، چطور شبکه فوری هویتش را بشناسد، چک کند آنتی‌ویروسش آپدیت است یا نه و تصمیم بگیرد به سرورها راهش بدهد یا در VLAN قرنطینه بیندازد؟ پاسخ: Cisco ISE!",
-      "goal": "درک کامل معماری Cisco ISE (Personas: PAN، MnT، PSN)، جریان احراز هویت 802.1X و MAB، مکانیزم CoA (Change of Authorization)، Posture Assessment و TrustSec (SGT).",
-      "prereq": "آشنایی با RADIUS/TACACS+، VLAN، ACL و امنیت لایه ۲ (درس‌های دانشکده ۱ و ۳).",
+      "title": "۷.۲ Security: معماری خوشه‌ای Cisco ISE، مدیریت دستگاه با TACACS+، Posture و pxGrid",
+      "lead": "در درس `spec_sec` دیدیم پورت سوئیچ چگونه با `802.1X` و `MAB` جلوی ورود ناشناس را می‌گیرد؛ اما در یک سازمان چند‌هزارنفری، خودِ پلتفرم **Cisco ISE** چطور مقیاس می‌گیرد، تفاوت نقش‌های `PAN`، `MnT` و `PSN` چیست، چطور پیش از وصل شدن لپ‌تاپ سلامت آنتی‌ویروس و وصله‌های سیستم‌عامل را می‌سنجد (`Posture`) و چگونه مدیریت مهندسان روی تجهیزات را با **TACACS+** کنترل می‌کند؟",
+      "goal": "تسلط بر معماری خوشه‌ای **Cisco ISE Personas (`PAN`, `MnT`, `PSN`, `pxGrid`)**، طراحی قوانین **`Policy Set`** (`Authentication` + `Authorization`)، مکانیسم **`Posture Assessment`** و **`Device Administration (TACACS+)`** (با تفکیک دقیق از `RADIUS`).",
+      "prereq": "آشنایی با `802.1X`, `MAB`, `RADIUS CoA` و `TrustSec SGT` (درس `spec_sec` و `ccnp_enc_sec`).",
       "sections": [
         {
-          "h": "۱. معماری خوشه‌ای و نقش‌های سه‌گانه Cisco ISE (Personas)",
+          "h": "۱. چرا یک سرور تکی ISE در سازمان بزرگ کافی نیست و ۴ نقش خوشه چه می‌کنند؟",
           "p": [
-            "یک استقرار واقعی Cisco ISE در سازمان معمولاً از چند گره (Node) با ۳ نقش مجزا تشکیل می‌شود: (۱) PAN (Policy Administration Node) که مغز تنظیمات و وب‌پنل مدیریتی است و قوانین را می‌نویسد (به صورت Active/Standby)؛ (۲) MnT (Monitoring and Troubleshooting Node) که تمام لاگ‌های RADIUS/TACACS و گزارش‌های زنده را جمع و تحلیل می‌کند؛ و (۳) PSN (Policy Service Node) که کارگران خط مقدم هستند و درخواست‌های احراز هویت 802.1X/MAB/Guest/TACACS+ هزاران سوئیچ و WLC را لحظه‌ای جواب می‌دهند (تعداد PSNها را متناسب با افزایش تعداد کاربران اضافه می‌کنند)."
+            "در یک شرکت ۵۰ نفره ممکن است همهٔ سرویس‌های ISE روی یک ماشین مجازی تک نصب شوند؛ اما در مقیاس هزاران کاربر و صدها سوئیچ/WLC، هم از نظر دسترس‌پذیری (`HA`) و هم پردازش، تفکیک نقش‌ها (**Personas**) در یک خوشه (`Deployment`) ضروری است:"
+          ],
+          "bullets": [
+            "**`PAN (Policy Administration Node)` — واحد سیاست‌گذاری (Active / Standby):** تمام تنظیمات، پروفایل‌ها و Policy Setها فقط روی `PAN` اولیه تعریف و به بقیه همگام می‌شوند. در صورت از کار افتادن PAN، احراز هویت کاربران روی PSNهای فعال ادامه می‌یابد ولی تغییر سیاست متوقف می‌شود تا PAN دوم ارتقا یابد.",
+            "**`MnT (Monitoring and Troubleshooting Node)` — واحد پایش و لاگ (Active / Standby):** گزارش‌های زنده (`RADIUS/TACACS Live Logs`)، داشبوردها و آلارم‌ها را از همهٔ گره‌ها جمع‌آوری می‌کند.",
+            "**`PSN (Policy Service Node)` — خط مقدم احراز هویت (`N`-تایی برای Load Balancing/Scale):** درخواست‌های واقعی `802.1X`, `MAB`, `Guest`, `Posture`, `TACACS+` و صدور `CoA` مستقیماً توسط `PSN`ها پاسخ داده می‌شوند؛ با افزایش شعبه‌ها یا کاربران، PSNهای جدید اضافه می‌شوند.",
+            "**`pxGrid (Platform Exchange Grid)`:** گذرگاه تبادل زمینه (`Context`) میان ISE و ابزارهای دیگر (مانند **FMC/FTD**، **Catalyst Center** و SIEM)؛ برای مثال ISE می‌تواند نگاشت `User -> IP -> SGT` را از طریق pxGrid به فایروال FTD بدهد تا قانون فایروال بر اساس «نام گروه کاربری» نوشته شود نه IP!"
           ]
         },
         {
-          "h": "۲. چطور 802.1X، MAB و WebAuth با هم کار می‌کنند؟ (Authentication & Authorization Flow)",
+          "h": "۲. تفاوت کاربردی `RADIUS` و `TACACS+` در ISE + چرخهٔ Posture",
           "p": [
-            "وقتی دستگاهی به پورت سوئیچ وصل می‌شود، سوئیچ (Authenticator) در حالت پیش‌فرض پورت را بسته نگه می‌دارد و با پروتکل EAP از دستگاه می‌پرسد «هویتت چیست؟». در روش اصلی 802.1X (پروتکل‌های امن EAP-TLS با گواهینامه دیجیتال یا PEAP-MSCHAPv2 با نام کاربری اکتیودایرکتوری)، اطلاعات از سوئیچ با پروتکل RADIUS به PSN در ISE فرستاده می‌شود. اگر دستگاه پرینتر یا دوربین IP بود و به EAP جواب نداد، سوئیچ سراغ مرحله Fallback یعنی MAB می‌رود و مک‌آدرس آن را به ISE می‌فرستد تا با پروفایل‌های هوشمند (ISE Profiling با کمک DHCP/CDP/HTTP) تشخیص دهد آیا واقعاً یک پرینتر HP است یا یک لپ‌تاپ جعلی که MAC را جعل کرده!",
-            "پس از تایید هویت، ISE نه فقط یک بله/خیر ساده، بلکه مجوز پویا برمی‌گرداند: یا نام یک VLAN خاص را به سوئیچ می‌دهد، یا یک Downloadable ACL (dACL) روی همان تک‌پورت اعمال می‌کند، یا یک تگ امنیتی SGT (Cisco TrustSec) به کاربر اختصاص می‌دهد!"
-          ]
+            "بسیاری از مهندسان تازه‌کار `RADIUS` و `TACACS+` را با هم اشتباه می‌گیرند، در حالی که ISE از هر دو برای دو هدف کاملاً متفاوت استفاده می‌کند:"
+          ],
+          "steps": [
+            "**`RADIUS (UDP 1812/1813)` برای دسترسی شبکه (`Network Access`):** ویژهٔ ورود کلاینت‌ها/کارمندان به سوئیچ، Wi-Fi و VPN (`802.1X/MAB`). در RADIUS احراز هویت و مجوزدهی در یک بستهٔ `Access-Accept` ترکیب می‌شوند و **فقط گذرواژه** (در برخی حالت‌ها) رمزنگاری می‌شود؛ همچنین پشتیبانی بومی از **`CoA (UDP 3799)`** برای تغییر آنی نشست دارد.",
+            "**`TACACS+ (TCP 49 — RFC 8907)` برای مدیریت تجهیزات (`Device Admin`):** ویژهٔ لاگین مهندسان به CLI/GUI روترها، سوئیچ‌ها و فایروال‌ها! سه گام **Authentication**، **Authorization (مجوز تک‌تک دستورات CLI مثلاً اجازهٔ `show` ولی ممنوعیت `conf t`)** و **Accounting** را جدا می‌کند و **تمام بدنهٔ بسته را پس از ۱۲ بایت هدر ثابت** با کلید مشترک obfuscate/محافظت می‌نماید *(یادآوری مهم امنیتی: در شبکه‌های تولیدی برای حفاظت کامل مدیریتی، عبور TACACS+ از بستر امن مثل TLS/IPsec یا شبکهٔ OOB مجزا توصیه می‌شود)*.",
+            "**چرخهٔ `Posture Assessment`:** حتی اگر کارمند با گواهینامهٔ معتبر `802.1X` لاگین کند، عامل روی لپ‌تاپ (`AnyConnect/Secure Client Posture Module`) پس از دریافت یک دسترسی موقتِ محدود (`URL-Redirect + dACL محدود`) وضعیت آنتی‌ویروس، فایروال محلی و آپدیت سیستم‌عامل را به `PSN` گزارش می‌دهد؛ اگر `Compliant` بود ISE با **`CoA`** دسترسی کامل را باز می‌کند، وگرنه در حالت `Non-Compliant` به صفحهٔ اصلاح (`Remediation`) می‌ماند!"
+          ],
+          "think": {
+            "q": "در یک استقرار توزیع‌شدهٔ Cisco ISE (یک `PAN/MnT` در دیتاسنتر مرکزی و دو `PSN` محلی در شعبهٔ بزرگ)، اگر ارتباط WAN بین شعبه و دیتاسنتر مرکزی برای ۲ ساعت قطع شود، چه اتفاقی برای احراز هویت `802.1X` کارمندان شعبه و چه اتفاقی برای ثبت لاگ‌های جدید می‌افتد؟",
+            "a": "احراز هویت `802.1X` کارمندان شعبه **همچنان روی `PSN`های محلی ادامه می‌یابد** (به شرطی که منابع هویتی لازم مثل کش محلی/AD محلی یا گواهینامه‌های قابل اعتبارسنجی در دسترس `PSN` شعبه باشند)! اما تغییر قوانین در `PAN` مرکزی موقتاً به شعبه نمی‌رسد و `MnT` مرکزی تا زمان بازگشت لینک WAN لاگ‌های جدیدِ آن دو ساعت را دریافت نمی‌کند (لاگ‌ها روی دیسک محلی PSN تا سقف بافر نگه داشته می‌شوند)."
+          }
         },
         {
-          "h": "۳. جادوی CoA (Change of Authorization) و بررسی سلامت سیستم (Posture)",
+          "h": "۳. تلهٔ `Policy Set` و طراحی بدون تک‌نقطهٔ خطا",
           "p": [
-            "در احراز هویت معمولی اگر کاربری وصل شد، دیگر کنترل نمی‌شود! اما با مکانیزم RADIUS CoA (پورت UDP 1700 یا 3799)، ISE می‌تواند هر لحظه در میان کار دستور جدیدی به سوئیچ یا WLC بفرستد: مثلاً کاربر ابتدا با دسترسی محدود در مرحله Posture چک می‌شود که آیا ویندوز آپدیت و آنتی‌ویروس فعال دارد؟ اگر بله، ISE با یک پیام CoA فوری بدون قطع شدن اتصال، دسترسی کامل را باز می‌کند؛ و اگر وسط روز آنتی‌ویروسش خاموش شد یا فایروال FTD هشدار آلودگی داد، ISE با یک CoA پورت کاربر را بلافاصله به VLAN قرنطینه می‌فرستد یا ریست (Reauth) می‌کند!"
+            "در ISE قوانین داخل **Policy Sets** از بالا به پایین ارزیابی می‌شوند: اگر در بالای جدول یک قانون عمومی شرط `Wired_802.1X` را بگیرد اما فراموش شود شرط `Allowed Protocols` (مثل فعال بودن `EAP-TLS` یا `PEAP`) مطابق کلاینت باشد، حتی در صورت صحیح بودن پسورد یا گواهینامه نشست با خطای EAP رد می‌شود. همچنین برای جلوگیری از قفل شدن دسترسی مهندسان در هنگام قطعی سرور ISE، همیشه در تنظیمات `aaa authentication login` تجهیزات از متد پشتیبان **`local`** پس از `group tacacs+` استفاده کنید."
           ]
         }
       ],
+      "analogy": "خوشهٔ **Cisco ISE** مثل سازمان مرکزی گذرنامه و حراست یک شرکت چندشعبه‌ای است: **`PAN`** دفتر قوانین مرکزی است که مقررات ورود را می‌نویسد، **`MnT`** آرشیو دوربین‌ها و دفتر ثبت ترددهاست، **`PSN`**ها باجه‌های کنترل ورود در تک‌تک ساختمان‌ها هستند که کارت‌ها را لحظه‌ای چک می‌کنند، و **`pxGrid`** خط تلفن مستقیم باجه‌ها به نگهبانان فایروال (`FTD`) است تا بدانند پشت هر پلاک (`IP`) چه کسی (`User/SGT`) نشسته است. محل شکست تشبیه اینجاست: اگر باجهٔ محلی (`PSN`) برای تایید رمز کاربری به دیتابیس AD مرکزی متکی باشد و لینک WAN قطع شود، با وجود روشن بودن خودِ باجه (`PSN`) بدون نسخهٔ محلی AD/گواهینامه، کاربران جدید رد می‌شوند.",
+      "table": {
+        "title": "مقایسهٔ نقش‌های Cisco ISE و تفکیک RADIUS در برابر TACACS+",
+        "headers": [
+          "مولفه / پروتکل",
+          "پورت / معماری",
+          "کاربرد اصلی در ISE"
+        ],
+        "rows": [
+          [
+            "`PAN` / `MnT`",
+            "Primary + Secondary (HA)",
+            "مدیریت متمرکز سیاست (`PAN`) و تجمیع لاگ/گزارش (`MnT`)"
+          ],
+          [
+            "`PSN` / `pxGrid`",
+            "مقیاس‌پذیری افقی `N`-تایی / TLS",
+            "پاسخ‌گویی به `802.1X/MAB/Posture/TACACS+` و اشتراک زمینه با FTD"
+          ],
+          [
+            "`RADIUS`",
+            "`UDP 1812/1813` + `CoA 3799`",
+            "کنترل دسترسی کاربران/دستگاه‌ها (`802.1X`, `MAB`, `Guest`, `Posture`)"
+          ],
+          [
+            "`TACACS+`",
+            "`TCP 49` (RFC 8907)",
+            "کنترل دسترسی مدیران به CLI تجهیزات با تفکیک AuthC/AuthZ/Acct تک‌فرمان"
+          ]
+        ]
+      },
+      "faq": [
+        {
+          "q": "اگر در شبکهٔ دارای Cisco ISE، پرینتر فقط IP استاتیک داشته باشد و از `802.1X` پشتیبانی نکند، `Posture` هم روی آن اجرا می‌شود؟",
+          "a": "خیر؛ **Posture Assessment** نیازمند اجرای عامل نرم‌افزاری (مانند `Cisco Secure Client Posture Module` یا عامل موقت Web) روی سیستم‌عامل کلاینت‌هایی مثل Windows/macOS است. پرینترها و تجهیزات IoT با **`MAB` + `ISE Profiling`** (تشخیص نوع دستگاه از روی DHCP Option/CDP/SNMP/MAC OUI) شناسایی و با `dACL`/`SGT` بسیار محدود ایزوله می‌شوند."
+        },
+        {
+          "q": "چرا در `TACACS+` می‌گوییم هدر ۱۲ بایتی غیررمزنگاری‌شده است؟",
+          "a": "طبق **RFC 8907** در پروتکل کلاسیک `TACACS+` تنها ۱۲ بایت هدر ابتدایی بسته (شامل نسخه، نوع بسته، Session ID و طول) بدون obfuscation فرستاده می‌شود و بدنهٔ بسته با کلید مشترک obfuscate می‌گردد؛ به همین دلیل در شبکه‌های غیرقابل‌اعتماد باید از **شبکهٔ مدیریتی OOB یا IPsec/TLS** روی مسیر TACACS+ استفاده کرد."
+        }
+      ],
+      "summary": "**Cisco ISE** قلب مدیریت هویت در معماری Zero Trust است: با تفکیک گره‌ها به **`PAN`** (سیاست)، **`MnT`** (پایش)، **`PSN`** (پردازش مقیاس‌پذیر) و **`pxGrid`** (تبادل زمینه با FTD/Catalyst Center) کار می‌کند؛ از **`RADIUS` (`UDP 1812/3799 CoA`)** برای کنترل دسترسی کاربران، **`Posture`** برای سنجش سلامت قبل از دسترسی کامل و **`TACACS+` (`TCP 49`)** برای کنترل دستورات CLI مدیران استفاده می‌نماید.",
+      "ciscoRef": "Cisco Identity Services Engine (ISE) Administrator Guide & Distributed Deployment Design Guide (RFC 8907 TACACS+)",
       "protocolAnalysis": [
-        "در تحلیل عملی ۷.۲ Security، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
+        "در جریان **Posture با `CoA`**, کلاینت پس از موفقیت در `802.1X` ابتدا از `PSN` یک وضعیت موقت (`Unknown` با `URL-Redirect` به پورتال Posture و محدودیت دسترسی) می‌گیرد؛ پس از ارسال گزارش سلامت توسط عامل کلاینت به `PSN` و تایید انطباق (`Compliant`)، این **`PSN` پیام `RADIUS CoA (UDP 3799)`** را به سوئیچ/WLC می‌فرستد تا `dACL` محدود برداشته شود.",
+        "در **`TACACS+ Command Authorization`**, هر بار که مهندس یک فرمان مانند `configure terminal` یا `reload` را در CLI وارد می‌کند، روتر/سوئیچ استعلام `Author Request` را روی `TCP 49` به ISE می‌فرستد تا بر اساس سطح مجوز (`Command Set`) اجازه یا خطای `% Command authorization failed` صادر شود."
       ],
       "iosCommands": [
         {
-          "cmd": "show interfaces status",
-          "out": "Gi0/1  UPLINK  connected  trunk  a-full  a-1000",
-          "note": "بررسی وضعیت لایه ۱/۲ پورت‌ها"
+          "cmd": "show tacacs",
+          "out": "Server status: Alive\nServer address: 10.10.90.10, port: 49\n  Socket opens: 14, closes: 13\n  Errors: 0, Packets sent: 128, Packets received: 128",
+          "note": "بررسی وضعیت ارتباط روتر/سوئیچ با سرور TACACS+ در Cisco ISE. [نکتهٔ شبیه‌ساز: دستور `show tacacs` در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تست زنده نیازمند CML/تجهیز واقعی و Cisco ISE است.]",
+          "why": "تایید اینکه ارتباط TCP 49 با سرور ISE برقرار است، سوکت‌ها خطا ندارند و بسته‌های ارسالی پاسخ می‌گیرند.",
+          "anatomy": "آدرس IP سرور ISE، پورت `49`، وضعیت `Alive` و شمارنده‌های `Errors` و `Packets sent/received`.",
+          "lookFor": "وضعیت `Alive` و برابر بودن یا پاسخ گرفتن بسته‌ها بدون رشد `Errors`.",
+          "ifUnexpected": "افزایش `Errors` یا `closes` غیرعادی معمولاً نشانهٔ بسته بودن `TCP 49` در فایروال یا تطابق نداشتن کلید مشترک (`tacacs-server key`) است."
         },
         {
-          "cmd": "show vlan brief",
-          "out": "10  USERS  active  Gi0/3, Gi0/4\n20  SERVERS  active  Gi0/5",
-          "note": "تایید تخصیص VLANها"
+          "cmd": "show aaa servers",
+          "out": "RADIUS: id 1, priority 1, host 10.10.90.10, auth-port 1812, acct-port 1813\n  State: current UP, duration 1842s\n  Authen: request 94, timeouts 0, fail 2, success 92",
+          "note": "پایش سلامت سرورهای RADIUS/TACACS+ در تجهیز شبکه. [نکتهٔ شبیه‌ساز: دستور مرجع غیرشبیه‌سازی‌شده.]",
+          "why": "تشخیص اینکه سوئیچ، سرور `PSN` در ISE را `UP` می‌بیند یا به حالت `DEAD` رفته است.",
+          "anatomy": "وضعیت فعلی سرور (`UP`/`DEAD`)، تعداد درخواست‌ها و تعداد `timeouts`.",
+          "lookFor": "`State: current UP` و نزدیک به صفر بودن `timeouts`.",
+          "ifUnexpected": "اگر سرور `DEAD` شده باشد، تست پینگ، کلید مشترک RADIUS و دسترسی `UDP 1812/1813` بررسی شوند."
+        },
+        {
+          "cmd": "show running-config",
+          "out": "Building configuration...\nhostname R1\n...",
+          "note": "دستور زنده در شبیه‌ساز داخلی برای ممیزی پورت‌های ایزولهٔ مدیریتی (`VLAN 90`) و پورت‌های کاربران/قرنطینه.",
+          "why": "تایید جداسازی دقیق سگمنت مدیریتی ارتباط با سرور ISE از پورت‌های عادی کاربران در آزمایشگاه پایه.",
+          "anatomy": "فهرست VLANها، توضیحات و عضویت پورت‌ها در تنظیمات فعال.",
+          "lookFor": "قرار داشتن پورت سرور مدیریتی/ISE در VLAN اختصاصی و `shutdown` بودن پورت‌های بلااستفاده.",
+          "ifUnexpected": "در صورت وجود پورت آزاد فعال در VLAN پیش‌فرض `1`، احتمال اتصال غیرمجاز وجود دارد."
         }
       ],
       "diagramSvg": "topo",
       "lab": {
-        "title": "آزمایشگاه عملی: ۷.۲ Security",
+        "title": "آزمایشگاه آماده‌سازی سگمنت‌های ISE Management، Posture Quarantine و تفکیک پورت در شبیه‌ساز",
         "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۲ Security را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
+          "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `aaa new-model`، `tacacs server`، `radius server` و `pxgrid` را اجرا نمی‌کند (برای آزمایش زنده از Cisco DevNet ISE Sandbox یا EVE-NG استفاده کنید). در اینجا آماده‌سازی سگمنت مجزای ارتباط مدیریتی به ISE (`VLAN 90: ISE_OOB_MGMT`)، سگمنت قرنطینهٔ `Posture` (`VLAN 92: POSTURE_QUARANTINE`) و قفل دسترسی پورت‌ها در شبیه‌ساز را زنده انجام می‌دهیم.",
+          "۲. با `enable` وارد شوید و با `show vlan brief` و `show interfaces status` وضعیت پایهٔ پورت‌ها را بررسی کنید.",
+          "۳. سگمنت‌های مدیریتی ISE و قرنطینهٔ Posture را روی شبیه‌ساز پیاده کنید: `configure terminal` -> `vlan 90` -> `name ISE_OOB_MGMT` -> `vlan 92` -> `name POSTURE_QUARANTINE` -> `exit` -> `interface Gi0/6` -> `description TO-ISE-PSN-OOB` -> `switchport mode access` -> `switchport access vlan 90` -> `switchport nonegotiate` -> `interface Gi0/7` -> `description POSTURE-CLIENT-PORT` -> `switchport mode access` -> `switchport access vlan 92` -> `switchport nonegotiate` -> `no shutdown` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 90,92` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces trunk`، `show interfaces Gi0/6 switchport` و `show running-config` بررسی کنید که VLANهای `90` و `92` روی `Gi0/6`/`Gi0/7` (با `nonegotiate`) و ترانک `Gi0/1` ثبت شده‌اند.",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (قطعه‌فرمان مرجع Device Admin با TACACS+ و Fallback ایمن — پلتفرم مرجع: Cisco IOS-XE + Cisco ISE):** **پیش‌نیازها و فرمان‌ها:** در ISE قابلیت `Device Admin Service` روی PSN فعال، شبکهٔ دستگاه (`NAD`) با آدرس سوئیچ و کلید مشترک TACACS+ تعریف، و Policy Set با `Command Set` و `Shell Profile (Priv 15)` ساخته شده باشد؛ همچنین مسیر `TCP 49` از `10.10.90.0/24` تا `10.10.90.10` باز باشد. روی سوئیچ/روتر: `aaa new-model` -> `tacacs server ISE_TAC` (`address ipv4 10.10.90.10`, `key <STRONG_SECRET>`) -> `aaa group server tacacs+ TAC_GRP` (`server name ISE_TAC`) -> `aaa authentication login VTY_AUTH group TAC_GRP local` -> `aaa authorization exec VTY_EXEC group TAC_GRP local` -> `aaa authorization commands 15 VTY_CMD group TAC_GRP if-authenticated` -> `aaa accounting commands 15 default start-stop group TAC_GRP` -> `line vty 0 4` (`login authentication VTY_AUTH`, `authorization exec VTY_EXEC`). سپس `show tacacs` را بزنید و با یک کاربر محدودشده تست کنید. **خروجی مرجع و نشانهٔ موفقیت:** در `show tacacs` وضعیت `Server status: Alive` بدون `Errors`، ثبت گزارش دستورات در `ISE TACACS Live Logs` و باز ماندن ورود با حساب `local` در زمان قطع تست‌شدهٔ سرور ISE. **نشانهٔ شکست:** قفل شدن مدیران در نبود `local` fallback پس از قطع ISE، یا خطای `% Authorization failed` به‌خاطر تطابق نداشتن `Command Set`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط ساختار VLANهای `90/92` و `nonegotiate` را ذخیره کرد و هیچ ارتباط `TCP 49` یا `UDP 1812/3799` شبیه‌سازی نمی‌شود."
         ],
         "verifyCmds": [
-          "show interfaces status",
-          "show vlan brief"
+          "enable",
+          "show vlan brief",
+          "show interfaces trunk",
+          "show interfaces Gi0/6 switchport",
+          "show running-config"
         ]
       },
       "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۲ Security، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
+        "fault": "مهندسان یک شرکت پس از تنظیم `TACACS+` با Cisco ISE برای مدیریت CLI سوئیچ‌ها، متوجه می‌شوند وقتی ارتباط شبکه با سرور ISE قطع می‌شود اصلاً با نام کاربری پشتیبان محلی (`local`) هم نمی‌توانند وارد کنسول/SSH شوند! در کنار آن، روی برخی کلاینت‌های دارای Posture نیز پس از تکمیل بررسی آنتی‌ویروس، دسترسی همچنان در حالت محدود باقی می‌ماند!",
+        "analysis": "دو خطای مجزا رخ داده است: ۱) در لیست متد `aaa authentication login`، یا کلمهٔ **`local`** پس از `group TAC_GRP` فراموش شده است (بنابراین وقتی سرور در پاسخ `FAIL` می‌فرستد یا `DEAD` است روش پشتیبان ندارد)، یا در دستورات `authorization` قید `local`/`if-authenticated` گذاشته نشده است! ۲) در بخش Posture، کلاینت تایید را به `PSN` داده اما پیام **`RADIUS CoA (UDP 3799)`** از طرف ISE یا توسط فایروال مسدود شده یا بخش `aaa server radius dynamic-author` روی سوئیچ تعریف نشده است.",
+        "fix": "اضافه کردن **`local`** به‌عنوان fallback در پایان `aaa authentication login` و `aaa authorization exec` (همراه با نگه‌داری امن حساب اضطراری محلی در حالت قطعی سرور)، و باز کردن **`UDP 3799`** از IPهای PSN به سمت سوئیچ‌ها به همراه تعریف `aaa server radius dynamic-author`."
       },
-      "exercise": "برای مبحث «۷.۲ Security» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
+      "misconceptions": [
+        {
+          "myth": "در Cisco ISE، `RADIUS` و `TACACS+` هر دو کار مشابهی می‌کنند و فرقی ندارد کدام را برای `802.1X` و کدام را برای مدیریت CLI مهندسان بگذاریم.",
+          "reality": "`802.1X/MAB` استاندارد شبکهٔ دسترسی است و فقط با **RADIUS** (`EAP` + `CoA`) کار می‌کند؛ در حالی که مدیریت CLI مدیران و کنترل تک‌تک دستورات (`Command Authorization`) تخصصی برای **TACACS+** طراحی شده است.",
+          "howToSpot": "بررسی پورت‌ها و نوع سرویس: `UDP 1812/1813/3799` برای دسترسی شبکه (`RADIUS`) و `TCP 49` برای مدیریت تجهیزات (`TACACS+`)."
+        },
+        {
+          "myth": "اگر کل گرهٔ `PAN` در Cisco ISE خاموش شود، تمام کاربران در حال اتصال و کاربران جدید شعبه فوراً قطع می‌شوند.",
+          "reality": "وظیفهٔ پاسخ به احراز هویت بر عهدهٔ **`PSN`** است نه `PAN`! تا زمانی که `PSN`ها روشن و به منابع هویتی متصلند، احراز هویت ادامه می‌یابد؛ فقط امکان تغییر سیاست‌های جدید تا بازگشت `PAN` متوقف می‌ماند.",
+          "howToSpot": "تایید جدا بودن نقش `PSN`ها از `PAN` در `Administration -> System -> Deployment`."
+        }
+      ],
+      "exercise": "در یک استقرار توزیع‌شدهٔ ISE با یک دفتر مرکزی و ۴ شعبهٔ بزرگ (هر کدام ۵۰۰ کاربر)، کدام Personaها را در دفتر مرکزی و کدام را در شعبه‌های بزرگ مستقر می‌کنید؟ همچنین تفاوت `RADIUS` و `TACACS+` را از نظر پروتکل انتقال، تفکیک AAA و کاربرد در ISE توضیح دهید.",
+      "exercises": [
+        {
+          "level": "ساده",
+          "task": "اگر بخواهیم به یک کارشناس سطح ۱ اجازه دهیم در CLI سوئیچ فقط دستورات `show` را اجرا کند ولی دستور `configure terminal` برایش بسته باشد، از کدام ویژگی ISE و کدام پروتکل (`RADIUS` یا `TACACS+`) استفاده می‌کنیم؟",
+          "hint": "کنترل تک‌تک دستورات CLI پس از لاگین (`Command Authorization`).",
+          "solution": "از **Device Administration با پروتکل `TACACS+` (`TCP 49`)** و تعریف یک **Command Set** در Cisco ISE که تنها الگوی `show` را `Permit` و سایر دستورات (از جمله `configure`) را `Deny` می‌کند."
+        },
+        {
+          "level": "متوسط",
+          "task": "در جریان **Posture Assessment** در ISE، چرا پس از اینکه لپ‌تاپ با `802.1X` لاگین کرد، نیاز به باز کردن **`UDP 3799`** از سمت `PSN` به سوئیچ داریم؟ اگر این پورت بسته باشد کاربر چه تجربه‌ای دارد؟",
+          "hint": "تغییر وضعیت از دسترسی موقتِ Posture-Unknown به دسترسی کامل بدون قطع و وصل کابل.",
+          "solution": "زیرا پس از بررسی سلامت دستگاه، `PSN` باید وضعیت دسترسیِ نشستِ از قبل بازشده را ارتقا دهد و این کار با ارسال **`RADIUS CoA (UDP 3799)`** به سوئیچ انجام می‌شود. اگر `UDP 3799` بسته باشد، کلاینت حتی پس از تایید آنتی‌ویروس همچنان در حالت محدود (`URL-Redirect / Quarantine dACL`) گیر می‌ماند."
+        },
+        {
+          "level": "چالشی",
+          "task": "طراحی خوشهٔ ISE برای سناریوی بخش `exercise` بالا (دفتر مرکزی + ۴ شعبهٔ ۵۰۰ نفره) را بنویسید: جایگاه `PAN` (Primary/Secondary)، `MnT` و `PSN`ها را مشخص کنید و دو نکتهٔ ایمنی برای جلوگیری از قفل شدن دسترسی مدیریتی تجهیزات (`TACACS+`) در هنگام قطع لینک WAN شعبه توضیح دهید.",
+          "hint": "PAN/MnT در مرکز (یا سایت دوم برای DR) و PSN محلی در هر شعبهٔ بزرگ یا مرکزیِ نزدیک با لینک افزونه؛ برای TACACS+ همیشه fallback `local` لازم است.",
+          "solution": "۱) **توپولوژی خوشه:** `Primary PAN + Primary MnT` در دیتاسنتر مرکزی ۱ و `Secondary PAN + Secondary MnT` در دیتاسنتر ۲ (یا سایت پشتیبان) برای HA؛ و قرار دادن **`PSN`های محلی** در شعبه‌های بزرگ ۵۰۰ نفره (در کنار داشتن AD Read-Only محلی یا گواهی‌های قابل تایید توسط PSN محلی) تا قطع WAN جلوی لاگین `802.1X` کارمندان شعبه را نگیرد؛ و فعال‌سازی **`pxGrid`** روی گره‌های مرکزی برای هم‌رسانی زمینه به FTD.\n۲) **دو نکتهٔ ایمنی `TACACS+`:** الف) قرار دادن **`local`** به‌عنوان متد پشتیبان در `aaa authentication login` و `aaa authorization exec` تا در قطعی WAN/ISE امکان ورود اضطراری بماند؛ ب) ایجاد حساب اضطراری با گذرواژهٔ قوی و نگهداری امن و انتقال ترافیک `TCP 49` از شبکهٔ OOB یا تانل امن به‌خاطر رمزنگاری‌نشدن ۱۲ بایت هدر TACACS+."
+        }
+      ],
       "quiz": [
         {
-          "q": "در پیاده‌سازی استاندارد «۷.۲ Security» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
+          "q": "در معماری خوشه‌ای **Cisco ISE**، کدام گره (Persona) مستقیماً درخواست‌های احراز هویت `802.1X`، `MAB`، `Posture` و `TACACS+` تجهیزات را پردازش و پاسخ می‌دهد؟",
           "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
+            "`PSN (Policy Service Node)`",
+            "`MnT (Monitoring and Troubleshooting Node)`",
+            "`PAN (Policy Administration Node)`",
+            "`SNMP Trap Receiver`"
           ],
           "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۲ Security نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
-        }
-      ],
-      "table": {
-        "title": "مقایسه روش‌های احراز هویت شبکه در Cisco ISE و سطح امنیت آن‌ها",
-        "headers": [
-          "روش احراز هویت",
-          "نیاز به کلاینت روی دستگاه؟",
-          "سطح امنیت و کاربرد اصلی"
-        ],
-        "rows": [
-          [
-            "802.1X با EAP-TLS",
-            "بله (گواهینامه دیجیتال دستگاه/کاربر)",
-            "بالاترین امنیت ممکن — ضدسرقت پسورد، استاندارد طلایی شرکت‌ها"
-          ],
-          [
-            "802.1X با PEAP",
-            "بله (یوزر و پسورد Active Directory)",
-            "امنیت بالا و راه‌اندازی سریع‌تر از PKI کامل"
-          ],
-          [
-            "MAB (MAC Auth Bypass)",
-            "خیر (احراز بر اساس MAC Address)",
-            "مناسب پرینتر، دوربین و IoT (باید حتماً همراه با Profiling و dACL محدود شود!)"
-          ],
-          [
-            "WebAuth (CWA/Guest)",
-            "خیر (مرورگر پورتال مهمان)",
-            "مناسب پورتال وای‌فای مهمانان و BYOD با تایید پیامکی یا اسپانسر"
-          ]
-        ]
-      },
-      "faq": [
-        {
-          "q": "اگر هنگام پیاده‌سازی اولیه 802.1X روی یک سوئیچ، تمام کاربران یکجا قطع شوند چه کار کنیم که بی‌دردسر اجرا شود؟",
-          "a": "هرگز از روز اول حالت سخت Closed Mode را نزنید! همیشه ۳ فاز دارد: (۱) Monitor Mode (دستور authentication open روی پورت؛ همه رد می‌شوند ولی گزارش تمام خطاها در ISE ثبت می‌شود تا تکلیف همه دستگاه‌ها مشخص شود)؛ (۲) Low-Impact Mode (فقط ترافیک پایه مثل DHCP/DNS و یک ACL حداقلی قبل از تایید باز است)؛ و (۳) Closed Mode نهایی."
+          "exp": "`PSN` گرهٔ پردازشگر درخواست‌های احراز هویت/مجوزدهی است؛ `PAN` تنظیمات را مدیریت و `MnT` لاگ‌ها را جمع‌آوری می‌کند."
         },
         {
-          "q": "چرا به جای ساخت صدها VLAN مختلف در ISE، از TrustSec و SGT (Scalable Group Tags) استفاده می‌کنند؟",
-          "a": "چون در مدل VLAN/ACL با تغییر IP یا جابه‌جایی سرور باید صدها خط IP-based ACL را در تمام روترها تغییر دهید؛ اما با SGT یک سیاست ساده می‌نویسید: «گروه کارمندان (SGT 10) اجازه دسترسی به گروه سرورهای مالی (SGT 50) ندارند» — مستقل از اینکه IP آن‌ها چیست!"
+          "q": "چرا برای کنترل سطح دسترسی تک‌تک دستورات CLI مهندسان روی روترها و سوئیچ‌های سیسکو از **`TACACS+`** به جای `RADIUS` استفاده می‌شود؟",
+          "opts": [
+            "چون TACACS+ از پورت UDP 1812 استفاده می‌کند",
+            "چون TACACS+ هر سه فاز `Authentication`, `Authorization` و `Accounting` را جدا کرده و امکان کنترل مجوز **تک‌تک دستورات CLI** را می‌دهد",
+            "چون TACACS+ برای `802.1X` روی لپ‌تاپ‌ها اجباری است",
+            "چون TACACS+ نیاز به کلید مشترک ندارد"
+          ],
+          "ans": 1,
+          "exp": "TACACS+ (`TCP 49`, RFC 8907) با جداسازی AAA می‌تواند هر فرمان تایپ‌شده در CLI را مجزا بررسی و مجاز/رد کند."
         },
         {
-          "q": "پورت‌های RADIUS CoA برای تغییر سطح دسترسی آنی کاربر روی سوئیچ چه شماره‌ای هستند و جهتش کدام طرف است؟",
-          "a": "در ارتباط عادی RADIUS، سوئیچ به سمت ISE روی پورت ۱۸۱۲/۱۸۱۳ پیام می‌فرستد؛ اما در CoA این سرور ISE است که به سمت سوئیچ روی پورت UDP 1700 (استاندارد سیسکو) یا ۳۷۹۹ (استاندارد RFC 5176) فرمان می‌فرستد (پس باید در فایروال بین ISE و سوئیچ‌ها باز باشد!)."
+          "q": "نقش **`pxGrid`** در اکوسیستم Cisco ISE چیست؟",
+          "opts": [
+            "فشرده‌سازی بسته‌های VLAN روی ترانک",
+            "جایگزینی کابل اترنت با فیبر نوری",
+            "تبادل لحظه‌ای اطلاعات زمینه (`User`, `IP`, `SGT`, وضعیت Posture) میان ISE و سیستم‌هایی مانند فایروال FTD و Catalyst Center",
+            "تنظیم خودکار آدرس IP برای سرورهای DHCP"
+          ],
+          "ans": 2,
+          "exp": "`pxGrid` گذرگاه اشتراک زمینه است تا فایروال‌ها و ابزارهای امنیتی دیگر از هویت کاربر و وضعیت سلامت متصل به هر IP مطلع شوند."
         }
       ],
-      "analogy": "Cisco ISE (Identity Services Engine) مثل کنترل گذرنامه و سلامت پزشکی یک فرودگاه فوق‌مدرن است: وقتی مسافری (دستگاه) به گیت (پورت سوئیچ یا وای‌فای) می‌رسد، سوئیچ حتی یک قدم اجازه عبور نمی‌دهد تا از ISE بپرسد: «اول پاسپورتش (802.1X) را چک کن؛ دوم چک کن تب و ویروس نداشته باشد (Posture Compliance)؛ و بر اساس جایگاهش به او یک مچ‌بند رنگی بده (Downloadable ACL یا SGT) تا هر سالنی که می‌رود فقط به بخش‌های مجاز خود دسترسی داشته باشد!»",
-      "ciscoRef": "Cisco CCNP Security Implementing and Configuring Cisco Identity Services Engine (300-715 SISE) Official Cert Guide",
-      "summary": "Cisco ISE (با گره‌های PAN، MnT و PSN) کنترل دسترسی هویت‌محور را بر کل شبکه سیمی، وایرلس و VPN حاکم می‌کند: ترکیب 802.1X (EAP-TLS/PEAP)، MAB همراه Profiling برای دستگاه‌های بدون کلاینت، بررسی سلامت سیستم (Posture) و واکنش آنی با RADIUS CoA و TrustSec SGT شبکه‌ای کاملاً مقاوم در برابر دستگاه‌های ناشناس می‌سازد."
+      "bridge": {
+        "whereUsed": "در لایهٔ کنترل دسترسی Campus، شعب و مدیریت امن تجهیزات دیتاسنتر و شبکه.",
+        "nextQuestion": "اکنون که دنیای امنیت را دیدیم، وارد دیتاسنتر می‌شویم! سیستم‌عامل سوئیچ‌های دیتاسنتر یعنی **Cisco NX-OS** روی سری **Nexus** چه تفاوت‌های کلیدی با IOS دارد، و چطور فناوری **`vPC (Virtual Port Channel)`** بدون تکیه به یک Control Plane واحد، دو سوئیچ Nexus را برای سرورها به یک مقصد افزونه بدون بلاک STP تبدیل می‌کند؟",
+        "nextId": "spec_dc_nx"
+      }
     },
     "spec_dc_nx": {
       "id": "spec_dc_nx",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۳ Data Center: سیستم‌عامل Cisco NX-OS، سوئیچ‌های Nexus و vPC",
-      "lead": "سوئیچ‌های دیتاسنتر Cisco Nexus به جای سیستم‌عامل معمولی IOS روی NX-OS اجرا می‌شوند! این سیستم‌عامل فوق‌پذیر، ماژولار و مبتنی بر لینوکس قابلیت‌های خاصی مثل vPC (Virtual Port Channel)، VDC و چک‌پوینت تنظیمات دارد که در هیچ سوئیچ اداری نمی‌بینید.",
-      "goal": "تسلط بر معماری ماژولار NX-OS (فعال‌سازی featureها، دستور checkpoint، مدیریت VRF management)، پیکربندی دقیق vPC (Peer-Keepalive، Peer-Link، Orphan Ports) و پرهیز از اشتباهات مرگبار vPC.",
-      "prereq": "آشنایی با EtherChannel LACP، VLAN، STP و سوئیچینگ دیتاسنتر.",
+      "title": "۷.۳ Data Center: سیستم‌عامل Cisco NX-OS، معماری Nexus و vPC (Virtual Port Channel)",
+      "lead": "در دیتاسنتر روی سوئیچ‌های **Cisco Nexus** دیگر با IOS عادی طرف نیستید: در NX-OS تا ویژگی را روشن (`feature ...`) نکنید دستوراتش اصلاً وجود ندارند، پورت مدیریت در یک `VRF` مجزا قرار دارد، و به جای یکی‌کردنِ کاملِ Control Plane مثل StackWise Virtual، دو سوئیچ Nexus مستقل با فناوری **`vPC (Virtual Port Channel)`** به‌صورت هم‌زمان ترافیک سرورها را عبور می‌دهند—به شرطی که در دام خطای `Type-1 Consistency` یا `Orphan Ports` هنگام افت Peer-Link نیفتید!",
+      "goal": "تسلط بر تفاوت‌های بنیادی **Cisco NX-OS** با IOS (`feature`, `VRF management`, `checkpoint/rollback`)، معماری کامل **vPC (`Peer-Keepalive`, `Peer-Link`, `vPC Domain`)**، بررسی **`Type-1 / Type-2 Consistency`** و رفتار دقیق **`Orphan Ports`**.",
+      "prereq": "آشنایی با EtherChannel LACP، VLAN، STP و طراحی دیتاسنتر (`ccna_03_stp` و `adv_01`).",
       "sections": [
         {
-          "h": "۱. تفاوت‌های کلیدی NX-OS با Cisco IOS که روز اول کار در دیتاسنتر باید بدانید",
+          "h": "۱. چهار تفاوت کلیدی NX-OS با IOS در روز اول دیتاسنتر",
           "p": [
-            "به محض لاگین به یک سوئیچ Nexus 9000 متوجه ۴ تفاوت بزرگ می‌شوید: (۱) ویژگی‌ها به‌صورت پیش‌فرض خاموش‌اند تا رم و امنیت حفظ شود؛ تا دستور feature ospf، feature bgp، feature lacp یا feature vpc را نزنید، حتی دستوراتشان در CLI وجود ندارد! (۲) پورت مدیریتی mgmt0 به‌صورت خودکار داخل یک VRF مجزا به نام management قرار دارد (برای پینگ باید بزنید ping 10.1.1.1 vrf management) تا ترافیک مدیریت با دیتای سرورها قاطی نشود؛ (۳) دستور ذخیره همان copy running-config startup-config است و قبل از تغییرات خطرناک می‌توانید با checkpoint before-change یک نقطه بازگشت بسازید و با rollback به ثانیه قبل برگردید؛ (۴) تنظیمات پورت‌های Ethernet به‌صورت پیش‌فرض shutdown یا switchport است ولی با نظام جدید Nexus کار می‌کند."
-          ]
-        },
-        {
-          "h": "۲. کالبدشکافی فناوری vPC (Virtual Port Channel): شاهکار دیتاسنترهای Nexus",
-          "p": [
-            "چرا در دیتاسنتر به جای StackWise یا VSS از vPC بین دو سوئیچ Nexus 9000 استفاده می‌کنند؟ چون در StackWise دو سوئیچ یک Control Plane مشترک دارند (یعنی اگر باگ نرم‌افزاری یا ارتقای IOS بخواهد رخ دهد ریسک هم‌زمان هست)؛ اما در vPC دو سوئیچ Control Plane کاملاً مستقل دارند و فقط جداول MAC و ARP و IGMP را با هم همگام می‌کنند! اجزای الزامی یک vPC Domain:"
+            "سیستم‌عامل **Cisco NX-OS** مبتنی بر هستهٔ لینوکس و با معماری ماژولار برای پایداری دیتاسنتر طراحی شده است:"
           ],
           "bullets": [
-            "۱. vPC Peer-Keepalive Link: یک لینک جداگانه لایه ۳ (معمولاً بین پورت‌های mgmt0 یا یک VRF جدا؛ هرگز روی خود Peer-Link نگذارید!) که هر ثانیه یک بسته UDP پورت ۳۲۰۰ می‌فرستد تا بفهمد آیا سوئیچ همتا هنوز زنده است یا خاموش شده (جلوگیری از Split-Brain).",
-            "۲. vPC Peer-Link (حیاتی‌ترین لینک): یک Port-Channel حداقل دوتایی ۱۰/۴۰/۱۰۰ گیگابیتی با LACP مستقیم بین دو سوئیچ Nexus که ترافیک همگام‌سازی CFSoE (جداول MAC/ARP/IGMP) و ترافیک دستگاه‌های تک‌پورتی (Orphan Devices) را حمل می‌کند.",
-            "۳. vPC Member Ports: پورت‌هایی که به سمت سرورها یا سوئیچ‌های پایین‌تر با شماره یکسان vpc <id> روی هر دو Nexus بسته می‌شوند تا یک Multichassis EtherChannel بدون هیچ پورت Blocked در STP تشکیل دهند!"
+            "**ماژولار بودن با `feature`:** برای کاهش مصرف حافظه و سطح حمله، ویژگی‌ها پیش‌فرض خاموشند؛ تا زمانی که دستور **`feature lacp`**، **`feature vpc`**، **`feature ospf`** یا **`feature bgp`** را نزنید، دستورات مربوطه حتی در CLI ظاهر نمی‌شوند!",
+            "**ایزوله‌سازی پورت مدیریت (`mgmt0` در `VRF management`):** پورت فیزیکی `mgmt0` به‌طور خودکار در VRF جداگانهٔ **`management`** قرار دارد تا جدول روتینگ سرورها با مدیریت تداخل نکند؛ بنابراین برای تست دسترسی سرور مدیریت یا NTP باید صریحاً `vrf management` بنویسید (مثلاً `ping 10.10.90.5 vrf management`).",
+            "**ابزار بازگشت امن (`checkpoint` و `rollback`):** پیش از تغییرات حساس می‌توان با `checkpoint before-vpc` یک نسخهٔ فوری از وضعیت فعلی ذخیره کرد و در صورت بروز مشکل با `rollback running-config checkpoint before-vpc` دقیقاً به قبل برگشت (ذخیرهٔ دائمی هم با `copy running-config startup-config` است).",
+            "**اینترفیس‌های شبکه و `no write memory` پیش‌فرض:** در NX-OS استاندارد پورت‌ها با نام `Ethernet1/1` شناخته می‌شوند و پورت‌ها در مدل‌های سوئیچی با حالت‌های دسترسی/ترانک لایه ۲ یا `no switchport` لایه ۳ پیکربندی می‌شوند."
           ]
         },
         {
-          "h": "۳. قانون طلایی ضدلوپ vPC و سه دستور نجات‌بخش (Peer-Gateway / Auto-Recovery / Delay Restore)",
+          "h": "۲. کالبدشکافی `vPC (Virtual Port Channel)` و دو لینک حیاتی آن",
           "p": [
-            "در vPC یک قانون طلایی ضدلوپ وجود دارد: «هیچ فریمی که از روی vPC Peer-Link وارد شده، حق ندارد از یک vPC Member Port دیگر خارج شود!» (مگر اینکه لینک عضو در سوئیچ دیگر قطع شده باشد). همچنین سه دستور حیاتی است که در تمام Nexusهای واقعی حتماً باید زیر vpc domain تنظیم شوند: (۱) peer-gateway (باعث می‌شود هر دو سوئیچ بسته‌های لایه ۳ خطاب به MAC سوئیچ همتا را خودشان مستقیماً مسیریابی کنند بدون اینکه بی‌خود بسته را روی Peer-Link بفرستند)؛ (۲) auto-recovery (اگر هر دو سوئیچ هم‌زمان بعد از قطعی برق روشن شوند و یکی بالا نیاید، دومی بعد از ۲۴۰ ثانیه خودش ترافیک را بالا می‌آورد)؛ و (۳) peer-switch (باعث می‌شود هر دو Nexus یک Bridge ID واحد به STP نشان دهند تا تلاطم STP هنگام ریبوت یک سوئیچ حذف شود)."
+            "تفاوت فلسفی **vPC** با `VSS / StackWise Virtual` بسیار مهم است: در **vPC دو سوئیچ Nexus از نظر Control Plane مستقل می‌مانند** (یعنی دو سیستم‌عامل و دو جدول مدیریتی مجزا دارند، پس خطای نرم‌افزاری یا ارتقای یکی به سادگی دیگری را پایین نمی‌کشد!)؛ اما در **Data Plane** از دید سرور یا سوئیچ Access پایین‌دست، یک Port-Channel واحد (`LACP`) نشان می‌دهند تا هر دو آپ‌لینک بدون بلاک STP فعال باشند:"
+          ],
+          "steps": [
+            "**`vPC Peer-Keepalive Link` (فقط ضربان قلب — معمولاً روی `mgmt0` در VRF management یا لینک L3 مجزا):** پیام‌های سبک `UDP 3200` را برای اطمینان از زنده بودن همتا ردوبدل می‌کند تا در صورت قطع Peer-Link دو سوئیچ از وضعیت هم باخبر باشند. *(این لینک هرگز ترافیک دادهٔ سرورها را حمل نمی‌کند!)*",
+            "**`vPC Peer-Link` (بزرگراه کنترل و هماهنگی — حتماً Port-Channel چندلینکهٔ 10G/40G/100G):** علاوه بر همگام‌سازی جدول MAC/IGMP/ARP (`CFS`) و بررسی سازگاری تنظیمات (`Consistency Check`)، ترافیک دستگاه‌های تک‌پورتی (**`Orphan Ports`**) و ترافیک برگشتی در زمان خرابی یکی از لینک‌های پایین‌دست را عبور می‌دهد.",
+            "**قانون جلوگیری از حلقهٔ vPC (`Duplicate Prevention Rule`):** هر فریمی که از طریق `Peer-Link` به سوئیچ همتا برسد، **اجازهٔ خروج از هیچ پورت عضو vPC دیگری را ندارد** (چون سوئیچ فرستنده قبلاً آن را روی لینک خودش به مقصد رسانده یا باید برساند)؛ تنها پورت‌های غیر-vPC (**`Orphan Ports`**) از آن سمت ترافیک می‌گیرند!"
+          ],
+          "think": {
+            "q": "در یک جفت سوئیچ Nexus در حالت `vPC`، به علت اشتباه ادمین روی سوئیچ اول `VLAN 50` روی `vPC Peer-Link` مجاز نیست، یا روی یک عضو vPC مقدار `MTU` برابر `9216` و روی عضو همتای آن `1500` تنظیم شده است! سیستم vPC با این دو نوع ناهماهنگی (`Type-1` در برابر `Type-2`) چه رفتاری نشان می‌دهد؟",
+            "a": "در ناهماهنگی بحرانی **`Type-1 Consistency`** (مانند اختلاف `MTU`، مد LACP، یا `STP mode` در پورت عضو vPC)، سیستم vPC برای جلوگیری از سیاه‌چاله یا حلقه، **پورت‌های vPC ناسازگار (یا روی عضو Secondary همهٔ پورت‌های vPC) را خودکار `Suspend` می‌کند** تا ترافیک خراب نشود! در حالی که در **`Type-2 Consistency`** (مانند نبود یک VLAN روی یک سمت در برخی حالت‌ها، یا اختلاف تنظیمات ثانویه) هشدار ثبت شده و ممکن است تنها همان VLAN معیوب روی پورت معلق شود (با بررسی `show vpc consistency-parameters`)."
+          }
+        },
+        {
+          "h": "۳. تلهٔ `Orphan Ports` هنگام افت `Peer-Link` و ویژگی‌های تکمیلی (`peer-gateway` / `auto-recovery`)",
+          "p": [
+            "فرض کنید `Peer-Link` قطع شود در حالی که `Peer-Keepalive` نشان می‌دهد سوئیچ Primary هنوز زنده است: طبق قانون حفاظتی، سوئیچ **Secondary تمام پورت‌های vPC خود را پایین (`Suspend`) می‌آورد** تا Split-Brain نشود؛ در این میان دستگاهی که به‌صورت **تک‌پورتی (`Orphan Port`)** فقط به سوئیچ Secondary وصل بود (نه به هر دو!) ارتباطش با بقیهٔ شبکه از دست می‌رود مگر طراحی تک‌لینکه اصلاح شود. همچنین در معماری vPC با روترها/فایروال‌های متصل، فعال‌سازی **`peer-gateway`** و **`arp synchronize`** از انداختن بسته‌های ارسالی به MAC مجازیِ همتا جلوگیری می‌کند."
           ]
         }
       ],
-      "protocolAnalysis": [
-        "در تحلیل عملی ۷.۳ Data Center، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
-      ],
-      "iosCommands": [
-        {
-          "cmd": "show interfaces status",
-          "out": "Gi0/1  UPLINK  connected  trunk  a-full  a-1000",
-          "note": "بررسی وضعیت لایه ۱/۲ پورت‌ها"
-        },
-        {
-          "cmd": "show vlan brief",
-          "out": "10  USERS  active  Gi0/3, Gi0/4\n20  SERVERS  active  Gi0/5",
-          "note": "تایید تخصیص VLANها"
-        }
-      ],
-      "diagramSvg": "leafspine",
-      "lab": {
-        "title": "آزمایشگاه عملی: ۷.۳ Data Center",
-        "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۳ Data Center را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
-        ],
-        "verifyCmds": [
-          "show interfaces status",
-          "show vlan brief"
-        ]
-      },
-      "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۳ Data Center، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
-      },
-      "exercise": "برای مبحث «۷.۳ Data Center» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
-      "quiz": [
-        {
-          "q": "در پیاده‌سازی استاندارد «۷.۳ Data Center» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
-          "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
-          ],
-          "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۳ Data Center نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
-        }
-      ],
+      "analogy": "فلسفهٔ **vPC** در Nexus مثل **دو برج مراقبت مستقل فرودگاه** است که هر کدام سیستم کامپیوتری و برق مستقل دارند (Control Plane جدا برای جلوگیری از خرابی مشترک)، اما با یک فیبر پرسرعت (`Peer-Link`) لیست پروازها و فرودها را لحظه‌ای هماهنگ می‌کنند تا خلبان‌ها (`LACP` سرورها) هر دو باند را یک باند یکپارچه ببینند؛ و خط تلفن پشتیبان (`Peer-Keepalive`) چک می‌کند آیا برج دیگر هنوز زنده است یا خاموش شده. محل شکست تشبیه اینجاست: اگر یک هواپیما فقط با یک چرخ به باند برج دوم وصل باشد (`Orphan Port`) و پل میان دو برج (`Peer-Link`) قطع شود، برای حفظ ایمنی، برج دوم مسیرش را می‌بندد و آن هواپیمای تک‌باندی معطل می‌ماند!",
       "table": {
-        "title": "مقایسه فناوری‌های تجمیع دوتایی سیسکو: StackWise Virtual در برابر Nexus vPC",
+        "title": "اجزای حیاتی پیکربندی vPC و تفاوت با StackWise Virtual",
         "headers": [
-          "معیار",
-          "StackWise Virtual (در Catalyst 9K)",
-          "Nexus vPC (در Nexus 9K)"
+          "مولفه / ویژگی",
+          "نقش و الزامات فنی در NX-OS vPC",
+          "تفاوت با StackWise Virtual"
         ],
         "rows": [
           [
-            "Control Plane و استقلال سوئیچ‌ها",
-            "یک Control Plane واحد (Active + Standby)",
-            "دو Control Plane کاملاً مستقل (ایزولاسیون خطا و ارتقای تک‌به‌تک ISSU)"
+            "`Control Plane`",
+            "دو سوئیچ کاملاً مستقل (جدایی خرابی نرم‌افزاری / ارتقای ISSU)",
+            "Control Plane واحد (یک Active و یک Standby)"
           ],
           [
-            "مسیر همگام‌سازی و کنترل",
-            "لینک SVL + لینک جداگانه DAD",
-            "لینک L2 Peer-Link + لینک L3 Peer-Keepalive"
+            "`Peer-Keepalive`",
+            "لینک L3 مجزا (`mgmt0` در VRF `management` یا لینک L3) با `UDP 3200`",
+            "معادل لینک DAD برای تشخیص Dual-Active"
           ],
           [
-            "محدودیت مسیریابی داینامیک روی لینک تجمیعی",
-            "روتینگ کامل روی Port-Channel بدون محدودیت",
-            "در vPC کلاسیک نباید روی خود vPC همسایگی OSPF/BGP با رقیب ببندید (باید از لینک L3 مجزا یا layer3 peer-router استفاده کنید!)"
+            "`Peer-Link`",
+            "Port-Channel چندلینکه (`trunk`)؛ حمل CFS و ترافیک Orphan/خطا",
+            "معادل SVL؛ حمل کل ترافیک کنترل و داده بین اعضا"
           ],
           [
-            "محیط کاربرد استاندارد",
-            "ساختمان‌های Campus و هسته اداری",
-            "دیتاسنترهای Enterprise و Spine-Leaf"
+            "`Consistency Check`",
+            "`Type-1` (Suspend پورت‌های vPC) و `Type-2` (هشدار/معلق‌سازی VLAN)",
+            "تنظیمات در کلاستر ذاتاً یکپارچه نوشته می‌شوند"
           ]
         ]
       },
       "faq": [
         {
-          "q": "اگر یک سرور فقط یک کابل داشته باشد و تنها به یکی از دو سوئیچ vPC وصل باشد (Orphan Port) چه مشکلی پیش می‌آید؟",
-          "a": "اگر فقط لینک Peer-Link در آن لحظه خراب شود، سوئیچ Secondary تمام vPCها را می‌بندد ولی سرور تک‌پورتی اگر به Secondary وصل باشد ممکن است از دسترس خارج شود! تا حد امکان همه سرورها را دوکابله (Dual-Homed) به هر دو Nexus وصل کنید."
+          "q": "آیا می‌توان `vPC Peer-Link` و `vPC Peer-Keepalive` را از روی یک لینک فیزیکی مشترک عبور داد؟",
+          "a": "خیر؛ اگر هر دو از یک مسیر فیزیکی بگذرند، با قطع آن مسیر هم Peer-Link می‌افتد و هم Keepalive قطع می‌شود که به **Split-Brain (Dual-Active)** می‌انجامد. `Peer-Keepalive` حتماً باید از یک مسیر مجزا (معمولاً شبکهٔ مدیریت `mgmt0` یا یک لینک L3 جداگانه) برود."
         },
         {
-          "q": "چرا در vPC همیشه خطای Type-1 Consistency Check بسیار مهم است و اگر دو طرف یکی نباشد چه می‌شود؟",
-          "a": "پارامترهای Type-1 (مثل شماره vPC domain، وضعیت STP و MTU پورت‌ها) باید بین دو Nexus دقیقاً یکسان باشند؛ در غیر این صورت برای جلوگیری از حلقه و فساد داده، کل vPC اصلاً بالا نمی‌آید!"
-        },
-        {
-          "q": "آیا اگر لینک Peer-Keepalive قطع شود، کل ترافیک سرورها قطع می‌شود؟",
-          "a": "خیر! تا وقتی Peer-Link سالم است ترافیک ادامه دارد؛ فقط در حالتی که Peer-Link هم قطع شود سوئیچ Secondary از Peer-Keepalive برای تشخیص زنده بودن Primary استفاده می‌کند."
+          "q": "دستور `peer-gateway` در تنظیمات `vpc domain` برای چیست؟",
+          "a": "بعضی تجهیزات NAS یا لودبالانسرها هنگام پاسخ به ترافیک، به جای استفاده از HSRP Virtual MAC، بسته را مستقیماً به MAC فیزیکی سوئیچ همتای vPC می‌فرستند؛ با فعال بودن `peer-gateway`، هر یک از دو سوئیچ Nexus می‌تواند بسته‌های خطاب به MAC فیزیکی همکار خود را هم محلی روت کند تا بسته بیهوده از Peer-Link عبور نکند یا Drop نشود."
         }
       ],
-      "analogy": "اگر سوئیچ Catalyst مثل یک ماشین اداری قابل اعتماد است، سوئیچ Nexus با NX-OS مثل یک کامیون حمل بار سنگین دیتاسنتر است! مهم‌ترین شاهکارش فناوری vPC است: فرض کنید سروری با ۲ کارت شبکه باید هم‌زمان به ۲ سوئیچ مختلف Top-of-Rack وصل شود تا اگر یکی سوخت سرور قطع نشود؛ vPC به سرور دروغِ هوشمندانه و خوبی می‌گوید که «تو انگار به یک سوئیچ واحد با LACP وصل هستی» در حالی که دو سوئیچ کاملاً از هم مستقل‌اند و حتی اگر یکی را خاموش و آپدیت کنید، سرور اصلاً نمی‌فهمد!",
-      "ciscoRef": "Cisco Nexus 9000 Series NX-OS Interfaces Configuration Guide — Configuring vPCs & Best Practices",
-      "summary": "سیستم‌عامل ماژولار Cisco NX-OS با فعال‌سازی انتخابی featureها، VRF مدیریتی جداگانه و قابلیت بازگشت Checkpoint برای دیتاسنتر طراحی شده است. فناوری کلیدی آن یعنی vPC با پیوند Peer-Link (همگام‌سازی MAC/ARP) و Peer-Keepalive (لایه ۳)، دو سوئیچ Nexus کاملاً مستقل را برای سرورها به یک مقصد یکپارچه با بهره‌وری ۱۰۰٪ بدون Blocking STP تبدیل می‌کند."
+      "summary": "در **Cisco NX-OS** قابلیت‌ها به‌صورت ماژولار با **`feature ...`** روشن می‌شوند، پورت `mgmt0` در **`VRF management`** ایزوله است و **`checkpoint/rollback`** ایمنی تغییرات را بالا می‌برد. فناوری **`vPC`** با حفظ استقلال Control Plane میان دو سوئیچ Nexus، پورت‌های دسترسی سرورها را بدون بلاک STP به یک **Port-Channel مشترک** تبدیل می‌کند؛ مشروط به جداسازی فیزیکی **`Peer-Keepalive`** و **`Peer-Link`**، رعایت دقیق **`Type-1 Consistency`** (مانند MTU و LACP) و پرهیز از اتصال تک‌پورتی (**Orphan Ports**) برای سرورهای حیاتی.",
+      "ciscoRef": "Cisco Nexus 9000 Series NX-OS Interfaces Configuration Guide — Configuring vPCs",
+      "protocolAnalysis": [
+        "در فرآیند کنترل سلامت `vPC`, سوئیچ‌ها یک پروتکل هماهنگ‌سازی به نام **CFS (Cisco Fabric Services)** را روی `Peer-Link` اجرا می‌کنند تا جدول MAC، اطلاعات IGMP Snooping و بررسی پارامترهای `Type-1 / Type-2 Consistency` لحظه‌ای بین Primary و Secondary همگام شوند.",
+        "در زمان بوت شدن هر دو سوئیچ پس از قطعی برق، اگر فقط یکی روشن شود و همتایش هنوز بالا نیامده باشد، قابلیت **`auto-recovery`** (پس از تایمر مثلاً ۲۴۰ ثانیه) اجازه می‌دهد سوئیچ تک‌مانده از حالت Hold خارج شده و پورت‌های vPC خود را بالا بیاورد تا دیتاسنتر کاملاً خاموش نماند."
+      ],
+      "iosCommands": [
+        {
+          "cmd": "show vpc brief",
+          "out": "vPC domain id                     : 10\nPeer status                       : peer adjacency formed ok\nvPC keep-alive status             : peer is alive\nConfiguration consistency status  : success\nPer-vlan consistency status       : success\nType-2 consistency status         : success\nvPC role                          : primary\nNumber of vPCs configured         : 12\n\nvPC Peer-link status\n---------------------------------------------------------------------\nid    Port   Status Active vlans\n1     Po1    up     1,10,20,100",
+          "note": "مرجع اصلی عیب‌یابی vPC روی Nexus NX-OS. [نکتهٔ شبیه‌ساز: دستور `show vpc` در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تست زنده نیازمند Cisco Nexus 9000v در CML/EVE-NG است.]",
+          "why": "بررسی یک‌جا بودن سلامت Peer-Link، Peer-Keepalive، نقش Primary/Secondary و نتایج Consistency Check.",
+          "anatomy": "وضعیت همسایگی vPC، Keepalive (`peer is alive`)، سه خط وضعیت Consistency، نقش سوئیچ و وضعیت `Po1` (Peer-Link).",
+          "lookFor": "`peer adjacency formed ok`، `peer is alive` و `success` بودن هر سه سطح Consistency.",
+          "ifUnexpected": "اگر `Configuration consistency status: failed` بود، بلافاصله دستور `show vpc consistency-parameters global` را برای یافتن پارامتر ناسازگار (مانند MTU یا STP) اجرا کنید."
+        },
+        {
+          "cmd": "show vpc orphan-ports",
+          "out": "Note:\n--------\nPort        Orphan status\nEth1/12     Yes",
+          "note": "ممیزی پورت‌های تک‌اتصالیِ متصل به یک سوئیچ Nexus بدون عضویت در vPC. [نکتهٔ شبیه‌ساز: دستور مرجع غیرشبیه‌سازی‌شده.]",
+          "why": "شناسایی سرورها یا دستگاه‌هایی که در صورت افت `Peer-Link` روی سوئیچ Secondary قطع می‌شوند.",
+          "anatomy": "شماره پورت و وضعیت Orphan.",
+          "lookFor": "نبودن سرورهای حیاتی در این فهرست (یا آگاهی از رفتار آن‌ها در خرابی Peer-Link).",
+          "ifUnexpected": "سرور حیاتی در فهرست Orphan را باید به صورت Dual-Homed با LACP روی هر دو سوئیچ vPC متصل کرد."
+        },
+        {
+          "cmd": "show interfaces trunk",
+          "out": "Port        Mode             Encapsulation  Status        Native vlan\nGi0/1       on               802.1q         trunking      1",
+          "note": "دستور زنده در شبیه‌ساز داخلی برای تایید تطابق `allowed vlans` روی ترانک (معادل بررسی لیست VLAN مجاز روی Peer-Link و vPC).",
+          "why": "تطابق لیست VLANهای مجاز روی ترانک‌های دو سمت، یکی از شروط مهم جلوگیری از ناهماهنگی vPC است.",
+          "anatomy": "پورت، مد، Native VLAN و ستون `Vlans allowed on trunk`.",
+          "lookFor": "حضور یکسان تمام VLANهای سروری مورد نیاز روی لینک‌های ترانک.",
+          "ifUnexpected": "جا افتادن یک VLAN از لیست مجاز ترانک ارتباط بخشی از سرورها را یک‌طرفه قطع می‌کند."
+        }
+      ],
+      "diagramSvg": "leafspine",
+      "lab": {
+        "title": "آزمایشگاه تطابق VLANهای ترانک و ایزوله‌سازی پورت مدیریت در شبیه‌ساز + سناریوی مرجع NX-OS vPC",
+        "steps": [
+          "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `NX-OS` (`feature vpc`, `vpc domain`, `vrf context management`) را اجرا نمی‌کند (برای تمرین زنده از ایمیج `Nexus 9000v` در CML یا EVE-NG استفاده کنید). اما اینجا تمرین تطابق دقیق لیست VLANهای ترانک، تفکیک پورت مدیریت (`VLAN 199: MGMT_OOB`) از VLANهای سرور (`VLAN 100, 105`) و قفل DTP روی `Gi0/1` در شبیه‌ساز را زنده اجرا می‌کنیم.",
+          "۲. با `enable` وارد شوید و با `show interfaces trunk` و `show vlan brief` لیست VLANهای موجود روی ترانک `Gi0/1` را بررسی کنید.",
+          "۳. سگمنت‌های سرور دیتاسنتر (`VLAN 100`, `VLAN 105`) و مدیریت ایزوله (`VLAN 199`) را بسازید، پورت `Gi0/6` را برای سرور دوپورتی نمونه (`VLAN 100`) و `Gi0/7` را برای پورت مدیریت (`VLAN 199`) تنظیم کنید و هر سه VLAN را روی ترانک `Gi0/1` مجاز نمایید: `configure terminal` -> `vlan 100` -> `name DC_APP_PROD` -> `vlan 105` -> `name DC_DB_PROD` -> `vlan 199` -> `name DC_MGMT_OOB` -> `exit` -> `interface Gi0/6` -> `description SRV-APP-PROD` -> `switchport mode access` -> `switchport access vlan 100` -> `switchport nonegotiate` -> `interface Gi0/7` -> `description MGMT0-OOB-SIM` -> `switchport mode access` -> `switchport access vlan 199` -> `switchport nonegotiate` -> `no shutdown` -> `interface Gi0/1` -> `description VPC-PEER-LINK-SIM` -> `switchport nonegotiate` -> `switchport trunk allowed vlan add 100,105,199` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces trunk`، `show interfaces Gi0/1 switchport` و `show running-config` تایید کنید که VLANهای `100,105,199` ساخته شده، روی ترانک `Gi0/1` مجازند و `nonegotiate` روی پورت‌ها ثبت شده است.",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (قطعه‌فرمان مرجع NX-OS vPC — وابسته به پیش‌نیازهای توپولوژی کامل؛ پلتفرم مرجع: Cisco Nexus 9000 NX-OS):** **پیش‌نیازها و فرمان‌ها:** دو سوئیچ `N9K-1` و `N9K-2` با آدرس‌های `mgmt0` (`10.10.90.11/24` و `10.10.90.12/24` در `vrf management`) متصل و با دو فیبر `Eth1/49-50` در `Po1` به هم وصلند. روی هر دو سوئیچ: `feature lacp` -> `feature vpc`؛ تعریف دامنه (با `role priority` پایین‌تر برای Primary، مثلاً `10` در `N9K-1` و `20` در `N9K-2`): `vpc domain 10` -> `peer-keepalive destination 10.10.90.12 source 10.10.90.11 vrf management` (برعکس روی N9K-2) -> `peer-gateway` -> `auto-recovery`؛ تنظیم `Po1` به‌عنوان Peer-Link: `interface port-channel 1` -> `switchport mode trunk` -> `spanning-tree port type network` -> `vpc peer-link`؛ و روی Port-Channel سرور (`Po12`): `interface port-channel 12` -> `switchport mode trunk` -> `vpc 12`. سپس `show vpc brief` و `show vpc consistency-parameters global` را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** `peer adjacency formed ok`، `peer is alive`، `success` در Consistency Check و وضعیت `up` برای `Po1` و `Po12`. **نشانهٔ شکست:** `failed` در Consistency (به‌خاطر اختلاف MTU/LACP/VLAN)، یا `down` شدن `peer-keepalive` به‌دلیل فراموش کردن `vrf management`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط VLANها و ترانک پایه را ثبت کرد و هیچ ویژگی NX-OS یا CFS/vPC را اجرا نمی‌کند."
+        ],
+        "verifyCmds": [
+          "enable",
+          "show vlan brief",
+          "show interfaces trunk",
+          "show interfaces Gi0/1 switchport",
+          "show running-config"
+        ]
+      },
+      "troubleshooting": {
+        "fault": "پس از راه‌اندازی یک جفت Nexus 9000 در حالت `vPC` و افزودن یک `Port-Channel 20` جدید برای سرور پایگاه داده، لینک‌ها به طور فیزیکی `up` هستند، اما در `show vpc` پورت `Po20` روی هر دو سوئیچ (یا در سوئیچ Secondary) در وضعیت **`down / Suspended (Consistency Check Failed)`** قفل شده است!",
+        "analysis": "یک ناهماهنگی **`Type-1 Consistency`** میان `N9K-1` و `N9K-2` در تنظیمات `Port-Channel 20` وجود دارد: مثلاً روی `N9K-1` زیر `Po20` مقدار `mtu 9216` (Jumbo Frame) تنظیم شده ولی روی `N9K-2` با پیش‌فرض `1500` باقی مانده است، یا یکی `switchport mode access` و دیگری `trunk` است، یا یکی `mode active` (LACP) و دیگری `mode on` تنظیم شده است.",
+        "fix": "اجرای `show vpc consistency-parameters vpc 20` و `show vpc consistency-parameters global` برای دیدن دقیق سطر ناهماهنگ در ستون `Local Value` در برابر `Peer Value`، و یکسان‌سازی کامل آن پارامتر روی هر دو سوئیچ."
+      },
+      "misconceptions": [
+        {
+          "myth": "در `vPC` مانند StackWise دو سوئیچ Nexus به یک سوئیچ واحد با یک IP مدیریتی و یک فایل تنظیمات تبدیل می‌شوند.",
+          "reality": "در `vPC` دو سوئیچ Nexus از نظر **Control Plane کاملاً مستقلند** (دو فایل کانفیگ جدا، دو سیستم‌عامل جدا) و باید تنظیمات سمت چپ و راست با دقت یکسان نوشته شوند (`Consistency Check`)؛ تنها در Data Plane برای سرورها شبیه یک شریک LACP ظاهر می‌شوند.",
+          "howToSpot": "بررسی وجود دو جلسهٔ SSH مجزا به دو IP مدیریت و مقایسهٔ مقادیر در `show vpc consistency-parameters`."
+        },
+        {
+          "myth": "در زمان قطع `Peer-Link` روی `vPC`, فقط سرورهای متصل به پورت‌های `vPC` روی سوئیچ Secondary تحت تاثیر قرار می‌گیرند و سرورهای تک‌کابله (`Orphan`) امن هستند.",
+          "reality": "دقیقاً برعکس! سرورهای **Dual-Homed روی vPC** از طریق سوئیچ Primary زنده به کار ادامه می‌دهند، اما یک سرور تک‌کابله (`Orphan Port`) که فقط به سوئیچ Secondary وصل بوده پس از Suspend شدن پورت‌های vPC روی Secondary از بقیهٔ شبکه ایزوله می‌شود.",
+          "howToSpot": "اجرای `show vpc orphan-ports` و اطمینان از Dual-Homed بودن تمام سرورهای حیاتی."
+        }
+      ],
+      "exercise": "در یک جفت Nexus 9000 با `vPC`، چرا `Peer-Keepalive` باید در `VRF management` (یا لینک L3 مجزا) و از مسیر فیزیکی جدا از `Peer-Link` عبور کند؟ و چه فرقی میان ناهماهنگی `Type-1` و `Type-2` در `show vpc` وجود دارد؟",
+      "exercises": [
+        {
+          "level": "ساده",
+          "task": "وقتی تازه وارد CLI یک سوئیچ Nexus با `NX-OS` می‌شوید و با زدن `router bgp 65100` یا `vpc domain 10` سیستم دستور را نمی‌شناسد، اولین کاری که در `NX-OS` فراموش شده چیست؟ و برای پینگ کردن سرور NTP از پورت `mgmt0` چه پارامتری به دستور `ping` اضافه می‌کنید؟",
+          "hint": "ماژولار بودن NX-OS (`feature ...`) و VRF پیش‌فرض پورت `mgmt0`.",
+          "solution": "۱) فعال‌سازی ویژگی با دستورات **`feature bgp`** و **`feature vpc`**؛ ۲) افزودن **`vrf management`** به انتهای دستور: `ping <NTP_IP> vrf management`."
+        },
+        {
+          "level": "متوسط",
+          "task": "طبق قانون **`vPC Duplicate Prevention Rule`**, اگر بسته‌ای از سرور A (متصل به هر دو سوئیچ vPC) وارد `N9K-1` شود و از طریق **`Peer-Link`** به `N9K-2` برود، آیا `N9K-2` اجازه دارد آن بسته را از یکی از پورت‌های `vPC` خودش به سمت سرور B (که او هم به هر دو سوئیچ وصل است) بفرستد؟ چرا؟",
+          "hint": "خود `N9K-1` مستقیماً می‌تواند به سرور B ارسال کند؛ اگر `N9K-2` هم بفرستد چه رخ می‌دهد؟",
+          "solution": "**خیر!** طبق قانون جلوگیری از تکرار/حلقه در vPC، بسته‌ای که از روی `Peer-Link` به سوئیچ همتا می‌رسد اجازهٔ خروج از هیچ پورت عضو `vPC` دیگری را ندارد (زیرا `N9K-1` قبلاً مستقیماً یک کپی را روی پورت `vPC` خودش به سرور B می‌فرستد، پس فرستادن دوباره از `N9K-2` باعث دریافت بستهٔ تکراری یا حلقه می‌شود؛ ارسال از سمت `N9K-2` پس از عبور از Peer-Link فقط برای `Orphan Ports` مجاز است)."
+        },
+        {
+          "level": "چالشی",
+          "task": "چرا در `vPC` طراحی یک سرور تک‌کابله (`Orphan Port`) روی سوئیچ Secondary خطرناک‌تر از اتصال آن به سوئیچ Primary است—و راه اصولی حذف کامل ریسک Orphan در دیتاسنتر چیست؟ در کنار آن، نقش `checkpoint` و `rollback` هنگام تغییر `MTU` روی vPC را شرح دهید.",
+          "hint": "افت Peer-Link باعث Suspend شدن vPC روی Secondary می‌شود؛ و اگر MTU فقط روی یک سمت تغییر کند Type-1 Consistency پورت را می‌اندازد.",
+          "solution": "۱) **خطر Orphan روی Secondary:** هنگام قطع `Peer-Link` (در حالی که `Peer-Keepalive` زنده است)، سوئیچ **Secondary** برای جلوگیری از Split-Brain تمام پورت‌های vPC خود را `Suspend` می‌کند. سرورهای Dual-Homed روی لینک سمت Primary زنده می‌مانند، اما `Orphan Port` متصل به Secondary هیچ راهی به بقیهٔ شبکه ندارد و قطع می‌شود! راه‌حل اصولی: اتصال تمام سرورهای حیاتی به‌صورت **Dual-Homed LACP vPC** به هر دو سوئیچ.\n۲) **تغییر ایمن با `checkpoint`:** پیش از تغییر پارامتر حساس `Type-1` (مثل `MTU` روی `Po12`) روی هر دو سوئیچ `checkpoint pre-mtu` می‌گیریم تا اگر اشتباهی رخ داد با `rollback running-config checkpoint pre-mtu` فوراً به وضعیت سالم قبلی برگردیم."
+        }
+      ],
+      "quiz": [
+        {
+          "q": "در سیستم‌عامل **Cisco NX-OS**، اگر پورت مدیریتی `mgmt0` آدرس `10.10.90.11/24` داشته باشد، چرا یک `ping 10.10.90.1` ساده بدون ذکر VRF ممکن است به مقصد نرسد؟",
+          "opts": [
+            "چون `mgmt0` فقط ترافیک IPv6 می‌پذیرد",
+            "چون باید ابتدا `feature ping` را فعال کرد",
+            "چون دستور `ping` در NX-OS حذف شده است",
+            "چون پورت `mgmt0` به‌طور پیش‌فرض درون **`VRF management`** ایزوله شده است و برای تست آن باید `vrf management` را در دستور `ping` ذکر کرد"
+          ],
+          "ans": 3,
+          "exp": "در NX-OS پورت `mgmt0` داخل VRF اختصاصی `management` قرار دارد تا مسیرهای مدیریتی از جدول روتینگ ترافیک دیتاسنتر جدا بمانند."
+        },
+        {
+          "q": "در عیب‌یابی **vPC**, اگر بین دو سوئیچ Nexus در یک Port-Channel عضو vPC مقدار **`MTU`** در یک سمت `9216` و در سمت دیگر `1500` باشد، چه اتفاقی می‌افتد؟",
+          "opts": [
+            "یک ناهماهنگی **`Type-1 Consistency`** رخ داده و پورت‌های vPC ناسازگار (یا پورت‌های vPC روی Secondary) جهت پیشگیری از خطا **Suspend** می‌شوند",
+            "ترافیک بدون هیچ واکنشی با سرعت دو برابر عبور می‌کند",
+            "پورت `mgmt0` خاموش می‌شود",
+            "سوئیچ خودکار به حالت IOS تبدیل می‌شود"
+          ],
+          "ans": 0,
+          "exp": "اختلاف پارامترهای حیاتی مثل `MTU`، مد `LACP` یا `STP` از نوع `Type-1` است و برای جلوگیری از سیاه‌چاله/حلقه باعث Suspend شدن پورت vPC می‌شود."
+        },
+        {
+          "q": "کاربرد اصلی لینک **`vPC Peer-Keepalive`** چیست؟",
+          "opts": [
+            "حمل ترافیک پشتیبان دیتابیس‌ها و کلاسترهای ذخیره",
+            "ارسال ضربان قلب سبک (`UDP 3200`) از یک مسیر مجزای L3 برای اطلاع از زنده بودن همتا و جلوگیری از Split-Brain هنگام افت Peer-Link",
+            "جایگزینی برای پروتکل BGP در هسته",
+            "توزیع VLANهای دسترسی به سرورها"
+          ],
+          "ans": 1,
+          "exp": "`Peer-Keepalive` هیچ ترافیک دادهٔ سروری را حمل نمی‌کند و تنها برای تشخیص زنده بودن سوئیچ همتا در زمان افت `Peer-Link` به کار می‌رود."
+        }
+      ],
+      "bridge": {
+        "whereUsed": "در لایهٔ Aggregation و Access دیتاسنترهای مبتنی بر Cisco Nexus (مانند N9K/N7K/N5K).",
+        "nextQuestion": "حالا که سوئیچینگ جفتی `vPC` روی Nexus را شناختیم، در یک دیتاسنتر مدرن با صدها رک چطور به‌کلی STP را حذف کنیم، تمام لینک‌ها را با **ECMP** فعال نگه داریم و با معماری **Leaf-Spine** و **VXLAN BGP EVPN** اجازه دهیم هر ماشین مجازی در هر رک بدون محدودیت جابه‌جا شود؟ این موضوع درس بعدی (`s11`) است!",
+        "nextId": "s11"
+      }
     },
     "spec_dc_aci": {
       "id": "spec_dc_aci",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۳ Data Center: Cisco ACI، کنترلر APIC و معماری Multi-Site",
-      "lead": "چطور کل یک دیتاسنتر ۱۰۰ رکی Leaf-Spine را به جای کانفیگ دستی روی تک‌تک سوئیچ‌های Nexus، از یک مغز مرکزی سیاست‌محور به نام APIC کنترل کنیم که همه‌چیز با Application Profile، EPG و Contract مدیریت شود؟ این دنیای Cisco ACI است.",
-      "goal": "تسلط بر معماری فیزیکی و منطقی Cisco ACI (خوشه APIC، کنترل‌پلین COOP/IS-IS/MP-BGP)، ساختار سلسله‌مراتبی Tenant/VRF/Bridge Domain/EPG/Contract، مدل White-List و Multi-Site Orchestrator.",
-      "prereq": "تسلط بر معماری Leaf-Spine و VXLAN (درس قبل).",
+      "title": "۷.۳ Data Center: معماری Cisco ACI، کنترلر APIC، مدل EPG/Contract و Multi-Site",
+      "lead": "پیکربندی خط‌به‌خط ده‌ها VLAN و VRF روی پنجاه سوئیچ `Leaf` در `NX-OS` حتی با اسکریپت هم با رشد اپلیکیشن‌ها پیچیده و مستعد ناهماهنگی می‌شود. **Cisco ACI (Application Centric Infrastructure)** با همان سخت‌افزار `Leaf-Spine` سری Nexus 9000 (در مد ACI)، منطق شبکه را از «تنظیم پورت‌به‌پورت» به «توصیف نیاز امنیتی و ارتباطی اپلیکیشن» منتقل می‌کند—به شرطی که مدل سلسله‌مراتبی **Tenant -> VRF -> Bridge Domain -> EPG -> Contract** و جدایی نقش خوشهٔ **APIC** از Data Plane را دقیق بشناسید.",
+      "goal": "درک معماری **Cisco ACI** و رفتار خوشهٔ **APIC** (خارج از مسیر Data Plane و رفتار **Headless** هنگام افت APIC)، تسلط بر مدل منطقی (`Tenant`, `VRF`, `Bridge Domain`, `EPG`, `Contract` در مدل Whitelist)، کنترل‌پلین داخلی (`IS-IS + COOP + MP-BGP`) و معماری **ACI Multi-Site (NDO/MSO)**.",
+      "prereq": "تسلط بر معماری `Leaf-Spine` و `VXLAN EVPN` (درس قبلی `s11`).",
       "sections": [
         {
-          "h": "۱. معماری سخت‌افزاری Cisco ACI و نقش خوشه کنترلر APIC",
+          "h": "۱. جایگاه خوشهٔ کنترلر APIC و کنترل‌پلین داخل Fabric ACI",
           "p": [
-            "معماری Cisco Application Centric Infrastructure (ACI) روی همان سخت‌افزار Leaf-Spine سوئیچ‌های Nexus 9000 (در حالت ACI Mode) پیاده‌سازی می‌شود اما توسط یک خوشه حداقل ۳ تایی از سرورهای کنترلر به نام APIC (Application Policy Infrastructure Controller) مدیریت می‌شود. نکته شگفت‌انگیز معماری: APIC اصلاً در مسیر عبور داده‌های سرورها (Data Plane) یا حتی در Control Plane لحظه‌ای شبکه نیست! اگر تمام ۳ سرور APIC هم خاموش شوند، تمام ترافیک دیتاسنتر، مسیریابی VXLAN و قراردادهای امنیتی در سخت‌افزار سوئیچ‌های Leaf و Spine بدون حتی یک میلی‌ثانیه اختلال به کار خود ادامه می‌دهند؛ فقط امکان تغییر سیاست جدید موقتاً متوقف می‌شود."
-          ]
-        },
-        {
-          "h": "۲. کالبدشکافی مدل منطقی ACI (از Tenant تا EPG و Contract)",
-          "p": [
-            "در ACI تمام مفاهیم شبکه و امنیت به شکل شی‌گرا (Object Model) از بالا به پایین تعریف می‌شوند:"
+            "در **Cisco ACI** تمام سیاست‌ها از یک خوشهٔ کنترلر به نام **APIC (Application Policy Infrastructure Controller)** (معمولاً ۳ یا تعداد فرد بیشتری سرور برای تشکیل **Quorum**) تعریف و به سوئیچ‌های Leaf/Spine تزریق می‌شوند. یک نکتهٔ بنیادی معماری:"
           ],
           "bullets": [
-            "Tenant: بالاترین سطح جداسازی (مثلاً هر مشتری یا واحد تجاری یک Tenant است). سه Tenant پیش‌فرض همیشه وجود دارند: common (سرویس‌های مشترک مثل DNS/AD)، mgmt (مدیریت Out-of-Band و In-Band) و infra (مخصوص تونل‌های داخلی Fabric).",
-            "VRF (Context): جدول مسیریابی ایزوله لایه ۳ داخل Tenant.",
-            "Bridge Domain (BD): معادل کانتینر لایه ۲ و Broadcast Domain (که داخلش یک یا چند Subnet IP تعریف می‌شود و نقش Anycast Gateway روی تمام Leafها را بازی می‌کند؛ جالب اینکه Bridge Domain دیگر نیازی به یادداشت شماره VLAN ندارد!).",
-            "Application Profile و EPG (Endpoint Group): گروهی از سرورها که یک نقش و سیاست امنیتی مشترک دارند (مثلاً Web-Servers EPG و App-Servers EPG و DB-Servers EPG).",
-            "Contract (مبتنی بر مدل White-List): قانون طلایی ACI این است که به صورت پیش‌فرض بین دو EPG مختلف هیچ ترافیکی مجاز نیست (Zero Trust)! برای ارتباط، یک EPG قرارداد را Provide می‌کند (مثلاً دیتابیس پورت ۱۵۲۱ را ارائه می‌دهد) و EPG دیگر آن را Consume می‌کند."
+            "**APIC خارج از مسیر لحظه‌ای Data Plane و Control Plane بسته‌هاست:** ترافیک واقعی سرورها هرگز از سرورهای APIC عبور نمی‌کند! در صورت از دست رفتن یا خاموش شدن کل خوشهٔ APIC (**Headless Operation**)، ترافیک موجود و قوانینِ از قبل برنامه‌ریزی‌شده در سخت‌افزار Leaf/Spine به کار خود ادامه می‌دهند؛ با این حال **اعمال هر تغییر سیاست جدید، ثبت یا جابه‌جایی Endpointهای وابسته به بروزرسانی سیاست در APIC و پایش متمرکز متوقف می‌شوند** و تداوم سلامت به بازگشت Quorum خوشه وابسته است.",
+            "**کنترل‌پلین داخلی ACI بدون تنظیم دستی کاربر:** ACI به‌صورت خودکار روی Underlay بین Leaf و Spine از **IS-IS**، برای نگهداری پایگاه‌دادهٔ محل تمام Endpointها روی Spineها از **COOP (Council of Oracles Protocol)**، و برای ارتباط بیرونی و بین‌سایتی از **MP-BGP EVPN** استفاده می‌کند."
           ]
         },
         {
-          "h": "۳. کنترل‌پلین داخلی ACI (IS-IS، COOP، MP-BGP) و اتصال چنددیتاسنتری Multi-Site",
+          "h": "۲. کالبدشکافی مدل منطقی ACI: از `Tenant` تا `EPG` و `Contract`",
           "p": [
-            "زیر کاپوت Fabric، سوئیچ‌های Leaf و Spine بدون نیاز به تنظیم ادمین خودکار با پروتکل IS-IS همدیگر را پیدا می‌کنند (Fabric Discovery با LLDP و DHCP داخلی)، پایگاه‌داده مکان تمام سرورها توسط پروتکل COOP روی Spineها به عنوان Proxy نگه داشته می‌شود و ارتباط بیرون از دیتاسنتر (L3Out با OSPF یا BGP به روترهای WAN) و اتصال چند دیتاسنتر به هم توسط Nexus Dashboard Orchestrator (NDO / Multi-Site سابق) مدیریت می‌شود."
+            "بزرگ‌ترین مانع برای مهندسان شبکه در ورود به ACI، درک تفاوت ساختار اشیای منطقی آن با VLANهای سنتی است:"
+          ],
+          "steps": [
+            "**`Tenant` و `VRF (Context)`:** `Tenant` بالاترین مرز ایزوله‌سازی مدیریتی و منطقی است (مثلاً `Prod_Tenant` یا `common` برای سرویس‌های مشترک مثل DNS/AD). درون هر Tenant یک یا چند **`VRF`** به‌عنوان جدول مسیریابی ایزولهٔ لایه ۳ ساخته می‌شود.",
+            "**`Bridge Domain (BD)`:** معادل یک **ظرف لایه ۲ و دامنهٔ Broadcast (جایگزین SVI سنتی)** که ساب‌نت‌های IP (`Gateway IP` با Anycast) درون آن تعریف می‌شوند؛ درون BD تعیین می‌کنیم رفتار `ARP Flooding` و `L2 Unknown Unicast` (`Hardware Proxy` در برابر `Flood`) چگونه باشد. *(تلهٔ رایج: یک BD می‌تواند چند ساب‌نت داشته باشد، اما هر BD فقط به یک VRF متصل است!)*",
+            "**`EPG (Endpoint Group)` و مدل `Whitelist-Only Contract`:** به‌جای نوشتن قوانین بر اساس رنج IP، سرورهای هم‌نقش را در یک **EPG** می‌گذاریم (`EPG_Web`, `EPG_App`, `EPG_DB`). در حالت پیش‌فرض (`Policy Enforced` در VRF)، **هیچ دو EPG حق صحبت با هم ندارند** مگر اینکه بین آن‌ها یک **`Contract`** (شامل `Subject` و `Filter`های پورت مثل `TCP 443`) برقرار شود—یعنی یک **`Provider`** سرویس می‌دهد و **`Consumer`** مصرف می‌کند! *(در حالی که دستگاه‌های داخل یک EPG واحد آزادانه با هم ارتباط دارند مگر `Intra-EPG Isolation` روشن شود.)*"
+          ],
+          "think": {
+            "q": "در یک `Tenant`، دو گروه `EPG_Web` و `EPG_DB` هر دو درون **یک `Bridge Domain` و یک ساب‌نت مشترک** (`10.50.0.0/24`) قرار گرفته‌اند و هر دو به یک سوئیچ `Leaf` متصلند! یک سرور از `EPG_Web` سعی می‌کند پورت `TCP 1433` را به سمت `EPG_DB` باز کند ولی ارتباط برقرار نمی‌شود، با اینکه پینگ داخل خود `EPG_Web` سالم است! چرا؟",
+            "a": "زیرا در **Cisco ACI** مرز اعمال سیاست امنیتی **`EPG`** است، نه ساب‌نت یا VLAN! حتی اگر دو سرور در یک ساب‌نت و یک Bridge Domain باشند، تا زمانی که در **دو EPG مجزا** قرار دارند و در VRF حالت سخت‌گیرانهٔ `Enforced` فعال است، بدون تعریف یک **`Contract`** صریح با فیلتر `TCP 1433` میان `Consumer (EPG_Web)` و `Provider (EPG_DB)`، ترافیک در سخت‌افزار Leaf مسدود (`Drop`) می‌شود!"
+          }
+        },
+        {
+          "h": "۳. اتصال دیتاسنترهای متعدد: `Multi-Pod` در برابر `Multi-Site (NDO/MSO)`",
+          "p": [
+            "وقتی بیش از یک دیتاسنتر ACI دارید، دو معماری متمایز وجود دارد: در **`ACI Multi-Pod`** چندین Pod زیر مدیریت **یک خوشهٔ واحد APIC** قرار می‌گیرند و برای لینک‌های بسیار نزدیک با تاخیر پایین (مانند دو ساختمان در یک پردیس) مناسب است، اما حوزهٔ خرابیِ کنترل‌پلین/سیاست همچنان مشترک می‌ماند. در **`ACI Multi-Site`** هر سایت دارای **خوشهٔ APIC مستقلِ خودش** است تا حوزهٔ خرابی (`Failure Domain`) و طوفان‌های محلی کاملاً ایزوله بمانند و یک ابزار متمرکز به نام **Cisco Nexus Dashboard Orchestrator (NDO / MSO سابق)** تنها سیاست‌ها و تونل‌های VXLAN EVPN بین‌سایتی (`ISN`) را هماهنگ می‌کند."
           ]
         }
       ],
-      "protocolAnalysis": [
-        "در تحلیل عملی ۷.۳ Data Center، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
-      ],
-      "iosCommands": [
-        {
-          "cmd": "show ip bgp summary",
-          "out": "10.255.0.2  4  65200  1420  1418  128",
-          "note": "پایش همسایگی BGP و تعداد Prefixها"
-        },
-        {
-          "cmd": "show ip route",
-          "out": "B  172.16.0.0/16 [20/0] via 10.255.0.2",
-          "note": "بررسی مسیرهای BGP در RIB"
-        }
-      ],
-      "diagramSvg": "leafspine",
-      "lab": {
-        "title": "آزمایشگاه عملی: ۷.۳ Data Center",
-        "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۳ Data Center را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
-        ],
-        "verifyCmds": [
-          "show ip bgp summary",
-          "show ip route"
-        ]
-      },
-      "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۳ Data Center، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
-      },
-      "exercise": "برای مبحث «۷.۳ Data Center» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
-      "quiz": [
-        {
-          "q": "در پیاده‌سازی استاندارد «۷.۳ Data Center» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
-          "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
-          ],
-          "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۳ Data Center نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
-        }
-      ],
+      "analogy": "شبکهٔ سنتی مثل **سیم‌کشی برق دستی تک‌تک کلیدها و پریزها در یک برج** است که با اضافه شدن هر اتاق جدید باید دیوارها را کند؛ اما **Cisco ACI** مثل **سیستم هوشمند مدیریت ساختمان (BMS)** است که اتاق‌ها را گروه‌بندی می‌کند (`EPG_Web`, `EPG_DB`) و تنها با یک قرارداد منطقی (`Contract: Permit TCP 1433`) چراغ‌ها و مسیرها را در تمام طبقات (`Leaf/Spine`) روشن می‌کند. محل شکست تشبیه اینجاست: حتی اگر پنل مرکزی BMS (`APIC`) خاموش شود، کلیدهای از پیش برنامه‌ریزی‌شدهٔ داخل دیوارها (`ASIC`) همچنان طبق آخرین برنامه کار می‌کنند (`Headless`)، ولی اگر کارمند جدیدی کارت جدید بگیرد یا بخواهید قفل اتاقی را عوض کنید تا بازگشت پنل مرکزی کاری انجام نمی‌شود.",
       "table": {
-        "title": "تطبیق مفاهیم شبکه سنتی با ساختار شی‌گرای Cisco ACI",
+        "title": "نگاشت مفاهیم کلاسیک شبکه به مدل منطقی Cisco ACI",
         "headers": [
-          "مفهوم در شبکه سنتی",
+          "مفهوم در شبکهٔ کلاسیک",
           "معادل دقیق در Cisco ACI",
-          "تفاوت کلیدی رفتاری"
+          "نکتهٔ مهم تفاوت"
         ],
         "rows": [
           [
-            "VRF / Virtual Router",
-            "VRF (Private Network)",
-            "داخل یک Tenant تعریف می‌شود و می‌تواند بین EPGها مشترک باشد"
+            "جدول روتینگ ایزوله (`VRF`)",
+            "`VRF / Context` زیر `Tenant`",
+            "حالت `Enforced` ارتباط بین EPGها را به صورت پیش‌فرض مسدود می‌کند"
           ],
           [
-            "VLAN + SVI Gateway",
-            "Bridge Domain + Subnet",
-            "به‌صورت Anycast روی تمام Leafهایی که EPG آنجا هست وجود دارد"
+            "دامنهٔ Broadcast / `SVI`",
+            "`Bridge Domain (BD)` + `Subnet`",
+            "هر BD به یک VRF وصل است و می‌تواند چند ساب‌نت با Anycast GW داشته باشد"
           ],
           [
-            "سابنت یا گروه سرور با ACL مشترک",
-            "EPG (Endpoint Group)",
-            "عضویت بر اساس پورت/VLAN یا حتی تگ VMware/Kubernetes"
+            "گروه امنیتی / VLAN پورت",
+            "`EPG (Application EPG)`",
+            "معیار اعمال Contract؛ چند EPG می‌توانند در یک BD هم وجود داشته باشند"
           ],
           [
-            "قوانین Allow در فایروال (Permit)",
-            "Contract (Provider / Consumer + Filter)",
-            "مدل White-List پیش‌فرض (هرچه قرارداد ندارد کاملاً بسته است!)"
+            "`ACL` بین سگمنت‌ها",
+            "`Contract` (`Consumer -> Provider`)",
+            "مدل **Whitelist** با فیلترهای L4 و جهت‌دار (`Apply Both Directions`)"
           ]
         ]
       },
       "faq": [
         {
-          "q": "اگر در یک Bridge Domain دو سرور داخل یک EPG واحد باشند، آیا برای ارتباطشان با هم به Contract نیاز دارند؟",
-          "a": "در حالت عادی خیر؛ اعضای داخل یک EPG واحد آزادانه با هم صحبت می‌کنند (مگر اینکه قابلیت Intra-EPG Isolation را برای جداسازی کامل مثل PVLAN فعال کنید). Contract برای ارتباط بین دو EPG مختلف الزامی است."
+          "q": "آیا اگر ارتباط یکی از سه سرور APIC با سوئیچ‌های Leaf قطع شود، خوشهٔ ACI از کار می‌افتد؟",
+          "a": "در یک خوشهٔ ۳تایی APIC، برای حفظ **Quorum** (اکثریت کنترلرها) حداقل به **۲ سرور از ۳** نیاز است. با افتادان *یک* APIC، دو APIC باقی‌مانده همچنان Quorum دارند و هم مدیریت و هم Fabric عادی کار می‌کنند؛ اما اگر ۲ سرور از ۳ سرور خاموش شوند، Quorum از دست رفته و کلاستر وارد حالت `Read-Only` (و تداوم دیتاپلین فعلی در سخت‌افزار تا بازگشت Quorum) می‌شود."
         },
         {
-          "q": "تفاوت L2Out و L3Out در Cisco ACI چیست؟",
-          "a": "L3Out ارتباط مسیریابی لایه ۳ (OSPF، EIGRP، BGP یا Static) بین Fabric ACI و شبکه بیرون (WAN یا فایروال مرزی) است؛ در حالی که L2Out گسترش یک سگمنت لایه ۲ به سوئیچ‌های قدیمی بیرون از ACI است (معمولاً برای مهاجرت مرحله‌ای دیتاسنتر)."
-        },
-        {
-          "q": "وقتی کلاستر APIC کاملاً از کار بیفتد چه اتفاقی برای ترافیک جاری سرورها می‌افتد؟",
-          "a": "هیچ اختلالی در ارسال بسته‌ها (Data Plane) رخ نمی‌دهد! چون کل جدول‌ها و قوانین پیشاپیش در سخت‌افزار ASIC تمام سوئیچ‌های Leaf و Spine برنامه‌ریزی شده است."
+          "q": "برای سرویس‌های مشترکی مثل `DNS` یا `Active Directory` در ACI، باید در تک‌تک Tenantها یک سرور DNS جدید بسازیم؟",
+          "a": "خیر؛ در ACI یک Tenant پیش‌فرض ویژه به نام **`common`** وجود دارد! اگر سرویس‌های مشترک را در `common` بگذارید و Contract مربوطه را به صورت **`Global` / Exported** به Tenantهای دیگر بدهید (همراه با تنظیم درست Subnet Scope مثل `Shared between VRFs`), تمام Tenantها به آن سرویس مشترک دسترسی پیدا می‌کنند."
         }
       ],
-      "analogy": "تفاوت NX-OS مستقل و Cisco ACI مثل تفاوت مدیریت دستی تک‌تک چراغ‌ها و کولرهای یک برج در برابر یک سیستم هوشمند ساختمان (BMS) است: در ACI شما به تک‌تک سوئیچ‌ها نمی‌گویید «این پورت را VLAN 10 کن و آن ACL را روی این اینترفیس بنویس»؛ بلکه از روی کنسول مرکزی APIC برای نرم‌افزار فروش یک «پرونده کاربردی» می‌سازید: گروه وب (Web EPG) فقط حق دارد روی پورت ۱۴۳۳ با گروه دیتابیس (DB EPG) صحبت کند (Contract). خود کنترلر APIC به صورت لحظه‌ای کل قوانین را روی تمام سوئیچ‌های Leaf ترجمه و اعمال می‌کند!",
-      "ciscoRef": "Cisco ACI Fundamentals Guide & Cisco CCNP Data Center 350-601 DCCOR Official Cert Guide",
-      "summary": "Cisco ACI شبکه دیتاسنتر را از تنظیم پورت‌به‌پورت به مدیریت نرم‌افزارمحور با کنترلر APIC ارتقا می‌دهد: جداسازی در سطوح Tenant -> VRF -> Bridge Domain -> EPG، اعمال امنیت White-List بین گروه‌ها با Contract، و هماهنگی چند دیتاسنتر با Nexus Dashboard (NDO) بدون وابستگی Data Plane به کنترلر."
+      "summary": "**Cisco ACI** سخت‌افزار `Leaf-Spine` را با کنترلر **APIC** (دارای Quorum، خارج از Data Plane و با قابلیت Headless برای ترافیک از قبل برنامه‌ریزی‌شده) و کنترل‌پلین خودکار **IS-IS / COOP / MP-BGP** مدیریت می‌کند. مدل منطقی آن از **`Tenant -> VRF -> Bridge Domain -> EPG -> Contract`** تشکیل شده و بر پایهٔ **Whitelist** بین EPGها عمل می‌نماید؛ و در استقرار چندسایتی، **ACI Multi-Site (NDO/MSO)** با حفظ خوشهٔ APIC مستقل در هر سایت، حوزهٔ خرابی سایت‌ها را از هم جدا نگه می‌دارد.",
+      "ciscoRef": "Cisco Application Centric Infrastructure (ACI) Fundamentals & Cisco ACI Multi-Site Architecture White Paper",
+      "protocolAnalysis": [
+        "در کنترل‌پلین **COOP**, وقتی یک سرور جدید به `Leaf-1` وصل می‌شود، `Leaf-1` اطلاعات `MAC/IP` آن را از طریق پیام COOP به **`Spine`ها** گزارش می‌دهد تا پایگاه‌دادهٔ یکپارچهٔ مکان تمام Endpointها در Spine نگهداری شود؛ به همین دلیل اگر `Leaf-2` محل یک IP درون Fabric را نداند (`Hardware Proxy`), بسته را به Spine می‌فرستد تا Spine مستقیم به `Leaf-1` هدایتش کند.",
+        "برای خروج از Fabric به شبکهٔ بیرونی (مانند روتر هستهٔ WAN یا فایروال مرزی)، از شیء منطقی **`L3Out`** روی Border Leaf استفاده می‌کنیم که برای تزریق پیشوندهای خارجی به Tenant و کنترل دسترسی با `External EPG` (تعیین‌شونده بر اساس پیشوندهای IP و نیازمند Contract با EPGهای داخلی) به کار می‌رود."
+      ],
+      "iosCommands": [
+        {
+          "cmd": "show endpoint",
+          "out": "Legend:\n s - static   v - vpc   p - peer   L - local\nVLAN/Encap      MAC Address       IP Address       Interface        Flags\n--------------  ----------------- ---------------  ---------------  -----\nvlan-110        0200.0000.0110    10.110.0.10      eth1/11          L",
+          "note": "دستور پرکاربرد روی CLI سوئیچ `Leaf` در Cisco ACI برای دیدن Endpointهای یادگرفته‌شده. [نکتهٔ شبیه‌ساز: دستور `show endpoint` مخصوص ACI Leaf در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تست زنده نیازمند Cisco ACI Simulator در DevNet Sandbox است.]",
+          "why": "بررسی سریع اینکه آیا MAC و IP سرور در جدول Endpoint سوئیچ Leaf ثبت شده و از چه پورت/Encap یاد گرفته شده است.",
+          "anatomy": "تگ `VLAN/Encap` ورودی، آدرس MAC، IP، اینترفیس و پرچم‌های `L` (محلی روی همین Leaf) یا `v` (روی vPC).",
+          "lookFor": "حضور MAC و IP صحیح سرور با پرچم `L` روی پورت و `vlan-encap` مورد انتظار.",
+          "ifUnexpected": "اگر با وجود اتصال فیزیکی سرور در `show endpoint` دیده نشد، تنظیمات `AAEP`، `VLAN Pool` و Domain متصل به آن EPG در APIC را چک کنید."
+        },
+        {
+          "cmd": "acidiag fnvread",
+          "out": "ID   Pod ID  Name      Serial Number  IP Address     Role   State\n-------------------------------------------------------------------\n101  1       Leaf-101  FDO2100101A    10.0.0.64/32   leaf   active\n201  1       Spine-201 FDO2100201A    10.0.0.65/32   spine  active",
+          "note": "دستور تشخیصی روی APIC برای مشاهدهٔ جدول کشف و وضعیت ثبت تمام Leaf/Spineهای Fabric. [نکتهٔ شبیه‌ساز: دستور مرجع غیرشبیه‌سازی‌شده روی APIC.]",
+          "why": "تایید اینکه تمام سوئیچ‌های Leaf و Spine توسط APIC از طریق LLDP/DHCP کشف شده و در وضعیت `active` قرار دارند.",
+          "anatomy": "شناسهٔ نود، Pod ID، نام، شماره سریال، آدرس TEP در Fabric، نقش و وضعیت.",
+          "lookFor": "وضعیت `active` برای تمام سوئیچ‌های طراحی‌شده.",
+          "ifUnexpected": "نود جدیدی که `active` نشود معمولاً مشکل کابل اتصال به Spine، عدم تطابق نسخهٔ Firmware با APIC یا خطای تایید گواهی دارد."
+        },
+        {
+          "cmd": "show mac address-table",
+          "out": "Vlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n  10    0200.0000.0001    DYNAMIC     Gi0/3",
+          "note": "دستور زنده در شبیه‌ساز داخلی برای مشاهدهٔ یادگیری مک لایه ۲ روی پورت‌های دسترسی (پایهٔ مفهومی `show endpoint` در ACI).",
+          "why": "تطبیق یادگیری آدرس فیزیکی سرور روی پورت و VLAN مشخص.",
+          "anatomy": "شماره VLAN، آدرس MAC، نوع (`DYNAMIC/STATIC`) و پورت.",
+          "lookFor": "ثبت MAC در VLAN صحیح روی پورت متصل به سرور.",
+          "ifUnexpected": "نبود MAC یا ثبت آن در VLAN اشتباه نشانهٔ ناهماهنگی تنظیمات پورت دسترسی یا ترانک است."
+        }
+      ],
+      "diagramSvg": "leafspine",
+      "lab": {
+        "title": "آزمایشگاه شبیه‌سازی تفکیک سگمنت‌های EPG در شبیه‌ساز + سناریوی مرجع APIC/ACI",
+        "steps": [
+          "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی سیستم‌عامل `Cisco ACI`، کنترلر `APIC`، `COOP` و `Contract/EPG` را ندارد (برای آزمایش زنده از **Cisco DevNet ACI Simulator Always-On Sandbox** استفاده کنید). در اینجا تفکیک سگمنت‌های معادل دو EPG (`VLAN 130: EPG_WEB`, `VLAN 135: EPG_DB`)، ایزوله‌سازی پورت Border L3Out (`Gi0/0`) و قفل ترانک روی `Gi0/1` در شبیه‌ساز را زنده اجرا می‌کنیم.",
+          "۲. با `enable` وارد شوید و با `show mac address-table` و `show vlan brief` جدول لایه ۲ پایه و VLANهای فعلی را ببینید.",
+          "۳. سگمنت‌های EPG تمرینی و دروازهٔ Border را روی شبیه‌ساز پیاده کنید: `configure terminal` -> `interface Gi0/0` -> `description ACI-L3OUT-BORDER` -> `vlan 130` -> `name EPG_WEB_ENCAP` -> `vlan 135` -> `name EPG_DB_ENCAP` -> `exit` -> `interface Gi0/6` -> `description SRV-EPG-WEB` -> `switchport mode access` -> `switchport access vlan 130` -> `switchport nonegotiate` -> `interface Gi0/7` -> `description SRV-EPG-DB` -> `switchport mode access` -> `switchport access vlan 135` -> `switchport nonegotiate` -> `no shutdown` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 130,135` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces trunk`، `show interfaces Gi0/7 switchport` و `show running-config` تایید کنید که `VLAN 130/135` ساخته شده، روی `Gi0/6`/`Gi0/7` (با `nonegotiate`) و ترانک `Gi0/1` ثبت شده‌اند.",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (مدل سیاست‌گذاری EPG/Contract در Cisco APIC — پلتفرم مرجع: Cisco ACI 5.x/6.x):** **پیش‌نیازها و گام‌ها در APIC:** کشف سوئیچ‌ها در `acidiag fnvread` (`active`)، ساخت `VLAN Pool (130-135)`، `Physical Domain` و `AAEP` متصل به پورت‌های سرور، و ساخت Tenant `TEN_APP`: درون آن `VRF_PROD` (حالت `Policy Control Enforcement: Enforced`) -> `BD_APP` (متصل به `VRF_PROD` با Subnet `10.50.0.1/24`) -> ایجاد دو EPG (`EPG_WEB` با Static Port روی Leaf 101 `eth1/11` `vlan-130` و `EPG_DB` روی `eth1/12` `vlan-135`)؛ سپس تعریف Filter `FIL_MSSQL (TCP dest 1433)` و Contract `CON_WEB_DB` و اختصاص آن به صورت `Provider` در `EPG_DB` و `Consumer` در `EPG_WEB`. پس از آن روی CLI لیف دستور `show endpoint` و از سرور تست اتصال به پورت `1433` را بزنید. **خروجی مرجع و نشانهٔ موفقیت:** ثبت هر دو سرور در `show endpoint` زیر `vlan-130` و `vlan-135`، برقراری اتصال `TCP 1433` و مسدود شدن سایر پورت‌های بدون Contract (مثل ICMP در نبود فیلتر). **نشانهٔ شکست:** نرسیدن سرور به `show endpoint` (خطای ربط‌نداشتن `AAEP/Domain/VLAN Pool` در APIC)، یا خطای فراموش شدن تخصیص `Contract` هنگام داشتن یک ساب‌نت مشترک. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط VLANها/پورت‌های تمرینی را ثبت کرد و هیچ پردازش APIC، COOP یا Contract TCAM اجرا نمی‌کند."
+        ],
+        "verifyCmds": [
+          "enable",
+          "show vlan brief",
+          "show interfaces trunk",
+          "show interfaces Gi0/7 switchport",
+          "show running-config"
+        ]
+      },
+      "troubleshooting": {
+        "fault": "در **Cisco ACI** یک پورت‌گروه جدید برای `EPG_APP` ساخته و سرور به پورت `eth1/15` سوئیچ `Leaf-101` متصل شده است؛ لینک فیزیکی `up` است، اما در دستور `show endpoint` روی `Leaf-101` اصلاً نامی از سرور یا `vlan-130` دیده نمی‌شود و هیچ ارتباطی برقرار نمی‌شود!",
+        "analysis": "در ACI، صرف نوشتن یک Static Path (`vlan-130`) زیر `EPG` کافی نیست؛ زنجیرهٔ Policy دسترسی فیزیکی در APIC باید از بالا تا پایین متصل باشد: **`Interface Policy Group -> Interface Profile -> Switch Profile`** و از سوی دیگر اتصال از طریق **`AAEP (Attachable Access Entity Profile)`** به **`Physical/VMM Domain`** و **`VLAN Pool`** حاوی `vlan-130`! اگر `vlan-130` در `VLAN Pool` نباشد یا `Domain` به `EPG` وصل نشده باشد، Leaf آن تگ VLAN را روی پورت برنامه‌ریزی نمی‌کند و عیب‌یابی در APIC خطای `Fault (missing-encap / invalid-path)` می‌دهد.",
+        "fix": "بررسی تب `Faults` در EPG مورد نظر درون APIC و کامل کردن زنجیرهٔ اتصال: اطمینان از وجود بازهٔ VLAN در `VLAN Pool`، ربط دادن Domain به `AAEP` پورت فیزیکی، و متصل کردن همان Domain به `EPG_APP`."
+      },
+      "misconceptions": [
+        {
+          "myth": "در Cisco ACI اگر سه سرور APIC هر سه قطع شوند، کل دیتاسنتر و ارتباط سرورهای فعلی فوراً از کار می‌افتد.",
+          "reality": "APIC در مسیر **Data Plane** نیست؛ در وضعیت **Headless Operation** ترافیک موجود و سیاست‌های از قبل کامپایل‌شده در ASIC سوئیچ‌ها ادامه می‌یابند و تنها تغییر سیاست جدید، ثبت پویای موارد وابسته به APIC و پایش از کار می‌افتد تا Quorum بازگردد.",
+          "howToSpot": "بررسی تداوم عبور ترافیک روی لینک‌های Leaf-Spine و وضعیت مدیریت در `acidiag avread` هنگام تست نگهداری APIC."
+        },
+        {
+          "myth": "اگر دو EPG درون یک `Bridge Domain` و یک ساب‌نت واحد باشند، آزادانه با هم ارتباط دارند و نیازی به `Contract` نیست.",
+          "reality": "در VRF با حالت پیش‌فرض `Enforced`, مرز امنیتی **خودِ EPG** است نه ساب‌نت یا Bridge Domain! دو EPG مجزا حتی در یک ساب‌نت مشترک هم بدون `Contract` صریح هیچ ترافیکی به هم نمی‌فرستند.",
+          "howToSpot": "بررسی شمارنده‌های Drop سیاست (`vzAny / Contract`) در `show zoning-rule` روی سوئیچ Leaf."
+        }
+      ],
+      "exercise": "تفاوت اساسی **`ACI Multi-Pod`** و **`ACI Multi-Site (NDO/MSO)`** را از نظر تعداد خوشهٔ APIC، حوزهٔ خرابی (Failure Domain) و کاربرد عملی بنویسید؛ و زنجیرهٔ اشیای لازم در APIC را از `Interface Policy Group` تا `VLAN Pool` نام ببرید.",
+      "exercises": [
+        {
+          "level": "ساده",
+          "task": "در مدل سلسله‌مراتبی **Cisco ACI**، اشیای زیر را از کلان‌ترین لایه به جزئی‌ترین لایه مرتب کنید: `Bridge Domain`، `Tenant`، `EPG`، `VRF`.",
+          "hint": "مرز سازمانی -> جدول روتینگ -> دامنهٔ L2/Subnet -> گروه سرورها.",
+          "solution": "**`Tenant` -> `VRF` -> `Bridge Domain` -> `EPG`** (توجه: در شیء منطقی، EPG زیر `Application Profile` تعریف و به یک `Bridge Domain` متصل می‌شود)."
+        },
+        {
+          "level": "متوسط",
+          "task": "در یک `Tenant`، ترافیک بین سرور `A` (در `EPG_Web`، `10.50.0.10`) و سرور `B` (در `EPG_App`، `10.50.0.20`) که هر دو در یک `Bridge Domain` هستند کار نمی‌کند. چه دو علت رایج در پیکربندی APIC را اول بررسی می‌کنید؟",
+          "hint": "نبود یا جهت اشتباه `Contract` (Consumer/Provider)، یا ربط نداشتن `Domain / VLAN Pool` به یکی از EPGها.",
+          "solution": "۱) بررسی وجود **`Contract`** بین `EPG_Web` (`Consumer`) و `EPG_App` (`Provider`) با Filter صحیح (و توجه به جهت برگشت/Stateful بودن `Filter`)؛ ۲) بررسی وجود هر دو Endpoint در `show endpoint` (تایید اینکه `VLAN Pool -> Physical Domain -> AAEP -> EPG` برای هر دو پورت کامل متصل است)."
+        },
+        {
+          "level": "چالشی",
+          "task": "پاسخ بخش `exercise` بالا را بنویسید: یک بانک دو دیتاسنتر با فاصلهٔ ۶۰ کیلومتر دارد و می‌خواهد اگر در دیتاسنتر اول اختلالی در خوشهٔ کنترلر یا طوفان تغییر سیاست رخ داد، دیتاسنتر دوم کاملاً مستقل بماند ولی سیاست‌های انتخابی بتوانند بین دو سایت اعمال شوند. کدام معماری (`Multi-Pod` یا `Multi-Site`) را انتخاب می‌کنید و چرا؟ همچنین زنجیرهٔ اتصال فیزیکی تا EPG در APIC را رسم متنی کنید.",
+          "hint": "خوشهٔ APIC واحد (Multi-Pod) در برابر دو خوشهٔ APIC مستقل با NDO/MSO (Multi-Site).",
+          "solution": "۱) **انتخاب معماری:** **`ACI Multi-Site`** (مدیریت‌شده با **Nexus Dashboard Orchestrator / NDO**). دلیل: در `Multi-Pod` یک خوشهٔ APIC واحد کل دو سایت را مدیریت می‌کند و حوزهٔ خرابی کنترلی مشترک است؛ اما در `Multi-Site` هر دیتاسنتر خوشهٔ APIC مستقل خود را دارد، Failure Domainها کاملاً ایزوله‌اند، و تنها قراردادها/سگمنت‌های انتخابی از طریق تونل VXLAN بین‌سایتی (`ISN`) توسط NDO هم‌تراز می‌شوند.\n۲) **زنجیرهٔ فیزیکی تا EPG در APIC:** `Switch Profile -> Interface Profile -> Interface Policy Group -> AAEP -> Physical/VMM Domain -> VLAN Pool` (و از سوی دیگر اتصال همان `Domain` به `EPG` و تعریف `Static Path` با آن `vlan-encap`)."
+        }
+      ],
+      "quiz": [
+        {
+          "q": "در **Cisco ACI** اگر هر سه سرور خوشهٔ کنترلر `APIC` موقتاً ارتباطشان با سوئیچ‌های Leaf و Spine قطع شود، وضعیت ترافیک‌های موجود سرورها چگونه خواهد بود؟",
+          "opts": [
+            "کل شبکه در همان ثانیه خاموش می‌شود",
+            "ترافیک و مسیریابیِ از قبل برنامه‌ریزی‌شده در سخت‌افزار به کار خود ادامه می‌دهند (**Headless Operation**)، ولی اعمال تغییر سیاست جدید و ثبت موارد وابسته به APIC متوقف می‌شود",
+            "تمام پورت‌ها به VLAN 1 برمی‌گردند",
+            "سوئیچ‌ها به پروتکل RIP تبدیل می‌شوند"
+          ],
+          "ans": 1,
+          "exp": "APIC خارج از مسیر Data Plane قرار دارد؛ بنابراین با قطع APIC ترافیک جاری در سخت‌افزار ادامه می‌یابد اما تغییرات سیاست جدید ممکن نیست."
+        },
+        {
+          "q": "در مدل **Cisco ACI** با حالت پیش‌فرض `Enforced` در VRF، اگر دو سرور در **دو `EPG` مختلف** ولی درون **یک `Bridge Domain` و یک ساب‌نت مشترک** قرار بگیرند، چگونه با هم ارتباط برقرار می‌کنند؟",
+          "opts": [
+            "فوراً و بدون هیچ تنظیمی با هم صحبت می‌کنند",
+            "باید از پروتکل HSRP استفاده کنند",
+            "باید حتماً میان آن دو EPG یک **`Contract`** (شامل `Consumer`، `Provider` و `Filter`) برقرار شود؛ در غیر این صورت ترافیک Drop می‌شود",
+            "باید نام هر دو سرور یکی باشد"
+          ],
+          "ans": 2,
+          "exp": "در ACI مرز امنیتی EPG است (نه ساب‌نت و نه VLAN) و ارتباط بین دو EPG نیازمند تعریف صریح Contract است."
+        },
+        {
+          "q": "مزیت کلیدی **`ACI Multi-Site (با NDO/MSO)`** نسبت به **`ACI Multi-Pod`** برای دو دیتاسنتر در دو شهر مجزا چیست؟",
+          "opts": [
+            "استفاده از یک خوشهٔ APIC واحد برای هر دو شهر",
+            "استفاده از Spanning Tree روی لینک WAN بین دو شهر",
+            "حذف نیاز به مسیریابی بین‌سایتی (`ISN`)",
+            "داشتن خوشهٔ APIC مستقل در هر سایت و جداسازی کامل **Failure Domain** کنترلی و سیاستی بین دو دیتاسنتر"
+          ],
+          "ans": 3,
+          "exp": "در Multi-Site هر سایت APIC مستقل خودش را دارد تا اشکالات کنترل‌پلین یا سیاست در یک سایت به سایت دوم سرایت نکند."
+        }
+      ],
+      "bridge": {
+        "whereUsed": "در دیتاسنترهای بزرگ سازمانی، بانکی و کلان‌سازمان‌های مبتنی بر Cisco Nexus 9000 ACI.",
+        "nextQuestion": "تا اینجا ترافیک شبکهٔ IP سرورها را در دیتاسنتر دیدیم؛ اما سرورهای پایگاه داده و مجازی‌سازی چطور با **Fibre Channel**، **Zoning**، **`BB_Credit`** و **FCoE / PFC** به دیسک‌های مرکزی (**SAN**) وصل می‌شوند تا با کم‌ترین تاخیر و جلوگیری از افت فریم بخوانند و بنویسند؟ این موضوع درس بعدی (`spec_dc_stor`) است!",
+        "nextId": "spec_dc_stor"
+      }
     },
     "spec_dc_stor": {
       "id": "spec_dc_stor",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۳ Data Center: شبکه ذخیره‌سازی (SAN)، Fibre Channel و FCoE",
-      "lead": "در دیتاسنتر فقط ترافیک کاربران وجود ندارد؛ سرورهای حیاتی برای خواندن و نوشتن روی دیسک‌های مرکزی (Storage Array) به شبکه‌ای با تأخیر صفر و بدون افت حتی یک فریم نیاز دارند! اینجا وارد دنیای SAN، Fibre Channel، Zoning و FCoE می‌شویم.",
-      "goal": "تفاوت SAN (Block Storage) و NAS (File Storage)، درک معماری Fibre Channel (FC)، آدرس‌دهی WWN/FCID، مکانیزم ضدافت BB_Credit، پروتکل‌های FLOGI/PLOGI، Zoning روی Cisco MDS و فناوری FCoE/iSCSI.",
-      "prereq": "آشنایی با معماری دیتاسنتر و Nexus NX-OS (درس‌های قبل).",
+      "title": "۷.۳ Data Center: شبکهٔ ذخیره‌سازی (SAN)، Fibre Channel، Zoning و FCoE",
+      "lead": "در شبکهٔ IP معمولی (TCP/IP)، اگر یک بافر سوئیچ لحظه‌ای پر شود و فریم بیفتد، پروتکل TCP چند میلی‌ثانیه بعد بسته را دوباره می‌فرستد؛ اما در ترافیک ذخیره‌سازی سطح بلاک (**Block Storage / SAN**) افت فریم به معنی خطا یا توقف مستقیم خواندن و نوشتن دیسک‌های پایگاه داده (`SCSI Timeout`) و کندی شدید ماشین‌های مجازی است! به همین دلیل **Fibre Channel (FC)** و **FCoE** با مکانیزم‌های کنترل جریان **Lossless** طراحی شده‌اند—البته هرکدام با محدودیت‌ها و تله‌های واقعی خودشان.",
+      "goal": "تمایز دقیق **DAS، NAS (File-Level)** و **SAN (Block-Level: FC, FCoE, iSCSI)**، درک ساختار **Fibre Channel (`WWNN/WWPN`, `FCID 24-bit`, `FLOGI/PLOGI`, `VSAN`)**، مکانیسم **`BB_Credit` (Buffer-to-Buffer Credit)**، طراحی امن **Zoning (`Single-Initiator / Single-Target`)** روی Cisco MDS/Nexus، و آشنایی واقع‌بینانه با **FCoE و `PFC (802.1Qbb)`**.",
+      "prereq": "آشنایی با مفاهیم دیتاسنتر، سوئیچینگ لایه ۲ و Cisco NX-OS (`spec_dc_nx` و `s11`).",
       "sections": [
         {
-          "h": "۱. تفاوت DAS، NAS و SAN (و چرا دیتابیس‌های سنگین SAN می‌خواهند؟)",
+          "h": "۱. تفاوت DAS، NAS و SAN در دیتاسنتر",
           "p": [
-            "سه راه اتصال حافظه به سرور داریم: (۱) DAS (دیسک داخل خود سرور — غیرقابل اشتراک)؛ (۲) NAS (مثل NFS و SMB روی شبکه IP معمولی که فضای فایل File-Level را به اشتراک می‌گذارد)؛ و (۳) SAN (Storage Area Network که دیسک‌ها را در سطح Block-Level دقیقاً مثل هارد دیسک داخلی SCSI مستقیم در اختیار سیستم‌عامل سرور و ESXi می‌گذارد با حداکثر سرعت ۸/۱۶/۳۲/۶۴ گیگابیت بر ثانیه)."
-          ]
-        },
-        {
-          "h": "۲. کالبدشکافی شبکه Fibre Channel (FC) در سوئیچ‌های Cisco MDS و Nexus",
-          "p": [
-            "در دنیای Fibre Channel به جای کارت شبکه (NIC) از کارت HBA (Host Bus Adapter) روی سرور استفاده می‌کنیم، به جای آدرس MAC از یک شناسه ۶۴ بیتی کارخانه‌ای به نام WWN (به شکل WWNN برای کل دستگاه و WWPN برای تک‌پورت، مثل 20:00:00:25:b5:00:00:01) استفاده می‌کنیم، و معادل VLAN در SAN یک کلمه جدید به نام VSAN (Virtual SAN) است!",
-            "چطور فریم FC بدون حتی یک افت بسته (Lossless) کار می‌کند؟ با سیستم کنترل جریان در لایه لینک به نام Buffer-to-Buffer Credit (BB_Credit): هر پورت دقیقاً می‌داند طرف مقابل چند جای خالی در بافرش دارد و تا زمانی که سیگنال R_RDY (تایید خالی شدن یک خانه) برنگردد، فریم بعدی را نمی‌فرستد! وقتی پورت سرور به سوئیچ SAN وصل می‌شود سه لاگین انجام می‌دهد: FLOGI (ثبت‌نام در Fabric سوئیچ و گرفتن آدرس ۲۴ بیتی FCID)، PLOGI (برقراری نشست با Storage) و PRLI (تبادل دستورات SCSI). برای امنیت و جلوگیری از تداخل سرورها نیز حتماً Zoning (تعیین دقیق اینکه کدام WWPN سرور حق دیدن کدام WWPN استوریج را دارد؛ بهترین روش Single-Initiator Zoning با Smart Zoning در سیسکو) را تنظیم می‌کنیم."
-          ]
-        },
-        {
-          "h": "۳. همگرایی شبکه و ذخیره‌سازی: مقایسه FC بومی، FCoE و iSCSI / NVMe-oF",
-          "p": [
-            "برای اینکه روی یک کابل فیزیکی واحد ۱۰/۴۰/۱۰۰ گیگابیتی هم ترافیک شبکه معمولی LAN و هم ترافیک حساس Storage را عبور دهیم (Unified Fabric روی Nexus)، از استاندارد FCoE (Fibre Channel over Ethernet) استفاده می‌کنیم؛ اما شرط مطلق کارکرد FCoE تبدیل کردن شبکه اترنت معمولی به اترنت بدون افت بسته (DCB - Data Center Bridging) با دو قابلیت PFC (مکث انتخابی فقط برای کلاس ترافیک Storage بدون متوقف کردن بقیه ترافیک) و ETS است. در مقابل، پروتکل ارزان‌تر iSCSI و استاندارد فوق‌سریع جدید NVMe over Fabrics (NVMe-oF / FC-NVMe) بسته‌های ذخیره‌سازی را روی زیرساخت استاندارد اترنت و TCP/RDMA حمل می‌کنند."
-          ]
-        }
-      ],
-      "protocolAnalysis": [
-        "در تحلیل عملی ۷.۳ Data Center، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
-      ],
-      "iosCommands": [
-        {
-          "cmd": "show interfaces status",
-          "out": "Gi0/1  UPLINK  connected  trunk  a-full  a-1000",
-          "note": "بررسی وضعیت لایه ۱/۲ پورت‌ها"
-        },
-        {
-          "cmd": "show vlan brief",
-          "out": "10  USERS  active  Gi0/3, Gi0/4\n20  SERVERS  active  Gi0/5",
-          "note": "تایید تخصیص VLANها"
-        }
-      ],
-      "diagramSvg": "leafspine",
-      "lab": {
-        "title": "آزمایشگاه عملی: ۷.۳ Data Center",
-        "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۳ Data Center را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
-        ],
-        "verifyCmds": [
-          "show interfaces status",
-          "show vlan brief"
-        ]
-      },
-      "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۳ Data Center، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
-      },
-      "exercise": "برای مبحث «۷.۳ Data Center» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
-      "quiz": [
-        {
-          "q": "در پیاده‌سازی استاندارد «۷.۳ Data Center» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
-          "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
+            "روش اتصال سرور به فضای ذخیره‌سازی به سه معماری اصلی تقسیم می‌شود:"
           ],
-          "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۳ Data Center نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
+          "bullets": [
+            "**`DAS (Direct Attached Storage)`:** دیسک فیزیکی داخل یا مستقیماً متصل به یک سرور (کارایی بالا ولی غیرقابل اشتراک‌گذاری میان چند سرور و سخت در مقیاس‌پذیری).",
+            "**`NAS (Network Attached Storage)` — سطح فایل (`File-Level` با `NFS` / `SMB`):** روی شبکهٔ IP معمولی کار می‌کند؛ مدیریت مجوز فایل‌ها بر عهدهٔ خود دستگاه NAS است و برای اشتراک پوشه‌های سازمانی و فایل‌ها عالی است.",
+            "**`SAN (Storage Area Network)` — سطح بلاک (`Block-Level` با `Fibre Channel`, `FCoE`, `iSCSI` یا `NVMe-oF`):** سیستم‌عامل سرور یا هایپروایزر (`ESXi`) فضای ذخیره‌سازی را دقیقاً مثل یک **دیسک سختِ خام محلی (LUN / SCSI Block)** می‌بیند تا روی آن فایل‌سیستم خودش (مانند `VMFS` یا دیتابیس خام) را بنویسد."
+          ]
+        },
+        {
+          "h": "۲. کالبدشکافی Fibre Channel (FC)، `BB_Credit` و `Zoning` در سوئیچ Cisco MDS",
+          "p": [
+            "در شبکهٔ **Fibre Channel** (سرعت‌های متداول `8G / 16G / 32G / 64G`) به جای کارت NIC از **HBA (Host Bus Adapter)** و به جای MAC از شناسهٔ ۶۴-بیتی کارخانه‌ای **WWN (World Wide Name)** استفاده می‌شود (`WWNN` برای کل نود و `WWPN` برای تک‌تک پورت‌ها، مثلاً `20:00:00:25:b5:00:00:01`؛ توجه: برخلاف اترنت، FC یک ساختار سلسله‌مراتبی لایه ۲/۳ خاص با آدرس ۲۴-بیتی پویا به نام **`FCID`** دارد):"
+          ],
+          "steps": [
+            "**مراحل ورود (`FLOGI` و `PLOGI`):** ابتدا پورت HBA سرور (یا Storage) به پورت `F_Port` سوئیچ MDS پیام **`FLOGI (Fabric Login)`** می‌فرستد تا از سوئیچ آدرس ۲۴-بیتی **`FCID`** بگیرد و مقدار **`BB_Credit`** را توافق کند؛ سپس بین سرور (`Initiator`) و آرایهٔ دیسک (`Target`) یک **`PLOGI (Port Login)`** و **`PRLI (Process Login)`** انجام می‌شود تا تبادل فریم‌های SCSI آغاز گردد.",
+            "**مکانیزم ضدسرریز بافر `BB_Credit (Buffer-to-Buffer Credit)`:** به جای انداختن فریم هنگام شلوغی، در هنگام `FLOGI` دو سمت توافق می‌کنند فرستنده حداکثر چند فریم می‌تواند بفرستد تا زمانی که گیرنده با سیگنال **`R_RDY`** خالی شدن بافرش را اعلام کند! بنابراین در یک لینک سالم، فریم به‌خاطر سرریز بافر نمی‌افتد *(اما در لینک‌های فیبر بسیار طولانی مثل DWDM بین دو شهر بدون تنظیم `BB_Credit` کافی، تاخیر برگشت `R_RDY` باعث کاهش شدید سرعت و گلوگاه می‌شود؛ و در خطای فیزیکی کابل یا خرابی قطعه باز هم فریم خراب یا قطع می‌شود)*.",
+            "**ایزوله‌سازی امن با `VSAN` و `Zoning` (`Single-Initiator / Single-Target`):** دقیقاً مثل `VLAN` در اترنت، **`VSAN`** یک فابریک ایزولهٔ منطقی می‌سازد (در طراحی استاندارد، فابریک A و فابریک B کاملاً از هم جدا و موازی بدون اتصال متقابلند). درون هر VSAN با **`Zoning` (استفاده از `fcalias` بر اساس `WWPN`)** دقیقاً مشخص می‌کنیم کدام HBA سرور حق دیدن کدام پورت Storage را دارد! در طراحی استاندارد هر Zone شامل **یک Initiator و یک Target** (یا یک Initiator با Targetهای مجاز) است تا هم سرورهای دیگر به دیسک یکدیگر دست نزنند و هم با وصل/قطع شدن یک سرور، سیل پیام‌های تغییر وضعیت (**`RSCN`**) بقیهٔ سرورها را درگیر نکند."
+          ],
+          "think": {
+            "q": "یک مهندس برای راحتی کار، تمام ۴۰ سرور و ۴ پورت Storage را داخل **یک Zone بزرگ مشترک** قرار داده و تمام `BB_Credit` لینک بین دو ساختمان با فاصلهٔ ۵۰ کیلومتر را روی پیش‌فرض `16` گذاشته است! دو مشکل جدی که در این دو تصمیم ایجاد می‌شوند چیست؟",
+            "a": "۱) **تلهٔ Zone بزرگ مشترک (`Single Big Zone`):** هم امنیت از بین می‌رود (همهٔ HBAها همهٔ Targetها و دیگر Initiatorها را می‌بینند) و هم هر بار که یک سرور ریبوت شود، سوئیچ پیام **`RSCN (Registered State Change Notification)`** را به کل ۴۰ سرور می‌فرستد که می‌تواند باعث اختلال یا توقف لحظه‌ای سیستم‌ها شود! ۲) **کمبود `BB_Credit` روی مسافت ۵۰ کیلومتر:** با اعتبار پیش‌فرضِ کم، فرستنده خیلی زود تمام `16` اعتبارش را خرج می‌کند و تا برگشت `R_RDY` در مسافت ۵۰ کیلومتر بیکار می‌ماند (`BB_Credit Starvation`) که کارایی لینک را به‌شدت سقوط می‌دهد."
+          }
+        },
+        {
+          "h": "۳. فناوری `FCoE` و کنترل جریان `PFC (802.1Qbb)` — فرصت و محدودیت",
+          "p": [
+            "برای حذف سیم‌کشی دوگانهٔ اترنت و Fibre Channel تا رک سرورها، فناوری **FCoE (Fibre Channel over Ethernet)** فریم FC را مستقیم درون فریم Ethernet با **`Jumbo MTU` (حداقل ~`2158–2240` بایت به بالا برای جای‌دهی فریم کامل `2112B` FC)** قرار می‌دهد تا یک **CNA (Converged Network Adapter)** روی یک جفت کابل `10G/25G/40G` هم LAN و هم SAN را ببرد. شرط Lossless شدن اترنت برای FCoE مجموعه‌استانداردهای **DCB (Data Center Bridging)** و مهم‌تر از همه **`PFC (Priority Flow Control — IEEE 802.1Qbb)`** (توقف انتخابی فقط کلاس ترافیک FCoE بدون متوقف کردن کل پورت) به همراه **`ETS` (تضمین سهم پهنای باند)** است—البته باید توجه داشت در شبکه‌های بزرگ L2، استفادهٔ نادرست از PFC می‌تواند در خطای سخت‌افزاری منجر به انتشار توقف (**Pause Storm / Head-of-Line Blocking**) شود، به همین دلیل FCoE معمولاً به یک **تک‌پرش تا سوئیچ Top-of-Rack** یا دامنهٔ محدود نگه داشته می‌شود و در دیتاسنترهای بزرگ همچنان SAN مجزای FC یا iSCSI/NVMe-TCP رواج بالایی دارد."
+          ]
         }
       ],
+      "analogy": "شبکهٔ IP معمولی مثل **ارسال بسته از طریق ادارهٔ پست** است (اگر انبار پر شد بسته برمی‌گردد و دوباره فرستاده می‌شود)؛ اما **Fibre Channel با `BB_Credit`** مثل **نوار نقالهٔ هوشمند کارخانه با کارت‌های مجوز (`Credit`)** است: کارگر اول تا کارت تایید خالی شدن جایگاهِ کارگر بعدی (`R_RDY`) را نگیرد بستهٔ جدید را روی نوار نمی‌گذارد، پس جعبه روی زمین نمی‌ریزد! و **`Zoning`** مثل گذاشتن دیوار بین خطوط تولید مختلف است تا ریبوت یک ماشین خط کنار را دچار لرزش (`RSCN`) نکند. محل شکست تشبیه اینجاست: در مسافت‌های طولانی بین‌ساختمانی، اگر تعداد کارت‌های مجوز (`BB_Credit`) کم باشد، نوار نقاله مدام منتظر برگشت کارت از آن سر شهر می‌ماند و سرعت به شدت افت می‌کند!",
       "table": {
-        "title": "مقایسه سه پروتکل اصلی شبکه‌های ذخیره‌سازی (Block Storage SAN)",
+        "title": "مقایسهٔ پروتکل‌های رایج ذخیره‌سازی (`NAS` در برابر سه روش `SAN`)",
         "headers": [
-          "پروتکل",
-          "بستر انتقال و تجهیزات",
-          "مکانیزم عدم افت بسته",
-          "کاربرد و هزینه"
+          "پروتکل / فناوری",
+          "سطح دسترسی و بستر",
+          "نکات معماری و محدودیت اصلی"
         ],
         "rows": [
           [
-            "Fibre Channel (FC)",
-            "شبکه اختصاصی جداگانه (سوئیچ MDS + کارت HBA)",
-            "ذاتی با BB_Credit (۳۲/۶۴G FC)",
-            "بانک‌ها، هسته حیاتی، بالاترین پایداری و هزینه بالاتر"
+            "`NAS (NFS / SMB)`",
+            "سطح فایل (`File-Level`) روی TCP/IP",
+            "ساده و اشتراکی؛ تاخیر و سربار فایل‌سیستم بالاتر برای دیتابیس‌های سنگین"
           ],
           [
-            "FCoE (FC over Ethernet)",
-            "کابل اترنت مشترک با کارت CNA و سوئیچ Nexus",
-            "استاندارد DCB (PFC روی یک کلاس CoS)",
-            "کاهش تعداد کابل و پورت در رک سرورها (Unified Fabric)"
+            "`iSCSI`",
+            "سطح بلاک (`Block-Level`) روی TCP/IP معمولی",
+            "هزینهٔ پایین بدون سوئیچ MDS؛ وابسته به TCP (یا نیازمند طراحی/QoS دقیق برای بار بالا)"
           ],
           [
-            "iSCSI / NVMe-TCP",
-            "شبکه اترنت/IP استاندارد بدون نیاز به کارت HBA خاص",
-            "تکیه بر TCP (یا RDMA/RoCE برای NVMe)",
-            "بسیار اقتصادی و محبوب برای شبکه‌های متوسط و کلود"
+            "`Fibre Channel (FC)`",
+            "سطح بلاک روی فابریک اختصاصی (`BB_Credit`)",
+            "پشتیبانی Lossless کنترل جریان و پایداری بالا؛ نیازمند سوئیچ MDS/HBA و دو فابریک A/B مجزا"
+          ],
+          [
+            "`FCoE`",
+            "سطح بلاک کپسوله‌شده مستقیم در لایه ۲ اترنت",
+            "یکپارچه‌سازی کابل با `CNA`؛ نیازمند `DCB (PFC + ETS)` و Jumbo MTU (`>=2240`) در دامنهٔ محدود"
           ]
         ]
       },
       "faq": [
         {
-          "q": "تفاوت VSAN و Zoning در شبکه Fibre Channel سیسکو چیست (چرا هر دو لازم‌اند)؟",
-          "a": "VSAN مثل VLAN کل سوئیچ SAN را به فابریک‌های فیزیکی/منطقی کاملاً جدا تقسیم می‌کند (معمولاً دو فابریک مجزای فیزیکی Fabric A / VSAN 10 و Fabric B / VSAN 20 برای افزونگی کامل می‌سازند!)؛ اما Zoning داخل یک VSAN مثل لیست دسترسی امنیتی دقیقاً تعیین می‌کند سرور X فقط پورت‌های Storage A را ببیند و دیسک سرور دیگر را خراب نکند."
+          "q": "چرا در شبکه‌های Fibre Channel همیشه دو فابریک کاملاً مجزا (**Fabric A** و **Fabric B**) بدون اتصال لینک به هم می‌سازند؟",
+          "a": "در SAN برخلاف شبکهٔ LAN که به هم متصل می‌شوند و با STP/L3 مسیر می‌یابند، اگر دو فابریک SAN را به هم وصل کنید یک خطای کنترلی یا تغییر Zone/RSCN هر دو مسیر دسترسی دیسک سرور را هم‌زمان درگیر می‌کند! با جداسازی کامل `VSAN A` روی سوئیچ ۱ و `VSAN B` روی سوئیچ ۲ (با مسیرهای مستقل از هر HBA سرور با Multipathing مثل MPIO)، قطعی یا نگهداری کل فابریک A هیچ تاثیری روی فابریک B نمی‌گذارد."
         },
         {
-          "q": "چرا در طراحی SAN سیسکو همیشه تاکید می‌شود از دو Fabric مجزا (Fabric A و Fabric B) بدون اتصال مستقیم بینشان استفاده کنید؟",
-          "a": "این قانون Air-Gap در SAN است! چون کوچک‌ترین اشتباه در یک Fabric (مثل تلاطم RSCN یا Zone Merge) نباید Fabric دوم را بیندازد؛ هر سرور با دو پورت HBA و نرم‌افزار Multipathing (مثل MPIO) هم‌زمان به هر دو فابریک مستقل وصل می‌شود."
-        },
-        {
-          "q": "آیا برای پیاده‌سازی iSCSI هم به قابلیت‌های PFC و DCB مثل FCoE نیاز داریم؟",
-          "a": "خیر، iSCSI روی پروتکل استاندارد TCP/IP پورت ۳۲۶۰ کار می‌کند؛ اگرچه استفاده از Jumbo Frame (MTU 9000) و یک VLAN/شبکه فیزیکی جداگانه برای ترافیک iSCSI کارایی آن را به شدت بالا می‌برد."
+          "q": "تفاوت **`FLOGI`** و **`PLOGI`** در Fibre Channel چیست؟",
+          "a": "**`FLOGI (Fabric Login)`** اولین گام بین پورت سرور (`N_Port`) و پورت سوئیچ (`F_Port`) است که در آن آدرس ۲۴-بیتی `FCID` به سرور داده می‌شود و `BB_Credit` تنظیم می‌گردد؛ اما **`PLOGI (Port Login)`** مرحلهٔ بعدی است که میان خود `Initiator` (سرور) و `Target` (Storage) در همان Zone برای آغاز جلسهٔ SCSI برقرار می‌شود."
         }
       ],
-      "analogy": "در شبکه معمولی IP/Ethernet، اگر خیابان شلوغ شود سیستم یکی دو بسته را می‌اندازد تا TCP بعداً دوباره بفرستد؛ اما اگر کامپیوتر بخواهد روی هارد دیسک خودش فایلی بنویسد و وسط راه یک بایت گم شود، فایل و کل دیتابیس بانک فاسد می‌شود! شبکه ذخیره‌سازی (SAN با پروتکل Fibre Channel) مثل یک تسمه نقاله اختصاصی و قفل‌شده است که قبل از فرستادن هر جعبه از انبار (Storage)، جا خالی کردن گیرنده را چک می‌کند (Buffer-to-Buffer Credit) تا هیچ جعبه‌ای هرگز زمین نیفتد (Lossless)!",
-      "ciscoRef": "Cisco MDS 9000 Series NX-OS Fundamentals & CCNP Data Center 350-601 DCCOR Storage Networking Guide",
-      "summary": "شبکه‌های ذخیره‌سازی SAN دسترسی پرسرعت Block-Level را بدون افت بسته فراهم می‌کنند: Fibre Channel روی سوئیچ‌های MDS با آدرس WWPN، مکانیزم کنترل جریان BB_Credit، جداسازی VSAN و Zoning (روی دو فابریک کاملاً مستقل A و B) بالاترین پایداری را می‌دهد؛ FCoE از طریق DCB/PFC آن را روی کابل واحد اترنت می‌آورد و iSCSI/NVMe-oF راهکار IP-محور اقتصادی ارائه می‌دهند."
+      "summary": "در ذخیره‌سازی دیتاسنتر، **SAN** بر خلاف `NAS` (سطح فایل) دسترسی سطح بلاک (`Block-Level`) فراهم می‌کند. **Fibre Channel** با شناسه‌های **`WWPN/WWNN`**، آدرس پویای ۲۴-بیتی **`FCID`** (`FLOGI/PLOGI`)، کنترل جریان اعتباری **`BB_Credit`** (نیازمند تنظیم متناسب با مسافت)، جداسازی دو فابریک مجزا (**`VSAN A/B`**) و **`Zoning (Single-Initiator / Single-Target)`** از تداخل و طوفان `RSCN` پیشگیری می‌کند؛ و **`FCoE`** نیز همین ترافیک را با کمک **`DCB (PFC 802.1Qbb + ETS)`** و **Jumbo MTU** روی اترنت تجمیع‌شده حمل می‌نماید.",
+      "ciscoRef": "Cisco MDS 9000 Series NX-OS Fabric Configuration Guide (Zoning, VSAN & FC) & Nexus FCoE/DCB Guide",
+      "protocolAnalysis": [
+        "در تحلیل آدرس **`FCID` (`24-bit`)** در Fibre Channel، این آدرس مشابه ساختار سلسله‌مراتبی سه بایتی است: ۸ بیت **`Domain ID`** (شناسهٔ یکتای سوئیچ MDS در VSAN)، ۸ بیت **`Area ID`** و ۸ بیت **`Port ID`**؛ بنابراین هنگام اتصال دو سوئیچ MDS روی لینک **`E_Port (ISL)`**، هر سوئیچ حتماً باید `Domain ID` یکتایی در آن VSAN داشته باشد.",
+        "در **FCoE (`EtherType 0x8906`)** فریم‌ها لایه ۲ خالصند (بدون هدر IP!) و برای تبدیل پورت‌های سرور به فابریک از پروتکل **`FIP (FCoE Initialization Protocol — EtherType 0x8914)`** جهت کشف سوئیچ FCF و انجام معادل `FLOGI` روی اترنت استفاده می‌شود."
+      ],
+      "iosCommands": [
+        {
+          "cmd": "show flogi database",
+          "out": "--------------------------------------------------------------------------------\nINTERFACE        VSAN    FCID           PORT NAME               NODE NAME\n--------------------------------------------------------------------------------\nfc1/1            10    0xef0001  20:00:00:25:b5:00:00:11 10:00:00:25:b5:00:00:01\nfc1/5            10    0xef0002  50:06:01:60:47:e0:11:22 50:06:01:60:47:e0:11:00\nTotal number of flogi = 2.",
+          "note": "مهم‌ترین دستور عیب‌یابی اولیه روی Cisco MDS / Nexus FC برای تایید ورود فیزیکی سرور و Storage به فابریک. [نکتهٔ شبیه‌ساز: دستور `show flogi database` در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تست زنده نیازمند سوئیچ Cisco MDS یا Nexus پشتیبان FC است.]",
+          "why": "تایید اینکه کارت HBA سرور و پورت Storage هر دو به سوئیچ متصلند، `FCID` گرفته‌اند و `WWPN` دقیق آن‌ها ثبت شده است.",
+          "anatomy": "پورت فیزیکی، شماره `VSAN`، آدرس `FCID` اختصاص‌یافته (`0xef0001`)، و شناسه‌های ۶۴ بیتی `PORT NAME (WWPN)` و `NODE NAME (WWNN)`.",
+          "lookFor": "حضور هر دو `WWPN` سرور و Storage در `VSAN` صحیح.",
+          "ifUnexpected": "اگر HBA در `show flogi database` نبود، مشکل در لایه ۱ (فیبر/SFP/سرعت پورت FC) یا فعال نبودن پورت در VSAN است؛ و نه Zoning!"
+        },
+        {
+          "cmd": "show zoneset active vsan 10",
+          "out": "zoneset name ZSET_PROD vsan 10\n  zone name Z_SRV1_STOR1 vsan 10\n   * fcid 0xef0001 [pwwn 20:00:00:25:b5:00:00:11]\n   * fcid 0xef0002 [pwwn 50:06:01:60:47:e0:11:22]",
+          "note": "بررسی Zoneset فعال روی VSAN 10 در Cisco MDS. [نکتهٔ شبیه‌ساز: دستور مرجع غیرشبیه‌سازی‌شده.]",
+          "why": "تایید اینکه Zone مورد نظر واقعاً **`Activate`** شده و هر دو عضو دارای ستارهٔ `*` (یعنی آنلاین در فابریک) هستند.",
+          "anatomy": "نام Zoneset فعال، نام تک‌تک Zoneها و ستارهٔ `*` کنار WWPN/FCID آنلاین.",
+          "lookFor": "وجود علامت `*` کنار هر دو `Initiator` و `Target` داخل یک Zone مشترک.",
+          "ifUnexpected": "فراموش کردن اجرای دستور `zoneset activate name ... vsan 10` پس از ساخت Zone باعث می‌شود تغییرات اصلاً اعمال نشوند."
+        },
+        {
+          "cmd": "show interfaces status",
+          "out": "Port      Name            Status       Vlan       Duplex  Speed   Type\nGi0/6     SAN-FAB-A-SIM   connected    10         a-full  a-1000  10/100/1000BaseTX",
+          "note": "دستور زنده در شبیه‌ساز داخلی برای ممیزی ایزوله‌سازی فیزیکی پورت‌ها و سرعت لینک‌های مجزا (مشابه تفکیک فابریک A و B).",
+          "why": "تضمین جداسازی پورت‌های سگمنت‌های مجزا و خاموش بودن پورت‌های آزاد برای پرهیز از تداخل.",
+          "anatomy": "پورت، توضیح، وضعیت، VLAN و سرعت.",
+          "lookFor": "تفکیک واضح سگمنت A از B روی پورت‌های مجزا.",
+          "ifUnexpected": "قرار گرفتن اشتباهی دو لینک ایزوله در یک دامنه باعث از بین رفتن افزونگی مستقل می‌شود."
+        }
+      ],
+      "diagramSvg": "leafspine",
+      "lab": {
+        "title": "آزمایشگاه شبیه‌سازی جداسازی فابریک A/B (VSAN A/B) روی پورت‌ها در شبیه‌ساز + سناریوی مرجع MDS Zoning",
+        "steps": [
+          "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات Fibre Channel (`vsan database`, `zoneset`, `show flogi database`) یا `PFC / FCoE` را اجرا نمی‌کند (برای آزمایش زنده نیازمند Cisco MDS یا Nexus با پورت FC/FCoE هستید). در اینجا اصل حیاتی جداسازی دو مسیر مستقل (`VLAN 140: SAN_FABRIC_A_SIM` روی `Gi0/6` و `VLAN 145: SAN_FABRIC_B_SIM` روی `Gi0/7` با `nonegotiate` و کنترل ترانک) در شبیه‌ساز را زنده اجرا می‌کنیم.",
+          "۲. با `enable` وارد شوید و با `show interfaces status` و `show vlan brief` پورت‌های آزاد `Gi0/6` و `Gi0/7` را ببینید.",
+          "۳. تفکیک کامل دو مسیر تمرینیِ معادل `Fabric A` و `Fabric B` را تنظیم کنید (توجه کنید در ترانک `Gi0/1` فقط سگمنت `140` را به عنوان فابریک اول و پورت‌ها را با `nonegotiate` قفل می‌کنیم): `configure terminal` -> `vlan 140` -> `name SAN_FABRIC_A_SIM` -> `vlan 145` -> `name SAN_FABRIC_B_SIM` -> `exit` -> `interface Gi0/6` -> `description HBA1-TO-FABRIC-A` -> `switchport mode access` -> `switchport access vlan 140` -> `switchport nonegotiate` -> `interface Gi0/7` -> `description HBA2-TO-FABRIC-B` -> `switchport mode access` -> `switchport access vlan 145` -> `switchport nonegotiate` -> `no shutdown` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 140` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces trunk`، `show interfaces Gi0/6 switchport` و `show running-config` تایید کنید که `VLAN 140` و `145` به‌صورت ایزوله روی `Gi0/6` و `Gi0/7` (همراه `nonegotiate`) و تنها `140` روی ترانک `Gi0/1` ثبت شده‌اند.",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (قطعه‌فرمان مرجع Cisco MDS VSAN & Single-Initiator Zoning — پلتفرم مرجع: Cisco MDS 9000 NX-OS):** **پیش‌نیازها و فرمان‌ها:** پورت‌های `fc1/1` (سرور HBA `20:00:00:25:b5:00:00:11`) و `fc1/5` (Storage Target `50:06:01:60:47:e0:11:22`) فیزیکی متصل بوده و در `show flogi database` ظاهر شده‌اند. تنظیم در `VSAN 10`: `vsan database` -> `vsan 10` -> `vsan 10 interface fc1/1` -> `vsan 10 interface fc1/5` -> `exit`؛ تعریف نام مستعار و Zone: `fcalias name SRV1_HBA1 vsan 10` (`member pwwn 20:00:00:25:b5:00:00:11`) -> `fcalias name STOR1_P1 vsan 10` (`member pwwn 50:06:01:60:47:e0:11:22`) -> `zone name Z_SRV1_STOR1 vsan 10` (`member fcalias SRV1_HBA1`, `member fcalias STOR1_P1`) -> `zoneset name ZSET_PROD vsan 10` (`member Z_SRV1_STOR1`) -> **`zoneset activate name ZSET_PROD vsan 10`** -> `copy running-config startup-config`. سپس `show flogi database` و `show zoneset active vsan 10` را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** ثبت `FCID` هر دو در `show flogi database` و علامت `*` کنار هر دو عضو در `show zoneset active vsan 10` و دیده شدن LUN در سیستم‌عامل سرور. **نشانهٔ شکست:** فراموش کردن `zoneset activate`، نبود ستارهٔ `*` (مشکل فیزیکی/`FLOGI`) یا ریختن همهٔ سرورها در یک Zone مشترک (ساخت طوفان `RSCN`). **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط دو VLAN تمرینی `140/145` را ثبت کرد و هیچ پروتکل FC، `FLOGI`، `BB_Credit` یا `PFC` را اجرا نمی‌کند."
+        ],
+        "verifyCmds": [
+          "enable",
+          "show vlan brief",
+          "show interfaces trunk",
+          "show interfaces Gi0/6 switchport",
+          "show running-config"
+        ]
+      },
+      "troubleshooting": {
+        "fault": "پس از اتصال یک سرور جدید به پورت `fc1/8` سوئیچ `Cisco MDS` و ساختن `zone name Z_NEW_SRV vsan 10` با نام صحیح `WWPN` سرور و Storage، سرور همچنان دیسک‌های Storage را نمی‌بیند؛ بررسی `show flogi database` نشان می‌دهد هم سرور و هم Storage به درستی وارد VSAN 10 شده‌اند و `FCID` گرفته‌اند!",
+        "analysis": "وقتی هر دو دستگاه در `show flogi database` حاضرند، یعنی لایه ۱ و `FLOGI` سالم است و مشکل در فاز **Zoning** قرار دارد: رایج‌ترین خطا روی Cisco MDS این است که مهندس `zone` را ساخته و حتی به `zoneset` اضافه کرده، اما دستور **`zoneset activate name <ZSET> vsan 10`** را اجرا نکرده است (بنابراین `Active Zoneset` فعلی هنوز نسخهٔ قدیمی و بدون سرور جدید است!). احتمال دوم داشتن فاصله/تایپ اشتباه در یکی از بایت‌های `WWPN` هنگام تعریف `fcalias` است.",
+        "fix": "مقایسهٔ دقیق `show zoneset active vsan 10` با `show flogi database` برای تایید ستارهٔ `*` در کنار هر دو `WWPN`، و اجرای **`zoneset activate name ZSET_PROD vsan 10`** به همراه `copy running-config startup-config`."
+      },
+      "misconceptions": [
+        {
+          "myth": "در `Fibre Channel` هم مانند شبکهٔ اترنتِ تک‌پایه، می‌توانیم دو فابریک `SAN A` و `SAN B` را برای افزایش مسیر با هم لینک بزنیم.",
+          "reality": "دو فابریک SAN (`Fabric A` و `Fabric B`) باید کاملاً از نظر فیزیکی و منطقی **جدا از هم** بمانند! اتصال بین آن‌ها خطر سرایت خطای کنترلی، تغییر Zone و طوفان `RSCN` به کل فابریک پشتیبان را ایجاد می‌کند.",
+          "howToSpot": "بررسی وجود دو سگمنت مستقل `VSAN A` و `VSAN B` بدون هیچ ISL بین سوئیچ‌های دو فابریک."
+        },
+        {
+          "myth": "در `FCoE` کافی است یک پورت ترانک `10G` ساده با `MTU 1500` باز کنیم تا ترافیک ذخیره‌سازی مثل iSCSI رویش کار کند.",
+          "reality": "`FCoE` مستقیماً روی لایه ۲ اترنت (بدون TCP!) کار می‌کند؛ بنابراین بدون **`DCB` (شامل `PFC 802.1Qbb` و `ETS`)** و **Jumbo MTU (`>= 2240` بایت)** فریم‌های `2112` بایتی FC اصلاً جا نمی‌شوند یا با کوچک‌ترین ازدحام می‌افتند و دیسک‌ها قطع می‌شوند.",
+          "howToSpot": "تایید تنظیمات `class-fcoe` (`pause no-drop` / `PFC`) و `mtu 9216` روی لینک‌های حامل FCoE."
+        }
+      ],
+      "exercise": "تفاوت `NAS` و `SAN` را با مثال بیان کنید و بنویسید چرا در **Zoning** سوئیچ‌های Cisco MDS باید از الگوی `Single-Initiator / Single-Target` به جای قرار دادن کل سرورها در یک Zone استفاده کرد.",
+      "exercises": [
+        {
+          "level": "ساده",
+          "task": "در عیب‌یابی Fibre Channel، اگر یک سرور جدید اصلاً در خروجی `show flogi database` سوئیچ MDS ظاهر نشود، خطا در کدام بخش است: «Zoning» یا «لایه ۱ فیزیکی / عضویت پورت در VSAN»؟",
+          "hint": "`FLOGI` قبل از `PLOGI` و قبل از بررسی Zone بین پورت سرور و سوئیچ رخ می‌دهد.",
+          "solution": "در **لایه ۱ فیزیکی (کابل فیبر، SFP، قطبیت فیبر، سرعت HBA) یا عضویت پورت در VSAN / فعال نبودن پورت (`no shut`)**؛ چون `FLOGI` مرحلهٔ ثبت ورود خود پورت به سوئیچ پیش از اعمال قوانین Zoning است."
+        },
+        {
+          "level": "متوسط",
+          "task": "مکانیزم **`BB_Credit`** چگونه از افت فریم به‌علت سرریز بافر در Fibre Channel جلوگیری می‌کند و چرا در لینک‌های فیبر بسیار طولانی بین دو دیتاسنتر باید مقدار `BB_Credit` را افزایش داد؟",
+          "hint": "تا سیگنال `R_RDY` برنگردد، اعتبار مصرف‌شده آزاد نمی‌شود؛ در مسیر طولانی زمان رفت‌وبرگشت (`RTT`) بالا می‌رود.",
+          "solution": "فرستنده تنها به تعداد **`BB_Credit`** توافق‌شده فریم ارسال می‌کند و برای هر فریم ارسالی منتظر بازگشت سیگنال **`R_RDY`** از گیرنده می‌ماند تا اعتبار آزاد شود؛ پس بافر گیرنده سرریز نمی‌شود. در مسافت‌های طولانی بین دو شهر، تا `R_RDY` برگردد زمان طول می‌کشد؛ اگر `BB_Credit` کم باشد اعتبار فرستنده تمام شده و لینک بیکار می‌ماند (`Starvation`) و سرعت به‌شدت افت می‌کند."
+        },
+        {
+          "level": "چالشی",
+          "task": "یک مهندس شبکه تصمیم گرفته ۲۴ سرور ESXi و یک آرایهٔ Storage دارای ۴ پورت را برای سادگی در **یک Zone واحد (`ALL_IN_ONE_ZONE`)** روی `VSAN 10` بگذارد. دو پیامد منفی فنی (`امنیتی` و `پایداری کنترلی RSCN`) را شرح دهید و الگوی استاندارد صحیح تعداد Zoneها را برای اتصال هر ۲۴ سرور به پورت `Target-1` بنویسید.",
+          "hint": "هر سرور + هر Target در یک Zone مجزا؛ با ۲۴ سرور و ۴ پورت Target (یا ۲ پورت در هر فابریک A و B) دقیقاً چه ساختاری توصیه می‌شود؟",
+          "solution": "۱) **پیامد امنیتی:** تمام ۲۴ سرور HBAها و پورت‌های هم را می‌بینند و هر سرور با تغییر تنظیمات محلی می‌تواند به پورت‌های نامرتبط دسترسی بگیرد.\n۲) **پیامد پایداری (`RSCN`):** با ریبوت یا وصل/قطع یک سرور، سوئیچ MDS پیام **`RSCN`** را به کل ۲۳ سرور دیگر در همان Zone می‌فرستد که می‌تواند باعث لرزش و مکث مجدد اسکن SCSI در همهٔ سرورها شود.\n۳) **الگوی صحیح (`Single-Initiator / Single-Target`):** برای فابریک A (مثلاً متصل به ۲ پورت Target)، برای هر سرور یک Zone مجزا به ازای هر Target می‌سازیم (مثلاً `Z_ESX01_T1` و `Z_ESX01_T2` که مجموعاً برای ۲۴ سرور و ۲ Target در این فابریک ۴۸ Zone مجزا می‌شود؛ هرچند در برخی استقرارها `Single-Initiator / Multi-Target` هم دیده می‌شود، اما ایزوله‌ترین روش استاندارد `Single-Initiator / Single-Target` است) و سپس همه را در یک **`Zoneset`** فعال می‌کنیم."
+        }
+      ],
+      "quiz": [
+        {
+          "q": "در شبکه‌های **Fibre Channel**، برای ایزوله‌سازی امن میان سرورها و Storageها و جلوگیری از پخش شدن پیام‌های `RSCN` به تمام سرورها هنگام ریبوت یک سرور، بهترین الگوی **Zoning** کدام است؟",
+          "opts": [
+            "الگوی **`Single-Initiator / Single-Target`** (قرار دادن یک HBA سرور و یک پورت Storage در هر Zone مجزا با `WWPN`)",
+            "قرار دادن تمام سرورها و تمام Storageها در یک Zone مشترک",
+            "حذف کامل Zoning و استفاده از Default Zone Allow",
+            "استفاده از `Port Security` اترنت روی پورت‌های FC"
+          ],
+          "ans": 0,
+          "exp": "الگوی `Single-Initiator / Single-Target` هم دسترسی‌های غیرضروری بین سرورها را می‌بندد و هم دامنهٔ ارسال پیام `RSCN` را به حداقل می‌رساند."
+        },
+        {
+          "q": "در عیب‌یابی **Cisco MDS SAN**، اگر سرور و Storage هر دو در `show flogi database` حاضر باشند ولی سرور دیسک‌های Storage را نبیند، محتمل‌ترین گام بررسی بعدی کدام است؟",
+          "opts": [
+            "بررسی کابل فیبر (چون FLOGI هم انجام نمی‌شد)",
+            "بررسی **`show zoneset active`** برای اطمینان از عضویت صحیح `WWPN`ها و **Activate** شدن Zoneset روی VSAN مربوطه",
+            "تغییر آدرس IP سرور DNS",
+            "فعال‌سازی `switchport mode trunk` روی HBA"
+          ],
+          "ans": 1,
+          "exp": "حضور هر دو در `show flogi database` یعنی لایه ۱ و ورود به فابریک سالم است؛ گام بعدی بررسی فعال بودن Zone صحیح بین آن‌هاست."
+        },
+        {
+          "q": "برای عبور امن فریم‌های **`FCoE`** روی اترنت بدون افت فریم ناشی از ازدحام، کدام قابلیت و اندازهٔ MTU الزامی است؟",
+          "opts": [
+            "`MTU 1500` با پروتکل TCP",
+            "`CDP` و `VTP Transparent`",
+            "`DCB` شامل **`PFC (IEEE 802.1Qbb)`** + **`ETS`** و **Jumbo MTU (`>= 2240` بایت)**",
+            "`NAT-Traversal` روی `UDP 4500`"
+          ],
+          "ans": 2,
+          "exp": "FCoE روی لایه ۲ خالص است؛ پس برای جای‌دهی فریم ۲۱۱2 بایتی FC به Jumbo MTU و برای کنترل جریان Lossless انتخابی به `PFC + ETS` در استاندارد DCB نیاز دارد."
+        }
+      ],
+      "bridge": {
+        "whereUsed": "در زیرساخت ذخیره‌سازی دیتاسنترها روی سوئیچ‌های Cisco MDS و Nexus با Storageهای SAN.",
+        "nextQuestion": "اکنون که دنیای Enterprise، Security و Data Center را پشت سر گذاشتیم، در بخش بعدی سراغ شبکه‌های غول‌پیکر مخابراتی (**Service Provider: IOS-XR و Segment Routing**) و سپس تخصصی‌های Wireless، Automation و Cloud می‌رویم!",
+        "nextId": "spec_sp"
+      }
     },
     "spec_sp_xr": {
       "id": "spec_sp_xr",
@@ -22410,8 +22823,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "ref": "adv_04"
     }
   ]
-}
-;
+};
 </script>
 <script>
 /* FAM Cisco Academy — Comprehensive Curriculum Engine (vanilla JS, CSP-safe, FAM session synced) */

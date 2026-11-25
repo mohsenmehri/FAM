@@ -141,19 +141,25 @@ class AcademyRedesignTests(unittest.TestCase):
                 ans_dist[q["ans"]] += 1
         self.assertTrue(all(6 <= v <= 10 for v in ans_dist.values()), ans_dist)
 
-        # 2b. Checks for f4 Batch 1 (first 5 lessons in f4) + Round-6 regressions
-        f4_b1 = data["curriculumGroups"][4]["lessons"][:5]
-        self.assertEqual(f4_b1, ["spec_ent", "spec_ent_campus", "spec_ent_sd", "spec_sec", "spec_sec_vpn"])
-        for lid in f4_b1:
+        # 2b. Checks for f4 Batch 1 & Batch 2 (first 10 lessons in f4) + Round-6/7 regressions
+        f4_b1_b2 = data["curriculumGroups"][4]["lessons"][:10]
+        self.assertEqual(
+            f4_b1_b2,
+            [
+                "spec_ent", "spec_ent_campus", "spec_ent_sd", "spec_sec", "spec_sec_vpn",
+                "spec_sec_ise", "spec_dc_nx", "s11", "spec_dc_aci", "spec_dc_stor",
+            ],
+        )
+        for lid in f4_b1_b2:
             lesson = data["lessons"][lid]
             self.assertEqual(len(lesson.get("exercises", [])), 3, lid)
             self.assertEqual(len(lesson.get("quiz", [])), 3, lid)
             self.assertEqual(len(lesson["lab"]["steps"]), 5, lid)
             s = json.dumps(lesson, ensure_ascii=False)
-            for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "۹۰٪", "۱۰۰٪", "جادویی"):
+            for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "قانون طلایی", "۹۰٪", "۹۹٪", "۱۰۰٪", "۸۰٪", "جادویی"):
                 self.assertNotIn(bad, s, f"{lid} contains {bad}")
 
-        # Round-6 regression assertions
+        # Round-6 & Round-7 regression assertions
         ent_step = data["lessons"]["spec_ent"]["sections"][1]["steps"][0]
         self.assertIn("49.0001.0102.5500.0001.00", ent_step)
         self.assertIn("49.0001.0102.5500.0002.00", ent_step)
@@ -163,8 +169,9 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("vBond", sd_ctrl["note"])
         self.assertNotIn("سوختن یکی از روترها، مدار متصل به آن همچنان", data["lessons"]["spec_ent_sd"]["exercise"])
 
-        ensdwi_cmds = [c["cmd"] for c in data["lessons"]["ccnp_ensdwi"]["iosCommands"]]
+        ensdwi_cmds = {c["cmd"]: c for c in data["lessons"]["ccnp_ensdwi"]["iosCommands"]}
         self.assertIn("show sdwan app-route stats", ensdwi_cmds)
+        self.assertIn("نه خروجی عین CLI", ensdwi_cmds["show sdwan app-route stats"]["note"])
         self.assertIn("show sdwan app-route stats", data["lessons"]["ccnp_ensdwi"]["lab"]["steps"][4])
 
         sec_lesson = data["lessons"]["spec_sec"]
@@ -173,9 +180,10 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("Spoofing", sec_lesson["sections"][2]["steps"][0])
 
         vpn_lesson = data["lessons"]["spec_sec_vpn"]
+        self.assertEqual(vpn_lesson["bridge"]["nextId"], "spec_sec_ise")
         self.assertIn("IP Multicast", vpn_lesson["protocolAnalysis"][1])
-        self.assertIn("۴ بایت", vpn_lesson["exercises"][2]["solution"])
-        self.assertIn("24", vpn_lesson["exercises"][2]["solution"])
+        self.assertIn("پیش از محاسبهٔ Padding", vpn_lesson["exercises"][2]["solution"])
+        self.assertIn("1400", vpn_lesson["exercises"][2]["solution"])
 
         camp_lesson = data["lessons"]["spec_ent_campus"]
         self.assertNotIn("همیشه باید حداقل دو لینک", camp_lesson["sections"][1]["think"]["a"])
@@ -194,9 +202,9 @@ class AcademyRedesignTests(unittest.TestCase):
                 self.fail(msg)
             self.skipTest(msg)
 
-        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1 lesson
+        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1 & Batch 2 lesson
         extracted_labs = {}
-        for lid in f4_b1:
+        for lid in f4_b1_b2:
             step_txt = data["lessons"][lid]["lab"]["steps"][2]
             start_idx = step_txt.index("`configure terminal`")
             cmds = re.findall(r"`([^`]+)`", step_txt[start_idx:])
@@ -224,18 +232,23 @@ function run(cmds) {{
     sim: ctx.getSim()
   }};
 }}
+function isSimError(out) {{
+  const t = (out || '').trim();
+  return t.startsWith('%') || t.includes('Invalid') || t.includes('Command rejected') || t.includes('پشتیبانی نمی‌شود') || t.includes('مجاز نیست') || t.includes('ابتدا');
+}}
+
 const r = run(['enable','configure terminal','interface Gi0/2','switchport mode access','switchport nonegotiate','end','show running-config','configure terminal','interface Gi0/2','switchport mode access','end','show running-config','configure terminal','interface Gi0/2','no switchport nonegotiate','end','show interfaces Gi0/2 switchport']);
 if (r.out[6] !== r.out[11]) throw new Error('repeated mode access altered running-config');
 if (!r.out[11].includes('switchport nonegotiate')) throw new Error('nonegotiate lost after repeated mode access');
 if (r.sim.interfaces['GigabitEthernet0/2'].nonegotiate !== false) throw new Error('no switchport nonegotiate failed');
 const neg = run(['enable','configure terminal','interface Gi0/0','switchport nonegotiate','no switchport nonegotiate']);
-if (!neg.out[3].includes('Command rejected') || !neg.out[4].includes('Command rejected')) throw new Error('routed interface accepted nonegotiate');
+if (!isSimError(neg.out[3]) || !isSimError(neg.out[4])) throw new Error('routed interface accepted nonegotiate');
 
 function assertRunLab(id, verifyFn) {{
   const cmds = ['enable'].concat(extractedLabs[id]).concat(['show running-config']).concat(extractedLabs[id]).concat(['show running-config']);
   const res = run(cmds);
   for (let i = 0; i < res.out.length; i++) {{
-    if (res.out[i].includes('% Invalid') || res.out[i].includes('Command rejected')) {{
+    if (isSimError(res.out[i])) {{
       throw new Error(id + ' failed on ' + cmds[i] + ': ' + res.out[i]);
     }}
   }}
@@ -247,32 +260,97 @@ function assertRunLab(id, verifyFn) {{
   verifyFn(res.sim, res.out[secondRunIdx]);
 }}
 
+// Negative test: ensure unsupported commands & mode errors are caught by assertRunLab/isSimError
+let caughtUnsupported = false;
+try {{
+  const bad = run(['enable'].concat(extractedLabs['spec_ent']).concat(['totally unsupported command']));
+  for (const o of bad.out) {{ if (isSimError(o)) throw new Error('caught unsupported'); }}
+}} catch (err) {{ caughtUnsupported = true; }}
+if (!caughtUnsupported) throw new Error('Negative test failed: totally unsupported command was not caught!');
+
+const modeErr1 = run(['enable', 'configure terminal', 'shutdown']);
+if (!isSimError(modeErr1.out[2])) throw new Error('Negative test failed: shutdown in global config not rejected');
+const modeErr2 = run(['configure terminal']);
+if (!isSimError(modeErr2.out[0])) throw new Error('Negative test failed: configure terminal in user mode not rejected');
+
+// Explicit per-VLAN and per-port assertions for all 10 f4 lessons (Batch 1 + Batch 2)
 assertRunLab('spec_ent', (sim) => {{
-  if (!sim.vlans[210] || !sim.vlans[220]) throw new Error('spec_ent missing VLAN 210/220');
+  if (!sim.vlans[210] || sim.vlans[210].name !== 'VN_CORP_HANDOFF') throw new Error('spec_ent VLAN 210');
+  if (!sim.vlans[220] || sim.vlans[220].name !== 'VN_GUEST_HANDOFF') throw new Error('spec_ent VLAN 220');
   if (sim.interfaces['GigabitEthernet0/6'].accessVlan !== 210) throw new Error('spec_ent Gi0/6 vlan');
   if (sim.interfaces['GigabitEthernet0/7'].accessVlan !== 220) throw new Error('spec_ent Gi0/7 vlan');
   const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
   if (!allowed.includes(210) || !allowed.includes(220)) throw new Error('spec_ent trunk missing 210/220');
 }});
 assertRunLab('spec_ent_campus', (sim) => {{
+  if (!sim.vlans[150] || sim.vlans[150].name !== 'CORE_MGMT_OOB') throw new Error('spec_ent_campus VLAN 150');
+  if (!sim.vlans[10]) throw new Error('spec_ent_campus VLAN 10');
   if (!sim.interfaces['GigabitEthernet0/1'].nonegotiate) throw new Error('spec_ent_campus nonegotiate');
   if (!sim.interfaces['GigabitEthernet0/1'].allowedVlans.includes(150)) throw new Error('spec_ent_campus trunk 150');
   if (sim.interfaces['GigabitEthernet0/6'].accessVlan !== 150) throw new Error('spec_ent_campus Gi0/6');
   if (sim.interfaces['GigabitEthernet0/7'].accessVlan !== 10) throw new Error('spec_ent_campus Gi0/7');
 }});
 assertRunLab('spec_ent_sd', (sim) => {{
+  if (!sim.vlans[10] || sim.vlans[10].name !== 'BRANCH_DATA_VPN10') throw new Error('spec_ent_sd VLAN 10');
+  if (!sim.vlans[20] || sim.vlans[20].name !== 'BRANCH_VOICE_VPN20') throw new Error('spec_ent_sd VLAN 20');
+  if (!sim.vlans[99] || sim.vlans[99].name !== 'UNUSED_PARK') throw new Error('spec_ent_sd VLAN 99');
   if (!sim.interfaces['GigabitEthernet0/1'].nonegotiate) throw new Error('spec_ent_sd Gi0/1 nonegotiate');
-  if (sim.interfaces['GigabitEthernet0/6'].voiceVlan !== 20) throw new Error('spec_ent_sd Gi0/6 voice vlan');
-  if (sim.interfaces['GigabitEthernet0/7'].adminUp !== false || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 99) throw new Error('spec_ent_sd Gi0/7 shut/99');
+  if (sim.interfaces['GigabitEthernet0/6'].voiceVlan !== 20 || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 20) throw new Error('spec_ent_sd Gi0/6');
+  if (sim.interfaces['GigabitEthernet0/7'].adminUp !== false || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 99) throw new Error('spec_ent_sd Gi0/7');
 }});
 assertRunLab('spec_sec', (sim) => {{
+  if (!sim.vlans[30] || sim.vlans[30].name !== 'TRUST_USERS') throw new Error('spec_sec VLAN 30');
+  if (!sim.vlans[40] || sim.vlans[40].name !== 'QUARANTINE_ISOLATED') throw new Error('spec_sec VLAN 40');
+  if (!sim.vlans[999] || sim.vlans[999].name !== 'PARK_SHUT') throw new Error('spec_sec VLAN 999');
   if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 30) throw new Error('spec_sec Gi0/6');
   if (!sim.interfaces['GigabitEthernet0/2'].adminUp || sim.interfaces['GigabitEthernet0/2'].accessVlan !== 40) throw new Error('spec_sec Gi0/2');
   if (sim.interfaces['GigabitEthernet0/7'].adminUp !== false || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 999) throw new Error('spec_sec Gi0/7');
 }});
 assertRunLab('spec_sec_vpn', (sim) => {{
+  if (!sim.vlans[35] || sim.vlans[35].name !== 'CORP_ENCRYPT_LAN') throw new Error('spec_sec_vpn VLAN 35');
   if (!sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 35) throw new Error('spec_sec_vpn Gi0/7');
   if (!sim.interfaces['GigabitEthernet0/1'].allowedVlans.includes(35)) throw new Error('spec_sec_vpn Gi0/1 allowed 35');
+}});
+assertRunLab('spec_sec_ise', (sim) => {{
+  if (!sim.vlans[90] || sim.vlans[90].name !== 'ISE_OOB_MGMT') throw new Error('spec_sec_ise VLAN 90');
+  if (!sim.vlans[92] || sim.vlans[92].name !== 'POSTURE_QUARANTINE') throw new Error('spec_sec_ise VLAN 92');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 90) throw new Error('spec_sec_ise Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 92) throw new Error('spec_sec_ise Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(90) || !allowed.includes(92)) throw new Error('spec_sec_ise trunk 90/92');
+}});
+assertRunLab('spec_dc_nx', (sim) => {{
+  if (!sim.vlans[100] || sim.vlans[100].name !== 'DC_APP_PROD') throw new Error('spec_dc_nx VLAN 100');
+  if (!sim.vlans[105] || sim.vlans[105].name !== 'DC_DB_PROD') throw new Error('spec_dc_nx VLAN 105');
+  if (!sim.vlans[199] || sim.vlans[199].name !== 'DC_MGMT_OOB') throw new Error('spec_dc_nx VLAN 199');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 100) throw new Error('spec_dc_nx Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 199) throw new Error('spec_dc_nx Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!sim.interfaces['GigabitEthernet0/1'].nonegotiate || !allowed.includes(100) || !allowed.includes(105) || !allowed.includes(199)) throw new Error('spec_dc_nx trunk');
+}});
+assertRunLab('s11', (sim) => {{
+  if (!sim.vlans[110] || sim.vlans[110].name !== 'L2VNI_10110_WEB') throw new Error('s11 VLAN 110');
+  if (!sim.vlans[120] || sim.vlans[120].name !== 'L2VNI_10120_APP') throw new Error('s11 VLAN 120');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 110) throw new Error('s11 Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 120) throw new Error('s11 Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(110) || !allowed.includes(120)) throw new Error('s11 trunk');
+}});
+assertRunLab('spec_dc_aci', (sim) => {{
+  if (!sim.vlans[130] || sim.vlans[130].name !== 'EPG_WEB_ENCAP') throw new Error('spec_dc_aci VLAN 130');
+  if (!sim.vlans[135] || sim.vlans[135].name !== 'EPG_DB_ENCAP') throw new Error('spec_dc_aci VLAN 135');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 130) throw new Error('spec_dc_aci Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 135) throw new Error('spec_dc_aci Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(130) || !allowed.includes(135)) throw new Error('spec_dc_aci trunk');
+}});
+assertRunLab('spec_dc_stor', (sim) => {{
+  if (!sim.vlans[140] || sim.vlans[140].name !== 'SAN_FABRIC_A_SIM') throw new Error('spec_dc_stor VLAN 140');
+  if (!sim.vlans[145] || sim.vlans[145].name !== 'SAN_FABRIC_B_SIM') throw new Error('spec_dc_stor VLAN 145');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 140) throw new Error('spec_dc_stor Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 145) throw new Error('spec_dc_stor Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(140) || allowed.includes(145)) throw new Error('spec_dc_stor trunk isolation');
 }});
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
