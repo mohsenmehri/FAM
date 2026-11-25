@@ -1,0 +1,390 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "academy-stage-zero-03-arp-icmp-dns-dhcp-fa",
+  "id": "academy-stage-zero-03-arp-icmp-dns-dhcp-fa",
+  "facultyId": "f0",
+  "objectiveId": "Term1-03",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-stage-zero",
+  "title": "پروتکل‌های حیاتی پایه: ARP، ICMP، DNS و DHCP",
+  "titleEn": "Core Protocols: ARP, ICMP, DNS & DHCP End-to-End Flow",
+  "domain": "دانشکده صفر · هفته سوم و چهارم: پروتکل‌های پایه",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 90,
+  "prerequisites": [
+    "academy-stage-zero-02-ipv4-subnetting-fa"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "academy-stage-zero-02-ipv4-subnetting-fa"
+    ],
+    "learningObjectives": [
+      "چرخهٔ ۴مرحله‌ای DHCP DORA",
+      "پروتکل ARP برای ترجمهٔ IP به MAC",
+      "نقش DNS در تبدیل نام به IP",
+      "تحلیل رفتار ICMP در Ping و Traceroute"
+    ]
+  },
+  "whyItMatters": "تقریباً تمام خطاهای «اینترنت قطع است» در دنیا به یکی از چهار حلقهٔ DHCP، DNS، ARP یا Gateway برمی‌گردد؛ شناخت توالی دقیق این ۴ پروتکل عیب‌یابی را چندبرابری سریع می‌کند.",
+  "topology": {
+    "devices": [
+      {
+        "id": "PC1",
+        "type": "host",
+        "x": 80,
+        "y": 140
+      },
+      {
+        "id": "SW1",
+        "type": "switch",
+        "x": 240,
+        "y": 140
+      },
+      {
+        "id": "R1",
+        "type": "router",
+        "x": 400,
+        "y": 140
+      },
+      {
+        "id": "DNS-DHCP",
+        "type": "server",
+        "x": 560,
+        "y": 140
+      }
+    ],
+    "links": [
+      {
+        "a": "PC1:eth0",
+        "b": "SW1:Gi0/1"
+      },
+      {
+        "a": "SW1:Gi0/24",
+        "b": "R1:Gi0/0"
+      },
+      {
+        "a": "R1:Gi0/1",
+        "b": "DNS-DHCP:eth0"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۰ · ارزیابی و تکمیل مبانی — پروتکل‌های سرویس‌دهندهٔ روزمرهٔ شبکه</div><p><strong>هدف درس:</strong> چرخهٔ کامل «روشن شدن کلاینت تا باز شدن یک وب‌سایت» را قدم‌به‌قدم توضیح دهید: DHCP ← DNS ← ARP ← ICMP و برای هر مرحله، فرمان تشخیصی مناسب (ipconfig / release، nslookup، arp -a، ping/traceroute) را اجرا و خروجی را بخوانید.</p><p><strong>پیش‌نیازها:</strong> آدرس‌دهی IPv4 و زیرشبکه‌بندی (مرحلهٔ صفر-۰۲)، مدل لایه‌ای OSI/TCP-IP و تفاوت فریم (L2) با بسته (L3).</p><p><strong>خروجی یادگیری:</strong> عیب‌یابی چهار خرابی رایج — DHCP کار نمی‌کند، DNS پاسخ نمی‌دهد، ARP تکراری می‌شود، میزبان به‌صورت محلی ping نمی‌شود — با دستور درست و بدون حدس زدن.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>این چهار پروتکل «زیرساخت نامرئی» شبکه‌اند: کاربر فقط «اینترنت کند است» می‌گوید، ولی مهندس باید بداند کدام حلقه شکسته است.</p><ul><li><strong>DHCP:</strong> بدون آن، هر کلاینت به IP ثابت نیاز دارد؛ با خرابی آن در ساعت شروع کاری، ده‌ها نفر «متصل نیستند» گزارش می‌دهند — رایج‌ترین تیکت L1.</li><li><strong>DNS:</strong> آدرس IP را کسی حفظ نمی‌کند؛ خرابی DNS یعنی «اینترنت قطع شد» در حالی که مسیریابی سالم است — تشخیص این دو از هم مهم‌ترین مهارت عیب‌یابی مقدماتی است.</li><li><strong>ARP:</strong> پل بین IP و MAC؛ بدون آن، حتی درست‌ترین آدرس‌دهی هم روی یک لینک اترنت کار نمی‌کند. حمله ARP Spoofing هم ریشه در همین پروتکل بدون احراز هویت دارد.</li><li><strong>ICMP:</strong> زبان «آیا می‌رسی؟» — ping و traceroute پایهٔ هر تست شبکه‌اند؛ ولی باید بدانید ICMP در کدام لایه است و چرا بعضی فایروال‌ها آن را می‌بندند.</li></ul><div class=\"lesson-callout\"><strong>قانون تشخیص:</strong> IP ندارم ← DHCP · IP دارم ولی نام باز نمی‌شود ← DNS · نام باز می‌شود ولی مقصد نمی‌رسد ← مسیریابی/ACL/ARP.</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. چرخهٔ ۴مرحله‌ای DHCP DORA",
+      "html": "<p>ARP در لایه ۲٫۵ کار می‌کند: ورودی آدرس IP مقصد، خروجی آدرس MAC. چهار پیام دارد: Request (پخش)، Reply (unicast)، Gratuitous ARP (اعلام بدون درخواست) و Inverse ARP (در frame-relay/DMVPN).</p><table class=\"lesson-data-table\"><thead><tr><th>مرحله</th><th>چه اتفاقی می‌افتد</th><th>اگر نباشد…</th></tr></thead><tbody><tr><td>۱</td><td>کلاینت ARP Cache (جدول نشست) خود را چک می‌کند</td><td>—</td></tr><tr><td>۲</td><td>نیست ← ARP Request با MAC پخش ff:ff:ff:ff:ff:ff</td><td>بسته در همین‌جا می‌ماند</td></tr><tr><td>۳</td><td>فقط صاحب همان IP پاسخ می‌دهد (Reply unicast)</td><td>«Destination host unreachable»</td></tr><tr><td>۴</td><td>ورودی جدول ARP با تایمر (پیش‌فرض IOS معمولاً ۴ ساعت) ذخیره می‌شود</td><td>هر بسته دوباره پخش می‌شود ← ترافیک اضافه</td></tr></tbody></table><p>نکته: ARP فقط در همان broadcast domain کار می‌کند؛ از مرز روتر عبور نمی‌کند. به‌همین‌دلیل کلاینت برای مقصد خارجی، MAC گیت‌وی را می‌خواهد نه MAC مقصد را.</p>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. پروتکل ARP برای ترجمهٔ IP به MAC",
+      "html": "<p>ICMP (پروتکل کنترل پیام، شمارهٔ 1 در IP) برای گزارش خطا و آزمایش است؛ دادهٔ کاربری حمل نمی‌کند. مهم‌ترین نوع‌ها:</p><table class=\"lesson-data-table\"><thead><tr><th>نوع</th><th>کاربرد</th><th>پیام رایج</th></tr></thead><tbody><tr><td>Echo Request / Reply (8 / 0)</td><td>ping</td><td>timeout یا !!!!!</td></tr><tr><td>Destination Unreachable (3)</td><td>رد شدن بسته</td><td>«Destination host/network unreachable»</td></tr><tr><td>Time Exceeded (11)</td><td>traceroute و TTL صفر</td><td>مسیر یک‌هاپ‌به‌یک‌هاپ</td></tr><tr><td>Redirect (5)</td><td>راهنمایی به گیت‌وی بهتر</td><td>معمولاً در LAN ناخواسته است</td></tr><tr><td>Frag Needed (4)</td><td>بسته بزرگ‌تر از MTU</td><td>PMTUD شکست — وب باز نمی‌شود ولی ping جواب می‌دهد!</td></tr></tbody></table><p>نکتهٔ آزمون: ICMP در لایهٔ اینترنت است و خودش TCP/UDP ندارد؛ شمارهٔ پورت ندارد، ولی از شناسهٔ نوع/کد برای تمایز استفاده می‌کند. فایروال‌های stateful ممکن است Echo Reply برگشتی را رد کنند اگر Request دیده نشده باشد (asymmetry).</p>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. نقش DNS در تبدیل نام به IP",
+      "html": "<p>DNS نام دامنه را به IP تبدیل می‌کند (و برعکس PTR). یک مکالمهٔ معمولی برای باز شدن example.com:</p><ol><li>کلاینت اول در /etc/hosts یا hosts.local چک می‌کند — نیست.</li><li>به Resolver خودش (مثلاً 10.10.4.10) UDP/53 سؤال می‌فرستد؛ اگر رکورد در کش Resolver باشد، همان‌جا پاسخ می‌گیرد.</li><li>Resolver در صورت نیاز recursive query می‌زند: Root ← TLD (.com) ← Authoritative — و کش را بر اساس TTL پر می‌کند.</li><li>کلاینت IP می‌گیرد و تازه وارد فاز ARP/اتصال TCP می‌شود.</li></ol><table class=\"lesson-data-table\"><thead><tr><th>رکورد</th><th>معنی</th><th>مثال</th></tr></thead><tbody><tr><td>A / AAAA</td><td>نام ← IPv4 / IPv6</td><td>www.example.com → 93.184.216.34</td></tr><tr><td>CNAME</td><td>نام مستعار</td><td>cdn → edge.example.net</td></tr><tr><td>MX</td><td>سرور ایمیل (با ترجیح)</td><td>mail.example.com preference 10</td></tr><tr><td>PTR</td><td>IP ← نام (reverse)</td><td>برای anti-spam و لاگ‌ها</td></tr><tr><td>NS</td><td>سرور مجاز دامنه</td><td>زنجیرهٔ delegation</td></tr></tbody></table><div class=\"lesson-callout\"><strong>تفصیل مهم:</strong> «پینگ به IP می‌رسد ولی نام باز نمی‌شود» ← دقیقاً همین یک جمله یعنی DNS خراب است، نه مسیریابی.</div>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. تحلیل رفتار ICMP در Ping و Traceroute",
+      "html": "<p>DHCP چهار پیام DORA را مبادله می‌کند؛ همه broadcast (در نسخه‌های استاندارد) و روی UDP پورت‌های 67 (server) و 68 (client):</p><table class=\"lesson-data-table\"><thead><tr><th>قدم</th><th>پیام</th><th>محتوا</th></tr></thead><tbody><tr><td>۱</td><td><strong>D</strong>iscover</td><td>«آیا DHCP سروری هست؟» — کلاینت بدون IP، مقصد 255.255.255.255</td></tr><tr><td>۲</td><td><strong>O</strong>ffer</td><td>سرور پیشنهاد: آدرس، ماسک، lease، DNS، gateway</td></tr><tr><td>۳</td><td><strong>R</strong>equest</td><td>کلاینت قبول رسمی پیشنهاد (برای جلوگیری از تخصیص هم‌زمان)</td></tr><tr><td>۴</td><td><strong>A</strong>ck</td><td>سرور تأیید و فعال‌سازی lease</td></tr></tbody></table><p>سوییچ پورت کلاینت باید در VLAN درست باشد و DHCP Relay (<code>ip helper-address</code>) روی سوییچ/روتر لازم است وقتی سرور در subnet دیگری است؛ بدون آن، Discover از مرز subnet عبور نمی‌کند. کلاینت بعد از نیمهٔ lease، Renew (unicast به سرور) و نزدیک انقضا Rebind می‌کند؛ در صورت نبود پاسخ، آدرس را رها و دوباره Discover می‌زند.</p>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>موضوع</th><th>گزینه‌ها</th><th>تصمیم</th></tr></thead><tbody><tr><td>فروشندهٔ IP</td><td>DHCP در برابر استاتیک</td><td>کلاینت ← DHCP با رزرو (MAC binding) برای چاپگر/سرور؛ زیرساخت ← استاتیک</td></tr><tr><td>دامنهٔ scope</td><td>یک scope بزرگ در برابر چند scope جدا</td><td>یک scope به‌ازای هر زیرشبکه؛ helper-address به سرور مرکزی</td></tr><tr><td>DNS سرور</td><td>روتر به‌عنوان relay در برابر سرور داخلی</td><td>سازمانی ← سرور داخلی (قابل لاگ/فیلتر)؛ خانگی ← گیت‌وی</td></tr><tr><td>نام‌گذاری</td><td>میزبان در برابر فول‌کوالیفاید</td><td>نام میزبان + domain سازمانی؛ برای سرورهای مهم A رکورد ثابت</td></tr><tr><td>زمان</td><td>NTP سرور محلی در برابر اینترنتی</td><td>همهٔ دستگاه‌ها ← سرور NTP داخلی؛ سرور داخلی ← اینترنتی با stratum پایین</td></tr></tbody></table><div class=\"lesson-callout\"><strong>اشتباه کلاسیک:</strong> DNS روی scope به IP عمومی (مثلاً 8.8.8.8) داده شده ولی فایروال خروج UDP/53 را می‌بندد ← همه «اینترنت ندارند» در حالی که DHCP کامل تحویل داده است.</div>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>کلاینت 10.10.4.150 می‌خواهد server.example.com را باز کند — جریان کامل کنترل‌پلین:</p><ol><li><strong>DHCP:</strong> اگر IP ندارد، Discover/Offer/Request/Ack؛ IP+mask+GW+DNS دریافت. شکست ← همهٔ مراحل بعد شکست می‌خورند.</li><li><strong>DNS:</strong> پرسش A record برای server.example.com به resolver ← پاسخ 10.10.4.80. شکست ← خطای «نام یافت نشد» بدون هیچ بستهٔ TCP.</li><li><strong>تصمیم محلی:</strong> 10.10.4.80 را با ماسک خود AND می‌زند؛ خارجی است ← MAC گیت‌وی (10.10.4.129) را از ARP می‌پرسد، نه MAC سرور را.</li><li><strong>اتصال:</strong> TCP three-way handshake با MAC گیت‌وی در L2، ولی IP سرور در L3؛ روترها در هر هاپ MAC را عوض می‌کنند.</li><li><strong>شکست در میانه:</strong> ICMP Destination Unreachable (گیت‌وی جدول ندارد)، ICMP Redirect (مسیر نامناسب)، یا سکوت (ACL silently drop) — هر کدام علامت متفاوتی دارند.</li></ol><div class=\"lesson-callout\"><strong>مرتب بگیرید:</strong> ip → name → mac → path. هر مرحله فقط با دستور همان مرحله چک می‌شود.</div>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع: یک LAN ساده با سرویس‌دهنده‌های داخلی.</p><table class=\"lesson-data-table\"><thead><tr><th>دستگاه</th><th>نقش</th><th>آدرس</th></tr></thead><tbody><tr><td>SW1</td><td>سوییچ دسترسی، VLAN 10</td><td>—</td></tr><tr><td>R1 (گیت‌وی)</td><td>روتر + DHCP Relay + DNS forwarder</td><td>10.10.4.129/26</td></tr><tr><td>SRV-DHCP</td><td>DHCP سرور (scope 10.10.4.128/26، pool .130–.190)</td><td>10.10.4.200</td></tr><tr><td>SRV-DNS</td><td>DNS داخلی + رکوردهای A داخلی</td><td>10.10.4.201</td></tr><tr><td>PC-A</td><td>کلاینت DHCP</td><td>تخصیصی (مثلاً .150)</td></tr></tbody></table><p>روی R1: <code>ip helper-address 10.10.4.200</code> روی رابط LAN تا Discover به سرور برسد؛ DNS scope هم 10.10.4.201. این توپولوژی برای هر چهار تمرین بعدی مشترک است.</p>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی‌های کلیدی (طراحی‌شده — اجرا نشده):</p><pre><code>R1(config)# ip dhcp excluded-address 10.10.4.129 10.10.4.132\nR1(config)# ip dhcp pool USERS\nR1(dhcp-config)# network 10.10.4.128 255.255.255.192\nR1(dhcp-config)# default-router 10.10.4.129\nR1(dhcp-config)# dns-server 10.10.4.201\nR1(dhcp-config)# domain-name corp.local\nR1(config)# ip dhcp excluded-address 10.10.4.200 10.10.4.201\nR1(config)# interface GigabitEthernet0/0\nR1(config-if)# ip helper-address 10.10.4.200\n\nPC-A# show ip dhcp binding\nIP address       Client-ID/          Expiration      State\n10.10.4.150      0063.6261.7363.     Feb 01 2027     Automatic\nPC-A# nslookup server.example.com\nName: server.example.com  Address: 10.10.4.80</code></pre><ul><li><code>ip dhcp excluded-address</code> — رزرو گیت‌وی و سرورها؛ بدون آن، DHCP ممکن است IP سرور را به کلاینت بدهد (درگیری دستی بعدی).</li><li><code>show ip dhcp binding</code> — لیست تخصیص‌های فعال؛ اولین دستور در عیب‌یابی DHCP.</li><li><code>show ip dhcp server statistics</code> — شمارنده‌های Discover/Offer/Nak؛ اگر Discover صفر است، مشکل از لینک/relay است نه سرور.</li><li><code>clear ip dhcp binding *</code> روی سرور — آزاد کردن leaseهای خراب (با احتیاط).</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<p>دستورات مشاهده و تفسیر خروجی:</p><pre><code>PC-A# arp -a\nInternet Address      Physical Address      Type\n10.10.4.129           001a.2b3c.4d5e        dynamic\n\nR1# show ip arp\nInternet  10.10.4.150   0063.6261.7363  47  arpa  GigabitEthernet0/0\n\nR1# ping 10.10.4.201\nType escape sequence to abort.\nSending 5, 100-byte ICMP Echos to 10.10.4.201, timeout is 2 seconds:\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/2/4 ms\n\nR1# traceroute 10.10.4.80\n 1  10.10.4.129  1 msec   1 msec   1 msec\n 2  10.10.4.80   2 msec   2 msec   3 msec</code></pre><ul><li><code>arp -a</code> روی کلاینت و <code>show ip arp</code> روی روتر باید همدیگر را تأیید کنند؛ مک MAC گیت‌وی در هر دو یکی است.</li><li>الگوی ping: <code>!!!!!</code> موفق · <code>.....</code> timeout (ACL/مسیر/خاموشی) · <code>U.U.U</code> یا «unreachable» (بدون مسیر برگشت یا رد شدن).</li><li>traceroute با ICMP در لینوکس/IOS: هاپ‌ها از TTL صفر دریافت‌شده ساخته می‌شوند؛ هاپ غایب = بستهٔ ICMP Time-Exceeded فایلتر شده.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<p>در Wireshark یک جلسهٔ سالم را دنبال کنید (فیلترها را به ترتیب باز کنید):</p><ol><li><code>bootp</code> یا <code>dhcp</code> — چهار پیام DORA را با ترتیب ببینید؛ بین Discover تا Ack معمولاً چند دهم ثانیه فاصله است. پاسخ Offer با MAC سرور و مقصد MAC کلاینت (پس از اولین exchange) ارسال می‌شود.</li><li><code>dns</code> — Query و Response با همان transaction ID؛ در Response رکورد A با TTL. اگر Query برود و Response نیاید ← Resolver یا فایروال.</li><li><code>arp</code> — Request پخش با مقصد IP سرور؛ سپس Reply با MAC سرور. بعد از آن، بسته‌های TCP با مقصد MAC سرور (در این لینک = MAC گیت‌وی اگر سرور خارجی است).</li><li><code>icmp</code> — Echo Request/Reply با type/codes. یک «_frag needed» (type 3 code 4) نشان‌دهندهٔ مشکل MTU در مسیر است — پروندهٔ کلاسیک «سایت خاص باز نمی‌شود».</li></ol><div class=\"lesson-callout\"><strong>نکتهٔ امتحان:</strong> ARP فقط در همان subnet دیده می‌شود؛ اگر در capture شما ARP برای مقصد چندهاپی دیدید، یا ماسک کلاینت اشتباه است یا capture در جای اشتباهی گرفته شده.</div>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>رفتار غلطِ مشاهده‌شده</th><th>تشخیص درست</th></tr></thead><tbody><tr><td>پینگ به مقصد خارجی timeout ولی گیت‌وی جواب می‌دهد</td><td>«اینترنت قطع است»</td><td>DNS یا مسیر یا ACL برگشت؛ اول nslookup، بعد traceroute</td></tr><tr><td>ping به IP خود میزبان جواب نمی‌دهد</td><td>کارت شبکه خراب فرض می‌شود</td><td>باید همیشه جواب دهد (loopback software)؛ اگر ندهد ← پشتهٔ TCP/IP یا فایروال محلی</td></tr><tr><td>ARP تکراری برای یک IP</td><td>کندی شبکه</td><td>میزبان خاموش، IP تکراری (duplicate IP)، یا ماسک ناهماهنگ در دو طرف</td></tr><tr><td>DHCP بعضی کلاینت‌ها جواب نمی‌گیرند</td><td>خرابی سرور</td><td>پورت VLAN اشتباه، نبود helper-address، یا scope تمام‌شده ← show ip dhcp binding و statistics</td></tr><tr><td>نام داخلی باز نمی‌شود، بیرونی باز می‌شود</td><td>خرابی DNS کلی</td><td>Search domain یا رکورد داخلی ناقص؛ بررسی با nslookup -type=SOA</td></tr><tr><td>ICMP کلاً جواب نمی‌دهد ولی سرویس کار می‌کند</td><td>خرابی مسیر</td><td>عمداً: policy روی ICMP؛ تست با TCP پورت باز (telnet/nc)</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریوی ترکیبی:</strong> کاربر می‌گوید «سایت داخلی باز نمی‌شود، ولی ایمیل کار می‌کند». IP و اینترنت دارد.</p><ol><li><code>ipconfig /all</code> ← DNS سرور = 10.10.4.201؟ اگر خالی یا اشتباه ← مشکل DHCP/اسکوپ.</li><li><code>nslookup intranet.corp.local</code> ← timeout؟ پاسخ NXDOMAIN؟ پاسخ غلط؟ <br>Timeout ← فایروال/سرور DNS خاموش · NXDOMAIN ← رکورد گم · پاسخ غلط ← کش منقضی یا رکورد قدیمی.</li><li>اگر DNS سالم است: <code>ping 10.10.4.80</code> (IP داخلی) ← جواب نمی‌دهد: <code>arp -a</code> برای گیت‌وی و <code>show ip arp</code> روی R1؛ مک درست است؟ سپس <code>traceroute 10.10.4.80</code> تا هاپی که می‌ایستد.</li><li>هاپ اول ایستاد ← ACL روی روتر یا ماسک ناهماهنگ؛ هاپ دوم ایستاد ← سرور مقصد یا فایروال میزبان.</li><li>بازبینی: بعد از هر تغییر دوباره همان زنجیره را از قدم ۱ اجرا کنید؛ عیب‌یابی خطی، نه پراکنده.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>ARP: IP ← MAC فقط در همان broadcast domain؛ Request پخش، Reply unicast؛ بدون احراز هویت ← هدف Spoofing.</li><li>ICMP در لایهٔ اینترنت: Echo، Unreachable، Time Exceeded (مبنای traceroute)، Frag Needed (MTU).</li><li>DNS: UDP/53؛ A/AAAA، CNAME، MX، PTR، NS؛ «IP می‌رسد، نام نمی‌رسد» = خرابی DNS.</li><li>DHCP با DORA روی UDP 67/68؛ helper-address برای عبور از مرز subnet؛ binding و statistics اولین دستورهای عیب‌یابی.</li><li>ترتیب عیب‌یابی: IP ← نام ← MAC ← مسیر. هر مرحله با دستور خودش.</li><li>ping: ! موفق · . timeout · U unreachable — الگو مهم‌تر از متن پیام است.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>مرحلهٔ ذهنی:</strong> چرخهٔ DORA و اینکه چرا Request لازم است (جلوگیری از تخصیص هم‌زمان توسط دو سرور) را بنویسید.</li><li><strong>در شبیه‌ساز:</strong> توپولوژی بخش ۹ را بسازید؛ DHCP pool با excluded-address تعریف کنید؛ روی PC-A با <code>ipconfig /renew</code> و <code>show ip dhcp binding</code> تخصیص را تأیید کنید.</li><li><strong>عیب‌یابی عمدی:</strong> DNS را روی 9.9.9.9 (ناموجود در lab) بگذارید، رفتار را ثبت کنید؛ سپس helper-address را حذف و دوباره تست کنید — دو خرابی مصنوعی، دو مستندات.</li><li><strong>تحلیل capture:</strong> یک نشست کامل (DHCP تا HTTP) را با Wireshark ذخیره و هر پیام را با یک جمله توضیح دهید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "ARP",
+      "fa": "مفهوم کلیدی ARP",
+      "simple": "اصطلاح تخصصی مرتبط با پروتکل‌های حیاتی پایه: ARP، ICMP، DNS و DHCP"
+    },
+    {
+      "term": "ICMP",
+      "fa": "مفهوم کلیدی ICMP",
+      "simple": "اصطلاح تخصصی مرتبط با پروتکل‌های حیاتی پایه: ARP، ICMP، DNS و DHCP"
+    },
+    {
+      "term": "DNS",
+      "fa": "مفهوم کلیدی DNS",
+      "simple": "اصطلاح تخصصی مرتبط با پروتکل‌های حیاتی پایه: ARP، ICMP، DNS و DHCP"
+    },
+    {
+      "term": "DHCP",
+      "fa": "مفهوم کلیدی DHCP",
+      "simple": "اصطلاح تخصصی مرتبط با پروتکل‌های حیاتی پایه: ARP، ICMP، DNS و DHCP"
+    },
+    {
+      "term": "DORA",
+      "fa": "مفهوم کلیدی DORA",
+      "simple": "اصطلاح تخصصی مرتبط با پروتکل‌های حیاتی پایه: ARP، ICMP، DNS و DHCP"
+    },
+    {
+      "term": "Default Gateway",
+      "fa": "مفهوم کلیدی Default Gateway",
+      "simple": "اصطلاح تخصصی مرتبط با پروتکل‌های حیاتی پایه: ARP، ICMP، DNS و DHCP"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    },
+    {
+      "term": "Policy",
+      "fa": "سیاست شبکه",
+      "simple": "قواعد کنترلی برای اولویت‌دهی، فیلتر یا هدایت ترافیک"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — پروتکل‌های حیاتی پایه: ARP، ICMP، DNS و DHCP",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>show ip arp\nshow ip dhcp binding\nip dhcp pool LAN10\n network 192.168.10.0 255.255.255.0\n default-router 192.168.10.1\n dns-server 192.168.10.5</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "چهار پیام اصلی در فرآیند تخصیص آدرس با DHCP به ترتیب کدام‌اند؟",
+      "options": [
+        "ACK, Request, Offer, Discover",
+        "Discover, Offer, Request, ACK",
+        "SYN, SYN-ACK, ACK, FIN",
+        "Request, Discover, ACK, Offer"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مخفف DORA یعنی Discover -> Offer -> Request -> Acknowledge.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "اگر کلاینت و سرور DHCP در دو VLAN/Subnet متفاوت باشند، چه چیزی روی روتر میانی لازم است؟",
+      "options": [
+        "ip helper-address (DHCP Relay)",
+        "Proxy ARP",
+        "PortFast",
+        "Passive Interface"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>روتر Broadcastهای DHCP Discover را فوروارد نمی‌کند مگر با ip helper-address به Unicast تبدیل شوند.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "بستهٔ ARP Request به چه آدرس MAC در لایهٔ ۲ ارسال می‌شود؟",
+      "options": [
+        "00:00:00:00:00:00",
+        "ff:ff:ff:ff:ff:ff (Broadcast)",
+        "01:00:5e:00:00:05",
+        "MAC روتر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ARP Request به‌صورت Broadcast در لایه ۲ ارسال می‌شود تا همه در همان VLAN آن را ببینند.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "وقتی PC1 می‌خواهد به 8.8.8.8 بسته بفرستد، ARP برای چه آدرسی انجام می‌شود؟",
+      "options": [
+        "خود 8.8.8.8",
+        "آدرس Default Gateway",
+        "سرور DNS",
+        "آدرس Broadcast"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>چون مقصد خارج از ساب‌نت محلی است، میزبان فریم لایه ۲ را باید به MAC دروازهٔ پیش‌فرض بفرستد.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "اگر ping 8.8.8.8 جواب دهد اما باز کردن نام سایت‌ها خطا بدهد، مشکل به احتمال زیاد کجاست؟",
+      "options": [
+        "کابل شبکه",
+        "تنظیمات یا دسترسی سرور DNS",
+        "جدول MAC سوئیچ",
+        "تخصیص Default Gateway"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دسترسی IP سالم است ولی ترجمهٔ نام دامنه به IP (DNS) انجام نمی‌شود.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "کدام پیام ICMP هنگام صفر شدن TTL در روتر به فرستنده برگردانده می‌شود؟",
+      "options": [
+        "Destination Unreachable",
+        "Time Exceeded",
+        "Echo Reply",
+        "Redirect"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>روتر قبل از دور انداختن بسته با TTL=0، پیام ICMP Time Exceeded می‌فرستد که اساس کار Traceroute است.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "پروتکل DNS در پرس‌وجوهای عادی کلاینت از چه پورتی استفاده می‌کند؟",
+      "options": [
+        "TCP 22",
+        "UDP 53",
+        "UDP 67",
+        "TCP 443"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>کوئری‌های استاندارد DNS به‌صورت پیش‌فرض روی UDP پورت ۵۳ هستند.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "چرا آدرس ۱۶۹.۲۵۴.x.x (APIPA) روی کارت شبکه ظاهر می‌شود؟",
+      "options": [
+        "کلاینت پاسخ DHCP نگرفته است",
+        "اتصال DNS سریع‌تر شده",
+        "فایروال فعال است",
+        "روتر OSPF همسایه شده"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در نبود سرور DHCP در ویندوز/کلاینت‌ها آدرس خودکار APIPA در رنج 169.254.0.0/16 تخصیص می‌یابد.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "دستور مشاهدهٔ جدول ARP روی روتر یا سوئیچ سیسکو چیست؟",
+      "options": [
+        "show mac address-table",
+        "show ip arp",
+        "show ip route",
+        "show cdp neighbors"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دستور show ip arp نگاشت IP به MAC در جدول ARP را نمایش می‌دهد.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "پروتکل DHCP روی سرور و کلاینت به ترتیب از کدام پورت‌های UDP استفاده می‌کند؟",
+      "options": [
+        "67 و 68",
+        "53 و 54",
+        "80 و 443",
+        "161 و 162"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>سرور DHCP روی UDP 67 و کلاینت روی UDP 68 گوش می‌دهد.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "Gratuitous ARP در شبکه چه کاربردی دارد؟",
+      "options": [
+        "رمزنگاری بسته",
+        "تشخیص تداخل IP (Duplicate IP) و به‌روزرسانی کش همسایه‌ها هنگام Failover",
+        "تغییر VLAN پورت",
+        "تست سرعت لینک"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>میزبان برای IP خودش ARP می‌فرستد تا هم تداخل را کشف کند هم جدول ARP بقیه را آپدیت نماید.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "اگر TTL در فریم اترنت تمام شود، کدام جمله درست است؟",
+      "options": [
+        "TTL درون هدر IP (لایه ۳) است نه هدر Ethernet",
+        "سوئیچ لایه ۲ آن را کم می‌کند",
+        "کابل TTL را می‌سوزاند",
+        "در هدر UDP قرار دارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>TTL یک فیلد لایه ۳ در هدر IPv4 (معادل Hop Limit در IPv6) است و فقط توسط روترها کم می‌شود.</p>"
+    }
+  ]
+}

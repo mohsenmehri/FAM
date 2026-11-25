@@ -1,0 +1,400 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f5-01-ccie-mpls-l3vpn-mpbgp",
+  "id": "fam-f5-01-ccie-mpls-l3vpn-mpbgp",
+  "facultyId": "f5",
+  "objectiveId": "F5-01",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-5-ccie",
+  "title": "سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4",
+  "titleEn": "CCIE Expert: MPLS LDP/Label Stack, RD/RT & MP-BGP L3VPN",
+  "domain": "دانشکده ۵ · CCIE Core & MPLS L3VPN",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 110,
+  "prerequisites": [
+    "fam-f4-03-sdwan-sp-automation"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f4-03-sdwan-sp-automation"
+    ],
+    "learningObjectives": [
+      "تفاوت دقیق Route Distinguisher (RD) و Route Target (RT)",
+      "پشتهٔ دوبرچسبی در Data Plane",
+      "مکانیزم PHP (Penultimate Hop Popping)",
+      "تلهٔ رایج CCIE در LDP/OSPF"
+    ]
+  },
+  "whyItMatters": "در آزمون عملی CCIE Enterprise Infrastructure و Service Provider، تسلط بر تعامل لایه‌ای IGP، LDP، MP-BGP و VRF در L3VPN یکی از کلیدی‌ترین بخش‌های سناریوی آزمایشگاهی است.",
+  "topology": {
+    "devices": [
+      {
+        "id": "CE1",
+        "type": "router",
+        "x": 60,
+        "y": 140
+      },
+      {
+        "id": "PE1",
+        "type": "router",
+        "x": 210,
+        "y": 140
+      },
+      {
+        "id": "P-CORE",
+        "type": "router",
+        "x": 370,
+        "y": 140
+      },
+      {
+        "id": "PE2",
+        "type": "router",
+        "x": 530,
+        "y": 140
+      },
+      {
+        "id": "CE2",
+        "type": "router",
+        "x": 680,
+        "y": 140
+      }
+    ],
+    "links": [
+      {
+        "a": "CE1:Gi0/0",
+        "b": "PE1:Gi0/0"
+      },
+      {
+        "a": "PE1:Gi0/1",
+        "b": "P-CORE:Gi0/0"
+      },
+      {
+        "a": "P-CORE:Gi0/1",
+        "b": "PE2:Gi0/1"
+      },
+      {
+        "a": "PE2:Gi0/0",
+        "b": "CE2:Gi0/0"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۵ · مسیر تخصصی Service Provider — درس ۱ از ۲</div><p><strong>هدف درس:</strong> یک L3VPN سنتی MPLS را سر تا سر بفهمید: نقش PE/P/CE، ایجاد VRF روی PE، تبلیغ route ها با MP-BGP (RD/RT)، کنترل‌پلین با LDP و مسیر بسته در دو طرف پوسته — و بتوانید هر مرحله را با دستور show راستی‌آزمایی کنید.</p><p><strong>پیش‌نیازها:</strong> BGP چندنمونه‌ای (MP-BGP)، VRF و جدول‌های فوروارد، LDP مقدماتی، روتینگ سراسری PE.</p><p><strong>خروجی یادگیری:</strong> خواندن <code>show vrf</code>/<code>show bgp vrf</code>/<code>show mpls forwarding-table</code>، توضیح تفاوت import/export RT، و بازگویی مسیر یک بسته بین دو CE در دو شهر.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>سرویس IP بین شعبه‌ها بدون L3VPN یکی از این دو مشکل را دارد:</p><ul><li><strong>تعدد VLAN/روتر:</strong> برای هر مشتری (customer) باید پیوند جدا، VLAN جدا یا tunnel جدا داشته باشید — مقیاس خطی می‌شود و هر مشتری یک پیچیدگی به هسته اضافه می‌کند.</li><li><strong>ایزوله نبودن:</strong> بدون VRF، پیشوندهای همهٔ مشتری‌ها در یک جدول جهانی رقابت می‌کنند؛ نشت مسیر و امکان دیدن ترافیک دیگری.</li></ul><p>L3VPN این مشکل را با جداسازی منطقی در PE حل می‌کند:</p><ol><li>هر مشتری یک <strong>VRF</strong> روی PE خودش دارد (جداول جدا، پورت‌ها/زیرشبکه‌های جدا).</li><li>بین PE ها یک <strong>پوستهٔ MPLS</strong> مشترک وجود دارد؛ بستهٔ مشتری با دو برچسب (outer=LSP مقصد PE، inner=VPN label) عبور می‌کند — پوسته از محتوای داخلی بی‌خبر است.</li><li>یادگیری مسیر بین PE ها با <strong>MP-BGP</strong> (خانوادهٔ L3VPN) انجام می‌شود؛ هر مسیر با RD یکتا و RT (برچسب ورود/خروج) به VRF درست وصل می‌شود.</li><li>P ها فقط MPLS جلو می‌برند — از VRF و BGP مشتری بی‌خبر‌اند (مقیاس: هزاران مشتری بدون هزاران جدول در هسته).</li></ol>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. تفاوت دقیق Route Distinguisher (RD) و Route Target (RT)",
+      "html": "<p>چهار نقش اصلی و مرزهایشان:</p><table class=\"lesson-data-table\"><thead><tr><th>نقش</th><th>روی چه دستگاهی</th><th>وظیفه</th></tr></thead><tbody><tr><td><strong>CE</strong> (Customer Edge)</td><td>دستگاه مشتری</td><td>روتر لبهٔ مشتری؛ با PE با روتینگ ساده (static/iBGP/eBGP) حرف می‌زند</td></tr><tr><td><strong>PE</strong> (Provider Edge)</td><td>لبهٔ اپراتور</td><td>VRF می‌سازد، پورت CE را به VRF وصل می‌کند، MP-BGP با PE های دیگر، ورود/خروج MPLS</td></tr><tr><td><strong>P</strong> (Provider core)</td><td>هستهٔ اپراتور</td><td>فقط MPLS forwarding (LDP/SR)؛ بدون VRF و بدون BGP مشتری</td></tr><tr><td><strong>Route Reflector</strong></td><td>معمولاً در هسته/لبه</td><td>مقیاس MP-BGP بین ده‌ها PE بدون full-mesh</td></tr></tbody></table><p>دو برچسب لایهٔ ۳ که باید همیشه از هم تفکیک شوند:</p><ul><li><strong>VPN Label:</strong> توسط PE مقصد (مرجع آن VRF) تخصیص داده و با MP-BGP اعلام می‌شود؛ به PE می‌گوید «این بسته را در VRF فلان، به سمت CE فلان بفرست».</li><li><strong>LSP Label (inner/outer):</strong> توسط LDP یا SR برای رسیدن به PE مقصد (یا hop بعدی) ساخته می‌شود؛ P ها فقط همین را نگاه می‌کنند.</li></ul>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. پشتهٔ دوبرچسبی در Data Plane",
+      "html": "<p><strong>RD (Route Distinguisher)</strong> — 8 بایت جلوی پیشوند مشتری می‌نشیند تا پیشوند تکراری دو مشتری در جدول جهانی BGP یکتا شود:</p><pre><code>10.1.1.0/24 مشتری A  →  [65000:100][10.1.1.0/24]\n10.1.1.0/24 مشتری B  →  [65000:200][10.1.1.0/24]   ← همین یکتا شد</code></pre><p><strong>RT (Route Target)</strong> — اترپایتی BGP که جهت جریان را کنترل می‌کند (معمولاً با ASN:number):</p><ul><li><strong>Export RT:</strong> وقتی PE مسیری را از VRF خود به MP-BGP می‌فرستد، با این RT برچسب می‌زند — «متعلق به کسی که این RT را import می‌کند».</li><li><strong>Import RT:</strong> PE مسیرهایی را که این RT را دارند، در VRF موردنظرش یاد می‌گیرد — «من به آن‌ها گوش می‌دهم».</li><li>اگر import و export دو مشتری اشتباهی یکی شوند → مسیرهایشان به هم نشت می‌کند (رایج‌ترین خطای طراحی).</li><li>مدل‌های رایج: هر مشتری RT اختصاصی؛ hub-and-spoke با RT مشترک مرکزی؛ لایه‌ای (l3vpn-over-vrf) با دو RT زوج.</li></ul><div class=\"lesson-callout\"><strong>جملهٔ کلیدی:</strong> RD می‌گوید «این مسیر کیست»؛ RT می‌گوید «این مسیر به کجا می‌رود و از کجا می‌آید».</div>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. مکانیزم PHP (Penultimate Hop Popping)",
+      "html": "<p>LDP کنترل‌پلین داده است (مقصد: PE بعدی/loopback):</p><ol><li>هر روتر IGP (OSPF/IS-IS) ابتدا loopback ها را در سراسر حوزه می‌بیند — زیرساخت آماده است.</li><li>LDP Hello ها روی لینک‌ها جاری می‌شوند؛ همسایهٔ LDP اعلام شده و session (TCP 646) بین دو طرف بالا می‌آید.</li><li>به‌ازای هر پیشوند IGP، یک label بین همسایه‌ها تبادل می‌شود (label space per prefix)؛ جدول LDP با FIB/CEF ترکیب می‌شود.</li><li>وقتی PE می‌خواهد به PE بعدی بسته بفرستد: لیبل LDP (برای loopback مقصد) + لیبل VPN (از MP-BGP) روی بسته می‌گذارد؛ P فقط لیبل بیرونی را swap می‌کند.</li></ol><p><strong>دنبالهٔ label ها (LSP):</strong> CE-A → PE1 (push VPN + LDP) → P1 (swap) → P2 (swap) → PE2 (pop LDP، سپس pop VPN و تحویل به CE-B). نکات:</p><ul><li>گاهی LDP و IGP هم‌پوشانی ندارند (مثلاً لینکی IGP دارد ولی LDP نه) ← MPLS core traffic blackhole می‌شود؛ <strong>LDP-IGP sync</strong> یا هم‌زمان‌سازی LDP با IGP لازم است.</li><li>در مدل‌های modern (SR/MPLS) به‌جای LDP، SIDs از IGP توزیع می‌شود — منطق لیبل‌گذاری حفظ می‌شود.</li><li>Penultimate Hop Pop (PHP): روتر قبل از PE آخرین لیبل LDP را برمی‌دارد تا PE فقط VPN label را ببیند (قابل تنظیم؛ در بعضی طراحی‌ها برای QoS خاموش می‌شود).</li></ul>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. تلهٔ رایج CCIE در LDP/OSPF",
+      "html": "<p>زندگی یک مسیر مشتری از CE تا جهان:</p><ol><li>CE مسیر داخلی‌اش را با PE به اشتراک می‌گذارد (مثلاً eBGP یا static).</li><li>PE آن مسیر را در VRF مربوطه می‌بیند، به آن RD می‌زند و در MP-BGP (خانوادهٔ <code>vpnv4</code>/<code>l3vpn</code>) با RT خروجی به RR یا PE های دیگر اعلام می‌کند.</li><li>PE مقصد، مسیر را با RT import خودش قبول می‌کند و در VRF خودش نصب می‌کند؛ اگر CE مقصد خواست، آن را به CE خودش اعلام می‌کند (مسیر مستقیم/رد شده را هم همین‌طور).</li><li>مسیر برگشت: همین فرایند برعکس؛ هیچ‌وقت دو طرف «یک جدول» ندارند — هر طرف جدول VRF خودش را دارد.</li></ol><p>تفاوت با مدل سنتی تونل: در L3VPN یادگیری کنترل‌پلینی است؛ نیازی به flood ARP در پوسته نیست و PE می‌تواند برای هر مشتری سیاست جدا (QoS، فایروال، route-target جدا) اعمال کند.</p><div class=\"lesson-callout\"><strong>خلاصهٔ داده‌ها:</strong> CE ↔ PE: روتینگ ساده · PE ↔ PE: MP-BGP با RD/RT · P: فقط LDP/SR label swapping.</div>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>راهنما</th></tr></thead><tbody><tr><td>کنترل‌پلین مسیر بین PE</td><td>MP-BGP با RR / full-mesh</td><td>RR در هسته (یا جفت RR)؛ full-mesh فقط با چند PE</td></tr><tr><td>روتینگ CE-PE</td><td>eBGP / static / OSPF per-VRF</td><td>eBGP برای مشتری‌های بزرگ و چندمنطقه‌ای؛ static برای کوچک؛ OSPF per-VRF فقط وقتی مشتری اصرار دارد</td></tr><tr><td>مدل RT</td><td>per-customer / hub-spoke / لایه‌ای</td><td>پیش‌فرض per-customer؛ hub-spoke فقط با طراحی صریح؛ هرگز RT اشتراکی نانوشته</td></tr><tr><td>لایهٔ داده</td><td>LDP / SR (MPLS)</td><td>برای فضای جدید: SR ساده‌تر است؛ LDP هنوز کاملاً رایج — طراحی شما باید هر دو را بخواند</td></tr><tr><td>PE به P</td><td>چند لینک ECMP</td><td>ECMP برای بازیابی سریع LSP؛ بدون آن خرابی یک لینک کل مسیر را می‌بُرد</td></tr><tr><td>ایزولهٔ مشتری</td><td>فقط VRF / + uRPF / + فایروال</td><td>حداقل VRF+uRPF؛ مشتری حساس: سیاست روی PE یا هستهٔ جدا</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>مسیر کامل یک بستهٔ IPv4 از شعبهٔ مشتری A (CE-A) به شعبهٔ B (CE-B):</p><ol><li>CE-A بسته را با گیت‌وی VRF خودش به PE1 می‌فرستد؛ PE1 روی پورت CE می‌بیند که متعلق به VRF CustA است.</li><li>PE1 در جدول VRF مقصد (10.1.1.0/24 روی CE-B) را می‌بیند: next-hop = خود PE2، با دو label — VPN label (برای VRF روی PE2) و LDP label (برای loopback PE2).</li><li>PE1 لیبل بیرونی LDP را push می‌کند؛ P1 لیبل را swap بر اساس FIB/LDP می‌کند؛ همین‌طور تا P2.</li><li>P2 (یا PHP) لیبل LDP را pop می‌کند؛ PE2 فقط VPN label را می‌بیند: «این برای VRF CustA است» — جدول همان VRF را نگاه می‌کند و next-hop = CE-B.</li><li>PE2 لیبل VPN را هم pop می‌کند و بسته را خام (بدون برچسب) روی پورت CE-B می‌فرستد؛ CE-B با جدول خودش تحویل می‌دهد.</li><li>مسیر برگشت عین همین است با جهت معکوس؛ هیچ‌کس در P از هویت مشتری خبر ندارد — فقط برچسب‌ها.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): سه PE و دو P.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>مقدار</th></tr></thead><tbody><tr><td>PE1/PE2/PE3</td><td>هر کدام VRF های CustA و CustB (با RD/RT خودشان)</td></tr><tr><td>P1/P2</td><td>فقط OSPF + MPLS/LDP؛ بدون BGP</td></tr><tr><td>RR1/RR2</td><td>MP-BGP RR (در PE یا جدا)</td></tr><tr><td>CustA</td><td>CE-A1 (PE1) و CE-A2 (PE2)؛ RT 65000:100</td></tr><tr><td>CustB</td><td>CE-B1 (PE1) و CE-B2 (PE3)؛ RT 65000:200</td></tr><tr><td>زیرساخت</td><td>OSPF area 0 روی loopback ها؛ LDP روی همهٔ لینک‌ها</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی PE1 برای دو مشتری (طراحی‌شده — اجرا نشده؛ دستورها نمایندهٔ IOS-XE هستند):</p><pre><code>! --- VRF و پورت CE ---\nPE1(config)# vrf definition CustA\nPE1(config-vrf)# address-family ipv4\nPE1(config-vrf-af)# route-target import 65000:100\nPE1(config-vrf-af)# route-target export 65000:100\nPE1(config)# interface GigabitEthernet0/0/1\nPE1(config-if)# description to CE-A1\nPE1(config-if)# vrf forwarding CustA\nPE1(config-if)# ip address 192.168.10.1 255.255.255.252\n\n! --- MP-BGP با RR ---\nPE1(config)# router bgp 65000\nPE1(config-router)# bgp router-id 10.0.0.11\nPE1(config-router)# no bgp default ipv4-unicast\nPE1(config-router)# neighbor 10.0.0.101 remote-as 65000\nPE1(config-router)# neighbor 10.0.0.101 update-source Loopback0\nPE1(config-router)# address-family vpnv4\nPE1(config-router-af)# neighbor 10.0.0.101 activate\nPE1(config-router-af)# neighbor 10.0.0.101 send-community both\nPE1(config-router)# address-family ipv4 vrf CustA\nPE1(config-router-af)# neighbor 192.168.10.2 remote-as 65101   ! CE-A1\nPE1(config-router-af)# neighbor 192.168.10.2 activate\n\n! --- زیرساخت MPLS ---\nPE1(config)# mpls ldp router-id Loopback0 force\nPE1(config)# mpls ip\nPE1(config)# interface range GigabitEthernet0/0/0 - 2\nPE1(config-if-range)# mpls ip</code></pre><ul><li>RD را معمولاً روی هر VRF با <code>rd 10.0.0.11:100</code> (یا auto) می‌گذارند؛ export/import RT می‌تواند لیست داشته باشد (برای hub-spoke).</li><li><code>send-community both</code> برای حمل RT واقعاً لازم است؛ بدون آن مسیرها رد RT ندارند و VRF مقصد چیزی یاد نمی‌گیرد.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>PE1# show vrf\nName     Default RD   Interfaces\nCustA    10.0.0.11:100 Gi0/0/1\nCustB    10.0.0.11:200 Gi0/0/4\n\nPE1# show bgp vpnv4 unicast all summary | begin Neighbor\nNeighbor        V    AS   MsgRcvd MsgSent   Up/Down  State/PfxRcd\n10.0.0.101      4  65000    8812    8810   12d04h        42\n10.0.0.102      4  65000    8811    8812   12d04h        41\n\nPE1# show bgp vpnv4 unicast all 10.1.1.0/24\nRoute Distinguisher: 10.0.0.12:100\n(1 entry) — 10.1.1.0/24\n  Paths: (1 available, best #1)\n  Not advertised to any peer\n  65102\n    10.0.0.12 (default) from 10.0.0.101 (10.0.0.101)\n      Origin IGP, valid, external, best\n      Extended Community: RT:65000:100\n      mpls labels in/out 301/407        ← VPN label / LDP label\n\nPE1# show mpls forwarding-table\nLocal   Outgoing   Prefix          Bytes Label   Outgoing Next Hop\n301     407        10.0.0.12/32    148299123     Gi0/0/0  10.1.0.2\n\nPE1# show ip route vrf CustA\nGateway of last resort is 192.168.10.2 to network 0.0.0.0\nC    192.168.10.0/30 is directly connected, Gi0/0/1\nB    10.1.1.0/24 [20/0] via 192.168.10.2, 02:14:11   ← از CE</code></pre><ul><li>«mpls labels in/out» دقیقاً همان جفت لیبل VPN/LDP مسیر است — مهم‌ترین عدد راستی‌آزمایی.</li><li>اگر PfxRcd صفر شد یا Extended Community نداشت: <code>send-community</code> یا import/export RT را چک کنید.</li><li>در P: فقط <code>show mpls forwarding-table</code> و نبودِ هر route ورودی BGP مشتری، طبیعی است.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Wireshark روی لینک PE↔P با فیلتر <code>mpls</code>:</strong> هدر MPLS با label بیرونی را ببینید؛ هنگام PHP، فقط یک label و پس از PE هم بدون label ادامه می‌یابد (علامت سلامت).</li><li><strong>روی پورت CE:</strong> فقط ترافیک بدون label (یا MPLS نهایتاً به‌عنوان همتای CE)؛ وجود label در پورت مشتری ← نشت پوسته به مشتری (خطای جدی).</li><li><strong>پایش:</strong> تعداد مسیرهای vpnv4 هر PE، تعداد session های LDP، و میزان label mismatch. جهش تعداد مسیر ← نشت RT یا اضافه شدن مشتری اشتباه.</li><li><strong>نشانگر:</strong> با capture روی دو PE، یک پینگ بین دو CE و تطبیق لیبل در/خروجی با show mpls forwarding-table — اگر عدد در و out با capture نخواند، مسیر دیگری در میان است (ECMP).</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>علت</th><th>راه‌حل</th></tr></thead><tbody><tr><td>پینگ بین دو CE قطع ولی ping loopback PE ها سالم</td><td>LDP session پایین یا LDP-IGP ناهمخوان</td><td>show mpls ldp neighbor؛ show mpls ldp discovery؛ بررسی sync</td></tr><tr><td>مسیر یک‌طرفه است</td><td>RT import در یک PE فراموش/اشتباه</td><td>show bgp vpnv4 all + Extended Community مقصد را چک کنید</td></tr><tr><td>دو مشتری هم را می‌بینند</td><td>RT مشترک اشتباه یا leak عمدی/تصادفی</td><td>import/export هر VRF را بازبینی؛ leak فقط با policy صریح</td></tr><tr><td>بعد از جابه‌جایی CE مسیر نمی‌آید</td><td>RD همان ولی آدرسهای CE جدید با ASN اشتباه اعلام می‌شود</td><td>peer CE-PE و allowas-in/as-override (در یکسان‌سازی ASN)</td></tr><tr><td>MTU بزرگ گم می‌شود</td><td>سربار MPLS روی لینک‌های 1500</td><td>mtu مسیر ≥1600 یا jumbo سراسری + PMTUD</td></tr><tr><td>BGP vpnv4 بالا نمی‌آید</td><td>no default ipv4-unicast و activate ناقص / send-community نبود</td><td>address-family vpnv4 و neighbor activate و send-community both</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> مشتری A شکایت که شعبهٔ دومش قابل دسترسی نیست؛ شعبهٔ دیگر مشتری B سالم است.</p><ol><li>روی PE1: <code>show ip route vrf CustA 10.1.1.0/24</code> ← مسیر remote هست؟ نه ← به MP-BGP نگاه کنید.</li><li><code>show bgp vpnv4 unicast all 10.1.1.0/24</code> ← RD: چه کسی اعلام کرده؟ Extended Community چیست؟ اگر RT ندارد: send-community یا export روی PE مبدأ.</li><li>روی PE مقصد: <code>show bgp vpnv4 ...</code> و <code>show ip route vrf CustA</code> ← آیا import انجام شده؟ اگر مسیر در BGP هست ولی در VRF نیست ← import RT اشتباه.</li><li>لایهٔ داده: <code>show mpls ldp neighbor</code> روی هر P در مسیر + <code>show mpls forwarding-table</code> ← اگر لیبل خروجی گم است، LDP/IGP را چک کنید (و ECMP مسیر دوم را).</li><li>تست واقعی: با trace از CE با <code>traceroute</code> (اگر MPLS TTL propagation روشن باشد hop های P دیده می‌شوند)؛ جایی که گم می‌شود همان مرز خرابی است.</li><li>رفع رایج: RT/افعال‌سازی BGP/بازگرداندن فراموش‌شدهٔ send-community — با یک مشتری دیگر (CustB) کار می‌کند؟ بله ← خطا در VRF CustA است نه زیرساخت.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>CE ساده · PE (VRF+MP-BGP+MPLS) · P (فقط MPLS) · RR (مقیاس BGP).</li><li>RD یکتایی می‌سازد؛ RT جهت import/export را — رایج‌ترین خطای طراحی، RT اشتباه است.</li><li>دو لیبل: LDP/SR برای رسیدن به PE، VPN برای انتخاب VRF و CE.</li><li>LDP روی IGP؛ عدم هم‌پوشانی = blackhole — LDP-IGP sync.</li><li>CE-PE: eBGP/static/OSPF per-VRF؛ send-community both فراموش نشود.</li><li>شش show کلیدی: vrf · bgp vpnv4 all · bgp vpnv4 per-prefix · mpls forwarding-table · mpls ldp neighbor · ip route vrf.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>کالبدشکافی (۱۵ دقیقه):</strong> یک پینگ بین دو CE را با برچسب‌هایش لایه‌به‌لایه بنویسید (کجا push، swap، pop).</li><li><strong>VRF (۲۵ دقیقه):</strong> دو VRF با RD/RT جدا روی PE درست کنید؛ با show تأیید کنید هیچ مسیری بین‌شان نشت ندارد.</li><li><strong>MP-BGP (۳۰ دقیقه):</strong> vpnv4 را با RR بالا بیاورید؛ یک مسیر CE را دنبال کنید تا در PE دیگر با RT درست نصب شود.</li><li><strong>عیب‌یابی (۲۰ دقیقه):</strong> یک RT را عمداً درست نکنید؛ با سه show بالا دلیل قطعی را پیدا و رفع کنید.</li><li><strong>خودآزمایی:</strong> تفاوت RD و RT، دلیل وجود دو لیبل، و اینکه چرا P ها BGP مشتری را ندارند — در شش خط بنویسید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "CCIE",
+      "fa": "مفهوم کلیدی CCIE",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4"
+    },
+    {
+      "term": "MPLS",
+      "fa": "مفهوم کلیدی MPLS",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4"
+    },
+    {
+      "term": "L3VPN",
+      "fa": "مفهوم کلیدی L3VPN",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4"
+    },
+    {
+      "term": "MP-BGP",
+      "fa": "مفهوم کلیدی MP-BGP",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4"
+    },
+    {
+      "term": "VPNv4",
+      "fa": "مفهوم کلیدی VPNv4",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4"
+    },
+    {
+      "term": "RD",
+      "fa": "مفهوم کلیدی RD",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4"
+    },
+    {
+      "term": "Route-Target",
+      "fa": "مفهوم کلیدی Route-Target",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4"
+    },
+    {
+      "term": "PHP",
+      "fa": "مفهوم کلیدی PHP",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — سطح CCIE: معماری MPLS L3VPN، پشتهٔ برچسب‌ها و MP-BGP VPNv4",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>vrf definition CUST-A\n rd 65000:100\n address-family ipv4\n  route-target export 65000:100\n  route-target import 65000:100\nmpls ldp router-id Loopback0 force\nshow mpls forwarding-table\nshow bgp vpnv4 unicast all</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "نقش اصلی Route Distinguisher (RD) در MPLS L3VPN چیست؟",
+      "options": [
+        "یکتاسازی پیشوندهای IPv4 هم‌پوشانِ مشتریان مختلف با تبدیل به آدرس ۹۶بیتی VPNv4",
+        "تعیین اینکه کدام VRF مسیر را دریافت کند",
+        "رمزنگاری بسته",
+        "جایگزینی MAC"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>RD صرفاً برای یکتایی پیشوند در MP-BGP است؛ سیاست عضویت در VRF با Route Target انجام می‌شود.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "تفاوت RD با Route Target (RT) چیست؟",
+      "options": [
+        "RD پیشوند را یکتا می‌کند و RT مشخص می‌کند مسیر به کدام VRFها Import یا از کدام Export شود",
+        "هر دو دقیقاً یک کار انجام می‌دهند",
+        "RT فقط در لایه ۱ است",
+        "RD سرعت لینک را زیاد می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در سناریوهای Hub-and-Spoke یا Shared Services یک VRF می‌تواند چندین RT متفاوت را Import/Export کند.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "چرا روترهای میانی هسته (P Routers) در MPLS L3VPN نیازی به داشتن جدول BGP مشتریان ندارند؟",
+      "options": [
+        "چون تصمیم‌گیری سوئیچینگ فقط بر اساس برچسب بیرونی (Transport Label) تا Egress PE انجام می‌شود",
+        "چون تمام مشتریان یک IP دارند",
+        "چون روتر P خاموش است",
+        "چون بسته از اینترنت می‌رود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مفهوم BGP-Free Core اندازهٔ جدول روتینگ P-Routerها را کوچک و سریع نگه می‌دارد.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "در مکانیزم Penultimate Hop Popping (PHP)، برچسب بیرونی توسط چه روتری برداشته می‌شود؟",
+      "options": [
+        "توسط روتر یکی مانده به آخر (ماقبل Egress PE)",
+        "توسط روتر CE مشتری",
+        "توسط سوئیچ دسترسی",
+        "هرگز برداشته نمی‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>با Implicit Null (برچسب ۳)، روتر P ماقبل آخر برچسب بیرونی را Pop می‌کند تا PE خروجی دو بار جست‌وجو نکند.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "اگر در آزمایشگاه CCIE جدول <code>show bgp vpnv4 unicast all</code> سالم باشد ولی ترافیک Data Plane بین CE1 و CE2 عبور نکند، اولین مورد مشکوک چیست؟",
+      "options": [
+        "قطع بودن LSP به‌دلیل خلاصه‌سازی (Summarization) آدرس Loopback روترهای PE یا خاموش بودن LDP",
+        "تنظیم نبودن پورت کنسول",
+        "خرابی DNS",
+        "نوع کابل VGA"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>برای تشکیل موفق LSP باید /32 Loopback دقیق PEها در IGP تبلیغ و توسط LDP برچسب‌گذاری شده باشد.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "کدام پروتکل برچسب درونی (VPN Label) را بین PE1 و PE2 مبادله می‌کند؟",
+      "options": [
+        "MP-BGP (Multi-Protocol BGP)",
+        "LDP",
+        "OSPF",
+        "ARP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>LDP برچسب بیرونی Transport و MP-BGP برچسب درونی VPN را توزیع می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "برچسب رزروشدهٔ Implicit Null در خروجی <code>show mpls forwarding-table</code> چه مقداری دارد؟",
+      "options": [
+        "0",
+        "3 (Pop Label)",
+        "16",
+        "100"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مقدار ۳ به‌معنای درخواست PHP از همسایهٔ بالادست است.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "اگر بین PE و CE از OSPF به‌عنوان پروتکل مسیریابی استفاده شود و یک مشتری دو لینک به MPLS داشته باشد (Backdoor Link)، برای جلوگیری از حلقه چه چیزی لازم است؟",
+      "options": [
+        "تنظیم Sham-Link و درک رفتار Down-Bit (DN Bit) در LSA Type 3",
+        "تغییر رمز Enable",
+        "فعال کردن PortFast",
+        "حذف Loopback"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Down-Bit و Domain-Tag مانع برگشت LSAهای MPLS به داخل سایت‌های OSPF می‌شوند و Sham-Link ترجیح مسیر هسته را تنظیم می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "یک آدرس VPNv4 چند بیتی است؟",
+      "options": [
+        "۳۲ بیتی",
+        "۶۴ بیتی",
+        "۹۶ بیتی (۶۴ بیت RD + ۳۲ بیت IPv4)",
+        "۱۲۸ بیتی"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>ترکیب RD 64بیتی و IPv4 32بیتی آدرس ۹۶بیتی VPNv4 را می‌سازد.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "تفاوت CEF (Cisco Express Forwarding) با MPLS چیست؟",
+      "options": [
+        "فعال بودن CEF روی روتر پیش‌نیاز اجباری عملکرد MPLS است",
+        "MPLS جایگزین CEF است",
+        "CEF فقط برای Wi-Fi است",
+        "ارتباطی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تولید LIB/LFIB در MPLS سیسکو بدون ip cef کار نمی‌کند.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "دستور مشاهدهٔ برچسب اختصاص‌یافته به هر پیشوند در MPLS سیسکو چیست؟",
+      "options": [
+        "show mpls forwarding-table",
+        "show vlan brief",
+        "show ip dhcp binding",
+        "show spanning-tree"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>این دستور Local Label، Outgoing Label و Outgoing Interface را نشان می‌دهد.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "در L3VPN، در صورت تغییر MTU لینک به‌خاطر اضافه شدن دو برچسب MPLS (هر برچسب ۴ بایت)، حداقل سربار هدر MPLS روی فریم چقدر است؟",
+      "options": [
+        "۸ بایت (۲ × ۴ بایت)",
+        "۶۴ بایت",
+        "۱ بایت",
+        "۲۰۰ بایت"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر برچسب MPLS دقیقاً ۴ بایت (۳۲ بیت) طول دارد (Label 20b + TC 3b + S 1b + TTL 8b).</p>"
+    }
+  ]
+}

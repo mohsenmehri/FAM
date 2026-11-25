@@ -1,0 +1,398 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f5-02-ccie-segment-routing-tilfa",
+  "id": "fam-f5-02-ccie-segment-routing-tilfa",
+  "facultyId": "f5",
+  "objectiveId": "F5-02",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-5-ccie",
+  "title": "سطح CCIE: Segment Routing (SR-MPLS) و TI-LFA بدون حلقه",
+  "titleEn": "CCIE Expert: Segment Routing SIDs, SRGB & TI-LFA Protection",
+  "domain": "دانشکده ۵ · Segment Routing و همگرایی سریع",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 100,
+  "prerequisites": [
+    "fam-f5-01-ccie-mpls-l3vpn-mpbgp"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f5-01-ccie-mpls-l3vpn-mpbgp"
+    ],
+    "learningObjectives": [
+      "مفهوم Source Routing و حذف LDP",
+      "تفاوت Prefix-SID (SRGB) و Adjacency-SID",
+      "چرا LFA/RLFA سنتی در برخی توپولوژی‌ها کافی نبود؟",
+      "فضاهای P-Space و Q-Space در TI-LFA"
+    ]
+  },
+  "whyItMatters": "در شبکه‌های مدرن و آزمون CCIE، Segment Routing پیچیدگی همگام‌سازی LDP با IGP را حذف کرده و مسیرهای پشتیبان را بدون حالت State اضافه در هسته ایجاد می‌کند.",
+  "topology": {
+    "devices": [
+      {
+        "id": "R1",
+        "type": "router",
+        "x": 120,
+        "y": 140
+      },
+      {
+        "id": "R2",
+        "type": "router",
+        "x": 300,
+        "y": 70
+      },
+      {
+        "id": "R3",
+        "type": "router",
+        "x": 300,
+        "y": 210
+      },
+      {
+        "id": "R4",
+        "type": "router",
+        "x": 480,
+        "y": 140
+      }
+    ],
+    "links": [
+      {
+        "a": "R1:Gi0/0",
+        "b": "R2:Gi0/0"
+      },
+      {
+        "a": "R1:Gi0/1",
+        "b": "R3:Gi0/0"
+      },
+      {
+        "a": "R2:Gi0/1",
+        "b": "R4:Gi0/0"
+      },
+      {
+        "a": "R3:Gi0/1",
+        "b": "R4:Gi0/1"
+      },
+      {
+        "a": "R2:Gi0/2",
+        "b": "R3:Gi0/2"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۵ · مسیر تخصصی Service Provider — درس ۲ از ۲</div><p><strong>هدف درس:</strong> Segment Routing (SR-MPLS و SRv6) را بفهمید: SID چیست، Prefix-SID و Adjacency-SID کجا استفاده می‌شوند، SR چگونه LDP را حذف می‌کند، و TI-LFA چگونه سرعت/پوشش failover را بدون FRR سنتی به ارمغان می‌آورد — و مسیر یک SID stack را ردیابی کنید.</p><p><strong>پیش‌نیازها:</strong> MPLS لیبل و LDP، IGP (IS-IS/OSPF) و SR extensions، مفهوم FRR و backup path.</p><p><strong>خروجی یادگیری:</strong> خواندن <code>show segment-routing</code>، توضیح تفاوت SR-MPLS و SRv6، و بازگویی رفتار TI-LFA در لحظهٔ خرابی.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>لایهٔ کنترل مسیر در MPLS سنتی سه مشکل دارد:</p><ul><li><strong>LDP و IGP دو پروتکل موازی:</strong> هر دو باید همیشه سالم و هم‌پوش باشند؛ هر کدام ناهماهنگ شود، لینک از دید داده «وجود» ندارد (نیاز به LDP-IGP sync و پیکربندی‌های مراقبتی).</li><li><strong>FRR سنتی (LFA/TILFA قدیمی):</strong> مسیر جایگزین فقط وقتی «در دسترس» است که بتوان با فرمول محاسبه کرد؛ بعضی توپولوژی‌ها محافظت کامل نمی‌گیرند (partial FRR).</li><li><strong>ترافیک‌محور بودن:</strong> کنترل مسیر در لبهٔ شبکه است؛ هسته فقط برچسب swap می‌کند و امکان مهندسی مسیر ترافیک (TE) در میانه محدود است.</li></ul><div class=\"lesson-callout\"><strong>ادعای SR:</strong> یک برنامهٔ روتینگ واحد (IS-IS/OSPF) + مجموعه‌ای از SID ها = مسیریابی، لیبل‌گذاری، و محافظت از خرابی — بدون LDP، بدون پروتکل TE جداگانه.</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. مفهوم Source Routing و حذف LDP",
+      "html": "<p>SR یک معماری «مسیر‌محور» است: به‌جای اینکه هر روتر فقط بداند «بعدی کیست»، مسیر به‌صورت لیستی از <strong>segment ها</strong> (SID) روی بسته حمل می‌شود.</p><ol><li>هر روتر یک یا چند SID دارد: معمولاً یک <strong>Prefix-SID</strong> (برای loopback/خودش، محلی در سطح IGP) و چند <strong>Adjacency-SID</strong> (برای هر لینک خروجی).</li><li>SR-MPLS: SID = لیبل MPLS (مثلاً 16001). SRv6: SID = یک آدرس IPv6 128 بیتی با معنای Segment Routing.</li><li>مبدأ یک بسته یک «SID stack» می‌سازد: لیست اهداف متوالی (مثلاً [16050، 16002]) — هر روتر بیرونی‌ترین SID را مصرف می‌کند و به سمت بعدی می‌رود.</li><li>IGP (IS-IS با TLV های SR یا OSPF with SIDs) این SID ها را در سراسر حوزه توزیع می‌کند؛ SRGB (range پیش‌فرض) باید روی همه یکسان باشد (مثلاً 16000-23999).</li></ol><div class=\"lesson-callout\"><strong>تفکیک دو SID:</strong> Prefix-SID = «از مسیر من بگیر و تا خودم برو» (ECMP-پذیر) · Adjacency-SID = «از این لینک خاص برو» (دقیق، برای TE و protection).</div>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. تفاوت Prefix-SID (SRGB) و Adjacency-SID",
+      "html": "<p>شاخه‌بندی دو خانواده:</p><table class=\"lesson-data-table\"><thead><tr><th></th><th>SR-MPLS</th><th>SRv6</th></tr></thead><tbody><tr><td>شکل SID</td><td>لیبل 20 بیتی (در SRGB)</td><td>آدرس IPv6 128 بیتی (loc/func/node)</td></tr><tr><td>حمل</td><td>روی MPLS data plane موجود</td><td>روی IPv6 native؛ هدر SRH (Routing Header)</td></tr><tr><td>پیچیدگی داده</td><td>کم (swap/push/pop)</td><td>بیشتر (پردازش SID در هر hop، جاگیری هدر)</td></tr><tr><td>یکپارچگی</td><td>با فضای MPLS امروز یکی است</td><td>با IPv6 end-to-end هم‌راستا؛ بدون ترنسلات</td></tr><tr><td>سناریو</td><td>مهاجرت کم‌ریسک از LDP</td><td>فابریک‌های جدید، policy سراسری، service chaining</td></tr></tbody></table><p>در عمل، بزرگ‌ترین مزیت SR نسبت به LDP در «سادگی عملیاتی» است: یک پروتکل کمتر، بسته‌بندی امنیتی/TE با همان IGP، و قابلیت مشاهدهٔ مسیر (SID stack خوانا در capture). در SRv6، نیاز به ترنسلاشن بین دامنه‌های MPLS/IPv6 با گیت‌وی SRv6↔MPLS برطرف می‌شود.</p>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. چرا LFA/RLFA سنتی در برخی توپولوژی‌ها کافی نبود؟",
+      "html": "<p><strong>TI-LFA (Topology-Independent Loop-Free Alternate)</strong> پاسخ SR به «پوشش کامل FRR در هر توپولوژی» است:</p><ol><li>قبل از خرابی، هر روتر با الگوریتم P,Q (محاسبهٔ post-convergence path و مسیر جایگزین بدون حلقه) می‌داند که در لحظهٔ شکست لینک/neighbor، بسته را به کجا و با چه SID stack بفرستد.</li><li>در لحظهٔ خرابی، هیچ انتظاری برای IGP convergence وجود ندارد: روتر «پنهان‌سازی» (concealment) را با یک لیست SID جایگزین از همان اولین hop شروع می‌کند — تأخیر به اندازهٔ یک swap، نه چند ثانیه.</li><li><strong>پوشش 100٪:</strong> برخلاف LFA قدیمی که در بعضی گراف‌ها backup ندارد، TI-LFA برای هر لینک/neighbor یک مسیر می‌سازد (گاهی با microloop avoidance یعنی مسیری که لینک را هم دور می‌زند).</li><li>در SR-MPLS: این مسیر همان SID stack جایگزین است؛ در SRv6: SID list در SRH.</li></ol><p>پارامتر عملیاتی رایج: <code>fast-reroute per-prefix</code> برای حالت TI-LFA، همراه با اینکه هر روتر SRGB یکسان داشته باشد؛ محاسبه زمان‌بندی‌شده (trigger) است نه لحظه‌ای پس از هر تغییر کوچک.</p>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. فضاهای P-Space و Q-Space در TI-LFA",
+      "html": "<p>مسیر عادی (بدون خرابی) و مسیر محافظت‌شده در یک حلقهٔ سه‌Node:</p><ol><li>مبدأ R1 می‌خواهد به R4 (SID 16004) بسته بفرستد؛ طبیعی‌ترین مسیر: R1→R2→R3→R4 با SID تکی (یا stack کوتاه).</li><li>روی هر لینک، TI-LFA از قبل می‌داند اگر لینک R2→R3 قطع شود، بسته باید به‌جای R3، به R5 (مسیر جایگزین) برود: stack چندتایی [16005، 16004].</li><li>لحظهٔ شکست: R2 بلافاصله بسته را با stack جایگزین push می‌کند؛ R5 آن را می‌گیرد و طبق SID بعدی به R4 می‌رساند — بدون اینکه منتظر IGP بماند.</li><li>چند ثانیه بعد IGP هم همگرا می‌شود و مسیر «طبیعی» جدید می‌سازد؛ آن‌جا SID stack به حالت عادی برمی‌گردد (microloop avoidance از تداخل این دو مرحله جلوگیری می‌کند).</li></ol><div class=\"lesson-callout\"><strong>جمع:</strong> TI-LFA «لحظهٔ اول» خرابی را با SID stack می‌بندد؛ IGP «دقایق بعد» را. هیچ‌کدام جای دیگری را نمی‌گیرند.</div>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>راهنما</th></tr></thead><tbody><tr><td>plane</td><td>SR-MPLS / SRv6 / هر دو</td><td>مهاجرت: اول SR-MPLS روی همان هسته؛ SRv6 برای دامنه‌های جدید/IPv6-first</td></tr><tr><td>منبع SID</td><td>Static / Dynamic (IGP)</td><td>پیش‌فرض Prefix-SID از IGP؛ Adjacency-SID برای TE دقیق</td></tr><tr><td>SRGB</td><td>بازهٔ پیش‌فرض / سفارشی</td><td>یکسان در کل حوزه؛ تغییر بازه = مهاجرت سراسری — از اول استاندارد کنید</td></tr><tr><td>محافظت</td><td>TI-LFA / LFA قدیمی / بدون</td><td>در فضای SR: همیشه TI-LFA per-prefix</td></tr><tr><td>TE</td><td>بدون TE / SR policy</td><td>اول ساده؛ SR Policy را فقط برای نیاز واقعی (traffic engineering، service chaining)</td></tr><tr><td>کوآگزیست با LDP</td><td>فقط-LDP / SR-only / هر دو</td><td>مرحله‌بندی: LDP → SR+LDP (MRT) → SR-only</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>یک بسته با SID stack در SR-MPLS، مرحله‌به‌مرحله (مبدأ R1، مقصد R4):</p><ol><li>R1 تصمیم می‌گیرد بسته باید از R5 عبور کند (SR Policy): stack = [16005، 16004] — لیبل بیرونی 16005.</li><li>R1 بسته را روی لینک به سمت R5 می‌فرستد (مسیر IGP به 16005 یا adjacency مشخص).</li><li>R5 بیرونی‌ترین لیبل (16005 = خودش) را consume می‌کند: pop؛ لیبل بعدی 16004 (R4) روی بسته می‌ماند؛ بر اساس IGP آن را به سمت R4 swap/forward می‌کند.</li><li>R4 آخرین لیبل را می‌بیند (خودش): pop و تحویل به سرویس/پورت ورودی — اگر پایان‌نقطهٔ SID (End.DT4 در SRv6 یا VPN در MPLS) باشد، در همین‌جا به VRF درست وصل می‌شود.</li><li>اگر بین R1 و R5 لینک قطع شود: همان stack جایگزین TI-LFA (مثلاً [16006، 16004] از مسیر دیگر) از همان اولین hop جایگزین می‌شود؛ کل این مکانیسم شفاف برای کاربر است.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): پنج روتر هسته + یک PE.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>مقدار</th></tr></thead><tbody><tr><td>R1..R5</td><td>IS-IS level-1-2 + SR extensions</td></tr><tr><td>SRGB</td><td>16000-23999 (همه یکسان)</td></tr><tr><td>Prefix-SID</td><td>هر روتر: SID = 1600X (X = شماره روتر)</td></tr><tr><td>Adjacency-SID</td><td>برای هر لینک: به‌صورت local اجرا می‌شود</td></tr><tr><td>محافظت</td><td>TI-LFA per-prefix روی همهٔ لینک‌ها</td></tr><tr><td>مبدأ/مقصد نمونه</td><td>R1 → R4 با مسیر جایگزین از R5</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی IS-IS + SR و TI-LFA (نماینده — طراحی‌شده، اجرا نشده):</p><pre><code>! --- IS-IS و SRGB ---\nR2(config)# router isis CORE\nR2(config-router)# net 49.0001.0010.1001.0000.0002.00\nR2(config-router)# address-family ipv4 unicast\nR2(config-router-af)# segment-routing mpls\nR2(config-router-af)# segment-routing global-block 16000 23999\nR2(config-router)# segment-routing\nR2(config-sr)# mpls\nR2(config-sr)# prefix-sid-map address-family ipv4\nR2(config-sr)# interface GigabitEthernet0/0/1\nR2(config-sr-if)# mpls adj-sid index 201\n\n! --- TI-LFA ---\nR2(config)# router isis CORE\nR2(config-router)# fast-reroute per-prefix\nR2(config-router)# fast-reroute per-prefix tie-breaker\nR2(config-router)# address-family ipv4 unicast\nR2(config-router-af)# fast-reroute per-prefix\nR2(config-router-af)# fast-reroute per-prefix ti-lfa\n\n! --- راستی‌آزمایی ---\nR2# show segment-routing prefix-sid-map ipv4\nR2# show isis topology\nR2# show mpls forwarding-table</code></pre><ul><li>قبل از SR: اطمینان از IS-IS سالم و SRGB یکسان؛ بعد SR را روشن کنید (همه یک‌باره یا مرحله‌ای با MRT).</li><li>در بعضی پلتفرم‌ها نام دستورها <code>segment-routing ip</code> یا <code>sr-prefer</code> است — همیشه با مدل دستگاه خودتان تطبیق دهید.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>R2# show segment-routing global-block\n Global Block: 16000-23999   Reserved: 16000-16127\n\nR2# show segment-routing prefix-sid-map ipv4 10.0.0.4/32\n  SID: 16004   Node: R4   Type: Prefix   Algorithm: 0\n\nR2# show isis topology\nMetric  Next-Hop  SID   Interface\n10      R3        -     Gi0/0/2\n20      R5        -     Gi0/0/3      ← مسیر جایگزین TI-LFA\n\nR2# show mpls forwarding-table\nLocal   Outgoing   Prefix         Label   Outgoing Next Hop\n16005   16005      10.0.0.5/32    Pop     Gi0/0/3  10.1.0.5\n16004   16004      10.0.0.4/32    16004   Gi0/0/2  10.1.0.3\n\nR2# show isis fast-reroute per-prefix detail\n  Prefix 10.0.0.4/32\n    Repair path: via 10.1.0.5 (R5) label(s): 16005 16004\n    State: ready</code></pre><ul><li>«State: ready» + repair path درست = TI-LFA فعال و محاسبه‌شده است.</li><li>اگر repair path «none» یا incomplete بود: توپولوژی/متریک/همرسانی SRGB را چک کنید.</li><li>شمارش لیبل‌های out با مسیر انتظار نخواند ← ECMP یا تغییر IGP اخیر را در نظر بگیرید.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Capture روی لینک با فیلتر <code>mpls</code>:</strong> در حالت عادی یک لیبل؛ در لحظهٔ سناریوی failover چند لیبل (stack جایگزین) را ببینید — علامت زندهٔ TI-LFA.</li><li><strong>زمان‌سنجی خرابی:</strong> ping پیوسته با timestamp (یا IP SLA) هنگام قطع دستی لینک: پکت‌های از‌دست‌رفته باید در حد چند پکت (زیر 50ms معمولاً) باشد نه ثانیه — اگر ثانیه است، TI-LFA اعمال نشده یا مسیر جایگزین ندارد.</li><li><strong>پایش:</strong> تعداد prefix های دارای repair path، تعداد تغییرات topology هر ساعت، و میزان ترافیک جایگزین. روند بالا رفتن تغییرات ← بی‌ثباتی IGP/لینک.</li><li><strong>نشانگر منفی:</strong> دیدن لیبل‌های غیرمنتظره در مسیرهای static ← SID map دستی یا policy فراموش‌شده.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>علت</th><th>راه‌حل</th></tr></thead><tbody><tr><td>SR بالا نمی‌آید روی بعضی روترها</td><td>extension های IS-IS/OSPF غیرفعال یا نسخه قدیمی</td><td>capability دستگاه؛ فعال‌سازی TLV های SR؛ سازگاری نرم‌افزار</td></tr><tr><td>بعد از مهاجرت، بعضی مسیرها گم می‌شوند</td><td>SRGB ناهماهنگ یا SID رزروشده در یک روتر</td><td>show segment-routing global-block روی همه؛ یکسان‌سازی بازه</td></tr><tr><td>failover کند است (ثانیه‌ای)</td><td>TI-LFA فعال نیست یا repair path ندارد</td><td>show isis fast-reroute per-prefix detail ← State ready؟</td></tr><tr><td>لینک سالم ولی مسیر جایگزین همیشه از همان گره می‌گذرد</td><td>متریک نامتعادل/همه‌چیز به یک hub</td><td>بازبینی متریک و توپولوژی؛ TI-LFA وابسته به گراف است</td></tr><tr><td>MTU/SRH در SRv6 بسته‌های بزرگ را می‌شکند</td><td>سربار SRH و PMTUD نادیده</td><td>MTU سراسری با سربار SRv6؛ جریان‌های DF-less را هم بسنجید</td></tr><tr><td>مهاجرت با LDP هم‌زمان blackhole می‌دهد</td><td>مرحله‌بندی نادرست (SR-only یک‌باره)</td><td>روش MRT: SR+LDP هم‌زمان، سپس حذف LDP پس از راستی‌آزمایی</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> یک لینک هسته را قطع می‌کنید؛ ترافیک چند ثانیه قطع می‌شود و بعد برمی‌گردد — یعنی TI-LFA کار نمی‌کند.</p><ol><li>روی روتر نزدیک شکست: <code>show isis fast-reroute per-prefix detail</code> ← برای پیشوندهای حساس State چیست؟ اگر none/disabled ← دستور per-prefix/ti-lfa اعمال نشده یا بعد از reload ذخیره نشده.</li><li><code>show segment-routing prefix-sid-map</code> ← SID های مقصد موجودند؟ SRGB در همه جا یکسان؟</li><li>در لحظهٔ قطع: <code>show mpls forwarding-table</code> را دو بار بگیرید (قبل/بعد) ← خروجی جایگزین ظاهر شده؟ اگر نه، مسیر IGP/ECMP درست نیست.</li><li>اگر repair آماده بود ولی ترافیک همچنان کند افت: آیا مسیر جایگزین خودش از لینکِ بحرانی (مثلاً در ادامهٔ همان مسیر) می‌گذرد؟ — با <code>show isis topology</code> پیش از/پس از شکست، مسیر واقعی را رسم کنید.</li><li>رفع: اصلاح per-prefix/ti-lfa و ذخیره پیکربندی، یکسان‌سازی SRGB، و در صورت نیاز اصلاح متریک؛ سپس تست قطع مجدد با همان روش زمان‌سنجی.</li><li>برای مستندات: مقادیر ping loss قبل/بعد را ثبت کنید — قبول پروژه به این عدد است نه به «به نظر می‌رسد کار می‌کند».</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>SR = SID stack روی بسته؛ Prefix-SID (تا گره) و Adjacency-SID (از لینک).</li><li>SR-MPLS (لیبل 20 بیتی) در برابر SRv6 (SID IPv6 + SRH).</li><li>SRGB باید سراسری یکسان باشد؛ SID map منبع حقیقت است.</li><li>TI-LFA: پوشش کامل، بدون منتظر ماندن برای IGP؛ مسیر جایگزین از قبل محاسبه و در لحظهٔ شکست با stack جایگزین اعمال می‌شود.</li><li>مهاجرت از LDP: مرحله‌بندی با MRT؛ هرگز SR-only یک‌باره در هسته بزرگ.</li><li>شش show کلیدی: global-block · prefix-sid-map · isis topology · mpls forwarding-table · fast-reroute detail · segment-routing.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>کالبدشکافی (۱۵ دقیقه):</strong> یک SID stack دوتایی را با شمارهٔ لیبل‌ها در هر hop دنبال کنید؛ کجا pop و کجا swap می‌شود؟</li><li><strong>IS-IS+SR (۳۰ دقیقه):</strong> در شبیه‌ساز دو روتر را با IS-IS و SR وصل کنید؛ Prefix-SID را در show دوطرف تأیید کنید.</li><li><strong>TI-LFA (۲۵ دقیقه):</strong> fast-reroute per-prefix/ti-lfa را اعمال کنید؛ repair path را با detail ببینید و یک لینک را قطع کنید (با ping پیوسته زمان بگیرید).</li><li><strong>عیب‌یابی (۲۰ دقیقه):</strong> یک SRGB متفاوت عمداً بگذارید؛ با global-block و prefix-sid-map دلیل خرابی را پیدا و رفع کنید.</li><li><strong>خودآزمایی:</strong> تفاوت Prefix و Adjacency SID، نقش P/Q در TI-LFA، و چرا لینک اول باید «همیشه» محافظت داشته باشد — در شش خط بنویسید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Segment Routing",
+      "fa": "مفهوم کلیدی Segment Routing",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: Segment Routing (SR-MPLS) و TI-LFA بدون حلقه"
+    },
+    {
+      "term": "SR-MPLS",
+      "fa": "مفهوم کلیدی SR-MPLS",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: Segment Routing (SR-MPLS) و TI-LFA بدون حلقه"
+    },
+    {
+      "term": "Prefix-SID",
+      "fa": "مفهوم کلیدی Prefix-SID",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: Segment Routing (SR-MPLS) و TI-LFA بدون حلقه"
+    },
+    {
+      "term": "Adj-SID",
+      "fa": "مفهوم کلیدی Adj-SID",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: Segment Routing (SR-MPLS) و TI-LFA بدون حلقه"
+    },
+    {
+      "term": "SRGB",
+      "fa": "مفهوم کلیدی SRGB",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: Segment Routing (SR-MPLS) و TI-LFA بدون حلقه"
+    },
+    {
+      "term": "TI-LFA",
+      "fa": "مفهوم کلیدی TI-LFA",
+      "simple": "اصطلاح تخصصی مرتبط با سطح CCIE: Segment Routing (SR-MPLS) و TI-LFA بدون حلقه"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    },
+    {
+      "term": "Policy",
+      "fa": "سیاست شبکه",
+      "simple": "قواعد کنترلی برای اولویت‌دهی، فیلتر یا هدایت ترافیک"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — سطح CCIE: Segment Routing (SR-MPLS) و TI-LFA بدون حلقه",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>segment-routing mpls\n global-block 16000 23999\nrouter isis CORE\n segment-routing mpls\n fast-reroute per-prefix enable level-2 all\n fast-reroute ti-lfa level-2\nshow isis segment-routing label-table</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "بزرگ‌ترین مزیت معماری Segment Routing (SR-MPLS) نسبت به LDP چیست؟",
+      "options": [
+        "حذف پروتکل مجزای LDP و تبلیغ برچسب‌ها درون خود IS-IS یا OSPF",
+        "نیاز به دو روتر اضافه",
+        "افزایش تایمر Hello به ۶۰ ثانیه",
+        "حذف کامل آدرس IP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در SR دیگر مشکل عدم همگام‌سازی IGP و LDP وجود ندارد و هسته Stateless می‌شود.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "اگر SRGB روی یک روتر بازهٔ 16000 تا 23999 باشد و Index یک Prefix-SID برابر 10 باشد، برچسب محلی آن چقدر است؟",
+      "options": [
+        "10",
+        "16010",
+        "24009",
+        "3"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>برچسب = شروع بازهٔ SRGB + مقدار Index یعنی 16000 + 10 = 16010.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "تفاوت Prefix-SID با Adjacency-SID چیست؟",
+      "options": [
+        "Prefix-SID مسیر ECMP تا یک نود/پیشوند و Adj-SID یک لینک خاصِ همسایه را مشخص می‌کند",
+        "هر دو دقیقاً یک معنا دارند",
+        "Adj-SID همیشه از SRGB می‌آید",
+        "Prefix-SID فقط در لایه ۲ است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Adj-SID محلی (SRLB/Dynamic) است و روتر را مجبور به خروج از یک لینک دقیق می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "TI-LFA چگونه ۱۰۰٪ پوشش توپولوژی را در مقایسه با LFA کلاسیک تضمین می‌کند؟",
+      "options": [
+        "با محاسبهٔ مسیر Post-Convergence در فضای P-Space و Q-Space و تزریق Repair List",
+        "با افزایش TTL",
+        "با خاموش کردن همسایه‌ها",
+        "با استفاده از STP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>TI-LFA همیشه بر اساس مسیر پس از همگرایی کامل محاسبه می‌کند و با لیست Segmentها از حلقه جلوگیری می‌نماید.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "معماری SRv6 چه تفاوتی با SR-MPLS دارد؟",
+      "options": [
+        "SRv6 به‌جای پشتهٔ برچسب MPLS، دستورالعمل‌های Segment را در هدر IPv6 (SRH) حمل می‌کند",
+        "SRv6 فقط روی کابل تلفن است",
+        "SRv6 از IPv4 استفاده می‌کند",
+        "تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>SRv6 از آدرس ۱۲۸بیتی IPv6 به‌عنوان Segment Identifier استفاده می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "وقتی در TI-LFA P-Space و Q-Space یک نقطهٔ مشترک (PQ Node) داشته باشند، چند برچسب برای تعمیر لازم است؟",
+      "options": [
+        "حداکثر یک Node SID تا آن PQ Node",
+        "حداقل ۱۰ برچسب",
+        "هیچ برچسبی کار نمی‌کند",
+        "فقط در BGP انجام می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در روش RLFA/TI-LFA وقتی PQ Node وجود داشته باشد یک برچسب به سمت آن نود کافی است.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "یک روتر میانی در Segment Routing چه عملیاتی روی Segment فعال در بالای پشته می‌تواند انجام دهد؟",
+      "options": [
+        "NEXT (Pop), CONTINUE (Swap), PUSH",
+        "فقط Drop",
+        "فقط NAT",
+        "تغییر VLAN"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در SR سه دستور پایهٔ PUSH، CONTINUE و NEXT معادل عملیات برچسب MPLS تعریف می‌شوند.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "چرا همگرایی در TI-LFA معمولاً زیر ۵۰ میلی‌ثانیه است؟",
+      "options": [
+        "زیرا مسیر Backup از پیش در FIB/Data Plane برنامه‌ریزی شده و منتظر پیام‌های IGP نمی‌ماند",
+        "چون تایمر OSPF برابر ۱۰۰ ثانیه است",
+        "چون کابل سریع‌تر می‌شود",
+        "زیرا روتر ریست نمی‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>PLR (Point of Local Repair) به‌محض تشخیص قطع فیزیکی یا BFD، ترافیک را فوری به Backup Path سوییچ می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "در تبلیغ Prefix-SID در IS-IS، پرچم <code>N-Flag</code> و <code>P-Flag (No-PHP)</code> به چه معناست؟",
+      "options": [
+        "تعیین اینکه SID متعلق به Node (Loopback) است و آیا همسایه PHP انجام دهد یا خیر",
+        "خاموش کردن اینترفیس",
+        "تنظیم رمز SSH",
+        "فعال‌سازی DHCP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>P-Flag یا No-PHP رفتار برچسب‌برداری قبل از رسیدن به نود مقصد را کنترل می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "مخفف PCE در شبکه‌های Segment Routing Traffic Engineering (SR-TE) چیست؟",
+      "options": [
+        "Path Computation Element",
+        "Port Channel Engine",
+        "Packet Check Error",
+        "Primary Core Edge"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>PCE یک محاسبه‌گر متمرکز است که می‌تواند بر اساس تأخیر یا پهنای باند، مسیرهای مهندسی‌شده (SR Policy) بسازد.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "در SR-TE مفهوم Color برای یک SR Policy چه کاربردی دارد؟",
+      "options": [
+        "نگاشت ترافیک‌های با نیاز متفاوت (مثلاً تأخیر کم در برابر پهنای باند زیاد) به مسیرهای متمایز با کمک BGP Extended Community",
+        "تغییر رنگ کابل پچ‌کورد",
+        "نام‌گذاری VLAN",
+        "رمزنگاری DNS"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>با Color می‌توان ترافیک صدا را روی مسیر کم‌تأخیر و ترافیک پشتیبان را روی مسیر دیگر انداخت.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "این دستور <code>segment-routing mpls</code> در کجای پیکربندی اجرا می‌شود؟",
+      "options": [
+        "در مود سراسری (Global) و درون فرآیند IGP (مثل router isis یا router ospf)",
+        "فقط روی پورت Access",
+        "فقط روی PC کلاینت",
+        "در DNS"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>باید هم SR-MPLS سراسری و هم پشتیبانی آن در پروتکل IGP فعال شود.</p>"
+    }
+  ]
+}

@@ -1,0 +1,380 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f4-01-security-8021x-ise-ztna",
+  "id": "fam-f4-01-security-8021x-ise-ztna",
+  "facultyId": "f4",
+  "objectiveId": "F4-01",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-4-specialties",
+  "title": "تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust",
+  "titleEn": "Security Specialty: 802.1X, RADIUS CoA, MACsec & Zero Trust",
+  "domain": "دانشکده ۴ · تخصص امنیت شبکه (Security)",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 95,
+  "prerequisites": [
+    "fam-f3-03-ccnp-qos-netflow-automation"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f3-03-ccnp-qos-netflow-automation"
+    ],
+    "learningObjectives": [
+      "سه نقش اصلی در IEEE 802.1X",
+      "حالت‌های Monitor، Low-Impact و Closed Mode",
+      "نقش MAB و RADIUS CoA",
+      "رمزنگاری Hop-by-Hop لایه ۲ با MACsec"
+    ]
+  },
+  "whyItMatters": "در معماری Zero Trust هیچ دستگاهی صرفاً با زدن کابل به پورت سوئیچ نباید به شبکهٔ داخلی دسترسی پیدا کند؛ هویت کاربر و سلامت دستگاه قبل از دریافت IP باید احراز شود.",
+  "topology": {
+    "devices": [
+      {
+        "id": "CLIENT",
+        "type": "host",
+        "x": 80,
+        "y": 140
+      },
+      {
+        "id": "SW-AUTH",
+        "type": "switch",
+        "x": 300,
+        "y": 140
+      },
+      {
+        "id": "ISE-SRV",
+        "type": "server",
+        "x": 520,
+        "y": 140
+      }
+    ],
+    "links": [
+      {
+        "a": "CLIENT:NIC",
+        "b": "SW-AUTH:Gi0/1"
+      },
+      {
+        "a": "SW-AUTH:Gi0/24",
+        "b": "ISE-SRV:eth0"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۴ · مسیر تخصصی Security — درس ۱ از ۳</div><p><strong>هدف درس:</strong> دسترسی شبکه را بر اساس هویت (نه فقط پورت/آدرس) پیاده کنید: IEEE 802.1X با سه نقش (Supplicant/Authenticator/AAA)، حالت‌های مانیتور/کم‌تأثیر/بسته، رزرو دستگاه‌های غیر802.1X با MAB و RoCoA، و مسیر تکامل به ZTNA.</p><p><strong>پیش‌نیازها:</strong> VLAN و trunk، مفهوم RADIUS/TACACS+، آشنایی با MAC و L2، درک محدودهٔ پورت‌های access.</p><p><strong>خروجی یادگیری:</strong> پیکربندی یک پورت به‌صورت auth/multi-domain، انتخاب حالت برای مرحلهٔ استقرار، خواندن debug و لاگ ISE، و توضیح تفاوت 802.1X با ZTNA در مدل تهدید.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>مدل سنتی «امنیت با دیوار» یک شکاف ساختاری دارد: هر کسی که فیزیکی یا از طریق Wi-Fi به پورت برسد، تا مرز بعدی «داخلی» محسوب می‌شود. 802.1X این فرض را باطل می‌کند:</p><ul><li><strong>هویت مقدم بر موقعیت:</strong> بدون احراز هویت موفق، پورت فقط LAN ویژه (VLAN سرورها/به‌روزرسانی) می‌دهد — نه شبکهٔ کاری.</li><li><strong>دستگاه‌های غیرقابل احراز:</strong> چاپگر، IP Phone، دوربین و IoT را نمی‌توان حذف کرد؛ MAB (MAC Authentication Bypass) با ثبت از پیش تعریف‌شده آن‌ها را کنترل می‌کند.</li><li><strong>پیشرفت تهدید:</strong> یک لپ‌تاپ آلودهٔ کارمند بدون 802.1X در همان VLAN سرورها می‌نشیند و lateral movement می‌کند؛ با SGT/segmentation بر اساس هویت، دامنهٔ خرابی کوچک می‌شود.</li><li>در بسیاری از الزامات انطباق (PCI-DSS، ISMS) «کنترل دسترسی شبکه بر اساس هویت» خواستهٔ صریح است.</li></ul><div class=\"lesson-callout\"><strong>قانون:</strong> 802.1X فقط لبه را قفل نمی‌کند — بعد از احراز، سیاست segmentation (VLAN/SGT) را بر اساس کاربر/دستگاه اعمال می‌کند.</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. سه نقش اصلی در IEEE 802.1X",
+      "html": "<p>سه نقش استاندارد IEEE 802.1X:</p><table class=\"lesson-data-table\"><thead><tr><th>نقش</th><th>نرم‌افزار/سخت‌افزار</th><th>وظیفه</th></tr></thead><tbody><tr><td><strong>Supplicant</strong></td><td>سیستم‌عامل (Windows w/ EAPoL)، دوربین، IP Phone</td><td>هویت را ارائه می‌دهد (گواهی/کاربر-رمز/رمز)</td></tr><tr><td><strong>Authenticator</strong></td><td>سوییچ یا AP (NAS)</td><td>پورت را می‌بندد/باز می‌کند؛ پیام‌ها را بین طرفین ترجمه می‌کند (EAPoL روی لینک، RADIUS به سرور)</td></tr><tr><td><strong>AAA Server</strong></td><td>Cisco ISE / FreeRADIUS / NPS</td><td>احراز هویت، تصمیم سیاست (VLAN، SGT، دسترسی)، لاگ و accounting</td></tr></tbody></table><p>جریان یک نشست موفق:</p><ol><li>پورت باز می‌شود (یا در حالت unauthorized فقط LAN ویژه)؛ Authenticator پیام‌های EAP شروع می‌کند.</li><li>Supplicant با EAP-Response (مثلاً EAP-TLS با گواهی یا PEAP با کاربر-رمز) پاسخ می‌دهد؛ Authenticator آن را در RADIUS Access-Request به ISE می‌فرستد.</li><li>ISE با Active Directory/ادارهٔ گواهی بررسی می‌کند و <strong>Access-Accept</strong> + قواعد سیاست (VLAN=CORP، SGT=10) می‌فرستد.</li><li>سوییچ پورت را در VLAN درست می‌گذارد و session را شروع می‌کند؛ همهٔ رویدادها در ISE لاج می‌شوند.</li></ol>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. حالت‌های Monitor، Low-Impact و Closed Mode",
+      "html": "<p>سه حالت استقرار — انتخاب آن‌ها مهم‌تر از خود پیکربندی است:</p><table class=\"lesson-data-table\"><thead><tr><th>حالت</th><th>رفتار پورت</th><th>ریسک/مزیت</th></tr></thead><tbody><tr><td><strong>Monitor Mode</strong></td><td>همه ترافیک عبور می‌کند؛ فقط احراز «آزمایشی» و لاج می‌شود</td><td>صفر اختلال؛ برای جمع‌آوری سیاههٔ دستگاه‌ها قبل از استقرار</td></tr><tr><td><strong>Low-Impact (Closed-ish)</strong></td><td>فقط ترافیک ضروری (AAA/DHCP/DNS…) از پورت عبور می‌کند؛ بقیه تا احراز فیلتر</td><td>محافظت جزئی با اختلال کم — پل بین دو حالت</td></tr><tr><td><strong>Closed Mode</strong></td><td>بدون احراز موفق: فقط LAN ویژه (VLAN دانلود/به‌روزرسانی)</td><td>کامل‌ترین کنترل؛ ریسک قطع چاپگر/تلفن اگر MAB درست نباشد</td></tr></tbody></table><pre><code>SW(config)# interface GigabitEthernet1/0/10\nSW(config-if)# switchport mode access\nSW(config-if)# authentication host-mode multi-domain    ! کاربر + تلفن\nSW(config-if)# authentication port-control auto\nSW(config-if)# authentication order dot1x mab\nSW(config-if)# authentication priority mab\nSW(config-if)# dot1x pae authenticator\nSW(config-if)# mab\nSW(config-if)# authentication event fail action next-layer\nSW(config-if)# authentication event no-response action authorize vlan 999\nSW(config-if)# spanning-tree portfast</code></pre><ul><li>ترتیب: اول <code>dot1x</code>، در صورت شکست/نبود supplicant <code>mab</code>. <code>event no-response action authorize vlan</code> برای پورت‌های «هرگز جواب نمی‌دهند» (مانیتور قدیمی) کاربرد دارد.</li><li>Multi-domain: کاربر (PC) روی پورت، تلفن (IP Phone) به‌عنوان سوئیچ میانی — هر کدام احراز جدا دارند.</li></ul>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. نقش MAB و RADIUS CoA",
+      "html": "<p><strong>MAB:</strong> دستگاهی که EAP ندارد (چاپگر، دوربین) را با MAC آن احراز می‌کنید؛ MAC در ISE به‌عنوان لیست سفید ثبت است. نقطهٔ ضعف: MAC قابل کپی/جاعلی است — پس ترکیب MAB با MACsec یا حداقل monitoring، عاقلانه است.</p><p><strong>RoCoA (MAC Authentication Bypass با Change of Authorization):</strong> وقتی ISE بعد از احراز اولیه تغییر عقیده بدهد (مثلاً لیست سیاه شد)، با CoA پیام RADIUS Disconnect/CoA-Request می‌فرستد و سوییچ session را refresh یا قطع می‌کند — بدون این، سیاست جدید فقط برای نشست‌های بعدی اعمال می‌شود.</p><pre><code>SW(config)# aaa new-model\nSW(config)# aaa authentication dot1x default group radius\nSW(config)# aaa authorization network default group radius\nSW(config)# radius server ISE-1\nSW(config-radius-server)# address ipv4 10.10.9.30\nSW(config-radius-server)# key 0 STRONG-KEY\nSW(config-radius-server)# exit\nSW(config)# dot1x system-auth-control\nSW(config)# ip access-list extended LIMITED\nSW(config-acl)# permit udp any any eq 67\nSW(config-acl)# permit udp any any eq 53\nSW(config-acl)# permit udp any any eq 123\nSW(config)# interface range GigabitEthernet1/0/1 - 24\nSW(config-if-range)# access session closed\nSW(config-if-range)# access session control-list default</code></pre><ul><li>پورت‌هایی که CoA را پاس نمی‌دهند (نسخه IOS قدیمی/سوییچ غیرسیسکو): <code>reauthentication</code> با تایمر، یا در ISE گزینهٔ «CoA disabled» برای آن device profile.</li><li>لاگ ISE: Operation → Live Sessions و Authentication Reports — برای هر شکست، دلیل دقیق (رخداد ۲۴۴۰۰۴: supplicant response ناقص، گواهی نامعتبر، پروفایل ناشناخته…) دیده می‌شود.</li></ul>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. رمزنگاری Hop-by-Hop لایه ۲ با MACsec",
+      "html": "<p><strong>MACsec (802.1AE)</strong> رمزنگاری hop-by-hop در لایه ۲ را بین دو انتهای یک لینک ارائه می‌دهد — پس از احراز موفق، ترافیک همان پورت را با کلید مشترک MKA (MACsec Key Agreement) رمز می‌کند:</p><ul><li><strong>دامنه:</strong> فقط دو انتهای لینک (سوییچ-سوییچ یا سوییچ-دستگاه پشتیبانی‌کننده)؛ از مرز اول رمزگشایی می‌شود. جایگزین VPN سراسری نیست، مکمل آن است.</li><li><strong>یکپارچگی:</strong> هر فریم با SSCI/ICV تأیید می‌شود؛ دستکاری و replay رد می‌شود.</li><li><strong>پیش‌نیاز:</strong> کلیدها معمولاً از ISE/AAA (MKA policy با PSK یا EAP-TLS برای تبادل کلید) می‌آیند؛ سوییچ و endpoint باید از MACsec پشتیبانی کنند.</li><li><strong>هزینه:</strong> سربار CPU/throughput روی بعضی پلتفرم‌ها — روی uplink های پرسرعت با تست throughput اعمال کنید.</li></ul><p><strong>مسیر به ZTNA:</strong> 802.1X می‌گوید «این هویت، این پورت»؛ ZTNA پا را فراتر می‌گذارد: «این هویت، فقط به این اپلیکیشن، در این لحظه، با این وضعیت دستگاه» — دسترسی بر اساس اپلیکیشن و session، نه شبکه. در عمل سازمانی: ISE + SGT (شبکه) در کنار ZTNA broker (اپلیکیشن)؛ هر دو از یک منبع هویت (IdP) تغذیه می‌شوند. 802.1X حذف نمی‌شود، لبهٔ فیزیکی آن می‌ماند و ظرافت سیاست بالاتر می‌رود.</p>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>راهنما</th></tr></thead><tbody><tr><td>مرحلهٔ استقرار</td><td>مستقیم closed / با monitor</td><td>همیشه monitor → low-impact → closed؛ شناسایی سیاههٔ دستگاه‌ها مرحلهٔ صفر است</td></tr><tr><td>نوع احراز کاربر</td><td>PEAP-MSCHAPv2 / EAP-TLS</td><td>EAP-TLS با گواهی قوی‌تر است؛ PEAP برای شروع سریع‌تر (بدون PKI سراسری)</td></tr><tr><td>دستگاه‌های غیرقابل احراز</td><td>MAB لیست سفید / غیرفعال‌سازی پورت</td><td>MAB + ثبت رسمی در CMDB؛ دستگاه ناشناس ← VLAN quarantine</td></tr><tr><td>تلفن IP</td><td>بدون احراز / multi-domain</td><td>multi-domain: تلفن MAB، PC پشت آن 802.1X</td></tr><tr><td>segmenation خروجی</td><td>VLAN / SGT</td><td>VLAN ساده‌تر؛ SGT با ارتباط با firewall سیاست می‌دهد — در فاز بعدی</td></tr><tr><td>پشتیبان ISE</td><td>تکی / node pair</td><td>حداقل دو ISE در سیاست (personas) + پشتیبان پایگاه داده</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>یک بستهٔ EAP از لپ‌تاپ تا ISE و تصمیم سوییچ:</p><ol><li>لپ‌تاپ به پورت وصل می‌شود؛ سوییچ (authenticator) پورت را در حالت unauthorized می‌گذارد و EAP-Request/Identity می‌فرستد (یا منتظر EAP-Start می‌ماند).</li><li>سوپلیکنت با نام کاربری/گواهی پاسخ می‌دهد؛ سوییچ آن را در RADIUS Access-Request به ISE می‌فرستد (معمولاً VLAN ویژه تا احراز تمام شود).</li><li>ISE پروفایل دستگاه (با بسته‌های DHCP/CDP/HTTP که سوییچ جمع کرده) و هویت را ارزیابی می‌کند؛ نتیجه: Access-Accept با اترپایت‌ها (VLAN=10، SGT=10) یا Access-Reject.</li><li>سوییچ اترپایت‌ها را اعمال می‌کند: پورت به VLAN 10 می‌رود، MAC آموزش می‌بیند، و در صورت نیاز CoA دوباره session را تازه می‌کند.</li><li>هر چند وقت یک‌بار reauthentication (مثلاً ۳۶۰۰ ثانیه) یا رویداد لینک، چرخه را از نو شروع می‌کند؛ session تا زمان up بودن لینک نگه داشته می‌شود.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): لبهٔ کاربری با ISE مرکزی.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>نقش/مقدار</th></tr></thead><tbody><tr><td>ISE-1/ISE-2</td><td>Authentication + Policy Server (10.10.9.30/31)</td></tr><tr><td>SW-ACCESS</td><td>سوییچ دسترسی، پورت‌های 1/0/1 تا 1/0/48</td></tr><tr><td>پورت کاربر</td><td>host-mode multi-domain، order dot1x mab</td></tr><tr><td>VLANها</td><td>10=CORP (احرازشده)، 20=VOICE (MAB تلفن)، 999=QUARANTINE (بدون احراز)</td></tr><tr><td>پروفایل‌ها</td><td>Windows-Laptop، IP-Phone-Cisco، Printer-Xerox (MAB)</td></tr><tr><td>مبدأ لیست سفید MAC</td><td>CMDB/Excel رسمی + ورود ISE</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی کامل سمت سوییچ و اشاره‌های ISE (طراحی‌شده — اجرا نشده):</p><pre><code>! --- سوییچ ---\nSW(config)# aaa new-model\nSW(config)# aaa authentication login default local\nSW(config)# aaa authentication dot1x default group radius\nSW(config)# aaa authorization network default group radius\nSW(config)# aaa accounting dot1x default start-stop group radius\nSW(config)# dot1x system-auth-control\nSW(config)# radius server ISE-1\nSW(config-radius-server)# address ipv4 10.10.9.30\nSW(config-radius-server)# timeout 10\nSW(config-radius-server)# retransmit 3\nSW(config-radius-server)# key 0 Str0ng-Shared\nSW(config)# username ise-admin privilege 15 secret 0 AdminPass\nSW(config)# interface GigabitEthernet1/0/10\nSW(config-if)# switchport mode access\nSW(config-if)# switchport access vlan 999          ! VLAN پیش‌فرض قبل از احراز\nSW(config-if)# authentication port-control auto\nSW(config-if)# authentication host-mode multi-domain\nSW(config-if)# authentication order dot1x mab\nSW(config-if)# authentication priority mab\nSW(config-if)# dot1x pae authenticator\nSW(config-if)# dot1x timeout tx-period 7\nSW(config-if)# mab\nSW(config-if)# access-session timeout idle-time 60\nSW(config-if)# access-session closed\nSW(config-if)# exit\nSW(config)# interface Vlan10\nSW(config-if)# ip address 10.10.4.129 255.255.255.192\n\n! --- ISE (خلاصهٔ منطق) ---\n! Policy: Identity Source = AD\n! Condition: EndpointProfile = Windows-Laptop AND AuthStatus = Success\n! Result: VLAN 10 + SGT 10 + Reauthentication 3600s\n! Exception: MAB &amp; MAC not in list → VLAN 999 + Quarantine SGT</code></pre><ul><li>پورت قبل از احراز باید VLAN 999 داشته باشد تا در صورت شکست، کلاینت فقط به سرویس‌های به‌روزرسانی برسد.</li><li><code>tx-period</code> کوتاه‌تر سریع‌تر جواب می‌دهد ولی روی supplicant‌های کند false-reject می‌دهد؛ با تست واقعی تنظیم کنید.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>SW# show authentication sessions interface GigabitEthernet1/0/10\nInterface  MAC Address    Method   Domain  Status   Fallback  Timeout  VLAN\nGi1/0/10   001a.2b3c.4d5e MAB      DATA    Authz    None      60       10\n\nSW# show authentication sessions interface Gi1/0/10 details\n  Operational host-mode: multi-domain\n  Common Session ID: 0A0A040A0000000A0000001E\n  Method: mab   Status: Authz Success\n  VLAN Group: Vlan10   SGT: 10\n  Timeout: 60s   Idle-time: 60s\n\nSW# show dot1x all\nSysauthControl: Enabled\nSW# debug dot1x events\n*Mar 1 10:12:01.111: Gi1/0/10: Posting AUTH_START event to LCP\n*Mar 1 10:12:02.402: Gi1/0/10: Authorization succeeded - assigning VLAN 10\n\nSW# show radius statistics\n  Radius Authentications: 1241\n  Radius Retransmissions: 3\n  Radius Timeouts: 0</code></pre><ul><li>«Authorization succeeded» + VLAN درست = پایان موفق؛ «Authz Fail/Unauth» را در ISE با رخداد مطابقت دهید (رویداد 244004/11005…).</li><li><code>show authentication sessions</code> سریع‌ترین دستور وضعیت پورت است؛ status ها: Authz Success · Authz Fail · Unauth.</li><li>اگر Timeout صفر شد و پورت به VLAN 999 رفت ← supplicant جواب نداد یا MAB رد شده است.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Wireshark روی پورت (mirror) با فیلتر <code>eapol</code>:</strong> چهار پیام EAPOL-Start/Identity/Response/Success را ببینید. نبودِ EAP-Request یعنی supplicant خاموش است؛ وجود Request ولی پاسخ نامعتبر ← مشکل گواهی/رمز.</li><li><strong>فیلتر <code>radius</code>:</strong> Access-Request/Accept/Reject و Attribute ها (Tunnel-Type، Filter-Id، SGT) را ببینید؛ در Accept دقیقاً چه چیزی اعمال شده؟</li><li><strong>پایش:</strong> نرخ Reject در ISE per profile، تعداد sessionهای فعال per switch، و ساعت‌های پیک قطعی. آستانه: ناگهانی شدن Reject یک profile ← یا گواهی منقضی، یا تغییر policy.</li><li><strong>نشانگر:</strong> در Wireshark دیدن مکرر EAPOL-Start بدون Success ← supplicant در حلقهٔ retry است؛ علت شایع VLAN اشتباه یا key ناهماهنگ RADIUS.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>علت</th><th>راه‌حل</th></tr></thead><tbody><tr><td>چاپگر بعد از استقرار کار نمی‌کند</td><td>MAB فعال نبود یا MAC در لیست نیست</td><td>monitor mode برای شناسایی؛ سپس MAB + ثبت رسمی</td></tr><tr><td>گواهی لپ‌تاپ رد می‌شود</td><td>زمان نادرست سیستم یا CA ناشناخته در ISE</td><td>NTP را درست کنید؛ trust chain ISE و پروفایل CA را بررسی کنید</td></tr><tr><td>سیاست جدید ISE روی session قدیمی اعمال نمی‌شود</td><td>CoA نمی‌رسد یا سوییچ پشتیبانی نمی‌کند</td><td>show radius statistics؛ reauthentication دوره‌ای؛ یا ISE CoA غیرفعال برای آن دستگاه</td></tr><tr><td>فقط بعضی پورت‌ها auth می‌شوند</td><td>IOS قدیمی یا مجوز/پلتفرم ناقص</td><td>جدول قابلیت پلتفرم؛ یا با switch replacement در فاز بعد</td></tr><tr><td>«همه چیز VLAN 999 شد» بعد از قطع ISE</td><td>AAA group در دسترس نیست ← fail-closed</td><td>ISE pair + شرایط fallback (authorize vlan یا سیاست محلی با احتیاط)</td></tr><tr><td>تلفن و پشت‌آهستهٔ PC هر دو قطع</td><td>host-mode تکی به‌جای multi-domain</td><td>authentication host-mode multi-domain + order dot1x mab</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> بعد از تغییر policy در ISE، گروهی از کاربران به‌صورت گروهی قطع شده‌اند.</p><ol><li>در ISE: Operations → Live Sessions ← آیا session فعال هستند؟ برای یک کاربر نمونه، رخداد آخر را باز کنید؛ کد/دلیل رد (Authorization profile mismatch، VLAN missing، …) را یادداشت کنید.</li><li>مقایسه با قبل از تغییر: پروفایل policy چه چیزی را عوض کرده؟ (مثلاً VLAN جدید یا SGT که در نتیجه هست ولی سوییچ نمی‌شناسد).</li><li>روی سوییچ: <code>show authentication sessions</code> و <code>show radius statistics</code>؛ اگر Retransmissions بالا رفته ← شبکه/کلید؛ اگر Reject واقعی است ← سیاست.</li><li>اگر CoA گروهی باعث شده: ISE → Device/Endpoint → رویدادها؛ برای sessionهای گیرکرده <code>clear authentication sessions</code> (با احتیاط — همهٔ پورت‌ها ری‌استارت می‌شوند) یا shutdown/no shutdown پورت نمونه.</li><li>قبل از ادامه: با یک کاربر آزمایشی و monitor mode تغییر را تست کنید؛ بعد روی گروه کوچک، بعد سراسری (فلگ رول‌آوت).</li><li>در صورت نیاز به rollback: policy را به نسخهٔ قبل برگردانید (ISE نسخهٔ policy را دارد) و باز هم اول آزمایشی.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>سه نقش: Supplicant (سوپلیکنت) · Authenticator (سوییچ/AP) · AAA/ISE.</li><li>جریان: EAP روی لینک ← RADIUS بین سوییچ و ISE ← اترپایت (VLAN/SGT) روی پورت.</li><li>سه حالت: Monitor (بدون اثر) → Low-Impact → Closed (LAN ویژه). همیشه تدریجی.</li><li>MAB برای دستگاه‌های بدون EAP؛ RoCoA/CoA برای اعمال تغییر سیاست روی session زنده.</li><li>MACsec فقط hop-by-hop؛ مکمل segmentation است نه جایگزین VPN/ZTNA.</li><li>ZTNA = دسترسی اپلیکیشن‌محور با session کوتاه؛ 802.1X لبهٔ فیزیکی را نگه می‌دارد.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>شناخت (۱۵ دقیقه):</strong> جریان چهار پیام EAPOL و سه نقش را روی کاغذ بکشید؛ برای هر پیام بگویید چه داده‌ای حمل می‌شود.</li><li><strong>Monitor (۲۵ دقیقه):</strong> یک پورت را در حالت monitor بگذارید؛ سیاههٔ device profile های دیده‌شده را از ISE استخراج و طبقه‌بندی کنید (لپ‌تاپ/تلفن/چاپگر/ناشناخته).</li><li><strong>Closed + MAB (۲۵ دقیقه):</strong> یک چاپگر جعلی (MAC ثبت‌نشده) وصل کنید؛ تأیید کنید به VLAN 999 می‌افتد؛ سپس MAC را ثبت و تکرار کنید.</li><li><strong>عیب‌یابی (۲۰ دقیقه):</strong> کلید RADIUS را عمدی خراب کنید؛ با show radius statistics و debug به ریشه برسید؛ سپس اصلاح کنید.</li><li><strong>خودآزمایی:</strong> تفاوت سه حالت، دلیل نیاز به CoA، و جایگاه ZTNA در برابر 802.1X را در پنج جمله بنویسید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "802.1X",
+      "fa": "مفهوم کلیدی 802.1X",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust"
+    },
+    {
+      "term": "Cisco ISE",
+      "fa": "مفهوم کلیدی Cisco ISE",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust"
+    },
+    {
+      "term": "RADIUS",
+      "fa": "مفهوم کلیدی RADIUS",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust"
+    },
+    {
+      "term": "CoA",
+      "fa": "مفهوم کلیدی CoA",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust"
+    },
+    {
+      "term": "MAB",
+      "fa": "مفهوم کلیدی MAB",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust"
+    },
+    {
+      "term": "MACsec",
+      "fa": "مفهوم کلیدی MACsec",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust"
+    },
+    {
+      "term": "Zero Trust",
+      "fa": "مفهوم کلیدی Zero Trust",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — تخصص امنیت: 802.1X، Cisco ISE، CoA و معماری Zero Trust",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>aaa new-model\ndot1x system-auth-control\ninterface GigabitEthernet0/1\n authentication port-control auto\n dot1x pae authenticator\n mab\nshow authentication sessions interface Gi0/1 details</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "در معماری 802.1X، سوئیچ دسترسی چه نقشی دارد؟",
+      "options": [
+        "Supplicant",
+        "Authenticator",
+        "Authentication Server",
+        "CA Root"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>کلاینت Supplicant، سوئیچ Authenticator و سرور ISE/RADIUS نقش Authentication Server را دارد.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "کدام پروتکل بین کلاینت و سوئیچ روی لایهٔ ۲ پیش از داشتن آدرس IP ردوبدل می‌شود؟",
+      "options": [
+        "EAPoL (EAP over LAN)",
+        "HTTPS",
+        "SSH",
+        "OSPF"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>EAPoL اجازه می‌دهد پیام‌های احراز هویت مستقیماً در لایه ۲ پیش از گرفتن IP بین کلاینت و سوئیچ تبادل شوند.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "برای دستگاه‌هایی مثل پرینتر قدیمی که نرم‌افزار 802.1X ندارند از چه مکانیزمی استفاده می‌شود؟",
+      "options": [
+        "MAB (MAC Authentication Bypass)",
+        "BGP",
+        "HSRP",
+        "VXLAN"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>سوئیچ پس از timeout شدن 802.1X آدرس MAC دستگاه را برای بررسی به سرور ISE می‌فرستد.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "مزیت اصلی RADIUS CoA (Change of Authorization) چیست؟",
+      "options": [
+        "سرور ISE می‌تواند وضعیت یک نشست فعال را فوراً تغییر دهد (مثلاً انتقال به VLAN قرنطینه یا دانلود dACL جدید)",
+        "تغییر رمز روتر هر شب",
+        "افزایش سرعت Wi-Fi",
+        "حذف گواهی TLS"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>CoA روی پورت UDP 3799/1700 امکان تغییر آنی دسترسی بدون قطع و وصل کابل را می‌دهد.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "تفاوت حالت Monitor Mode و Closed Mode در پیاده‌سازی 802.1X چیست؟",
+      "options": [
+        "در Monitor Mode ترافیک با وجود شکست احراز هویت باز می‌ماند تا خطاها شناسایی شوند؛ در Closed Mode تا تأیید هویت فقط EAPoL/DHCP مجاز است",
+        "در Closed Mode هیچ امنیتی نیست",
+        "Monitor Mode یعنی خاموشی سوئیچ",
+        "یکسان هستند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تغییر تدریجی از Monitor به Low-Impact و سپس Closed جلوی قطعی ناگهانی شبکه را می‌گیرد.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "پروتکل MACsec (802.1AE) در کدام لایه رمزنگاری انجام می‌دهد؟",
+      "options": [
+        "لایه ۲ (Data Link)",
+        "لایه ۷",
+        "لایه ۴",
+        "فقط در مرورگر"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>MACsec رمزنگاری با تأخیر نزدیک به صفر را روی فریم‌های اترنت در لایه ۲ انجام می‌دهد.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "پورت‌های استاندارد RADIUS برای Authentication و Accounting کدام‌اند؟",
+      "options": [
+        "UDP 1812 و 1813 (یا 1645/1646)",
+        "TCP 22 و 23",
+        "UDP 53 و 67",
+        "TCP 443 و 80"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>RADIUS از UDP 1812 برای احراز هویت و 1813 برای Accounting استفاده می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "اصل اساسی معماری Zero Trust چیست؟",
+      "options": [
+        "اعتماد کامل به همهٔ کاربران داخل ساختمان",
+        "Never Trust, Always Verify — بررسی مداوم هویت، سلامت دستگاه و حداقل دسترسی لازم",
+        "حذف کامل رمز عبور",
+        "باز کردن همهٔ پورت‌های فایروال"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Zero Trust موقعیت مکانی داخل شبکه را دلیلی برای اعتماد نمی‌داند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "Downloadable ACL (dACL) در Cisco ISE چه فایده‌ای دارد؟",
+      "options": [
+        "نیاز به ذخیرهٔ صدها ACL به‌صورت دستی روی تک‌تک سوئیچ‌ها را حذف می‌کند",
+        "جایگزین کابل فیبر می‌شود",
+        "IP کلاینت را مخفی می‌کند",
+        "BGP را جایگزین OSPF می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ISE پس از احراز هویت، سیاست ACL متناسب با نقش کاربر را به‌صورت داینامیک روی پورت سوئیچ تزریق می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "کدام پروتکل احراز هویت، رمز عبور و کل ارتباط را برخلاف RADIUS کاملاً رمزنگاری می‌کند (روی TCP 49)؟",
+      "options": [
+        "TACACS+",
+        "SNMPv2c",
+        "Telnet",
+        "Syslog"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>TACACS+ برای مدیریت ادمین تجهیزات (Device Administration) روی TCP 49 تمام بدنهٔ بسته را رمزنگاری می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "دستور مشاهدهٔ وضعیت احراز هویت 802.1X/MAB روی پورت Gi0/1 در IOS چیست؟",
+      "options": [
+        "show authentication sessions interface Gi0/1 details",
+        "show vlan brief",
+        "show ip route",
+        "show cdp"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>این دستور روش موفق (dot1x یا mab)، دامین و dACL/SGT اعمال‌شده را نشان می‌دهد.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "در 802.1X با حالت Multi-Auth روی یک پورت چه چیزی مجاز است؟",
+      "options": [
+        "هر دستگاه متصل (مثلاً تلفن IP و PC پشت آن) باید جداگانه احراز هویت شود",
+        "احراز هویت یک دستگاه برای بقیه هم باز می‌شود",
+        "فقط یک MAC مجاز است",
+        "همه آزادند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Multi-Auth در صورت وجود چند دستگاه در یک پورت، هر یک را مستقل بررسی می‌کند.</p>"
+    }
+  ]
+}

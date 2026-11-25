@@ -1,0 +1,394 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f4-02-datacenter-evpn-vxlan",
+  "id": "fam-f4-02-datacenter-evpn-vxlan",
+  "facultyId": "f4",
+  "objectiveId": "F4-02",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-4-specialties",
+  "title": "تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN",
+  "titleEn": "Data Center Specialty: VXLAN EVPN Fabric & Anycast Gateway",
+  "domain": "دانشکده ۴ · تخصص دیتاسنتر (Data Center)",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 100,
+  "prerequisites": [
+    "fam-f4-01-security-8021x-ise-ztna"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f4-01-security-8021x-ise-ztna"
+    ],
+    "learningObjectives": [
+      "کالبدشکافی هدر VXLAN و نقش VNI",
+      "چرا MP-BGP EVPN جایگزین Flood & Learn شد؟",
+      "انواع Route در EVPN (Type 2, 3, 5)",
+      "Distributed Anycast Gateway"
+    ]
+  },
+  "whyItMatters": "ترافیک دیتاسنتر عمدتاً East-West بین سرورها و ماشین‌های مجازی است؛ جابه‌جایی VM بین رک‌ها نیازمند گسترش لایه ۲ روی یک هستهٔ تمام‌لایه ۳ با ECMP است.",
+  "topology": {
+    "devices": [
+      {
+        "id": "SPINE1",
+        "type": "switch",
+        "x": 200,
+        "y": 80
+      },
+      {
+        "id": "SPINE2",
+        "type": "switch",
+        "x": 420,
+        "y": 80
+      },
+      {
+        "id": "LEAF1",
+        "type": "switch",
+        "x": 200,
+        "y": 210
+      },
+      {
+        "id": "LEAF2",
+        "type": "switch",
+        "x": 420,
+        "y": 210
+      }
+    ],
+    "links": [
+      {
+        "a": "LEAF1:Eth1/1",
+        "b": "SPINE1:Eth1/1"
+      },
+      {
+        "a": "LEAF1:Eth1/2",
+        "b": "SPINE2:Eth1/1"
+      },
+      {
+        "a": "LEAF2:Eth1/1",
+        "b": "SPINE1:Eth1/2"
+      },
+      {
+        "a": "LEAF2:Eth1/2",
+        "b": "SPINE2:Eth1/2"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۴ · مسیر تخصصی Data Center — درس ۱ از ۳</div><p><strong>هدف درس:</strong> معماری EVPN-VXLAN را بفهمید: ساختار هدر VXLAN و VNI، چرا MP-BGP EVPN جایگزین Flood-and-Learn شد، نقش هر نوع route (Type 2/3/5) و نحوهٔ Distributed Anycast Gateway — و بتوانید یک مسیر بسته را از leaf تا leaf با نام هر جزء بازگو کنید.</p><p><strong>پیش‌نیازها:</strong> VXLAN در سطح مفهومی، MP-BGP و route-target، L2/L3 و ARP، آشنایی با spine-leaf.</p><p><strong>خروجی یادگیری:</strong> خواندن <code>show nve peers</code>/<code>show bgp l2vpn evpn</code>، توضیح لزوم ARP suppression و هاست‌موبیلیتی، و انتخاب مدل گیت‌وی (متمرکز یا توزیع‌شده).</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>دیتاسنترهای مدرن با دو محدودیت لایهٔ ۲ سنتی دست‌وپنجه نرم می‌کنند:</p><ul><li><strong>دامنهٔ لایه ۲ بزرگ:</strong> مهاجرت VM بین رک‌ها نیاز به VLAN سراسری دارد؛ STP/MLAG پیچیده می‌شود و یک خرابی می‌تواند کل pod را بگیرد. VXLAN با تونل، لایهٔ ۲ را بین هر جفت leaf ممکن می‌کند بدون آنکه لینک لایهٔ ۲ واقعی وجود داشته باشد.</li><li><strong>Flood-and-Learn سنتی:</strong> هر ARP جدید در کل fabric پخش می‌شود؛ در مقیاس ده‌ها هزار VM، نوسان و مصرف پهنای باند غیرقابل قبول است. EVPN با BGP یاد می‌گیرد و پاسخ هدفمند می‌دهد.</li><li><strong>چندگانگی داده (dual-homing):</strong> VM روی دو leaf (vPC/ESI) بدون دو برابر شدن ARP و بدون حلقه لازم است.</li><li><strong>مقیاس L3:</strong> هزاران VNI و subnet نیاز به جدول‌های مقیاس‌پذیر و تفکیک‌پذیر (EVPN) دارد، نه فقط MAC learning محلی.</li></ul><div class=\"lesson-callout\"><strong>خلاصهٔ پارادایم:</strong> VXLAN لایهٔ ۲ را «می‌پوشاند»؛ EVPN کنترل‌پلین یادگیری را «هوشمند» می‌کند؛ MP-BGP زبان مشترک آن‌هاست.</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. کالبدشکافی هدر VXLAN و نقش VNI",
+      "html": "<p>کپسولهٔ VXLAN یک فریم اترنت را در UDP (پورت 4789) می‌پیچد:</p><table class=\"lesson-data-table\"><thead><tr><th>لایه</th><th>فیلد</th><th>توضیح</th></tr></thead><tbody><tr><td>لایه ۲/۳ خارجی</td><td>Ethernet/IP/UDP</td><td>مسیر فقط بر اساس IP دو NVE (نقطهٔ سر و ته تونل)</td></tr><tr><td>VXLAN</td><td>VNI 24 بیت</td><td>تا 16M segment؛ معادل منطقی VLAN اما در سطح سراسری</td></tr><tr><td>هدر VXLAN</td><td>I/V/flag، GBP، آیدی‌های امنیتی</td><td>قابلیت حمل SGT/Policy در بعضی پیاده‌سازی‌ها</td></tr><tr><td>فریم داخلی</td><td>Ethernet + payload</td><td>MAC مبدأ/مقصد و VLAN داخلی دست‌نخورده حمل می‌شود</td></tr></tbody></table><ul><li><strong>NVE (Network Virtualization Endpoint):</strong> جایی که کپسوله انجام/باز می‌شود — معمولاً leaf (VTEP با IP آدرس loopback).</li><li><strong>Underlay:</strong> IS-IS/OSPF + multicast یا unicast head-end replication؛ هر NVE یک IP unicast دارد که مقصد تونل‌هاست.</li><li><strong>MTU:</strong> سربار ~50 بایت (8 VNI + 8 UDP + 8 IP + سربار اتر) ← underlay باید ≥1550 یا PMTUD سالم باشد؛ در دیتاسنتر معمولاً 9216 (jumbo) سراسری تعریف می‌کنند.</li></ul><pre><code>LEAF-1# show nve peers\nInterface  Peer-IP        State  Learn Type  Uptime\nnve1       10.0.0.11      Up     EVPN         5d02h\nnve1       10.0.0.12      Up     EVPN         5d02h\nLEAF-1# show nve interface nve1 source-interface\nInterface  Source-Interface  Source-IP\nnve1       loopback0         10.0.0.11</code></pre>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. چرا MP-BGP EVPN جایگزین Flood & Learn شد؟",
+      "html": "<p>در VXLAN سنتی (بدون EVPN)، یادگیری اینطور کار می‌کند: بسته از VM-A می‌آید ← leaf MAC-A را یاد می‌گیرد ← ARP مقصد را flood می‌کند ← همهٔ leaf ها می‌بینند و VM-B پاسخ می‌دهد. مشکلات:</p><ol><li><strong>فود بیش از حد:</strong> هر ARP/ND/بستهٔ ناشناخته در همهٔ VNI‌ها/تونل‌ها پخش می‌شود (یا با BUM multicast) — مصرف پهنای باند و CPU.</li><li><strong>یادگیری کند مهاجرت:</strong> هاست جدید باید «بسته بفرستد تا یاد بگیرند»؛ در مهاجرت، MAC move و تأخیر لحظه‌ای.</li><li><strong>بدون کنترل مسیر:</strong> هیچ منبع مرکزی برای پاسخ ARP نیست؛ مشکل MAC duplicate فقط با دردسر پیدا می‌شود.</li></ol><p><strong>EVPN</strong> همان یادگیری را از طریق MP-BGP (خانوادهٔ <code>l2vpn evpn</code>) به کنترل‌پلین می‌آورد:</p><ul><li>leaf (VTEP) وقتی MAC/ARP VM را می‌بیند، یک route EVPN اعلام می‌کند؛ بقیهٔ leaf ها آن را در جدول خود ثبت می‌کنند <em>بدون فود</em>.</li><li>برای ARP مقصد، به‌جای فود، یک ARP Request هدفمند (Proxy ARP از طرف EVPN) یا مستقیماً داده‌ای unicast می‌رود.</li><li>مسیرها با Route Target تفکیک می‌شوند (هر L2 VNI / هر L3 VNI خودش RT دارد) و با route-reflector یا pair مقیاس می‌گیرد.</li></ul>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. انواع Route در EVPN (Type 2, 3, 5)",
+      "html": "<p>مهم‌ترین نوع‌های route در EVPN و نقش هر کدام:</p><table class=\"lesson-data-table\"><thead><tr><th>Type</th><th>نام</th><th>محتوا</th><th>کاربرد</th></tr></thead><tbody><tr><td><strong>2</strong></td><td>MAC/IP Advertisement</td><td>MAC + (اختیاری) IP + VNI + MPLS label</td><td>یادگیری L2/L3؛ هم میزبان و هم Gateway</td></tr><tr><td><strong>3</strong></td><td>Inclusive Multicast Ethernet Tag (IMET)</td><td>لیست VTEP های مجاز برای پخش BUM در یک VNI</td><td>فهرست head-end replication؛ جایگزین گروه multicast</td></tr><tr><td><strong>5</strong></td><td>IP Prefix</td><td>پیشوند L3 + RT + label</td><td>تبلیغ subnet ها بین VNI ها/externally؛ جای Type 2 برای L3 در مقیاس</td></tr><tr><td>1</td><td>درخواست/پاسخ ادراک (Route Server/Discovery)</td><td>—</td><td>کمتر مصرف می‌شود (فقط برخی پیاده‌سازی‌ها)</td></tr><tr><td>4</td><td>منحنی ESI</td><td>برای dual-homing با ESI</td><td>هماهنگی بین دو leaf هم‌میزبان</td></tr></tbody></table><pre><code>LEAF-1# show bgp l2vpn evpn summary | begin Neighbor\nNeighbor        V    AS   MsgRcvd MsgSent   Up/Down  State/PfxRcd\n10.0.0.101      4  65000   44122   44120   12d04h        12044\n\nLEAF-1# show bgp l2vpn evpn 2.2.2.2/32 route-target both\nBGP routing table entry for [2][0][48][0000.1111.2222][0][*]/224\n Paths: (1 available, best #1)\n  Route Distinguisher: 10.0.0.11:10110\n    Advertised to non peer-group peers: 10.0.0.101\n    65000 (default for vrf TENANT-A)\n      from 10.0.0.12 (10.0.0.12)\n      Origin IGP, valid, external, best\n      Extended Community: RT:65000:11010\n      MPLS label: 11010</code></pre><p>نکتهٔ کلیدی: هر Type 2 می‌تواند IP هم داشته باشد (ARP از Type 2)؛ Type 5 وقتی جدول‌های L3 بزرگ می‌شوند و می‌خواهید پیشوند را جای MAC تبلیغ کنید، مقیاس بهتری می‌دهد.</p>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. Distributed Anycast Gateway",
+      "html": "<p><strong>Distributed Anycast Gateway:</strong> همان آدرس گیت‌وی (مثلاً 10.10.4.1) روی <em>همهٔ</em> leaf ها هم‌زمان تعریف می‌شود — هر leaf بهترین گیت‌وی برای VM خودش است (بهینهٔ first-hop). چگونه بدون تداخل؟</p><ol><li>هر leaf یک MAC anycast مشترک (مثلاً 0000.0c9f.f0ff) برای آن IP دارد؛ ARP پاسخ در لبهٔ محلی داده می‌شود.</li><li>خودِ گیت‌وی در هیچ جای underlay «وجود فیزیکی» ندارد؛ L3 forwarding داخل VNI با همان leaf انجام می‌شود.</li><li>ترافیک بین دو VNI (مثلاً وب به دیتابیس): در همان leaf مقصد L3 وارد VNI دیگر می‌شود (نیازی به رفتن تا یک روتر مرکزی نیست)؛ بین leaf ها با Type 5/Type 2 مسیر دارد.</li><li><strong>Anycast gateway + DHCP relay</strong>: روی هر leaf همان helper-address؛ <strong>+ HSRP ندارید</strong> — هر چیزی که لایهٔ ۳ گیت‌وی را متمرکز کرده باشد، مدل را به عقب برمی‌گرداند.</li></ol><div class=\"lesson-callout\"><strong>هشدار رایج:</strong> اگر روی leaf ها VRRP/HSRP برای گیت‌وی بگذارید، با Anycast تداخل می‌کند؛ گیت‌وی توزیع‌شده خودش failover داخلی دارد (خرابی یک leaf فقط VM های همان leaf را می‌بَرد).</div>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>راهنما</th></tr></thead><tbody><tr><td>کنترل‌پلین EVPN</td><td>MP-BGP با RR / سیگنال‌دهی دستی</td><td>همیشه MP-BGP + دو RR (pair)؛ دستی فقط برای lab کوچک</td></tr><tr><td>توزیع BUM</td><td>Multicast underlay / head-end replication (HER)</td><td>HER ساده‌تر (بدون PIM) برای کوچک/متوسط؛ multicast برای مقیاس بزرگ و پهنای باند بهتر</td></tr><tr><td>مدل Gateway</td><td>متمرکز (روتر مرکزی) / توزیع‌شده (anycast)</td><td>Distributed برای east-west داخلی؛ centralized فقط برای edge خاص</td></tr><tr><td>تفکیک L2/L3</td><td>یک VNI مشترک / L2 VNI + L3 VNI جدا</td><td>مدل سه‌لایه: per-tenant L3 VNI (فایروال/سیاست) + L2 VNI های مورد نیاز</td></tr><tr><td>لینک‌ها</td><td>vPC/ESI dual-homing / تک‌اتصالی</td><td>برای VMهای حساس ESI/vPC؛ leaf های ساده تک‌اتصالی هم قابل قبول‌اند</td></tr><tr><td>جداکننده</td><td>تک tenant / multi-tenant</td><td>هر tenant: VRF خودش + RT های خودش؛ هرگز route-target اشتباه بین tenant</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>مهاجرت یک ARP و سپس ترافیک بین دو VM در دو leaf:</p><ol><li>VM-A (leaf1، MAC-A/IP-A) ARP می‌زند برای IP-B. leaf1 اول در جدول EVPN خود می‌گردد: نیست.</li><li>leaf1 یا ARP را به صورت BUM به VTEP های لیست Type 3 (یا گروه multicast) می‌فرستد، یا در مدل مدرن، از control plane می‌پرسد (ARP suppression): پاسخ را از جدول BGP می‌گیرد و خودش به VM-A جواب می‌دهد — بدون اینکه ARP واقعاً به leaf2 برسد.</li><li>VM-A حالا MAC-B را دارد؛ بستهٔ داده با VNI و مقصد MAC-B روی تونل leaf1→leaf2 (IP های loopback دو VTEP) می‌رود.</li><li>leaf2 تونل را باز می‌کند، MAC-B را local تحویل می‌دهد. مسیر برگشت همین است؛ هیچ لینک لایهٔ ۲ بین leaf1 و leaf2 وجود ندارد — فقط underlay L3.</li><li>اگر VM-A به subnet دیگری در همان tenant برود: در همان leaf1 به‌عنوان گیت‌وی anycast وارد L3 می‌شود؛ با Type 5 مسیر مقصد را می‌گیرد و از VNI L3 خارج می‌شود.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): یک pod کامل.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>مقدار</th></tr></thead><tbody><tr><td>SPINE-1/2</td><td>زیرساخت IS-IS + iBGP EVPN (RR در spine)</td></tr><tr><td>LEAF-1..4</td><td>VTEP: loopback 10.0.0.11..14/32</td></tr><tr><td>L2 VNI</td><td>10110 = VLAN 10 وب · 10120 = VLAN 20 دیتابیس</td></tr><tr><td>L3 VNI (فایروال/tenant)</td><td>10001 = VRF TENANT-A (RT 65000:11010)</td></tr><tr><td>Anycast GW</td><td>10.10.4.1/26 با MAC 0000.0c9f.f0ff روی همهٔ leaf ها</td></tr><tr><td>VM ها</td><td>VM-A روی LEAF-1 (10.10.4.10)، VM-B روی LEAF-2 (10.10.4.11)</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی مینیمال یک leaf (طراحی‌شده — اجرا نشده؛ نام دستورها بسته به پلتفرم/رلیز NX-OS/IOS-XE متفاوت است):</p><pre><code>! --- زیرسافت و VTEP ---\nLEAF-1(config)# feature nv overlay\nLEAF-1(config)# feature bgp\nLEAF-1(config)# feature ospf\nLEAF-1(config)# feature vn-segment-vlan-based\nLEAF-1(config)# interface loopback0\nLEAF-1(config-if)# ip address 10.0.0.11/32\nLEAF-1(config)# nve 1\nLEAF-1(config-nve)# source-interface loopback0\nLEAF-1(config-nve)# member vni 10110\nLEAF-1(config-nve-vni)# ingress-replication protocol bgp\nLEAF-1(config)# vlan configuration 10\nLEAF-1(config-vlan-config)# member vni 10110\nLEAF-1(config)# interface Ethernet1/1\nLEAF-1(config-if)# switchport mode access\nLEAF-1(config-if)# switchport access vlan 10\n\n! --- BGP EVPN ---\nLEAF-1(config)# router bgp 65000\nLEAF-1(config-router)# router-id 10.0.0.11\nLEAF-1(config-router)# address-family l2vpn evpn\nLEAF-1(config-router-af)# retain route-target all\nLEAF-1(config-router)# neighbor 10.0.0.101 remote-as 65000\nLEAF-1(config-router)# neighbor 10.0.0.101 update-source loopback0\nLEAF-1(config-router)# neighbor 10.0.0.101 address-family l2vpn evpn\nLEAF-1(config-router)# vrf TENANT-A\nLEAF-1(config-router-vrf)# address-family ipv4 unicast\nLEAF-1(config-router-vrf)# route-target both 65000:11010\nLEAF-1(config-router-vrf)# rd 10.0.0.11:10110\nLEAF-1(config)# vlan 10\nLEAF-1(config-vlan)# name WEB\nLEAF-1(config)# vrf context TENANT-A\nLEAF-1(config-vrf)# address-family ipv4 unicast\nLEAF-1(config-vrf)# route-target import 65000:11010\nLEAF-1(config-vrf)# route-target export 65000:11010\nLEAF-1(config)# interface Vlan10\nLEAF-1(config-if)# vrf member TENANT-A\nLEAF-1(config-if)# ip address 10.10.4.1/26\nLEAF-1(config-if)# fabric forwarding mode anycast-gateway</code></pre><ul><li><code>ingress-replication protocol bgp</code> یعنی BUM با Type 3 و HER توزیع می‌شود (بدون multicast).</li><li><code>fabric forwarding mode anycast-gateway</code> همان MAC anycast مشترک را می‌سازد؛ بدون آن، هر leaf گیت‌وی جدا دارد و مهاجرت VM خراب می‌شود.</li><li>همهٔ RT ها را با یک اسکریپت/قالب چک کنید؛ اشتباه RT دقیقاً یعنی «tenant A دسترسی به داده‌های tenant B».</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>LEAF-1# show nve peers\nInterface  Peer-IP        State  Learn Type  Uptime  Router-MAC\nnve1       10.0.0.12      Up     EVPN         5d02h   50f7.ca11.2233\nnve1       10.0.0.13      Up     EVPN         5d02h   50f7.ca44.5566\n\nLEAF-1# show bgp l2vpn evpn summary\nNeighbor        V    AS   MsgRcvd MsgSent   Up/Down  State/PfxRcd\n10.0.0.101      4  65000   44122   44120   12d04h        12044\n10.0.0.102      4  65000   44118   44121   12d04h        12044\n\nLEAF-1# show l2 route evpn mac\nLegend: E - Extended Route, D - Direct Route\n VNI      MAC Address     IP Address     Route Distinguisher\n 10110    0000.1111.2222  10.10.4.10     10.0.0.11:10110\n 10110    0000.1111.3333  10.10.4.11     10.0.0.12:10110   ← از LEAF-2\n\nLEAF-1# show vxlan tunnel peer\n  VNI 10110: peer 10.0.0.12 state up\n\nLEAF-1# show ip arp\nInternet  10.10.4.10  0000.1111.2222  ARPA  Vlan10\nInternet  10.10.4.11  0000.1111.3333  ARPA  Vlan10   ← ساخته‌شده توسط suppression</code></pre><ul><li>علامت سالم: PfxRcd غیرصفر برای هر RR، تعداد peer های nve برابر تعداد leaf های هم‌VNI، و MAC های remote در جدول.</li><li>اگر MAC فقط local دیده شد و remote نیست ← RT/RD ناهماهنگ یا BGP پایین است.</li><li>ARP ساخته‌شده بدون دیده شدن ARP request در capture ← ARP suppression کار می‌کند (رفتار مطلوب).</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Wireshark روی underlay (فیلتر <code>udp.port == 4789</code>):</strong> هدر VXLAN با VNI را ببینید؛ با Decode As، فریم داخلی را هم چک کنید (MAC مبدأ/مقصد داخلی).</li><li><strong>فیلتر <code>arp</code> روی لینک leaf به spine:</strong> در مدل سالم با HER، تعداد ARP ها باید کم باشد؛ انبوه ARP یعنی suppression/Type 3 درست کار نمی‌کند یا پروفایل اشتباهی BUM زیادی تولید می‌کند.</li><li><strong>پایش:</strong> تعداد VNI فعال، تعداد MAC در جدول EVPN، تعداد peer های nve، و نرخ خطا/اختلال تونل. آستانه: افت peer یا جهش MAC (ممکن است حلقهٔ MAC flapping باشد).</li><li><strong>تشخیص MTU:</strong> پینگ با اندازه‌های صعودی بین دو VM؛ جایی که شکست ← سقف MTU واقعی. علامت خاص: پینگ کوچک سالم، وب/فایل کند یا ناقص.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>علت</th><th>راه‌حل</th></tr></thead><tbody><tr><td>ARP انبوه بعد از بالا آمدن fabric</td><td>ARP suppression غیرفعال یا پروفایل اشتباه</td><td>فعال‌سازی suppression + بررسی Type 2/3</td></tr><tr><td>VM بعد از مهاجرت IP/پینگ ندارد</td><td>گیت‌وی anycast نبود یا MAC move منتشر نشد</td><td>fabric forwarding mode + show l2 route evpn mac</td></tr><tr><td>بسته‌های بزرگ گم می‌شوند</td><td>MTU underale پایین/نامنظم</td><td>استاندارد jumbo یا PMTUD سالم؛ تست با ping صعودی</td></tr><tr><td>دو tenant به هم دسترسی دارند</td><td>RT مشترک یا فراموش‌شدن import/export</td><td>بازبینی route-target per VRF؛ هرگز RT عمومی بین tenant</td></tr><tr><td>فقط Type 2 دیده می‌شود، L3 کار نمی‌کند</td><td>VRF/L3 VNI پیکربندی نشده یا rd/rt ناهماهنگ</td><td>show bgp l2vpn evpn + show vrf</td></tr><tr><td>BUM بیش از حد در spine</td><td>هر leaf همه را replicate می‌کند (HER در مقیاس بزرگ)</td><td>به multicast underlay مهاجرت یا محدود کردن VNI های BUM-سنگین</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> بعد از راه‌اندازی pod جدید، VM های یک VLAN در دو leaf به هم نمی‌رسند ولی هر کدام به گیت‌وی خودش پاسخ می‌دهد.</p><ol><li>روی هر leaf: <code>show nve peers</code> ← آیا peer متقابل Up است؟ اگر نه، loopback ها را ping کنید (زیرساخت) و سپس BGP را چک کنید.</li><li><code>show bgp l2vpn evpn summary</code> ← PfxRcd؟ اگر صفر: address-family فعال نیست یا RT/RD ناهماهنگ. با <code>show bgp l2vpn evpn</code> دقیقاً چه route هایی تبادل شده را ببینید.</li><li>روی leaf مقصد: <code>show l2 route evpn mac</code> ← MAC های leaf دیگر را می‌بینید؟ نه ← یادگیری/اعلام قطع است.</li><li>VLAN/VNI: <code>show vlan brief</code> و <code>show nve vni</code> ← member vni هر VLAN یکسان است؟ یک ویروس رایج: در یک طرف VLAN 10 ← VNI 10110 و در طرف دیگر VNI 10120.</li><li>MTU: پینگ صعودی از VM به VM؛ اگر فقط بسته‌های بزرگ شکست بخورند، underlay/هدر را بررسی کنید.</li><li>پس از رفع: ARP suppression را با capture تأیید کنید (ARP کم بعد از نشست اول) و مسیر Type 3/HER را در show ها مستند کنید.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>VXLAN: VNI 24 بیت، UDP 4789، NVE/VTEP با IP loopback؛ سربار MTU را فراموش نکنید.</li><li>EVPN روی MP-BGP: Type 2 (MAC/IP)، Type 3 (لیست BUM)، Type 5 (پیشوند L3)، Type 4 (dual-homing).</li><li>بدون EVPN = flood-and-learn؛ با EVPN = یادگیری کنترل‌پلین + ARP suppression + مهاجرت تمیز.</li><li>Distributed Anycast Gateway: همان گیت‌وی روی همه leaf ها؛ HSRP/VRRP در فابریک ممنوع.</li><li>RT/RD دقیقاً همان جایی است که امنیت multi-tenant ساخته (یا خراب) می‌شود.</li><li>شش show کلیدی: nve peers · bgp l2vpn evpn summary · l2 route evpn mac · vxlan tunnel · vlan brief · ip arp.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>کالبدشکافی (۱۵ دقیقه):</strong> یک فریم نمونه را با Wireshark به لایه‌هایش تکه‌کنید و VNI/آدرس‌های داخلی-خارجی را علامت بزنید.</li><li><strong>لینک‌ها (۳۰ دقیقه):</strong> در شبیه‌ساز دو leaf با one spine؛ VTEP را با loopback و nve راه بیندازید؛ با show nve peers تأیید کنید.</li><li><strong>EVPN (۳۰ دقیقه):</strong> BGP l2vpn evpn را بین دو leaf وصل کنید؛ یک MAC را دستی/با ترافیک یاد بگیرید و در جدول دیگری ببینید.</li><li><strong>Anycast (۲۰ دقیقه):</strong> گیت‌وی مشترک روی هر دو leaf تعریف کنید؛ از VM-A به VM-B در leaf دیگر ping بزنید و مسیر را با show trace کنید.</li><li><strong>خودآزمایی:</strong> تفاوت flood-and-learn و EVPN، نقش Type 3، و دلیل ممنوعیت HSRP در مدل anycast را بنویسید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "EVPN",
+      "fa": "مفهوم کلیدی EVPN",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN"
+    },
+    {
+      "term": "VXLAN",
+      "fa": "مفهوم کلیدی VXLAN",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN"
+    },
+    {
+      "term": "VTEP",
+      "fa": "مفهوم کلیدی VTEP",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN"
+    },
+    {
+      "term": "VNI",
+      "fa": "مفهوم کلیدی VNI",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN"
+    },
+    {
+      "term": "Spine-Leaf",
+      "fa": "مفهوم کلیدی Spine-Leaf",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN"
+    },
+    {
+      "term": "Anycast Gateway",
+      "fa": "مفهوم کلیدی Anycast Gateway",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN"
+    },
+    {
+      "term": "ARP Suppression",
+      "fa": "مفهوم کلیدی ARP Suppression",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — تخصص دیتاسنتر: فابریک Spine-Leaf با MP-BGP EVPN و VXLAN",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>feature nv overlay\nfeature vn-segment-vlan-based\nnv overlay evpn\ninterface nve1\n source-interface loopback1\n host-reachability protocol bgp\nshow bgp l2vpn evpn</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "طول فیلد VNI (VXLAN Network Identifier) چند بیت است و تا چند سگمنت پشتیبانی می‌کند؟",
+      "options": [
+        "۱۲ بیت (۴۰۹۶)",
+        "۲۴ بیت (بیش از ۱۶ میلیون)",
+        "۱۶ بیت (۶۵۵۳۵)",
+        "۸ بیت (۲۵۶)"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>برخلاف VLAN 12بیتی، VNI دارای ۲۴ بیت است که مقیاس‌پذیری کلود و Multi-Tenancy را فراهم می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "دستگاه یا رابطی که ترافیک را در VXLAN کپسوله و دکپسوله می‌کند چه نام دارد؟",
+      "options": [
+        "VTEP (VXLAN Tunnel Endpoint)",
+        "ABR",
+        "Supplicant",
+        "Root Bridge"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>VTEP (معمولاً رابط NVE روی Leaf Switch) مبدأ و مقصد تونل‌های VXLAN در لایه Underlay است.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "پروتکل VXLAN به‌طور استاندارد از کدام پورت لایهٔ ۴ برای ترافیک Data Plane استفاده می‌کند؟",
+      "options": [
+        "UDP 4789",
+        "TCP 179",
+        "UDP 500",
+        "TCP 443"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بسته‌های اترنت داخل UDP پورت 4789 کپسوله می‌شوند.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "در BGP EVPN کدام نوع Route برای تبلیغ جفت MAC و Host IP میزبان‌ها استفاده می‌شود؟",
+      "options": [
+        "EVPN Type 2 (MAC/IP Advertisement Route)",
+        "EVPN Type 1",
+        "OSPF Type 4",
+        "BGP MED"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Route Type 2 آدرس‌های MAC و در صورت وجود IP میزبان را بین VTEPها توزیع می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "مزیت قابلیت ARP Suppression در EVPN-VXLAN چیست؟",
+      "options": [
+        "VTEP محلی پاسخ ARP کلاینت را از جدول محلی می‌دهد تا ARP Broadcast در کل دیتاسنتر پخش نشود",
+        "غیرفعال کردن IP",
+        "حذف BGP",
+        "کند کردن سرورها"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ARP Suppression طوفان Broadcast را در دیتاسنترهای بزرگ به‌شدت کاهش می‌دهد.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "در توپولوژی Spine-Leaf، اگر دو Leaf بخواهند با هم ارتباط بگیرند، چند Hop در لایهٔ Underlay طی می‌کنند؟",
+      "options": [
+        "همیشه یکسان (Leaf -> Spine -> Leaf)",
+        "بین ۱ تا ۱۰ Hop متغیر",
+        "از سرور دیگری عبور می‌کنند",
+        "مستقیم بدون Spine"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر Leaf به همهٔ Spineها متصل است؛ بنابراین تأخیر بین تمام سرورها قابل پیش‌بینی و یکنواخت است.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "ترافیک BUM در لایهٔ ۲ مخفف چیست؟",
+      "options": [
+        "Broadcast, Unknown Unicast, Multicast",
+        "Backup, Up, Monitor",
+        "BGP, UDP, MPLS",
+        "Border, Underlay, MAC"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>EVPN با Route Type 3 یا Multicast Underlay مسیر ارسال ترافیک BUM را مشخص می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "مزایای Distributed Anycast Gateway روی تمام Leafها چیست؟",
+      "options": [
+        "مسیریابی بهینه در نزدیک‌ترین Leaf به سرور بدون Hairpinning و جابه‌جایی روان VM",
+        "داشتن یک روتر واحد در اتاق دیگر",
+        "حذف نیاز به IP",
+        "خاموش کردن ECMP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر سرور همیشه دروازهٔ خود را روی همان Leaf محلی می‌بیند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "برای تبلیغ یک Subnet کامل IP (مثلاً از فایروال یا روتر مرزی به داخل فابریک) از کدام EVPN Route استفاده می‌شود؟",
+      "options": [
+        "Type 5 (IP Prefix Route)",
+        "Type 2",
+        "STP BPDU",
+        "ARP Request"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>EVPN Type 5 برای تبلیغ پیشوندهای IP (L3VNI) مشابه مسیرهای IP متعارف به کار می‌رود.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "نقش Underlay در فابریک Spine-Leaf چیست؟",
+      "options": [
+        "تأمین دسترسی IP با ECMP بین آدرس‌های Loopback تمام VTEPها",
+        "قرار دادن تمام سرورها در یک STP",
+        "اجرای NAT",
+        "احراز هویت کاربران وب"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Underlay فقط وظیفهٔ اتصال لایه ۳ سریع و بدون حلقه بین VTEPها را دارد.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "چرا در فابریک Spine-Leaf بین Spineها مستقیماً لینک نمی‌کشند؟",
+      "options": [
+        "زیرا کل ترافیک East-West از طریق Leafها و Spineها با ECMP عبور می‌کند و نیازی به لینک بین Spineها نیست",
+        "کابل گران است",
+        "سوئیچ اجازه نمی‌دهد",
+        "به دلیل STP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در معماری Clos، Spineها فقط با Leafها ارتباط دارند تا هم‌قوارگی تأخیر حفظ شود.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "تفاوت L2VNI و L3VNI در EVPN چیست؟",
+      "options": [
+        "L2VNI معادل یک سگمنت لایه ۲ (VLAN) و L3VNI معادل یک VRF برای مسیریابی بین سگمنت‌هاست",
+        "هر دو یکی هستند",
+        "L3VNI فقط برای کابل مسی است",
+        "L2VNI کار نمی‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در Symmetric IRB، هر VRF یک L3VNI دارد که ترافیک مسیریابی‌شده بین Leafها با آن عبور می‌کند.</p>"
+    }
+  ]
+}

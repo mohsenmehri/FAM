@@ -1,0 +1,380 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f3-02-ccnp-bgp-path-selection",
+  "id": "fam-f3-02-ccnp-bgp-path-selection",
+  "facultyId": "f3",
+  "objectiveId": "F3-02",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-3-ccnp",
+  "title": "BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای",
+  "titleEn": "Enterprise BGP: Attributes, Route-Maps & Path Selection",
+  "domain": "دانشکده ۳ · مسیریابی BGP سازمانی",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 100,
+  "prerequisites": [
+    "fam-f3-01-ccnp-encor-sd-access-lisp"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f3-01-ccnp-encor-sd-access-lisp"
+    ],
+    "learningObjectives": [
+      "پروتکل انتقال و تفاوت eBGP با iBGP",
+      "قانون Split-Horizon در iBGP",
+      "ترتیب انتخاب بهترین مسیر (Path Selection)",
+      "مهندسی ترافیک ورودی در برابر خروجی"
+    ]
+  },
+  "whyItMatters": "هر شرکت متصل به دو ISP یا دارای WAN بزرگ برای کنترل دقیق ترافیک ورودی و خروجی باید به‌جای تکیه بر کوتاه‌ترین Hop، ویژگی‌های BGP را مهندسی کند.",
+  "topology": {
+    "devices": [
+      {
+        "id": "EDGE-R1",
+        "type": "router",
+        "x": 180,
+        "y": 140
+      },
+      {
+        "id": "ISP-A",
+        "type": "router",
+        "x": 420,
+        "y": 80
+      },
+      {
+        "id": "ISP-B",
+        "type": "router",
+        "x": 420,
+        "y": 210
+      }
+    ],
+    "links": [
+      {
+        "a": "EDGE-R1:Gi0/0",
+        "b": "ISP-A:Gi0/0"
+      },
+      {
+        "a": "EDGE-R1:Gi0/1",
+        "b": "ISP-B:Gi0/0"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۳ · CCNP Enterprise (ENCOR) — درس ۲ از ۳</div><p><strong>هدف درس:</strong> تفاوت eBGP/iBGP را توضیح دهید، قانون Split-Horizon در iBGP را بشناسید، و <strong>ترتیب کامل انتخاب بهترین مسیر BGP</strong> (از Weight تا tiebreak نهایی Router-ID) را قدم‌به‌قدم روی یک خروجی <code>show ip bgp</code> اعمال کنید.</p><p><strong>پیش‌نیازها:</strong> جدول مسیریابی و AD، مفهوم next-hop و مسیر استاتیک، آشنایی با AS (در سطح CCNA). مسیریابی داخلی OSPF/IS-IS برای IGP-to-next-hop لازم است.</p><p><strong>خروجی یادگیری:</strong> خواندن ستون‌های جدول BGP، اعمال ترتیب انتخاب مسیر بدون حفظ کور، مهندسی ترافیک ورودی/خروجی با LOCAL_PREF/MED و عیب‌یابی «چرا مسیر دیگری انتخاب شد».</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>BGP پروتکل مسیریابی بین سازمان‌هاست (AS) و برخلاف IGPها، «معیار» ساده‌ای ندارد؛ ۱۰+ مرحلهٔ تصمیم دارد. این ویژگی دلیل هم قدرت آن است (مهندسی ترافیک) و هم دشواری عیب‌یابی آن:</p><ul><li><strong>مقیاس:</strong> بیش از یک میلیون پیشوند در جدول جهانی — بدون مرحله‌بندی و filter، روتینگ غیرممکن است.</li><li><strong>سیاست (Policy):</strong> مسیر «کوتاه‌تر» همیشه بهتر نیست؛ سیاست AS ما (local-pref، weight) مهم‌تر از مسیر فیزیکی همسایه است.</li><li><strong>چندمسیره‌بودن:</strong> BGP می‌تواند چند مسیر هم‌ارز نگه دارد و فقط بهترین را در جدول نصب کند — برای load-sharing و failover ارزشمند است.</li><li>در آزمون و محیط واقعی، رایج‌ترین تیکت «BGP» دقیقاً همین است: مسیر اشتباه انتخاب شده، یا مسیری اصلاً نیامده — هر دو با دانستن ترتیب حل می‌شوند.</li></ul><div class=\"lesson-callout\"><strong>قانون طلایی:</strong> اول بفهم «چه مسیرهایی رسیده» (show ip bgp)، بعد «کدام انتخاب شده و چرا» (same command + ترتیب)، بعد «چرا نرسیده» (filter/neighbor/session).</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. پروتکل انتقال و تفاوت eBGP با iBGP",
+      "html": "<p><strong>eBGP</strong> بین دو AS، <strong>iBGP</strong> داخل یک AS. تفاوت‌های عملیاتی کلیدی:</p><table class=\"lesson-data-table\"><thead><tr><th>ویژگی</th><th>eBGP</th><th>iBGP</th></tr></thead><tbody><tr><td>TTL پیش‌فرض</td><td>۱ (باید مستقیم لینک داشته باشید؛ multihop لازم است)</td><td>۲۵۵ (هر جای AS)</td></tr><tr><td>نحوهٔ اعلام next-hop</td><td>next-hop را به آدرس خودش عوض می‌کند</td><td>دست‌نخورده نگه می‌دارد ← باید <code>next-hop-self</code> بدهید</td></tr><tr><td>AD</td><td>۲۰</td><td>۲۰۰ (تا از IGP عقب بماند)</td></tr><tr><td>MED/TTL preprocessing</td><td>فعال</td><td>بین iBGP همسایه‌ها معمولاً نادیده گرفته می‌شود</td></tr><tr><td>تمرین رایج</td><td>با اینترنت/شرکا/سایت‌ها</td><td>داخل IGP backbone؛ معمولاً با route reflector در مقیاس</td></tr></tbody></table><pre><code>R1(config)# router bgp 65010\nR1(config-router)# neighbor 10.0.12.2 remote-as 65020     ! eBGP\nR1(config-router)# neighbor 10.0.13.3 remote-as 65010     ! iBGP\nR1(config-router)# neighbor 10.0.13.3 next-hop-self\nR1(config-router)# address-family ipv4 unicast\nR1(config-router-af)# neighbor 10.0.12.2 activate\nR1(config-router-af)# neighbor 10.0.13.3 activate\nR1(config-router-af)# network 192.168.10.0 mask 255.255.255.0\nR1(config-router-af)# bgp bestpath as-path multipath-relax</code></pre>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. قانون Split-Horizon در iBGP",
+      "html": "<p>قانون Split-Horizon در iBGP می‌گوید: <strong>مسیری که از یک iBGP همسایه آمده، به هیچ iBGP همسایهٔ دیگری اعلام نمی‌شود</strong> (مگر route reflector). نتیجه: داخل یک AS، همهٔ روترها باید با هم iBGP full-mesh داشته باشند:</p><ul><li>با N روتر، تعداد جلسات = N×(N−1)/2؛ ۵۰ روتر یعنی ۱۲۲۵ جلسه — غیرعملی.</li><li><strong>راه‌حل ۱ — Route Reflector (RR):</strong> یک (یا pair) روتر که از کلاینت‌ها مسیر می‌گیرد و به بقیهٔ کلاینت‌ها و هم‌peerهایش اعلام می‌کند. کلاینت‌ها فقط به RR وصل‌اند. قاعدهٔ مهم RR: مسیر از client ← به همه؛ از non-client ← فقط به client ها؛ مسیر از RR خودش (originated) به همه. برای جلوگیری از حلقهٔ مسیر، AS_PATH داخلی (originator-id / cluster-list) بررسی می‌شود.</li><li><strong>راه‌حل ۲ — BGP Confederation:</strong> AS بزرگ را به ASهای داخلی کوچک‌تر می‌شکنید؛ بین آن‌ها eBGP و داخل هر کدام iBGP. برای شبکه‌های بسیار بزرگ یا چند تیم مستقل.</li></ul><div class=\"lesson-callout\"><strong>تشخیص:</strong> اگر روتری مسیری از همسایهٔ iBGP دریافت نمی‌کند ولی جلسه UP است، اول به RR بودن/نبودن و mesh نگاه کنید، نه به filterها.</div>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. ترتیب انتخاب بهترین مسیر (Path Selection)",
+      "html": "<p><strong>ترتیب کامل انتخاب بهترین مسیر (Best Path) در BGP — به همین ترتیب اعمال می‌شود؛ اولین مرحله‌ای که نامساوی بود، تصمیم را می‌گیرد:</strong></p><ol><li><strong>Weight</strong> (فقط محلی، سیسکو، ۰–۶۵۵۳۵): بالاترین Weight برنده. فقط روی همان روتر معنا دارد و به جایی اعلام نمی‌شود.</li><li><strong>Local Preference (LOCAL_PREF)</strong> (پیش‌فرض ۱۰۰، در کل AS): بالاترین LP برنده. اصلی‌ترین ابزار مهندسی ترافیک <em>خروجی</em> در یک AS.</li><li><strong>AS_PATH کوتاه‌تر</strong>: تعداد AS کمتر برنده (مگر <code>bgp bestpath as-path ignore</code>).</li>\n<li><strong>Origin:</strong> IGP (i) بهتر از EGP (e) بهتر از Incomplete (?) — عمدتاً تزئینی/تعیین‌کنندهٔ منبع توزیع.</li><li><strong>MED</strong> (پیش‌فرض ۰، فقط بین همسایه‌های یک AS همسایه): پایین‌تر برنده. ابزار مهندسی <em>ورودی</em> از یک همسایهٔ خاص. با <code>bgp always-compare-med</code> بین ASهای متفاوت هم مقایسه می‌شود (با احتیاط).</li><li><strong>eBGP بهتر از iBGP:</strong> مسیر از بیرون AS ترجیح دارد (مگر deterministic-med).</li><li><strong>کوتاه‌ترین IGP metric تا next-hop</strong> (کلیدی‌ترین مرحلهٔ داخلی): روتری که از نظر IGP به next-hop نزدیک‌تر است، مسیر را انتخاب می‌کند. پس OSPF/IS-IS داخلی مستقیماً روی BGP اثر می‌گذارد.</li><li><strong>قدیمی‌ترین مسیر (oldest)</strong> و سپس <strong>پایین‌ترین Router-ID مبدأ/peer</strong> (یا originator-id/cluster-list در RR) به‌عنوان tiebreakهای نهایی.</li></ol><pre><code>R1# show ip bgp\nNetwork          Next Hop          Metric LocPrf Weight Path\n* i 10.50.0.0/16  10.0.13.3             0    100      0 i\n*                  10.0.12.2             0             0 65020 i\n*>                  10.0.12.2             0             0 65020 i\n*  10.60.0.0/16   10.0.14.4             0    120      0 65030 65010 i\nR1# show ip bgp 10.50.0.0/16\nPaths: 2 available, best #2, table default\n  0. i (received from Peer R1) — best path reason: lower IGP metric to next-hop</code></pre><p><strong>مثال تمرینی:</strong> دو مسیر با Weight برابر (0)، LP برابر (100)، AS_PATH با طول یکسان، Origin یکسان، MED یکسان ← eBGP در برابر iBGP: eBGP برنده. اگر هر دو eBGP بود ← مسیری که next-hop آن از نظر OSPF نزدیک‌تر است. اگر هر دو هم‌ارز شدند ← کوچک‌ترین Router-ID همسایه برنده است. این پنج قدم را روی هر خروجی show می‌توانید تکرار کنید.</p>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. مهندسی ترافیک ورودی در برابر خروجی",
+      "html": "<p><strong>ترافیک ورودی (Inbound)</strong> یعنی چطور دیگران به ما برسند؛ <strong>خروجی (Outbound)</strong> یعنی ما چطور به بیرون برویم:</p><table class=\"lesson-data-table\"><thead><tr><th>هدف</th><th>ابزار</th><th>کجا اعمال می‌شود</th></tr></thead><tbody><tr><td>مسیر خروجی بهتر از یک ISP</td><td><code>neighbor … route-map OUT permit</code> با set local-preference 200</td><td>اعلام به همسایه (ORF/route-map out)</td></tr><tr><td>هدایت ورودی از یک ISP</td><td>فیلتر prefix-list ورودی + MED</td><td>قبل از نصب در جدول</td></tr><tr><td>ترجیح مسیر کوتاه‌تر AS</td><td>set weight دریافتی</td><td>فقط محلی</td></tr><tr><td>مسیر پیش‌فرض از سمت اینترنت</td><td><code>neighbor … default-originate</code> یا <code>ip route 0.0.0.0 0.0.0.0</code> + redistribute</td><td>اعلام default به داخل AS</td></tr><tr><td>جداسازی دو ISP برای backup</td><td>as-path access-list برای رد پیشوندهای خودمان (یا BGP filtering استاندارد)</td><td>جلوگیری از routing loop در مسیرهای خودمان</td></tr></tbody></table><pre><code>R1(config)# ip prefix-list PL-OUT seq 10 permit 192.168.10.0/24 le 24\nR1(config)# route-map SET-OUT permit 10\nR1(config-route-map)# match ip address prefix-list PL-OUT\nR1(config-route-map)# set local-preference 200\nR1(config)# router bgp 65010\nR1(config-router)# neighbor 10.0.12.2 route-map SET-OUT out\nR1(config-router)# neighbor 10.0.12.2 prefix-list PL-IN in</code></pre><div class=\"lesson-callout\"><strong>هشدار:</strong> route-map بدون permit صریح یعنی «همه را رد کن» — بعد از اعمال، حتماً با <code>show ip bgp neighbors … advertised-routes</code> تأیید کنید چه چیزی اعلام شده است.</div>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>راهنما</th></tr></thead><tbody><tr><td>مدل iBGP در AS متوسط</td><td>full-mesh / route reflector</td><td>از ~۱۰ روتر به بالا: RR با pair (برای تحمل خرابی)</td></tr><tr><td>کنترل ترافیک ورودی</td><td>MED / AS-path prepending / more-specific</td><td>پیشوند جزئی‌تر قوی‌ترین ابزار است (longest prefix)؛ prepending ساده‌ترین</td></tr><tr><td>کنترل ترافیک خروجی</td><td>weight / local-pref</td><td>local-pref سراسری در AS؛ weight فقط برای تصمیم محلی سریع</td></tr><tr><td>مسیرهای هم‌ارز</td><td>یک best / multipath</td><td><code>maximum-paths</code> + شرایط هم‌ارزی دقیق (metric/LP/… یکسان)</td></tr><tr><td>امنیت همسایه</td><td>MD5 / GTSM / اعلام فقط پیشوندهای مجاز</td><td>همیشه prefix-list ورودی + غیرفعال‌سازی ناشناس‌ها</td></tr><tr><td>مقیاس جدول</td><td>full table از یک transit / فقط default</td><td>سایت لبه بدون نیاز، فقط default + مسیرهای خودی</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>یک بسته از LAN داخلی تا اینترنت و تصمیم‌های BGP در مسیر:</p><ol><li>کلاینت به edge (AS 65010) می‌رسد؛ جدول edge شامل پیشوندهای BGP از دو ISP است.</li><li>برای مقصد X، دو مسیر eBGP از ISP-A و ISP-B هست. وزن/local-pref محلی (که سیاست ماست) اول تصمیم می‌گیرد؛ سپس AS_PATH و در نهایت IGP metric تا next-hop.</li><li>مسیر انتخابی در جدول نصب می‌شود؛ پکت با next-hop ISP خروجی می‌یابد. اگر مسیر نصب نشود (فقط در BGP table)، پکت به default یا blackhole می‌رود — علت شایع «اینترنت یک‌طرفه».</li><li>مسیر اعلامی به داخل AS (iBGP): اگر next-hop-self نباشد، همسایه‌های داخلی next-hop از لینک eBGP را در underlay خود پیدا نمی‌کنند ← مسیر به داخل AS «رسیده» ولی قابل استفاده نیست.</li><li>در لبهٔ ورودی، اگر فقط default از ISP گرفته باشید، مسیرهای خاص داخلی‌تان را باید خودتان به ISP اعلام کنید (network statement/aggregate) تا ترافیک برگشتی بیاید.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): دو ISP، دو edge، یک RR.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>مقدار</th></tr></thead><tbody><tr><td>AS ما</td><td>65010 (edge-1 10.0.1.1، edge-2 10.0.1.2، RR 10.0.1.3)</td></tr><tr><td>ISP-A</td><td>AS 65020 — peer 10.0.12.2 — اعلام کل جدول (full)</td></tr><tr><td>ISP-B</td><td>AS 65030 — peer 10.0.13.3 — اعلام default + مسیرهای ملی</td></tr><tr><td>سیاست ورودی</td><td>از ISP-A: local-pref 150 · از ISP-B: local-pref 100 + default-originate</td></tr><tr><td>سیاست خروجی</td><td>اعلام فقط 192.168.0.0/16 به هر دو ISP</td></tr><tr><td>پیشوندهای داخلی</td><td>192.168.10.0/24 (LAN)، 10.50.0.0/16 (DC)</td></tr></tbody></table><p>در این طرح می‌توان هر مرحلهٔ انتخاب مسیر را دستی شبیه‌سازی کرد: دو مسیر برای یک پیشوند خارجی از دو ISP، با weight/local-pref/AS_PATH عمداً متفاوت.</p>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی کامل (طراحی‌شده — اجرا نشده):</p><pre><code>! --- edge-1 ---\nedge-1(config)# router bgp 65010\nedge-1(config-router)# bgp router-id 10.0.1.1\nedge-1(config-router)# bgp log-neighbor-changes\nedge-1(config-router)# neighbor 10.0.12.2 remote-as 65020\nedge-1(config-router)# neighbor 10.0.12.2 description ISP-A\nedge-1(config-router)# neighbor 10.0.12.2 password 0 STRONG-KEY\nedge-1(config-router)# neighbor 10.0.13.3 remote-as 65030\nedge-1(config-router)# neighbor 10.0.1.3 remote-as 65010\nedge-1(config-router)# neighbor 10.0.1.3 next-hop-self\nedge-1(config-router)# address-family ipv4 unicast\nedge-1(config-router-af)# network 192.168.10.0 mask 255.255.255.0\nedge-1(config-router-af)# network 10.50.0.0 mask 255.255.0.0\nedge-1(config-router-af)# neighbor 10.0.12.2 activate\nedge-1(config-router-af)# neighbor 10.0.12.2 route-map ISP-A-IN in\nedge-1(config-router-af)# neighbor 10.0.12.2 route-map ONLY-MYNET out\nedge-1(config-router-af)# neighbor 10.0.1.3 activate\nedge-1(config-router-af)# maximum-paths 2\n\nedge-1(config)# ip prefix-list ONLY-MYNET seq 10 permit 192.168.0.0/16 le 16\nedge-1(config)# ip prefix-list ONLY-MYNET seq 20 permit 10.50.0.0/16 le 16\nedge-1(config)# route-map ONLY-MYNET permit 10\nedge-1(config-route-map)# match ip address prefix-list ONLY-MYNET\nedge-1(config)# route-map ISP-A-IN permit 10\nedge-1(config-route-map)# set local-preference 150\nedge-1(config)# route-map ISP-A-IN permit 20</code></pre><ul><li>پایان‌بندی route-map: قاعدهٔ permit 20 خالی برای «بقیه را عبور بده»؛ بدون آن، همهٔ مسیرهای دیگر ISP-A رد می‌شوند.</li><li><code>network</code> فقط پیشوندهایی را اعلام می‌کند که <em>در جدول محلی وجود داشته باشند</em>؛ اگر مسیر داخلی نصب نشده، BGP آن را اعلام نمی‌کند — اول IGP/static را چک کنید.</li><li>password همسایه‌گی فقط یکپارچگی پیام‌هاست؛ امنیت واقعی ← prefix-list + کنترل دسترسی لینک.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>edge-1# show ip bgp summary\nNeighbor        V   AS   MsgRcvd MsgSent   Up/Down  State/PfxRcd\n10.0.12.2       4  65020   18442    18440   12d04h        894213\n10.0.13.3       4  65030     941      938   12d04h          1204\n10.0.1.3        4  65010    4410     4407   12d04h          1207\n\nedge-1# show ip bgp 10.40.0.0/16\nBGP routing table entry for 10.40.0.0/16\nPaths: (2 available, best #1, table default)\n  Advertised to non peer-group peers:\n  10.0.1.3\n  65020\n    10.0.12.2 from 10.0.12.2 (10.0.12.2)\n      Origin IGP, valid, external, best (First path received)\n      Community: no-export  ← اگر دیدید یعنی به iBGP هم اعلام نمی‌شود!\n  65030 65010\n    10.0.13.3 from 10.0.13.3 (10.0.13.3)\n      Origin IGP, valid, external\n      rx pathid: 0, tx pathid: 0\n\nedge-1# show ip route bgp\nB    10.40.0.0/16 [20/0] via 10.0.12.2, 00:41:22\n\nedge-1# show ip bgp neighbors 10.0.12.2 advertised-routes\nNetwork          Next Hop\n192.168.10.0/24  10.0.12.2\n10.50.0.0/16     10.0.12.2</code></pre><ul><li>State/PfxRcd عددی = تعداد پیشوندهای دریافتی؛ یا <code>Active</code>/<code>Idle</code> = جلسه up نشده (دریافت/ارسال، MD5، مسیر لینک).</li><li>در show ip bgp تک‌پیشوند، مسیر «best» و دلیلش را می‌بینید؛ مسیر بدون <code>valid</code> یعنی next-hop قابل resolve نیست.</li><li>ستون‌ها: <code>*</code> valid · <code>&gt;</code> best · <code>i</code> از iBGP · <code>d</code> dampened · <code>s</code> suppressed.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Wireshark (فیلتر <code>tcp.port == 179</code>):</strong> OPEN/OPEN ACK/UPDATE/NOTIFICATION/KEEPALIVE. دیدن NOTIFICATION با کد (مثلاً Hold Timer Expired یا Finite State Machine) دقیقاً علت قطعی را می‌گوید — قبل از هر چیز capture کنید.</li><li><strong>محتوای UPDATE:</strong> در پیام‌های UPDATE، NLRI (پیشوندها) و path attributes (AS_PATH، LOCAL_PREF، MED) را ببینید؛ وقتی route-map اعمال می‌کنید، تفاوت قبل/بعد در همین پیام‌هاست.</li><li><strong>پایش:</strong> تعداد پیشوندهای دریافتی per-neighbor (آستانه: افت >۱۰٪)، زمان up/down جلسات، تعداد مسیرهای best در جدول. در اینترنت عمومی، عدد ~900K+ طبیعی است.</li><li><strong>نشانگر مشکل:</strong> نوسان مکرر مسیرها (flap) ← لینک یا keepalive/hold timer؛ اگر فقط یک پیشوند نوسان دارد ← مسیر مبدأ یا dampening. با <code>show ip bgp flap-statistics</code> بررسی کنید.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>چرا اشتباه است</th><th>درست چیست؟</th></tr></thead><tbody><tr><td>«مسیر رسید ولی پینگ نمی‌شود»</td><td>next-hop در AS داخلی resolve نمی‌شود</td><td>next-hop-self روی همسایه‌های iBGP + مسیر IGP تا next-hop</td></tr><tr><td>اعتباد به AS_PATH کوتاه‌تر با نادیده گرفتن local-pref</td><td>local-pref قبل از AS_PATH مقایسه می‌شود</td><td>ترتیب: Weight ← LP ← AS_PATH ← Origin ← MED ← … ← IGP metric ← Router-ID</td></tr><tr><td>MED بین دو ISP مختلف</td><td>پیش‌فرض فقط بین همسایه‌های یک AS مقایسه می‌شود</td><td>always-compare-med یا ابزارهای دیگر (prepend/prefix)</td></tr><tr><td>اعلام network بدون مسیر در جدول</td><td>شرط BGP: ابتدا باید در RIB باشد</td><td>static/IGP را درست کنید یا <code>network … backdoor</code>/<code>aggregate-address</code> با احتیاط</td></tr><tr><td>route-map بدون قاعدهٔ پایان</td><td>implicit deny همه را حذف می‌کند</td><td>permit 20 خالی یا ساختار صریح</td></tr><tr><td>eBGP multihop فراموش</td><td>TTL=1 فقط لینک مستقیم</td><td>neighbor … ebgp-multihop n (و IGP تا next-hop)</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> ترافیک خروجی سایت به‌جای ISP-A (سیاست: LP 150)، از ISP-B (LP 100) می‌رود و بعضی مقاصد کند است.</p><ol><li><code>show ip bgp</code> ← پیشوند مقصد را پیدا کنید؛ دو مسیر را با هم مقایسه کنید: کدام <code>&gt;</code> دارد؟</li><li>ستون‌ها را به ترتیب چک کنید: Weight (هر دو 0؟) ← LocalPrf (آیا 150 از ISP-A اعمال شده؟) ← AS_PATH ← … . اگر LP دومی بالاتر است، route-map ورودی اعمال نشده: <code>show route-map</code> و <code>show ip bgp neighbors … received-routes</code>.</li><li>اگر LP درست است ولی باز هم مسیر دیگری best شد ← به مرحلهٔ بعد بروید: AS_PATH (شاید prepend شده)، Origin، MED.</li><li>اگر همه برابرند ← IGP metric تا next-hop: <code>show ip route &lt;next-hop&gt;</code> روی هر دو؛ edge شاید به ISP-B نزدیک‌تر است. در این حالت یا IGP را اصلاح کنید یا وزن را با route-map set weight بالا ببرید.</li><li>مرحلهٔ نهایی: اگر مسیر بهتر اعلام می‌شود ولی در جدول نیست ← <code>show ip bgp …</code> را بخوانید؛ ممکن است invalid/best نشود به‌خاطر next-hop یا dampening.</li><li>پس از اعمال هر تغییر، <code>clear ip bgp soft in</code> (بدون قطع جلسه) و سپس با traceroute تأیید کنید مسیر واقعاً عوض شده — نه فقط در جدول.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>eBGP: TTL 1، next-hop عوض می‌شود، AD 20 · iBGP: next-hop دست‌نخورده ← next-hop-self، AD 200، نیاز به RR/confederation در مقیاس.</li><li>Split-Horizon در iBGP ← mesh یا Route Reflector.</li><li>ترتیب انتخاب: Weight ← Local-Pref ← AS-Length ← Origin ← MED ← eBGP over iBGP ← IGP metric to next-hop ← oldest ← Router-ID.</li><li>ورودی = prefix-list + MED + prepend · خروجی = local-pref + filter اعلام.</li><li>همیشه: <code>show ip bgp summary</code> اول، بعد جدول، بعد route-map ها، بعد IGP.</li><li>NOTIFICATION در capture، سریع‌ترین جواب برای «چرا جلسه پایین آمد».</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>تبیین ترتیب (۱۵ دقیقه):</strong> ترتیب ۱۰ مرحله‌ای را بدون نگاه بنویسید؛ برای هر مرحله یک مثال یک‌خطی بزنید.</li><li><strong>دو ISP در شبیه‌ساز (۳۰ دقیقه):</strong> یک edge و دو همسایهٔ eBGP جعلی (یا دو AS دیگر) بسازید؛ با route-map محلی و وزن‌های مختلف، مسیر انتخابی را عوض کنید و show بگیرید.</li><li><strong>iBGP + RR (۲۵ دقیقه):</strong> سه روتر داخلی با یک RR؛ ثابت کنید بدون RR، همسایهٔ iBGP سوم مسیر را نمی‌گیرد؛ بعد با RR می‌گیرد.</li><li><strong>عیب‌یابی (۲۰ دقیقه):</strong> عمدتاً یک route-map با قاعدهٔ ناقص بگذارید؛ با show route-map و advertised-routes پیدا و اصلاحش کنید.</li><li><strong>خودآزمایی:</strong> چرا «کوتاه‌ترین AS_PATH» همیشه برنده نیست و چرا next-hop-self در iBGP لازم است را در سه جمله توضیح دهید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "BGP",
+      "fa": "مفهوم کلیدی BGP",
+      "simple": "اصطلاح تخصصی مرتبط با BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای"
+    },
+    {
+      "term": "eBGP",
+      "fa": "مفهوم کلیدی eBGP",
+      "simple": "اصطلاح تخصصی مرتبط با BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای"
+    },
+    {
+      "term": "iBGP",
+      "fa": "مفهوم کلیدی iBGP",
+      "simple": "اصطلاح تخصصی مرتبط با BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای"
+    },
+    {
+      "term": "Local Preference",
+      "fa": "مفهوم کلیدی Local Preference",
+      "simple": "اصطلاح تخصصی مرتبط با BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای"
+    },
+    {
+      "term": "MED",
+      "fa": "مفهوم کلیدی MED",
+      "simple": "اصطلاح تخصصی مرتبط با BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای"
+    },
+    {
+      "term": "AS_PATH",
+      "fa": "مفهوم کلیدی AS_PATH",
+      "simple": "اصطلاح تخصصی مرتبط با BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای"
+    },
+    {
+      "term": "Route-Map",
+      "fa": "مفهوم کلیدی Route-Map",
+      "simple": "اصطلاح تخصصی مرتبط با BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — BGP پیشرفته: eBGP/iBGP، ویژگی‌ها و انتخاب مسیر ۱۳مرحله‌ای",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>router bgp 65100\n bgp log-neighbor-changes\n neighbor 203.0.113.2 remote-as 65200\n neighbor 203.0.113.2 route-map SET-LP in\nshow ip bgp summary\nshow ip bgp</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "پروتکل BGP در لایهٔ ۴ از چه پورتی استفاده می‌کند؟",
+      "options": [
+        "UDP 520",
+        "TCP 179",
+        "IP Protocol 89",
+        "UDP 161"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>BGP برای اطمینان و عدم ارسال دوره‌ای کل جدول، روی TCP پورت ۱۷۹ کار می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "اولین معیار اختصاصی سیسکو در الگوریتم انتخاب بهترین مسیر BGP کدام است؟",
+      "options": [
+        "MED",
+        "Weight (بیشترین مقدار برنده)",
+        "AS_PATH",
+        "Router ID"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Weight فقط روی همان روتر معنی دارد و بالاترین مقدار برنده می‌شود (پیش‌فرض ۰ برای یادگرفته‌شده، ۳۲۷۶۸ برای محلی).</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "کدام ویژگی برای انتخاب مسیر خروجی در سطح کل یک Autonomous System (AS) استفاده می‌شود؟",
+      "options": [
+        "Local Preference (پیش‌فرض ۱۰۰، بیشتر بهتر)",
+        "MED",
+        "TTL",
+        "MTU"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Local Preference بین تمام همسایگان iBGP تبلیغ می‌شود تا کل سازمان یک خروجی واحد انتخاب کند.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "مقدار Administrative Distance پیش‌فرض برای مسیرهای eBGP و iBGP به ترتیب چیست؟",
+      "options": [
+        "110 و 120",
+        "20 و 200",
+        "90 و 170",
+        "1 و 5"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>eBGP دارای AD=20 و iBGP دارای AD=200 است.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "چرا در iBGP قانون Split-Horizon وجود دارد؟",
+      "options": [
+        "برای جلوگیری از حلقه درون AS چون AS_PATH در iBGP تغییر نمی‌کند",
+        "برای افزایش سرعت لینک",
+        "چون TCP قطع می‌شود",
+        "برای کاهش MTU"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>از آنجا که iBGP شماره AS خودش را به AS_PATH اضافه نمی‌کند، برای جلوگیری از Loop مسیر iBGP به همسایهٔ iBGP دیگر ارسال نمی‌شود.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "راهکار متداول برای حل مشکل Full-Mesh در شبکه‌های بزرگ iBGP چیست؟",
+      "options": [
+        "Route Reflector (RR) یا Confederation",
+        "OSPF Stub",
+        "PortFast",
+        "HSRP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Route Reflector اجازه می‌دهد کلاینت‌ها فقط به RR متصل شوند و RR مسیرها را بازتاب دهد.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "برای اینکه ترافیک ورودی از اینترنت کمتر از یک لینک خاص ISP وارد سازمان شود چه تکنیکی رایج است؟",
+      "options": [
+        "افزایش طول AS_PATH (AS-Path Prepending) در مسیر خروجی روی آن لینک",
+        "افزایش Weight روی روتر داخلی",
+        "تغییر Router ID",
+        "خاموش کردن Loopback"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>با تکرار شماره AS خودمان در مسیر ارسالی به ISP، آن مسیر در اینترنت طولانی‌تر به نظر رسیده و کمتر انتخاب می‌شود.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "عبارت <code>next-hop-self</code> در همسایگی iBGP چه مشکلی را حل می‌کند؟",
+      "options": [
+        "عدم دسترسی روترهای داخلی به آدرس Next-Hop بیرونی (eBGP) در جدول روتینگ",
+        "تداخل VLAN",
+        "خطای DNS",
+        "کندی DHCP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>به‌صورت پیش‌فرض iBGP آدرس Next-Hop تبلیغ‌شده از eBGP را تغییر نمی‌دهد؛ با next-hop-self روتر مرزی خودش را Next-Hop معرفی می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "در همسایگی BGP روی آدرس‌های Loopback (با دو مسیر موازی) چرا دستور <code>ebgp-multihop</code> لازم است؟",
+      "options": [
+        "چون بسته‌های eBGP به‌طور پیش‌فرض TTL=1 دارند",
+        "چون Loopback آدرس MAC ندارد",
+        "برای تغییر پورت به ۴۴۳",
+        "برای فعال‌سازی OSPF"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>رسیدن به Loopback سمت مقابل یک Hop اضافه مصرف می‌کند؛ پس باید ebgp-multihop و update-source loopback تنظیم شوند.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "در جدول <code>show ip bgp</code>، وجود علامت <code>*&gt;</code> در کنار یک مسیر یعنی چه؟",
+      "options": [
+        "مسیر معتبر (*) و بهترین مسیر انتخاب‌شده (>) است",
+        "مسیر خراب است",
+        "مسیر مسدود شده",
+        "مسیر تکراری است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ستاره یعنی Next-Hop قابل دسترس و معتبر است و > یعنی Best Path انتخاب‌شده و آمادهٔ ورود به RIB است.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "BGP برای جلوگیری از حلقه بین سیستم‌های مستقل (eBGP) از چه مکانیزمی استفاده می‌کند؟",
+      "options": [
+        "بررسی وجود شماره AS خود روتر در ویژگی AS_PATH مسیر دریافتی",
+        "شمارش تایمر Hello",
+        "کد FCS",
+        "تغییر MAC"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>اگر روتر شماره AS خودش را در AS_PATH ببیند، آن تبلیغ را برای جلوگیری از حلقه رد می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "کدام معیار در انتخاب مسیر BGP معمولاً آخرین معیار در صورت برابری تمام پارامترهای قبلی است؟",
+      "options": [
+        "کمترین BGP Neighbor IP (یا Router ID)",
+        "بیشترین Weight",
+        "کوتاه‌ترین AS_PATH",
+        "Local Preference"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>اگر تمام معیارها برابر باشند، پایین‌ترین BGP Router ID و سپس پایین‌ترین آدرس IP همسایه برنده می‌شود.</p>"
+    }
+  ]
+}

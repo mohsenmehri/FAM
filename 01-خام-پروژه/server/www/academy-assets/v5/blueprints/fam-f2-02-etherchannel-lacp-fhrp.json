@@ -1,0 +1,384 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f2-02-etherchannel-lacp-fhrp",
+  "id": "fam-f2-02-etherchannel-lacp-fhrp",
+  "facultyId": "f2",
+  "objectiveId": "F2-02",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-2-rs",
+  "title": "EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)",
+  "titleEn": "EtherChannel LACP & First-Hop Redundancy (HSRP/VRRP)",
+  "domain": "دانشکده ۲ · تجمیع لینک و افزونگی",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 85,
+  "prerequisites": [
+    "fam-f2-01-rstp-mstp-stp-hardening"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f2-01-rstp-mstp-stp-hardening"
+    ],
+    "learningObjectives": [
+      "منطق LACP و شروط تشکیل Port-Channel",
+      "توزیع بار (Load Balancing) در EtherChannel",
+      "معماری HSRP و انتخاب Active/Standby",
+      "مقایسهٔ HSRP با استاندارد باز VRRP"
+    ]
+  },
+  "whyItMatters": "در شبکهٔ واقعی، یک لینک بین دو سوئیچ و یک روتر دروازه هر دو Single Point of Failure هستند؛ تجمیع لینک و FHRP ستون دسترسی‌پذیری بالا (High Availability) هستند.",
+  "topology": {
+    "devices": [
+      {
+        "id": "DSW1",
+        "type": "switch",
+        "x": 160,
+        "y": 100
+      },
+      {
+        "id": "DSW2",
+        "type": "switch",
+        "x": 440,
+        "y": 100
+      },
+      {
+        "id": "ASW1",
+        "type": "switch",
+        "x": 300,
+        "y": 220
+      }
+    ],
+    "links": [
+      {
+        "a": "DSW1:Po1",
+        "b": "DSW2:Po1"
+      },
+      {
+        "a": "DSW1:Gi0/2",
+        "b": "ASW1:Gi0/1"
+      },
+      {
+        "a": "DSW2:Gi0/2",
+        "b": "ASW1:Gi0/2"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۲ · مهندسی R&S پیشرفته — درس ۲ از ۳</div><p><strong>هدف درس:</strong> تجمیع چند لینک فیزیکی به یک لینک منطقی (EtherChannel با LACP) و ارائهٔ گیت‌وی متحرک (HSRP/VRRP) طوری که قطعی یک لینک یا یک روتر، برای کلاینت‌ها نامرئی بماند.</p><p><strong>پیش‌نیازها:</strong> trunk و VLAN (CCNA)، رأی‌گیری STP و اینکه چرا دو لینک موازی بدون channel حلقهٔ منطقی می‌سازد، مفهوم ARP و gateway پیش‌فرض کلاینت.</p><p><strong>خروجی یادگیری:</strong> پیکربندی LACP با شروط سازگاری، انتخاب الگوریتم load-balancing، طراحی HSRP با priority/preempt و بررسی وضعیت با <code>show</code>های مربوطه.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>دو مشکل رایج لایهٔ ۲/۳ در LANهای متوسط:</p><ul><li><strong>پهنای باند و حلقه:</strong> دو کابل موازی بین دو سوییچ بدون EtherChannel یا حلقهٔ STP ایجاد می‌کند (یکی blocking می‌شود و ظرفیت هدر می‌رود) یا اگر STP خاموش باشد، broadcast storm. با Channel، پهنای باند جمع می‌شود (مثلاً ۴×۱G = 4G از نظر الگوریتم هش) و failover در حد میلی‌ثانیه اتفاق می‌افتد.</li><li><strong>گیت‌وی تک‌نقطه‌ای:</strong> اگر تنها روتر LAN خاموش شود، کل سایت از داخل به هم و از داخل به بیرون قطع می‌شود، حتی اگر روتر دوم آماده باشد. HSRP/VRRP با یک IP مجازی مشترک، این وابستگی را حذف می‌کند.</li><li>در محیط‌های مالی/بیمارستانی، RTO چندثانیه‌ای هم غیرقابل قبول است؛ همین‌ها مبنای استاندارد «شبکهٔ بدون قطعی» می‌شوند.</li></ul><div class=\"lesson-callout\"><strong>قانون:</strong> هر لینک موازی ← یا channel، یا STP (نه هر دو نیمه‌کاره)؛ هر subnet کاربری ← دست‌کم دو gateway مجازی.</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. منطق LACP و شروط تشکیل Port-Channel",
+      "html": "<p>LACP (802.3ad) پروتکل استاندارد مذاکره برای تشکیل channel است؛ PAgP اختصاصی سیسکو (فقط بین سوییچ‌های سیسکو). شروط تشکیل — باید در هر دو طرف یکسان باشد:</p><table class=\"lesson-data-table\"><thead><tr><th>شرط</th><th>مقدار معتبر</th></tr></thead><tbody><tr><td>سرعت (speed)</td><td>یکسان در همهٔ پورت‌ها (مثلاً همه 1G)</td></tr><tr><td>دیپلکس</td><td>یکسان (همه full)</td></tr><tr><td>نوع لینک</td><td>همه access یا همه trunk (ترکیب ممنوع)</td></tr><tr><td>VLAN</td><td>همان VLAN دسترسی یا همان trunk/allowed/native</td></tr><tr><td>MTU</td><td>یکسان</td></tr><tr><td>حالت channel</td><td>on/on فقط با فعال‌سازی دستی؛ desirable/active برای مذاکره</td></tr></tbody></table><pre><code>SW1(config)# interface range GigabitEthernet0/1 - 4\nSW1(config-if-range)# channel-group 10 mode active        ! LACP فعال\nSW1(config-if-range)# exit\nSW1(config)# interface port-channel 10\nSW1(config-if)# switchport mode trunk\nSW1(config-if)# spanning-tree portfast trunk             ! فقط اگر امن باشد\nSW1(config-if)# lacp max-bundle 2                        ! حداکثر پورت فعال (اختیاری)</code></pre><ul><li><code>mode active</code> = LACP فعال (همیشه پیشنهاد)، <code>passive</code> = گوش می‌دهد؛ ترکیب active/passive کار می‌کند، passive/passive نه.</li><li>اگر پورتی شرطی را نداشته باشد، LACP آن را در حالت «suspended» نگه می‌دارد و فقط با پورت‌های سازگار bundle می‌کند — علت شایع «چرا فقط ۲ تا از ۴ لینک up است» همین است.</li></ul>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. توزیع بار (Load Balancing) در EtherChannel",
+      "html": "<p>LACP و EtherChannel خودشان ترافیک را روی پورت‌های فعال پخش نمی‌کنند؛ الگوریتم هش بر اساس سریالی‌های لایه ۳/۴ تصمیم می‌گیرد هر flow روی کدام پورت برود:</p><table class=\"lesson-data-table\"><thead><tr><th>الگوریتم</th><th>ورودی هش</th><th>مناسب کی؟</th></tr></thead><tbody><tr><td><code>src-mac</code> (پیش‌فرض بعضی نسخه‌ها)</td><td>MAC مبدأ</td><td>ترافیک یک‌سویه؛ ضعیف برای ترافیک کلاینت‌های متفاوت با یک MAC</td></tr><tr><td><code>dst-mac</code></td><td>MAC مقصد</td><td>محو کردن ترافیک به چند uplink</td></tr><tr><td><code>src-dst-ip</code></td><td>جفت IP مبدأ/مقصد</td><td>متعادل‌ترین حالت برای LAN معمولی ← توصیه</td></tr><tr><td><code>src-dst-port</code></td><td>پورت‌های TCP/UDP</td><td>وقتی چند flow پرترافیک بین دو هاست واحد دارید</td></tr></tbody></table><pre><code>SW1(config)# port-channel load-balance src-dst-ip\nSW1# show etherchannel load-balance\nSource Destination Port Load-Balance\nIP     IP          Non-IP\nSW1# show etherchannel port-channel\nFlags:  D - in use  I - standalone, no bundle\nNumber of channels in use: 2\nGroup  Port-channel  Protocol    Ports\n1      Po1(SU)       LACP        Gi1/0/1(P) Gi1/0/2(P)\n2      Po2(SU)       LACP        Gi1/0/3(P) Gi1/0/4(P)</code></pre><div class=\"lesson-callout\"><strong>هشدار:</strong> همهٔ بایت‌های یک flow روی یک پورت می‌روند؛ یک جریان 10G روی channel چهارتایی پورت دوم را خالی می‌گذارد. افزودن پورت جدید به channel فعال، هش را بازمحاسبه می‌کند و ممکن است چند میلی‌ثانیه reorder ایجاد کند.</div>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. معماری HSRP و انتخاب Active/Standby",
+      "html": "<p>HSRP (پروتکل اختصاصی سیسکو) دو یا چند روتر را در یک <strong>group</strong> با یک IP مجازی مشترک جمع می‌کند. یک روتر <strong>Active</strong> (ترافیک را جلو می‌برد) و بقیه <strong>Standby</strong> (در انتظار hello از Active) هستند:</p><ol><li>روترها hello (UDP 1985، مقصد 224.0.0.2) با تایمر پیش‌فرض ۳ ثانیه می‌فرستند.</li><li>بالاترین <strong>priority</strong> (پیش‌فرض ۱۰۰) → Active؛ در صورت تساوی، بالاترین IP مجازی/اسکلار.</li><li>اگر Active تا ۳×hello (۱۰ ثانیه با تایمر پیش‌فرض) ساکت بماند، Standby به Active ارتقا می‌یابد و ARP مجازی را با MAC خودش_gratuitous ARP اعلام می‌کند تا کلاینت‌ها سریع جدول را تازه کنند.</li><li><strong>Preemption:</strong> با فعال شدن، روتر با priority بالاتر که برگشته، دوباره Active می‌شود؛ بدون آن، تا زمان خاموشی Active باقی می‌ماند (بعضی طراحی‌ها عمداً preempt را خاموش می‌گذارند تا flapping نداشته باشند).</li></ol><pre><code>R1(config)# interface GigabitEthernet0/0\nR1(config-if)# standby version 2\nR1(config-if)# standby 1 ip 10.10.4.129\nR1(config-if)# standby 1 priority 110\nR1(config-if)# standby 1 preempt delay minimum 60\nR1(config-if)# standby 1 authentication md5 key-string FAM-LAB\nR1(config-if)# standby 1 track GigabitEthernet0/1 decrement 20</code></pre><p><code>standby track</code> اگر رابط uplink پایین بیاید، priority را ۲۰ واحد کم می‌کند تا روتر دوم Active شود — جلوی «uplink مرده ولی Active همچنان ترافیک را به بیرون پرت می‌کند» را می‌گیرد.</p>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. مقایسهٔ HSRP با استاندارد باز VRRP",
+      "html": "<p>VRRP (استاندارد IETF، RFC 5798) همان مدل را با نام‌های متفاوت و چند تفاوت رفتاری ارائه می‌دهد:</p><table class=\"lesson-data-table\"><thead><tr><th>ویژگی</th><th>HSRP v2</th><th>VRRP v2</th></tr></thead><tbody><tr><td>استاندارد</td><td>سیسکو (کارگروه‌های دیگر هم پشتیبانی می‌کنند)</td><td>IETF — بین فروشنده‌ها</td></tr><tr><td>پورت/مقصد</td><td>UDP 1985 / 224.0.0.2</td><td>IP شماره 112 / 224.0.0.18</td></tr><tr><td>نسخهٔ آدرس IP مجازی</td><td>v2: IPv4 چندپخشی یا unicast</td><td>v2: فقط چندپخشی 224.0.0.18</td></tr><tr><td>نام نقش</td><td>Active / Standby</td><td>Master / Backup</td></tr><tr><td>پیش‌فرض preempt</td><td>خاموش</td><td>فعال</td></tr><tr><td>احراز هویت</td><td>plain/md5</td><td>simple یا AH (v3 برای IPv6)</td></tr></tbody></table><pre><code>R2(config)# interface GigabitEthernet0/0\nR2(config-if)# vrrp 1 ip 10.10.4.129\nR2(config-if)# vrrp 1 priority 95\nR2(config-if)# vrrp 1 authentication md5 key-string FAM-LAB\nR2(config-if)# vrrp 1 track 1 decrement 20\nR2(config-if)# vrrp 1 preempt</code></pre><div class=\"lesson-callout\"><strong>تصمیم مهندسی:</strong> محیط تماماً سیسکو و کنترل دقیق track/preempt ← HSRP · نیاز به interoperability یا مهاجرت به Juniper/Aruba ← VRRP · IPv6 ← HSRPv6 یا VRRPv3. در طراحی هر دو را هم‌زمان روی یک لینک فعال نکنید — دو پروتکل hello هم‌زمان یعنی دو پروتکل رأی‌گیری روی یک subnet.</div>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>معیار</th><th>LACP</th><th>PAgP</th><th>HSRP</th><th>VRRP</th></tr></thead><tbody><tr><td>دامنه</td><td>لینک (L2)</td><td>لینک (L2)</td><td>گیت‌وی (L3)</td><td>گیت‌وی (L3)</td></tr><tr><td>استاندارد</td><td>802.3ad</td><td>اختصاصی سیسکو</td><td>اختصاصی سیسکو</td><td>RFC 5798</td></tr><tr><td>بین فروشنده‌ها</td><td>بله</td><td>خیر</td><td>عمدتاً خیر</td><td>بله</td></tr><tr><td>حالت‌ها</td><td>active/passive/on</td><td>desirable/auto/on</td><td>active/standby</td><td>master/backup</td></tr><tr><td>رایج‌ترین خطا</td><td>عدم تطابق سرعت/دیپلکس/trunk</td><td>auto/auto هرگز channel نمی‌سازد</td><td>نبود preempt یا track</td><td>دو پروتکل هم‌زمان با HSRP</td></tr><tr><td>گزینهٔ پیشنهادی ما</td><td>✓ همیشه</td><td>فقط سازگاری قدیمی</td><td>شبکهٔ سیسکو-محور</td><td>شبکهٔ چندفروشنده‌ای</td></tr></tbody></table><p>نکتهٔ طراحی: HSRP/VRRP جایگزین STP نیست؛ STP همچنان حلقهٔ لایه ۲ را مدیریت می‌کند و گیت‌وی مجازی روی همان درخت سوار است. کاری که HSRP می‌کند این است که «خرابی یک روتر» را از دید کلاینت پنهان می‌کند.</p>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>مسیر یک بستهٔ کلاینت به اینترنت و نقطه‌های تصمیم:</p><ol><li>کلاینت ARP برای گیت‌وی مجازی (10.10.4.129) می‌زند؛ MAC این IP را Active (یا Master) اعلام می‌کند — در HSRP این MAC از پیش‌فرض 0000.0c9f.fxxx ساخته می‌شود.</li><li>فریم با MAC روتر Active می‌رسد؛ روتر لایه ۲ را باز می‌کند، NAT/routing انجام می‌دهد و از uplink خارج می‌شود.</li><li>در لینک uplink، اگر چهار پورت در یک port-channel باشند، الگوریتم هش src-dst-ip تصمیم می‌گیرد روی کدام پورت برود؛ جریان‌های متفاوت روی پورت‌های متفاوت.</li><li>قطعی لینک: LACP بسته‌های آن پورت را به پورت‌های باقی‌ماندهٔ bundle منتقل می‌کند (در حد میلی‌ثانیه). قطعی Active: hello قطع می‌شود، Standby با preempt/track جایگزین می‌شود و gratuitous ARP جدول کلاینت‌ها را تازه می‌کند.</li><li>بدون track: روتری که uplinkش مرده ولی زنده است همچنان Active می‌ماند و بسته‌ها را دور می‌ریزد — پس track بخشی از طراحی است، نه زیباسازی.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): دو distribution و دو access، LAN کاربران.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>مقدار</th></tr></thead><tbody><tr><td>LAN کاربران</td><td>10.10.4.128/26 — گیت‌وی مجازی 10.10.4.129</td></tr><tr><td>R1/R2 (distribution)</td><td>HSRP group 1 — R1 priority 110 (Active)، R2 priority 100</td></tr><tr><td>لینک uplink</td><td>SW1 Gi0/1-2 ↔ R1 Gi0/0-1 و SW2 ↔ R2 — همه trunk</td></tr><tr><td>Channel دسترسی</td><td>SW1 Gi0/5-8 ↔ SW3 Gi0/23-24 (فقط ۲ پورت هر طرف در lab) — LACP active</td></tr><tr><td>پورت‌های کاربری SW3</td><td>Gi0/1-12 access + PortFast + BPDU Guard</td></tr></tbody></table><p>نکته: گیت‌وی مجازی در HSRP باید در همان subnet کلاینت باشد ولی IP فیزیکی دو روتر در دو subnet متفاوت هم می‌تواند باشد ( subnet های transit جدا) — در این طرح ساده، هر دو روتر رابط LAN با IP .130 و .131 دارند و .129 فقط مجازی است.</p>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی کامل (طراحی‌شده — اجرا نشده):</p><pre><code>! --- SW1: EtherChannel ---\nSW1(config)# interface range GigabitEthernet0/5 - 8\nSW1(config-if-range)# channel-group 10 mode active\nSW1(config-if-range)# exit\nSW1(config)# interface port-channel 10\nSW1(config-if)# switchport mode trunk\nSW1(config-if)# exit\nSW1(config)# port-channel load-balance src-dst-ip\n\n! --- R1: HSRP Active با track ---\nR1(config)# standby version 2\nR1(config)# interface GigabitEthernet0/0\nR1(config-if)# ip address 10.10.4.130 255.255.255.192\nR1(config-if)# standby 1 ip 10.10.4.129\nR1(config-if)# standby 1 priority 110\nR1(config-if)# standby 1 preempt delay minimum 60\nR1(config-if)# standby 1 authentication md5 key-string FAM-LAB\nR1(config-if)# standby 1 track 1 decrement 20\nR1(config)# interface GigabitEthernet0/1\nR1(config-if)# standby 1 track 1 decrement 20     ! track object 1 = uplink سلامت\n\n! --- VRRP (جایگزین) ---\nR2(config)# interface GigabitEthernet0/0\nR2(config-if)# vrrp 1 ip 10.10.4.129\nR2(config-if)# vrrp 1 priority 95\nR2(config-if)# vrrp 1 preempt</code></pre><ul><li>حتماً <code>standby version 2</code> را روی هر دو روتر یکسان بگذارید؛ ترکیب v1/v2 ممنوع است.</li><li>authentication md5 مشترک از helloهای جعلی از داخل subnet جلوگیری می‌کند (نه جایگزین ACL).</li><li>پورت‌های channel در سوییچ باید قبل از trunk شدن در یک گروه باشند؛ trunk را روی port-channel تنظیم کنید نه تک‌تک پورت‌ها.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>SW1# show etherchannel summary\nFlags:  D - down        P - bundled in port-channel\n        I - stand-alone s - suspended\n        H - Hot-standby (LACP only)\nGroup  Port-channel  Protocol    Ports\n10(P)  Po10(SU)      LACP        Gi0/5(P)   Gi0/6(P)   Gi0/7(P)   Gi0/8(P)\n\nSW1# show interfaces port-channel 10\nPort-channel10 is up, line protocol is up (connected)\n  Load-share method: src-dst-ip\n  4 bundles in use\n\nR1# show standby\nGigabitEthernet0/0 - Group 1\n  State is Active\n    Virtual IP address is 10.10.4.129\n    Priority 110 (configured 110)\n    Preemption enabled, min delay 60 sec\n    Track object 1 state Up decrement 20\n    Hello time 3 sec, hold time 10 sec\n    Authentication md5, key-string \"FAM-LAB\"\n  Active virtual MAC address is 0000.0c9f.f001\n\nR1# show standby brief\n                      P      Cipt  Local    Group   Pri  State      Address\nGi0/0                 P P    10.10.4.130  1     110  Active     10.10.4.129\nGi0/0                 P P    10.10.4.130  1     110  Active     10.10.4.129\n\nR1# show ip arp 10.10.4.129\nInternet  10.10.4.129   0000.0c9f.f001   ARPA  GigabitEthernet0/0</code></pre><ul><li>علامت سالم channel: همهٔ پورت‌ها <code>(P)</code> و وضعیت <code>SU</code>. حرف <code>s</code> یا <code>I</code> یعنی پورت stand-alone مانده — یکی از شروط را ندارد.</li><li>در show standby: دقیقاً یک روتر Active؛ اگر هر دو Active شدند ← authentication ناهماهنگ یا دو subnet جدا (ترافیک hello عبور نمی‌کند).</li><li>MAC مجازی در ARP کلاینت باید با MAC اعلامی Active یکی باشد؛ اختلاف یعنی کلاینت جدول قدیمی دارد (پس از failover چند ثانیه صبر یا clear arp).</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Wireshark روی uplink (فیلتر <code>hsrp</code> یا <code>vrrp</code>):</strong> hello هر ۳ ثانیه دیده می‌شود؛ بعد از قطع Active، فقط hello روتر دوم ادامه می‌یابد و state در پیام‌ها از Standby به Active تغییر می‌کند. همزمان gratuitous ARP (ARP announcement) با MAC جدید را بگیرید.</li><li><strong>LACPDU:</strong> فیلتر <code>lacp</code> — پیام‌های LACP هر ۳۰ ثانیه (slow) مبادله می‌شوند؛ قطعی پورت با حذف آن‌ها و سپس bundle narrower شدن دیده می‌شود.</li><li><strong>پایش ترکیبی:</strong> SNMP یا telemetry برای <code>poChannelOperStatus</code> و <code>hsrpRouterState</code>؛ آستانهٔ هشدار: تغییر State یا افت تعداد پورت‌های bundled.</li><li><strong>نشانهٔ مشکل:</strong> flap مکرر بین Active/Standby با فاصلهٔ چند ثانیه ← لینک لبه یا hello گم‌شده (ACL روی UDP 1985، یا native VLAN متفاوت). با capture هر دو را تشخیص دهید.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>چرا اشتباه است</th><th>درست چیست؟</th></tr></thead><tbody><tr><td><code>channel-group 1 mode on</code> روی لینک به فروشندهٔ دیگر</td><td>بدون مذاکره؛ اگر یک طرف on و طرف دیگر active، ترافیک ناهماهنگ و لوپ ممکن</td><td>on/on فقط وقتی هر دو طرف کاملاً کنترل‌شده‌اند؛ وگرنه LACP</td></tr><tr><td>ترکیب trunk و access در یک channel</td><td>پورت suspended می‌شود یا channel ناقص می‌ماند</td><td>همه پورت‌ها یک نوع لینک و یک VLAN plan</td></tr><tr><td>حذف preempt برای «پایداری»</td><td>بعد از بازگشت روتر اصلی، ترافیک روی روتر ضعیف می‌ماند</td><td>preempt با delay منطقی (60s) فعال؛ در صورت flapping، علت لینک را رفع کنید</td></tr><tr><td>نبود track برای uplink</td><td>روتر بدون مسیر خروج همچنان Active است</td><td>standby/vrrp track روی رابط یا object مسیر</td></tr><tr><td>دو پروتکل HSRP و VRRP هم‌زمان</td><td>دو انتخاب Master مستقل، گیت‌وی دوگانه</td><td>یکی را انتخاب و روی همهٔ روترها یکسان کنید</td></tr><tr><td>IP مجازی خارج از subnet کلاینت</td><td>کلاینت ARP نمی‌زند یا روتر ریجکت می‌کند</td><td>گیت‌وی مجازی حتماً در همان prefix</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> کاربران شکایت دارند بعد از نگهداری شبکه، «اینترنت چند ثانیه قطع شد و بعد دوباره وصل شد ولی بعضی‌ها هنوز قطعند».</p><ol><li>روی هر دو روتر <code>show standby</code> ← آیا دقیقاً یکی Active است؟ اگر هیچ‌کدام Active نیست ← authentication یا IP مجازی ناهماهنگ.</li><li>روی کلاینت‌ها <code>arp -a</code> ← MAC گیت‌وی باید با MAC روتر Active برابر باشد. اگر MAC روتر قبلی مانده ← جدول کلاینت قدیمی است؛ gratuitous ARP نرسیده (وای‌فای/AP های بعضی vendorها ARP announce را forward نمی‌کنند) — راه‌حل: تایمر ARP کلاینت یا probe مکرر.</li><li>بررسی track: <code>show standby</code> ← «Track object … state Down»؟ اگر track آپلینک مرده را ندیده، Active بدون مسیر مانده. Object را با <code>show track</code> تأیید کنید.</li><li>بررسی channel: <code>show etherchannel summary</code> ← پورت‌های suspended (s) یا down؟ سرعت/دیپلکس/trunk بودن هر پورت را با <code>show interfaces status</code> مقایسه کنید.</li><li>رفع: ناهماهنگی را اصلاح، preempt/track را فعال، سپس تست قطعی عمدی (shutdown رابط Active) — زمان failover HSRP با تایمر پیش‌فرض ~۱۰ ثانیه است؛ با hello 1s/hold 3s می‌توان به ~۳ ثانیه رساند (هزینه: ترافیک hello بیشتر).</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li> EtherChannel: شروط یکسان (سرعت، دیپلکس، نوع لینک، VLAN، MTU)؛ LACP active/passive استاندارد و بین فروشنده‌ها.</li><li>load-balancing هش می‌کند، load-sharing کامل نیست؛ src-dst-ip برای LAN معمولی بهترین انتخاب است.</li><li>HSRP: Active/Standby با hello UDP 1985؛ priority + preempt + track سه ضلع طراحی سالم.</li><li>VRRP استاندارد IETF با Master/Backup و preempt پیش‌فرض؛ برای شبکه‌های چندفروشنده‌ای.</li><li>گیت‌وی مجازی = همان subnet کلاینت؛ MAC آن را فقط Active اعلام می‌کند.</li><li>علامت سالم: show etherchannel با SU و show standby با یک Active و track Up.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>Channel (۲۰ دقیقه):</strong> چهار لینک را با LACP active جمع کنید؛ عمدتاً یک پورت را با سرعت متفاوت بگذارید و با show etherchannel summary ببینید چگونه suspended می‌شود؛ سپس اصلاح و تأیید کنید.</li><li><strong>HSRP (۲۰ دقیقه):</strong> گیت‌وی 10.10.4.129 را روی دو روتر بسازید؛ با shutdown کردن رابط Active، زمان failover و پیام‌های ARP بعد از آن را اندازه بگیرید.</li><li><strong>track (۱۰ دقیقه):</strong> رابط uplink Active را shutdown کنید بدون آنکه خود روتر خاموش شود؛ اگر track ندارید، ببینید چگونه Active بدون مسیر می‌ماند؛ سپس track را اضافه و تکرار کنید.</li><li><strong>خودآزمایی:</strong> تفاوت on/active/desirable، دلیل نیاز به preempt، و اینکه چرا MAC گیت‌وی بعد از failover باید عوض شود.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "EtherChannel",
+      "fa": "مفهوم کلیدی EtherChannel",
+      "simple": "اصطلاح تخصصی مرتبط با EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)"
+    },
+    {
+      "term": "LACP",
+      "fa": "مفهوم کلیدی LACP",
+      "simple": "اصطلاح تخصصی مرتبط با EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)"
+    },
+    {
+      "term": "Port-Channel",
+      "fa": "مفهوم کلیدی Port-Channel",
+      "simple": "اصطلاح تخصصی مرتبط با EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)"
+    },
+    {
+      "term": "HSRP",
+      "fa": "مفهوم کلیدی HSRP",
+      "simple": "اصطلاح تخصصی مرتبط با EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)"
+    },
+    {
+      "term": "VRRP",
+      "fa": "مفهوم کلیدی VRRP",
+      "simple": "اصطلاح تخصصی مرتبط با EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)"
+    },
+    {
+      "term": "FHRP",
+      "fa": "مفهوم کلیدی FHRP",
+      "simple": "اصطلاح تخصصی مرتبط با EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)"
+    },
+    {
+      "term": "Load Balancing",
+      "fa": "مفهوم کلیدی Load Balancing",
+      "simple": "اصطلاح تخصصی مرتبط با EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — EtherChannel (LACP/PAgP) و افزونگی دروازه (HSRP/VRRP)",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>interface range GigabitEthernet0/1 - 2\n channel-group 1 mode active\ninterface Port-channel1\n switchport mode trunk\ninterface Vlan10\n standby 10 ip 10.10.10.1\n standby 10 priority 110\n standby 10 preempt</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "کدام ترکیب حالت‌های LACP باعث تشکیل موفق EtherChannel نمی‌شود؟",
+      "options": [
+        "Active - Active",
+        "Active - Passive",
+        "Passive - Passive",
+        "هر دو طرف در channel-group 1"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>اگر هر دو طرف Passive باشند هیچ‌کدام پیام مذاکرهٔ LACP را آغاز نمی‌کنند.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "چرا از EtherChannel به‌جای چند لینک مجزا استفاده می‌کنیم؟",
+      "options": [
+        "چون STP لینک‌های موازی را مسدود می‌کند اما Port-Channel را یک لینک منطقی می‌بیند",
+        "چون LACP سرعت تک‌کابل را ۱۰ برابر می‌کند",
+        "برای حذف آدرس IP",
+        "برای غیرفعال کردن VLAN"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>STP به‌جای بلاک کردن لینک‌های اضافی، کل Port-Channel را یک اینترفیس واحد می‌بیند.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "در دستور <code>standby 10 preempt</code> در HSRP چه اتفاقی می‌افتد؟",
+      "options": [
+        "پورت خاموش می‌شود",
+        "روتر با Priority بالاتر پس از بازگشت به مدار، دوباره نقش Active را پس می‌گیرد",
+        "تعداد VLANها دو برابر می‌شود",
+        "ARP غیرفعال می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون preempt حتی با بازگشت روتر اصلی، روتر Standby تا زمان خرابی Active باقی می‌ماند.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "آدرس MAC مجازی استاندارد در HSRP نسخهٔ ۱ برای گروه ۱۰ کدام است؟",
+      "options": [
+        "0000.0c07.ac0a",
+        "0000.5e00.010a",
+        "ffff.ffff.ffff",
+        "0100.5e00.000a"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>فرمت HSRP v1 برابر 0000.0c07.acXX است که 10 در مبنای ۱۶ برابر 0a است.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "در VRRP کدام عبارت صحیح است؟",
+      "options": [
+        "پروتکل انحصاری سیسکو است",
+        "پروتکل استاندارد IETF با نقش‌های Master و Backup است",
+        "فقط در لایه ۱ کار می‌کند",
+        "نیاز به VLAN ندارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>VRRP (RFC 5798) استاندارد باز بین تجهیزات برندهای مختلف است.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "اگر دو پورت عضو یک EtherChannel یکی Speed=1000 و دیگری Speed=100 داشته باشد چه رخ می‌دهد؟",
+      "options": [
+        "کانال با سرعت ۱۰۰ کار می‌کند",
+        "کانال تشکیل نمی‌شود یا عضو ناسازگار معلق (Suspended) می‌شود",
+        "روتر ریست می‌شود",
+        "فقط VLAN 1 کار می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تمام پورت‌های یک Port-Channel باید سرعت، Duplex و تنظیمات Trunk/VLAN یکسان داشته باشند.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "چرا سوئیچ در EtherChannel بسته‌های یک جریان TCP را روی لینک‌های مختلف پخش نمی‌کند؟",
+      "options": [
+        "برای جلوگیری از رسیدن خارج از ترتیب بسته‌ها (Out-of-Order Packets)",
+        "چون یک کابل همیشه خاموش است",
+        "چون Hash فقط روی پورت ۱ کار می‌کند",
+        "محدودیت سخت‌افزاری فیبر"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ارسال یک Flow روی چند لینک می‌تواند باعث Out-of-Order و افت کارایی TCP شود.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "کدام دستور وضعیت دقیق اعضای Port-Channel و پرچم‌های (P/I/D/s) را نشان می‌دهد؟",
+      "options": [
+        "show etherchannel summary",
+        "show ip arp",
+        "show vlan brief",
+        "show cdp"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>show etherchannel summary حالت Port-Channel (مثل SU) و پورت‌های عضو (P = bundled) را نشان می‌دهد.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "در HSRP کاربرد <code>standby track</code> چیست؟",
+      "options": [
+        "کاهش خودکار Priority روتر Active در صورت قطع شدن لینک Uplink/WAN",
+        "پاک کردن جدول MAC",
+        "ثبت لاگ کاربران",
+        "تغییر رمز عبور"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>اگر لینک Uplink روتر Active قطع شود، با کاهش Priority (به کمک preempt) روتر سالم‌تر جایگزین می‌شود.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "مقدار پیش‌فرض Priority در HSRP و VRRP چقدر است؟",
+      "options": [
+        "100",
+        "255",
+        "1",
+        "32768"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر دو به‌صورت پیش‌فرض Priority=100 دارند (بیشتر = برنده).</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "تایمرهای پیش‌فرض Hello و Hold در HSRP کدام‌اند؟",
+      "options": [
+        "۳ ثانیه و ۱۰ ثانیه",
+        "۱۰ ثانیه و ۴۰ ثانیه",
+        "۲ ثانیه و ۲۰ ثانیه",
+        "۳۰ ثانیه و ۱۸۰ ثانیه"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>HSRP به‌طور پیش‌فرض هر ۳ ثانیه Hello و Hold Time معادل ۱۰ ثانیه دارد.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "در HSRP کدام نسخه از IPv6 و گروه‌های تا ۴۰۹۵ پشتیبانی می‌کند؟",
+      "options": [
+        "HSRPv1",
+        "HSRPv2",
+        "PAgP",
+        "STP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>HSRPv2 بازهٔ گروه را به ۰..۴۰۹۵ گسترش می‌دهد و از IPv6 پشتیبانی می‌کند.</p>"
+    }
+  ]
+}

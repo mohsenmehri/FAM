@@ -1,0 +1,384 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f2-01-rstp-mstp-stp-hardening",
+  "id": "fam-f2-01-rstp-mstp-stp-hardening",
+  "facultyId": "f2",
+  "objectiveId": "F2-01",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-2-rs",
+  "title": "RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲",
+  "titleEn": "RSTP, MSTP & Layer 2 STP Hardening (BPDU/Root/Loop Guard)",
+  "domain": "دانشکده ۲ · مهندسی لایهٔ ۲ پیشرفته",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 90,
+  "prerequisites": [
+    "ccna-v11-1.2.b"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "ccna-v11-1.2.b"
+    ],
+    "learningObjectives": [
+      "حالت‌های پورت و نقش‌ها در RSTP",
+      "مذاکرهٔ Proposal/Agreement",
+      "MSTP (802.1s) برای VLANهای متعدد",
+      "نگهبان‌های STP (Hardening)"
+    ]
+  },
+  "whyItMatters": "یک حلقهٔ لایه ۲ یا تغییر ناگهانی Root Bridge می‌تواند کل شبکهٔ سازمانی را در چند ثانیه از کار بیندازد؛ مهندس سطح پیشرفته همگرایی سریع و قفل کردن مرزهای STP را تضمین می‌کند.",
+  "topology": {
+    "devices": [
+      {
+        "id": "CORE-SW1",
+        "type": "switch",
+        "x": 180,
+        "y": 90
+      },
+      {
+        "id": "CORE-SW2",
+        "type": "switch",
+        "x": 420,
+        "y": 90
+      },
+      {
+        "id": "ACC-SW1",
+        "type": "switch",
+        "x": 300,
+        "y": 210
+      }
+    ],
+    "links": [
+      {
+        "a": "CORE-SW1:Gi0/1",
+        "b": "CORE-SW2:Gi0/1"
+      },
+      {
+        "a": "CORE-SW1:Gi0/2",
+        "b": "ACC-SW1:Gi0/1"
+      },
+      {
+        "a": "CORE-SW2:Gi0/2",
+        "b": "ACC-SW1:Gi0/2"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۲ · مهندسی R&S پیشرفته — درس ۱ از ۳</div><p><strong>هدف درس:</strong> طراحی، پیکربندی و عیب‌یابی لایهٔ ۲ با RSTP (802.1w) و MSTP (802.1s)، به‌گونه‌ای که همگرایی زیرثانیه‌ای تضمین شود و هیچ لینک یک‌طرفه یا حلقهٔ ناخواسته‌ای در شبکهٔ VLANهای متعدد پدید نیاید.</p><p><strong>پیش‌نیازها:</strong> کار با PVST+ و خواندن <code>show spanning-tree</code> (CCNA)، مفاهیم Root Bridge/BPDU، تفاوت لینک access با trunk، و آشنایی با VLAN و native VLAN.</p><p><strong>خروجی یادگیری:</strong> انتخاب آگاهانهٔ root با priority، پیکربندی PortFast/BPDU Guard/Root Guard، تفکیک VLANها در دو instance MST، و خواندن خروجی‌های show برای تشخیص وضعیت هر پورت.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>STP کلاسیک (802.1D) با تایمرهای ۲۰/۳۰ ثانیه‌ای خود، در شبکه‌های مدرن غیرقابل قبول است: یک لینک در ساعت شروع کاری تا نیم‌ دقیقه قطع می‌شود و کل VLANها همگرایی را به‌صورت موازی تجربه می‌کنند. علاوه بر این:</p><ul><li><strong>حملهٔ لایه ۲:</strong> یک کلاینت مخرب می‌تواند BPDU جعلی بفرستد و خودش را Root معرفی کند؛ بدون BPDU Guard کل توپولوژی به او گوش می‌دهد.</li><li><strong>هزینهٔ PVST+ در مقیاس:</strong> به‌ازای هر VLAN یک نمونهٔ درخت؛ ۲۰۰ VLAN یعنی ۲۰۰ بار BPDU روی هر لینک و پردازش CPU روی سوییچ‌های لبه.</li><li><strong>لینک‌های یک‌طرفه (unidirectional):</strong> کابل فیبر نیمه‌خراب یا پورت خراب باعث می‌شود یک طرف فکر کند لینک سالم است ← حلقه بدون BPDU دیده‌شدن.</li></ul><div class=\"lesson-callout\"><strong>این درس دقیقاً سه لایهٔ دفاعی می‌سازد:</strong> سرعت (RSTP) · مقیاس (MST) · ایمنی (Hardening).</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. حالت‌های پورت و نقش‌ها در RSTP",
+      "html": "<p>RSTP حالت‌های 802.1D را بازآرایی کرده و نقش‌های جدیدی افزوده است:</p><table class=\"lesson-data-table\"><thead><tr><th>حالت RSTP</th><th>معادل 802.1D</th><th>رفتار</th></tr></thead><tbody><tr><td>Discarding</td><td>Disabled/Blocking/Listening</td><td>BPDU می‌فرستد و یاد می‌گیرد؛ فریم کاربری عبور نمی‌کند</td></tr><tr><td>Learning</td><td>Learning</td><td>آدرس MAC یاد می‌گیرد، هنوز فریم عبور نمی‌دهد</td></tr><tr><td>Forwarding</td><td>Forwarding</td><td>ترافیک عبور می‌کند</td></tr></tbody></table><p><strong>نقش‌های جدید:</strong></p><ul><li><strong>Alternate:</strong> مسیر جایگزین تا Root؛ معادل Blocking قدیمی ولی در لحظهٔ خرابی <em>بدون تایمر</em> به Forwarding می‌رود (fallback به Root port از طریق sync).</li><li><strong>Backup:</strong> جایگزین همان رابط (مثلاً دومین لینک به یک هاب یا سوییچ دسترسی)؛ چون آن لینک از نوع shared است، فقط جایگزین می‌شود نه فعال.</li><li><strong>Designated:</strong> هر سگمنت دقیقاً یک پورت Designated دارد (در 802.1D هم بود ولی رأی‌گیری ساده‌تر و سریع‌تر شده).</li></ul><p>تفاوت کلیدی با 802.1D: افزایش اولیهٔ تایمرها (hello 2s، max-age 6s در برابر 2/20)، تایمر forward-delay حذف و با handshake جایگزین شده، و امکان اختیاری بودن UplinkFast/BackboneFast (در RSTP پیش‌فرض و جزو پروتکل است).</p>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. مذاکرهٔ Proposal/Agreement",
+      "html": "<p>مکانیزم مرکزی RSTP: روی لینک‌های point-to-point، سوییچ Designated به‌جای انتظار برای تایمر، دست‌تکانی مستقیم انجام می‌دهد:</p><ol><li>سوییچ A (Designated) وقتی می‌خواهد پورت خود را به Forwarding ببرد، یک <strong>Proposal</strong> BPDU با پرچم‌های توافقی می‌فرستد.</li><li>سوییچ B اگر پورت دریافت‌کننده در حالت Sync باشد (یعنی می‌تواند همهٔ پورت‌های همان انتهای دیگر را موقتاً Discarding کند تا حلقه‌ای ساخته نشود)، موافقت خود را با <strong>Agreement</strong> اعلام می‌کند و پورتش را فوراً به Forwarding می‌برد.</li><li>کل این مذاکره در یک تبادل BPDU — عموماً زیر ۱ ثانیه — تمام می‌شود؛ بدون 30 ثانیه انتظار.</li></ol><div class=\"lesson-callout\"><strong>شرط مهم:</strong> handshake فقط روی لینک‌های point-to-point معتبر است. روی لینک‌های shared (مثلاً کابل به یک هاب قدیمی یا پورتی که edge نیست و چند سوییچ پشت آن است) RSTP به حالت سازگاری با 802.1D برمی‌گردد و همان رفتار قدیمی را دارد — پس نوع لینک را با <code>spanning-tree link-type point-to-point</code> صریح کنید.</div>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. MSTP (802.1s) برای VLANهای متعدد",
+      "html": "<p>MSTP (802.1s) چند VLAN را در یک <strong>instance</strong> خلاصه می‌کند تا هزینهٔ پردازش و BPDU کم شود. دو سوییچ فقط وقتی هم‌گرا می‌شوند که <strong>منطقهٔ MST (MST Region) یکسان</strong> باشد: سه عنصر باید برابر باشند — <code>name</code>، <code>revision</code> و <code>instance-to-VLAN mapping</code>.</p><pre><code>SW1(config)# spanning-tree mst configuration\nSW1(config-mst)# name FAM-CAMPUS\nSW1(config-mst)# revision 1\nSW1(config-mst)# instance 1 vlan 10-19\nSW1(config-mst)# instance 2 vlan 20-29\nSW1(config-mst)# exit\nSW1(config)# spanning-tree mode mst\nSW1(config)# spanning-tree mst 1 root primary\nSW1(config)# spanning-tree mst 2 root secondary</code></pre><ul><li>هر instance یک درخت مستقل دارد؛ می‌توانید برای instance 1 (کاربران) و instance 2 (سرورها) دو root متفاوت تعیین کنید تا ترافیک هر گروه VLAN مسیر خودش را داشته باشد.</li><li><strong>CIST:</strong> MST یک درخت سراسری (Common and Internal Spanning Tree) هم دارد که مناطق مختلف و حتی PVST+ را به هم وصل می‌کند؛ مرز مناطق با حفظ سازگاری کار می‌کند ولی یک‌طرفه‌های مرزی هنوز ممکن‌اند.</li><li>تعداد VLANهایی که BPDU دارند به تعداد instanceها محدود می‌شود؛ پیش‌فرض instance 0 همهٔ VLANهای تعریف‌نشده را می‌گیرد.</li></ul>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. نگهبان‌های STP (Hardening)",
+      "html": "<p>چهار ابزار ایمن‌سازی و مرزبندی؛ هر کدام جای متفاوتی دارد:</p><table class=\"lesson-data-table\"><thead><tr><th>ابزار</th><th>جای پیکربندی</th><th>رفتار</th><em></em></tr></thead><tbody><tr><td><strong>PortFast</strong></td><td>پورت‌های endpoint (access)</td><td>پورت بلافاصله Forwarding؛ نباید روی لینک سوییچ‌به‌سوییچ باشد</td></tr><tr><td><strong>BPDU Guard</strong></td><td>کنار PortFast</td><td>دریافت BPDU روی پورت edge ← errdisable فوری پورت</td></tr><tr><td><strong>Root Guard</strong></td><td>پورت‌های سوییچ غیرمعتبر (مثلاً لبه/کاربر)</td><td>پورت در حالت inconsistent می‌ماند (نه errdisable) اگر بهترین BPDU از آن بیاید</td></tr><tr><td><strong>BPDU Filter</strong></td><td>با احتیاط، روی پورت edge</td><td>ارسال/دریافت BPDU را متوقف می‌کند — خطر حلقه اگر لینک واقعاً bridge نباشد</td></tr></tbody></table><pre><code>SW(config)# interface range GigabitEthernet0/1 - 12\nSW(config-if)# spanning-tree portfast\nSW(config-if)# spanning-tree bpduguard enable\nSW(config-if)# exit\nSW(config)# interface GigabitEthernet0/24\nSW(config-if)# spanning-tree guard root\nSW(config)# errdisable recovery cause bpduguard\nSW(config)# errdisable recovery interval 300</code></pre><div class=\"lesson-callout\"><strong>قانون:</strong> PortFast + BPDU Guard روی پورت‌های کاربری · Root Guard روی پورت‌هایی که نباید هرگز سوییچ لبه‌ای را به اینترنت/مرکز وصل کنند · هرگز BPDU Filter روی لینکی که ممکن است bridge شود.</div>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>معیار تصمیم</th><th>802.1D (PVST+)</th><th>RSTP (Rapid PVST+)</th><th>MSTP</th></tr></thead><tbody><tr><td>زمان همگرایی</td><td>۳۰–۵۰ ثانیه</td><td>زیر ۱ ثانیه (point-to-point)</td><td>مانند RSTP</td></tr><tr><td>هزینه به‌ازای VLAN</td><td>یک نمونهٔ کامل</td><td>یک نمونهٔ کامل</td><td>مشترک در instance</td></tr><tr><td>BPDU روی لینک</td><td>به تعداد VLAN</td><td>به تعداد VLAN</td><td>به تعداد instance</td></tr><tr><td>سناریوی مناسب</td><td>فقط نگهداری شبکهٔ قدیمی</td><td>LAN معمولی با VLAN کم</td><td>LAN با ۵۰+ VLAN یا چند site</td></tr><tr><td>پیش‌فرض پیشنهادی ما</td><td>✗</td><td>✓ تا ۵۰ VLAN</td><td>✓ از ۵۰ VLAN به بالا</td></tr><tr><td>خطر اصلی</td><td>کندی، مصرف CPU</td><td>پیکربندی ناهماهنگ link-type</td><td>عدم تطابق name/revision/mapping در مناطق</td></tr></tbody></table><p>تصمیم مهندسی: در شبکه‌ای با ۱۲ VLAN روی چند site، PVST+ یعنی ۱۲ بار BPDU در هر ثانیه روی هر لینک؛ با MST همان ۱۲ VLAN در ۲ instance جمع می‌شوند و ترافیک کنترلی ۶ برابر کمتر می‌شود. مهاجرت از PVST+ به MST را فقط در پنجرهٔ نگهداری و با بررسی همزمان‌بودن منطقه انجام دهید.</p>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>مسیر تصمیم RSTP برای هر پورت (به‌زبان ساده):</p><ol><li>بهترین BPDU دریافتی را نگه می‌داریم (Root ID + مسیر تا root + پورت دریافت‌کننده).</li><li>اگر BPDU دریافتی از BPDU تولیدی خودمان <em>بهتر</em> باشد ← پورت Designated می‌شود و Proposal می‌فرستد.</li><li>اگر <em>بدتر</em> باشد ← پورت Root یا Alternate می‌شود؛ در نقطهٔ تصمیم، sync اعلام می‌کند پورت‌های هم‌سنگر را موقتاً Discarding کن تا حلقه‌ای ساخته نشود، سپس Agreement می‌آید و پورت فوراً باز می‌شود.</li><li>دریافت BPDU روی پورتی که PortFast/edge فعال دارد ← نقض سیاست (اگر BPDU Guard روشن باشد، errdisable؛ اگر Root Guard باشد، inconsistent).</li><li>قطع شدن مسیر فعلی ← پورت Alternate در همان لحظه جایگزین Root port می‌شود؛ هیچ تایمر max-age در کار نیست.</li></ol><p>نکتهٔ کنترل‌پلینی مهم: STP فقط BPDU (کادر ۶۴بایتی لایه ۲، multicast 01:80:c2:00:00:00) مبادله می‌کند؛ دادهٔ کاربری تأثیری روی رأی‌گیری ندارد. به‌همین‌دلیل یک لینک اشباع‌شده می‌تواند BPDU را هم دیر برساند — در شبکه‌های پرترافیک، QoS دادن به BPDU (CoS 6/7) توصیه می‌شود.</p>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): چهار سوییچ، دو لینک uplink، ۲۰ VLAN.</p><table class=\"lesson-data-table\"><thead><tr><th>دستگاه/رابط</th><th>نقش</th><th>پیکربندی کلیدی</th></tr></thead><tbody><tr><td>SW1 (distribution)</td><td>Root برای instance 1</td><td>mst 1 root primary · Gi0/1-2 trunk</td></tr><tr><td>SW2 (distribution)</td><td>Root برای instance 2</td><td>mst 2 root primary · Gi0/1-2 trunk</td></tr><tr><td>SW3 (access)</td><td>سوییچ کاربری VLAN 10-19</td><td>Gi0/1-12 access + PortFast + BPDU Guard</td></tr><tr><td>SW4 (access)</td><td>سوییچ کاربری VLAN 20-29</td><td>Gi0/1-12 access + PortFast + BPDU Guard</td></tr><tr><td>SW3 Gi0/23 ↔ SW1 Gi0/1</td><td>uplink (point-to-point)</td><td>spanning-tree link-type point-to-point</td></tr><tr><td>SW3 Gi0/24 ↔ SW2 Gi0/1</td><td>uplink پشتیبان</td><td>پورت Alternate در instance 1</td></tr></tbody></table><p>در این طرح هیچ کابل حلقهٔ لایه ۲ بین access-switchها وجود ندارد؛ حلقهٔ منطقی فقط از uplinkها ساخته می‌شود و Root Guard روی پورت‌های access سوییچ‌های SW3/SW4 جلوی «سوییچ کاربری که root شد» را می‌گیرد.</p>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی کامل کنترلر (طراحی‌شده — اجرا نشده):</p><pre><code>SW1(config)# spanning-tree mode rapid-pvst        ! یا mst\nSW1(config)# spanning-tree vlan 10,20 root primary\nSW1(config)# spanning-tree vlan 30 root secondary\nSW1(config)# spanning-tree extend system-id\n\nSW3(config)# spanning-tree mode rapid-pvst\nSW3(config)# spanning-tree mst configuration\nSW3(config-mst)# name FAM-CAMPUS\nSW3(config-mst)# revision 1\nSW3(config-mst)# instance 1 vlan 10-19\nSW3(config-mst)# exit\nSW3(config)# spanning-tree mode mst\n\nSW3(config)# interface range GigabitEthernet0/1 - 12\nSW3(config-if)# switchport mode access\nSW3(config-if)# switchport access vlan 10\nSW3(config-if)# spanning-tree portfast\nSW3(config-if)# spanning-tree bpduguard enable\nSW3(config-if)# exit\nSW3(config)# interface GigabitEthernet0/23\nSW3(config-if)# switchport trunk encapsulation dot1q   ! IOS قدیمی‌تر\nSW3(config-if)# switchport mode trunk\nSW3(config-if)# spanning-tree link-type point-to-point\nSW3(config-if)# spanning-tree guard root\n\nSW3(config)# spanning-tree bpduguard enable          ! پیش‌فرض سراسری روی پورت‌های PortFast\nSW3(config)# errdisable recovery cause bpduguard\nSW3(config)# errdisable recovery interval 300\nSW3(config)# spanning-tree vlan 10-19 hello-time 2</code></pre><ul><li><code>root primary</code> priority را ۴۰۹۶ کم می‌کند (یا ۰ در صورت تکرار)؛ <code>root secondary</code> فقط ۸۱۹۲ پایین‌تر — برای ترتیب رزرو.</li><li><code>spanning-tree guard root</code> روی uplink سوییچ دسترسی با <code>bpduguard</code> روی پورت‌های کاربری متفاوت است؛ هر دو لازم‌اند، جایگزین هم نیستند.</li><li>اگر <code>switchport trunk encapsulation</code> پذیرفته نشد، IOS شما only dot1q است — جملهٔ اضافه را حذف کنید، خطا نیست.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<p>خروجی‌های استاندارد و تفسیر آن‌ها:</p><pre><code>SW1# show spanning-tree summary\nSwitch is in mst mode\nRoot bridge for VLANs: 10-19\nRoot bridge for VLANs: 20-29\nExtended system ID is enabled\nPortfast is enabled by default\nBPDU Guard is enabled by default\nUplinkFast is disabled\nBackboneFast is disabled\n\nSW1# show spanning-tree mst configuration\nName [FAM-CAMPUS], Revision 1, Instances configured 3\nInstance  Vlans mapped\n--------  ---------------------\n0         1-9,20-4094\n1         10-19\n2         20-29\n\nSW3# show spanning-tree interface GigabitEthernet0/23 detail\n Port 23 (GigabitEthernet0/23) of MST0 is designated port\n   Role: designated  State: forwarding\n   Edge Port: no  Uplink PortFast: no  bpdu guard: no\n   Point-to-point: yes\n\nSW3# show spanning-tree interface GigabitEthernet0/5 detail\n Port 5 (GigabitEthernet0/5) of MST1 is designated port\n   PortFast is configured on this port\n   Port state: forwarding\n   bpdu guard is enabled\n   BPDUs received: 0    (دریافت BPDU صفر = پورت سالم edge)</code></pre><ul><li>علامت سلامت: «Root bridge for VLANs» دقیقاً همان چیزی است که برنامه‌ریزی کرده‌اید؛ اگر سوییچ دیگری را نشان دهد، priority جابه‌جا شده.</li><li><code>BPDUs received: 0</code> روی پورت کاربری ← سالم؛ عدد بالا ← دستگاهی BPDU می‌فرستد (سوییچ دیگر، VM bridge، یا مهاجم) و پورت باید errdisable شده باشد.</li><li><code>show spanning-tree inconsistentports</code> ← لیست پورت‌هایی که Root Guard نگه داشته؛ <code>show errdisable recovery</code> ← وضعیت بازیابی خودکار.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<p>ابزارهای مشاهده برای لایهٔ ۲:</p><ul><li><strong>Wireshark با فیلتر <code>stp</code> یا <code>llc</code>:</strong> کادرهای BPDU (RSTP با پرچم‌های Proposal/Agreement) را ببینید. یک مکالمهٔ سالم Proposal ← Agreement در زیر ۱ ثانیه دیده می‌شود؛ اگر فقط TCN/Config قدیمی می‌بینید، یک طرف هنوز 802.1D یا PVST+ است.</li><li><strong>تشخیص حلقه با شمارش:</strong> اگر تعداد BPDU دریافتی روی یک پورت access غیرصفر و رو به رشد است ← یا سوییچ دیگری به آن پورت وصل است، یا loop دستی. با <code>show mac address-table address &lt;MAC&gt;</code> پورت حرکت‌کنندهٔ MAC را ردیابی کنید (flapping).</li><li><strong>Telemetry:</strong> در شبکه‌های بزرگ، state پورت‌ها را با SNMP (<code>dot1dStpPortState</code>) یا streaming telemetry به سیستم مانیتورینگ بفرستید تا تغییر Root یا پورت inconsistent در چند ثانیه اعلام شود، نه با تیکت کاربر.</li><li><strong>نشانهٔ لینک یک‌طرفه:</strong> یک طرف «forwarding» و طرف دیگر «blocking/absent» بدون هیچ BPDU — با تست ارسال دوطرفه (CDP/LLDP دوطرفه یا ping از هر دو سمت) تأیید کنید.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>چرا اشتباه است</th><th>درست چیست؟</th></tr></thead><tbody><tr><td>PortFast روی uplink سوییچ‌به‌سوییچ</td><td>لحظهٔ اتصال، حلقهٔ موقت بدون BPDU ساخته می‌شود</td><td>PortFast فقط دسترسی/endpoint؛ uplink با point-to-point + guard</td></tr><tr><td>عدم تطابق name یا revision در MST</td><td>دو سوییچ در دو «منطقه» جدا می‌افتند و CIST مرزی کند کار می‌کند</td><td>name/revision/mapping را روی همهٔ سوییچ‌های یک site یکسان کنید؛ <code>show spanning-tree mst configuration</code></td></tr><tr><td>«Root Guard همان BPDU Guard است»</td><td>یکی errdisable می‌کند، دیگری inconsistent — جواب متفاوت</td><td>BPDU Guard = کاربر مجاز نیست BPDU بفرستد؛ Root Guard = کاربر مجاز است ولی نباید root شود</td></tr><tr><td>همگرایی ۳۰ ثانیه‌ای بعد از مهاجرت از PVST+</td><td>هنوز یک طرف PVST+ است یا حالت mixed</td><td>همه جا یک حالت؛ بررسی با show spanning-tree summary</td></tr><tr><td>تغییر priority بدون در نظر گرفتن VLAN plan</td><td>root برای بعضی VLANها جابه‌جا می‌شود</td><td>با instance/ VLAN map کار کنید، نه priority کور</td></tr><tr><td>Native VLAN متفاوت روی trunk در کنار STP</td><td>traffic mismatch و گاه حلقهٔ ناخواسته</td><td>native VLAN یکسان و آن را از VLANهای کاربری خارج کنید</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> بعد از افزودن SW4، کلاینت‌های VLAN 10 هر چند دقیقه چند ثانیه قطع می‌شوند و <code>show spanning-tree</code> روی SW1 نشان می‌دهد Root جابه‌جا شده است.</p><ol><li>روی هر سوییچ: <code>show spanning-tree summary</code> ← Root ID برای VLAN 10 را یادداشت کنید. اگر SW4 root است ← احتمالاً priority پیش‌فرض (۳۲۷۶۸) دارد و بهتر از plan است.</li><li><code>show spanning-tree vlan 10</code> روی SW4 ← اگر «This bridge is the root» است، <code>show spanning-tree</code> روی SW1 مسیر تا root را بخوانید: چه پورتی Root port شده؟</li><li>بررسی trunk: <code>show interfaces trunk</code> روی هر دو لینک SW4 ← آیا هر دو uplink trunk و VLAN 10 را carry می‌کنند؟ اگر یکی native VLAN متفاوت دارد، اصلاح کنید.</li><li>بررسی حلقه: آیا بین SW3 و SW4 کابلی هست که نقشه نداشته باشد؟ <code>show cdp neighbors</code> + <code>show mac address-table vlan 10</code> و دنبال کردن MAC روی دو پورت.</li><li>اعمال سیاست: روی SW4 <code>spanning-tree vlan 10,20 root secondary</code> (یا priority مشخص)؛ روی پورت‌های access همان PortFast + BPDU Guard؛ روی uplinkها link-type point-to-point.</li><li>تأیید: خروجی root را دوباره چک کنید، سپس چند دقیقه پایش — دیگر تغییر Root نباید رخ دهد. سناریوی قطعی هم با یک‌طرفه‌کردن عمدی یک فیبر (یا shutdown) در lab تمرین شود: زمان بازیابی باید زیر ۱ ثانیه باشد.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>RSTP: سه حالت Discarding/Learning/Forwarding؛ نقش‌های Alternate و Backup؛ مذاکرهٔ Proposal/Agreement زیر ۱ ثانیه روی لینک point-to-point.</li><li>MSTP: instance = مجموعهٔ VLAN با یک درخت؛ شرط همگرایی = name + revision + mapping یکسان.</li><li>Hardening: PortFast + BPDU Guard برای edge · Root Guard برای مرزهای غیرمعتبر · هرگز PortFast روی uplink.</li><li>ریشهٔ تغییر Root را با <code>show spanning-tree summary</code> و <code>show spanning-tree vlan</code> ردیابی کنید، نه با حافظه.</li><li>لینک یک‌طرفه = BPDU قطع + یک طرف forwarding؛ با تست دوطرفهٔ CDP/ping اثبات کنید.</li><li>برای شبکه‌های ۵۰+ VLAN پیش‌فرض ما MST است؛ PVST+ فقط برای نگهداری.</li></ul><div class=\"lesson-callout\"><strong>چک‌لیست طراحی:</strong> root plan برای هر instance ✓ · همهٔ edgeها PortFast+Guard ✓ · همهٔ uplinkها point-to-point ✓ · native VLAN یکسان ✓ · مستندات MST name/revision ✓</div>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>در شبیه‌ساز (۲۵ دقیقه):</strong> توپولوژی بخش ۹ را بسازید؛ برای instance 1 و 2 دو root متفاوت تعیین کنید؛ با <code>show spanning-tree mst configuration</code> تطابق منطقه را روی همه تأیید کنید.</li><li><strong>سناریوی شکست (۱۵ دقیقه):</strong> یک uplink را shutdown کنید؛ زمان بازیابی ping ممتد را اندازه بگیرید (هدف: زیر ۱ ثانیه). سپس PortFast را روی همان uplink بگذارید و تفاوت رفتار را مستند کنید.</li><li><strong>ایمن‌سازی (۱۵ دقیقه):</strong> یک «سوییچ کاربری» جعلی (یا VM با bridge) به پورت access وصل کنید؛ با BPDU Guard باید پورت errdisable شود؛ <code>show errdisable recovery</code> را بخوانید و بازیابی خودکار را فعال کنید.</li><li><strong>خودآزمایی:</strong> پنج پرسش: تفاوت Guardهای دو، چرا name/revision مهم است، ترتیب همگرایی RSTP، خطر BPDU Filter، و اینکه چرا Backup port فعال نمی‌شود.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "RSTP",
+      "fa": "مفهوم کلیدی RSTP",
+      "simple": "اصطلاح تخصصی مرتبط با RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲"
+    },
+    {
+      "term": "802.1w",
+      "fa": "مفهوم کلیدی 802.1w",
+      "simple": "اصطلاح تخصصی مرتبط با RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲"
+    },
+    {
+      "term": "MSTP",
+      "fa": "مفهوم کلیدی MSTP",
+      "simple": "اصطلاح تخصصی مرتبط با RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲"
+    },
+    {
+      "term": "BPDU Guard",
+      "fa": "مفهوم کلیدی BPDU Guard",
+      "simple": "اصطلاح تخصصی مرتبط با RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲"
+    },
+    {
+      "term": "Root Guard",
+      "fa": "مفهوم کلیدی Root Guard",
+      "simple": "اصطلاح تخصصی مرتبط با RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲"
+    },
+    {
+      "term": "PortFast",
+      "fa": "مفهوم کلیدی PortFast",
+      "simple": "اصطلاح تخصصی مرتبط با RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲"
+    },
+    {
+      "term": "Loop Guard",
+      "fa": "مفهوم کلیدی Loop Guard",
+      "simple": "اصطلاح تخصصی مرتبط با RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — RSTP (802.1w)، MSTP (802.1s) و ایمن‌سازی لایه ۲",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>spanning-tree mode rapid-pvst\nspanning-tree vlan 10,20 root primary\ninterface range GigabitEthernet0/1 - 12\n spanning-tree portfast\n spanning-tree bpduguard enable\nshow spanning-tree summary</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "در RSTP (802.1w)، کدام سه حالتِ قدیمی 802.1D در حالت Discarding ادغام شده‌اند؟",
+      "options": [
+        "Disabled, Blocking, Listening",
+        "Listening, Learning, Forwarding",
+        "Blocking, Forwarding, Disabled",
+        "Init, 2-Way, Blocking"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در RSTP حالت‌های Disabled و Blocking و Listening همگی Discarding نامیده می‌شوند.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "اگر روی یک پورت PortFast + BPDU Guard فعال باشد و کاربری یک سوئیچ رومیزی به آن وصل کند چه می‌شود؟",
+      "options": [
+        "سوئیچ جدید Root Bridge می‌شود",
+        "پورت فوراً وارد حالت Err-Disabled می‌شود",
+        "ترافیک دو برابر سریع می‌شود",
+        "فقط VLAN 1 مسدود می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دریافت BPDU روی پورت دارای BPDU Guard پورت را برای جلوگیری از حلقه به Err-Disabled می‌برد.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "نقش Alternate Port در RSTP جایگزین چه چیزی است؟",
+      "options": [
+        "جایگزین فوری برای Root Port در صورت خرابی لینک اصلی",
+        "پورت وصل به پرینتر",
+        "پورتی که دو کابل روی یک هاب دارد",
+        "پورت خاموش"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Alternate Port مسیر جایگزینی به Root Bridge دارد و هنگام خرابی Root Port بلافاصله فعال می‌شود.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "کاربرد Root Guard چیست و کجا پیکربندی می‌شود؟",
+      "options": [
+        "روی پورت‌های دسترسی برای کلاینت",
+        "روی پورت‌های رو به سوئیچ‌های پایین‌دست که نباید هرگز مسیر Root شوند",
+        "فقط روی روترهای BGP",
+        "برای افزایش MTU"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اگر از پورت دارای Root Guard BPDU با اولویت بالاتر (Superior) برسد، پورت به Root-Inconsistent می‌رود.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "چرا در شبکه‌هایی با ۵۰۰ VLAN از MSTP به‌جای PVST+ استفاده می‌شود؟",
+      "options": [
+        "چون PVST+ روی Trunk کار نمی‌کند",
+        "برای کاهش بار CPU و حافظه با گروه‌بندی VLANها در چند Instance",
+        "چون MSTP بدون سوئیچ کار می‌کند",
+        "زیرا MSTP تایمر ندارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>MSTP اجازه می‌دهد مثلاً ۵۰۰ VLAN در ۲ یا ۴ Instance توزیع بار شوند.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "در RSTP یک لینک با سرعت 1Gbps چه مقدار Cost پیش‌فرض دارد؟",
+      "options": [
+        "100",
+        "19",
+        "4",
+        "2"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>در مقیاس استاندارد STP/RSTP لینک ۱ گیگ دارای Cost=4 و ۱۰ گیگ Cost=2 است.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "اگر فیبر نوری به‌صورت یک‌طرفه قطع شود و BPDU دریافت نشود، کدام قابلیت جلوی تبدیل شدن Blocking Port به Forwarding را می‌گیرد؟",
+      "options": [
+        "PortFast",
+        "Loop Guard / UDLD",
+        "VTP Pruning",
+        "DHCP Snooping"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Loop Guard پورت را به‌جای Forwarding به حالت Loop-Inconsistent می‌برد تا حلقه تشکیل نشود.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "برای اینکه RSTP مکانیزم سریع Proposal/Agreement را اجرا کند لینک باید چه نوعی باشد؟",
+      "options": [
+        "Half-Duplex Shared",
+        "Full-Duplex Point-to-Point",
+        "Access Port با هاب",
+        "لینک سریال بدون اترنت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دست‌تکانی RSTP روی لینک‌های Point-to-Point Full-Duplex عمل می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "مقدار پیش‌فرض Bridge Priority در سیسکو (بدون Extended System ID) کدام مضرب است؟",
+      "options": [
+        "1024",
+        "4096",
+        "1000",
+        "255"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Priority همیشه مضربی از 4096 است (پیش‌فرض 32768 + شماره VLAN).</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "در MSTP دو سوئیچ برای قرار گرفتن در یک MST Region باید در چه مواردی کاملاً یکسان باشند؟",
+      "options": [
+        "فقط Hostname",
+        "Region Name، Revision Number و جدول نگاشت VLAN-to-Instance",
+        "فقط آدرس IP مدیریت",
+        "فقط سرعت پورت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ناهمگونی هر یک از این سه مورد باعث می‌شود سوئیچ‌ها در دو Region جداگانه قرار گیرند.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "دستور بازیابی خودکار پورت Err-Disabled در سیسکو کدام است؟",
+      "options": [
+        "errdisable recovery cause bpduguard",
+        "no spanning-tree",
+        "shutdown immediate",
+        "clear mac"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>با errdisable recovery cause bpduguard می‌توان پورت را پس از تایمر مشخص به‌صورت خودکار بازیابی کرد.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "در RSTP یک سوئیچ غیرریشه هر چند ثانیه یک‌بار خودش Hello BPDU می‌فرستد (برخلاف 802.1D)؟",
+      "options": [
+        "فقط از Root رله می‌کند",
+        "هر Hello Time (پیش‌فرض ۲ ثانیه) مستقیماً می‌فرستد و به‌عنوان Keepalive عمل می‌کند",
+        "هر ۶۰ ثانیه",
+        "اصلاً نمی‌فرستد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در RSTP همهٔ سوئیچ‌ها هر ۲ ثانیه BPDU می‌فرستند و از دست رفتن ۳ پیام متوالی (۶ ثانیه) به‌معنای خرابی همسایه است.</p>"
+    }
+  ]
+}
