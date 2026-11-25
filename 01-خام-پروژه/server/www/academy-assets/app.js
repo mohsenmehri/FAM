@@ -1,58 +1,92 @@
-/* FAM Academy — interactions (vanilla JS, CSP-safe, integrated with FAM session) */
+/* FAM Cisco Academy — Comprehensive Curriculum Engine (vanilla JS, CSP-safe, FAM session synced) */
 (function () {
   'use strict';
 
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
-
-  /* ---------- ارقام فارسی ---------- */
   const FA = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
   const toFa = (n) => String(n).replace(/\d/g, d => FA[+d]);
 
-  /* ---------- هماهنگی با نشست FAM ---------- */
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  /* ---------- هماهنگی با نشست و ذخیره سرور FAM ---------- */
   const boot = window.FAM_ACADEMY_BOOTSTRAP || {};
   const csrf = boot.csrf || '';
   const stored = boot.progress || {};
 
-  function readSavedMissions() {
+  function loadState() {
+    const def = {
+      activeLesson: 's01',
+      completedLessons: [],
+      quizScores: {},
+      notes: {},
+      missions: [],
+      examScore: null,
+      cliMode: 'user'
+    };
     try {
-      if (typeof stored['fam3.progress.v1'] === 'string') {
-        const parsed = JSON.parse(stored['fam3.progress.v1']);
-        if (parsed && Array.isArray(parsed.missions)) return parsed.missions;
+      if (typeof stored['fam4.learn.v1'] === 'string') {
+        const parsed = JSON.parse(stored['fam4.learn.v1']);
+        if (parsed && typeof parsed === 'object') return Object.assign(def, parsed);
       }
     } catch (_) {}
-    return null;
-  }
-
-  async function saveMissions(missionIndices) {
-    if (!csrf) return;
     try {
-      await fetch('/api/academy/progress', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
-        body: JSON.stringify({
-          changes: { 'fam3.progress.v1': JSON.stringify({ missions: missionIndices }) }
-        })
-      });
+      if (typeof stored['fam3.progress.v1'] === 'string') {
+        const p3 = JSON.parse(stored['fam3.progress.v1']);
+        if (p3 && Array.isArray(p3.missions)) def.missions = p3.missions;
+      }
     } catch (_) {}
+    return def;
   }
 
+  const state = loadState();
+  let saveTimer = null;
+
+  function persistState() {
+    if (!csrf) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        await fetch('/api/academy/progress', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+          body: JSON.stringify({
+            changes: {
+              'fam4.learn.v1': JSON.stringify({
+                activeLesson: state.activeLesson,
+                completedLessons: state.completedLessons,
+                quizScores: state.quizScores,
+                notes: state.notes,
+                missions: state.missions,
+                examScore: state.examScore
+              }),
+              'fam3.progress.v1': JSON.stringify({ missions: state.missions })
+            }
+          })
+        });
+      } catch (_) {}
+    }, 180);
+  }
+
+  /* ---------- پروفایل و دسترسی پنل FAM ---------- */
   const avatarEl = $('.avatar');
   if (avatarEl && boot.userName) {
     avatarEl.title = boot.userName;
-    const firstChar = String(boot.userName).trim().charAt(0);
-    if (firstChar) avatarEl.textContent = firstChar;
+    const fc = String(boot.userName).trim().charAt(0);
+    if (fc) avatarEl.textContent = fc;
   }
-
-  /* ---------- دکمه بازگشت به پنل اصلی بر اساس دسترسی ---------- */
-  const backFamEls = $$('[data-fam-portal]');
   const canPortal = !boot.allowedViews || boot.allowedViews.panel || boot.allowedViews.equipment;
-  backFamEls.forEach(el => {
-    if (!canPortal) el.style.display = 'none';
+  $$('[data-fam-portal]').forEach(node => {
+    if (!canPortal) node.style.display = 'none';
   });
 
-  /* ---------- منوی موبایل سایت ---------- */
+  /* ---------- منوی موبایل صفحه عمومی ---------- */
   const burger = $('#navBurger');
   const navLinks = $('#navLinks');
   if (burger && navLinks) {
@@ -68,44 +102,28 @@
     });
   }
 
-  /* ---------- هایلایت لینک فعال هنگام اسکرول ---------- */
-  const sections = $$('section[id]');
-  const navAnchors = $$('.nav-links a[href^="#"]');
-  if (sections.length && navAnchors.length && 'IntersectionObserver' in window) {
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(en => {
-        if (!en.isIntersecting) return;
-        navAnchors.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + en.target.id));
-      });
-    }, { rootMargin: '-40% 0px -55% 0px' });
-    sections.forEach(s => io.observe(s));
-  }
-
-  /* ---------- انیمیشن ورود (reveal) ---------- */
+  /* ---------- انیمیشن reveal و شمارنده‌ها ---------- */
   const reveals = $$('.reveal');
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver(entries => {
       entries.forEach(en => {
         if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
       });
-    }, { threshold: 0.12 });
-    reveals.forEach(el => io.observe(el));
+    }, { threshold: 0.1 });
+    reveals.forEach(x => io.observe(x));
   } else {
-    reveals.forEach(el => el.classList.add('in'));
+    reveals.forEach(x => x.classList.add('in'));
   }
 
-  /* ---------- شمارنده‌ها ---------- */
   const counters = $$('[data-count]');
-  const runCounter = el => {
-    const target = +el.dataset.count;
-    const suffix = el.dataset.suffix || '';
-    const dur = 1600;
+  const runCounter = node => {
+    const target = +node.dataset.count;
+    const suffix = node.dataset.suffix || '';
     const t0 = performance.now();
     const tick = now => {
-      const p = Math.min((now - t0) / dur, 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      const val = Math.round(target * eased);
-      el.textContent = toFa(val.toLocaleString('en-US')) + suffix;
+      const p = Math.min((now - t0) / 1400, 1);
+      const val = Math.round(target * (1 - Math.pow(1 - p, 3)));
+      node.textContent = toFa(val.toLocaleString('en-US')) + suffix;
       if (p < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -115,65 +133,220 @@
       entries.forEach(en => {
         if (en.isIntersecting) { runCounter(en.target); io.unobserve(en.target); }
       });
-    }, { threshold: 0.5 });
-    counters.forEach(el => io.observe(el));
+    }, { threshold: 0.4 });
+    counters.forEach(x => io.observe(x));
   } else {
     counters.forEach(runCounter);
   }
 
-  /* ---------- پر شدن نوارها و حلقه‌ها هنگام دیده‌شدن ---------- */
-  const fillBars = root => {
-    $$('.bar i[data-w]', root).forEach(i => { i.style.width = i.dataset.w + '%'; });
-    $$('.ring .fg[data-pct]', root).forEach(c => {
-      const pct = +c.dataset.pct;
-      c.style.strokeDashoffset = String(339 - 339 * pct / 100);
-    });
-    $$('.wbar[data-h]', root).forEach(b => { b.style.height = b.dataset.h + '%'; });
-  };
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(en => {
-        if (en.isIntersecting) { fillBars(en.target); io.unobserve(en.target); }
-      });
-    }, { threshold: 0.25 });
-    $$('.card, .continue, .course-row, .view.active').forEach(el => io.observe(el));
-  }
-  setTimeout(() => fillBars(document), 350);
-
-  /* ---------- تایپ زندهٔ ترمینال هیرو ---------- */
+  /* ---------- تایپ زنده ترمینال هیرو ---------- */
   const typeTarget = $('#typeTarget');
   if (typeTarget) {
     const lines = [
       'R1> enable',
-      'R1# configure terminal',
-      'R1(config)# interface g0/0',
-      'R1(config-if)# ip address 10.0.0.1 255.255.255.0',
-      'R1(config-if)# no shutdown',
-      '%LINK-5-CHANGED: Interface Gi0/0, changed state to up',
-      'R1(config-if)# exit',
+      'R1# show ip interface brief',
+      'Gi0/0  10.10.0.1  YES manual up  up',
+      'R1# show ip route',
+      'O  10.255.0.2/32 [110/2] via 10.10.0.2 (ECMP)',
+      'R1# show arp',
+      '10.10.0.2  aabb.cc00.0200  ARPA  Gi0/0',
       'R1# write memory  [OK]'
     ];
     let li = 0, ci = 0, out = '';
     const step = () => {
       if (li >= lines.length) {
-        setTimeout(() => { out = ''; li = 0; ci = 0; typeTarget.textContent = ''; step(); }, 3400);
+        setTimeout(() => { out = ''; li = 0; ci = 0; typeTarget.textContent = ''; step(); }, 3200);
         return;
       }
       const line = lines[li];
       if (ci <= line.length) {
         typeTarget.textContent = out + line.slice(0, ci);
         ci++;
-        setTimeout(step, line[ci - 1] === ' ' ? 14 : 26);
+        setTimeout(step, line[ci - 1] === ' ' ? 14 : 24);
       } else {
         out += line + '\n';
         li++; ci = 0;
-        setTimeout(step, 420);
+        setTimeout(step, 400);
       }
     };
-    setTimeout(step, 700);
+    setTimeout(step, 600);
   }
 
-  /* ================= داشبورد ================= */
+  /* ---------- بارگذاری داده‌های جامع آکادمی ---------- */
+  let ACADEMY = null;
+
+  async function loadAcademyData() {
+    try {
+      const res = await fetch('/academy-assets/academy-data.json', { credentials: 'same-origin' });
+      if (!res.ok) return null;
+      ACADEMY = await res.json();
+      return ACADEMY;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /* ---------- ساخت دیاگرام SVG تمیز و خوانا برای هر درس ---------- */
+  function buildDiagramSvg(type) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 720 260');
+    svg.setAttribute('role', 'img');
+
+    function rect(x, y, w, h, stroke, fill) {
+      const r = document.createElementNS(ns, 'rect');
+      r.setAttribute('x', x); r.setAttribute('y', y);
+      r.setAttribute('width', w); r.setAttribute('height', h);
+      r.setAttribute('rx', '10'); r.setAttribute('fill', fill || '#0e1729');
+      r.setAttribute('stroke', stroke); r.setAttribute('stroke-width', '2');
+      svg.appendChild(r);
+    }
+    function txt(x, y, str, color, size, anchor) {
+      const t = document.createElementNS(ns, 'text');
+      t.setAttribute('x', x); t.setAttribute('y', y);
+      t.setAttribute('fill', color || '#f8fafc');
+      t.setAttribute('font-size', size || '13');
+      t.setAttribute('font-weight', '700');
+      t.setAttribute('text-anchor', anchor || 'middle');
+      t.textContent = str;
+      svg.appendChild(t);
+    }
+    function line(x1, y1, x2, y2, stroke) {
+      const l = document.createElementNS(ns, 'line');
+      l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+      l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+      l.setAttribute('stroke', stroke || '#38bdf8');
+      l.setAttribute('stroke-width', '2');
+      svg.appendChild(l);
+    }
+
+    if (type === 'osi') {
+      const layers = [
+        ['L7-5 · Application (Data)', '#a78bfa'],
+        ['L4 · Transport (TCP/UDP Segment)', '#3b82f6'],
+        ['L3 · Network (IP Packet)', '#00d4ff'],
+        ['L2 · Data Link (Ethernet Frame + MAC)', '#34d399'],
+        ['L1 · Physical (Bits / Fiber / Copper)', '#fbbf24']
+      ];
+      layers.forEach((L, idx) => {
+        const y = 16 + idx * 46;
+        rect(40, y, 310, 38, L[1], '#0d1628');
+        txt(195, y + 23, L[0], '#f1f5f9', '12.5');
+      });
+      rect(400, 38, 280, 184, '#00d4ff', '#0b1424');
+      txt(540, 66, 'Encapsulation Flow', '#7df9ff', '14');
+      txt(540, 102, '[ Data ]', '#a78bfa', '12.5');
+      txt(540, 134, '[ TCP | Data ]  -> Segment', '#60a5fa', '12.5');
+      txt(540, 166, '[ IP | TCP | Data ]  -> Packet', '#00d4ff', '12.5');
+      txt(540, 198, '[ MAC | IP | TCP | Data | FCS ]', '#34d399', '12');
+      line(350, 80, 400, 120, '#00d4ff');
+      line(350, 175, 400, 190, '#34d399');
+    } else if (type === 'leafspine') {
+      rect(180, 22, 130, 46, '#00d4ff', '#10203a'); txt(245, 50, 'SPINE-1', '#7df9ff', '13.5');
+      rect(410, 22, 130, 46, '#00d4ff', '#10203a'); txt(475, 50, 'SPINE-2', '#7df9ff', '13.5');
+      const leaves = [90, 285, 480];
+      leaves.forEach((lx, i) => {
+        rect(lx, 122, 130, 44, '#3b82f6', '#0e192e');
+        txt(lx + 65, 149, 'LEAF-' + (i + 1) + ' (VTEP)', '#93c5fd', '12.5');
+        line(lx + 45, 122, 245, 68, '#00d4ff');
+        line(lx + 85, 122, 475, 68, '#38bdf8');
+        rect(lx + 15, 200, 100, 38, '#34d399', '#0b1b21');
+        txt(lx + 65, 224, 'SRV-' + (i + 1), '#6ee7b7', '12');
+        line(lx + 65, 166, lx + 65, 200, '#34d399');
+      });
+      txt(360, 100, 'L3 IP Fabric (ECMP) + VXLAN EVPN Overlay', '#fbbf24', '12');
+    } else {
+      rect(290, 20, 140, 48, '#00d4ff', '#10203a'); txt(360, 49, 'R1 · CORE / GW', '#7df9ff', '13');
+      rect(110, 118, 140, 46, '#3b82f6', '#0e192e'); txt(180, 146, 'SW1 · ACCESS', '#93c5fd', '12.5');
+      rect(470, 118, 140, 46, '#3b82f6', '#0e192e'); txt(540, 146, 'SW2 · SERVERS', '#93c5fd', '12.5');
+      line(330, 68, 180, 118, '#00d4ff');
+      line(390, 68, 540, 118, '#00d4ff');
+      line(250, 141, 470, 141, '#fbbf24');
+      txt(360, 133, '802.1Q Trunk (VLAN 10, 20)', '#fde68a', '11');
+      rect(95, 198, 170, 40, '#a78bfa', '#14132b'); txt(180, 223, 'PC-A · 10.10.0.10/24', '#ddd6fe', '12');
+      rect(455, 198, 170, 40, '#34d399', '#0b1b21'); txt(540, 223, 'SRV · 10.20.0.10/26', '#6ee7b7', '12');
+      line(180, 164, 180, 198, '#a78bfa');
+      line(540, 164, 540, 198, '#34d399');
+    }
+    return svg;
+  }
+
+  /* ---------- شبیه‌ساز CLI آکادمی ---------- */
+  function runIosCommand(rawCmd, outputEl, promptEl) {
+    const cmd = String(rawCmd || '').trim();
+    if (!cmd) return;
+    const low = cmd.toLowerCase();
+    const prefix = state.cliMode === 'config' ? 'R1(config)# ' : (state.cliMode === 'priv' ? 'R1# ' : 'R1> ');
+    let reply = '';
+
+    if (low === 'clear') {
+      outputEl.textContent = '';
+      return;
+    } else if (low === 'enable' || low === 'en') {
+      state.cliMode = 'priv';
+      reply = (ACADEMY && ACADEMY.cliResponses.enable) || 'Privileged EXEC enabled.';
+    } else if (low === 'configure terminal' || low === 'conf t') {
+      state.cliMode = 'config';
+      reply = (ACADEMY && ACADEMY.cliResponses['configure terminal']) || '(config)#';
+    } else if (low === 'exit' || low === 'end') {
+      state.cliMode = low === 'end' ? 'priv' : (state.cliMode === 'config' ? 'priv' : 'user');
+      reply = 'بازگشت به سطح قبلی.';
+    } else if (low === 'no shutdown') {
+      reply = '%LINK-3-UPDOWN: Interface GigabitEthernet0/1, changed state to up\n%LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed state to up';
+    } else if (low.startsWith('ping ')) {
+      const ip = cmd.split(/\s+/)[1] || '10.10.0.2';
+      reply = `Type escape sequence to abort.\nSending 5, 100-byte ICMP Echos to ${ip}, timeout is 2 seconds:\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/2/3 ms`;
+    } else if (low.startsWith('traceroute ')) {
+      const ip = cmd.split(/\s+/)[1] || '10.255.0.2';
+      reply = `Tracing the route to ${ip}\n  1 10.10.0.2 2 msec 1 msec 2 msec\n  2 ${ip} 3 msec 2 msec *`;
+    } else if (ACADEMY && ACADEMY.cliResponses && ACADEMY.cliResponses[low]) {
+      reply = ACADEMY.cliResponses[low];
+    } else {
+      reply = `% Invalid or unmapped lab command. Type "help" for supported academy commands.`;
+    }
+
+    if (promptEl) {
+      promptEl.textContent = state.cliMode === 'config' ? 'R1(config)#' : (state.cliMode === 'priv' ? 'R1#' : 'R1>');
+    }
+    outputEl.textContent += (outputEl.textContent ? '\n\n' : '') + prefix + cmd + '\n' + reply;
+    outputEl.scrollTop = outputEl.scrollHeight;
+  }
+
+  /* ---------- رندر صفحه عمومی (/academy) ---------- */
+  function renderLandingFaculties() {
+    const grid = $('#landingFaculties');
+    if (!grid || !ACADEMY) return;
+    grid.textContent = '';
+    ACADEMY.faculties.forEach((f, idx) => {
+      const card = el('article', 'fac-card reveal in');
+      card.style.setProperty('--d', (idx * 0.05) + 's');
+
+      const top = el('div', 'fac-top');
+      top.appendChild(el('span', 'fac-num', 'دانشکده ' + f.num));
+      top.appendChild(el('span', 'fac-dur', f.duration));
+      card.appendChild(top);
+
+      card.appendChild(el('h3', '', f.title));
+      card.appendChild(el('p', '', f.summary));
+
+      const chips = el('div', 'fac-chips');
+      f.sections.slice(0, 4).forEach(s => {
+        chips.appendChild(el('span', 'fac-chip', s.title));
+      });
+      card.appendChild(chips);
+
+      const foot = el('div', 'fac-foot');
+      foot.appendChild(el('span', 'fac-cert', f.cert));
+      const link = el('a', 'btn btn-primary', 'باز کردن سرفصل ←');
+      link.href = '/academy/dashboard#faculty-' + f.id;
+      foot.appendChild(link);
+      card.appendChild(foot);
+
+      grid.appendChild(card);
+    });
+  }
+
+  /* ================= داشبورد دانشجو ================= */
   const side = $('#side');
   const sideToggle = $('#sideToggle');
   if (side && sideToggle) {
@@ -184,82 +357,695 @@
     });
   }
 
-  const titles = {
-    home:     ['داشبورد', 'خانه ← نمای کلی'],
-    courses:  ['دوره‌های من', 'یادگیری ← دوره‌ها'],
-    lab:      ['آزمایشگاه', 'یادگیری ← آزمایشگاه شبیه‌ساز'],
-    progress: ['پیشرفت', 'حساب ← آمار پیشرفت']
+  const viewTitles = {
+    home: ['داشبورد آکادمی سیسکو', 'خانه ← نمای کلی برنامه ۶ تا ۸ ساله'],
+    lesson: ['کلاس درس تعاملی', 'یادگیری ← آموزش ۱۱ بخشی + آزمایشگاه CLI'],
+    courses: ['۷ دانشکده و ۸ تخصص', 'نقشه کامل ← از دانشکده ۰ تا CCDE'],
+    lab: ['آزمایشگاه شبیه‌ساز', 'عملی ← ترمینال Cisco IOS و ۳۷ لاب الزامی'],
+    exam: ['آزمون ورودی و ارزیابی', 'دانشکده ۰ ← تعیین سطح و حدنصاب ۸۵٪'],
+    progress: ['پیشرفت و نقشه ۸ ساله', 'گزارش ← سال ۱ تا ۸ و منابع رسمی']
   };
 
-  const gotoView = name => {
+  function fillBars(root) {
+    $$('.bar i[data-w]', root).forEach(i => { i.style.width = i.dataset.w + '%'; });
+    $$('.ring .fg[data-pct]', root).forEach(c => {
+      c.style.strokeDashoffset = String(339 - 339 * (+c.dataset.pct) / 100);
+    });
+  }
+
+  function gotoView(name) {
     const panel = $('[data-panel="' + name + '"]');
     if (!panel) return;
     $$('.view').forEach(v => v.classList.toggle('active', v === panel));
     $$('.snav[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-    const t = titles[name] || ['داشبورد', ''];
+    const t = viewTitles[name] || ['داشبورد', ''];
     const titleEl = $('#viewTitle'), crumbEl = $('#viewCrumb');
     if (titleEl) titleEl.textContent = t[0];
     if (crumbEl) crumbEl.textContent = t[1];
-    panel.querySelectorAll('.reveal').forEach(el => el.classList.remove('in'));
-    requestAnimationFrame(() => {
-      panel.querySelectorAll('.reveal').forEach((el, i) => setTimeout(() => el.classList.add('in'), i * 70));
-      fillBars(panel);
-    });
+    panel.querySelectorAll('.reveal').forEach(x => x.classList.add('in'));
+    fillBars(panel);
     if (side) side.classList.remove('open');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  $$('.snav[data-view]').forEach(btn => {
-    btn.addEventListener('click', () => gotoView(btn.dataset.view));
-  });
-  $$('[data-goto]').forEach(el => {
-    el.addEventListener('click', e => { e.preventDefault(); gotoView(el.dataset.goto); });
-  });
-
-  /* ---------- دکمه‌های بدون inline handler (سازگار با CSP) ---------- */
-  $$('[data-action-alert]').forEach(el => {
-    el.addEventListener('click', e => {
-      e.preventDefault();
-      alert(el.dataset.actionAlert);
-    });
-  });
-
-  $$('[data-noop-link]').forEach(el => {
-    el.addEventListener('click', e => e.preventDefault());
-  });
-
-  /* ---------- مأموریت‌ها (تعاملی + ذخیره در سرور FAM) ---------- */
-  const missionEls = $$('.mission');
-  function syncMissionsSummary() {
-    const total = missionEls.length;
-    if (!total) return;
-    const done = $$('.mission.done').length;
-    const foot = $('.missions-foot .bar i');
-    if (foot) foot.style.width = Math.round(done / total * 100) + '%';
-    const label = $('.missions-foot span');
-    if (label) label.textContent = toFa(done) + ' از ' + toFa(total) + ' — تا پایان امروز';
   }
-  const savedMissions = readSavedMissions();
-  if (savedMissions && missionEls.length) {
-    missionEls.forEach((m, idx) => m.classList.toggle('done', savedMissions.includes(idx)));
-    syncMissionsSummary();
+
+  $$('.snav[data-view]').forEach(btn => btn.addEventListener('click', () => gotoView(btn.dataset.view)));
+  $$('[data-goto]').forEach(node => node.addEventListener('click', e => { e.preventDefault(); gotoView(node.dataset.goto); }));
+
+  /* ---------- رندر خانه داشبورد ---------- */
+  function updateHomeSummary() {
+    if (!ACADEMY) return;
+    const totalLessons = Object.keys(ACADEMY.lessons).length;
+    const doneCount = state.completedLessons.length;
+    const pct = Math.min(100, Math.round((doneCount / totalLessons) * 100));
+
+    const bar = $('#homeProgBar');
+    if (bar) { bar.dataset.w = String(pct); bar.style.width = pct + '%'; }
+    const txt = $('#homeProgText');
+    if (txt) txt.textContent = toFa(doneCount) + ' از ' + toFa(totalLessons) + ' جلسه';
+    const ringFg = $('#homeRingFg');
+    if (ringFg) { ringFg.dataset.pct = String(pct); ringFg.style.strokeDashoffset = String(339 - 339 * pct / 100); }
+    const ringPct = $('#homeRingPct');
+    if (ringPct) ringPct.textContent = toFa(pct) + '٪';
+    const xp = $('#homeXpLabel');
+    if (xp) xp.textContent = toFa(doneCount * 100 + state.missions.length * 25) + ' امتیاز آکادمی';
+
+    const cur = ACADEMY.lessons[state.activeLesson] || ACADEMY.lessons.s01;
+    if (cur) {
+      const ht = $('#homeActiveTitle');
+      if (ht) ht.textContent = cur.title;
+      const hs = $('#homeActiveSub');
+      if (hs) hs.textContent = cur.faculty + ' · ۱۲۰ دقیقه روزانه (۲۰ مرور + ۳۵ مفهوم + ۵۰ آزمایشگاه + ۱۵ مستندسازی)';
+    }
   }
-  missionEls.forEach(m => {
-    m.addEventListener('click', () => {
-      m.classList.toggle('done');
-      syncMissionsSummary();
-      const doneIndices = missionEls
-        .map((el, idx) => (el.classList.contains('done') ? idx : -1))
-        .filter(idx => idx >= 0);
-      saveMissions(doneIndices);
+
+  function renderHomeBlocks() {
+    if (!ACADEMY) return;
+    const wBox = $('#homeWeights');
+    if (wBox) {
+      wBox.textContent = '';
+      ACADEMY.meta.weights.forEach(w => {
+        const row = el('div', 'skill');
+        row.style.marginTop = '10px';
+        row.appendChild(el('b', '', w.label));
+        const bar = el('div', 'bar');
+        const i = el('i');
+        i.dataset.w = String(w.pct);
+        i.style.width = w.pct + '%';
+        bar.appendChild(i);
+        row.appendChild(bar);
+        row.appendChild(el('span', 'pct', toFa(w.pct) + '٪'));
+        wBox.appendChild(row);
+      });
+    }
+
+    const strip = $('#weeklyStrip');
+    if (strip) {
+      strip.textContent = '';
+      ACADEMY.meta.weeklyPlan.forEach(d => {
+        const box = el('div', 'wstrip-item');
+        box.appendChild(el('b', '', d.day));
+        box.appendChild(el('small', '', d.activity));
+        strip.appendChild(box);
+      });
+    }
+  }
+
+  /* ---------- چک‌لیست روزانه ۱۲۰ دقیقه + تایمر ---------- */
+  function initDailyMissionsAndTimer() {
+    const missionEls = $$('#dailyMissions .mission');
+    const syncFoot = () => {
+      const done = $$('#dailyMissions .mission.done').length;
+      const bar = $('.missions-foot .bar i');
+      if (bar) bar.style.width = Math.round((done / 4) * 100) + '%';
+      const lbl = $('.missions-foot span');
+      if (lbl) lbl.textContent = toFa(done) + ' از ۴ بخش امروز';
+    };
+    missionEls.forEach((m, idx) => {
+      if (state.missions.includes(idx)) m.classList.add('done');
+      m.addEventListener('click', () => {
+        m.classList.toggle('done');
+        state.missions = missionEls.map((x, i) => x.classList.contains('done') ? i : -1).filter(i => i >= 0);
+        syncFoot();
+        updateHomeSummary();
+        persistState();
+      });
     });
-  });
+    syncFoot();
+
+    const tBtn = $('#timerToggleBtn');
+    const tDisp = $('#timerDisplay');
+    let secLeft = 120 * 60;
+    let tId = null;
+    if (tBtn && tDisp) {
+      tBtn.addEventListener('click', () => {
+        if (tId) {
+          clearInterval(tId);
+          tId = null;
+          tBtn.textContent = 'ادامه تایمر ۱۲۰ دقیقه‌ای';
+          return;
+        }
+        tBtn.textContent = 'توقف موقت';
+        tId = setInterval(() => {
+          if (secLeft <= 0) { clearInterval(tId); tId = null; return; }
+          secLeft--;
+          const mm = String(Math.floor(secLeft / 60)).padStart(2, '0');
+          const ss = String(secLeft % 60).padStart(2, '0');
+          tDisp.textContent = toFa(mm + ':' + ss);
+        }, 1000);
+      });
+    }
+  }
+
+  /* ---------- کلاس درس ۱۱ بخشی (سبک امن‌افزار رایکا) ---------- */
+  function buildAutoLesson(id, title, facultyLabel) {
+    return {
+      id,
+      faculty: facultyLabel || 'دانشکده تخصصی',
+      title,
+      lead: `در این مبحث استاندارد، ${title} را با ساختار چهارخروجی آکادمی (درک مفهومی، دستورات پیکربندی، آزمایشگاه عملی و عیب‌یابی واقعی) بررسی می‌کنیم.`,
+      goal: `تسلط مفهومی و عملی بر ${title}، شناخت پارامترهای کلیدی در Cisco IOS و قابلیت عیب‌یابی در شبکه واقعی.`,
+      prereq: 'گذراندن مباحث پایه ترم اول یا آزمون ورودی با حدنصاب ۸۵ از ۱۰۰.',
+      sections: [
+        { h: `${title} چیست و چرا اهمیت دارد؟`, p: [`در معماری شبکه‌های سازمانی سیسکو، ${title} یکی از ستون‌های اصلی پایداری، امنیت و مقیاس‌پذیری زیرساخت است. مهندس شبکه باید قبل از نوشتن دستور در CLI، بداند این فناوری دقیقاً کدام مسئله را در Control Plane یا Data Plane حل می‌کند.`] },
+        { h: 'چارچوب اجرایی ۴ مرحله‌ای در آکادمی', cards: [
+          { t: '۱. درک مفهومی', d: 'شناخت فلسفه طراحی، ساختار بسته‌ها و تعامل با سایر لایه‌ها.' },
+          { t: '۲. تسلط بر CLI', d: 'پیکربندی تمیز، خواندن خروجی showها و پرهیز از حفظ طوطی‌وار.' },
+          { t: '۳. تایید با Packet / Lab', d: 'مشاهده تغییر واقعی در توپولوژی و Wireshark.' },
+          { t: '۴. عیب‌یابی مهندسی', d: 'جداسازی ریشه خطا در شرایط خرابی ترکیبی.' }
+        ] }
+      ],
+      protocolAnalysis: ['پروتکل‌ها و وضعیت اینترفیس‌ها همواره باید با خروجی show و Packet Capture تایید شوند.'],
+      iosCommands: [
+        { cmd: 'show ip interface brief', out: 'Gi0/0  10.10.0.1  up  up', note: 'بررسی وضعیت لایه ۱ تا ۳ پیش از شروع پیکربندی' },
+        { cmd: 'show ip route', out: 'C 10.10.0.0/24 ... O 10.255.0.2/32', note: 'تایید جدول مسیریابی' }
+      ],
+      diagramSvg: 'topo',
+      lab: { title: `آزمایشگاه عملی: ${title}`, steps: ['۱. وضعیت شبکه پایه را با show ip interface brief و show ip route بررسی کنید.', '۲. یادداشت مهندسی و تحلیل سناریو را در بخش مستندسازی ثبت کنید.'], verifyCmds: ['show ip interface brief', 'show ip route'] },
+      troubleshooting: { fault: 'خرابی عمدی: ارتباط بین دو بخش پس از تغییر تنظیمات قطع شده است.', analysis: 'لایه ۱ تا ۳ را به ترتیب با show interfaces status، show vlan/trunk و show ip route بررسی کنید.', fix: 'اصلاح پارامتر ناهماهنگ و ذخیره با copy run start.' },
+      exercise: `سناریوی کاربردی ${title} را در یک سازمان با ۲ شعبه طراحی کرده و دستورات کلیدی آن را یادداشت کنید.`,
+      quiz: [{ q: `هدف اصلی از یادگیری ${title} در نظام آکادمی سیسکو چیست؟`, opts: ['فقط حفظ کردن تعاریف', 'درک مفهومی + پیکربندی + آزمایشگاه واقعی + عیب‌یابی (با حدنصاب ۸۵٪)', 'بدون نیاز به آزمایشگاه'], ans: 1, exp: 'طبق قانون آکادمی، هر مبحث باید به هر ۴ خروجی واقعی منجر شود.' }]
+    };
+  }
+
+  function renderLessonToc() {
+    const toc = $('#lessonToc');
+    if (!toc || !ACADEMY) return;
+    toc.textContent = '';
+    toc.appendChild(el('h3', '', 'سرفصل ترم اول (۳۰ روز) و نمونه‌ها'));
+
+    ACADEMY.termOneWeeks.forEach(wk => {
+      const box = el('div', 'toc-wk');
+      box.appendChild(el('b', '', wk.week));
+      wk.sessions.forEach(s => {
+        const isDone = state.completedLessons.includes(s.id);
+        const btn = el('button', 'toc-btn' + (state.activeLesson === s.id ? ' active' : '') + (isDone ? ' done' : ''));
+        btn.appendChild(el('span', '', s.title));
+        btn.appendChild(el('i', '', isDone ? '✓' : '←'));
+        btn.addEventListener('click', () => {
+          state.activeLesson = s.id;
+          persistState();
+          renderLessonToc();
+          renderLessonArticle(ACADEMY.lessons[s.id]);
+          updateHomeSummary();
+        });
+        box.appendChild(btn);
+      });
+      toc.appendChild(box);
+    });
+  }
+
+  function renderLessonArticle(lessonObj) {
+    const host = $('#lessonArticle');
+    if (!host || !lessonObj) return;
+    host.textContent = '';
+
+    const meta = el('div', 'article-meta');
+    meta.appendChild(el('span', 'fac-num', lessonObj.faculty));
+    if (state.completedLessons.includes(lessonObj.id)) {
+      meta.appendChild(el('span', 'fac-cert', '✓ تکمیل‌شده'));
+    }
+    host.appendChild(meta);
+
+    host.appendChild(el('h1', 'article-h1', lessonObj.title));
+    host.appendChild(el('div', 'article-lead', lessonObj.lead));
+
+    // ۱ و ۲: هدف درس و پیش‌نیاز
+    const b1 = el('div', 'step-block');
+    b1.appendChild(el('span', 'step-tag', 'بخش ۱ و ۲ · هدف درس و پیش‌نیاز'));
+    b1.appendChild(el('p', '', 'هدف درس: ' + lessonObj.goal));
+    b1.appendChild(el('p', '', 'پیش‌نیاز: ' + lessonObj.prereq));
+    host.appendChild(b1);
+
+    // ۳: آموزش مفهومی عمیق (سبک امن‌افزار رایکا)
+    const b3 = el('div', 'step-block');
+    b3.appendChild(el('span', 'step-tag', 'بخش ۳ · آموزش مفهومی (ساختار استاندارد)'));
+    lessonObj.sections.forEach(sec => {
+      b3.appendChild(el('h2', '', sec.h));
+      if (Array.isArray(sec.p)) {
+        sec.p.forEach(para => b3.appendChild(el('p', '', para)));
+      }
+      if (Array.isArray(sec.cards)) {
+        const g = el('div', 'cards-2');
+        sec.cards.forEach(c => {
+          const mc = el('div', 'mini-info');
+          mc.appendChild(el('b', '', c.t));
+          mc.appendChild(el('p', '', c.d));
+          g.appendChild(mc);
+        });
+        b3.appendChild(g);
+      }
+      if (Array.isArray(sec.steps)) {
+        const ul = el('ul', 'step-list');
+        sec.steps.forEach(st => ul.appendChild(el('li', '', st)));
+        b3.appendChild(ul);
+      }
+    });
+    host.appendChild(b3);
+
+    // ۴: تحلیل پروتکل
+    const b4 = el('div', 'step-block');
+    b4.appendChild(el('span', 'step-tag', 'بخش ۴ · تحلیل رفتار پروتکل و بسته'));
+    const ul4 = el('ul', 'step-list');
+    lessonObj.protocolAnalysis.forEach(item => ul4.appendChild(el('li', '', item)));
+    b4.appendChild(ul4);
+    host.appendChild(b4);
+
+    // ۵: دستورات Cisco IOS
+    const b5 = el('div', 'step-block');
+    b5.appendChild(el('span', 'step-tag', 'بخش ۵ · دستورات کلیدی Cisco IOS'));
+    lessonObj.iosCommands.forEach(c => {
+      const box = el('div', 'mini-info');
+      box.style.marginBottom = '10px';
+      box.appendChild(el('b', '', c.cmd));
+      const pre = el('pre', 'cli-out', c.out);
+      pre.style.margin = '6px 0';
+      box.appendChild(pre);
+      box.appendChild(el('p', '', c.note));
+      b5.appendChild(box);
+    });
+    host.appendChild(b5);
+
+    // ۶: دیاگرام
+    const b6 = el('div', 'step-block');
+    b6.appendChild(el('span', 'step-tag', 'بخش ۶ · دیاگرام معماری درس'));
+    const dbox = el('div', 'diagram-box');
+    dbox.appendChild(buildDiagramSvg(lessonObj.diagramSvg || 'topo'));
+    b6.appendChild(dbox);
+    host.appendChild(b6);
+
+    // ۷: Lab تعاملی داخل درس
+    const b7 = el('div', 'step-block');
+    b7.appendChild(el('span', 'step-tag', 'بخش ۷ · آزمایشگاه عملی (Lab)'));
+    b7.appendChild(el('h2', '', lessonObj.lab.title));
+    const ul7 = el('ul', 'step-list');
+    lessonObj.lab.steps.forEach(s => ul7.appendChild(el('li', '', s)));
+    b7.appendChild(ul7);
+
+    const qRow = el('div', 'cli-quick');
+    (lessonObj.lab.verifyCmds || ['show ip interface brief']).forEach(cmdStr => {
+      const qb = el('button', 'cli-qbtn', cmdStr);
+      qb.addEventListener('click', () => runIosCommand(cmdStr, cliOut, cliPrompt));
+      qRow.appendChild(qb);
+    });
+    b7.appendChild(qRow);
+
+    const cliWrap = el('div', 'cli-box');
+    const cliOut = el('div', 'cli-out', 'R1> (دستورات آزمایشگاه را اینجا وارد کنید یا از دکمه‌های بالا بزنید)');
+    const cliRow = el('div', 'cli-in-row');
+    const cliPrompt = el('span', '', 'R1>');
+    const cliIn = el('input');
+    cliIn.type = 'text';
+    cliIn.placeholder = 'enable  |  show ip interface brief  |  help';
+    const cliBtn = el('button', 'btn btn-primary', 'اجرا');
+    const exec = () => {
+      runIosCommand(cliIn.value, cliOut, cliPrompt);
+      cliIn.value = '';
+    };
+    cliBtn.addEventListener('click', exec);
+    cliIn.addEventListener('keydown', e => { if (e.key === 'Enter') exec(); });
+    cliRow.appendChild(cliPrompt);
+    cliRow.appendChild(cliIn);
+    cliRow.appendChild(cliBtn);
+    cliWrap.appendChild(cliOut);
+    cliWrap.appendChild(cliRow);
+    b7.appendChild(cliWrap);
+    host.appendChild(b7);
+
+    // ۸: عیب‌یابی (Troubleshooting)
+    const b8 = el('div', 'step-block');
+    b8.appendChild(el('span', 'step-tag', 'بخش ۸ · عیب‌یابی سناریوی خطا (Troubleshooting)'));
+    const tb = el('div', 'trouble-box');
+    tb.appendChild(el('p', '', lessonObj.troubleshooting.fault));
+    tb.appendChild(el('p', '', 'تحلیل ریشه‌ای: ' + lessonObj.troubleshooting.analysis));
+    tb.appendChild(el('p', '', 'راه‌حل اصلاحی: ' + lessonObj.troubleshooting.fix));
+    b8.appendChild(tb);
+    host.appendChild(b8);
+
+    // ۹: تمرین مستقل
+    const b9 = el('div', 'step-block');
+    b9.appendChild(el('span', 'step-tag', 'بخش ۹ · تمرین مستقل دانشجو'));
+    b9.appendChild(el('p', '', lessonObj.exercise));
+    host.appendChild(b9);
+
+    // ۱۰: آزمون درس (با ارزیابی و حدنصاب ۸۵٪)
+    const b10 = el('div', 'step-block');
+    b10.appendChild(el('span', 'step-tag', 'بخش ۱۰ · آزمون پایانی جلسه (حدنصاب قبولی ۸۵٪)'));
+    const qBox = el('div', 'quiz-box');
+    const selected = {};
+    const expNodes = [];
+    (lessonObj.quiz || []).forEach((q, qi) => {
+      const qc = el('div', 'q-card');
+      qc.appendChild(el('b', '', toFa(qi + 1) + '. ' + q.q));
+      const opts = el('div', 'q-opts');
+      q.opts.forEach((op, oi) => {
+        const lbl = el('label', 'q-opt');
+        const radio = el('input');
+        radio.type = 'radio';
+        radio.name = 'quiz_' + lessonObj.id + '_' + qi;
+        radio.addEventListener('change', () => { selected[qi] = oi; });
+        lbl.appendChild(radio);
+        lbl.appendChild(el('span', '', op));
+        opts.appendChild(lbl);
+      });
+      qc.appendChild(opts);
+      const exp = el('div', 'q-exp', '');
+      expNodes.push({ exp, q, qi });
+      qc.appendChild(exp);
+      qBox.appendChild(qc);
+    });
+    b10.appendChild(qBox);
+
+    const qRes = el('p', '', '');
+    qRes.style.marginTop = '12px';
+    const qSubmit = el('button', 'btn btn-primary', 'ثبت و نمره‌دهی آزمون جلسه');
+    qSubmit.style.marginTop = '12px';
+    qSubmit.addEventListener('click', () => {
+      const qs = lessonObj.quiz || [];
+      let correct = 0;
+      expNodes.forEach(({ exp, q, qi }) => {
+        const ok = selected[qi] === q.ans;
+        if (ok) correct++;
+        exp.textContent = (ok ? '✓ صحیح — ' : '✗ پاسخ صحیح: ' + q.opts[q.ans] + ' — ') + q.exp;
+        exp.style.color = ok ? '#34d399' : '#fbbf24';
+      });
+      const score = qs.length ? Math.round((correct / qs.length) * 100) : 100;
+      state.quizScores[lessonObj.id] = score;
+      if (score >= 85 && !state.completedLessons.includes(lessonObj.id)) {
+        state.completedLessons.push(lessonObj.id);
+      }
+      persistState();
+      renderLessonToc();
+      updateHomeSummary();
+      renderProgressView();
+      qRes.textContent = `نمره شما: ${toFa(score)} از ۱۰۰ ` + (score >= 85 ? '— قبولی و ثبت تکمیل جلسه ✓' : '— برای عبور حداقل ۸۵ از ۱۰۰ لازم است.');
+      qRes.style.color = score >= 85 ? '#34d399' : '#fbbf24';
+    });
+    b10.appendChild(qSubmit);
+    b10.appendChild(qRes);
+    host.appendChild(b10);
+
+    // ۱۱: مستندسازی (دفترچه یادداشت متصل به سرور)
+    const b11 = el('div', 'step-block');
+    b11.appendChild(el('span', 'step-tag', 'بخش ۱۱ · مستندسازی و دفترچه یادداشت'));
+    const ta = el('textarea', 'note-area');
+    ta.placeholder = 'خلاصه دستورات، یافته‌های Wireshark و نکات عیب‌یابی این جلسه را بنویسید...';
+    ta.value = state.notes[lessonObj.id] || '';
+    const saveNoteBtn = el('button', 'btn btn-ghost', 'ذخیره یادداشت در پروفایل');
+    saveNoteBtn.style.marginTop = '10px';
+    const noteMsg = el('span', '', '');
+    noteMsg.style.marginInlineStart = '12px';
+    noteMsg.style.color = '#34d399';
+    saveNoteBtn.addEventListener('click', () => {
+      state.notes[lessonObj.id] = ta.value;
+      persistState();
+      noteMsg.textContent = 'در سرور FAM ذخیره شد ✓';
+    });
+    b11.appendChild(ta);
+    b11.appendChild(saveNoteBtn);
+    b11.appendChild(noteMsg);
+    host.appendChild(b11);
+  }
+
+  /* ---------- رندر ۷ دانشکده و ۸ تخصص ---------- */
+  let activeFacultyId = 'f0';
+  function renderFacultiesView() {
+    const tabs = $('#facultyTabs');
+    const area = $('#facultyDetailArea');
+    if (!tabs || !area || !ACADEMY) return;
+
+    tabs.textContent = '';
+    ACADEMY.faculties.forEach(f => {
+      const b = el('button', 'tab-btn' + (f.id === activeFacultyId ? ' active' : ''), `دانشکده ${f.num}: ${f.title}`);
+      b.addEventListener('click', () => { activeFacultyId = f.id; renderFacultiesView(); });
+      tabs.appendChild(b);
+    });
+
+    const f = ACADEMY.faculties.find(x => x.id === activeFacultyId) || ACADEMY.faculties[0];
+    area.textContent = '';
+
+    const box = el('div', 'fac-detail-box');
+    const head = el('div', 'fac-top');
+    head.appendChild(el('span', 'fac-num', `دانشکده ${f.num} · ${f.duration}`));
+    head.appendChild(el('span', 'fac-cert', f.cert));
+    box.appendChild(head);
+    box.appendChild(el('h3', '', f.title));
+    box.appendChild(el('p', '', f.summary));
+
+    const secGrid = el('div', 'cards-2');
+    secGrid.style.marginTop = '16px';
+    f.sections.forEach((sec, si) => {
+      const mc = el('div', 'mini-info');
+      mc.appendChild(el('b', '', sec.title));
+      const ul = el('ul', 'step-list');
+      sec.items.forEach(it => ul.appendChild(el('li', '', it)));
+      mc.appendChild(ul);
+      const openBtn = el('button', 'btn btn-ghost', 'باز کردن در کلاس درس ←');
+      openBtn.style.marginTop = '10px';
+      openBtn.addEventListener('click', () => {
+        const auto = buildAutoLesson(f.id + '_' + si, sec.title, `دانشکده ${f.num} · ${f.title}`);
+        renderLessonArticle(auto);
+        gotoView('lesson');
+      });
+      mc.appendChild(openBtn);
+      secGrid.appendChild(mc);
+    });
+    box.appendChild(secGrid);
+
+    const labSec = el('div', 'fac-detail-box');
+    labSec.appendChild(el('h3', '', 'آزمایشگاه‌های شاخص این دانشکده'));
+    const lul = el('ul', 'step-list');
+    f.labs.forEach(lb => lul.appendChild(el('li', '', lb)));
+    labSec.appendChild(lul);
+
+    const proj = el('div', 'article-lead');
+    proj.style.marginTop = '14px';
+    proj.textContent = 'پروژه پایانی دانشکده: ' + f.project;
+    labSec.appendChild(proj);
+
+    area.appendChild(box);
+    area.appendChild(labSec);
+  }
+
+  /* ---------- رندر آزمایشگاه و ۳۷ لاب + ۱۱ ابزار ---------- */
+  let activeLabTab = 'ccna';
+  function renderLabView() {
+    if (!ACADEMY) return;
+    const quick = $('#labQuickBtns');
+    const out = $('#labCliOut');
+    const prompt = $('#labCliPrompt');
+    const inp = $('#labCliInput');
+    const runBtn = $('#labCliRun');
+
+    if (quick && out && inp && runBtn && !quick.dataset.bound) {
+      quick.dataset.bound = '1';
+      ['help', 'enable', 'show ip interface brief', 'show vlan brief', 'show interfaces trunk', 'show ip route', 'show ip ospf neighbor', 'show ip bgp summary', 'ping 10.10.0.2', 'clear'].forEach(c => {
+        const b = el('button', 'cli-qbtn', c);
+        b.addEventListener('click', () => runIosCommand(c, out, prompt));
+        quick.appendChild(b);
+      });
+      const go = () => { runIosCommand(inp.value, out, prompt); inp.value = ''; };
+      runBtn.addEventListener('click', go);
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    }
+
+    const listEl = $('#mandatoryLabsList');
+    if (listEl) {
+      listEl.textContent = '';
+      const src = activeLabTab === 'ccna' ? ACADEMY.faculties[1].labs : ACADEMY.faculties[2].labs;
+      src.forEach((name, idx) => {
+        const row = el('div', 'lab-item');
+        row.appendChild(el('span', 'lab-ic', '🧪'));
+        const span = el('span');
+        span.appendChild(el('b', '', name));
+        span.appendChild(el('small', '', activeLabTab === 'ccna' ? 'CCNA 200-301 · الزامی' : 'Advanced R&S · عملی'));
+        row.appendChild(span);
+        const btn = el('button', 'st st-run', 'اجرا در درس');
+        btn.style.cursor = 'pointer';
+        btn.addEventListener('click', () => {
+          renderLessonArticle(buildAutoLesson('lab_' + activeLabTab + '_' + idx, name, 'آزمایشگاه عملی آکادمی'));
+          gotoView('lesson');
+        });
+        row.appendChild(btn);
+        listEl.appendChild(row);
+      });
+    }
+
+    $$('[data-labtab]').forEach(tb => {
+      if (tb.dataset.bound) return;
+      tb.dataset.bound = '1';
+      tb.addEventListener('click', () => {
+        activeLabTab = tb.dataset.labtab;
+        $$('[data-labtab]').forEach(x => x.classList.toggle('active', x.dataset.labtab === activeLabTab));
+        renderLabView();
+      });
+    });
+
+    const toolsEl = $('#labToolsList');
+    if (toolsEl && !toolsEl.dataset.bound) {
+      toolsEl.dataset.bound = '1';
+      ACADEMY.meta.labTools.forEach(t => {
+        const item = el('div', 'fitem');
+        item.appendChild(el('span', 'fic', '⚙'));
+        const sp = el('span');
+        sp.appendChild(el('b', '', t.name));
+        sp.appendChild(el('small', '', t.use));
+        item.appendChild(sp);
+        toolsEl.appendChild(item);
+      });
+    }
+  }
+
+  /* ---------- رندر آزمون ورودی دانشکده ۰ ---------- */
+  function renderEntranceExam() {
+    const card = $('#entranceExamCard');
+    if (!card || !ACADEMY) return;
+    card.textContent = '';
+    card.appendChild(el('h3', '', 'آزمون ورودی ارزیابی مبانی (۱۰ سؤال نمونه از بانک ۵۰+۱۰ سؤالی)'));
+    const qBox = el('div', 'quiz-box');
+    const picks = {};
+    ACADEMY.entranceExam.forEach((q, i) => {
+      const qc = el('div', 'q-card');
+      qc.appendChild(el('b', '', `${toFa(i + 1)}. [${q.topic}] ${q.q}`));
+      const opts = el('div', 'q-opts');
+      q.opts.forEach((op, oi) => {
+        const lbl = el('label', 'q-opt');
+        const r = el('input');
+        r.type = 'radio';
+        r.name = 'ent_' + q.id;
+        r.addEventListener('change', () => { picks[i] = oi; });
+        lbl.appendChild(r);
+        lbl.appendChild(el('span', '', op));
+        opts.appendChild(lbl);
+      });
+      qc.appendChild(opts);
+      qBox.appendChild(qc);
+    });
+    card.appendChild(qBox);
+
+    const resBox = el('p', '', state.examScore !== null ? `آخرین نمره ثبت‌شده شما: ${toFa(state.examScore)} از ۱۰۰` : '');
+    resBox.style.marginTop = '12px';
+    const sub = el('button', 'btn btn-primary', 'محاسبه نمره و تعیین مسیر پیشنهادی');
+    sub.style.marginTop = '14px';
+    sub.addEventListener('click', () => {
+      let ok = 0;
+      ACADEMY.entranceExam.forEach((q, i) => { if (picks[i] === q.ans) ok++; });
+      const pct = Math.round((ok / ACADEMY.entranceExam.length) * 100);
+      state.examScore = pct;
+      persistState();
+      resBox.textContent = pct >= 85
+        ? `عالی! نمره ${toFa(pct)} از ۱۰۰ — آماده ورود مستقیم به دانشکده ۱ (CCNA 200-301) هستید.`
+        : `نمره ${toFa(pct)} از ۱۰۰ — پیشنهاد می‌شود ترم اول (هفته ۱ تا ۴ مبانی و Subnetting) را کامل بگذرانید تا به بالای ۸۵ برسید.`;
+      resBox.style.color = pct >= 85 ? '#34d399' : '#fbbf24';
+    });
+    card.appendChild(sub);
+    card.appendChild(resBox);
+  }
+
+  /* ---------- رندر پیشرفت، نقشه ۸ ساله و منابع رسمی ---------- */
+  function renderProgressView() {
+    if (!ACADEMY) return;
+    const yt = $('#yearsTimeline');
+    if (yt) {
+      yt.textContent = '';
+      ACADEMY.meta.yearsPlan.forEach(y => {
+        const it = el('div', 'fitem');
+        it.appendChild(el('span', 'fic', '📆'));
+        const sp = el('span');
+        sp.appendChild(el('b', '', y.year));
+        sp.appendChild(el('small', '', y.goal));
+        it.appendChild(sp);
+        yt.appendChild(it);
+      });
+    }
+
+    const res = $('#officialResources');
+    if (res) {
+      res.textContent = '';
+      ACADEMY.meta.resources.forEach(r => {
+        const it = el('div', 'fitem');
+        it.appendChild(el('span', 'fic', '🔗'));
+        const sp = el('span');
+        sp.appendChild(el('b', '', r.name));
+        sp.appendChild(el('small', '', r.desc));
+        it.appendChild(sp);
+        res.appendChild(it);
+      });
+    }
+
+    const certs = $('#progressCerts');
+    if (certs) {
+      certs.textContent = '';
+      const doneCount = state.completedLessons.length;
+      const items = [
+        ['تکمیل جلسات ترم ۱', `${toFa(doneCount)} جلسه قبول‌شده (≥۸۵٪)`, doneCount >= 1],
+        ['آزمون ورودی مبانی', state.examScore !== null ? `نمره: ${toFa(state.examScore)}٪` : 'در انتظار آزمون', (state.examScore || 0) >= 85],
+        ['CCNA 200-301', 'پس از ۲۵ آزمایشگاه و پروژه سه‌طبقه', false],
+        ['CCNP / CCIE / CCDE', 'مسیر بلندمدت ۶ تا ۸ ساله', false]
+      ];
+      items.forEach(([t, s, open]) => {
+        const c = el('div', 'cert' + (open ? '' : ' locked'));
+        c.appendChild(el('b', '', t));
+        c.appendChild(el('small', '', s));
+        certs.appendChild(c);
+      });
+    }
+  }
 
   /* ---------- جستجوی سریع (Ctrl+K) ---------- */
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-      const s = $('.search input');
-      if (s) { e.preventDefault(); s.focus(); }
+  const searchInp = $('#dashSearch');
+  if (searchInp) {
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInp.focus();
+      }
+    });
+    searchInp.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || !ACADEMY) return;
+      const q = searchInp.value.trim().toLowerCase();
+      if (!q) return;
+      const found = Object.values(ACADEMY.lessons).find(l => (l.title + ' ' + l.lead).toLowerCase().includes(q));
+      if (found) {
+        state.activeLesson = found.id;
+        renderLessonToc();
+        renderLessonArticle(found);
+        gotoView('lesson');
+      }
+    });
+  }
+
+  /* ---------- راه‌اندازی ---------- */
+  loadAcademyData().then(data => {
+    if (!data) return;
+    renderLandingFaculties();
+    renderHomeBlocks();
+    updateHomeSummary();
+    initDailyMissionsAndTimer();
+    renderLessonToc();
+    renderLessonArticle(ACADEMY.lessons[state.activeLesson] || ACADEMY.lessons.s01);
+    renderFacultiesView();
+    renderLabView();
+    renderEntranceExam();
+    renderProgressView();
+
+    const h = window.location.hash || '';
+    if (h.startsWith('#lesson-')) {
+      const id = h.replace('#lesson-', '');
+      if (ACADEMY.lessons[id]) {
+        state.activeLesson = id;
+        renderLessonToc();
+        renderLessonArticle(ACADEMY.lessons[id]);
+      }
+      gotoView('lesson');
+    } else if (h.startsWith('#faculty-')) {
+      const fid = h.replace('#faculty-', '');
+      if (ACADEMY.faculties.some(x => x.id === fid)) activeFacultyId = fid;
+      renderFacultiesView();
+      gotoView('courses');
+    } else if (h === '#exam') {
+      gotoView('exam');
+    } else if (h === '#courses') {
+      gotoView('courses');
     }
   });
 })();

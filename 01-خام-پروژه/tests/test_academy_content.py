@@ -1,9 +1,9 @@
-"""Integrity tests for the redesigned FAM Academy (academy-redesign-v1)."""
+"""Integrity tests for the FAM Cisco Academy comprehensive curriculum."""
 from __future__ import annotations
 
 from html.parser import HTMLParser
+import json
 from pathlib import Path
-import re
 import unittest
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -57,16 +57,28 @@ class AcademyRedesignTests(unittest.TestCase):
         dash = (PRIVATE_UI / "academy_dashboard.html").read_text(encoding="utf-8")
         self.assertIn('class="topo"', landing)
         self.assertIn('id="typeTarget"', landing)
-        self.assertIn('href="/academy/dashboard"', landing)
-        for panel in ("home", "courses", "lab", "progress"):
+        self.assertIn('href="/academy/dashboard', landing)
+        for panel in ("home", "lesson", "courses", "lab", "exam", "progress"):
             self.assertIn(f'data-panel="{panel}"', dash)
         self.assertIn('href="/academy"', dash)
 
-    def test_old_academy_artifacts_are_removed(self):
-        self.assertFalse((WEB_ROOT / "academy-content").exists())
-        self.assertFalse((ASSET_ROOT / "v5").exists())
-        self.assertFalse((ASSET_ROOT / "curriculum-catalog.json").exists())
-        self.assertEqual(sorted(p.name for p in ASSET_ROOT.iterdir()), ["app.js", "styles.css"])
+    def test_comprehensive_cisco_curriculum_data_integrity(self):
+        self.assertEqual(
+            sorted(p.name for p in ASSET_ROOT.iterdir()),
+            ["academy-data.json", "app.js", "styles.css"],
+        )
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        self.assertEqual([f["id"] for f in data["faculties"]], ["f0", "f1", "f2", "f3", "f4", "f5", "f6"])
+        self.assertEqual(len(data["faculties"][1]["labs"]), 25)
+        self.assertEqual(len(data["faculties"][2]["labs"]), 12)
+        self.assertEqual(len(data["meta"]["labTools"]), 11)
+        self.assertEqual(data["meta"]["passingScore"], 85)
+        self.assertEqual(data["meta"]["dailyMinutes"], 120)
+        for sid in ("s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12"):
+            self.assertIn(sid, data["lessons"])
+            lesson = data["lessons"][sid]
+            for key in ("goal", "prereq", "sections", "protocolAnalysis", "iosCommands", "lab", "troubleshooting", "exercise", "quiz"):
+                self.assertIn(key, lesson, f"{sid}.{key}")
 
 
 if __name__ == "__main__":
