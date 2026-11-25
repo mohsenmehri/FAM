@@ -289,6 +289,8 @@
         'GigabitEthernet0/3': { short: 'Gi0/3', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'access', accessVlan: 10, voiceVlan: null, nativeVlan: 1, allowedVlans: [10], nonegotiate: false, desc: 'FINANCE-PC' },
         'GigabitEthernet0/4': { short: 'Gi0/4', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'access', accessVlan: 10, voiceVlan: null, nativeVlan: 1, allowedVlans: [10], nonegotiate: false, desc: 'FINANCE-PC2' },
         'GigabitEthernet0/5': { short: 'Gi0/5', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'access', accessVlan: 20, voiceVlan: null, nativeVlan: 1, allowedVlans: [20], nonegotiate: false, desc: 'SERVER-1' },
+        'GigabitEthernet0/6': { short: 'Gi0/6', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'access', accessVlan: 1, voiceVlan: null, nativeVlan: 1, allowedVlans: [1], nonegotiate: false, desc: 'GUEST-PORT' },
+        'GigabitEthernet0/7': { short: 'Gi0/7', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'access', accessVlan: 1, voiceVlan: null, nativeVlan: 1, allowedVlans: [1], nonegotiate: false, desc: 'SPARE-PORT' },
         'Loopback0': { short: 'Lo0', ip: '10.255.0.1', adminUp: true, lineUp: true, mode: 'routed', accessVlan: 1, voiceVlan: null, nativeVlan: 1, allowedVlans: [1], nonegotiate: false, desc: 'MGMT' }
       }
     };
@@ -320,9 +322,18 @@
   function runIosCommand(rawCmd, outputEl, promptEl) {
     const cmd = String(rawCmd || '').trim();
     if (!cmd) return;
-    const low = cmd.toLowerCase().replace(/\s+/g, ' ');
+    let low = cmd.toLowerCase().replace(/\s+/g, ' ');
     const prefix = simPromptText() + ' ';
     let reply = '';
+    const inConfigMode = (sim.mode === 'config' || sim.mode === 'if' || sim.mode === 'vlan');
+    let isDoExec = false;
+
+    if (low.startsWith('do ') && inConfigMode) {
+      isDoExec = true;
+      low = low.slice(3).trim();
+    }
+
+    const isExecCheckCmd = low.startsWith('show ') || low.startsWith('sh ') || low.startsWith('ping ') || low.startsWith('traceroute ');
 
     if (low === 'clear') {
       outputEl.textContent = '';
@@ -333,15 +344,19 @@
       reply = 'وضعیت شبیه‌ساز به تنظیمات اولیهٔ آزمایشگاه بازنشانی شد.';
     } else if (low === 'help' || low === '?') {
       reply = [
-        'دستورات پشتیبانی‌شده در این شبیه‌ساز تمرینی:',
-        '  حالت‌ها: enable | configure terminal | interface Gi0/1..5 | exit | end | reset lab',
-        '  پیکربندی پورت: shutdown | no shutdown | switchport mode access|trunk',
-        '                 switchport access vlan <id> | switchport voice vlan <id> | switchport nonegotiate',
-        '                 switchport trunk native vlan <id> | switchport trunk allowed vlan [add] <id,id>',
-        '  ساخت VLAN: vlan <id>  ->  name <NAME>',
-        '  بررسی: show ip interface brief | show interfaces status | show vlan brief',
-        '         show interfaces trunk | show interfaces Gi0/3 switchport | show arp | ping <ip>'
+        '۱) دستورات زنده و وضعیت‌دار (تغییر شما فوراً روی خروجی اثر می‌گذارد):',
+        '  حالت‌ها: enable | configure terminal | interface Gi0/0..7 | exit | end | do <cmd> | reset lab',
+        '  تنظیم پورت: shutdown | no shutdown | switchport mode access|trunk',
+        '              switchport access vlan <id> | switchport voice vlan <id> | switchport nonegotiate',
+        '              switchport trunk native vlan <id> | switchport trunk allowed vlan [add] <id,id>',
+        '  ساخت VLAN: vlan <id> -> name <NAME>',
+        '  بررسی زنده: show ip interface brief | show interfaces status | show vlan brief',
+        '              show interfaces trunk | show interfaces Gi0/3 switchport | ping <ip> | traceroute <ip>',
+        '۲) خروجی‌های نمونهٔ ثابت (برای آشنایی با ظاهر جدول؛ با تغییرات شما عوض نمی‌شوند):',
+        '  show arp | show ip route | show running-config | show mac address-table | show spanning-tree | ...'
       ].join('\n');
+    } else if (inConfigMode && !isDoExec && isExecCheckCmd) {
+      reply = `% Invalid input detected in config mode.\n(راهنما: در Cisco IOS، در حالت تنظیمات برای اجرای show یا ping یا ابتدا با end به R1# برگردید یا قبل از دستور کلمهٔ do بنویسید؛ مثلاً: do ${cmd})`;
     } else if (low === 'enable' || low === 'en') {
       sim.mode = 'priv';
       state.cliMode = 'priv';
@@ -385,7 +400,7 @@
           sim.activeIf = resolved;
           reply = `وارد تنظیمات پورت ${resolved} شدید.`;
         } else {
-          reply = `% اینترفیس "${arg}" در این شبیه‌ساز وجود ندارد (نمونه: Gi0/0 تا Gi0/5).`;
+          reply = `% اینترفیس "${arg}" در این شبیه‌ساز وجود ندارد (پورت‌های موجود: Gi0/0 تا Gi0/7 و Loopback0).`;
         }
       }
     } else if (/^vlan \d+$/.test(low)) {
@@ -495,7 +510,7 @@
         reply = lines.join('\n');
       }
     } else if (/^show interfaces .+ switchport$/.test(low)) {
-      const ifPart = cmd.split(/\s+/)[2];
+      const ifPart = low.split(/\s+/)[2];
       const resolved = resolveIfName(ifPart);
       if (!resolved) {
         reply = `% اینترفیس ${ifPart} یافت نشد.`;
@@ -514,7 +529,7 @@
         ].join('\n');
       }
     } else if (low.startsWith('ping ')) {
-      const ip = cmd.split(/\s+/)[1] || '';
+      const ip = low.split(/\s+/)[1] || '';
       const g0 = sim.interfaces['GigabitEthernet0/0'];
       const g0Ok = g0 && g0.adminUp && g0.lineUp;
       const reachable = (ip === '10.10.0.1' && g0Ok) || (ip === '10.255.0.1') || (ip === '10.10.0.2' && g0Ok);
@@ -527,7 +542,7 @@
         reply = `Type escape sequence to abort.\nSending 5, 100-byte ICMP Echos to ${ip}, timeout is 2 seconds:\n.....\nSuccess rate is 0 percent (0/5)${reason}`;
       }
     } else if (low.startsWith('traceroute ')) {
-      const ip = cmd.split(/\s+/)[1] || '10.255.0.2';
+      const ip = low.split(/\s+/)[1] || '10.255.0.2';
       const g0 = sim.interfaces['GigabitEthernet0/0'];
       if (g0 && g0.adminUp && g0.lineUp && (ip === '10.10.0.2' || ip === '10.255.0.2')) {
         reply = `Tracing the route to ${ip}\n  1 10.10.0.2 2 msec 1 msec 2 msec\n  2 ${ip} 3 msec 2 msec *`;
@@ -535,7 +550,7 @@
         reply = `Tracing the route to ${ip}\n  1 * * *\n  2 * * * (مقصد در دسترس نیست یا پورت خروجی خاموش است)`;
       }
     } else if (ACADEMY && ACADEMY.cliResponses && ACADEMY.cliResponses[low]) {
-      reply = ACADEMY.cliResponses[low];
+      reply = ACADEMY.cliResponses[low] + '\n\n[یادداشت شبیه‌ساز: این خروجی یک نمونهٔ ثابت آموزشی است و به تغییرات فعلی شما واکنش نشان نمی‌دهد.]';
     } else {
       reply = `% دستور "${cmd}" در این شبیه‌ساز پشتیبانی نمی‌شود. برای دیدن دستورات پشتیبانی‌شده عبارت help را بزنید.`;
     }
@@ -1176,7 +1191,7 @@
     const b7 = el('div', 'step-block');
     b7.appendChild(el('span', 'step-tag', 'بخش ۷ · آزمایشگاه عملی (Lab)'));
     b7.appendChild(el('h2', '', lessonObj.lab.title));
-    const simNote = el('p', '', 'توضیح دربارهٔ محیط تمرین: این ترمینال یک شبیه‌ساز سبک تحت وب است که وضعیت پورت‌ها (shutdown / no shutdown)، ساخت و نام‌گذاری VLAN، تنظیمات Access/Trunk و پینگ آدرس‌های توپولوژی همین آزمایشگاه (10.10.0.1 / 10.10.0.2 / 10.255.0.1) را به صورت زنده تغییر می‌دهد و در خروجی showها نمایش می‌دهد. برای شبیه‌سازی کامل چندروتری یا پروتکل‌های پیچیده‌تر از Packet Tracer، Cisco CML یا EVE-NG استفاده کنید.');
+    const simNote = el('p', '', 'مرز شبیه‌ساز: در این ترمینال، دستورات پیکربندی پورت (Gi0/0..7، shutdown/no shutdown)، ساخت و نام‌گذاری VLAN، تنظیمات Access/Trunk، و دستورات show ip interface brief / show interfaces status / show vlan brief / show interfaces trunk / switchport / ping / traceroute به‌صورت زنده و وضعیت‌دار به تغییرات شما واکنش می‌دهند (در حالت تنظیمات از end یا پیشوند do استفاده کنید). سایر دستورات مانند show arp یا show ip route صرفاً خروجی نمونهٔ ثابت نمایش می‌دهند و با علامت [خروجی نمونهٔ ثابت] مشخص می‌شوند.');
     simNote.style.fontSize = '12.5px';
     simNote.style.color = '#93c5fd';
     b7.appendChild(simNote);
