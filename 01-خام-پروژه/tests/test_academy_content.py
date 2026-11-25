@@ -74,7 +74,10 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(len(data["meta"]["labTools"]), 11)
         self.assertEqual(data["meta"]["passingScore"], 85)
         self.assertEqual(data["meta"]["dailyMinutes"], 120)
-        for sid in ("s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12"):
+        self.assertEqual([g["facultyId"] for g in data["curriculumGroups"]], ["f0", "f1", "f2", "f3", "f4", "f5", "f6"])
+        all_grouped = [lid for g in data["curriculumGroups"] for lid in g["lessons"]]
+        self.assertGreaterEqual(len(all_grouped), 30)
+        for sid in all_grouped:
             self.assertIn(sid, data["lessons"])
             lesson = data["lessons"][sid]
             for key in ("goal", "prereq", "sections", "protocolAnalysis", "iosCommands", "lab", "troubleshooting", "exercise", "quiz"):

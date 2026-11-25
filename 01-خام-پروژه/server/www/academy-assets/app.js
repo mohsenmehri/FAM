@@ -527,31 +527,61 @@
     };
   }
 
+  let activeLessonFaculty = 'all';
+
   function renderLessonToc() {
     const toc = $('#lessonToc');
+    const filterBar = $('#lessonFacultyFilter');
     if (!toc || !ACADEMY) return;
-    toc.textContent = '';
-    toc.appendChild(el('h3', '', 'سرفصل ترم اول (۳۰ روز) و نمونه‌ها'));
 
-    ACADEMY.termOneWeeks.forEach(wk => {
-      const box = el('div', 'toc-wk');
-      box.appendChild(el('b', '', wk.week));
-      wk.sessions.forEach(s => {
-        const isDone = state.completedLessons.includes(s.id);
-        const btn = el('button', 'toc-btn' + (state.activeLesson === s.id ? ' active' : '') + (isDone ? ' done' : ''));
-        btn.appendChild(el('span', '', s.title));
-        btn.appendChild(el('i', '', isDone ? '✓' : '←'));
-        btn.addEventListener('click', () => {
-          state.activeLesson = s.id;
-          persistState();
-          renderLessonToc();
-          renderLessonArticle(ACADEMY.lessons[s.id]);
-          updateHomeSummary();
-        });
-        box.appendChild(btn);
+    const pill = $('#pillLessons');
+    const totalCount = Object.keys(ACADEMY.lessons).length;
+    if (pill) pill.textContent = toFa(totalCount);
+
+    const groups = ACADEMY.curriculumGroups || [
+      { facultyId: 'f0', title: 'ترم اول', lessons: Object.keys(ACADEMY.lessons) }
+    ];
+
+    if (filterBar) {
+      filterBar.textContent = '';
+      const allBtn = el('button', 'tab-btn' + (activeLessonFaculty === 'all' ? ' active' : ''), `همه دانشکده‌ها (${toFa(totalCount)})`);
+      allBtn.addEventListener('click', () => { activeLessonFaculty = 'all'; renderLessonToc(); });
+      filterBar.appendChild(allBtn);
+
+      groups.forEach(g => {
+        const label = g.title.split('·')[0].trim() + ` (${toFa(g.lessons.length)})`;
+        const b = el('button', 'tab-btn' + (activeLessonFaculty === g.facultyId ? ' active' : ''), label);
+        b.addEventListener('click', () => { activeLessonFaculty = g.facultyId; renderLessonToc(); });
+        filterBar.appendChild(b);
       });
-      toc.appendChild(box);
-    });
+    }
+
+    toc.textContent = '';
+    toc.appendChild(el('h3', '', `فهرست دروس ۷ دانشکده (${toFa(totalCount)} درس کامل)`));
+
+    groups
+      .filter(g => activeLessonFaculty === 'all' || g.facultyId === activeLessonFaculty)
+      .forEach(g => {
+        const box = el('div', 'toc-wk');
+        box.appendChild(el('b', '', g.title));
+        g.lessons.forEach(lid => {
+          const lessonObj = ACADEMY.lessons[lid];
+          if (!lessonObj) return;
+          const isDone = state.completedLessons.includes(lid);
+          const btn = el('button', 'toc-btn' + (state.activeLesson === lid ? ' active' : '') + (isDone ? ' done' : ''));
+          btn.appendChild(el('span', '', lessonObj.title));
+          btn.appendChild(el('i', '', isDone ? '✓' : '←'));
+          btn.addEventListener('click', () => {
+            state.activeLesson = lid;
+            persistState();
+            renderLessonToc();
+            renderLessonArticle(lessonObj);
+            updateHomeSummary();
+          });
+          box.appendChild(btn);
+        });
+        toc.appendChild(box);
+      });
   }
 
   function renderLessonArticle(lessonObj) {
@@ -790,6 +820,48 @@
     box.appendChild(head);
     box.appendChild(el('h3', '', f.title));
     box.appendChild(el('p', '', f.summary));
+
+    const grp = (ACADEMY.curriculumGroups || []).find(g => g.facultyId === f.id);
+    if (grp && grp.lessons.length) {
+      const lBox = el('div', 'fac-detail-box');
+      lBox.style.marginTop = '14px';
+      const lHead = el('div', 'fac-top');
+      lHead.appendChild(el('b', '', `دروس کامل این دانشکده (${toFa(grp.lessons.length)} درس ۱۱ بخشی)`));
+      const allInCls = el('button', 'btn btn-primary', 'مشاهده همه در کلاس درس ←');
+      allInCls.addEventListener('click', () => {
+        activeLessonFaculty = f.id;
+        state.activeLesson = grp.lessons[0];
+        renderLessonToc();
+        renderLessonArticle(ACADEMY.lessons[grp.lessons[0]]);
+        gotoView('lesson');
+      });
+      lHead.appendChild(allInCls);
+      lBox.appendChild(lHead);
+
+      const lGrid = el('div', 'cards-2');
+      lGrid.style.marginTop = '12px';
+      grp.lessons.forEach(lid => {
+        const lObj = ACADEMY.lessons[lid];
+        if (!lObj) return;
+        const lc = el('div', 'mini-info');
+        lc.appendChild(el('b', '', lObj.title));
+        lc.appendChild(el('p', '', lObj.goal));
+        const goBtn = el('button', 'btn btn-ghost', 'ورود به این درس ←');
+        goBtn.style.marginTop = '8px';
+        goBtn.addEventListener('click', () => {
+          activeLessonFaculty = f.id;
+          state.activeLesson = lid;
+          persistState();
+          renderLessonToc();
+          renderLessonArticle(lObj);
+          gotoView('lesson');
+        });
+        lc.appendChild(goBtn);
+        lGrid.appendChild(lc);
+      });
+      lBox.appendChild(lGrid);
+      box.appendChild(lBox);
+    }
 
     const secGrid = el('div', 'cards-2');
     secGrid.style.marginTop = '16px';
