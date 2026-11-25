@@ -141,7 +141,7 @@ class AcademyRedesignTests(unittest.TestCase):
                 ans_dist[q["ans"]] += 1
         self.assertTrue(all(6 <= v <= 10 for v in ans_dist.values()), ans_dist)
 
-        # 2b. Checks for f4 Batch 1 (first 5 lessons in f4)
+        # 2b. Checks for f4 Batch 1 (first 5 lessons in f4) + Round-6 regressions
         f4_b1 = data["curriculumGroups"][4]["lessons"][:5]
         self.assertEqual(f4_b1, ["spec_ent", "spec_ent_campus", "spec_ent_sd", "spec_sec", "spec_sec_vpn"])
         for lid in f4_b1:
@@ -153,7 +153,35 @@ class AcademyRedesignTests(unittest.TestCase):
             for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "۹۰٪", "۱۰۰٪", "جادویی"):
                 self.assertNotIn(bad, s, f"{lid} contains {bad}")
 
-        # 3. Simulator persistence of switchport nonegotiate across repeated mode access
+        # Round-6 regression assertions
+        ent_step = data["lessons"]["spec_ent"]["sections"][1]["steps"][0]
+        self.assertIn("49.0001.0102.5500.0001.00", ent_step)
+        self.assertIn("49.0001.0102.5500.0002.00", ent_step)
+
+        sd_ctrl = data["lessons"]["spec_ent_sd"]["iosCommands"][1]
+        self.assertNotIn("vbond", sd_ctrl["out"])
+        self.assertIn("vBond", sd_ctrl["note"])
+        self.assertNotIn("سوختن یکی از روترها، مدار متصل به آن همچنان", data["lessons"]["spec_ent_sd"]["exercise"])
+
+        ensdwi_cmds = [c["cmd"] for c in data["lessons"]["ccnp_ensdwi"]["iosCommands"]]
+        self.assertIn("show sdwan app-route stats", ensdwi_cmds)
+        self.assertIn("show sdwan app-route stats", data["lessons"]["ccnp_ensdwi"]["lab"]["steps"][4])
+
+        sec_lesson = data["lessons"]["spec_sec"]
+        self.assertIn("`mab`", sec_lesson["lab"]["steps"][4])
+        self.assertIn("Low-Impact", sec_lesson["protocolAnalysis"][0])
+        self.assertIn("Spoofing", sec_lesson["sections"][2]["steps"][0])
+
+        vpn_lesson = data["lessons"]["spec_sec_vpn"]
+        self.assertIn("IP Multicast", vpn_lesson["protocolAnalysis"][1])
+        self.assertIn("۴ بایت", vpn_lesson["exercises"][2]["solution"])
+        self.assertIn("24", vpn_lesson["exercises"][2]["solution"])
+
+        camp_lesson = data["lessons"]["spec_ent_campus"]
+        self.assertNotIn("همیشه باید حداقل دو لینک", camp_lesson["sections"][1]["think"]["a"])
+        self.assertNotIn("BFD", camp_lesson["sections"][1]["steps"][1])
+
+        # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
         self.assertIsNotNone(m_mode)
         self.assertNotIn("nonegotiate = false", m_mode.group(0))
@@ -166,11 +194,23 @@ class AcademyRedesignTests(unittest.TestCase):
                 self.fail(msg)
             self.skipTest(msg)
 
+        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1 lesson
+        extracted_labs = {}
+        for lid in f4_b1:
+            step_txt = data["lessons"][lid]["lab"]["steps"][2]
+            start_idx = step_txt.index("`configure terminal`")
+            cmds = re.findall(r"`([^`]+)`", step_txt[start_idx:])
+            self.assertGreaterEqual(len(cmds), 8, lid)
+            self.assertEqual(cmds[0], "configure terminal", lid)
+            self.assertEqual(cmds[-1], "end", lid)
+            extracted_labs[lid] = cmds
+
         js_script = f"""
 const fs = require('fs');
 const vm = require('vm');
 const ACADEMY = JSON.parse(fs.readFileSync({json.dumps(str(ASSET_ROOT / 'academy-data.json'))}, 'utf8'));
 const appCode = fs.readFileSync({json.dumps(str(ASSET_ROOT / 'app.js'))}, 'utf8');
+const extractedLabs = {json.dumps(extracted_labs)};
 const s = appCode.indexOf('function createInitialSim()');
 const e = appCode.indexOf('/* ---------- رندر صفحه عمومی (/academy) ---------- */');
 const simCode = appCode.slice(s, e);
@@ -191,21 +231,49 @@ if (r.sim.interfaces['GigabitEthernet0/2'].nonegotiate !== false) throw new Erro
 const neg = run(['enable','configure terminal','interface Gi0/0','switchport nonegotiate','no switchport nonegotiate']);
 if (!neg.out[3].includes('Command rejected') || !neg.out[4].includes('Command rejected')) throw new Error('routed interface accepted nonegotiate');
 
-const f4Labs = {{
-  spec_ent: ['enable','configure terminal','interface Gi0/0','description ISIS-UNDERLAY-L2','interface Loopback0','description NET-49.0001.0102.5500.0001.00','vlan 210','name VN_CORP_HANDOFF','vlan 220','name VN_GUEST_HANDOFF','exit','interface Gi0/6','switchport mode access','switchport access vlan 210','interface Gi0/7','switchport mode access','switchport access vlan 220','interface Gi0/1','switchport trunk allowed vlan add 210,220','end','show running-config','show vlan brief','show interfaces trunk'],
-  spec_ent_campus: ['enable','configure terminal','vlan 150','name CORE_MGMT_OOB','exit','interface Gi0/1','description MEC-TO-CORE-SVL','switchport nonegotiate','switchport trunk allowed vlan add 150','interface Gi0/6','description DAD-MGMT-MONITOR','switchport mode access','switchport access vlan 150','interface Gi0/7','description ACCESS-USER-PORT','switchport mode access','switchport access vlan 10','end','show interfaces trunk','show interfaces Gi0/1 switchport','show running-config'],
-  spec_ent_sd: ['enable','configure terminal','interface Gi0/0','description WAN-EDGE-VPN0-PRIMARY','interface Gi0/1','description LAN-DIST-TRUNK','switchport nonegotiate','vlan 10','name BRANCH_DATA_VPN10','vlan 20','name BRANCH_VOICE_VPN20','vlan 99','name UNUSED_PARK','exit','interface Gi0/6','description VOICE-USER-PORT','switchport mode access','switchport access vlan 20','switchport voice vlan 20','interface Gi0/7','description UNUSED-SHUT','switchport mode access','switchport access vlan 99','shutdown','end','show running-config','show vlan brief','show interfaces status'],
-  spec_sec: ['enable','configure terminal','vlan 30','name TRUST_USERS','vlan 40','name QUARANTINE_ISOLATED','vlan 999','name PARK_SHUT','exit','interface Gi0/6','description DOT1X-USER-PORT','switchport mode access','switchport access vlan 30','switchport nonegotiate','interface Gi0/2','description QUARANTINE-PORT','switchport mode access','switchport access vlan 40','no shutdown','interface Gi0/7','description UNUSED-PORT','switchport mode access','switchport access vlan 999','shutdown','end','show vlan brief','show interfaces Gi0/6 switchport','show interfaces status','show running-config'],
-  spec_sec_vpn: ['enable','configure terminal','interface Gi0/0','description IPSEC-WAN-SOURCE','interface Loopback0','description VTI-ROUTER-ID','vlan 35','name CORP_ENCRYPT_LAN','exit','interface Gi0/7','description VPN-LAN-HOST','switchport mode access','switchport access vlan 35','no shutdown','interface Gi0/1','switchport trunk allowed vlan add 35','end','show running-config','show vlan brief','show interfaces trunk']
-}};
-for (const [id, cmds] of Object.entries(f4Labs)) {{
+function assertRunLab(id, verifyFn) {{
+  const cmds = ['enable'].concat(extractedLabs[id]).concat(['show running-config']).concat(extractedLabs[id]).concat(['show running-config']);
   const res = run(cmds);
   for (let i = 0; i < res.out.length; i++) {{
     if (res.out[i].includes('% Invalid') || res.out[i].includes('Command rejected')) {{
       throw new Error(id + ' failed on ' + cmds[i] + ': ' + res.out[i]);
     }}
   }}
+  const firstRunIdx = 1 + extractedLabs[id].length;
+  const secondRunIdx = res.out.length - 1;
+  if (res.out[firstRunIdx] !== res.out[secondRunIdx]) {{
+    throw new Error(id + ' was not idempotent on repeated lab execution');
+  }}
+  verifyFn(res.sim, res.out[secondRunIdx]);
 }}
+
+assertRunLab('spec_ent', (sim) => {{
+  if (!sim.vlans[210] || !sim.vlans[220]) throw new Error('spec_ent missing VLAN 210/220');
+  if (sim.interfaces['GigabitEthernet0/6'].accessVlan !== 210) throw new Error('spec_ent Gi0/6 vlan');
+  if (sim.interfaces['GigabitEthernet0/7'].accessVlan !== 220) throw new Error('spec_ent Gi0/7 vlan');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(210) || !allowed.includes(220)) throw new Error('spec_ent trunk missing 210/220');
+}});
+assertRunLab('spec_ent_campus', (sim) => {{
+  if (!sim.interfaces['GigabitEthernet0/1'].nonegotiate) throw new Error('spec_ent_campus nonegotiate');
+  if (!sim.interfaces['GigabitEthernet0/1'].allowedVlans.includes(150)) throw new Error('spec_ent_campus trunk 150');
+  if (sim.interfaces['GigabitEthernet0/6'].accessVlan !== 150) throw new Error('spec_ent_campus Gi0/6');
+  if (sim.interfaces['GigabitEthernet0/7'].accessVlan !== 10) throw new Error('spec_ent_campus Gi0/7');
+}});
+assertRunLab('spec_ent_sd', (sim) => {{
+  if (!sim.interfaces['GigabitEthernet0/1'].nonegotiate) throw new Error('spec_ent_sd Gi0/1 nonegotiate');
+  if (sim.interfaces['GigabitEthernet0/6'].voiceVlan !== 20) throw new Error('spec_ent_sd Gi0/6 voice vlan');
+  if (sim.interfaces['GigabitEthernet0/7'].adminUp !== false || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 99) throw new Error('spec_ent_sd Gi0/7 shut/99');
+}});
+assertRunLab('spec_sec', (sim) => {{
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 30) throw new Error('spec_sec Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/2'].adminUp || sim.interfaces['GigabitEthernet0/2'].accessVlan !== 40) throw new Error('spec_sec Gi0/2');
+  if (sim.interfaces['GigabitEthernet0/7'].adminUp !== false || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 999) throw new Error('spec_sec Gi0/7');
+}});
+assertRunLab('spec_sec_vpn', (sim) => {{
+  if (!sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 35) throw new Error('spec_sec_vpn Gi0/7');
+  if (!sim.interfaces['GigabitEthernet0/1'].allowedVlans.includes(35)) throw new Error('spec_sec_vpn Gi0/1 allowed 35');
+}});
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
         self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
