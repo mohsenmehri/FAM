@@ -28,15 +28,22 @@ python3 -m http.server 8080
 
 مسیر کامل از **ارزیابی و مبانی (f0)** تا **CCDE (f6)** طبق طرح جامع آکادمی:
 
-| دانشکده | عنوان | درس |
-|---|---|---|
-| f0 | ارزیابی و مبانی | ۴ |
-| f1 | CCNA 200-301 | ۸ |
-| f2 | مسیریابی/سوئیچینگ پیشرفته | ۶ |
-| f3 | Enterprise (ENCOR) | ۶ |
-| f4 | تخصص‌ها (DC/SP/Wireless) | ۶ |
-| f5 | CCIE | ۵ |
-| f6 | CCDE | ۳ |
+**Cisco Master Roadmap (نقشهٔ نهایی، ۸ مرحله):**
+Networking Fundamentals → Cisco Entry/CCST → CCNA → CCNP Specialization → Advanced Technologies → CCIE → CCDE → Principal Network Architect
+
+| # | دانشکده | عنوان | درس |
+|---|---|---|---|
+| ۰ | f0 | ارزیابی و مبانی | ۴ |
+| ۱ | fnd | Network Engineering Foundations | ۴ |
+| ۲ | ccst | Cisco Entry / CCST | ۳ |
+| ۳ | f1 | CCNA 200-301 | ۸ |
+| ۴ | f2 | مسیریابی/سوئیچینگ پیشرفته | ۶ |
+| ۵ | f3 | Enterprise (ENCOR) | ۶ |
+| ۶ | f4 | هشت مسیر تخصصی (Enterprise·Security·DC·SP·Wireless·Collaboration·Automation·Cyber) | ۱۱ |
+| ۷ | f5 | CCIE | ۵ |
+| ۸ | f6 | CCDE + Principal Network Architect | ۴ |
+
+جمع: **۵۱ درس · ۱۶۴ سؤال · ۱۴۰ آزمایشگاه**
 
 هر درس: هدف ← پیش‌نیاز ← مفهوم ← پروتکل ← دستورات ← نمودار ← آزمایشگاه ← عیب‌یابی ← تمرین ← آزمون ← یادداشت (+سوالات متداول).
 

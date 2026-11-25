@@ -150,14 +150,17 @@
   let lessonQuizBlocks = null;
 
   /* ---------- tree ---------- */
+  const FA_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  const faNum = (n) => String(n).split('').map((d) => FA_DIGITS[+d] || d).join('');
+
   function renderTree() {
     const p = load();
     const tree = $('#tree');
-    tree.innerHTML = C.faculties.map((f) => {
+    tree.innerHTML = C.faculties.map((f, fi) => {
       const open = flat.some((x) => x.f.id === f.id && x.l.id === currentId) || f.id === 'f0';
       return '<div class="fac' + (open ? ' open' : '') + '" data-f="' + f.id + '">' +
         '<button class="fac-head" type="button">' +
-        '<span class="num">' + f.num + '</span>' +
+        '<span class="num">' + faNum(fi) + '</span>' +
         '<span class="ft">' + f.title + '<span class="fd">' + f.duration + ' · ' + f.tag + '</span></span>' +
         '<span class="chev">◀</span></button>' +
         '<div class="lessons">' + f.lessons.map((l) => {
@@ -189,18 +192,33 @@
 
   function renderHome() {
     currentId = null;
+    const stages = (C.meta.master || []).map((m) =>
+      '<button class="mr-stage" data-to="' + m.to + '" type="button">' +
+      '<span class="mr-n">' + m.n + '</span>' +
+      '<b>' + m.en + '</b><i>' + m.fa + '</i>' +
+      '<p>' + m.desc + '</p>' +
+      '<span class="mr-go">شروع مرحله ←</span>' +
+      '</button>').join('');
     $('#view').innerHTML =
       '<div class="home">' +
-      '<div class="hero"><span class="chip">🎓 مسیر کامل از CCNA تا CCDE</span>' +
-      '<h1>کلاس‌های آکادمی FAM</h1>' +
-      '<p>هر درس یازده بخش استاندارد دارد: هدف، پیش‌نیاز، مفهوم، پروتکل، دستورات، نمودار، آزمایشگاه واقعی، عیب‌یابی، تمرین، آزمون و یادداشت. ' +
-      'مانند روز اولِ CCNA تا سطح طراحی CCDE — فارسی روان با اصطلاحات انگلیسی، و اثبات رفتار پروتکل با CLI یا Packet Capture.</p></div>' +
-      '<div class="cards">' + C.faculties.map((f) =>
+      '<div class="hero"><span class="chip">🎓 Cisco Master Roadmap — نقشهٔ نهایی</span>' +
+      '<h1>از صفر تا متخصص ارشد شبکه</h1>' +
+      '<p>هشت مرحلهٔ نهایی، روزانه ۲ ساعت، فارسی با اصطلاحات انگلیسی — از مبانی شبکه تا جایگاه ' +
+      '<b>Principal Network Architect</b>. هر درس یازده بخش استاندارد دارد: هدف، پیش‌نیاز، مفهوم، پروتکل، ' +
+      'دستورات، نمودار، آزمایشگاه واقعی، عیب‌یابی، تمرین، آزمون و یادداشت؛ و اثبات رفتار پروتکل با CLI یا Packet Capture.</p></div>' +
+      '<div class="mr"><div class="mr-head"><h2>🗺️ Cisco Master Roadmap</h2>' +
+      '<span>۸ مرحله · صفر تا متخصص ارشد</span></div>' +
+      '<div class="mr-stages">' + stages + '</div></div>' +
+      '<div class="mr-head" style="margin-top:6px"><h2>📚 دانشکده‌ها و درس‌ها</h2>' +
+      '<span>' + flat.length + ' درس در ۹ دانشکده</span></div>' +
+      '<div class="cards">' + C.faculties.map((f, fi) =>
         '<button class="card" data-f="' + f.id + '" type="button">' +
-        '<span class="n">دانشکدهٔ ' + f.num + ' · ' + f.tag + '</span>' +
+        '<span class="n">دانشکدهٔ ' + faNum(fi) + ' · ' + f.tag + '</span>' +
         '<b>' + f.title + '</b><span>' + f.intro.slice(0, 90) + '…</span>' +
         '<span class="meta"><span>📚 ' + f.lessons.length + ' درس</span><span>⏱ ' + f.duration + '</span></span>' +
         '</button>').join('') + '</div></div>';
+    $$('.mr-stage').forEach((b) =>
+      b.addEventListener('click', () => (location.hash = '#/l/' + b.dataset.to)));
     $$('.card', $('#view')).forEach((c) =>
       c.addEventListener('click', () => {
         const f = C.faculties.find((x) => x.id === c.dataset.f);
@@ -234,7 +252,7 @@
     const prev = flat[idx - 1], next = flat[idx + 1];
     $('#view').innerHTML =
       '<div class="l-head">' +
-      '<span class="chip">🎓 دانشکدهٔ ' + f.num + ' — ' + f.tag + '</span>' +
+      '<span class="chip">🎓 دانشکدهٔ ' + faNum(C.faculties.indexOf(f)) + ' — ' + f.tag + '</span>' +
       '<h1>' + l.title + '</h1>' +
       '<div class="sub"><span>📁 ' + f.title + '</span><span>⏱ ' + (l.minutes || '') + '</span>' +
       '<span>🔖 ' + (l.sub || '') + '</span></div>' +
