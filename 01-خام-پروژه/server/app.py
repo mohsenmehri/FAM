@@ -794,33 +794,13 @@ def create_app(config=None):
     def academy_assets(filename):
         # Client assets stay behind the same FAM session as /academy; login.html
         # only loads /login.css and /login.js.
-        if Path(filename).suffix.lower() not in {'.css', '.js', '.json', '.jpg', '.jpeg', '.png', '.webp'}:
+        if Path(filename).suffix.lower() not in {'.css', '.js', '.json', '.jpg', '.jpeg', '.png', '.webp', '.svg'}:
             fail(404, 'فایل مورد نظر یافت نشد.')
         with connect() as db:
             user_and_session(db)
         return send_from_directory(ROOT/'www'/'academy-assets', filename, max_age=0)
 
-    @app.get('/academy-content/<path:filename>')
-    def academy_content(filename):
-        # Course documents and diagrams stay behind the same FAM session as /academy.
-        if filename != 'catalog.json' and not (
-                re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*\.md', filename) or
-                re.fullmatch(r'images/[a-z0-9]+(?:-[a-z0-9]+)*\.svg', filename)):
-            fail(404, 'فایل مورد نظر یافت نشد.')
-        with connect() as db:
-            user_and_session(db)
-        response = send_from_directory(ROOT/'www'/'academy-content', filename, max_age=0)
-        if filename.endswith('.md'):
-            response.headers['Content-Type'] = 'text/markdown; charset=utf-8'
-        elif filename.endswith('.svg'):
-            response.headers['Content-Security-Policy'] = (
-                "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; "
-                "script-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
-            response.headers['Content-Disposition'] = 'inline'
-        return response
-
-    @app.get('/academy')
-    def academy():
+    def render_academy_page(template_name):
         # Serve Academy only after authenticating the same FAM session used by
         # the main app. Progress is looked up by the server-derived user id.
         with connect() as db:
@@ -848,11 +828,27 @@ def create_app(config=None):
         }
         encoded = json.dumps(bootstrap, ensure_ascii=True, separators=(',', ':'))
         encoded = encoded.replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
-        page = (ROOT/'private_ui'/'academy.html').read_text(encoding='utf-8')
+        page = (ROOT/'private_ui'/template_name).read_text(encoding='utf-8')
         marker = '__FAM_ACADEMY_BOOTSTRAP__'
         if page.count(marker) != 1:
             raise RuntimeError('FAM Academy bootstrap marker missing or duplicated.')
         return private_html_response(page.replace(marker, encoded))
+
+    @app.get('/academy')
+    def academy():
+        return render_academy_page('academy.html')
+
+    @app.get('/academy/dashboard')
+    def academy_dashboard():
+        return render_academy_page('academy_dashboard.html')
+
+    @app.get('/academy/index.html')
+    def academy_index_redirect():
+        return redirect('/academy', code=302)
+
+    @app.get('/academy/dashboard.html')
+    def academy_dashboard_redirect():
+        return redirect('/academy/dashboard', code=302)
 
     @app.get('/api/real/status')
     def real_device_status():
@@ -897,142 +893,6 @@ def create_app(config=None):
                           ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at''',
                        (user['id'],payload,int(time.time()*1000)))
         return jsonify(ok=True)
-
-    @app.post('/api/academy/quiz/evaluate')
-    def evaluate_academy_quiz():
-        body=data()
-        if not isinstance(body,dict):fail(400,'بدنهٔ درخواست آزمون معتبر نیست.')
-        lesson_id=body.get('lessonId')
-        answers=body.get('answers')
-        if not isinstance(lesson_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,120}',lesson_id):
-            fail(400,'شناسهٔ درس معتبر نیست.')
-        if not isinstance(answers,list) or len(answers)>100:
-            fail(400,'فهرست پاسخ‌های آزمون معتبر نیست.')
-        with connect() as db:
-            user_and_session(db)
-        blueprints_dir=(ROOT/'www'/'academy-assets'/'v5'/'blueprints').resolve()
-        candidate=(blueprints_dir/f'{lesson_id}.json').resolve()
-        bp_path=candidate if candidate.parent==blueprints_dir and candidate.is_file() else None
-        if bp_path is None:
-            for item in sorted(blueprints_dir.glob('*.json')):
-                try:
-                    loaded=json.loads(item.read_text(encoding='utf-8'))
-                except Exception:
-                    continue
-                if loaded.get('lessonId')==lesson_id or loaded.get('id')==lesson_id:
-                    bp_path=item
-                    break
-        if bp_path is None:
-            fail(404,'آزمون این درس در سرور یافت نشد.')
-        bp=json.loads(bp_path.read_text(encoding='utf-8'))
-        questions=bp.get('interactiveQuiz')
-        if not isinstance(questions,list) or not questions:
-            questions=((bp.get('stages') or {}).get('quiz') or {}).get('questions') or []
-        if not isinstance(questions,list) or not questions:
-            fail(404,'برای این درس سؤال فعالی ثبت نشده است.')
-        if len(answers)!=len(questions):
-            fail(400,'تعداد پاسخ‌ها با تعداد سؤال‌های درس برابر نیست.')
-        correct=0;incorrect=0;unanswered=0;items=[]
-        for idx,(q,ans) in enumerate(zip(questions,answers)):
-            options=q.get('options') if isinstance(q,dict) and isinstance(q.get('options'),list) else []
-            right_idx=q.get('correctIndex') if isinstance(q,dict) and 'correctIndex' in q else (q.get('answer') if isinstance(q,dict) else None)
-            if type(right_idx) is not int:right_idx=-1
-            if ans is None:
-                unanswered+=1
-                items.append({
-                    'index':idx,'answered':False,'selectedIndex':None,'correctIndex':right_idx,
-                    'correct':False,'correctOption':options[right_idx] if 0<=right_idx<len(options) else '',
-                    'explanation':q.get('explanation','') if isinstance(q,dict) else '',
-                    'explanationHtml':q.get('explanationHtml','') if isinstance(q,dict) else ''
-                })
-                continue
-            if type(ans) is not int or ans<0 or ans>=len(options):
-                fail(400,'گزینهٔ انتخاب‌شده در آزمون معتبر نیست.')
-            is_ok=(ans==right_idx)
-            if is_ok:correct+=1
-            else:incorrect+=1
-            items.append({
-                'index':idx,'answered':True,'selectedIndex':ans,'correctIndex':right_idx,
-                'correct':is_ok,'correctOption':options[right_idx] if 0<=right_idx<len(options) else '',
-                'explanation':q.get('explanation','') if isinstance(q,dict) else '',
-                'explanationHtml':q.get('explanationHtml','') if isinstance(q,dict) else ''
-            })
-        total=len(questions)
-        score10=round(correct*10/total,2)
-        score_pct=round(correct*100/total)
-        return jsonify(ok=True,lessonId=lesson_id,total=total,correct=correct,incorrect=incorrect,
-                       unanswered=unanswered,score10=score10,scorePct=score_pct,passed=score_pct>=70,items=items)
-
-    @app.post('/api/academy/placement/evaluate')
-    def evaluate_academy_placement():
-        body=data()
-        if not isinstance(body,dict):fail(400,'بدنهٔ درخواست تعیین سطح معتبر نیست.')
-        answers=body.get('answers')
-        if not isinstance(answers,(dict,list)):fail(400,'فهرست پاسخ‌های آزمون تعیین سطح معتبر نیست.')
-        with connect() as db:
-            user_and_session(db)
-        q_path=(ROOT/'www'/'academy-assets'/'academy-placement-questions.json').resolve()
-        if not q_path.is_file():fail(404,'بانک سؤال تعیین سطح یافت نشد.')
-        bank=json.loads(q_path.read_text(encoding='utf-8'))
-        faculties=bank.get('faculties') or []
-        questions=bank.get('questions') or []
-        if not questions or not faculties:fail(500,'ساختار بانک سؤال تعیین سطح معتبر نیست.')
-        if isinstance(answers,list) and len(answers)!=len(questions):
-            fail(400,'تعداد پاسخ‌ها با تعداد سؤال‌های تعیین سطح برابر نیست.')
-        tier_stats={f['tier']:{'id':f['id'],'tier':f['tier'],'badge':f['badge'],'title':f['title'],'duration':f['duration'],'correct':0,'total':0} for f in faculties}
-        total_correct=0;items=[]
-        for idx,q in enumerate(questions):
-            qid=q['id']
-            options=q.get('options') or []
-            right_idx=q.get('correctIndex',-1)
-            sel=answers[idx] if isinstance(answers,list) else answers.get(qid)
-            if sel is not None and (type(sel) is not int or sel<0 or sel>=len(options)):
-                fail(400,'گزینهٔ انتخاب‌شده در آزمون تعیین سطح معتبر نیست.')
-            tier=int(q.get('tier',0))
-            if tier not in tier_stats:
-                tier_stats[tier]={'id':q.get('facultyId',f'f{tier}'),'tier':tier,'badge':'','title':'','duration':'','correct':0,'total':0}
-            tier_stats[tier]['total']+=1
-            is_ok=(sel==right_idx)
-            if is_ok:
-                total_correct+=1
-                tier_stats[tier]['correct']+=1
-            items.append({
-                'id':qid,'tier':tier,'topic':q.get('topic',''),
-                'answered':sel is not None,'selectedIndex':sel,'correctIndex':right_idx,
-                'correct':is_ok,'correctOption':options[right_idx] if 0<=right_idx<len(options) else '',
-                'explanation':q.get('explanation','')
-            })
-        ordered_tiers=sorted(tier_stats.keys())
-        rec_tier=ordered_tiers[0]
-        weak_tiers=[]
-        for t in ordered_tiers:
-            st=tier_stats[t]
-            c,tot=st['correct'],st['total']
-            if tot>0 and c==tot:
-                rec_tier=min(ordered_tiers[-1],t+1)
-            elif tot>0 and c*2>=tot and (t+1 in tier_stats) and tier_stats[t+1]['total']>0 and tier_stats[t+1]['correct']==tier_stats[t+1]['total']:
-                weak_tiers.append(st['title'])
-                rec_tier=t+1
-            else:
-                rec_tier=t
-                if c<tot:weak_tiers.append(st['title'])
-                break
-        breakdown=[]
-        for t in ordered_tiers:
-            st=tier_stats[t]
-            c,tot=st['correct'],st['total']
-            status='mastered' if tot>0 and c==tot else ('partial' if c>0 else 'gap')
-            breakdown.append({**st,'status':status})
-        rec_faculty=next((f for f in faculties if f['tier']==rec_tier),faculties[0])
-        total_q=len(questions)
-        score_pct=round(total_correct*100/total_q) if total_q else 0
-        summary_fa=(
-            f"بر اساس تحلیل مرحله‌به‌مرحلهٔ پاسخ‌های شما ({total_correct} از {total_q} پاسخ صحیح)، "
-            f"نقطهٔ شروع پیشنهادی شما «{rec_faculty['badge']} — {rec_faculty['title']}» است."
-        )
-        return jsonify(ok=True,recommendedFaculty=rec_faculty,recommendedTier=rec_tier,
-                       totalCorrect=total_correct,totalQuestions=total_q,scorePct=score_pct,
-                       tierBreakdown=breakdown,weakTiers=weak_tiers,summaryFa=summary_fa,items=items)
     @app.post('/api/login')
     def login():
         value=data();name=str(value.get('username','')).strip().lower();pw=value.get('password','')

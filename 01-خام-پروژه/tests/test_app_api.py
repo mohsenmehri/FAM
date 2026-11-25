@@ -125,9 +125,9 @@ class FamAppApiTests(unittest.TestCase):
             "/api/equipment/state",
             "/api/real/status",
             "/academy",
-            "/academy-assets/curriculum-catalog.json",
-            "/academy-assets/lesson-engine.js",
-            "/academy-content/catalog.json",
+            "/academy/dashboard",
+            "/academy-assets/styles.css",
+            "/academy-assets/app.js",
         ):
             r = self.client.get(path, environ_base=self.https_env)
             self.assertEqual(r.status_code, 401, f"Expected 401 for {path}")
@@ -225,129 +225,16 @@ class FamAppApiTests(unittest.TestCase):
         academy_html = academy_res.get_data(as_text=True)
         self.assertIn("fam3.progress.v1", academy_html)
         self.assertIn('"allowedViews":{"panel":true,"equipment":true}', academy_html)
+        self.assertIn('/academy/dashboard', academy_html)
 
-        # Server-side Academy quiz grading: CSRF, validation, and accurate scoring
-        no_csrf_quiz = self.client.post(
-            "/api/academy/quiz/evaluate",
-            json={"lessonId": "ccna-v11-1.1.a", "answers": [0] * 12},
-            headers={"Origin": self.ORIGIN},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(no_csrf_quiz.status_code, 403)
-
-        bad_lesson = self.client.post(
-            "/api/academy/quiz/evaluate",
-            json={"lessonId": "../etc/passwd", "answers": [0]},
-            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(bad_lesson.status_code, 400)
-
-        bp_path = PACKAGE_ROOT / "server" / "www" / "academy-assets" / "v5" / "blueprints" / "ccna-v11-1.1.a.json"
-        bp_data = json.loads(bp_path.read_text(encoding="utf-8"))
-        correct_answers = [q["correctIndex"] for q in bp_data["interactiveQuiz"]]
-
-        perfect_quiz = self.client.post(
-            "/api/academy/quiz/evaluate",
-            json={"lessonId": "ccna-v11-1.1.a", "answers": correct_answers},
-            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(perfect_quiz.status_code, 200)
-        pdata = perfect_quiz.get_json()
-        self.assertTrue(pdata["ok"])
-        self.assertEqual(pdata["total"], 12)
-        self.assertEqual(pdata["correct"], 12)
-        self.assertEqual(pdata["score10"], 10)
-        self.assertEqual(pdata["scorePct"], 100)
-        self.assertTrue(pdata["passed"])
-
-        partial_answers = list(correct_answers)
-        partial_answers[0] = (correct_answers[0] + 1) % 4
-        partial_answers[1] = None
-        partial_quiz = self.client.post(
-            "/api/academy/quiz/evaluate",
-            json={"lessonId": "ccna-v11-1.1.a", "answers": partial_answers},
-            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(partial_quiz.status_code, 200)
-        part = partial_quiz.get_json()
-        self.assertEqual(part["correct"], 10)
-        self.assertEqual(part["incorrect"], 1)
-        self.assertEqual(part["unanswered"], 1)
-
-        bad_choice = self.client.post(
-            "/api/academy/quiz/evaluate",
-            json={"lessonId": "ccna-v11-1.1.a", "answers": [99] + correct_answers[1:]},
-            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(bad_choice.status_code, 400)
-
-        # Smart multi-tier placement exam evaluation
-        no_csrf_place = self.client.post(
-            "/api/academy/placement/evaluate",
-            json={"answers": {}},
-            headers={"Origin": self.ORIGIN},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(no_csrf_place.status_code, 403)
-
-        qbank_path = PACKAGE_ROOT / "server" / "www" / "academy-assets" / "academy-placement-questions.json"
-        qbank = json.loads(qbank_path.read_text(encoding="utf-8"))
-        all_right = {q["id"]: q["correctIndex"] for q in qbank["questions"]}
-        all_wrong = {q["id"]: (q["correctIndex"] + 1) % 4 for q in qbank["questions"]}
-
-        # 1. All wrong -> f0
-        res_f0 = self.client.post(
-            "/api/academy/placement/evaluate",
-            json={"answers": all_wrong},
-            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(res_f0.status_code, 200)
-        self.assertEqual(res_f0.get_json()["recommendedFaculty"]["id"], "f0")
-
-        # 2. Lucky guess on f6 while missing f0 -> still starts at f0
-        lucky_f6 = dict(all_wrong)
-        for q in qbank["questions"]:
-            if q["tier"] == 6:
-                lucky_f6[q["id"]] = q["correctIndex"]
-        res_lucky = self.client.post(
-            "/api/academy/placement/evaluate",
-            json={"answers": lucky_f6},
-            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(res_lucky.status_code, 200)
-        self.assertEqual(res_lucky.get_json()["recommendedFaculty"]["id"], "f0")
-
-        # 3. f0 + f1 mastered, f2 partial (1/2) -> recommends f2
-        mid_answers = dict(all_wrong)
-        for q in qbank["questions"]:
-            if q["tier"] in (0, 1):
-                mid_answers[q["id"]] = q["correctIndex"]
-        mid_answers["p-f2-1"] = qbank["questions"][4]["correctIndex"]
-        res_f2 = self.client.post(
-            "/api/academy/placement/evaluate",
-            json={"answers": mid_answers},
-            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(res_f2.status_code, 200)
-        self.assertEqual(res_f2.get_json()["recommendedFaculty"]["id"], "f2")
-
-        # 4. All 14 correct -> f6
-        res_f6 = self.client.post(
-            "/api/academy/placement/evaluate",
-            json={"answers": all_right},
-            headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
-            environ_base=self.https_env,
-        )
-        self.assertEqual(res_f6.status_code, 200)
-        self.assertEqual(res_f6.get_json()["recommendedFaculty"]["id"], "f6")
-        self.assertEqual(res_f6.get_json()["scorePct"], 100)
+        dash_res = self.client.get("/academy/dashboard", environ_base=self.https_env)
+        self.assertEqual(dash_res.status_code, 200)
+        dash_html = dash_res.get_data(as_text=True)
+        self.assertIn("fam3.progress.v1", dash_html)
+        self.assertIn('data-panel="home"', dash_html)
+        self.assertIn('data-panel="courses"', dash_html)
+        self.assertIn('data-panel="lab"', dash_html)
+        self.assertIn('data-panel="progress"', dash_html)
 
         # Create custom users with restricted permissions and verify /academy allowedViews
         users_state = self.client.get("/api/users", environ_base=self.https_env)
@@ -386,11 +273,12 @@ class FamAppApiTests(unittest.TestCase):
         )
         self.assertEqual(save_users_res.status_code, 200)
 
-        asset_res = self.client.get("/academy-assets/curriculum-catalog.json", environ_base=self.https_env)
-        try:
-            self.assertEqual(asset_res.status_code, 200)
-        finally:
-            asset_res.close()
+        for asset_path in ("/academy-assets/styles.css", "/academy-assets/app.js"):
+            asset_res = self.client.get(asset_path, environ_base=self.https_env)
+            try:
+                self.assertEqual(asset_res.status_code, 200)
+            finally:
+                asset_res.close()
 
         out = self.client.post(
             "/api/logout",
