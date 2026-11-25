@@ -7133,9 +7133,10 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         "title": "آزمایشگاه آماده‌سازی Underlay لایه ۳ و جداسازی پورت ضبط ترافیک (SPAN)",
         "steps": [
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `interface Tunnel0`، `vrf definition` و `monitor session` را اجرا نمی‌کند (برای تمرین زندهٔ GRE/IPsec و ERSPAN از CML یا EVE-NG استفاده کنید). اما بررسی سلامت Underlay لایه ۳ (`Gi0/0`, `Loopback0`) و آماده‌سازی پورت ضبط در VLAN مجزا کاملاً زنده قابل آزمایش است.",
-          "۲. با `enable` وارد شوید و با `show ip interface brief`، `ping 10.10.0.2` و `ping 10.255.0.2` مسیر Underlay تا مقصد فرضی تونل را بررسی کنید.",
+          "۲. با `enable` وارد شوید و با `show ip interface brief` و `ping 10.255.0.2` وضعیت پورت لایه ۳ `Gi0/0` و خروجی ازپیش‌تعریف‌شدهٔ دسترسی پایه در شبیه‌ساز را مشاهده کنید *(اندازه‌گیری مسیر واقعی نیازمند CML/تجهیز واقعی است)*.",
           "۳. با `configure terminal` -> `interface Gi0/0` -> `description UNDERLAY-TRANSPORT-WAN` -> `interface Loopback0` -> `description VTEP-RLOC-LOOPBACK` -> `vlan 80` -> `name SPAN_ANALYSIS` -> `exit` -> `interface Gi0/7` -> `description SPAN-DEST-PROBE` -> `switchport mode access` -> `switchport access vlan 80` -> `end` نقش پورت‌ها را مستند کنید.",
-          "۴. با `show running-config`، `show vlan brief` و `traceroute 10.255.0.2` بررسی کنید فقط بخش زیرساخت آزمایشگاهی شبیه‌ساز یعنی برچسب‌گذاری `Gi0/0`/`Lo0`، قرارگیری `Gi0/7` در `VLAN 80` و مسیر پایهٔ لایه ۳ تا `10.255.0.2` ثبت شده است (اجرای واقعی تونل GRE، FVRF و ERSPAN در شبیه‌ساز داخلی انجام نمی‌شود)."
+          "۴. با `show running-config`، `show vlan brief` و `traceroute 10.255.0.2` بررسی کنید فقط بخش زیرساخت آزمایشگاهی شبیه‌ساز یعنی برچسب‌گذاری `Gi0/0`/`Lo0`، قرارگیری `Gi0/7` در `VLAN 80` و مسیر پایهٔ لایه ۳ تا `10.255.0.2` ثبت شده است (اجرای واقعی تونل GRE، FVRF و ERSPAN در شبیه‌ساز داخلی انجام نمی‌شود).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (GRE over FVRF):** روی یک روتر واقعی، `vrf definition INET_FVRF` را به `Gi0/0` بدهید و روی `Tunnel0` دستور `tunnel vrf INET_FVRF` بزنید. **خروجی مرجع و نشانهٔ موفقیت:** در `show interfaces Tunnel0` وضعیت `Tunnel0 is up, line protocol is up` و در `show ip route` جدا بودن `198.51.100.2` در `INET_FVRF` از مسیرهای داخل تونل در جدول Global دیده می‌شود. **نشانهٔ شکست:** پیام `%TUN-5-RECURDOWN` در Syslog یعنی مسیر مقصد تونل داخل خود تونل برگشته است. **مرز نتیجه‌گیری:** با شبیه‌ساز داخلی فقط تفکیک لایه ۲/برچسب پورت‌ها تمرین شد و پایداری واقعی Recursive Routing و رمزنگاری IPsec تنها در CML/تجهیز واقعی تأیید می‌شود."
         ],
         "verifyCmds": [
           "enable",
@@ -7349,7 +7350,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `ip policy route-map`، `ip nhrp` و `mpls ip` را اجرا نمی‌کند (برای آزمایش زنده از CML یا EVE-NG استفاده کنید). در اینجا سلامت مسیر NBMA/Underlay (`Gi0/0`, `Lo0`) و تفکیک دو مشتری ایزوله در لایه ۲ (`VLAN 110` و `VLAN 120` مشابه دو VRF مجزا) را در ترمینال زنده آزمایش می‌کنیم.",
           "۲. با `enable` وارد شوید و با `show ip interface brief` و `ping 10.255.0.2` دسترسی به گره مقابل (مثلاً Hub یا PE همسایه) را تایید کنید.",
           "۳. دو VLAN مجزا برای دو مشتری فرضی بسازید، پورت‌های `Gi0/6` و `Gi0/7` را به آن‌ها اختصاص دهید و لینک‌های بالادستی `Gi0/0` و `Gi0/1` را مستند کنید: `configure terminal` -> `vlan 110` -> `name CUST_A_VRF` -> `vlan 120` -> `name CUST_B_VRF` -> `exit` -> `interface Gi0/6` -> `description CUST-A-CE` -> `switchport mode access` -> `switchport access vlan 110` -> `interface Gi0/7` -> `description CUST-B-CE` -> `switchport mode access` -> `switchport access vlan 120` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 110,120` -> `interface Gi0/0` -> `description MPLS-NBMA-CORE` -> `end`.",
-          "۴. با `show vlan brief`، `show interfaces trunk`، `show running-config` و `traceroute 10.255.0.2` بررسی کنید تفکیک تمرینی `VLAN 110/120` روی `Gi0/6`/`Gi0/7`/`Gi0/1` و مسیر پایهٔ شبیه‌ساز برقرار است (PBR، DMVPN/NHRP و MPLS L3VPN در شبیه‌ساز داخلی اجرا نمی‌شوند)."
+          "۴. با `show vlan brief`، `show interfaces trunk`، `show running-config` و `traceroute 10.255.0.2` بررسی کنید تفکیک تمرینی `VLAN 110/120` روی `Gi0/6`/`Gi0/7`/`Gi0/1` و مسیر پایهٔ شبیه‌ساز برقرار است (PBR، DMVPN/NHRP و MPLS L3VPN در شبیه‌ساز داخلی اجرا نمی‌شوند).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (PBR / DMVPN / MPLS L3VPN):** در CML روی DMVPN Phase 3 دستور `show dmvpn` و `show ip route vrf CUST_A` را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** تبدیل وضعیت تونل Spoke-to-Spoke از `NHRP` پویا به وضعیت مستقیم `UP` با `Attrb = D` و تفکیک کامل جدول مسیر هر VRF. **نشانهٔ شکست:** ماندن تونل‌ها در `NHRP` بدون شکل‌گیری مسیر مستقیم (خطای `ip nhrp redirect/shortcut`) یا نشت مسیر بین VRFها. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی تنها جداسازی لایه ۲ VLANهای تمرینی را اجرا می‌کند و ترافیک Data Plane تونل‌ها را نمی‌سازد."
         ],
         "verifyCmds": [
           "enable",
@@ -11944,7 +11946,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           ],
           "steps": [
             "**Control Plane -> `RIB` و `ARP`:** پروتکل‌های روتینگ جدول **`RIB` (`show ip route`)** و پروتکل ARP جدول لایه ۲ همسایه‌ها را در CPU می‌سازند.",
-            "**Data Plane -> `FIB` و `Adjacency Table`:** CEF به‌طور پیوسته از روی RIB جدول سخت‌افزاری **`FIB` (`show ip cef`)** (شامل مقصد و خروجی) و از روی ARP جدول **`Adjacency Table` (`show adjacency`)** (شامل هدر آمادهٔ لایه ۲ مثل MAC مبدأ/مقصد!) را می‌سازد تا بسته در ASIC بی‌درنگ فوروارد شود.",
+            "**Data Plane -> `FIB` و `Adjacency Table`:** CEF به‌طور پیوسته از روی RIB جدول منطقی **`FIB` (`show ip cef`)** (شامل مقصد و خروجی) و از روی ARP جدول **`Adjacency Table` (`show adjacency`)** (شامل هدر آمادهٔ لایه ۲ مثل MAC مبدأ/مقصد!) را می‌سازد؛ در سوئیچ‌ها و روترهای سخت‌افزاری، این جداول سپس درون حافظه‌های سخت‌افزاری **ASIC/TCAM** پلتفرم برنامه‌ریزی می‌شوند تا بسته‌ها بدون نیاز به CPU فوروارد شوند (و روی پلتفرم‌های نرم‌افزاری یا حالت Punt در حافظهٔ سیستم پردازش می‌شوند).",
             "**`TCAM` (Ternary Content Addressable Memory):** حافظه‌ای سخت‌افزاری که نه فقط مثل RAM با `0` و `1` بلکه با حالت سوم **`X` (Don't Care / Wildcard Mask)** در **یک چرخهٔ ساعت** تطبیق ACL، QoS و مسیریابی را پیدا می‌کند! استثناهایی مثل بسته‌های نیاز به TTL=0، گزینه‌های IP Options، ARP/OSPF مقصد خودِ روتر، یا نبود رکورد Adjacency (`Glean`) به CPU ارسال می‌شوند که به آن **`Punt`** می‌گویند."
           ],
           "think": {
@@ -12010,17 +12012,17 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "a": "**VN** جداسازی درشت‌دانه در سطح لایه ۳ (معادل **VRF**؛ مثلاً `VN_Corporate` کاملاً از `VN_Guest` جدول روتینگ جدا دارد؛ جداسازی کلان/Macro)، اما **SGT** جداسازی ظریف داخل همان VRF است (مثلاً داخل `VN_Corporate`، گروه `HR` نتواند به پورت‌های مدیریتی `DevOps` وصل شود؛ جداسازی خرد/Micro-segmentation)."
         }
       ],
-      "summary": "در طراحی ENCOR، انتقال از Two/Three-Tier لایه ۲ به **Routed Access** باعث حذف STP و بهره‌گیری از ECMP می‌شود؛ درون تجهیزات، **CEF** از `RIB/ARP` جداول سخت‌افزاری `FIB/Adjacency` و `TCAM` را می‌سازد تا بسته‌ها بدون `Punt` به CPU عبور کنند؛ و **Cisco SD-Access** با ترکیب **IS-IS Underlay**، **LISP Control Plane**، **VXLAN-GPO Data Plane** و **SGT**، مدیریت متمرکز Campus را میسر می‌کند.",
+      "summary": "در طراحی ENCOR، انتقال از Two/Three-Tier لایه ۲ به **Routed Access** باعث حذف STP و بهره‌گیری از ECMP می‌شود؛ درون تجهیزات، **CEF** از `RIB/ARP` جداول منطقی `FIB/Adjacency` را می‌سازد که در پلتفرم‌های سخت‌افزاری در ASIC/TCAM برنامه‌ریزی می‌شوند تا بسته‌ها بدون `Punt` به CPU عبور کنند؛ و **Cisco SD-Access** با ترکیب **IS-IS Underlay**، **LISP Control Plane**، **VXLAN-GPO Data Plane** و **SGT**، مدیریت متمرکز Campus را میسر می‌کند.",
       "ciscoRef": "Cisco CCNP ENCOR 350-401 Official Cert Guide — Ch 1 (Enterprise Network Architecture), Ch 2 (Packet Forwarding / CEF) & Ch 17 (SD-Access)",
       "protocolAnalysis": [
-        "جدول **`FIB`** دقیقاً آینهٔ سخت‌افزاری `RIB` برای جستجوی طولانی‌ترین پیشوند (Longest Prefix Match) است، در حالی که **`Adjacency Table`** شامل ۱۴ بایت آمادهٔ هدر Ethernet (MAC مقصد و مبدأ) برای هر Next-Hop است تا ASIC در لحظه فریم خروجی را بازنویسی کند.",
+        "جدول منطقی **`FIB`** آینهٔ `RIB` برای جستجوی طولانی‌ترین پیشوند (Longest Prefix Match) و **`Adjacency Table`** شامل هدر آمادهٔ لایه ۲ برای هر Next-Hop است؛ این جداول در سوئیچ‌های سخت‌افزاری به جداول **ASIC/TCAM** کامپایل می‌شوند (و با دستورات پلتفرم‌محور مثل `show platform ...` وضعیت برنامه‌ریزی سخت‌افزاری آن‌ها بررسی می‌شود).",
         "در **SD-Access** بخش **`VXLAN-GPO`** از فیلدهای رزروشدهٔ هدر استاندارد `8` بایتی VXLAN استفاده می‌کند تا هم **`VNID`** (بخش Macro/VRF) و هم **`SGT`** ۱۶ بیتی (بخش Micro-segmentation) را در یک بسته حمل کند."
       ],
       "iosCommands": [
         {
           "cmd": "show ip cef",
           "out": "Prefix               Next Hop             Interface\n0.0.0.0/0            drop                 Null0 (default route handler)\n10.10.0.0/24         attached             GigabitEthernet0/0\n10.255.0.2/32        10.10.0.2            GigabitEthernet0/0",
-          "note": "نمایش جدول FIB سخت‌افزاری CEF. [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تمرین زندهٔ CEF، TCAM و LISP نیازمند CML، EVE-NG یا تجهیزات واقعی است.]",
+          "note": "نمایش جدول `FIB` منطقی CEF (که در پلتفرم‌های سخت‌افزاری در ASIC برنامه‌ریزی می‌شود؛ وضعیت سخت‌افزار در دستگاه واقعی با دستوراتی مانند `show platform ...` نیز راستی‌آزمایی می‌شود). [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تمرین زندهٔ CEF، TCAM و LISP نیازمند CML، EVE-NG یا تجهیزات واقعی است.]",
           "why": "تأیید اینکه پیشوندهای جدول مسیریابی واقعاً در Data Plane کامپایل شده‌اند و دارای Next-Hop یا وضعیت مشخص (`attached`, `receive`, `drop`, `glean`) هستند.",
           "anatomy": "هر پیشوند به یک Next-Hop و اینترفیس خروجی متصل شده است؛ وضعیت `glean` یعنی ساب‌نت مستقیم است ولی هنوز ARP یک میزبان خاص آن حل نشده است.",
           "lookFor": "حضور مسیر مورد نظر با Next-Hop معتبر و نبود وضعیت‌های معیوب `drop` ناخواسته.",
@@ -12043,7 +12045,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `show ip cef`، `show platform tcam` و `show lisp` را اجرا نمی‌کند (برای تمرین زندهٔ CEF و SD-Access از CML یا Cisco DevNet استفاده کنید). اما بررسی تفکیک پورت‌های لایه ۳ (`Gi0/0`, `Lo0`) از پورت‌های Access (`Gi0/2..7`) در شبیه‌ساز کاملاً زنده اجرا می‌شود.",
           "۲. با `enable` وارد شوید و `show ip interface brief` و `show interfaces status` را ببینید؛ تفکیک ستون `Vlan` بین `routed` (`Gi0/0`)، `trunk` (`Gi0/1`) و `access` (`10, 20`) را مشاهده کنید.",
           "۳. فرض کنید سوئیچ را برای یک Campus مدرن مستند و آماده می‌کنیم: `configure terminal` -> `interface Gi0/0` -> `description ROUTED-UPLINK-ECMP` -> `interface Loopback0` -> `description SDA-RLOC-VTEP` -> `vlan 55` -> `name SDA_USER_VN` -> `exit` -> `interface Gi0/7` -> `description EDGE-PORT-SDA` -> `switchport mode access` -> `switchport access vlan 55` -> `end`.",
-          "۴. با `show running-config`، `show interfaces status` و `ping 10.255.0.2` بررسی کنید تنظیمات نمونه (برچسب‌گذاری `Gi0/0`/`Lo0` و ایجاد `VLAN 55` برای `Gi0/7`) در شبیه‌ساز ساده ثبت شده و پایهٔ ارتباط با `10.255.0.2` پاسخ می‌دهد (ساختار واقعی CEF، TCAM و Fabric SD-Access در این شبیه‌ساز اجرا نمی‌شوند)."
+          "۴. با `show running-config`، `show interfaces status` و `ping 10.255.0.2` بررسی کنید تنظیمات نمونه (برچسب‌گذاری `Gi0/0`/`Lo0` و ایجاد `VLAN 55` برای `Gi0/7`) در شبیه‌ساز ساده ثبت شده و پایهٔ ارتباط با `10.255.0.2` پاسخ می‌دهد (ساختار واقعی CEF، TCAM و Fabric SD-Access در این شبیه‌ساز اجرا نمی‌شوند).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (CEF/TCAM و SD-Access):** در یک سوئیچ واقعی Catalyst 9k، پس از افزودن ACLهای جدید دستورات `show ip cef 10.20.0.0/16`، `show platform tcam utilization` و (در SDA) `show lisp session` را بررسی کنید. **خروجی مرجع و نشانهٔ موفقیت:** در `show ip cef` وجود Next-Hop معتبر و در `show platform tcam utilization` ماندن مصرف زیر `80%` و `Punt = 0` در `show processes cpu`. **نشانهٔ شکست:** پر شدن TCAM (`100%`)، جهش CPU به خاطر `Punt` یا وضعیت `Down` در `show lisp session`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط تفکیک پورت‌ها را ثبت می‌کند و رفتار واقعی TCAM/ASIC به پلتفرم سخت‌افزاری وابسته است."
         ],
         "verifyCmds": [
           "enable",
@@ -12097,10 +12100,10 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
             "جایگزین پروتکل BGP در اینترنت هستند",
             "توسط STP ساخته می‌شوند و فقط در حالت Trunk فعالند",
             "فقط هنگام قطع برق در NVRAM ذخیره می‌شوند",
-            "توسط CEF از روی RIB و ARP ساخته می‌شوند؛ FIB شامل اطلاعات مسیریابی/خروجی است و Adjacency Table هدر آمادهٔ لایه ۲ (MAC Next-Hop) را نگه می‌دارد"
+            "توسط CEF از روی RIB و ARP ساخته می‌شوند (و در پلتفرم‌های سخت‌افزاری در ASIC برنامه‌ریزی می‌گردند)؛ FIB مسیر/خروجی و Adjacency Table هدر آمادهٔ لایه ۲ را نگه می‌دارد"
           ],
           "ans": 3,
-          "exp": "CEF جداول کنترلی RIB و ARP را به دو جدول سخت‌افزاری پرسرعت FIB و Adjacency تبدیل می‌کند تا ASIC بدون درگیری CPU بسته را بازنویسی و ارسال کند."
+          "exp": "CEF جداول کنترلی RIB و ARP را به جداول منطقی FIB و Adjacency تبدیل می‌کند که در تجهیزات سخت‌افزاری در ASIC برای فورواردینگ سریع برنامه‌ریزی می‌شوند."
         },
         {
           "q": "مزیت اصلی انتخاب طراحی **Routed Access** به جای لایهٔ دسترسیِ کلاسیک مبتنی بر VLAN Trunking تا Distribution چیست؟",
@@ -12254,7 +12257,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `ip ospf network point-to-point`، `router bgp` و `wireless mobility` را اجرا نمی‌کند (برای آزمایش زنده از CML یا EVE-NG استفاده کنید). در اینجا پیکربندی ترانک چند-VLANی برای یک Access Point حالت `FlexConnect` و بررسی زندهٔ لینک لایه ۳ `Gi0/0` را انجام می‌دهیم.",
           "۲. با `enable` وارد شوید و `show ip ospf neighbor` (خروجی نمونهٔ مد Broadcast با `FULL/DR`) و `show interfaces trunk` را ببینید.",
           "۳. فرض کنید پورت `Gi0/7` قرار است به یک AP در حالت **FlexConnect** متصل شود که مدیریت AP در `VLAN 99` (به صورت Native Untagged) و ترافیک دو SSID شرکتی و مهمان در `VLAN 10` و `VLAN 70` عبور کنند: `configure terminal` -> `vlan 99` -> `name AP_MGMT` -> `vlan 70` -> `name WLAN_GUEST` -> `exit` -> `interface Gi0/7` -> `description AP-FLEXCONNECT` -> `switchport trunk encapsulation dot1q` -> `switchport mode trunk` -> `switchport nonegotiate` -> `switchport trunk native vlan 99` -> `switchport trunk allowed vlan 10,70,99` -> `interface Gi0/0` -> `description OSPF-P2P-UPLINK` -> `end`.",
-          "۴. با `show interfaces trunk`، `show interfaces Gi0/7 switchport`، `show running-config` و `ping 10.255.0.2` بررسی کنید تنظیمات ترانک `Gi0/7` (`nonegotiate`, `Native vlan 99`, `10,70,99`) و دسترسی پایه در شبیه‌ساز ثبت شده‌اند (اجرای زندهٔ OSPF point-to-point، BGP و پروتکل CAPWAP نیازمند CML/EVE-NG است)."
+          "۴. با `show interfaces trunk`، `show interfaces Gi0/7 switchport`، `show running-config` و `ping 10.255.0.2` بررسی کنید تنظیمات ترانک `Gi0/7` (`nonegotiate`, `Native vlan 99`, `10,70,99`) و دسترسی پایه در شبیه‌ساز ثبت شده‌اند (اجرای زندهٔ OSPF point-to-point، BGP و پروتکل CAPWAP نیازمند CML/EVE-NG است).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (OSPF P2P و BGP):** روی دو روتر در CML با `ip ospf network point-to-point` و همسایگی BGP، دستورات `show ip ospf neighbor` و `show ip bgp summary` را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** در OSPF وضعیت `FULL/  -` (بدون DR/BDR) با همگرایی فوری، و در BGP ثبت عدد غیرصفر در `State/PfxRcd`. **نشانهٔ شکست:** ماندن در `EXSTART/EXCHANGE` (ناهم‌خوانی MTU) یا `Active/Idle` در BGP. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی تنها ترانک `Gi0/7` را زنده تست کرده و خروجی OSPF/BGP آن صرفاً نمونهٔ ایستا است."
         ],
         "verifyCmds": [
           "enable",
@@ -12457,7 +12461,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `control-plane`، `aaa new-model`، `access-list` و `show policy-map control-plane` را اجرا نمی‌کند (برای تمرین زندهٔ CoPP و TACACS+ از CML یا EVE-NG استفاده کنید). اما اجرای ممیزی امنیتی `show running-config`، تفکیک پورت‌های امنیتی/مدیریتی و قفل پورت‌های بلااستفاده کاملاً زنده در دسترس است.",
           "۲. با `enable` وارد شوید و با `show running-config` و `show interfaces status` وضعیت فعلی تمام پورت‌ها را ممیزی کنید؛ پورت‌های `Gi0/6` و `Gi0/7` در وضعیت پیش‌فرض در `VLAN 1` فعال مانده‌اند!",
           "۳. پورت مدیریتی اختصاصی برای سرور TACACS+/ISE را در `VLAN 90 (MGMT_SEC)` تعریف کنید، `Gi0/6` را برای آن اختصاص دهید، و پورت اضافی `Gi0/7` را ببندید (`shutdown` در VLAN پارک `999`): `configure terminal` -> `vlan 90` -> `name MGMT_SEC` -> `vlan 999` -> `name PARK_SHUT` -> `exit` -> `interface Gi0/6` -> `description ISE-TACACS-MGMT` -> `switchport mode access` -> `switchport access vlan 90` -> `interface Gi0/7` -> `description UNUSED-SHUT` -> `switchport mode access` -> `switchport access vlan 999` -> `shutdown` -> `interface Gi0/0` -> `description WAN-COPP-PROTECTED` -> `end`.",
-          "۴. با `show running-config`، `show vlan brief` و `show interfaces status` بررسی کنید تغییر وضعیت پورت‌ها در شبیه‌ساز ساده (`Gi0/6` در `VLAN 90` و `Gi0/7` `disabled` در `VLAN 999`) ثبت شده است (اعمال واقعی `CoPP` و `AAA` نیازمند CML یا تجهیز IOS/IOS-XE است)."
+          "۴. با `show running-config`، `show vlan brief` و `show interfaces status` بررسی کنید تغییر وضعیت پورت‌ها در شبیه‌ساز ساده (`Gi0/6` در `VLAN 90` و `Gi0/7` `disabled` در `VLAN 999`) ثبت شده است (اعمال واقعی `CoPP` و `AAA` نیازمند CML یا تجهیز IOS/IOS-XE است).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (CoPP & AAA):** روی IOS/IOS-XE، یک `policy-map COPP_POLICY` با کلاس `BGP/OSPF` و کلاس `DEFAULT` روی `control-plane` (`service-policy input`) اعمال کنید و سپس `show policy-map control-plane` را بخوانید. **خروجی مرجع و نشانهٔ موفقیت:** افزایش `conformed` برای کلاس `ROUTING_PROTOCOLS` بدون `exceeded` روی ترافیک مجاز، و `dropped/exceeded` شدن سیل پینگ یا بسته‌های غیرمجاز. **نشانهٔ شکست:** افت نشست BGP/OSPF در اثر rate-limit اشتباهی روی کلاس کنترلی یا قفل شدن VTY در تنظیم اشتباه AAA بدون `local` fallback. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط تفکیک VLAN مدیریتی و بستن پورت آزاد را انجام می‌دهد و محافظت واقعی CPU در CML/تجهیز واقعی آزموده می‌شود."
         ],
         "verifyCmds": [
           "enable",
@@ -12576,7 +12581,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           ],
           "think": {
             "q": "سناریوی خطا: مهندسی یک EEM Applet با ماشهٔ `event syslog pattern \"UPDOWN\"` می‌نویسد و در بخش `action` دستور `no shutdown` را روی یک پورت می‌زند که با بالا آمدنش خودش دوباره یک پیام Syslog با کلمهٔ `UPDOWN` تولید می‌کند! چه اتفاقی در روتر می‌افتد؟",
-            "a": "یک **حلقهٔ بی‌نهایت EEM (EEM Infinite Loop)** رخ می‌دهد که می‌تواند CPU روتر را مصرف و قفل کند! توجه داشته باشید پارامتر `maxrun` تنها **حداکثر زمان اجرای یک نوبت از Applet** را محدود می‌کند و به تنهایی جلوی اجرای مجدد یا قفل هم‌زمانی در رخدادهای پیاپی را نمی‌گیرد. به‌جای آن باید الگوی `event syslog pattern` دقیق و غیرمتداخل انتخاب کرد، از حذف trigger خودتولید مطمئن شد و برای تغییرات پورت کنترل تایید دستی/نگهبان گذاشت."
+            "a": "در صورت تولید مکرر رویداد (مانند پورتی که مدام Flap می‌کند یا تغییراتی که دوباره پیام Syslog منطبق با الگوی کلی `UPDOWN` تولید می‌کنند)، **خطر حلقهٔ مکرر EEM (EEM Loop)** و اشباع شدید CPU وجود دارد! *(تذکر: صرف اجرای `no shutdown` روی پورتی که از قبل کاملاً `up/up` است الزاماً هر بار پیام تغییر وضعیت و Syslog تازه نمی‌سازد، اما با الگوی عمومی مثل `UPDOWN` هنگام Flap یا بازتولید رویدادها، حلقهٔ تکرارشونده رخ می‌دهد.)* پارامتر `maxrun` نیز تنها **حداکثر زمان اجرای یک نوبت از Applet** را محدود می‌کند و جلوی تکرار اجرا یا قفل هم‌زمانی در رخدادهای پی‌درپی را نمی‌گیرد. بنابراین الگوی Syslog باید دقیق و غیرمتداخل باشد و تغییرات پورت کنترل تایید/نگهبان داشته باشند."
           }
         },
         {
@@ -12679,7 +12684,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی سرویس‌های واقعی `netconf-yang`، `restconf` و `EEM` ندارد (برای تست با Python `requests`/`ncclient` از Cisco DevNet Sandbox یا CML استفاده کنید). اما اینجا رفتار واقعیِ تطابق وضعیت با یک الگوی استاندارد (Intent) و تست واقعی **Idempotency** را روی ترمینال اجرا می‌کنیم.",
           "۲. با `enable` و `show interfaces status` و `show vlan brief` وضعیت اولیه (`Current State`) را بررسی کنید.",
           "۳. فرض کنید یک اسکریپت اتوماسیون باید `VLAN 65 (AUTO_ENFORCE)` را بسازد و پورت `Gi0/7` را با `description ENCOR-NETCONF-PORT` به آن متصل کند: `configure terminal` -> `vlan 65` -> `name AUTO_ENFORCE` -> `exit` -> `interface Gi0/7` -> `description ENCOR-NETCONF-PORT` -> `switchport mode access` -> `switchport access vlan 65` -> `no shutdown` -> `end`.",
-          "۴. با `show running-config` خروجی اولیه را ثبت کنید (Post-Check). سپس برای **تست Idempotency** در شبیه‌ساز، عیناً مرحلهٔ ۳ را برای بار دوم تکرار کنید و بررسی نمایید خروجی `show running-config` تغییری نکرده است (سرویس‌های واقعی `netconf-yang`, `restconf` و `EEM` در این شبیه‌ساز اجرا نمی‌شوند)."
+          "۴. با `show running-config` خروجی اولیه را ثبت کنید (Post-Check). سپس برای **تست Idempotency** در شبیه‌ساز، عیناً مرحلهٔ ۳ را برای بار دوم تکرار کنید و بررسی نمایید خروجی `show running-config` تغییری نکرده است (سرویس‌های واقعی `netconf-yang`, `restconf` و `EEM` در این شبیه‌ساز اجرا نمی‌شوند).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (RESTCONF/NETCONF و EEM):** با پایتون `requests.get('https://.../restconf/data/ietf-interfaces:interfaces', headers={'Accept':'application/yang-data+json'})` و روی IOS دستور `show event manager statistics policy` را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** کد `200 OK` با بدنهٔ JSON معتبر (یا ثبت عدد اجرای تک‌نوبت در EEM بدون جهش `Trigger Count`). **نشانهٔ شکست:** کد `406 Not Acceptable` (نبود هدر `Accept`)، `401`، یا اجرای پیاپی EEM و افزایش CPU در صورت Flap. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی تنها مفهوم تکرارپذیری دستور CLI را نشان داد و رفتار واقعی XML/JSON و EEM نیازمند DevNet Sandbox یا CML است."
         ],
         "verifyCmds": [
           "enable",
@@ -12754,11 +12760,11 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "opts": [
             "تبدیل پورت به Trunk",
             "پاک شدن NVRAM",
-            "ایجاد حلقهٔ بی‌نهایت اجرای EEM (Infinite Loop) و اشباع CPU روتر",
+            "خطر حلقهٔ مکرر اجرای EEM (در صورت تولید مکرر پیام تغییر وضعیت / Flap) و مصرف شدید CPU روتر",
             "بسته شدن پورت ۲۲"
           ],
           "ans": 2,
-          "exp": "هر تغییر پورت خودش یک پیام `%LINK` جدید تولید می‌کند که دوباره همان EEM را تریگر کرده و CPU را قفل می‌کند."
+          "exp": "در صورتی که تغییر پورت یا Flap باعث تولید مکرر پیام منطبق با `%LINK` شود، EEM پی‌درپی تحریک شده و می‌تواند CPU روتر را تحت فشار شدید یا قفل بگذارد."
         }
       ],
       "bridge": {
@@ -12890,10 +12896,11 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "lab": {
         "title": "آزمایشگاه آماده‌سازی نقش‌های Transport (`VPN 0`) و Service (`VPN 10/20`) در شبیه‌ساز",
         "steps": [
-          "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی کنترلرهای `vBond/vManage/vSmart` و دستورات `show sdwan ...` را ندارد (برای آزمایش زنده از DevNet SD-WAN Sandbox یا EVE-NG استفاده کنید). اما جداسازی لایه‌ای پورت Transport (`Gi0/0` به عنوان معادل زیرساخت `VPN 0`) از پورت‌های Service (`VLAN 10`, `VLAN 20`) و تست دسترسی‌پذیری Transport (`ping`/`traceroute`) کاملاً زنده اجرا می‌شود.",
+          "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی کنترلرهای `vBond/vManage/vSmart` و دستورات `show sdwan ...` را ندارد (برای آزمایش زنده از DevNet SD-WAN Sandbox یا EVE-NG استفاده کنید). در اینجا جداسازی برچسب پورت Transport (`Gi0/0`) از پورت‌های VLAN سرویسی و بررسی وضعیت پایهٔ `Gi0/0` (خروجی ازپیش‌تعریف‌شدهٔ `ping` در شبیه‌ساز) تمرین می‌شود.",
           "۲. با `enable` وارد شوید و با `show ip interface brief` و `show vlan brief` پورت Transport و VLANهای سرویسی را مشاهده کنید.",
           "۳. فرض کنید می‌خواهیم پورت‌های شبکه را دقیقاً مطابق تفکیک SD-WAN مستند و ایزوله کنیم: `configure terminal` -> `interface Gi0/0` -> `description VPN0-TRANSPORT-MPLS` -> `interface Loopback0` -> `description SYSTEM-IP-10-255-0-1` -> `vlan 512` -> `name VPN512_MGMT_OOB` -> `exit` -> `interface Gi0/7` -> `description MGMT-OOB-PORT` -> `switchport mode access` -> `switchport access vlan 512` -> `end`.",
-          "۴. با `show running-config`، `show vlan brief` و `ping 10.255.0.2` بررسی کنید تنها تفکیک تمرینیِ پورت‌های شبیه‌ساز (`Gi0/7` در `VLAN 512` و برچسب‌های `Gi0/0`/`Lo0`) و دسترسی پایه به `10.255.0.2` ثبت شده است (اجرای واقعی `OMP`، `TLOC` و `AAR` نیازمند کنترلرهای SD-WAN در CML/DevNet است)."
+          "۴. با `show running-config`، `show vlan brief` و `ping 10.255.0.2` بررسی کنید تنها تفکیک تمرینیِ پورت‌های شبیه‌ساز (`Gi0/7` در `VLAN 512` و برچسب‌های `Gi0/0`/`Lo0`) و دسترسی پایه به `10.255.0.2` ثبت شده است (اجرای واقعی `OMP`، `TLOC` و `AAR` نیازمند کنترلرهای SD-WAN در CML/DevNet است).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (OMP & BFD در SD-WAN):** روی یک WAN Edge در DevNet Sandbox دستورات `show sdwan omp peers` و `show sdwan bfd sessions` را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** وضعیت `up` برای نشست OMP تا `vSmart` و وضعیت `up` با Loss/Latency/Jitter مطابق SLA در `bfd sessions`. **نشانهٔ شکست:** `init` ماندن OMP (خطای گواهی/System-IP/DTLS) یا سقوط `bfd` و جابه‌جایی اجباری AAR به رنگ پشتیبان. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط نام‌گذاری و جداسازی پورت‌های تمرینی را ذخیره می‌کند و پروتکل‌های کنترل/دادهٔ SD-WAN را اجرا نمی‌نماید."
         ],
         "verifyCmds": [
           "enable",
@@ -13010,7 +13017,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           ],
           "think": {
             "q": "در طراحی افزونگی یک جفت **Route Reflector (`RR-1` و `RR-2`)**، اگر هر کلاینت به *هر دو* RR متصل شود، آیا باید برای `RR-1` و `RR-2` مقدار `Cluster-ID` یکسان بگذاریم یا متفاوت، و پیامد اشتباه در این انتخاب چیست؟",
-            "a": "در طراحی **استاندارد پیشنهادی** وقتی کلاینت‌ها به هر دو RR وصل‌اند، اگر `Cluster-ID` را **یکسان** بگذارید و ناگهان لینک بین `RR-1` و کلاینت A قطع شود ولی `RR-2` به کلاینت A وصل باشد، مسیرهایی که `RR-2` به `RR-1` می‌فرستد چون `Cluster-ID` یکسان دارند توسط `RR-1` رد می‌شوند (چک ضدلوپ `CLUSTER_LIST`)! پس تنها در صورت وجود ارتباط مستقیمِ کامل بین همهٔ کلاینت‌ها و عدم نیاز به بازتاب بین دو RR می‌توان یکسان گذاشت، اما در طراحی ایمن‌تر امروز **هر RR یک `Cluster-ID` مجزا** دارد (و دو RR با هم همسایهٔ Non-Client iBGP می‌شوند) تا در قطعی‌های جزئی، مسیر پشتیبان از RR دوم همچنان به کلاینت برسد!"
+            "a": "نتیجهٔ افزونگی به **چند عامل هم‌زمان** وابسته است: اتصال کامل کلاینت‌ها به هر دو RR، وجود لینک/همسایگی iBGP بین دو RR، و دسترس‌پذیری Next-Hop در شبکه! وقتی هر کلاینت به *هر دو* RR متصل است و دو RR نیز به هم نشست دارند: اگر هر دو RR **`Cluster-ID` یکسان** داشته باشند، مسیر بازتاب‌شده از `RR-2` به `RR-1` توسط چک ضدلوپ `CLUSTER_LIST` رد می‌شود؛ بنابراین در این حالت اگر لینک بین `RR-1` و کلاینت A قطع شود ولی `RR-2` به کلاینت A وصل باشد، `RR-1` نمی‌تواند آن مسیر را از `RR-2` بگیرد و به کلاینت‌های دیگر بدهد (مگر اینکه کلاینت‌ها خودشان هم به `RR-2` وصل باشند یا مسیرهای IGP/BGP جایگزین بدون نیاز به بازتاب بین RRها در دسترس باشند). در طراحی رایج افزونگی کامل برای تحمل قطعی‌های نامتقارن، معمولاً به هر RR **`Cluster-ID` مجزا** (یا پیش‌فرض Router-ID خودش) می‌دهند و دو RR را همسایهٔ Non-Client iBGP می‌کنند تا بازتاب بین دو RR ممکن بماند—البته به شرط سلامت طراحی Next-Hop و نبود حلقهٔ روتینگ."
           }
         },
         {
@@ -13069,7 +13076,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "a": "IS-IS مستقیماً روی لایه ۲ کار می‌کند (مستقل از IP؛ بدون آسیب‌پذیری‌های IP spoofing به خود کنترل‌پلین)، توسعهٔ ساده‌ای برای IPv6 و Segment Routing با TLVهای جدید دارد، و محدودیت سفت‌وسخت Area 0 مرکزیِ OSPF را در لایهٔ ترافیک چندگانه منعطف‌تر مدیریت می‌کند؛ در حالی که OSPF در تیم‌های سازمانی آشنایی عمومی بیشتر و سازگاری گسترده‌تر با برندهای غیرمخابراتی دارد."
         }
       ],
-      "summary": "طراحی شبکه در **ENSLD** یعنی توازن میان هزینه، افزونگی، سادگی و مقیاس‌پذیری: محاسبهٔ درست **Oversubscription** (`<= 20:1` در Access و `<= 4:1` در Core)، کوچک نگه داشتن **Failure Domain** با خلاصه‌سازی و Stub در IGP، طراحی افزونهٔ **BGP Route Reflector**ها با `Cluster-ID`های مستقل، و طرح‌ریزی Nibble-Aligned **IPv6** (`/48` به ازای سایت و `/64` به ازای VLAN).",
+      "summary": "طراحی شبکه در **ENSLD** یعنی توازن میان هزینه، افزونگی، سادگی و مقیاس‌پذیری: به‌کارگیری راهنماهای متداول **Oversubscription** (حدود `20:1` در Access و `4:1` در Core به‌عنوان نقطهٔ شروع، مشروط به الگوی ترافیک، Microburst و عمق بافر سخت‌افزار)، کوچک نگه داشتن **Failure Domain** با خلاصه‌سازی و Stub در IGP، طراحی دقیق افزونگی **BGP Route Reflector**ها متناسب با توپولوژی و ارتباط متقابل RRها، و طرح‌ریزی Nibble-Aligned **IPv6** (`/48` به ازای سایت و `/64` به ازای VLAN).",
       "ciscoRef": "Cisco Designing Cisco Enterprise Networks (300-420 ENSLD) Official Cert Guide — Ch 2–5 (Campus/DC Design, IGP/BGP Scaling, IPv6 Plan)",
       "protocolAnalysis": [
         "فرمول تعداد نشست‌های Full-Mesh iBGP برابر **`N × (N - 1) / 2`** است: برای ۵۰ روتر یعنی `1,225` نشست، در حالی که با ۲ Route Reflector هر روتر کلاینت تنها **۲ نشست** به RRها دارد (جمع کل تنها حدود `100` نشست)!",
@@ -13102,7 +13109,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `ipv6 unicast-routing`، `area stub` و `neighbor ... route-reflector-client` را اجرا نمی‌کند (برای آزمایش زنده از CML یا EVE-NG استفاده کنید). اما اینجا ممیزی واقعی ظرفیت پورت‌ها برای محاسبهٔ **Oversubscription** و تقسیم مدولار سگمنت‌ها روی `Gi0/0..7` را زنده اجرا می‌کنیم.",
           "۲. با `enable` وارد شوید و با `show interfaces status` سرعت پورت‌های دسترسی (`Gi0/2..7`، شش پورت `1G` فعال/آماده) و لینک بالادستی (`Gi0/1` `1G` ترانک) را بررسی کنید.",
           "۳. برچسب‌های طراحی سلسله‌مراتبی و تفکیک دامنه‌های سرویس را اعمال کنید (`Gi0/0` برای هسته/L3، `Gi0/1` برای ترانک تجمیعی، و ایزوله‌سازی `Gi0/7` به‌عنوان پورت افزونهٔ رزرو): `configure terminal` -> `interface Gi0/0` -> `description CORE-L3-UPLINK-1G` -> `interface Gi0/1` -> `description DIST-TRUNK-AGG-1G` -> `interface Gi0/7` -> `description SPARE-ACCESS-1G` -> `shutdown` -> `end`.",
-          "۴. با `show interfaces status` و `show running-config` بررسی کنید با خاموش شدن `Gi0/7` در شبیه‌ساز ساده چند پورت فعال باقی مانده‌اند تا به‌صورت تمرینی نسبت پهنای باند دسترسی (`Gi0/3,4,5,6` + `Gi0/2` در صورت روشن شدن) به `Gi0/1` را محاسبه کنید (سنجش واقعی ترافیک و ظرفیت بافر روی سخت‌افزار انجام می‌شود)."
+          "۴. با `show interfaces status` و `show running-config` بررسی کنید با خاموش شدن `Gi0/7` در شبیه‌ساز ساده چند پورت فعال باقی مانده‌اند تا به‌صورت تمرینی نسبت پهنای باند دسترسی (`Gi0/3,4,5,6` + `Gi0/2` در صورت روشن شدن) به `Gi0/1` را محاسبه کنید (سنجش واقعی ترافیک و ظرفیت بافر روی سخت‌افزار انجام می‌شود).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (IGP Summarization & BGP RR):** در یک لاب چندروتوره در CML پس از `area 10 range 10.10.0.0 255.255.224.0` و راه‌اندازی دو RR با `Cluster-ID` مجزا، `show ip route` در Core و `show ip bgp <prefix>` را چک کنید. **خروجی مرجع و نشانهٔ موفقیت:** دیدن یک خلاصه‌مسیر تمیز `/19` در Core بدون سقوط با Flap یک لینک داخل Area 10، و رسیدن مسیر پشتیبان از RR دوم در قطع یکی از لینک‌ها. **نشانهٔ شکست:** باقی ماندن `/24`های جزئی یا طرد مسیر در `CLUSTER_LIST` در صورت طراحی ناسازگار RRها. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط شمارش وضعیت پورت‌های `1G` خود را انجام می‌دهد و ارزیابی واقعی Microburst و ترافیک در شبکهٔ واقعی/CML صورت می‌گیرد."
         ],
         "verifyCmds": [
           "enable",
@@ -13317,7 +13325,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی سرویس‌دهندهٔ واقعی NETCONF/RESTCONF یا کنترلرهای Catalyst Center/Meraki را ندارد (برای کدنویسی زنده از Cisco DevNet Sandbox استفاده کنید). اما اینجا اثر منطقی عملیات CRUD (`PATCH` جزئی روی یک پورت در برابر `PUT` جایگزین‌کنندهٔ کامل لیست ترانک!) را به‌طور زنده روی شبیه‌ساز تجربه می‌کنیم.",
           "۲. با `enable` وارد شوید و با `show interfaces trunk` و `show running-config` ببینید روی ترانک `Gi0/1` VLANهای `1,10,20` مجاز هستند.",
           "۳. شبیه‌سازی **`PATCH`** (افزودن جزئی بدون حذف قبلی‌ها): روی `Gi0/1` دستور `configure terminal` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 75` -> `end` و سپس `show interfaces trunk` را ببینید (لیست `1,10,20,75` حفظ شد!). حالا خطر **`PUT`ِ ناقص** را شبیه‌سازی کنید: فرض کنید کدی به اشتباه به جای افزودن جزئی، جایگزینی کامل (`switchport trunk allowed vlan 75`) می‌فرستد! آن را روی `Gi0/1` امتحان و در `show interfaces trunk` ببینید چطور `1,10,20` حذف شدند؛ سپس با `switchport trunk allowed vlan 1,10,20,75` -> `end` اصلاحش کنید.",
-          "۴. با `show interfaces trunk` و `show running-config` بررسی کنید در شبیه‌ساز ساده تفاوت جایگزینی لیست ترانک (شبیه خطرِ `PUT` ناقص) با افزودن افزایشی (`add`) روی `Gi0/1` قابل مشاهده است (پروتکل‌های واقعی RESTCONF/NETCONF و کنترلرهای Catalyst Center/Meraki در این شبیه‌ساز اجرا نمی‌شوند)."
+          "۴. با `show interfaces trunk` و `show running-config` بررسی کنید در شبیه‌ساز ساده تفاوت جایگزینی لیست ترانک (شبیه خطرِ `PUT` ناقص) با افزودن افزایشی (`add`) روی `Gi0/1` قابل مشاهده است (پروتکل‌های واقعی RESTCONF/NETCONF و کنترلرهای Catalyst Center/Meraki در این شبیه‌ساز اجرا نمی‌شوند).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (Catalyst Center Async `202` Polling & RESTCONF `PATCH`):** در پایتون، پس از ارسال یک تغییر ناهمگام به Catalyst Center پاسخ `202` و `taskId` را گرفته و `/dna/intent/api/v1/task/{taskId}` را Poll کنید؛ یا روی RESTCONF پس از `PATCH`، یک `GET` راستی‌آزمایی بزنید. **خروجی مرجع و نشانهٔ موفقیت:** در Catalyst Center دریافت `isError: false` و `endTime` غیرخالی در تسک، و در RESTCONF کد `204 No Content` و تایید فیلد جدید با `GET` بدون پاک شدن IP قبلی. **نشانهٔ شکست:** خطای `409 Conflict` / `400 Bad Request` در schema، پاک شدن فیلدها با `PUT` ناقص، یا Timeout در Polling. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی تنها مدل ذهنی `add` در برابر جایگزینی لیست VLAN ترانک را نمایش داد نه رفتار واقعی RFC 8040/8072."
         ],
         "verifyCmds": [
           "enable",
@@ -13487,7 +13496,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "summary": "در **300-440 ENCC**، طراحی اتصال ابر بر سه اصل استوار است: استفاده از هاب‌های ابری (**AWS Transit Gateway** / **Azure vWAN**) به جای اتصالات نقطه‌به‌نقطه؛ درک تفاوت **IPsec** (رمزنگاری‌شده و ارزان ولی وابسته به اینترنت) در برابر **Direct Connect / ExpressRoute** (پایدار و کم‌هزینه در Egress ولی بدون رمزنگاری ذاتی و دارای سقف BGP Prefix که نیازمند خلاصه‌سازی است)؛ و به‌کارگیری **Cloud OnRamp** و **DIA** برای حذف Hairpinning.",
       "ciscoRef": "Cisco Designing and Implementing Cloud Connectivity (300-440 ENCC) Study Guide & AWS/Azure Cisco SD-WAN Cloud OnRamp Design Guides",
       "protocolAnalysis": [
-        "در اتصال **VPN + Direct Connect** هم‌زمان در AWS: اگر هر دو پیشوند دقیقاً طول ماسک یکسان داشته باشند (مثلاً `/16` از هر دو طرف)، AWS بر اساس Longest Prefix Match یکسان بودن، مدار **Direct Connect (BGP)** را نسبت به VPN ترجیح می‌دهد؛ اما اگر یک پیشوند جزئی‌تر (`/24`) از روی VPN تبلیغ شود، طبق قانون طول پیشوند ترافیک ناخواسته به سمت VPN می‌رود!",
+        "در اتصال هم‌زمان **VPN + Direct Connect** در AWS، برتری مسیر بسته به **طول پیشوند (Longest Prefix Match)**، **نوع دروازه و Route Table** (مانند VGW در برابر Transit Gateway Route Table و تنظیمات Attachment) دارد؛ برای نمونه در ساختارهایی که با طول پیشوند برابر (مثل `/16` روی هر دو)، AWS مسیر Direct Connect را ترجیح می‌دهد، اگر پیشوند جزئی‌تر (`/24`) روی VPN تبلیغ شود، Longest Prefix Match باعث برتری VPN می‌شود.",
         "در **Cloud OnRamp for SaaS**, روتر شعبه با فرستادن دوره‌ای بسته‌های پروب HTTP/DNS روی لینک‌های اینترنت محلی و مرکزی، امتیاز کیفیت (**vQoE**) می‌گیرد تا ترافیک SaaS مستقیم از سریع‌ترین خروجی برود."
       ],
       "iosCommands": [
@@ -13526,7 +13535,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی قابلیت ساخت VPC/TGW، دستور `aggregate-address` و دستور `show ip bgp neighbors ... advertised-routes` را ندارد (برای آزمایش واقعی BGP به ابر از CML و محیط آزمایشی AWS/Azure استفاده کنید). در اینجا خواندن صحیح خروجی نمونهٔ `show ip bgp summary` و تفکیک یک VLAN تمرینی برای خروج محلی (`DIA`) را انجام می‌دهیم.",
           "۲. با `enable` وارد شوید و `show ip bgp summary` را اجرا کنید؛ در خروجی نمونه، ستون `State/PfxRcd` عدد `128` را نشان می‌دهد. دقت کنید این عدد یعنی **۱۲۸ پیشوند از همسایه `10.255.0.2` دریافت شده است**—برای بررسی پیشوندهایی که روتر ما به AWS تبلیغ می‌کند باید در IOS واقعی دستور `show ip bgp neighbors <peer> advertised-routes` را بررسی کنید و سهمیهٔ آن را متناسب با نوع VIF (مثلاً Private VIF در برابر Transit VIF)، جهت و خانوادهٔ آدرس در مستندات AWS بسنجید.",
           "۳. پورت‌های تمرینی شبیه‌ساز را برای تفکیک لینک لبه و یک VLAN مجزا (`VLAN 85`) برچسب‌گذاری کنید: `configure terminal` -> `interface Gi0/0` -> `description DIRECT-CONNECT-EDGE` -> `interface Loopback0` -> `description CLOUD-ONRAMP-RID` -> `vlan 85` -> `name DIA_SAAS_EXIT` -> `exit` -> `interface Gi0/7` -> `description DIA-LOCAL-INTERNET` -> `switchport mode access` -> `switchport access vlan 85` -> `end`.",
-          "۴. با `show running-config`، `show vlan brief` و `ping 10.255.0.2` تایید کنید تغییرات تمرینی روی `Gi0/7`/`VLAN 85` در شبیه‌ساز ثبت شده‌اند و دسترسی پایه به `10.255.0.2` پاسخ می‌دهد (بررسی واقعی مسیر تا PoP ابر یا سقف BGP ابر در شبیه‌ساز داخلی انجام نمی‌شود)."
+          "۴. با `show running-config`، `show vlan brief` و `ping 10.255.0.2` تایید کنید تغییرات تمرینی روی `Gi0/7`/`VLAN 85` در شبیه‌ساز ثبت شده‌اند و دسترسی پایه به `10.255.0.2` پاسخ می‌دهد (بررسی واقعی مسیر تا PoP ابر یا سقف BGP ابر در شبیه‌ساز داخلی انجام نمی‌شود).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (BGP Advertised-Routes & AWS Longest Match):** روی روتر مرزی در CML پس از `aggregate-address 10.20.0.0 255.255.0.0 summary-only`، دستور `show ip bgp neighbors 203.0.113.2 advertised-routes` را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** وجود فقط `10.20.0.0/16` (`Total number of prefixes 1`) روی هر دو نشست DX و VPN و تطبیق در AWS VPC Route Table با اولویت Direct Connect. **نشانهٔ شکست:** مشاهدهٔ ساب‌نت‌های `/24` روی VPN (غلبهٔ Longest Match و رفتن ترافیک ابر به سازمان روی VPN) یا عبور پیشوندها از سقف مجاز آن نوع VIF و Reset شدن نشست BGP. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط خروجی ثابت `show ip bgp summary` (`PfxRcd`) را نمایش می‌دهد و پیشوندهای ارسالی (`advertised-routes`) یا جداول AWS را شبیه‌سازی نمی‌کند."
         ],
         "verifyCmds": [
           "enable",
@@ -13536,9 +13546,9 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         ]
       },
       "troubleshooting": {
-        "fault": "سازمانی هم‌زمان یک لینک اختصاصی **Direct Connect (`10 Gbps`)** و یک تانل پشتیبان **IPsec VPN** به AWS دارد. در حالت عادی انتظار دارند کل ترافیک از Direct Connect برود؛ اما بعد از یک تغییر کوچک، با کمال تعجب می‌بینند ترافیک به سمت سرورهای اصلی (`10.20.10.0/24`) همچنان از روی VPN کُند عبور می‌کند، با اینکه لینک `10 Gbps` کاملاً سالم و `Established` است!",
-        "analysis": "روتر شعبه روی لینک **Direct Connect** فقط مسیر خلاصهٔ کل سازمان (`10.20.0.0/16`) را به ابر تبلیغ کرده است، در حالی که روی تانل **VPN** زیرشبکهٔ دقیق‌تر (`10.20.10.0/24`) تبلیغ شده است! در AWS (و هر روتر IP دیگر)، قانون **Longest Prefix Match (`/24` بر `/16` پیروز است!)** مقدم بر اولویت ذاتی Direct Connect عمل می‌کند و کل ترافیک به VPN سرازیر می‌شود!",
-        "fix": "یکسان کردن دقیق طول پیشوندهای تبلیغ‌شده در هر دو مسیر (تبلیغ `/16` روی هر دو یا هر دو دقیقاً یکسان) تا AWS با طول پیشوند برابر، اولویت را به Direct Connect بدهد."
+        "fault": "سازمانی شبکهٔ داخلی **`10.20.0.0/16`** (شامل ساب‌نت کاربران اصلی **`10.20.10.0/24`**) را از طریق یک **Direct Connect (`10 Gbps`)** و یک تانل پشتیبان **IPsec VPN** به یک VGW در AWS با رنج **`172.16.0.0/16`** (سرورهای ابری **`172.16.10.0/24`**) متصل کرده است. پس از یک تغییر در تنظیمات BGP، مشاهده می‌شود ترافیک **برگشتی و خروجی از سرورهای AWS (`172.16.10.0/24`) به مقصد سازمان (`10.20.10.0/24`)** به‌جای Direct Connect از روی تانل IPsec VPN عبور می‌کند، در حالی که Direct Connect کاملاً `Established` است!",
+        "analysis": "با تفکیک دو جهت ترافیک:\n۱) **جهت ابر به سازمان (`172.16.10.0/24 -> 10.20.10.0/24`):** روتر سازمان روی Direct Connect فقط مسیر خلاصهٔ **`10.20.0.0/16`** را *به AWS تبلیغ کرده*، اما روی تانل VPN زیرشبکهٔ دقیق‌تر **`10.20.10.0/24`** را *به AWS فرستاده* است! در جدول مسیر AWS، قانون **Longest Prefix Match (`/24` بر `/16` پیروز است!)** بر اولویت پیش‌فرض Direct Connect در VGW غلبه کرده و ترافیک ابر به سمت سازمان را روی VPN می‌فرستد.\n۲) **جهت سازمان به ابر (`10.20.10.0/24 -> 172.16.10.0/24`):** تصمیم این جهت در **جدول مسیر خودِ روتر سازمان** بر اساس پیشوندهای دریافتی از AWS و سیاست‌های محلی (مانند `Local Preference` یا `AS_PATH`) گرفته می‌شود و باید جداگانه با `show ip bgp 172.16.10.0` بررسی شود.",
+        "fix": "برای اصلاح مسیر ابر به سازمان، طول پیشوندهای تبلیغ‌شده به AWS را روی هر دو مسیر یکسان کنید (مثلاً فقط `10.20.0.0/16` روی هر دو، بدون نشت `/24` روی VPN) تا با طول برابر و طبق اولویت مسیر در آن ساختار VGW/TGW، Direct Connect برگزیده شود؛ و برای جهت رفت، `Local Preference` روتر سازمان را روی Direct Connect بالاتر قرار دهید."
       },
       "misconceptions": [
         {
@@ -13562,9 +13572,9 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         },
         {
           "level": "متوسط",
-          "task": "یک تیم ابری قصد دارد با یک تک‌تانل IPsec ساده روی اینترنت به یک VPC برسد و انتظار دارد ۵ گیگابیت بر ثانیه بکاپ بفرستد. چرا روی یک تک‌تانل به این سرعت نمی‌رسد و دو راه‌حل استاندارد در ENCC کدامند؟",
-          "hint": "محدودیت پردازشی یک تک‌تانل IPsec ابری (~1.25 Gbps) در برابر ECMP روی چند تانل یا لینک اختصاصی.",
-          "solution": "هر تک‌تانل IPsec مدیریت‌شده روی VGW/TGW معمولاً سقف ~**`1.25 Gbps`** دارد. راه‌حل‌ها: ۱) فعال‌سازی **ECMP روی چندین تانل IPsec موازی** به **Transit Gateway**؛ یا ۲) خرید مدار **AWS Direct Connect** (`1G`/`10G`) یا استقرار روترهای مجازی قوی‌تر (`Catalyst 8000V`) در ابر."
+          "task": "یک تیم ابری قصد دارد از طریق یک **تانل IPsec استاندارد** مدیریت‌شده در AWS به یک VPC برسد و انتظار دارد ۵ گیگابیت بر ثانیه بکاپ بفرستد. محدودیت تانل استاندارد چیست و این محدودیت با چه گزینه‌هایی در AWS (از جمله تفاوت VGW با Transit Gateway / Cloud WAN در پشتیبانی از **Large Bandwidth Tunnel**) و طراحی ENCC حل می‌شود؟",
+          "hint": "تانل استاندارد IPsec سقف ~`1.25 Gbps` دارد؛ اما AWS برای TGW/Cloud WAN گزینهٔ Large Bandwidth Tunnel تا `5 Gbps` هم ارائه کرده است (نه برای VGW). سایر گزینه‌ها: ECMP چندتانلی یا Direct Connect / C8000V.",
+          "solution": "هر **تانل IPsec استاندارد** مدیریت‌شده روی VGW/TGW سقف حدود **`1.25 Gbps`** دارد. گزینه‌های حل در ENCC:\n۱) **Large Bandwidth Tunnel تا `5 Gbps`:** در اتصال به **AWS Transit Gateway** یا **Cloud WAN** می‌توان گزینهٔ Large Bandwidth Tunnel (تا `5 Gbps` برای هر تانل، با پشتیبانی تجهیزات سازگار مثل BGP و Jumbo Frames) را برگزید *(توجه: این گزینه روی VGW پشتیبانی نمی‌شود)*.\n۲) **ECMP روی چند تانل موازی** متصل به **Transit Gateway**؛\n۳) خرید مدار **AWS Direct Connect** (`10G`) یا استقرار روترهای مجازی قوی‌تر (`Catalyst 8000V`) در ابر."
         },
         {
           "level": "چالشی",
@@ -13640,7 +13650,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
             "**Endpoint Agents (مستقیماً روی لپ‌تاپ و دسکتاپ کاربران واقعی):** از چشم خودِ کاربر (مشتری‌محور) وضعیت سیگنال Wi-Fi خانگی/سازمانی، VPN، DNS، Gateway و زمان واقعی باز شدن صفحهٔ مرورگر (**Real User Monitoring**) را ثبت می‌کنند!"
           ],
           "steps": [
-            "**لایهٔ ۱ — Path Visualization (گراف پرش‌به‌پرش):** مثل یک `traceroute` بسیار پیشرفته با چندین پروب هم‌زمان (TCP/ICMP) نشان می‌دهد بسته در داخل هر AS و هر روتر ISP چقدر تاخیر یا Packet Loss خورده و دقیقاً در کدام هاپ (شماره AS و شهر!) افتاده است.",
+            "**لایهٔ ۱ — Path Visualization (گراف پرش‌به‌پرش):** مثل یک `traceroute` پیشرفته با پروب‌های هم‌زمان (TCP/ICMP) نشان می‌دهد در کدام هاپ برای پروب‌های آن تست تاخیر یا افت پاسخ دیده شده است؛ با این حال در حضور **ECMP** ممکن است ترافیک واقعی کاربر (End-to-End) و پروب‌های Path Visualization دقیقاً از یک مسیر عبور نکنند و افت یک هاپ میانی نیز می‌تواند ناشی از Rate Limit کنترلی آن روتر باشد.",
             "**لایهٔ ۲ — BGP Route Visualization:** به‌صورت زنده تغییرات مسیر BGP جهانی (از جمله **BGP Route Leak** یا **BGP Hijacking**) را از ده‌ها ناظر جهانی نشان می‌دهد؛ اگر ترافیک شما ناگهان به جای اروپا از مسیر آسیا دور زده، بلافاصله دیده می‌شود.",
             "**لایهٔ ۳ — تست وب و تراکنش (`HTTP Server` / `Page Load` / `Transaction`):** در ThousandEyes زمان‌های جزئی مانند **`DNS`** -> **`Connect (TCP)`** -> **`SSL/TLS`** -> **`Wait` (از پایان ارسال درخواست HTTP تا رسیدن اولین بایت پاسخ)** -> **`Receive`** جدا می‌شوند و معیار کلی **`Response Time`** مجموع زمان از شروع تراکنش تا دریافت اولین بایت است (بنابراین `Response Time` با خود `Wait` یکی نیست!). این تفکیک سرنخ مهمی برای طرح فرضیهٔ محل گلوگاه می‌دهد."
           ],
@@ -13719,11 +13729,11 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         },
         {
           "cmd": "# خروجی مرجع تست HTTP + Path (ThousandEyes Reference)",
-          "out": "Agent: Esfahan-Ent-01 -> Target: https://crm.example.com\nHTTP: DNS=14ms | Connect=290ms | SSL=85ms | Wait=115ms | Response=419ms\nPath Hop 4 (LocalGW): 0% loss, 4ms | Hop 5 (ISP-AS65400): 18% loss | Hop 6-End: 0% loss (Case A) OR 18% loss (Case B)",
-          "note": "نمونهٔ مرجع ساختار خروجی تست ترکیبی HTTP/Path در داشبورد ThousandEyes (غیرشبیه‌سازی‌شده در ترمینال داخلی IOS).",
-          "why": "نشان می‌دهد چطور مقادیر `DNS / Connect / SSL / Wait / Response Time` در کنار ریزشِ هاپ‌های `Path Visualization` خوانده می‌شوند و چرا باید بین `Case A` (فقط هاپ ۵ افت دارد؛ احتمال Rate Limit کنترلی) و `Case B` (افت تا مقصد ادامه دارد؛ فرضیهٔ قوی اختلال مسیر) تمایز گذاشت.",
-          "anatomy": "تفکیک زمانی لایه‌های HTTP و زنجیرهٔ افت بسته از هاپ میانی تا مقصد نهایی.",
-          "lookFor": "همبستگی افت هاپ میانی با افت/Retransmission در مقصد نهایی (یا نرخ پایین پاسخ برنامه)؛ اگر مقصد `0% loss` داشت، هاپ ۵ام تنها Rate Limit کرده است.",
+          "out": "Agent: Esfahan-Ent-01 -> Target: https://crm.example.com\nHTTP: DNS=14ms | Connect=290ms | SSL=85ms | Wait=115ms | Response=504ms\nPath Hop 4 (LocalGW): 0% loss, 4ms | Hop 5 (ISP-AS65400): 18% loss | Hop 6-End: 0% loss (Case A) OR 18% loss (Case B)",
+          "note": "نمونهٔ مرجع ساختار خروجی تست ترکیبی HTTP/Path در داشبورد ThousandEyes (غیرشبیه‌سازی‌شده در ترمینال داخلی IOS). طبق مستندات ThousandEyes، `Response Time` از شروع تراکنش تا دریافت اولین بایت است و در اینجا برابر `DNS (14) + Connect (290) + SSL (85) + Wait (115) = 504ms` محاسبه می‌شود.",
+          "why": "نشان می‌دهد چطور مقادیر `DNS / Connect / SSL / Wait / Response Time` در کنار ریزشِ هاپ‌های `Path Visualization` خوانده می‌شوند و چگونه بین `Case A` (مقصد `0% loss`) و `Case B` (افت متداوم تا مقصد) فرضیهٔ اولیه و آزمایش تکمیلی طراحی می‌کنیم.",
+          "anatomy": "تفکیک زمانی لایه‌های HTTP تا اولین بایت (`Response Time = 504ms`) و زنجیرهٔ افت پروب از هاپ میانی تا مقصد نهایی.",
+          "lookFor": "اگر مقصد `0% loss` داشت (`Case A`)، شواهد به نفع این است که افت هاپ ۵ام احتمالاً ناشی از Rate Limit کنترلی آن روتر بوده است (نه افت واقعی ترافیک عبوری)؛ با این حال به علت احتمال ECMP و تفاوت مسیر برگشت، برای قطعیت باید آزمایش تکمیلی و تجربهٔ واقعی برنامه نیز بررسی شوند.",
           "ifUnexpected": "در صورت وجود `Wait` بالا بدون افت مسیر، تست مستقیم به سرور (دور زدن WAF/Proxy) را برای تایید یا رد کندی خود اپلیکیشن انجام دهید."
         },
         {
@@ -13733,17 +13743,18 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "why": "مشاهدهٔ گام‌به‌گام مسیر لایه ۳ تا مقصد و شناسایی اینکه تاخیر یا قطعی از اولین گامِ داخل شبکه است یا در گام‌های بعدی ایجاد شده است.",
           "anatomy": "شماره هاپ، آدرس IP پاسخ‌دهنده و سه مقدار RTT بر حسب میلی‌ثانیه.",
           "lookFor": "RTT پایین و یکنواخت بدون `* * *` در مسیرهای مجاز داخلی.",
-          "ifUnexpected": "جهش ناگهانی RTT یا بروز `* * *` در یک هاپ مشخص نشان‌دهندهٔ گلوگاه، افت بسته یا تغییر مسیر در آن نقطه است."
+          "ifUnexpected": "جهش RTT یا `* * *` در یک هاپ میانی صرفاً سرنخ فرضیه است (نه حکم قطعی)؛ ممکن است ناشی از **ICMP/Control-Plane Rate Limiting**، فیلتر پروب در آن روتر یا تفاوت مسیر **ECMP** باشد و تنها با بررسی تداوم افت تا مقصد و تست مستقیم برنامه قابل جمع‌بندی است."
         }
       ],
       "diagramSvg": "topo",
       "lab": {
-        "title": "آزمایشگاه آماده‌سازی سگمنت App-Hosting برای ThousandEyes Agent و تست مسیر در شبیه‌ساز",
+        "title": "آزمایشگاه آماده‌سازی سگمنت App-Hosting برای ThousandEyes Agent در شبیه‌ساز + سناریوی مرجع",
         "steps": [
           "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی کانتینر `iox / app-hosting` و داشبورد ابری ThousandEyes ندارد (برای آزمایش زنده از Cisco DevNet Sandbox استفاده کنید). اما تخصیص پورت/VLAN اختصاصی برای میزبانی کانتینر `Enterprise Agent` (مثل پورت `AppGigabitEthernet` روی Catalyst 9k) و تست مسیر با `ping` و `traceroute` کاملاً زنده قابل آزمایش است.",
-          "۲. با `enable` وارد شوید و با `show ip interface brief` و `traceroute 10.255.0.2` خط پایهٔ تاخیر و سلامت مسیر تا گره مقابل را بسنجید.",
+          "۲. با `enable` وارد شوید و با `show ip interface brief` و `traceroute 10.255.0.2` وضعیت ساختگی/پایهٔ اینترفیس `Gi0/0` و خروجی ثابت شبیه‌ساز تا `10.255.0.2` را ببینید *(توجه: `ping` و `traceroute` در شبیه‌ساز داخلی خروجی ازپیش‌تعریف‌شده بر اساس وضعیت `Gi0/0` تولید می‌کنند و تاخیر شبکهٔ واقعی را اندازه‌گیری نمی‌نمایند)*.",
           "۳. یک VLAN اختصاصی برای ترافیک پروب‌های **`ThousandEyes Agent (VLAN 95)`** بسازید، پورت `Gi0/7` را برای پروب سخت‌افزاری/VM به آن متصل کنید و روی ترانک `Gi0/1` عبورش دهید: `configure terminal` -> `vlan 95` -> `name TE_ASSURANCE_AGENT` -> `exit` -> `interface Gi0/7` -> `description TE-ENTERPRISE-AGENT` -> `switchport mode access` -> `switchport access vlan 95` -> `no shutdown` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 95` -> `end`.",
-          "۴. با `show vlan brief`، `show interfaces trunk`، `show running-config` و `traceroute 10.255.0.2` بررسی کنید که در شبیه‌ساز ساده صرفاً `VLAN 95` روی `Gi0/7` و ترانک `Gi0/1` ایجاد و مسیر پایهٔ آزمایشگاهی تا `10.255.0.2` تست شده است (استقرار واقعی `app-hosting` کانتینر ThousandEyes و تست‌های Path/HTTP/BGP در این شبیه‌ساز انجام نمی‌شود)."
+          "۴. با `show vlan brief`، `show interfaces trunk`، `show running-config` و `traceroute 10.255.0.2` بررسی کنید که در شبیه‌ساز ساده صرفاً `VLAN 95` روی `Gi0/7` و ترانک `Gi0/1` ایجاد و مسیر پایهٔ آزمایشگاهی تا `10.255.0.2` تست شده است (استقرار واقعی `app-hosting` کانتینر ThousandEyes و تست‌های Path/HTTP/BGP در این شبیه‌ساز انجام نمی‌شود).",
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (ThousandEyes HTTP/Path & Client 360):** در داشبورد ThousandEyes یا خروجی مرجع `iosCommands[1]` بالا، تست هم‌زمان `Cloud Agent` + `Enterprise Agent` را بررسی کنید. **خروجی مرجع و نشانهٔ موفقیت:** تفکیک `DNS + Connect + SSL + Wait = Response Time` (مثلاً `14 + 290 + 85 + 115 = 504ms`) و همبستگی افت/تاخیر بین هاپ‌ها و مقصد نهایی. **نشانهٔ شکست و دام تفسیری:** اگر تنها هاپ ۵ام `18% loss` داشت ولی مقصد نهایی `0% loss` داشت (`Case A`)، احتمالاً Rate Limit کنترلی آن هاپ است (با لحاظ احتمال تفاوت مسیر در ECMP)؛ اما اگر `18% loss` تا خود مقصد ادامه داشت (`Case B`)، فرضیهٔ افت مسیر تقویت می‌شود و با تست مستقیم/Wireshark راستی‌آزمایی می‌گردد. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط `VLAN 95` را ثبت کرد و هیچ پروب واقعی شبکه یا کانتینر `app-hosting` در آن اجرا نمی‌شود."
         ],
         "verifyCmds": [
           "enable",
@@ -22346,9 +22357,17 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
     } else if (low === 'no shutdown') {
       reply = '% ابتدا با interface <name> یک پورت را انتخاب کنید (یا در آزمایشگاه درس ۱: configure terminal -> interface Gi0/2 -> no shutdown).';
     } else if (low === 'switchport mode access' && sim.mode === 'if' && sim.activeIf) {
-      sim.interfaces[sim.activeIf].mode = 'access';
-      sim.interfaces[sim.activeIf].nonegotiate = false;
-      reply = `پورت ${sim.activeIf} به حالت static access تنظیم شد (مذاکرهٔ DTP غیرفعال شد).`;
+      const inf = sim.interfaces[sim.activeIf];
+      inf.mode = 'access';
+      reply = `پورت ${sim.activeIf} در حالت static access قرار گرفت${inf.nonegotiate ? ' (تنظیم switchport nonegotiate قبلی حفظ شد)' : ''}.`;
+    } else if (low === 'no switchport nonegotiate' && sim.mode === 'if' && sim.activeIf) {
+      const inf = sim.interfaces[sim.activeIf];
+      if (inf.mode === 'routed') {
+        reply = `% Command rejected: ${sim.activeIf} is a routed interface.`;
+      } else {
+        inf.nonegotiate = false;
+        reply = `تنظیم switchport nonegotiate روی ${sim.activeIf} برداشته شد.`;
+      }
     } else if (low === 'switchport mode trunk' && sim.mode === 'if' && sim.activeIf) {
       sim.interfaces[sim.activeIf].mode = 'trunk';
       reply = `پورت ${sim.activeIf} به حالت trunk تنظیم شد.`;

@@ -438,9 +438,17 @@
     } else if (low === 'no shutdown') {
       reply = '% ابتدا با interface <name> یک پورت را انتخاب کنید (یا در آزمایشگاه درس ۱: configure terminal -> interface Gi0/2 -> no shutdown).';
     } else if (low === 'switchport mode access' && sim.mode === 'if' && sim.activeIf) {
-      sim.interfaces[sim.activeIf].mode = 'access';
-      sim.interfaces[sim.activeIf].nonegotiate = false;
-      reply = `پورت ${sim.activeIf} به حالت static access تنظیم شد (مذاکرهٔ DTP غیرفعال شد).`;
+      const inf = sim.interfaces[sim.activeIf];
+      inf.mode = 'access';
+      reply = `پورت ${sim.activeIf} در حالت static access قرار گرفت${inf.nonegotiate ? ' (تنظیم switchport nonegotiate قبلی حفظ شد)' : ''}.`;
+    } else if (low === 'no switchport nonegotiate' && sim.mode === 'if' && sim.activeIf) {
+      const inf = sim.interfaces[sim.activeIf];
+      if (inf.mode === 'routed') {
+        reply = `% Command rejected: ${sim.activeIf} is a routed interface.`;
+      } else {
+        inf.nonegotiate = false;
+        reply = `تنظیم switchport nonegotiate روی ${sim.activeIf} برداشته شد.`;
+      }
     } else if (low === 'switchport mode trunk' && sim.mode === 'if' && sim.activeIf) {
       sim.interfaces[sim.activeIf].mode = 'trunk';
       reply = `پورت ${sim.activeIf} به حالت trunk تنظیم شد.`;
