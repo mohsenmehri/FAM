@@ -551,7 +551,16 @@
       groups.forEach(g => {
         const label = g.title.split('·')[0].trim() + ` (${toFa(g.lessons.length)})`;
         const b = el('button', 'tab-btn' + (activeLessonFaculty === g.facultyId ? ' active' : ''), label);
-        b.addEventListener('click', () => { activeLessonFaculty = g.facultyId; renderLessonToc(); });
+        b.addEventListener('click', () => {
+          activeLessonFaculty = g.facultyId;
+          if (!g.lessons.includes(state.activeLesson) && g.lessons.length) {
+            state.activeLesson = g.lessons[0];
+            persistState();
+            renderLessonArticle(ACADEMY.lessons[state.activeLesson]);
+            updateHomeSummary();
+          }
+          renderLessonToc();
+        });
         filterBar.appendChild(b);
       });
     }
