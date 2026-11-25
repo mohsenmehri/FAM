@@ -747,6 +747,15 @@
     appendRichText(leadDiv, lessonObj.lead, lessonObj.id);
     host.appendChild(leadDiv);
 
+    if (lessonObj.analogy) {
+      const ab = el('div', 'analogy-box');
+      ab.appendChild(el('b', '', '💡 مثال روزمره (تا کاملاً شیرفهم شود)'));
+      const ap = el('p');
+      appendRichText(ap, lessonObj.analogy, lessonObj.id);
+      ab.appendChild(ap);
+      host.appendChild(ab);
+    }
+
     // ۱ و ۲: هدف درس و پیش‌نیاز
     const b1 = el('div', 'step-block');
     b1.appendChild(el('span', 'step-tag', 'بخش ۱ و ۲ · هدف درس و پیش‌نیاز'));
@@ -831,6 +840,21 @@
         fl.appendChild(fi);
       });
       b3.appendChild(fl);
+    }
+
+    if (lessonObj.summary) {
+      const sb = el('div', 'summary-box');
+      sb.appendChild(el('b', '', '✨ جمع‌بندی ساده'));
+      const sp = el('p');
+      appendRichText(sp, lessonObj.summary, lessonObj.id);
+      sb.appendChild(sp);
+      b3.appendChild(sb);
+    }
+    if (lessonObj.ciscoRef) {
+      const cr = el('div', 'cisco-ref-box');
+      cr.appendChild(el('b', '', '📘 منبع رسمی سیسکو:'));
+      cr.appendChild(el('span', '', lessonObj.ciscoRef));
+      b3.appendChild(cr);
     }
     host.appendChild(b3);
 

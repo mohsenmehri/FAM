@@ -83,7 +83,7 @@ class AcademyRedesignTests(unittest.TestCase):
         for sid in all_grouped:
             self.assertIn(sid, data["lessons"])
             lesson = data["lessons"][sid]
-            for key in ("goal", "prereq", "sections", "table", "faq", "protocolAnalysis", "iosCommands", "lab", "troubleshooting", "exercise", "quiz"):
+            for key in ("goal", "prereq", "analogy", "summary", "ciscoRef", "sections", "table", "faq", "protocolAnalysis", "iosCommands", "lab", "troubleshooting", "exercise", "quiz"):
                 self.assertIn(key, lesson, f"{sid}.{key}")
         self.assertGreaterEqual(len(data["glossary"]), 100)
         for item in data["glossary"]:
