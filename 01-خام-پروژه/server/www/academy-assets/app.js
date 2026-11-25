@@ -346,7 +346,7 @@
       reply = [
         '۱) دستورات زنده و وضعیت‌دار (تغییر شما فوراً روی خروجی اثر می‌گذارد):',
         '  حالت‌ها: enable | configure terminal | interface Gi0/0..7 | exit | end | do <cmd> | reset lab',
-        '  تنظیم پورت: shutdown | no shutdown | switchport mode access|trunk',
+        '  تنظیم پورت: description <NAME> | shutdown | no shutdown | switchport mode access|trunk',
         '              switchport access vlan <id> | switchport voice vlan <id> | switchport nonegotiate',
         '              switchport trunk native vlan <id> | switchport trunk allowed vlan [add] <id,id>',
         '  ساخت VLAN: vlan <id> -> name <NAME>',
@@ -421,6 +421,10 @@
       const vname = cmd.split(/\s+/).slice(1).join('_');
       sim.vlans[sim.activeVlan].name = vname;
       reply = `نام VLAN ${sim.activeVlan} به ${vname} تغییر یافت.`;
+    } else if (low.startsWith('description ') && sim.mode === 'if' && sim.activeIf) {
+      const descTxt = cmd.split(/\s+/).slice(1).join('_');
+      sim.interfaces[sim.activeIf].desc = descTxt || 'PORT';
+      reply = `توضیحات پورت ${sim.activeIf} به "${sim.interfaces[sim.activeIf].desc}" تغییر یافت.`;
     } else if (low === 'shutdown' && sim.mode === 'if' && sim.activeIf) {
       const iface = sim.interfaces[sim.activeIf];
       iface.adminUp = false;
@@ -472,28 +476,33 @@
         reply = `لیست مجاز ترانک جایگزین شد: ${iface.allowedVlans.join(',') || 'none'}`;
       }
     } else if (low === 'show running-config' || low === 'sh run') {
-      const lines = ['Building configuration...', '', 'Current configuration:', '!', 'hostname R1', '!'];
-      Object.keys(sim.vlans).map(Number).sort((a, b) => a - b).filter(v => v !== 1).forEach(vid => {
-        lines.push(`vlan ${vid}`, ` name ${sim.vlans[vid].name}`, '!');
-      });
-      Object.entries(sim.interfaces).forEach(([name, inf]) => {
-        lines.push(`interface ${name}`);
-        if (inf.ip && inf.ip !== 'unassigned') lines.push(` ip address ${inf.ip} 255.255.255.0`);
-        if (inf.mode === 'access') {
-          lines.push(' switchport mode access');
-          if (inf.accessVlan !== 1) lines.push(` switchport access vlan ${inf.accessVlan}`);
-          if (inf.voiceVlan) lines.push(` switchport voice vlan ${inf.voiceVlan}`);
-          if (inf.nonegotiate) lines.push(' switchport nonegotiate');
-        } else if (inf.mode === 'trunk') {
-          lines.push(' switchport trunk encapsulation dot1q', ' switchport mode trunk');
-          if (inf.nativeVlan !== 1) lines.push(` switchport trunk native vlan ${inf.nativeVlan}`);
-          lines.push(` switchport trunk allowed vlan ${inf.allowedVlans.join(',')}`);
-        }
-        if (!inf.adminUp) lines.push(' shutdown');
-        lines.push('!');
-      });
-      lines.push('end');
-      reply = lines.join('\n');
+      if (sim.mode === 'user') {
+        reply = '% Invalid input detected (دستور show running-config در مد کاربر R1> مجاز نیست؛ ابتدا دستور enable را وارد کنید).';
+      } else {
+        const lines = ['Building configuration...', '', 'Current configuration:', '!', 'hostname R1', '!'];
+        Object.keys(sim.vlans).map(Number).sort((a, b) => a - b).filter(v => v !== 1).forEach(vid => {
+          lines.push(`vlan ${vid}`, ` name ${sim.vlans[vid].name}`, '!');
+        });
+        Object.entries(sim.interfaces).forEach(([name, inf]) => {
+          lines.push(`interface ${name}`);
+          if (inf.desc) lines.push(` description ${inf.desc}`);
+          if (inf.ip && inf.ip !== 'unassigned') lines.push(` ip address ${inf.ip} 255.255.255.0`);
+          if (inf.mode === 'access') {
+            lines.push(' switchport mode access');
+            if (inf.accessVlan !== 1) lines.push(` switchport access vlan ${inf.accessVlan}`);
+            if (inf.voiceVlan) lines.push(` switchport voice vlan ${inf.voiceVlan}`);
+            if (inf.nonegotiate) lines.push(' switchport nonegotiate');
+          } else if (inf.mode === 'trunk') {
+            lines.push(' switchport trunk encapsulation dot1q', ' switchport mode trunk');
+            if (inf.nativeVlan !== 1) lines.push(` switchport trunk native vlan ${inf.nativeVlan}`);
+            lines.push(` switchport trunk allowed vlan ${inf.allowedVlans.join(',')}`);
+          }
+          if (!inf.adminUp) lines.push(' shutdown');
+          lines.push('!');
+        });
+        lines.push('end');
+        reply = lines.join('\n');
+      }
     } else if (low === 'show ip interface brief' || low === 'sh ip int br') {
       const lines = ['Interface              IP-Address      OK? Method Status                Protocol'];
       Object.entries(sim.interfaces).forEach(([name, inf]) => {
@@ -555,7 +564,7 @@
       const ip = low.split(/\s+/)[1] || '';
       const g0 = sim.interfaces['GigabitEthernet0/0'];
       const g0Ok = g0 && g0.adminUp && g0.lineUp;
-      const reachable = (ip === '10.10.0.1' && g0Ok) || (ip === '10.255.0.1') || (ip === '10.10.0.2' && g0Ok);
+      const reachable = (ip === '10.10.0.1' && g0Ok) || (ip === '10.255.0.1') || ((ip === '10.10.0.2' || ip === '10.255.0.2') && g0Ok);
       if (!ip) {
         reply = '% آدرس IP مقصد را وارد کنید (مثلاً ping 10.10.0.2).';
       } else if (reachable) {

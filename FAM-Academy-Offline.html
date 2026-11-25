@@ -2548,11 +2548,11 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "p": [
             "یکی از کلیدی‌ترین مفاهیم شبکه این است که ARP **هرگز از روتر عبور نمی‌کند** (چون Broadcast در لایه ۳ متوقف می‌شود). پس وقتی لپ‌تاپ `192.168.10.10/24` می‌خواهد به یک سرور بیرونی با آدرس نمونهٔ مستندسازی `198.51.100.80` وصل شود، کار اشتباهی است اگر برای `198.51.100.80` پیام ARP بفرستد!",
             "کلاینت ابتدا IP مقصد را با Subnet Mask خودش مقایسه می‌کند و می‌فهمد در شبکهٔ محلی نیست؛ بنابراین در جدول مسیر خود سراغ **دروازهٔ پیش‌فرض (Default Gateway)** (مثلاً روتر `192.168.10.1`) می‌رود و **ARP Request را برای `192.168.10.1` می‌فرستد**. در نتیجه روی فریم اترنت، Destination IP همان `198.51.100.80` است، اما Destination MAC آدرس کارت شبکهٔ روترِ محلی خواهد بود.",
-            "دومین کاربرد مهم ARP، **Gratuitous ARP (ARP رایگان)** است: وقتی یک دستگاه IP می‌گیرد یا کارت شبکه‌اش عوض می‌شود، یک بستهٔ ARP می‌فرستد که هم IP مبدأ و هم IP مقصد آن **آدرس خودش** است! این کار دو فایده دارد: ۱) اگر دستگاه دیگری قبلاً همین IP را برداشته باشد (IP Conflict)، فوری مشخص می‌شود؛ ۲) تمام سوئیچ‌ها و همسایه‌ها کش قدیمی خود را با MAC تازه به‌روزرسانی می‌کنند."
+            "دومین کاربرد مهم ARP، **Gratuitous ARP (GARP)** است: وقتی یک دستگاه IP می‌گیرد یا در یک Failover آدرس IP خود را به کارت شبکهٔ دیگری منتقل می‌کند، یک بستهٔ ARP می‌فرستد که هم IP مبدأ و هم IP مقصد آن **آدرس خودش** است. این کار دو فایده دارد: ۱) کشف تداخل IP (IP Conflict) در صورت پاسخ دستگاه دیگر؛ ۲) اطلاع‌رسانی به شبکه تا میزبان‌ها و روترها در **جدول ARP Cache** خود (نگاشت `IP -> MAC`) تغییر را ثبت کنند و سوئیچ‌ها نیز در **جدول MAC** (نگاشت `MAC -> Port` که اصلاً اطلاعی از آدرس IP ندارد!) آدرس سخت‌افزاری جدید را روی پورت مربوطه یاد بگیرند. **محدودیت مهم GARP:** بسیاری از سیستم‌عامل‌ها و تجهیزات مدرن به دلایل امنیتی (پیشگیری از ARP Spoofing/Poisoning)، اگر IP مورد نظر از قبل در جدول ARP Cacheشان نباشد ورودی تازه‌ای نمی‌سازند و برخی سیستم‌ها حتی به‌روزرسانی خودکار کش با GARP را محدود یا نادیده می‌گیرند."
           ],
           "think": {
-            "q": "اگر دو دستگاه در یک VLAN به اشتباه IP یکسان `192.168.10.50` بگیرند، در پاسخ به ARP Request چه اتفاقی می‌افتد و چرا کاربر گاهی قطع و گاهی وصل می‌شود؟",
-            "a": "هر دو دستگاه به درخواست ARP پاسخ می‌دهند. کامپیوتر فرستنده و سوئیچ آخرین پاسخی را که دیرتر برسد در جدول خود ثبت می‌کنند؛ بنابراین بسته گاهی به دستگاه درست و گاهی به دستگاه مزاحم می‌رود (که به آن IP Conflict و در سناریوی حمله به آن ARP Spoofing می‌گوییم)."
+            "q": "اگر دو دستگاه با دو کارت شبکهٔ متفاوت در یک VLAN به اشتباه IP یکسان `192.168.10.50` بگیرند، کدام جدول دچار تداخل و جابجایی می‌شود: جدول ARP Cache میزبان‌ها یا جدول MAC سوئیچ؟ و چرا ارتباط کاربر ناپایدار می‌شود؟",
+            "a": "در این حالت **جدول ARP Cache میزبان‌ها (و روتر)** دچار تداخل می‌شود؛ زیرا هر دو دستگاه برای یک IP واحد پاسخ ARP می‌فرستند و کامپیوتر فرستنده آخرین پاسخی را که برسد در کش `IP -> MAC` خود می‌نویسد، بنابراین بسته گاهی به دستگاه درست و گاهی به دستگاه دوم می‌رود. اما در جدول MAC سوئیچ، چون هر دستگاه آدرس MAC متمایزی دارد، دو MAC به‌طور مجزا روی دو پورت مختلف می‌مانند و مشکلی در لایه ۲ ندارند (سوئیچ لایه ۲ اصلاً جدول ARP و آدرس IP ندارد)."
           }
         }
       ],
@@ -2683,7 +2683,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "level": "چالشی",
           "task": "فرض کنید سرور پشتیبان در یک شرکت دچار خرابی شده و در چند ثانیه IP خود (`10.5.1.10`) را به یک سرور جایگزین با کارت شبکه جدید منتقل می‌کنند (Failover)، اما کامپیوترهای کاربران هنوز MAC سرور قدیمی را در ARP Cache دارند و ارتباطشان قطع شده. چه مکانیزمی از ARP بدون انتظار برای پایان Age این مشکل را همان لحظه حل می‌کند و فریم آن چه مقادیری دارد؟",
           "hint": "به کاربرد دوم Gratuitous ARP فکر کنید.",
-          "solution": "سرور جایگزین بلافاصله یک Gratuitous ARP (Broadcast به `FF:FF:FF:FF:FF:FF`) می‌فرستد که در آن هم Sender IP و هم Target IP برابر `10.5.1.10` و Sender MAC برابر آدرس جدید خودش است. تمام سوئیچ‌ها و کلاینت‌ها با دیدن این فریم، نگاشت `10.5.1.10` در جدول‌های خود را فوری به MAC جدید به‌روزرسانی می‌کنند."
+          "solution": "سرور جایگزین بلافاصله یک Gratuitous ARP (Broadcast به `FF:FF:FF:FF:FF:FF`) می‌فرستد که در آن هم Sender IP و هم Target IP برابر `10.5.1.10` و Sender MAC برابر MAC جدید خودش است. سوئیچ‌ها (که IP نمی‌دانند و جدول ARP ندارند) با دیدن این فریم، صرفاً آدرس MAC جدید را روی پورت سرور جایگزین در MAC Table یاد می‌گیرند؛ و کلاینت‌هایی که از قبل رکورد `10.5.1.10` را در ARP Cache داشته‌اند و سیستم‌عاملشان GARP را بپذیرد، آن را به MAC جدید به‌روزرسانی می‌کنند. (محدودیت عملی: در سیستم‌عامل‌ها یا فایروال‌هایی که برای مقابله با ARP Spoofing به‌روزرسانی کش با GARP را محدود کرده باشند، این تغییر فوری اعمال نمی‌شود و تا انقضای TTL کش یا ارسال ARP Request تازه صبر لازم است.)"
         }
       ],
       "quiz": [
@@ -2779,7 +2779,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           }
         }
       ],
-      "analogy": "طراحی VLSM مثل قطعه‌بندی یک زمین مستطیلی بزرگ بین چند واحد شرکت است (انبار بزرگ، دفتر فنی متوسط، اتاق مدیریت کوچک و اتاقک نگهبانی)، با این شرط مهندسی که **در هر برش فقط می‌توانید زمین را به دو نیمهٔ دقیقاً برابر تقسیم کنید**. انبار بزرگ یک نیمه (۵۰٪ زمین = `/25`) را می‌برد؛ نیمهٔ دوم را دو نصف می‌کنیم و ۲۵٪ (`/26`) به فنی می‌رسد؛ باقیمانده را دوباره نصف می‌کنیم تا سهم‌های کوچک‌تر `/28` و `/30` بیرون بیاید. وجه شباهت در رعایت مضرب‌های توان ۲ و مرتب‌سازی از بزرگ به کوچک است. اما محل شکست تشبیه اینجاست: در زمین واقعی اگر ۱۰۰ مترمربع نیاز دارید، می‌توانید دقیقاً ۱۰۲ متر مربع بردارید، اما در IPv4 هر زیرشبکه حتماً باید اندازهٔ توان ۲ (مثلاً ۱۲۸ آدرس) داشته باشد و همیشه ۲ آدرس مرزی آن (Network و Broadcast) قابل استفاده برای دستگاه‌ها نیستند (به جز استثنای `/31` در برخی لینک‌های روتری طبق RFC 3021).",
+      "analogy": "طراحی VLSM مثل قطعه‌بندی یک زمین مستطیلی بزرگ بین چند واحد شرکت است (انبار بزرگ، دفتر فنی متوسط، اتاق مدیریت کوچک و اتاقک نگهبانی)، با این شرط مهندسی که **در هر برش فقط می‌توانید زمین را به دو نیمهٔ دقیقاً برابر تقسیم کنید**. انبار بزرگ یک نیمه (۵۰٪ زمین = `/25`) را می‌برد؛ نیمهٔ دوم را دو نصف می‌کنیم و ۲۵٪ (`/26`) به فنی می‌رسد؛ باقیمانده را دوباره نصف می‌کنیم تا سهم‌های کوچک‌تر `/28` و `/30` بیرون بیاید. وجه شباهت در رعایت مضرب‌های توان ۲ و مرتب‌سازی از بزرگ به کوچک است. اما محل شکست تشبیه اینجاست: در زمین واقعی اگر ۱۰۰ مترمربع نیاز دارید، می‌توانید دقیقاً ۱۰۲ متر مربع بردارید، اما در IPv4 هر زیرشبکه حتماً باید اندازهٔ توان ۲ داشته باشد و در زیرشبکه‌های عادی (`/30` تا `/0`) همیشه ۲ آدرس مرزی (Network و Broadcast) قابل تخصیص به هاست نیستند؛ مگر در دو استثنای خاص: پیشوند **`/31` (RFC 3021)** که در لینک‌های نقطه-به‌نقطه بین دو روتر به دلیل نبود نیاز به Broadcast هر دو آدرس را به دو سر لینک اختصاص می‌دهد، و **`/32`** که یک آدرس میزبان تکی (مانند Loopback) را مشخص می‌کند.",
       "table": {
         "title": "جدول مرجع سریع پیشوندهای پرکاربرد CIDR از /24 تا /30",
         "headers": [
@@ -3086,8 +3086,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         "title": "آزمایشگاه آماده‌سازی سوئیچ برای Inter-VLAN Routing و بررسی Trunk",
         "steps": [
           "۱. مرز شبیه‌ساز: ترمینال داخلی تنظیمات سوئیچ (ساخت VLANها، پورت‌های Access روی `Gi0/2..7` و پورت Trunk روی `Gi0/1`) را به‌صورت **زنده** اجرا می‌کند؛ اما تنظیم Subinterface روتر (`Gi0/0.10`) و دستور `ip routing` برای SVI نیازمند محیط بیرونی (Packet Tracer / CML / GNS3) است.",
-          "۲. وارد `enable` شوید و با `show vlan brief` و `show interfaces trunk` ببینید روی `R1` اکنون VLAN 10 و پورت Trunk `Gi0/1` تنظیم هستند.",
-          "۳. سناریو: باید شبکه را برای دو بخش مجزای مالی (`VLAN 10`) و فروش (`VLAN 20`) و اتصالشان به روتر از طریق Trunk آماده کنید. با `configure terminal` وارد شوید، `vlan 20` با نام `SALES` بسازید، پورت `Gi0/6` را در `VLAN 20` (`switchport mode access` -> `switchport access vlan 20`) و پورت `Gi0/3` را در `VLAN 10` قرار دهید، و روی `Gi0/1` مطمئن شوید `switchport trunk allowed vlan 10,20` تنظیم است.",
+          "۲. وارد `enable` شوید و با `show vlan brief` و `show interfaces trunk` وضعیت اولیه را ببینید: در وضعیت اولیه `VLAN 10 (USERS)` با `Gi0/3, Gi0/4` و `VLAN 20 (SERVERS)` با `Gi0/5` وجود دارند، پورت `Gi0/6` روی `VLAN 1` است و `Gi0/1` با لیست `1,10,20` در حالت Trunk قرار دارد.",
+          "۳. سناریو: پورت `Gi0/6` را هم به بخش `VLAN 20` منتقل کنید و نام `VLAN 20` را به `SALES` تغییر دهید، و Trunk `Gi0/1` را به فقط `10,20` محدود کنید: با `configure terminal` وارد شوید (`vlan 20` -> `name SALES` -> `exit` -> `interface Gi0/6` -> `switchport mode access` -> `switchport access vlan 20` -> `interface Gi0/1` -> `switchport trunk allowed vlan 10,20`).",
           "۴. با `end` خارج شده و با `show vlan brief`، `show interfaces trunk` و `show running-config` زنده نتیجه را بررسی کنید؛ سپس در دفترچهٔ خود دستورات تکمیلی سمت روتر (`Gi0/0.10` و `Gi0/0.20`) را برای تکمیل کل مسیر بنویسید."
         ],
         "verifyCmds": [
@@ -3596,9 +3596,9 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       },
       "misconceptions": [
         {
-          "myth": "سوئیچ دامنهٔ پخش همگانی (Broadcast Domain) را می‌شکند و جلوی ترافیک Broadcast بین کامپیوترها را می‌گیرد.",
-          "reality": "سوئیچ Collision Domain را در هر پورت می‌شکند، نه Broadcast Domain را. همهٔ پورت‌های داخل یک VLAN همچنان فریم‌های Broadcast را دریافت می‌کنند و فقط روتر (یا تفکیک VLAN به همراه روتر) مرز Broadcast Domain است.",
-          "howToSpot": "اگر دو کامپیوتر روی دو پورت مختلف یک سوئیچ در یک VLAN باشند، هنگام ارسال ARP Request روی سیم هر دو کامپیوتر آن فریم Broadcast را دریافت می‌کنند (قابل مشاهده در Wireshark)."
+          "myth": "سوئیچ به‌خودی‌خود دامنهٔ پخش همگانی (Broadcast Domain) را می‌شکند و جلوی ترافیک Broadcast بین کامپیوترها را می‌گیرد.",
+          "reality": "در حالت پیش‌فرض (وقتی همهٔ پورت‌ها در یک VLAN واحد هستند)، سوئیچ فقط Collision Domain را در هر پورت می‌شکند، نه Broadcast Domain را. اما با تقسیم پورت‌ها به **VLANهای مجزا**، خود سوئیچ هر VLAN را به یک Broadcast Domain مستقل تبدیل می‌کند (حتی بدون وجود روتر)؛ و برای برقراری ارتباط میان این Broadcast Domainهای جداست که به روتر یا سوئیچ لایه ۳ نیاز داریم.",
+          "howToSpot": "اگر دو کامپیوتر در یک VLAN واحد به یک سوئیچ وصل باشند، هنگام ارسال ARP Request در Wireshark هر دو آن فریم Broadcast را دریافت می‌کنند؛ ولی اگر در دو VLAN جداگانه قرار گیرند، Broadcast یکی اصلاً به دیگری نمی‌رسد."
         },
         {
           "myth": "پروتکل UDP همیشه ناامن یا بی‌کیفیت است و نباید در سرویس‌های مهم از آن استفاده کرد.",
@@ -4252,8 +4252,8 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       },
       "troubleshooting": {
         "fault": "کاربران گزارش می‌دهند پس از قطع اینترنت، با اینکه صفحهٔ هیچ سایتی با نام دامنه‌اش باز نمی‌شود، ولی وقتی آدرس عددی IP یک سرور بیرونی شناخته شده را مستقیم می‌زنند یا پینگ می‌گیرند، پاسخ بدون مشکل می‌آید.",
-        "analysis": "پینگ موفق یک IP بیرونی نشان می‌دهد لایه‌های ۱ تا ۳، Gateway و PAT همگی درست کار می‌کنند. اما از کار افتادن باز کردن سایت‌ها با نام دامنه، مشکل را دقیقاً به نامه‌رسان اسم یعنی DNS محدود می‌کند (قطع بودن سرور DNS، اشتباه بودن آدرس DNS در تنظیمات DHCP یا مسدود شدن UDP/TCP پورت ۵۳).",
-        "fix": "از روی کلاینت با `nslookup example.org` یا `dig` بررسی کنید کدام سرور DNS پاسخ نمی‌دهد؛ سپس آدرس DNS داده‌شده در DHCP Pool را اصلاح کرده و مطمئن شوید فایروال پورت ۵۳ را نبسته است."
+        "analysis": "پینگ موفق به یک IP بیرونی مشخص، در آن لحظه صرفاً نشان می‌دهد مسیر لایه ۱ تا ۳، Gateway و ترجمهٔ ICMP در NAT/PAT برای آن مقصد خاص برقرارند (نه لزوماً برای تمام مقاصد یا ترافیک TCP/UDP مثل پورت ۴۴۳ وب). ناتوانی در باز کردن سایت با نام دامنه احتمال بالایی از اختلال DNS را مطرح می‌کند، اما بدون تست اتصال مستقیم وب با IP یا اجرای `nslookup` نمی‌توان بسته بودن پورت ۴۴۳ در فایروال یا مشکل Proxy را کاملاً رد کرد.",
+        "fix": "از روی کلاینت ابتدا با `nslookup example.org` یا `dig` بررسی کنید آیا سرور DNS پاسخ صحیح می‌دهد یا خیر (و در صورت امکان باز بودن TCP 443 را هم بسنجید)؛ اگر `nslookup` خطا داد یا تایم‌اوت خورد، آدرس DNS داده‌شده در DHCP Pool یا باز بودن پورت ۵۳ (UDP/TCP) در فایروال را اصلاح کنید."
       },
       "misconceptions": [
         {
@@ -4312,15 +4312,15 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "exp": "PAT با نگاشت ترکیبی IP عمومی + شماره پورت مبدأ منحصربه‌فرد، اتصال هم‌زمان صدها یا هزاران نشست روی یک IP عمومی را ممکن می‌سازد."
         },
         {
-          "q": "اگر در شبکه کاربری بتواند IP بیرونی سرور را پینگ کند (`ping` موفق)، اما هیچ سایتی با نام دامنه باز نشود، محتمل‌ترین محل بررسی بعدی چیست؟",
+          "q": "اگر در شبکه کاربری بتواند به یک سرور وب هم `ping` بگیرد و هم با وارد کردن مستقیم آدرس IP آن در مرورگر صفحهٔ وب را باز کند، اما باز کردن همان سایت با نام دامنه شکست بخورد، محتمل‌ترین محل بررسی بعدی چیست؟",
           "opts": [
-            "تنظیمات DNS و پورت ۵۳",
+            "تنظیمات DNS و دسترسی به پورت ۵۳",
             "تعویض کابل شبکه",
             "تغییر آدرس MAC",
             "فعال کردن STP"
           ],
           "ans": 0,
-          "exp": "برقراری پینگ مستقیم با IP نشان می‌دهد لایه ۱ تا ۳ و مسیریابی سالمند؛ ناتوانی در باز کردن نام دامنه معمولاً به DNS مربوط است."
+          "exp": "موفقیت اتصال مستقیم به صفحهٔ وب با IP نشان می‌دهد لایه ۱ تا ۳، مسیریابی، PAT و سرویس وب در آن لحظه کار می‌کنند؛ ناکامی با نام دامنه مستقیماً به اختلال DNS اشاره دارد."
         }
       ],
       "bridge": {
@@ -4725,10 +4725,10 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "lab": {
         "title": "پروژهٔ عملی نهایی ترم اول: عیب‌یابی لایه‌به‌لایه روی روتر R1",
         "steps": [
-          "۱. سناریوی پروژه: ارتباط با همسایهٔ `10.10.0.2` و Loopback مقصد `10.255.0.2` را باید با روش لایه‌به‌لایه راستی‌آزمایی و سپس بازیابی یک خرابی شبیه‌سازی‌شده را تمرین کنید (توجه: در شبیه‌ساز داخلی دستورات وضعیت پورت، `ping`، `traceroute` و `show running-config` زنده هستند و `show ip route` نمونهٔ ثابت است؛ برای تمرین کامل روتینگ چندروتری از Packet Tracer یا CML استفاده کنید).",
-          "۲. گام لایه ۱ و ۲: وارد `enable` شوید و با `show ip interface brief` و `show interfaces status` پورت‌های `Gi0/0` و `Gi0/2` را چک کنید. می‌بینید `Gi0/2` در حالت `administratively down` است.",
+          "۱. سناریوی پروژه: ارتباط با همسایهٔ `10.10.0.2` و Loopback مقصد `10.255.0.2` را با روش لایه‌به‌لایه بررسی و سپس یک خرابی شبیه‌سازی‌شده را بازیابی کنید (مرز شبیه‌ساز: دستورات وضعیت پورت، `ping`، `traceroute` و `show running-config` زنده هستند و `show ip route` نمونهٔ ثابت است؛ برای تمرین کامل روتینگ چندروتری از Packet Tracer یا CML استفاده کنید).",
+          "۲. گام لایه ۱ و ۲: وارد `enable` شوید و با `show ip interface brief` و `show interfaces status` پورت‌های `Gi0/0` و `Gi0/2` را چک کنید. می‌بینید `Gi0/2` در حالت `administratively down` است و پینگ اولیهٔ `ping 10.255.0.2` موفق (`5/5`) است.",
           "۳. گام لایه ۳ (شبیه‌سازی خرابی مسیر خروجی): با `configure terminal` -> `interface Gi0/0` -> `shutdown` پورت خروجی را ببندید. با `do ping 10.255.0.2` و `do traceroute 10.255.0.2` اثر قطع لایه ۱ را روی مسیریابی ببینید (`0/5` و `* * *`).",
-          "۴. بازیابی و تحویل پروژه: اکنون هر دو پورت `Gi0/0` و `Gi0/2` را روشن کنید (`no shutdown`), با `end` خارج شوید، و با `show ip interface brief`، `show running-config` و `ping 10.255.0.2` تایید کنید وضعیت شبکه پایدار شده است."
+          "۴. بازیابی و تحویل پروژه: اکنون ابتدا همان `Gi0/0` را با `no shutdown` برگردانید، سپس `interface Gi0/2` -> `no shutdown` -> `end` بزنید و با `show ip interface brief`، `show running-config` و `ping 10.255.0.2` تایید کنید مسیر زنده دوباره `5/5` برقرار شده است."
         ],
         "verifyCmds": [
           "enable",
@@ -4750,9 +4750,9 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "howToSpot": "در آزمون‌ها و شبکه واقعی همیشه اول طول `/x` هر سطر جدول را مقایسه کنید، و تنها در صورت تساوی کامل پیشوند سراغ عدد اول داخل براکت `[AD/Metric]` بروید."
         },
         {
-          "myth": "اگر یک پینگ به سمت سرور موفق شد (`5/5`)، پس یعنی کل مسیر برگشت مهم نیست یا یک‌طرفه است.",
-          "reality": "پینگ (`Echo Request` + `Echo Reply`) یک آزمایش **رفت‌وبرگشتی** است؛ موفقیت آن به معنای سلامت مسیر رفت *و* مسیر برگشت است. بسیاری از قطعی‌ها فقط به این دلیل رخ می‌دهند که مسیر رفت هست اما روتر مقصد مسیر برگشت به شبکهٔ فرستنده را بلد نیست!",
-          "howToSpot": "وقتی `traceroute` در یک پرش متوقف می‌شود اما ترافیک از یک جهت می‌رسد، در روتر طرف مقابل `show ip route <Source-IP>` را اجرا کنید تا ببینید آیا مسیر برگشت را می‌شناسد یا خیر."
+          "myth": "اگر یک پینگ به سمت سرور موفق شد، پس کل مسیر و تمام سرویس‌های شبکه بین دو طرف بدون هیچ مشکلی کار می‌کنند.",
+          "reality": "پینگ (`Echo Request` + `Echo Reply`) یک آزمایش **رفت‌وبرگشتی فقط برای پروتکل ICMP بین همین دو IP و در همین لحظه** است. درست است که موفقیت آن از سلامت مسیر رفت و برگشت ICMP در آن لحظه خبر می‌دهد، اما ممکن است فایروال ترافیک پورت‌های TCP (مثل ۴۴۳ یا ۲۲) را بسته باشد یا به دلیل Policy/Asymmetric Routing ترافیک برنامه مسیر متفاوتی برود.",
+          "howToSpot": "اگر `ping` موفق است ولی برنامه وصل نمی‌شود، حتماً با تست پورت سرویس (مانند `Test-NetConnection` یا `curl`) و بررسی ACL/فایروال و مسیر رفت‌وبرگشت در روترها (`show ip route <Source-IP>`) علت را دقیق‌تر بشکافید."
         }
       ],
       "exercise": "روتری چهار مسیر دارد: `10.0.0.0/8` (Static, AD=1)، `10.10.0.0/16` (EIGRP, AD=90)، `10.10.5.0/24` (OSPF, AD=110) و `10.10.5.0/24` (RIP, AD=120). برای بستهٔ مقصد `10.10.5.44` دقیقاً کدام مسیر انتخاب می‌شود و اگر لینک OSPF قطع شود بعدی کدام است؟",
@@ -4945,15 +4945,16 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "lab": {
         "title": "آزمایشگاه بررسی وضعیت لایه ۱ پورت‌ها و شبیه‌سازی قطع لینک Uplink",
         "steps": [
-          "۱. مرز شبیه‌ساز: ترمینال داخلی وضعیت پورت‌ها (`Gi0/0..7`)، تغییر حالت `shutdown`/`no shutdown` و خروجی `show interfaces status` را به‌صورت زنده اجرا می‌کند؛ اما شبیه‌سازی فیزیکی ماژول‌های فیبر نوری (`DOM/SFP`) و تست کابل در تجهیزات واقعی یا Packet Tracer/CML انجام می‌شود.",
-          "۲. وارد `enable` شوید و با `show interfaces status` سرعت، Duplex و Type همهٔ پورت‌ها را بررسی کنید.",
-          "۳. فرض کنید پورت `Gi0/2` به دلیل تعویض کابل از مدار خارج بوده و الان کابل Cat6 سالم به آن وصل شده؛ با `configure terminal` -> `interface Gi0/2` -> `description ACCESS-PC-FLOOR2` (یا مستقیماً `no shutdown`) پورت را فعال کنید.",
-          "۴. با `end` خارج شوید و با `show interfaces status` و `show ip interface brief` تایید کنید وضعیت لینک `Gi0/2` تغییر کرده است."
+          "۱. مرز شبیه‌ساز: ترمینال داخلی وضعیت پورت‌ها (`Gi0/0..7`)، دستور `description`، تغییر حالت `shutdown`/`no shutdown` و خروجی `show interfaces status` را به‌صورت زنده اجرا می‌کند؛ اما شبیه‌سازی فیزیکی ماژول‌های فیبر نوری (`DOM/SFP`) و تست کابل در تجهیزات واقعی یا Packet Tracer/CML انجام می‌شود.",
+          "۲. وارد `enable` شوید و با `show interfaces status` سرعت، Duplex، نام پورت (`Name`) و Type همهٔ پورت‌ها را بررسی کنید (`Gi0/2` با نام `PC-TEST` در وضعیت `disabled` است).",
+          "۳. فرض کنید پورت `Gi0/2` به دلیل تعویض کابل از مدار خارج بوده و الان کابل Cat6 سالم به آن وصل شده؛ با `configure terminal` -> `interface Gi0/2` -> `description ACCESS-PC-FLOOR2` -> `no shutdown` پورت را نام‌گذاری و فعال کنید.",
+          "۴. با `end` خارج شوید و با `show interfaces status`، `show ip interface brief` و `show running-config` تایید کنید هم وضعیت لینک `Gi0/2` به `connected` (`up/up`) تغییر کرده و هم توضیح `ACCESS-PC-FLOOR2` ثبت شده است."
         ],
         "verifyCmds": [
           "enable",
           "show interfaces status",
-          "show ip interface brief"
+          "show ip interface brief",
+          "show running-config"
         ]
       },
       "troubleshooting": {
@@ -4989,9 +4990,9 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         },
         {
           "level": "چالشی",
-          "task": "یک ساختمان اداری ۴ طبقه داریم که هر طبقه ۵۰ کاربر و ۱۰ اکسس‌پوینت Wi-Fi 6E با مصرف ۲۵ وات دارد. حداکثر فاصلهٔ هر طبقه تا اتاق سرور مرکزی ۴۵ متر است. معماری پیشنهادی خود (Two-Tier یا Three-Tier)، نوع کابل بین طبقات و سمت کاربران، و میزان حداقل PoE Budget مورد نیاز برای هر سوئیچ Access در هر طبقه را با دلیل محاسبه و طراحی کنید.",
-          "hint": "برای ۱۰ اکسس‌پوینت × ۲۵ وات و ۵۰ کاربر ببینید حداقل چند پورت و چه استاندارد PoE (`802.3at` = ۳۰ وات) و چه بودجه‌ای لازم است.",
-          "solution": "معماری: **Two-Tier (Collapsed Core)** برای ۲۰۰ کاربر کاملاً بهینه است (دو سوئیچ Core/Distribution افزونه در اتاق سرور + یک سوئیچ Access ۴۸ پورت یا دو سوئیچ ۲۴/۴۸ پورت در هر طبقه). کابل‌کشی بین طبقات تا اتاق سرور: فیبر **Multi-Mode (OM3/OM4)** با لینک دوگانه `10G` (برای افزونگی و حذف نویز بین طبقات). کابل‌کشی سمت کاربران و APها: **Cat6a** برای پشتیبانی ۱۰ گیگابیت در آینده و کاهش افت حرارتی PoE. استاندارد PoE برای APها: **`802.3at` (PoE+ تا ۳۰ وات)**. بودجهٔ PoE هر طبقه: `10 × 25W = 250W` (با حاشیهٔ ایمنی ۳۰٪ حداقل **۳۷۰ وات** بودجهٔ واقعی در هر سوئیچ طبقه)."
+          "task": "یک ساختمان اداری ۴ طبقه داریم که هر طبقه ۵۰ کاربر و ۱۰ اکسس‌پوینت Wi-Fi 6E با مصرف ۲۵ وات دارد (جمعاً ۶۰ دستگاه در هر طبقه). حداکثر فاصلهٔ هر طبقه تا اتاق سرور مرکزی ۴۵ متر است. معماری پیشنهادی خود، تعداد و ظرفیت پورت سوئیچ‌های هر طبقه، نوع کابل‌ها، و محاسبهٔ دقیق بودجهٔ PoE مورد نیاز را بنویسید.",
+          "hint": "توجه کنید ۵۰ کاربر + ۱۰ اکسس‌پوینت برابر ۶۰ پورت Access است (یک سوئیچ ۴۸ پورت جواب نمی‌دهد!)؛ و هر اکسس‌پوینت با `802.3at` (تخصیص تا ۳۰ وات) تغذیه می‌شود.",
+          "solution": "معماری: **Two-Tier (Collapsed Core)** برای حدود ۲۴۰ دستگاه کل ساختمان بهینه است (۲ سوئیچ Core/Distribution افزونه در اتاق سرور). تعداد پورت هر طبقه: ۵۰ کاربر + ۱۰ AP = **۶۰ پورت Access** (به علاوه پورت‌های Uplink)، پس یک سوئیچ ۴۸ پورت کافی نیست و هر طبقه به **۲ سوئیچ Access** (مثلاً دو سوئیچ ۴۸ پورت با ۹۶ پورت کل برای حاشیه رشد، یا یک ۴۸ پورت + یک ۲۴ پورت = ۷۲ پورت) نیاز دارد. کابل‌کشی بین طبقات تا اتاق سرور: فیبر **Multi-Mode (OM3/OM4)** با لینک `10G` دوگانه از هر سوئیچ به جفت Core؛ سمت کاربران و APها: **Cat6a** (آمادهٔ ۱۰ گیگابیت و کاهش اتلاف حرارتی PoE). محاسبهٔ PoE هر طبقه: مصرف واقعی ۱۰ AP برابر `10 × 25W = 250W` است (و اگر سوئیچ طبق استاندارد **`802.3at` (PoE+)** برای هر پورت `30W` رزرو کند برابر `300W` می‌شود). اگر همهٔ ۱۰ AP به یک سوئیچ PoE+ وصل شوند با ۲۰–۳۰٪ حاشیهٔ ایمنی، حداقل **۳۷۰ وات** بودجه PoE روی آن سوئیچ لازم است؛ و اگر ۵ AP روی هر یک از دو سوئیچ تقسیم شوند، حداقل `150W` (با حاشیه حدود **۱۹۰–۲۰۰ وات** به ازای هر سوئیچ، جمعاً حدود ۳۷۰–۴۰۰ وات در طبقه) نیاز خواهد بود."
         }
       ],
       "quiz": [
@@ -5159,14 +5160,15 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         "title": "آزمایشگاه آماده‌سازی پورت‌های Trunk همسان و بررسی مرز STP/LACP",
         "steps": [
           "۱. مرز شبیه‌ساز: ترمینال داخلی یک دستگاه تکی (`R1`) است؛ بنابراین سناریوهای چندسوئیچی مثل انتخاب Root Bridge (`show spanning-tree`)، مذاکرهٔ LACP (`show etherchannel summary`) و کشف همسایه با `CDP/LLDP` در شبیه‌ساز سبک داخلی اجرا نمی‌شوند و نیازمند **Packet Tracer / EVE-NG / CML** هستند. اما هم‌سان‌سازی دو پورت Trunk روی دستگاه را همین‌جا زنده تمرین می‌کنیم.",
-          "۲. وارد `enable` شوید و با `show interfaces status` و `show interfaces trunk` ببینید `Gi0/1` در وضعیت Trunk است اما `Gi0/5` هنوز Access روی VLAN 1 قرار دارد.",
-          "۳. فرض کنید می‌خواهید `Gi0/1` و `Gi0/5` را هم‌تراز کنید تا در یک سوئیچ واقعی آمادهٔ قرارگیری در یک LACP Trunk شوند: با `configure terminal` وارد `interface Gi0/5` شوید، دستورات `switchport mode trunk` و `switchport trunk allowed vlan 10,20,30` را بزنید و روی `Gi0/1` هم همین لیست VLAN را ست کنید.",
-          "۴. با `end` خارج شوید و با `show interfaces trunk` و `show running-config` تایید کنید هر دو پورت تنظیمات کاملاً یکسان دارند؛ سپس در Packet Tracer/CML دستورات `channel-group 1 mode active` و `spanning-tree mode rapid-pvst` را بین دو سوئیچ اجرا و تایید کنید."
+          "۲. وارد `enable` شوید و با `show interfaces status` و `show interfaces trunk` وضعیت اولیه را ببینید: `Gi0/1` در وضعیت Trunk (با لیست مجاز `1,10,20`) است و پورت آزاد `Gi0/7` (`SPARE-PORT`) به‌صورت Access روی `VLAN 1` قرار دارد.",
+          "۳. فرض کنید می‌خواهید `Gi0/1` و `Gi0/7` را برای VLANهای `10`، `20` و `30` هم‌تراز کنید تا در یک سوئیچ واقعی آمادهٔ قرارگیری در یک LACP Trunk شوند: با `configure terminal` وارد شوید، ابتدا `vlan 30` را بسازید (`vlan 30` -> `name DATA30` -> `exit`)، سپس روی `interface Gi0/7` (`switchport mode trunk` -> `switchport trunk allowed vlan 10,20,30`) و روی `interface Gi0/1` (`switchport trunk allowed vlan 10,20,30`) را تنظیم کنید.",
+          "۴. با `end` خارج شوید و با `show vlan brief`، `show interfaces trunk` و `show running-config` تایید کنید هر دو پورت تنظیمات یکسانی دارند؛ سپس در Packet Tracer/CML دستورات `channel-group 1 mode active` و `spanning-tree mode rapid-pvst` را بین دو سوئیچ اجرا نمایید."
         ],
         "verifyCmds": [
           "enable",
           "show interfaces status",
           "show interfaces trunk",
+          "show vlan brief",
           "show running-config"
         ]
       },
@@ -7667,10 +7669,10 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "lab": {
         "title": "آزمایشگاه آماده‌سازی پورت Trunk سمت سرور مجازی (Hypervisor) در شبیه‌ساز",
         "steps": [
-          "۱. مرز شبیه‌ساز: تنظیمات داخل ESXi/KVM یا کنسول ابر (AWS/Azure) در این ترمینال شبیه‌سازی نمی‌شود، اما سمت **سوئیچ فیزیکی سیسکو** که به سرور Hypervisor وصل می‌شود به‌صورت **زنده** در شبیه‌ساز قابل پیکربندی است.",
-          "۲. فرض کنید سرور ESXi ما به پورت `Gi0/4` وصل است و روی آن دو ماشین مجازی در VLAN 10 و VLAN 30 تعریف کرده‌اید. وارد `enable` شوید و اول با `show vlan brief` و `show interfaces trunk` وضعیت فعلی را ببینید (الان فقط `VLAN 10` هست و `Gi0/4` هنوز روی VLAN 1 به صورت Access مانده!).",
-          "۳. در `configure terminal` ابتدا VLAN 30 را بسازید (`vlan 30` -> `name VM-SERVERS` -> `exit`) و سپس `interface Gi0/4` را به Trunk تبدیل کنید تا فقط VLANهای 10 و 30 از آن بگذرند (`switchport mode trunk` -> `switchport trunk allowed vlan 10,30` -> `end`).",
-          "۴. با `show interfaces trunk`، `show vlan brief` و `show running-config` تایید کنید پورت `Gi0/4` آمادهٔ سرویس‌دهی به vSwitch شده است."
+          "۱. مرز شبیه‌ساز: تنظیمات داخل ESXi/KVM یا کنسول ابر در این ترمینال شبیه‌سازی نمی‌شود، اما سمت **سوئیچ فیزیکی سیسکو** که به سرور Hypervisor وصل می‌شود به‌صورت **زنده** در شبیه‌ساز قابل پیکربندی است.",
+          "۲. وارد `enable` شوید و اول با `show vlan brief` و `show interfaces trunk` وضعیت اولیه را ببینید: در وضعیت اولیه `VLAN 10 (USERS)` و `VLAN 20 (SERVERS)` از قبل ساخته شده‌اند، `Gi0/1` در حالت Trunk است و پورت `Gi0/6` (`GUEST-PORT`) به‌صورت Access روی `VLAN 1` قرار دارد.",
+          "۳. فرض کنید سرور ESXi جدید به `Gi0/6` وصل شده و دو ماشین مجازی در `VLAN 10` و `VLAN 30` دارد. در `configure terminal` ابتدا `VLAN 30` را بسازید (`vlan 30` -> `name VM-SERVERS` -> `exit`) و سپس `interface Gi0/6` را به Trunk تبدیل کنید (`switchport mode trunk` -> `switchport trunk allowed vlan 10,30` -> `end`).",
+          "۴. با `show interfaces trunk`، `show vlan brief` و `show running-config` تایید کنید پورت `Gi0/6` در حالت Trunk با لیست مجاز `10,30` آمادهٔ سرویس‌دهی به vSwitch شده است."
         ],
         "verifyCmds": [
           "enable",
@@ -8043,7 +8045,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         {
           "h": "۴. امنیت وای‌فای (WPA2 در برابر WPA3 و Personal در برابر Enterprise)",
           "p": [
-            "سیستم‌های قدیمی WEP و WPA منسوخ و به سادگی قابل شکستنند. استاندارد فعلی حداقل **WPA2** (با رمزنگاری AES/CCMP) و در تجهیزات مدرن **WPA3** (با پروتکل تبادل کلید مقاوم SAE به جای 4-Way Handshake آسیب‌پذیر PSK و اجبار PMF برای محافظت فریم‌های کنترلی) است. در شرکت‌ها به جای گذاشتن یک رمز مشترک برای همه (**PSK / Personal** که با رفتن یک کارمند باید رمز کل سازمان عوض شود)، از **WPA2/WPA3 Enterprise (802.1X + RADIUS / ISE)** استفاده می‌کنیم تا هر کارمند با نام کاربری و گواهینامهٔ اختصاصی خودش متصل شود."
+            "سیستم‌های قدیمی WEP و WPA منسوخ و به سادگی قابل شکستنند. استاندارد فعلی حداقل **WPA2** (با رمزنگاری AES/CCMP) و در تجهیزات مدرن **WPA3-Personal** (با پروتکل تبادل کلید **SAE — Simultaneous Authentication of Equals** به جای استفادهٔ مستقیم از رمز ثابت PSK به عنوان PMK، و همراه با اجبار PMF برای محافظت فریم‌های کنترلی) است. توجه کنید که در WPA3 پس از تولید کلید جلسهٔ یکتا توسط SAE، همچنان **4-Way Handshake** استاندارد 802.11 برای ساخت کلیدهای رمزنگاری داده و تایید نشست اجرا می‌شود؛ اما چون PMK هر نشست مستقل است و تبادل SAE در برابر حدس آفلاین مقاوم است، ضبط Handshake دیگر به مهاجم اجازهٔ حملهٔ Offline Dictionary نمی‌دهد. در شرکت‌ها نیز به جای یک رمز مشترک برای همه (Personal)، از **WPA2/WPA3 Enterprise (802.1X + RADIUS / ISE)** استفاده می‌کنیم تا هر کارمند با اعتبارنامهٔ اختصاصی خودش احراز هویت شود."
           ]
         }
       ],
@@ -8091,7 +8093,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "ciscoRef": "Cisco CCNA 200-301 Official Cert Guide — Vol 1, Chapters 26–28 (Wireless Fundamentals, Architectures & Security)",
       "protocolAnalysis": [
         "تونل کنترل **CAPWAP Control** روی **UDP 5246** و تونل ترافیک داده **CAPWAP Data** روی **UDP 5247** برقرار می‌شوند؛ فایروال بین شعبه و WLC مرکزی باید این دو پورت را باز بگذارد.",
-        "در **WPA3-Personal** پروتکل **SAE (Simultaneous Authentication of Equals)** جایگزین PSK کلاسیک شده تا حملات Offline Dictionary روی هندشیک بی‌اثر شوند."
+        "در **WPA3-Personal**، پروتکل **SAE (Dragonfly)** پیش از **4-Way Handshake** اجرا می‌شود تا به جای تکیهٔ مستقیم بر رمز ثابت PSK، یک کلید اصلی جلسهٔ یکتا (`PMK`) بین کلاینت و AP توافق شود؛ در نتیجه با وجود اجرای 4-Way Handshake برای تولید کلیدهای ترافیک، حملات Offline Dictionary روی فریم‌های ضبط‌شده بی‌اثر می‌شوند."
       ],
       "iosCommands": [
         {
@@ -8118,9 +8120,9 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         "title": "آزمایشگاه آماده‌سازی پورت‌های سوئیچ برای AP (Access) و WLC (Trunk)",
         "steps": [
           "۱. مرز شبیه‌ساز: تنظیمات داخل پنل وب/CLI کنترلر WLC (مثل ساخت SSID و تنظیم امنیت WPA2/WPA3) نیازمند Packet Tracer یا WLC واقعی است؛ اما آماده‌سازی صحیح لایه ۲ سوئیچ برای اتصال WLC و APها را در شبیه‌ساز زنده انجام می‌دهیم.",
-          "۲. فرض کنید WLC به پورت `Gi0/1` وصل است و دو Lightweight AP در مد Local به پورت‌های `Gi0/4` و `Gi0/5` وصلند (نیاز دارند در VLAN مدیریت ۴۰ باشند؛ SSIDها نیز روی VLAN 10 کارمندان و VLAN 50 مهمانان تعریف شده‌اند).",
-          "۳. وارد `enable` و `configure terminal` شوید؛ دو VLAN تازه بسازید (`vlan 40` -> `name AP-MGMT` و `vlan 50` -> `name GUEST-WIFI`)، پورت‌های `Gi0/4` و `Gi0/5` را Access در VLAN 40 بگذارید، و پورت `Gi0/1` (سمت WLC) را با `switchport trunk allowed vlan 10,40,50` تنظیم کنید.",
-          "۴. با `end` خارج شوید و با `show vlan brief`، `show interfaces trunk` و `show running-config` تایید کنید که هر AP پورت Access مدیریت دارد و WLC روی Trunk به همهٔ VLANها دسترسی دارد."
+          "۲. وارد `enable` شوید و با `show vlan brief` و `show interfaces trunk` وضعیت اولیه را ببینید (`Gi0/6` و `Gi0/7` در `VLAN 1` و `Gi0/1` Trunk روی `1,10,20` است). فرض کنید WLC به پورت `Gi0/1` وصل است و دو Lightweight AP در مد Local به پورت‌های آزاد `Gi0/6` و `Gi0/7` وصلند (نیاز به VLAN مدیریت `40` دارند؛ SSIDها نیز روی VLAN `10` کارمندان و VLAN `50` مهمانان تعریف شده‌اند).",
+          "۳. با `configure terminal` دو VLAN تازه بسازید (`vlan 40` -> `name AP-MGMT` -> `vlan 50` -> `name GUEST-WIFI` -> `exit`)؛ پورت‌های `Gi0/6` و `Gi0/7` را Access در VLAN 40 بگذارید (`interface Gi0/6` -> `switchport mode access` -> `switchport access vlan 40` و همین‌طور برای `Gi0/7`)، و روی `interface Gi0/1` (سمت WLC) دستور `switchport trunk allowed vlan 10,40,50` را بزنید.",
+          "۴. با `end` خارج شوید و با `show vlan brief`، `show interfaces trunk` و `show running-config` تایید کنید هر دو AP در VLAN مدیریت ۴۰ هستند و WLC روی Trunk به VLANهای ۱۰، ۴۰ و ۵۰ دسترسی دارد."
         ],
         "verifyCmds": [
           "enable",
@@ -8191,15 +8193,15 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "exp": "در Local Mode ترافیک چند SSID درون تونل CAPWAP می‌رود، پس AP فقط یک Access Port برای IP مدیریتش می‌خواهد، اما WLC تمام VLANها را از طریق پورت Trunk به سوئیچ تحویل می‌دهد."
         },
         {
-          "q": "مهم‌ترین بهبود امنیتی **WPA3-Personal** نسبت به WPA2-PSK چیست؟",
+          "q": "تغییر امنیتی کلیدی **WPA3-Personal** نسبت به WPA2-PSK چیست؟",
           "opts": [
             "استفاده از WEP 64-bit",
-            "جایگزینی 4-Way Handshake آسیب‌پذیر با تبادل کلید SAE (مقاوم در برابر حملات Offline Dictionary)",
-            "حذف کامل رمز عبور",
+            "جایگزینی احراز هویت آسیب‌پذیرِ مبتنی بر PSK ثابت پیش از 4-Way Handshake با پروتکل SAE برای تولید کلید یکتای هر نشست (مقاوم در برابر حملهٔ Offline Dictionary)",
+            "حذف کامل 4-Way Handshake و رمزنگاری داده",
             "محدود کردن سرعت به ۵۴ مگابیت"
           ],
           "ans": 1,
-          "exp": "پروتکل SAE در WPA3 جلوی ضبط هندشیک و شکستن آفلاین رمز با لیست کلمات (Dictionary Attack) را می‌گیرد."
+          "exp": "در WPA3، پروتکل SAE پیش از 4-Way Handshake یک PMK یکتا برای همان نشست می‌سازد، بنابراین ضبط Handshake دیگر اجازهٔ شکستن آفلاین رمز عبور را نمی‌دهد."
         }
       ],
       "bridge": {
@@ -19559,7 +19561,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       reply = [
         '۱) دستورات زنده و وضعیت‌دار (تغییر شما فوراً روی خروجی اثر می‌گذارد):',
         '  حالت‌ها: enable | configure terminal | interface Gi0/0..7 | exit | end | do <cmd> | reset lab',
-        '  تنظیم پورت: shutdown | no shutdown | switchport mode access|trunk',
+        '  تنظیم پورت: description <NAME> | shutdown | no shutdown | switchport mode access|trunk',
         '              switchport access vlan <id> | switchport voice vlan <id> | switchport nonegotiate',
         '              switchport trunk native vlan <id> | switchport trunk allowed vlan [add] <id,id>',
         '  ساخت VLAN: vlan <id> -> name <NAME>',
@@ -19634,6 +19636,10 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       const vname = cmd.split(/\s+/).slice(1).join('_');
       sim.vlans[sim.activeVlan].name = vname;
       reply = `نام VLAN ${sim.activeVlan} به ${vname} تغییر یافت.`;
+    } else if (low.startsWith('description ') && sim.mode === 'if' && sim.activeIf) {
+      const descTxt = cmd.split(/\s+/).slice(1).join('_');
+      sim.interfaces[sim.activeIf].desc = descTxt || 'PORT';
+      reply = `توضیحات پورت ${sim.activeIf} به "${sim.interfaces[sim.activeIf].desc}" تغییر یافت.`;
     } else if (low === 'shutdown' && sim.mode === 'if' && sim.activeIf) {
       const iface = sim.interfaces[sim.activeIf];
       iface.adminUp = false;
@@ -19685,28 +19691,33 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
         reply = `لیست مجاز ترانک جایگزین شد: ${iface.allowedVlans.join(',') || 'none'}`;
       }
     } else if (low === 'show running-config' || low === 'sh run') {
-      const lines = ['Building configuration...', '', 'Current configuration:', '!', 'hostname R1', '!'];
-      Object.keys(sim.vlans).map(Number).sort((a, b) => a - b).filter(v => v !== 1).forEach(vid => {
-        lines.push(`vlan ${vid}`, ` name ${sim.vlans[vid].name}`, '!');
-      });
-      Object.entries(sim.interfaces).forEach(([name, inf]) => {
-        lines.push(`interface ${name}`);
-        if (inf.ip && inf.ip !== 'unassigned') lines.push(` ip address ${inf.ip} 255.255.255.0`);
-        if (inf.mode === 'access') {
-          lines.push(' switchport mode access');
-          if (inf.accessVlan !== 1) lines.push(` switchport access vlan ${inf.accessVlan}`);
-          if (inf.voiceVlan) lines.push(` switchport voice vlan ${inf.voiceVlan}`);
-          if (inf.nonegotiate) lines.push(' switchport nonegotiate');
-        } else if (inf.mode === 'trunk') {
-          lines.push(' switchport trunk encapsulation dot1q', ' switchport mode trunk');
-          if (inf.nativeVlan !== 1) lines.push(` switchport trunk native vlan ${inf.nativeVlan}`);
-          lines.push(` switchport trunk allowed vlan ${inf.allowedVlans.join(',')}`);
-        }
-        if (!inf.adminUp) lines.push(' shutdown');
-        lines.push('!');
-      });
-      lines.push('end');
-      reply = lines.join('\n');
+      if (sim.mode === 'user') {
+        reply = '% Invalid input detected (دستور show running-config در مد کاربر R1> مجاز نیست؛ ابتدا دستور enable را وارد کنید).';
+      } else {
+        const lines = ['Building configuration...', '', 'Current configuration:', '!', 'hostname R1', '!'];
+        Object.keys(sim.vlans).map(Number).sort((a, b) => a - b).filter(v => v !== 1).forEach(vid => {
+          lines.push(`vlan ${vid}`, ` name ${sim.vlans[vid].name}`, '!');
+        });
+        Object.entries(sim.interfaces).forEach(([name, inf]) => {
+          lines.push(`interface ${name}`);
+          if (inf.desc) lines.push(` description ${inf.desc}`);
+          if (inf.ip && inf.ip !== 'unassigned') lines.push(` ip address ${inf.ip} 255.255.255.0`);
+          if (inf.mode === 'access') {
+            lines.push(' switchport mode access');
+            if (inf.accessVlan !== 1) lines.push(` switchport access vlan ${inf.accessVlan}`);
+            if (inf.voiceVlan) lines.push(` switchport voice vlan ${inf.voiceVlan}`);
+            if (inf.nonegotiate) lines.push(' switchport nonegotiate');
+          } else if (inf.mode === 'trunk') {
+            lines.push(' switchport trunk encapsulation dot1q', ' switchport mode trunk');
+            if (inf.nativeVlan !== 1) lines.push(` switchport trunk native vlan ${inf.nativeVlan}`);
+            lines.push(` switchport trunk allowed vlan ${inf.allowedVlans.join(',')}`);
+          }
+          if (!inf.adminUp) lines.push(' shutdown');
+          lines.push('!');
+        });
+        lines.push('end');
+        reply = lines.join('\n');
+      }
     } else if (low === 'show ip interface brief' || low === 'sh ip int br') {
       const lines = ['Interface              IP-Address      OK? Method Status                Protocol'];
       Object.entries(sim.interfaces).forEach(([name, inf]) => {
@@ -19768,7 +19779,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       const ip = low.split(/\s+/)[1] || '';
       const g0 = sim.interfaces['GigabitEthernet0/0'];
       const g0Ok = g0 && g0.adminUp && g0.lineUp;
-      const reachable = (ip === '10.10.0.1' && g0Ok) || (ip === '10.255.0.1') || (ip === '10.10.0.2' && g0Ok);
+      const reachable = (ip === '10.10.0.1' && g0Ok) || (ip === '10.255.0.1') || ((ip === '10.10.0.2' || ip === '10.255.0.2') && g0Ok);
       if (!ip) {
         reply = '% آدرس IP مقصد را وارد کنید (مثلاً ping 10.10.0.2).';
       } else if (reachable) {
