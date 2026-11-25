@@ -363,8 +363,145 @@
     courses: ['۷ دانشکده و ۸ تخصص', 'نقشه کامل ← از دانشکده ۰ تا CCDE'],
     lab: ['آزمایشگاه شبیه‌ساز', 'عملی ← ترمینال Cisco IOS و ۳۷ لاب الزامی'],
     exam: ['آزمون ورودی و ارزیابی', 'دانشکده ۰ ← تعیین سطح و حدنصاب ۸۵٪'],
-    progress: ['پیشرفت و نقشه ۸ ساله', 'گزارش ← سال ۱ تا ۸ و منابع رسمی']
+    progress: ['پیشرفت و نقشه ۸ ساله', 'گزارش ← سال ۱ تا ۸ و منابع رسمی'],
+    glossary: ['واژه‌نامه جامع و ارجاعات', 'مرجع اصطلاحات ← توضیح فوری و لینک مستقیم به درس']
   };
+
+  /* ---------- موتور واژه‌نامه هوشمند و ارجاع بین‌درسی ---------- */
+  let glossMap = new Map();
+  let glossRegex = null;
+  let glossHideTimer = null;
+
+  function buildGlossaryIndex() {
+    if (!ACADEMY || !Array.isArray(ACADEMY.glossary)) return;
+    glossMap = new Map();
+    const terms = [];
+    ACADEMY.glossary.forEach(item => {
+      if (!item || !item.term) return;
+      glossMap.set(item.term.toLowerCase(), item);
+      terms.push(item.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    });
+    terms.sort((a, b) => b.length - a.length);
+    if (terms.length) {
+      glossRegex = new RegExp('(?<![A-Za-z0-9_])(' + terms.join('|') + ')(?![A-Za-z0-9_])', 'gi');
+    }
+    const pillG = $('#pillGlossary');
+    if (pillG) pillG.textContent = toFa(ACADEMY.glossary.length);
+  }
+
+  function openLessonById(lessonId) {
+    if (!ACADEMY || !ACADEMY.lessons[lessonId]) return;
+    hideGlossaryPopover();
+    const grp = (ACADEMY.curriculumGroups || []).find(g => g.lessons.includes(lessonId));
+    if (grp) activeLessonFaculty = grp.facultyId;
+    state.activeLesson = lessonId;
+    persistState();
+    renderLessonToc();
+    renderLessonArticle(ACADEMY.lessons[lessonId]);
+    updateHomeSummary();
+    gotoView('lesson');
+  }
+
+  function hideGlossaryPopover() {
+    const pop = $('#glossPopover');
+    if (pop) pop.classList.remove('open');
+  }
+
+  function showGlossaryPopover(termObj, anchorEl, currentLessonId) {
+    const pop = $('#glossPopover');
+    if (!pop || !termObj) return;
+    clearTimeout(glossHideTimer);
+    pop.textContent = '';
+
+    const head = el('div', 'gp-head');
+    head.appendChild(el('span', 'gp-term', termObj.term));
+    const closeBtn = el('button', 'gp-close', '×');
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', 'بستن');
+    closeBtn.addEventListener('click', hideGlossaryPopover);
+    head.appendChild(closeBtn);
+    pop.appendChild(head);
+
+    if (termObj.full) pop.appendChild(el('div', 'gp-full', termObj.full));
+    pop.appendChild(el('p', 'gp-desc', termObj.desc));
+
+    const refLesson = ACADEMY && ACADEMY.lessons && termObj.ref ? ACADEMY.lessons[termObj.ref] : null;
+    if (refLesson) {
+      const refRow = el('div', 'gp-ref');
+      if (termObj.ref === currentLessonId) {
+        refRow.appendChild(el('small', '', '✓ این مبحث در همین درس توضیح داده شده است'));
+      } else {
+        refRow.appendChild(el('small', '', 'مرجع کامل: ' + refLesson.title));
+        const go = el('button', 'btn btn-primary', 'برو به درس ←');
+        go.type = 'button';
+        go.style.padding = '5px 10px';
+        go.style.fontSize = '11.5px';
+        go.addEventListener('click', () => openLessonById(termObj.ref));
+        refRow.appendChild(go);
+      }
+      pop.appendChild(refRow);
+    }
+
+    pop.classList.add('open');
+    const r = anchorEl.getBoundingClientRect();
+    const pw = Math.min(360, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(window.innerWidth - pw - 12, r.left));
+    const spaceBelow = window.innerHeight - r.bottom;
+    const top = spaceBelow > 210 ? (r.bottom + 8) : Math.max(12, r.top - 200);
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+
+  function bindPopoverLifecycle() {
+    const pop = $('#glossPopover');
+    if (!pop || pop.dataset.bound) return;
+    pop.dataset.bound = '1';
+    pop.addEventListener('mouseenter', () => clearTimeout(glossHideTimer));
+    pop.addEventListener('mouseleave', () => {
+      glossHideTimer = setTimeout(hideGlossaryPopover, 260);
+    });
+    document.addEventListener('click', e => {
+      if (!pop.classList.contains('open')) return;
+      if (!pop.contains(e.target) && !e.target.classList.contains('gloss-term')) hideGlossaryPopover();
+    });
+  }
+
+  function appendRichText(parent, text, currentLessonId) {
+    const str = String(text || '');
+    if (!glossRegex || !str) {
+      parent.appendChild(document.createTextNode(str));
+      return;
+    }
+    glossRegex.lastIndex = 0;
+    let last = 0;
+    let m;
+    while ((m = glossRegex.exec(str)) !== null) {
+      if (m.index > last) {
+        parent.appendChild(document.createTextNode(str.slice(last, m.index)));
+      }
+      const matched = m[0];
+      const entry = glossMap.get(matched.toLowerCase());
+      if (entry) {
+        const btn = el('button', 'gloss-term', matched);
+        btn.type = 'button';
+        btn.addEventListener('mouseenter', () => showGlossaryPopover(entry, btn, currentLessonId));
+        btn.addEventListener('mouseleave', () => {
+          glossHideTimer = setTimeout(hideGlossaryPopover, 260);
+        });
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          showGlossaryPopover(entry, btn, currentLessonId);
+        });
+        parent.appendChild(btn);
+      } else {
+        parent.appendChild(document.createTextNode(matched));
+      }
+      last = m.index + matched.length;
+    }
+    if (last < str.length) {
+      parent.appendChild(document.createTextNode(str.slice(last)));
+    }
+  }
 
   function fillBars(root) {
     $$('.bar i[data-w]', root).forEach(i => { i.style.width = i.dataset.w + '%'; });
@@ -606,46 +743,106 @@
     host.appendChild(meta);
 
     host.appendChild(el('h1', 'article-h1', lessonObj.title));
-    host.appendChild(el('div', 'article-lead', lessonObj.lead));
+    const leadDiv = el('div', 'article-lead');
+    appendRichText(leadDiv, lessonObj.lead, lessonObj.id);
+    host.appendChild(leadDiv);
 
     // ۱ و ۲: هدف درس و پیش‌نیاز
     const b1 = el('div', 'step-block');
     b1.appendChild(el('span', 'step-tag', 'بخش ۱ و ۲ · هدف درس و پیش‌نیاز'));
-    b1.appendChild(el('p', '', 'هدف درس: ' + lessonObj.goal));
-    b1.appendChild(el('p', '', 'پیش‌نیاز: ' + lessonObj.prereq));
+    const gp = el('p');
+    appendRichText(gp, 'هدف درس: ' + lessonObj.goal, lessonObj.id);
+    b1.appendChild(gp);
+    const pp = el('p');
+    appendRichText(pp, 'پیش‌نیاز: ' + lessonObj.prereq, lessonObj.id);
+    b1.appendChild(pp);
     host.appendChild(b1);
 
-    // ۳: آموزش مفهومی عمیق (سبک امن‌افزار رایکا)
+    // ۳: آموزش مفهومی عمیق (سبک امن‌افزار رایکا + جدول مقایسه + FAQ + واژه‌نامه)
     const b3 = el('div', 'step-block');
-    b3.appendChild(el('span', 'step-tag', 'بخش ۳ · آموزش مفهومی (ساختار استاندارد)'));
+    b3.appendChild(el('span', 'step-tag', 'بخش ۳ · آموزش مفهومی (ساختار استاندارد + واژه‌نامه تعاملی)'));
     lessonObj.sections.forEach(sec => {
       b3.appendChild(el('h2', '', sec.h));
       if (Array.isArray(sec.p)) {
-        sec.p.forEach(para => b3.appendChild(el('p', '', para)));
+        sec.p.forEach(para => {
+          const pNode = el('p');
+          appendRichText(pNode, para, lessonObj.id);
+          b3.appendChild(pNode);
+        });
       }
       if (Array.isArray(sec.cards)) {
         const g = el('div', 'cards-2');
         sec.cards.forEach(c => {
           const mc = el('div', 'mini-info');
           mc.appendChild(el('b', '', c.t));
-          mc.appendChild(el('p', '', c.d));
+          const mp = el('p');
+          appendRichText(mp, c.d, lessonObj.id);
+          mc.appendChild(mp);
           g.appendChild(mc);
         });
         b3.appendChild(g);
       }
       if (Array.isArray(sec.steps)) {
         const ul = el('ul', 'step-list');
-        sec.steps.forEach(st => ul.appendChild(el('li', '', st)));
+        sec.steps.forEach(st => {
+          const li = el('li');
+          appendRichText(li, st, lessonObj.id);
+          ul.appendChild(li);
+        });
         b3.appendChild(ul);
       }
     });
+
+    if (lessonObj.table && Array.isArray(lessonObj.table.headers) && Array.isArray(lessonObj.table.rows)) {
+      const tw = el('div', 'lesson-table-wrap');
+      if (lessonObj.table.title) tw.appendChild(el('div', 'lesson-table-title', lessonObj.table.title));
+      const tbl = el('table', 'lesson-table');
+      const thead = el('thead');
+      const htr = el('tr');
+      lessonObj.table.headers.forEach(h => htr.appendChild(el('th', '', h)));
+      thead.appendChild(htr);
+      tbl.appendChild(thead);
+      const tbody = el('tbody');
+      lessonObj.table.rows.forEach(row => {
+        const tr = el('tr');
+        row.forEach(cell => {
+          const td = el('td');
+          appendRichText(td, cell, lessonObj.id);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);
+      tw.appendChild(tbl);
+      b3.appendChild(tw);
+    }
+
+    if (Array.isArray(lessonObj.faq) && lessonObj.faq.length) {
+      const fh = el('h2', '', 'سوالات متداول (FAQ)');
+      fh.style.marginTop = '18px';
+      b3.appendChild(fh);
+      const fl = el('div', 'faq-list');
+      lessonObj.faq.forEach(fq => {
+        const fi = el('div', 'faq-item');
+        fi.appendChild(el('b', '', fq.q));
+        const fp = el('p');
+        appendRichText(fp, fq.a, lessonObj.id);
+        fi.appendChild(fp);
+        fl.appendChild(fi);
+      });
+      b3.appendChild(fl);
+    }
     host.appendChild(b3);
 
     // ۴: تحلیل پروتکل
     const b4 = el('div', 'step-block');
     b4.appendChild(el('span', 'step-tag', 'بخش ۴ · تحلیل رفتار پروتکل و بسته'));
     const ul4 = el('ul', 'step-list');
-    lessonObj.protocolAnalysis.forEach(item => ul4.appendChild(el('li', '', item)));
+    lessonObj.protocolAnalysis.forEach(item => {
+      const li = el('li');
+      appendRichText(li, item, lessonObj.id);
+      ul4.appendChild(li);
+    });
     b4.appendChild(ul4);
     host.appendChild(b4);
 
@@ -1095,9 +1292,49 @@
     });
   }
 
+  /* ---------- رندر واژه‌نامه جامع ---------- */
+  function renderGlossaryView(filterStr) {
+    const grid = $('#glossaryGrid');
+    const search = $('#glossarySearch');
+    if (!grid || !ACADEMY || !Array.isArray(ACADEMY.glossary)) return;
+
+    if (search && !search.dataset.bound) {
+      search.dataset.bound = '1';
+      search.addEventListener('input', () => renderGlossaryView(search.value));
+    }
+
+    const q = String(filterStr || '').trim().toLowerCase();
+    const list = ACADEMY.glossary.filter(item =>
+      !q || (item.term + ' ' + item.full + ' ' + item.desc).toLowerCase().includes(q)
+    );
+    grid.textContent = '';
+    list.forEach(item => {
+      const card = el('div', 'gloss-card');
+      const top = el('div', 'gloss-card-top');
+      top.appendChild(el('b', '', item.term));
+      if (item.full) top.appendChild(el('small', '', item.full));
+      card.appendChild(top);
+      card.appendChild(el('p', '', item.desc));
+
+      const refLesson = item.ref && ACADEMY.lessons[item.ref] ? ACADEMY.lessons[item.ref] : null;
+      if (refLesson) {
+        const btn = el('button', 'btn btn-ghost', '📚 درس مرجع: ' + refLesson.title);
+        btn.type = 'button';
+        btn.style.marginTop = 'auto';
+        btn.style.fontSize = '12px';
+        btn.style.justifyContent = 'flex-start';
+        btn.addEventListener('click', () => openLessonById(item.ref));
+        card.appendChild(btn);
+      }
+      grid.appendChild(card);
+    });
+  }
+
   /* ---------- راه‌اندازی ---------- */
   loadAcademyData().then(data => {
     if (!data) return;
+    buildGlossaryIndex();
+    bindPopoverLifecycle();
     renderLandingFaculties();
     renderHomeBlocks();
     updateHomeSummary();
@@ -1108,6 +1345,7 @@
     renderLabView();
     renderEntranceExam();
     renderProgressView();
+    renderGlossaryView('');
 
     const h = window.location.hash || '';
     if (h.startsWith('#lesson-')) {
