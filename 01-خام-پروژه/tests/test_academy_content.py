@@ -4,6 +4,9 @@ from __future__ import annotations
 from html.parser import HTMLParser
 import json
 from pathlib import Path
+import re
+import shutil
+import subprocess
 import unittest
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -88,6 +91,80 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertGreaterEqual(len(data["glossary"]), 100)
         for item in data["glossary"]:
             self.assertIn(item["ref"], data["lessons"], item["term"])
+
+    def test_f3_technical_accuracy_and_simulator_persistence(self):
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        app_js = (ASSET_ROOT / "app.js").read_text(encoding="utf-8")
+
+        # 1. HTTP Waterfall arithmetic consistency in ccnp_enna
+        enna_http = data["lessons"]["ccnp_enna"]["iosCommands"][1]["out"]
+        m = re.search(r"DNS=(\d+)ms\s*\|\s*Connect=(\d+)ms\s*\|\s*SSL=(\d+)ms\s*\|\s*Wait=(\d+)ms\s*\|\s*Response=(\d+)ms", enna_http)
+        self.assertIsNotNone(m, "ccnp_enna reference HTTP metrics missing")
+        dns, conn, ssl, wait, resp = map(int, m.groups())
+        self.assertEqual(dns + conn + ssl + wait, resp)
+
+        # 2. Regression checks for f3 review fixes
+        ex2_s = json.dumps(data["lessons"]["ccnp_enna"]["exercises"][2], ensure_ascii=False)
+        self.assertNotIn("سالم بوده و فقط", ex2_s)
+        self.assertIn("ECMP", ex2_s)
+
+        arch_s5 = data["lessons"]["ccnp_enc_arch"]["lab"]["steps"][4]
+        self.assertNotIn("Punt = 0", arch_s5)
+        self.assertIn("fwd-asic resource tcam utilization", arch_s5)
+        self.assertIn("فرضی", arch_s5)
+
+        auto_s = json.dumps(data["lessons"]["ccnp_enc_auto"], ensure_ascii=False)
+        self.assertNotIn("فراموش کرده فرمت درخواستی را با **`Accept", auto_s)
+        self.assertIn("RFC 8040", auto_s)
+
+        inf_s5 = data["lessons"]["ccnp_enc_inf"]["lab"]["steps"][4]
+        self.assertIn("State/PfxRcd", inf_s5)
+        self.assertIn("0", inf_s5)
+
+        f3_ids = data["curriculumGroups"][3]["lessons"]
+        self.assertEqual(len(f3_ids), 11)
+        ans_dist = {0: 0, 1: 0, 2: 0, 3: 0}
+        for lid in f3_ids:
+            self.assertEqual(len(data["lessons"][lid]["lab"]["steps"]), 5, lid)
+            for q in data["lessons"][lid]["quiz"]:
+                ans_dist[q["ans"]] += 1
+        self.assertTrue(all(6 <= v <= 10 for v in ans_dist.values()), ans_dist)
+
+        # 3. Simulator persistence of switchport nonegotiate across repeated mode access
+        m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
+        self.assertIsNotNone(m_mode)
+        self.assertNotIn("nonegotiate = false", m_mode.group(0))
+        self.assertIn("no switchport nonegotiate", app_js)
+
+        node_bin = shutil.which("node")
+        if node_bin:
+            js_script = f"""
+const fs = require('fs');
+const vm = require('vm');
+const ACADEMY = JSON.parse(fs.readFileSync({json.dumps(str(ASSET_ROOT / 'academy-data.json'))}, 'utf8'));
+const appCode = fs.readFileSync({json.dumps(str(ASSET_ROOT / 'app.js'))}, 'utf8');
+const s = appCode.indexOf('function createInitialSim()');
+const e = appCode.indexOf('/* ---------- رندر صفحه عمومی (/academy) ---------- */');
+const simCode = appCode.slice(s, e);
+function run(cmds) {{
+  const outEl = {{ textContent: '', scrollTop: 0, scrollHeight: 0 }};
+  const prEl = {{ textContent: '' }};
+  const ctx = {{ ACADEMY, state: {{ cliMode: 'user' }} }};
+  vm.runInNewContext(simCode + '\\nfunction getSim(){{ return sim; }}', ctx);
+  return {{
+    out: cmds.map(c => {{ outEl.textContent=''; ctx.runIosCommand(c, outEl, prEl); return outEl.textContent; }}),
+    sim: ctx.getSim()
+  }};
+}}
+const r = run(['enable','configure terminal','interface Gi0/2','switchport mode access','switchport nonegotiate','end','show running-config','configure terminal','interface Gi0/2','switchport mode access','end','show running-config','configure terminal','interface Gi0/2','no switchport nonegotiate','end','show interfaces Gi0/2 switchport']);
+if (r.out[6] !== r.out[11]) throw new Error('repeated mode access altered running-config');
+if (!r.out[11].includes('switchport nonegotiate')) throw new Error('nonegotiate lost after repeated mode access');
+if (r.sim.interfaces['GigabitEthernet0/2'].nonegotiate !== false) throw new Error('no switchport nonegotiate failed');
+const neg = run(['enable','configure terminal','interface Gi0/0','switchport nonegotiate','no switchport nonegotiate']);
+if (!neg.out[3].includes('Command rejected') || !neg.out[4].includes('Command rejected')) throw new Error('routed interface accepted nonegotiate');
+"""
+            res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
+            self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
 
 
 if __name__ == "__main__":
