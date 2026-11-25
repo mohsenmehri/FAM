@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from html.parser import HTMLParser
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -111,7 +112,17 @@ class AcademyRedesignTests(unittest.TestCase):
         arch_s5 = data["lessons"]["ccnp_enc_arch"]["lab"]["steps"][4]
         self.assertNotIn("Punt = 0", arch_s5)
         self.assertIn("fwd-asic resource tcam utilization", arch_s5)
+        self.assertIn("Catalyst 9300", arch_s5)
+        self.assertIn("Catalyst 9500 Standalone", arch_s5)
         self.assertIn("فرضی", arch_s5)
+
+        sec_s5 = data["lessons"]["ccnp_enc_sec"]["lab"]["steps"][4]
+        self.assertIn("eq bgp any", sec_s5)
+        self.assertIn("any eq bgp", sec_s5)
+        self.assertIn("class class-default", sec_s5)
+
+        for req_id in ("ccnp_enc_inf", "ccnp_encc", "ccnp_ensld"):
+            self.assertIn("پیش‌نیاز", data["lessons"][req_id]["lab"]["steps"][4], req_id)
 
         auto_s = json.dumps(data["lessons"]["ccnp_enc_auto"], ensure_ascii=False)
         self.assertNotIn("فراموش کرده فرمت درخواستی را با **`Accept", auto_s)
@@ -130,6 +141,18 @@ class AcademyRedesignTests(unittest.TestCase):
                 ans_dist[q["ans"]] += 1
         self.assertTrue(all(6 <= v <= 10 for v in ans_dist.values()), ans_dist)
 
+        # 2b. Checks for f4 Batch 1 (first 5 lessons in f4)
+        f4_b1 = data["curriculumGroups"][4]["lessons"][:5]
+        self.assertEqual(f4_b1, ["spec_ent", "spec_ent_campus", "spec_ent_sd", "spec_sec", "spec_sec_vpn"])
+        for lid in f4_b1:
+            lesson = data["lessons"][lid]
+            self.assertEqual(len(lesson.get("exercises", [])), 3, lid)
+            self.assertEqual(len(lesson.get("quiz", [])), 3, lid)
+            self.assertEqual(len(lesson["lab"]["steps"]), 5, lid)
+            s = json.dumps(lesson, ensure_ascii=False)
+            for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "۹۰٪", "۱۰۰٪", "جادویی"):
+                self.assertNotIn(bad, s, f"{lid} contains {bad}")
+
         # 3. Simulator persistence of switchport nonegotiate across repeated mode access
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
         self.assertIsNotNone(m_mode)
@@ -137,8 +160,13 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("no switchport nonegotiate", app_js)
 
         node_bin = shutil.which("node")
-        if node_bin:
-            js_script = f"""
+        if not node_bin:
+            msg = "Node.js binary not available; simulator VM verification could not run"
+            if os.environ.get("FAM_REQUIRE_NODE") == "1":
+                self.fail(msg)
+            self.skipTest(msg)
+
+        js_script = f"""
 const fs = require('fs');
 const vm = require('vm');
 const ACADEMY = JSON.parse(fs.readFileSync({json.dumps(str(ASSET_ROOT / 'academy-data.json'))}, 'utf8'));
@@ -162,9 +190,25 @@ if (!r.out[11].includes('switchport nonegotiate')) throw new Error('nonegotiate 
 if (r.sim.interfaces['GigabitEthernet0/2'].nonegotiate !== false) throw new Error('no switchport nonegotiate failed');
 const neg = run(['enable','configure terminal','interface Gi0/0','switchport nonegotiate','no switchport nonegotiate']);
 if (!neg.out[3].includes('Command rejected') || !neg.out[4].includes('Command rejected')) throw new Error('routed interface accepted nonegotiate');
+
+const f4Labs = {{
+  spec_ent: ['enable','configure terminal','interface Gi0/0','description ISIS-UNDERLAY-L2','interface Loopback0','description NET-49.0001.0102.5500.0001.00','vlan 210','name VN_CORP_HANDOFF','vlan 220','name VN_GUEST_HANDOFF','exit','interface Gi0/6','switchport mode access','switchport access vlan 210','interface Gi0/7','switchport mode access','switchport access vlan 220','interface Gi0/1','switchport trunk allowed vlan add 210,220','end','show running-config','show vlan brief','show interfaces trunk'],
+  spec_ent_campus: ['enable','configure terminal','vlan 150','name CORE_MGMT_OOB','exit','interface Gi0/1','description MEC-TO-CORE-SVL','switchport nonegotiate','switchport trunk allowed vlan add 150','interface Gi0/6','description DAD-MGMT-MONITOR','switchport mode access','switchport access vlan 150','interface Gi0/7','description ACCESS-USER-PORT','switchport mode access','switchport access vlan 10','end','show interfaces trunk','show interfaces Gi0/1 switchport','show running-config'],
+  spec_ent_sd: ['enable','configure terminal','interface Gi0/0','description WAN-EDGE-VPN0-PRIMARY','interface Gi0/1','description LAN-DIST-TRUNK','switchport nonegotiate','vlan 10','name BRANCH_DATA_VPN10','vlan 20','name BRANCH_VOICE_VPN20','vlan 99','name UNUSED_PARK','exit','interface Gi0/6','description VOICE-USER-PORT','switchport mode access','switchport access vlan 20','switchport voice vlan 20','interface Gi0/7','description UNUSED-SHUT','switchport mode access','switchport access vlan 99','shutdown','end','show running-config','show vlan brief','show interfaces status'],
+  spec_sec: ['enable','configure terminal','vlan 30','name TRUST_USERS','vlan 40','name QUARANTINE_ISOLATED','vlan 999','name PARK_SHUT','exit','interface Gi0/6','description DOT1X-USER-PORT','switchport mode access','switchport access vlan 30','switchport nonegotiate','interface Gi0/2','description QUARANTINE-PORT','switchport mode access','switchport access vlan 40','no shutdown','interface Gi0/7','description UNUSED-PORT','switchport mode access','switchport access vlan 999','shutdown','end','show vlan brief','show interfaces Gi0/6 switchport','show interfaces status','show running-config'],
+  spec_sec_vpn: ['enable','configure terminal','interface Gi0/0','description IPSEC-WAN-SOURCE','interface Loopback0','description VTI-ROUTER-ID','vlan 35','name CORP_ENCRYPT_LAN','exit','interface Gi0/7','description VPN-LAN-HOST','switchport mode access','switchport access vlan 35','no shutdown','interface Gi0/1','switchport trunk allowed vlan add 35','end','show running-config','show vlan brief','show interfaces trunk']
+}};
+for (const [id, cmds] of Object.entries(f4Labs)) {{
+  const res = run(cmds);
+  for (let i = 0; i < res.out.length; i++) {{
+    if (res.out[i].includes('% Invalid') || res.out[i].includes('Command rejected')) {{
+      throw new Error(id + ' failed on ' + cmds[i] + ': ' + res.out[i]);
+    }}
+  }}
+}}
 """
-            res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
-            self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
+        res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
+        self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
 
 
 if __name__ == "__main__":
