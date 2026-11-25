@@ -271,43 +271,276 @@
     return svg;
   }
 
-  /* ---------- شبیه‌ساز CLI آکادمی ---------- */
+  /* ---------- شبیه‌ساز CLI آکادمی (وضعیت‌دار برای تمرین‌های پایه و VLAN/Interface) ---------- */
+  function createInitialSim() {
+    return {
+      mode: 'user', // 'user' | 'priv' | 'config' | 'if' | 'vlan'
+      activeIf: null,
+      activeVlan: null,
+      vlans: {
+        1: { name: 'default', status: 'active' },
+        10: { name: 'USERS', status: 'active' },
+        20: { name: 'SERVERS', status: 'active' }
+      },
+      interfaces: {
+        'GigabitEthernet0/0': { short: 'Gi0/0', ip: '10.10.0.1', adminUp: true, lineUp: true, mode: 'routed', accessVlan: 1, voiceVlan: null, nativeVlan: 1, allowedVlans: [1], nonegotiate: false, desc: 'WAN-LINK' },
+        'GigabitEthernet0/1': { short: 'Gi0/1', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'trunk', accessVlan: 1, voiceVlan: null, nativeVlan: 1, allowedVlans: [1, 10, 20], nonegotiate: false, desc: 'UPLINK' },
+        'GigabitEthernet0/2': { short: 'Gi0/2', ip: 'unassigned', adminUp: false, lineUp: false, mode: 'access', accessVlan: 1, voiceVlan: null, nativeVlan: 1, allowedVlans: [1], nonegotiate: false, desc: 'PC-TEST' },
+        'GigabitEthernet0/3': { short: 'Gi0/3', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'access', accessVlan: 10, voiceVlan: null, nativeVlan: 1, allowedVlans: [10], nonegotiate: false, desc: 'FINANCE-PC' },
+        'GigabitEthernet0/4': { short: 'Gi0/4', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'access', accessVlan: 10, voiceVlan: null, nativeVlan: 1, allowedVlans: [10], nonegotiate: false, desc: 'FINANCE-PC2' },
+        'GigabitEthernet0/5': { short: 'Gi0/5', ip: 'unassigned', adminUp: true, lineUp: true, mode: 'access', accessVlan: 20, voiceVlan: null, nativeVlan: 1, allowedVlans: [20], nonegotiate: false, desc: 'SERVER-1' },
+        'Loopback0': { short: 'Lo0', ip: '10.255.0.1', adminUp: true, lineUp: true, mode: 'routed', accessVlan: 1, voiceVlan: null, nativeVlan: 1, allowedVlans: [1], nonegotiate: false, desc: 'MGMT' }
+      }
+    };
+  }
+
+  let sim = createInitialSim();
+
+  function resolveIfName(raw) {
+    const low = String(raw || '').trim().toLowerCase();
+    return Object.keys(sim.interfaces).find(k =>
+      k.toLowerCase() === low ||
+      sim.interfaces[k].short.toLowerCase() === low ||
+      k.toLowerCase().replace('gigabitethernet', 'g') === low
+    ) || null;
+  }
+
+  function simPromptText() {
+    if (sim.mode === 'if') return 'R1(config-if)#';
+    if (sim.mode === 'vlan') return 'R1(config-vlan)#';
+    if (sim.mode === 'config') return 'R1(config)#';
+    if (sim.mode === 'priv') return 'R1#';
+    return 'R1>';
+  }
+
+  function parseVlanList(str) {
+    return String(str || '').split(',').map(x => parseInt(x.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 4094);
+  }
+
   function runIosCommand(rawCmd, outputEl, promptEl) {
     const cmd = String(rawCmd || '').trim();
     if (!cmd) return;
-    const low = cmd.toLowerCase();
-    const prefix = state.cliMode === 'config' ? 'R1(config)# ' : (state.cliMode === 'priv' ? 'R1# ' : 'R1> ');
+    const low = cmd.toLowerCase().replace(/\s+/g, ' ');
+    const prefix = simPromptText() + ' ';
     let reply = '';
 
     if (low === 'clear') {
       outputEl.textContent = '';
       return;
+    } else if (low === 'reset lab') {
+      sim = createInitialSim();
+      state.cliMode = 'user';
+      reply = 'وضعیت شبیه‌ساز به تنظیمات اولیهٔ آزمایشگاه بازنشانی شد.';
+    } else if (low === 'help' || low === '?') {
+      reply = [
+        'دستورات پشتیبانی‌شده در این شبیه‌ساز تمرینی:',
+        '  حالت‌ها: enable | configure terminal | interface Gi0/1..5 | exit | end | reset lab',
+        '  پیکربندی پورت: shutdown | no shutdown | switchport mode access|trunk',
+        '                 switchport access vlan <id> | switchport voice vlan <id> | switchport nonegotiate',
+        '                 switchport trunk native vlan <id> | switchport trunk allowed vlan [add] <id,id>',
+        '  ساخت VLAN: vlan <id>  ->  name <NAME>',
+        '  بررسی: show ip interface brief | show interfaces status | show vlan brief',
+        '         show interfaces trunk | show interfaces Gi0/3 switchport | show arp | ping <ip>'
+      ].join('\n');
     } else if (low === 'enable' || low === 'en') {
+      sim.mode = 'priv';
       state.cliMode = 'priv';
-      reply = (ACADEMY && ACADEMY.cliResponses.enable) || 'Privileged EXEC enabled.';
+      reply = 'حالت Privileged EXEC فعال شد.';
     } else if (low === 'configure terminal' || low === 'conf t') {
-      state.cliMode = 'config';
-      reply = (ACADEMY && ACADEMY.cliResponses['configure terminal']) || '(config)#';
-    } else if (low === 'exit' || low === 'end') {
-      state.cliMode = low === 'end' ? 'priv' : (state.cliMode === 'config' ? 'priv' : 'user');
+      if (sim.mode === 'user') {
+        reply = '% ابتدا دستور enable را وارد کنید.';
+      } else {
+        sim.mode = 'config';
+        sim.activeIf = null;
+        sim.activeVlan = null;
+        state.cliMode = 'config';
+        reply = 'Enter configuration commands, one per line. End with CNTL/Z.';
+      }
+    } else if (low === 'exit') {
+      if (sim.mode === 'if' || sim.mode === 'vlan') {
+        sim.mode = 'config';
+        sim.activeIf = null;
+        sim.activeVlan = null;
+      } else if (sim.mode === 'config') {
+        sim.mode = 'priv';
+      } else {
+        sim.mode = 'user';
+      }
+      state.cliMode = sim.mode === 'config' ? 'config' : (sim.mode === 'priv' ? 'priv' : 'user');
       reply = 'بازگشت به سطح قبلی.';
+    } else if (low === 'end') {
+      sim.mode = 'priv';
+      sim.activeIf = null;
+      sim.activeVlan = null;
+      state.cliMode = 'priv';
+      reply = 'بازگشت به حالت R1#.';
+    } else if (low.startsWith('interface ') || low.startsWith('int ')) {
+      if (sim.mode === 'user' || sim.mode === 'priv') {
+        reply = '% ابتدا با configure terminal وارد حالت تنظیمات شوید.';
+      } else {
+        const arg = cmd.split(/\s+/).slice(1).join(' ');
+        const resolved = resolveIfName(arg);
+        if (resolved) {
+          sim.mode = 'if';
+          sim.activeIf = resolved;
+          reply = `وارد تنظیمات پورت ${resolved} شدید.`;
+        } else {
+          reply = `% اینترفیس "${arg}" در این شبیه‌ساز وجود ندارد (نمونه: Gi0/0 تا Gi0/5).`;
+        }
+      }
+    } else if (/^vlan \d+$/.test(low)) {
+      if (sim.mode !== 'config' && sim.mode !== 'if' && sim.mode !== 'vlan') {
+        reply = '% ابتدا با configure terminal وارد حالت تنظیمات شوید.';
+      } else {
+        const vid = parseInt(low.split(' ')[1], 10);
+        if (vid < 1 || vid > 4094) {
+          reply = '% شماره VLAN باید بین 1 تا 4094 باشد.';
+        } else {
+          if (!sim.vlans[vid]) sim.vlans[vid] = { name: `VLAN${String(vid).padStart(4, '0')}`, status: 'active' };
+          sim.mode = 'vlan';
+          sim.activeVlan = vid;
+          reply = `VLAN ${vid} انتخاب شد (می‌توانید با دستور name نام آن را تغییر دهید).`;
+        }
+      }
+    } else if (low.startsWith('name ') && sim.mode === 'vlan' && sim.activeVlan) {
+      const vname = cmd.split(/\s+/).slice(1).join('_');
+      sim.vlans[sim.activeVlan].name = vname;
+      reply = `نام VLAN ${sim.activeVlan} به ${vname} تغییر یافت.`;
+    } else if (low === 'shutdown' && sim.mode === 'if' && sim.activeIf) {
+      const iface = sim.interfaces[sim.activeIf];
+      iface.adminUp = false;
+      iface.lineUp = false;
+      reply = `%LINK-5-CHANGED: Interface ${sim.activeIf}, changed state to administratively down`;
+    } else if (low === 'no shutdown' && sim.mode === 'if' && sim.activeIf) {
+      const iface = sim.interfaces[sim.activeIf];
+      iface.adminUp = true;
+      iface.lineUp = true;
+      reply = `%LINK-3-UPDOWN: Interface ${sim.activeIf}, changed state to up\n%LINEPROTO-5-UPDOWN: Line protocol on Interface ${sim.activeIf}, changed state to up`;
     } else if (low === 'no shutdown') {
-      reply = '%LINK-3-UPDOWN: Interface GigabitEthernet0/1, changed state to up\n%LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed state to up';
+      reply = '% ابتدا با interface <name> یک پورت را انتخاب کنید (یا در آزمایشگاه درس ۱: configure terminal -> interface Gi0/2 -> no shutdown).';
+    } else if (low === 'switchport mode access' && sim.mode === 'if' && sim.activeIf) {
+      sim.interfaces[sim.activeIf].mode = 'access';
+      reply = `پورت ${sim.activeIf} به حالت static access تنظیم شد.`;
+    } else if (low === 'switchport mode trunk' && sim.mode === 'if' && sim.activeIf) {
+      sim.interfaces[sim.activeIf].mode = 'trunk';
+      reply = `پورت ${sim.activeIf} به حالت trunk تنظیم شد.`;
+    } else if (low === 'switchport trunk encapsulation dot1q' && sim.mode === 'if' && sim.activeIf) {
+      reply = `کپسوله‌سازی 802.1Q روی ${sim.activeIf} تایید شد.`;
+    } else if (low === 'switchport nonegotiate' && sim.mode === 'if' && sim.activeIf) {
+      sim.interfaces[sim.activeIf].nonegotiate = true;
+      reply = `مذاکره خودکار DTP روی ${sim.activeIf} خاموش شد.`;
+    } else if (/^switchport access vlan \d+$/.test(low) && sim.mode === 'if' && sim.activeIf) {
+      const vid = parseInt(low.split(' ').pop(), 10);
+      if (!sim.vlans[vid]) sim.vlans[vid] = { name: `VLAN${String(vid).padStart(4, '0')}`, status: 'active' };
+      sim.interfaces[sim.activeIf].accessVlan = vid;
+      reply = `پورت ${sim.activeIf} عضو VLAN ${vid} شد.`;
+    } else if (/^switchport voice vlan \d+$/.test(low) && sim.mode === 'if' && sim.activeIf) {
+      const vid = parseInt(low.split(' ').pop(), 10);
+      if (!sim.vlans[vid]) sim.vlans[vid] = { name: `VLAN${String(vid).padStart(4, '0')}`, status: 'active' };
+      sim.interfaces[sim.activeIf].voiceVlan = vid;
+      reply = `Voice VLAN پورت ${sim.activeIf} روی ${vid} تنظیم شد.`;
+    } else if (/^switchport trunk native vlan \d+$/.test(low) && sim.mode === 'if' && sim.activeIf) {
+      const vid = parseInt(low.split(' ').pop(), 10);
+      if (!sim.vlans[vid]) sim.vlans[vid] = { name: `VLAN${String(vid).padStart(4, '0')}`, status: 'active' };
+      sim.interfaces[sim.activeIf].nativeVlan = vid;
+      reply = `Native VLAN روی ترانک ${sim.activeIf} برابر ${vid} شد.`;
+    } else if (low.startsWith('switchport trunk allowed vlan ') && sim.mode === 'if' && sim.activeIf) {
+      const rest = low.replace('switchport trunk allowed vlan ', '').trim();
+      const iface = sim.interfaces[sim.activeIf];
+      if (rest.startsWith('add ')) {
+        const addIds = parseVlanList(rest.slice(4));
+        iface.allowedVlans = Array.from(new Set(iface.allowedVlans.concat(addIds))).sort((a, b) => a - b);
+        reply = `VLANهای جدید اضافه شدند. لیست مجاز فعلی: ${iface.allowedVlans.join(',')}`;
+      } else {
+        const ids = parseVlanList(rest);
+        iface.allowedVlans = ids.sort((a, b) => a - b);
+        reply = `لیست مجاز ترانک جایگزین شد: ${iface.allowedVlans.join(',') || 'none'}`;
+      }
+    } else if (low === 'show ip interface brief' || low === 'sh ip int br') {
+      const lines = ['Interface              IP-Address      OK? Method Status                Protocol'];
+      Object.entries(sim.interfaces).forEach(([name, inf]) => {
+        const st = inf.adminUp ? (inf.lineUp ? 'up' : 'down') : 'administratively down';
+        const pr = inf.adminUp && inf.lineUp ? 'up' : 'down';
+        lines.push(`${name.padEnd(23)}${inf.ip.padEnd(16)}YES manual ${st.padEnd(22)}${pr}`);
+      });
+      reply = lines.join('\n');
+    } else if (low === 'show interfaces status' || low === 'sh int status') {
+      const lines = ['Port      Name            Status       Vlan       Duplex  Speed   Type'];
+      Object.values(sim.interfaces).filter(i => i.short.startsWith('Gi')).forEach(inf => {
+        const st = inf.adminUp ? (inf.lineUp ? 'connected' : 'notconnect') : 'disabled';
+        const vl = inf.mode === 'trunk' ? 'trunk' : (inf.mode === 'routed' ? 'routed' : String(inf.accessVlan));
+        lines.push(`${inf.short.padEnd(10)}${inf.desc.padEnd(16)}${st.padEnd(13)}${vl.padEnd(11)}a-full  a-1000  10/100/1000BaseTX`);
+      });
+      reply = lines.join('\n');
+    } else if (low === 'show vlan brief' || low === 'sh vlan br') {
+      const lines = ['VLAN Name                             Status    Ports', '---- -------------------------------- --------- -------------------------------'];
+      Object.keys(sim.vlans).map(Number).sort((a, b) => a - b).forEach(vid => {
+        const v = sim.vlans[vid];
+        const ports = Object.values(sim.interfaces)
+          .filter(i => i.mode === 'access' && i.accessVlan === vid)
+          .map(i => i.short)
+          .join(', ');
+        lines.push(`${String(vid).padEnd(5)}${v.name.padEnd(33)}${v.status.padEnd(10)}${ports}`);
+      });
+      reply = lines.join('\n');
+    } else if (low === 'show interfaces trunk' || low === 'sh int trunk') {
+      const trunks = Object.values(sim.interfaces).filter(i => i.mode === 'trunk' && i.adminUp);
+      if (!trunks.length) {
+        reply = '(هیچ پورت فعالی در حالت Trunk قرار ندارد)';
+      } else {
+        const lines = ['Port        Mode             Encapsulation  Status        Native vlan'];
+        trunks.forEach(t => lines.push(`${t.short.padEnd(12)}on               802.1q         trunking      ${t.nativeVlan}`));
+        lines.push('', 'Port        Vlans allowed on trunk');
+        trunks.forEach(t => lines.push(`${t.short.padEnd(12)}${t.allowedVlans.join(',') || 'none'}`));
+        reply = lines.join('\n');
+      }
+    } else if (/^show interfaces .+ switchport$/.test(low)) {
+      const ifPart = cmd.split(/\s+/)[2];
+      const resolved = resolveIfName(ifPart);
+      if (!resolved) {
+        reply = `% اینترفیس ${ifPart} یافت نشد.`;
+      } else {
+        const inf = sim.interfaces[resolved];
+        const vName = (sim.vlans[inf.accessVlan] && sim.vlans[inf.accessVlan].name) || '';
+        reply = [
+          `Name: ${inf.short}`,
+          'Switchport: Enabled',
+          `Administrative Mode: ${inf.mode === 'trunk' ? 'trunk' : 'static access'}`,
+          `Operational Mode: ${inf.mode === 'trunk' ? 'trunk' : 'static access'}`,
+          `Negotiation of Trunking: ${inf.nonegotiate ? 'Off' : 'On'}`,
+          `Access Mode VLAN: ${inf.accessVlan} (${vName})`,
+          `Trunking Native Mode VLAN: ${inf.nativeVlan}`,
+          `Voice VLAN: ${inf.voiceVlan ? inf.voiceVlan : 'none'}`
+        ].join('\n');
+      }
     } else if (low.startsWith('ping ')) {
-      const ip = cmd.split(/\s+/)[1] || '10.10.0.2';
-      reply = `Type escape sequence to abort.\nSending 5, 100-byte ICMP Echos to ${ip}, timeout is 2 seconds:\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/2/3 ms`;
+      const ip = cmd.split(/\s+/)[1] || '';
+      const g0 = sim.interfaces['GigabitEthernet0/0'];
+      const g0Ok = g0 && g0.adminUp && g0.lineUp;
+      const reachable = (ip === '10.10.0.1' && g0Ok) || (ip === '10.255.0.1') || (ip === '10.10.0.2' && g0Ok);
+      if (!ip) {
+        reply = '% آدرس IP مقصد را وارد کنید (مثلاً ping 10.10.0.2).';
+      } else if (reachable) {
+        reply = `Type escape sequence to abort.\nSending 5, 100-byte ICMP Echos to ${ip}, timeout is 2 seconds:\n!!!!!\nSuccess rate is 100 percent (5/5), round-trip min/avg/max = 1/2/3 ms`;
+      } else {
+        const reason = !g0Ok ? ' (توجه: اینترفیس خروجی Gi0/0 خاموش است!)' : ' (این آدرس در جدول توپولوژی این آزمایشگاه سبک دسترس‌پذیر نیست یا مسیرش قطع است)';
+        reply = `Type escape sequence to abort.\nSending 5, 100-byte ICMP Echos to ${ip}, timeout is 2 seconds:\n.....\nSuccess rate is 0 percent (0/5)${reason}`;
+      }
     } else if (low.startsWith('traceroute ')) {
       const ip = cmd.split(/\s+/)[1] || '10.255.0.2';
-      reply = `Tracing the route to ${ip}\n  1 10.10.0.2 2 msec 1 msec 2 msec\n  2 ${ip} 3 msec 2 msec *`;
+      const g0 = sim.interfaces['GigabitEthernet0/0'];
+      if (g0 && g0.adminUp && g0.lineUp && (ip === '10.10.0.2' || ip === '10.255.0.2')) {
+        reply = `Tracing the route to ${ip}\n  1 10.10.0.2 2 msec 1 msec 2 msec\n  2 ${ip} 3 msec 2 msec *`;
+      } else {
+        reply = `Tracing the route to ${ip}\n  1 * * *\n  2 * * * (مقصد در دسترس نیست یا پورت خروجی خاموش است)`;
+      }
     } else if (ACADEMY && ACADEMY.cliResponses && ACADEMY.cliResponses[low]) {
       reply = ACADEMY.cliResponses[low];
     } else {
-      reply = `% Invalid or unmapped lab command. Type "help" for supported academy commands.`;
+      reply = `% دستور "${cmd}" در این شبیه‌ساز پشتیبانی نمی‌شود. برای دیدن دستورات پشتیبانی‌شده عبارت help را بزنید.`;
     }
 
-    if (promptEl) {
-      promptEl.textContent = state.cliMode === 'config' ? 'R1(config)#' : (state.cliMode === 'priv' ? 'R1#' : 'R1>');
-    }
+    if (promptEl) promptEl.textContent = simPromptText();
     outputEl.textContent += (outputEl.textContent ? '\n\n' : '') + prefix + cmd + '\n' + reply;
     outputEl.scrollTop = outputEl.scrollHeight;
   }
@@ -749,7 +982,7 @@
 
     if (lessonObj.analogy) {
       const ab = el('div', 'analogy-box');
-      ab.appendChild(el('b', '', '💡 مثال روزمره (تا کاملاً شیرفهم شود)'));
+      ab.appendChild(el('b', '', '💡 مثال روزمره (برای ساختن تصویر ذهنی)'));
       const ap = el('p');
       appendRichText(ap, lessonObj.analogy, lessonObj.id);
       ab.appendChild(ap);
@@ -943,6 +1176,10 @@
     const b7 = el('div', 'step-block');
     b7.appendChild(el('span', 'step-tag', 'بخش ۷ · آزمایشگاه عملی (Lab)'));
     b7.appendChild(el('h2', '', lessonObj.lab.title));
+    const simNote = el('p', '', 'توضیح دربارهٔ محیط تمرین: این ترمینال یک شبیه‌ساز سبک تحت وب است که وضعیت پورت‌ها (shutdown / no shutdown)، ساخت و نام‌گذاری VLAN، تنظیمات Access/Trunk و پینگ آدرس‌های توپولوژی همین آزمایشگاه (10.10.0.1 / 10.10.0.2 / 10.255.0.1) را به صورت زنده تغییر می‌دهد و در خروجی showها نمایش می‌دهد. برای شبیه‌سازی کامل چندروتری یا پروتکل‌های پیچیده‌تر از Packet Tracer، Cisco CML یا EVE-NG استفاده کنید.');
+    simNote.style.fontSize = '12.5px';
+    simNote.style.color = '#93c5fd';
+    b7.appendChild(simNote);
     const ul7 = el('ul', 'step-list');
     lessonObj.lab.steps.forEach(s => ul7.appendChild(el('li', '', s)));
     b7.appendChild(ul7);
