@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>۰۴. میز کار خط فرمان مهندس (CLI tmux Pro) — FAM Academy</title>
+  <style>:root{--bg:#040705;--bg2:#080c16;--panel:#0a150f;--panel2:#141d30;--glass:rgba(255,255,255,.05);--line:rgba(148,163,184,.18);--text:#eef2ff;--muted:#94a3b8;--acc:#22c55e;--acc2:#f59e0b;--on-acc:#04121c;--grad:linear-gradient(120deg,#22c55e,#f59e0b);--nav-bg:rgba(7,10,20,.80);--r:18px;}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:"Vazirmatn","IRANSans","Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--text);line-height:1.85;overflow-x:hidden}
+button,input{font-family:inherit}
+ul{list-style:none}
+.container{width:min(1220px,92vw);margin-inline:auto}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:var(--r,14px);font-size:14px;font-weight:700;border:1px solid transparent;cursor:pointer;transition:.18s ease}
+.btn-primary{background:var(--grad);color:var(--on-acc);box-shadow:0 10px 26px color-mix(in srgb,var(--acc) 30%,transparent)}
+.btn-primary:hover{transform:translateY(-2px)}
+.btn-ghost{background:var(--glass);border-color:var(--line);color:var(--text)}
+.btn-ghost:hover{border-color:var(--acc)}
+.kicker{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);padding:5px 13px;border-radius:99px}
+.kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc)}
+.badge{font-size:11px;font-weight:800;padding:4px 11px;border-radius:99px;background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 36%,transparent)}
+.course-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.course{background:var(--panel);border:1px solid var(--line);border-radius:var(--r,18px);padding:22px;display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;transition:.2s}
+.course::before{content:"";position:absolute;inset-inline:0;top:0;height:3px;background:var(--grad)}
+.course:hover{transform:translateY(-5px);border-color:var(--acc)}
+.c-top{display:flex;justify-content:space-between;align-items:center}.lvl{font-size:11.5px;color:var(--muted)}
+.course h3{font-size:18.5px;font-weight:900}.course p{font-size:13.5px;color:var(--muted);flex:1}
+.meta{display:flex;gap:7px;flex-wrap:wrap}.meta li{font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;background:var(--panel2);border:1px solid var(--line)}
+.c-foot{display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px dashed var(--line)}.price{font-size:12.5px;font-weight:800;color:var(--acc)}
+.path{position:relative;display:flex;gap:10px;overflow-x:auto;padding:28px 4px 10px}
+.path-line{position:absolute;top:46px;right:20px;left:20px;height:3px;background:linear-gradient(90deg,var(--acc) 0 48%,var(--line) 48% 100%)}
+.station{position:relative;flex:0 0 120px;text-align:center;z-index:1;background:var(--panel);padding:6px;border-radius:14px;cursor:pointer}
+.st-dot{width:36px;height:36px;margin:0 auto 8px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:13px;background:var(--panel2);border:2px solid var(--line);color:var(--muted)}
+.station.done .st-dot{border-color:var(--acc);color:var(--acc)}.station.now .st-dot{background:var(--grad);border-color:transparent;color:var(--on-acc);box-shadow:0 0 0 5px color-mix(in srgb,var(--acc) 22%,transparent)}.station.goal .st-dot{border-color:var(--acc2);color:var(--acc2)}
+.station b{display:block;font-size:12.5px}.station small{font-size:11px;color:var(--muted)}
+.term-body{background:#050912;color:#86efac;border:1px solid rgba(148,163,184,.22);border-radius:12px;padding:13px;font-family:"JetBrains Mono",Consolas,monospace;font-size:12px;line-height:1.8;direction:ltr;text-align:left;white-space:pre-wrap;min-height:115px}
+.cli-tabs{display:flex;gap:6px;margin:10px 0}.cli-tab{border:1px solid var(--line);background:var(--panel2);color:var(--muted);padding:4px 10px;border-radius:8px;font-size:11.5px;font-weight:800;cursor:pointer}.cli-tab.active{background:var(--acc);color:var(--on-acc);border-color:transparent}
+/* Dashboard defaults */
+.dash-wrap{display:flex;min-height:100vh;background:var(--bg2)}
+.side{width:252px;flex:0 0 252px;position:sticky;top:0;height:100vh;background:var(--panel);border-inline-end:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:6px}
+.logo-box{font-size:18px;font-weight:900;padding:4px 10px 14px}.logo-box b{color:var(--acc);font-weight:500}
+.side-sep{font-size:10.5px;font-weight:800;color:var(--muted);padding:10px 10px 4px}
+.snav{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border-radius:12px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:13.5px;font-weight:700;cursor:pointer;text-align:start}
+.snav.active{background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--text);border-color:color-mix(in srgb,var(--acc) 36%,transparent)}
+.snav .pill{margin-inline-start:auto;font-size:10.5px;background:var(--grad);color:var(--on-acc);border-radius:99px;padding:1px 8px}
+.upgrade{margin-top:auto;border-radius:16px;padding:14px;background:color-mix(in srgb,var(--acc) 10%,var(--panel2));border:1px solid color-mix(in srgb,var(--acc) 30%,transparent);display:grid;gap:8px}
+.upgrade small{font-size:12px;color:var(--muted)}
+.dash-main{flex:1;min-width:0}
+.topbar{position:sticky;top:0;z-index:30;background:var(--nav-bg);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.topbar h1{font-size:17.5px;font-weight:900}.crumb{font-size:12px;color:var(--muted)}
+.search{margin-inline-start:auto;display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:7px 12px;min-width:230px}
+.search input{border:0;background:transparent;color:var(--text);outline:0;width:100%;font-size:13px}
+.streak{font-size:12.5px;font-weight:800;padding:6px 12px;border-radius:99px;background:var(--panel2);border:1px solid var(--line)}
+.avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--grad);color:var(--on-acc);font-weight:900}
+.dash-body{padding:22px 24px 48px;display:grid;gap:18px}
+.continue{background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 12%,var(--panel)),var(--panel));border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);border-radius:20px;padding:24px;display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center}
+.continue h2{font-size:21px;font-weight:900;margin:8px 0 4px}.sub{font-size:13.5px;color:var(--muted)}
+.prog-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:14px}
+.bar{height:9px;width:200px;border-radius:99px;background:var(--bg2);border:1px solid var(--line);overflow:hidden}.bar i{display:block;height:100%;background:var(--grad)}
+.pct{font-size:13px;font-weight:800;color:var(--acc)}
+.cont-side{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ring{position:relative;width:112px;height:112px}.ring svg{width:112px;height:112px;transform:rotate(-90deg)}.ring circle{fill:none;stroke-width:9;stroke-linecap:round}.ring .tr{stroke:var(--line)}.ring .fg{stroke:var(--acc);stroke-dasharray:339.29}
+.ring .mid{position:absolute;inset:0;display:grid;place-items:center;text-align:center}.ring .mid b{display:block;font-size:19px}.ring .mid small{font-size:10.5px;color:var(--muted)}
+.xp{font-size:12px;font-weight:900;color:var(--acc)}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.grid-2{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r,18px);padding:20px}.card h3{font-size:16px;font-weight:800;margin-bottom:8px}
+.missions{display:grid;gap:9px}.mission{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);cursor:pointer}
+.mcheck{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line);display:grid;place-items:center;font-size:11px;color:transparent}
+.mission.done .mcheck{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}.mission.done b{text-decoration:line-through;opacity:.7}
+.mt{flex:1}.mt b{display:block;font-size:13px}.mt small{font-size:11px;color:var(--muted)}
+.live-card{background:linear-gradient(155deg,color-mix(in srgb,var(--acc2) 16%,var(--panel)),var(--panel));border:1px solid color-mix(in srgb,var(--acc2) 38%,transparent);border-radius:var(--r,18px);padding:20px;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+.when{font-size:12px;font-weight:800;color:var(--acc2);display:inline-flex;align-items:center;gap:6px}.rec{width:8px;height:8px;border-radius:50%;background:#f43f5e}
+.feed{display:grid;gap:9px}.fitem{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}.fic{font-size:16px}.fitem b{display:block;font-size:13px}.fitem small{font-size:11px;color:var(--muted)}.ftime{margin-inline-start:auto;font-size:11px;color:var(--muted)}
+@media (max-width:960px){.grid-3,.grid-2,.continue,.hero-2{grid-template-columns:1fr!important}.dash-wrap{flex-direction:column}.side{width:100%;height:auto;position:static}}
+
+
+        .tmux{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:18px;min-height:92vh}
+        .pane{background:#09140e;border:1px solid #22c55e55;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px}
+        .pane-head{font-family:monospace;font-size:12px;color:#22c55e;border-bottom:1px solid #22c55e33;padding-bottom:6px;display:flex;justify-content:space-between}
+        </style>
+</head>
+<body>
+  <div data-page="public">
+        <header style="border-bottom:1px solid #22c55e44;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;font-family:monospace">
+          <span style="color:#22c55e">fam-academy@core:~$ ls -la /faculties/f0..f6</span>
+          <button class="btn btn-primary" data-switch-view="dashboard">tmux attach -t student ←</button>
+        </header>
+        <section class="container" style="padding:36px 0;display:grid;grid-template-columns:1fr 1.1fr;gap:24px;align-items:stretch">
+          <div class="card" style="display:flex;flex-direction:column;justify-content:space-between">
+            <div><span class="kicker">CLI-FIRST HACKER WORKBENCH</span>
+              <h1 style="font-size:clamp(28px,4vw,44px);font-weight:900;margin:14px 0">تسلط بر شبکه با خط فرمان واقعی Cisco IOS</h1>
+              <p style="color:var(--muted)">کل صفحه مثل یک ترمینال تاکتیکی کار می‌کند؛ فرمان‌ها را امتحان کن و خروجی زنده بگیر.</p>
+            </div>
+            <div style="margin-top:20px"><button class="btn btn-primary" data-switch-view="dashboard">ورود به فضای کاری tmux ←</button></div>
+          </div>
+          <div class="card"><div class="cli-tabs">
+            <button class="cli-tab active" data-cli-btn="ospf" data-cli-target="pub-cli">OSPF</button>
+            <button class="cli-tab" data-cli-btn="vlan" data-cli-target="pub-cli">VLAN</button>
+            <button class="cli-tab" data-cli-btn="bgp" data-cli-target="pub-cli">BGP</button>
+            <button class="cli-tab" data-cli-btn="route" data-cli-target="pub-cli">IP Route</button>
+          </div><pre class="term-body" id="pub-cli" style="min-height:240px">R1# show ip ospf neighbor
+10.255.0.2   1   FULL/DR   00:00:34   10.12.0.2   Gi0/0</pre></div>
+        </section>
+        <section class="container" style="padding-bottom:60px"><div class="course-grid">
+        <article class="course">
+          <div class="c-top"><span class="badge">دانشکده ۰ · مبانی</span><span class="lvl">آمادهٔ شروع</span></div>
+          <h3>آمادگی پایه و IPv4</h3>
+          <p>درک لایه‌های OSI/TCP-IP، آدرس‌دهی IPv4، زیرشبکه‌بندی و پروتکل‌های پایه پیش از ورود به تجهیزات.</p>
+          <ul class="meta"><li>۴ هفته</li><li>۱۰ درس</li><li>VLSM / OSI</li></ul>
+          <div class="c-foot"><span class="price">مسیر تعاملی</span><button class="btn btn-primary" data-switch-view="dashboard">ورود به دوره ←</button></div>
+        </article>
+
+        <article class="course">
+          <div class="c-top"><span class="badge">دانشکده ۱ · CCNA</span><span class="lvl">آمادهٔ شروع</span></div>
+          <h3>مهندسی شبکه CCNA 200-301</h3>
+          <p>از VLAN و Trunk 802.1Q تا مسیریابی OSPF، امنیت لایه ۲، ACL، NAT و مبانی اتوماسیون.</p>
+          <ul class="meta"><li>۱۶ هفته</li><li>۴۸ درس</li><li>۲۴ آزمایش</li></ul>
+          <div class="c-foot"><span class="price">مسیر تعاملی</span><button class="btn btn-primary" data-switch-view="dashboard">ورود به دوره ←</button></div>
+        </article>
+
+        <article class="course">
+          <div class="c-top"><span class="badge">دانشکده ۲ · R&S</span><span class="lvl">آمادهٔ شروع</span></div>
+          <h3>سوییچینگ و روتینگ پیشرفته</h3>
+          <p>بهینه‌سازی RSTP/MSTP، حفاظت‌های STP، تجمیع لینک LACP، افزونگی HSRP و OSPF Multi-Area.</p>
+          <ul class="meta"><li>۱۲ هفته</li><li>۲۴ درس</li><li>RSTP / VRF</li></ul>
+          <div class="c-foot"><span class="price">مسیر تعاملی</span><button class="btn btn-primary" data-switch-view="dashboard">ورود به دوره ←</button></div>
+        </article>
+
+        <article class="course">
+          <div class="c-top"><span class="badge">دانشکده ۳ · CCNP</span><span class="lvl">آمادهٔ شروع</span></div>
+          <h3>CCNP Enterprise (350-401 ENCOR)</h3>
+          <p>معماری Cisco SD-Access با LISP/VXLAN، الگوریتم ۱۳مرحله‌ای BGP، QoS و اتوماسیون RESTCONF.</p>
+          <ul class="meta"><li>۲۰ هفته</li><li>۳۶ درس</li><li>BGP & LISP</li></ul>
+          <div class="c-foot"><span class="price">مسیر تعاملی</span><button class="btn btn-primary" data-switch-view="dashboard">ورود به دوره ←</button></div>
+        </article>
+
+        <article class="course">
+          <div class="c-top"><span class="badge">دانشکده ۴ · تخصصی</span><span class="lvl">آمادهٔ شروع</span></div>
+          <h3>Security · Data Center · SD-WAN</h3>
+          <p>گرایش‌های تخصصی: احراز هویت 802.1X/ISE، فابریک EVPN-VXLAN دیتاسنتر و شبکه‌های SD-WAN.</p>
+          <ul class="meta"><li>۱۸ هفته</li><li>۲۸ درس</li><li>EVPN / ISE</li></ul>
+          <div class="c-foot"><span class="price">مسیر تعاملی</span><button class="btn btn-primary" data-switch-view="dashboard">ورود به دوره ←</button></div>
+        </article>
+
+        <article class="course">
+          <div class="c-top"><span class="badge">دانشکده ۵ · CCIE</span><span class="lvl">آمادهٔ شروع</span></div>
+          <h3>معماری خبره شبکه (CCIE)</h3>
+          <p>هستهٔ سرویس‌دهنده‌ها و شبکه‌های عظیم: MPLS L3VPN، MP-BGP VPNv4 و Segment Routing با TI-LFA.</p>
+          <ul class="meta"><li>۲۴ هفته</li><li>۲۰ درس</li><li>MPLS / SR</li></ul>
+          <div class="c-foot"><span class="price">مسیر تعاملی</span><button class="btn btn-primary" data-switch-view="dashboard">ورود به دوره ←</button></div>
+        </article>
+
+        <article class="course">
+          <div class="c-top"><span class="badge">دانشکده ۶ · CCDE</span><span class="lvl">آمادهٔ شروع</span></div>
+          <h3>طراحی کلان زیرساخت (CCDE)</h3>
+          <p>تصمیم‌گیری معماری بدون تعصب؛ مرزبندی دامنه‌های شکست، تاب‌آوری و طراحی WAN چندمنطقه‌ای.</p>
+          <ul class="meta"><li>۱۶ هفته</li><li>۱۶ درس</li><li>Architecture</li></ul>
+          <div class="c-foot"><span class="price">مسیر تعاملی</span><button class="btn btn-primary" data-switch-view="dashboard">ورود به دوره ←</button></div>
+        </article></div></section></div>
+  <div data-page="dashboard" style="display:none">
+        <div class="container">
+          <div style="padding:14px 0;display:flex;justify-content:space-between;align-items:center;font-family:monospace">
+            <span style="color:#22c55e">[tmux session: student@fam] 4 panes active</span>
+            <button class="btn btn-ghost" data-switch-view="public">cd /public</button>
+          </div>
+          <div class="tmux" style="padding:0 0 36px">
+            <div class="pane"><div class="pane-head"><span>PANE 0: 7 FACULTIES</span><span>f0..f6</span></div><div style="padding:7px 10px;border:1px solid #22c55e33;border-radius:6px">دانشکده ۰ · مبانی — آمادگی پایه و IPv4</div><div style="padding:7px 10px;border:1px solid #22c55e33;border-radius:6px">دانشکده ۱ · CCNA — مهندسی شبکه CCNA 200-301</div><div style="padding:7px 10px;border:1px solid #22c55e33;border-radius:6px">دانشکده ۲ · R&S — سوییچینگ و روتینگ پیشرفته</div><div style="padding:7px 10px;border:1px solid #22c55e33;border-radius:6px">دانشکده ۳ · CCNP — CCNP Enterprise (350-401 ENCOR)</div><div style="padding:7px 10px;border:1px solid #22c55e33;border-radius:6px">دانشکده ۴ · تخصصی — Security · Data Center · SD-WAN</div></div>
+            <div class="pane"><div class="pane-head"><span>PANE 1: LIVE IOS CLI</span><span>SSH OK</span></div><div class="cli-tabs"><button class="cli-tab active" data-cli-btn="ospf">OSPF</button><button class="cli-tab" data-cli-btn="vlan">VLAN</button><button class="cli-tab" data-cli-btn="bgp">BGP</button></div><pre class="term-body" id="dash-cli-out" style="flex:1">R1# show ip ospf neighbor
+10.255.0.2  FULL/DR  Gi0/0</pre></div>
+            <div class="pane"><div class="pane-head"><span>PANE 2: PACKET CAPTURE</span><span>tcpdump</span></div><pre class="term-body">14:22:01.102 IP 10.12.0.1 > 224.0.0.5: OSPFv2 Hello
+14:22:01.418 802.1Q vlan 10, ARP who-has 10.10.0.1</pre></div>
+            <div class="pane"><div class="pane-head"><span>PANE 3: DAILY QUESTS</span><span>72% CCNA</span></div><div class="mission done" data-mission-item><span class="mcheck">✓</span><span class="mt"><b>تکمیل درس VLAN</b></span></div><div class="mission" data-mission-item><span class="mcheck">✓</span><span class="mt"><b>اجرای لاب OSPF</b></span></div></div>
+          </div>
+        </div></div>
+  <script>
+  const cliOutputs = {
+    ospf: "R1# show ip ospf neighbor\nNeighbor ID   Pri  State    Dead Time  Address     Interface\n10.255.0.2     1   FULL/DR  00:00:34   10.12.0.2   Gi0/0\n10.255.0.3     1   FULL/BDR 00:00:38   10.13.0.2   Gi0/1\nR1# ping 10.255.0.2 -> !!!!! (2ms)",
+    vlan: "SW1# show vlan brief\nVLAN Name            Status  Ports\n10   MGMT_NOC        active  Gi0/1, Gi0/2\n20   SERVERS_VXLAN   active  Gi1/0, Gi1/1\n30   USERS_8021X     active  Gi1/2",
+    bgp:  "Edge-R1# show ip bgp summary\nBGP router identifier 198.51.100.1, local AS 65100\nNeighbor     AS     MsgRcvd  Up/Down  State/PfxRcd\n192.0.2.2    65200  14210    4d12h    128\n203.0.113.2  65300   9844    2d06h     64",
+    route:"R1# show ip route\nC    10.12.0.0/30 is directly connected, Gi0/0\nO    10.20.0.0/24 [110/2] via 10.12.0.2, Gi0/0\nB    172.16.0.0/16 [20/0] via 192.0.2.2, Gi0/2"
+  };
+
+  function setView(v) {
+    document.querySelectorAll('[data-page]').forEach(p => {
+      p.style.display = (v === 'split' || p.dataset.page === v) ? '' : 'none';
+    });
+    document.querySelectorAll('[data-switch-view]').forEach(b => {
+      b.classList.toggle('active', b.dataset.switchView === v);
+    });
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+  document.querySelectorAll('[data-switch-view]').forEach(b => {
+    b.addEventListener('click', () => setView(b.dataset.switchView));
+  });
+  window.addEventListener('message', e => {
+    if (e.data && e.data.type === 'fam-set-view') setView(e.data.view);
+  });
+  const initView = new URLSearchParams(location.search).get('view') || 'public';
+  setView(initView);
+
+  // Interactive CLI buttons
+  document.querySelectorAll('[data-cli-btn]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.cliBtn;
+      const targetId = btn.dataset.cliTarget || 'dash-cli-out';
+      const box = document.getElementById(targetId);
+      if (box && cliOutputs[key]) box.textContent = cliOutputs[key];
+      btn.parentElement.querySelectorAll('[data-cli-btn]').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // Live typing terminal in hero if present
+  const heroTerm = document.getElementById('hero-type-code');
+  if (heroTerm) {
+    const txt = "R1# conf t\nR1(config)# router ospf 1\nR1(config-router)# network 10.0.0.0 0.255.255.255 area 0\nR1# show ip ospf neighbor\n10.255.0.2   FULL/DR   00:00:34   Gi0/0  [OK]";
+    let i = 0;
+    const tmr = setInterval(() => {
+      i += 2;
+      heroTerm.textContent = txt.slice(0, i);
+      if (i >= txt.length) clearInterval(tmr);
+    }, 24);
+  }
+
+  // Interactive Missions + XP
+  document.querySelectorAll('[data-mission-item]').forEach(el => {
+    el.addEventListener('click', () => {
+      el.classList.toggle('done');
+      const xpEl = document.getElementById('xp-val');
+      if (xpEl) {
+        const done = document.querySelectorAll('[data-mission-item].done').length;
+        xpEl.textContent = (2400 + done * 20).toLocaleString('fa-IR') + ' XP';
+      }
+    });
+  });
+
+  // Interactive 7-station path
+  document.querySelectorAll('[data-station-idx]').forEach(st => {
+    st.addEventListener('click', () => {
+      document.querySelectorAll('[data-station-idx]').forEach(x => x.classList.remove('now'));
+      st.classList.add('now');
+    });
+  });
+
+
+    const cmdIn = document.getElementById('cmdk-in');
+    if (cmdIn) cmdIn.addEventListener('input', () => {
+      const q = cmdIn.value.trim().toLowerCase();
+      document.querySelectorAll('.cmd-row').forEach(r => r.style.display = r.textContent.toLowerCase().includes(q) ? 'flex' : 'none');
+    });
+    </script>
+</body>
+</html>
