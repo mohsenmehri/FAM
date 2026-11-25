@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FAM Academy — گالری و پیش‌نمایش تعاملی ۲۰ سبک طراحی</title>
+  <style>
+    :root {
+      --studio-bg: #0b0f1a;
+      --studio-surface: #111827;
+      --studio-border: #1f2937;
+      --studio-text: #f8fafc;
+      --studio-muted: #94a3b8;
+      --studio-accent: #38bdf8;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: 'Vazirmatn', 'IRANSans', 'Segoe UI', Tahoma, sans-serif; background: var(--studio-bg); color: var(--studio-text); }
+    button, input, select { font-family: inherit; }
+    .studio-bar {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(11, 15, 26, 0.94); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--studio-border);
+      padding: 10px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .studio-bar.hidden { display: none; }
+    .studio-brand { display: flex; align-items: center; gap: 10px; }
+    .studio-logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#06b6d4,#6366f1); display: grid; place-items: center; font-weight: 900; color: #fff; }
+    .studio-brand strong { font-size: .95rem; display: block; }
+    .studio-brand small { font-size: .75rem; color: var(--studio-muted); }
+    .studio-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .studio-btn, .studio-select {
+      border: 1px solid #334155; background: #1e293b; color: #f8fafc;
+      border-radius: 10px; padding: 7px 12px; font-size: .82rem; font-weight: 700; cursor: pointer;
+    }
+    .studio-btn:hover { border-color: #38bdf8; }
+    .studio-btn.active { background: #0284c7; border-color: #38bdf8; color: #fff; }
+    .studio-btn.gold { background: linear-gradient(135deg,#f59e0b,#d97706); border-color: #fbbf24; color: #111; }
+    .studio-pills {
+      background: #0f172a; border-bottom: 1px solid var(--studio-border);
+      padding: 8px 16px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin;
+    }
+    .studio-pills.hidden { display: none; }
+    .style-chip {
+      flex: 0 0 auto; border: 1px solid #334155; background: #1e293b; color: #cbd5e1;
+      border-radius: 999px; padding: 5px 11px; font-size: .76rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .style-chip.active { border-color: #38bdf8; background: #0c4a6e; color: #fff; font-weight: 800; }
+    .chip-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,.4); }
+
+    /* Gallery Mode */
+    .gallery-wrap { max-width: 1400px; margin: 0 auto; padding: 24px 18px 60px; }
+    .gallery-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; align-items: center; justify-content: space-between; }
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px; }
+    .gal-card {
+      background: #111827; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: space-between; transition: transform .18s ease, border-color .18s ease;
+    }
+    .gal-card:hover { transform: translateY(-3px); border-color: #38bdf8; }
+    .gal-preview-mini {
+      padding: 16px; min-height: 132px; position: relative; border-bottom: 1px solid rgba(148,163,184,.18);
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .gal-mini-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .72rem; opacity: .9; }
+    .gal-mini-hero { font-weight: 900; font-size: .98rem; line-height: 1.5; margin: 8px 0; }
+    .gal-mini-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+    .gal-mini-box { height: 26px; border-radius: 6px; }
+    .gal-body { padding: 14px 16px; display: grid; gap: 8px; }
+    .gal-body h3 { margin: 0; font-size: .96rem; line-height: 1.5; }
+    .gal-body p { margin: 0; font-size: .8rem; color: #94a3b8; line-height: 1.7; }
+    .gal-pal { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .gal-pal span { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); }
+    .gal-actions { padding: 0 16px 16px; display: flex; gap: 8px; }
+    .gal-actions button, .gal-actions a {
+      flex: 1; text-align: center; text-decoration: none; border-radius: 10px; padding: 8px 10px; font-size: .8rem; font-weight: 800; cursor: pointer;
+    }
+
+    /* Live Preview Stage */
+    #stage-host { min-height: calc(100vh - 104px); }
+    .preview-stage {
+      min-height: calc(100vh - 104px);
+      background-color: var(--bg);
+      background-image: var(--glow);
+      color: var(--text);
+      padding-bottom: 48px;
+      transition: background-color .2s ease, color .2s ease;
+    }
+    .preview-stage.standalone { min-height: 100vh; }
+    .stage-container { max-width: 1280px; margin: 0 auto; padding: 18px 20px; }
+
+    /* Shared Preview Primitives (driven by style tokens + archetype classes) */
+    .top-nav {
+      position: sticky; top: 0; z-index: 40;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+    }
+    .top-nav-inner {
+      max-width: 1280px; margin: 0 auto;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .brand-box { display: flex; align-items: center; gap: 10px; }
+    .brand-mark {
+      width: 38px; height: 38px; border-radius: var(--radius);
+      background: var(--accent); color: var(--accent-text);
+      display: grid; place-items: center; font-weight: 900; font-size: 1.05rem;
+    }
+    .brand-box strong { display: block; font-size: .96rem; color: var(--text); }
+    .brand-box small { display: block; font-size: .74rem; color: var(--muted); }
+    .nav-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .pill-tab {
+      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      border-radius: var(--radius); padding: 7px 13px; font-size: .82rem; font-weight: 700; cursor: pointer;
+    }
+    .pill-tab.active, .btn-primary {
+      background: var(--accent); color: var(--accent-text); border: 1px solid var(--accent);
+    }
+    .btn {
+      border: 1px solid var(--borderStrong); background: var(--surface2); color: var(--text);
+      border-radius: var(--radius); padding: 9px 16px; font-size: .86rem; font-weight: 800; cursor: pointer;
+    }
+    .btn-primary {
+      border-radius: var(--radius); padding: 10px 18px; font-size: .88rem; font-weight: 800; cursor: pointer;
+    }
+    .card, .hero-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px;
+    }
+    .kicker {
+      display: inline-block; font-size: .72rem; font-weight: 800; color: var(--accent);
+      background: var(--surface2); border: 1px solid var(--borderStrong);
+      padding: 4px 10px; border-radius: 999px; margin-bottom: 10px;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px; font-size: .74rem; font-weight: 700;
+      padding: 4px 10px; border-radius: 999px; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    }
+    .muted { color: var(--muted); }
+    .mono { font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace; direction: ltr; unicode-bidi: isolate; }
+
+    /* Archetype Grid Layouts */
+    .hero-grid { display: grid; grid-template-columns: 1.15fr .95fr; gap: 18px; align-items: stretch; margin-top: 16px; }
+    .arch-editorial-clean .hero-grid { grid-template-columns: 1fr; text-align: center; }
+    .arch-editorial-clean .hero-actions { justify-content: center; }
+    .arch-editorial-clean .topo-box { max-width: 900px; margin: 0 auto; width: 100%; }
+    .arch-bento-rack .kpi-strip { grid-template-columns: repeat(4, minmax(0,1fr)); }
+
+    .hero-title { margin: 0 0 10px; font-size: clamp(1.45rem, 2.7vw, 2.25rem); line-height: 1.45; font-weight: 900; }
+    .hero-lead { margin: 0 0 16px; font-size: .95rem; line-height: 1.85; color: var(--muted); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .kpi-strip { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-top: 16px; }
+    .kpi-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .kpi-box strong { display: block; font-size: 1.2rem; color: var(--accent); }
+    .kpi-box small { font-size: .76rem; color: var(--muted); }
+
+    /* Interactive Topology SVG */
+    .topo-box { display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
+    .topo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .topo-svg-wrap { border: 1px solid var(--border); border-radius: calc(var(--radius) - 4px); background: var(--bg2); padding: 10px; overflow: hidden; }
+    .topo-info { background: var(--surface2); border: 1px solid var(--borderStrong); border-radius: 10px; padding: 10px 12px; font-size: .8rem; line-height: 1.7; }
+
+    /* 7-Faculty Interactive Strip */
+    .sec-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px; margin: 26px 0 12px; }
+    .sec-head h2 { margin: 0; font-size: 1.25rem; }
+    .faculty-pills { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 8px; }
+    .faculty-pill {
+      text-align: right; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      border-radius: var(--radius); padding: 11px 12px; cursor: pointer; display: grid; gap: 4px; transition: .15s ease;
+    }
+    .faculty-pill.active { border-color: var(--accent); background: var(--surface2); box-shadow: 0 0 0 2px var(--borderStrong); }
+    .faculty-pill small { font-size: .7rem; color: var(--accent); font-weight: 800; }
+    .faculty-pill strong { font-size: .82rem; line-height: 1.45; }
+    .faculty-detail { margin-top: 12px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; }
+    .lesson-mini-list { display: grid; gap: 8px; }
+    .lesson-mini-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2);
+    }
+
+    /* Dashboard Layout */
+    .dash-shell { display: grid; grid-template-columns: 260px minmax(0,1fr); gap: 18px; margin-top: 16px; align-items: start; }
+    .dash-side { position: sticky; top: 76px; display: grid; gap: 8px; }
+    .dash-nav-btn {
+      text-align: right; border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      border-radius: var(--radius); padding: 10px 12px; font-size: .84rem; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .dash-nav-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+    .dash-main { display: grid; gap: 16px; }
+    .dash-grid-2 { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; }
+    .progress-bar { height: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin: 8px 0; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 42%; border-radius: 999px; }
+
+    /* Interactive Mini-CLI & Subnet Widget */
+    .cli-screen {
+      background: #050a12; color: #e2e8f0; border: 1px solid #1e293b; border-radius: 10px;
+      padding: 12px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: .78rem; line-height: 1.6;
+      direction: ltr; text-align: left; min-height: 140px; white-space: pre-wrap; overflow-x: auto;
+    }
+    .rack-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2);
+    }
+    .led { width: 9px; height: 9px; border-radius: 50%; background: var(--accent2); display: inline-block; box-shadow: 0 0 8px var(--accent2); }
+    .led.warn { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+    /* Split Mode */
+    .split-divider { margin: 28px 0 10px; padding: 10px 14px; border-radius: 10px; background: var(--surface2); border: 1px dashed var(--accent); font-weight: 800; font-size: .86rem; color: var(--accent); }
+
+    @media (max-width: 1024px) {
+      .faculty-pills { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .hero-grid, .faculty-detail, .dash-shell, .dash-grid-2 { grid-template-columns: 1fr; }
+      .dash-side { position: static; }
+      .arch-bento-rack .kpi-strip { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="studio-bar" id="studio-bar">
+    <div class="studio-brand">
+      <div class="studio-logo">20</div>
+      <div>
+        <strong>استودیو انتخاب طراحی FAM Academy</strong>
+        <small id="studio-subtitle">۲۰ سبک کاملاً متفاوت — هر مدل دارای صفحهٔ عمومی + داشبورد دانشجو</small>
+      </div>
+    </div>
+    <div class="studio-controls">
+      <button class="studio-btn active" id="btn-mode-gallery">گالری ۲۰ مدل</button>
+      <button class="studio-btn" id="btn-prev">← قبلی</button>
+      <select class="studio-select" id="select-style" aria-label="انتخاب سبک"></select>
+      <button class="studio-btn" id="btn-next">بعدی →</button>
+      <button class="studio-btn" id="btn-view-public">صفحهٔ عمومی</button>
+      <button class="studio-btn" id="btn-view-dash">داشبورد دانشجو</button>
+      <button class="studio-btn" id="btn-view-split">هر دو همزمان</button>
+      <button class="studio-btn gold" id="btn-standalone">نمایش خالص تمام‌صفحه</button>
+    </div>
+  </header>
+
+  <nav class="studio-pills" id="studio-pills" aria-label="انتخاب سریع ۲۰ سبک"></nav>
+
+  <main id="studio-main"></main>
+
+  <style id="dynamic-style-extra"></style>
+  <script src="./styles-catalog.js"></script>
+  <script>
+    (() => {
+      'use strict';
+      const STYLES = window.FAM_STYLES_20 || [];
+      const FACULTIES = [
+        {
+          id: 'f0', badge: 'دانشکده ۰ · مبانی', title: 'مبانی شبکه و آمادگی پایه', duration: '۴ هفته',
+          desc: 'درک لایه‌های OSI/TCP-IP، آدرس‌دهی IPv4، Subnetting و پروتکل‌های پایه پیش از ورود به تجهیزات.',
+          lessons: ['معماری OSI و کپسوله‌سازی پکت', 'زیرشبکه‌بندی IPv4، VLSM و CIDR', 'چهارگانهٔ ARP، ICMP، DNS و DHCP']
+        },
+        {
+          id: 'f1', badge: 'دانشکده ۱ · CCNA', title: 'مهندسی شبکه CCNA 200-301', duration: '۱۶ هفته',
+          desc: 'تسلط کامل بر VLAN، Trunk 802.1Q، EtherChannel، OSPF، ACL، NAT و مبانی امنیت و اتوماسیون.',
+          lessons: ['سوییچینگ VLAN و Trunk 802.1Q', 'مسیریابی OSPF تک‌ناحیه و DR/BDR', 'امنیت پورت، DHCP Snooping و DAI']
+        },
+        {
+          id: 'f2', badge: 'دانشکده ۲ · R&S پیشرفته', title: 'سوییچینگ و مسیریابی سازمانی', duration: '۱۲ هفته',
+          desc: 'مهندسی RSTP/MSTP، حفاظت‌های STP، تجمیع لینک LACP، افزونگی HSRP/VRRP و OSPF Multi-Area با VRF.',
+          lessons: ['بهینه‌سازی RSTP/MSTP و BPDU Guard', 'تجمیع لینک LACP و FHRP', 'OSPF Multi-Area، VRF-Lite و Redistribution']
+        },
+        {
+          id: 'f3', badge: 'دانشکده ۳ · CCNP', title: 'CCNP Enterprise (350-401 ENCOR)', duration: '۲۰ هفته',
+          desc: 'معماری Cisco SD-Access با LISP/VXLAN، الگوریتم ۱۳مرحله‌ای BGP، کنترل کیفیت QoS و اتوماسیون RESTCONF.',
+          lessons: ['فابریک SD-Access، LISP و Underlay/Overlay', 'انتخاب مسیر BGP و کنترل ترافیک با Route-Map', 'مهندسی QoS، NetFlow و RESTCONF/NETCONF']
+        },
+        {
+          id: 'f4', badge: 'دانشکده ۴ · تخصصی', title: 'Security · Data Center · SD-WAN', duration: '۱۸ هفته',
+          desc: 'گرایش‌های فوق‌تخصصی بازار کار: احراز هویت 802.1X/ISE، فابریک EVPN-VXLAN دیتاسنتر و شبکه‌های SD-WAN.',
+          lessons: ['کنترل دسترسی 802.1X، Cisco ISE و ZTNA', 'دیتاسنتر Spine-Leaf با MP-BGP EVPN و VXLAN', 'معماری SD-WAN، پروتکل OMP و اتوماسیون']
+        },
+        {
+          id: 'f5', badge: 'دانشکده ۵ · CCIE', title: 'معماری خبره شبکه (CCIE)', duration: '۲۴ هفته',
+          desc: 'هستهٔ سرویس‌دهنده‌ها و شبکه‌های عظیم: MPLS L3VPN، پشتهٔ Label، MP-BGP VPNv4 و Segment Routing با TI-LFA.',
+          lessons: ['معماری MPLS L3VPN، LDP و MP-BGP VPNv4', 'Segment Routing (SR-MPLS) و محافظت TI-LFA']
+        },
+        {
+          id: 'f6', badge: 'دانشکده ۶ · CCDE', title: 'طراحی کلان زیرساخت (CCDE 400-007)', duration: '۱۶ هفته',
+          desc: 'تصمیم‌گیری معماری بدون تعصب؛ مرزبندی دامنه‌های شکست، تاب‌آوری، همگرایی و طراحی WAN چندمنطقه‌ای.',
+          lessons: ['مرزبندی دامنه‌های شکست و Control Plane', 'معماری WAN سازمانی و چندمنطقه‌ای']
+        }
+      ];
+
+      const CLI_OUTPUTS = {
+        ospf: `R1# show ip ospf neighbor\n\nNeighbor ID     Pri   State           Dead Time   Address         Interface\n10.255.0.2        1   FULL/DR         00:00:34    10.12.0.2       GigabitEthernet0/0\n10.255.0.3        1   FULL/BDR        00:00:38    10.13.0.2       GigabitEthernet0/1`,
+        vlan: `Core-SW1# show vlan brief\n\nVLAN Name                             Status    Ports\n---- -------------------------------- --------- -------------------------------\n1    default                          active    Gi0/3\n10   MGMT_NOC                         active    Gi0/1, Gi0/2\n20   SERVERS_VXLAN                    active    Gi1/0, Gi1/1\n30   USERS_8021X                      active    Gi1/2`,
+        bgp: `Edge-R1# show ip bgp summary\nBGP router identifier 198.51.100.1, local AS number 65100\nNeighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd\n192.0.2.2       4        65200   14210   14198       42    0    0 4d12h          128\n203.0.113.2     4        65300    9844    9810       42    0    0 2d06h           64`
+      };
+
+      const SUBNET_TABLE = {
+        24: { mask: '255.255.255.0', wild: '0.0.0.255', hosts: '۲۵۴ میزبان قابل استفاده', example: '192.168.10.1 — 192.168.10.254' },
+        26: { mask: '255.255.255.192', wild: '0.0.0.63', hosts: '۶۲ میزبان قابل استفاده', example: '192.168.10.1 — 192.168.10.62' },
+        28: { mask: '255.255.255.240', wild: '0.0.0.15', hosts: '۱۴ میزبان قابل استفاده', example: '192.168.10.1 — 192.168.10.14' },
+        30: { mask: '255.255.255.252', wild: '0.0.0.3', hosts: '۲ میزبان (لینک Point-to-Point)', example: '10.12.0.1 — 10.12.0.2' }
+      };
+
+      const TOPO_NODES = {
+        r1: 'روتر هسته R1 · AS 65100 · Loopback 10.255.0.1/32 · وضعیت OSPF FULL و BGP Established.',
+        sw1: 'سوییچ توزیع Core-SW1 · VLAN 10/20/30 · RSTP Root Bridge · لینک LACP Port-Channel 1.',
+        fw1: 'فایروال لبه Edge-FW · سیاست Zero-Trust · بازرسی IPS و تانل IPsec/SD-WAN فعال.',
+        cloud: 'بک‌بون ISP / MPLS · برچسب‌گذاری Segment Routing با همگرایی TI-LFA زیر ۵۰ میلی‌ثانیه.'
+      };
+
+      const params = new URLSearchParams(location.search);
+      let state = {
+        mode: params.get('style') ? 'preview' : 'gallery', // 'gallery' | 'preview'
+        view: params.get('view') || 'public',               // 'public' | 'dashboard' | 'split'
+        standalone: params.get('standalone') === '1',
+        styleId: Math.min(20, Math.max(1, Number(params.get('style')) || 1)),
+        filter: 'all',
+        facultyId: 'f1',
+        topoNode: 'r1',
+        cliCmd: 'ospf',
+        cidr: 26
+      };
+
+      const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const activeStyle = () => STYLES.find(s => s.id === state.styleId) || STYLES[0];
+
+      const selectEl = document.getElementById('select-style');
+      const pillsEl = document.getElementById('studio-pills');
+      const mainEl = document.getElementById('studio-main');
+      const extraCssEl = document.getElementById('dynamic-style-extra');
+      const studioBar = document.getElementById('studio-bar');
+
+      selectEl.innerHTML = STYLES.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+
+      function syncStudioChrome() {
+        studioBar.classList.toggle('hidden', state.standalone);
+        pillsEl.classList.toggle('hidden', state.standalone || state.mode === 'gallery');
+        selectEl.value = String(state.styleId);
+        document.getElementById('btn-mode-gallery').classList.toggle('active', state.mode === 'gallery');
+        document.getElementById('btn-view-public').classList.toggle('active', state.mode === 'preview' && state.view === 'public');
+        document.getElementById('btn-view-dash').classList.toggle('active', state.mode === 'preview' && state.view === 'dashboard');
+        document.getElementById('btn-view-split').classList.toggle('active', state.mode === 'preview' && state.view === 'split');
+
+        pillsEl.innerHTML = STYLES.map(s => `
+          <button class="style-chip ${s.id === state.styleId ? 'active' : ''}" data-pick-chip="${s.id}">
+            <span class="chip-dot" style="background:${s.swatches.bg}"></span>
+            <span class="chip-dot" style="background:${s.swatches.accent}"></span>
+            ${String(s.id).padStart(2,'0')} · ${esc(s.enName)}
+          </button>`).join('');
+        pillsEl.querySelectorAll('[data-pick-chip]').forEach(btn => {
+          btn.onclick = () => { state.styleId = Number(btn.dataset.pickChip); state.mode = 'preview'; render(); };
+        });
+      }
+
+      function renderTopologySvg(style) {
+        const a = style.swatches.accent;
+        const b = style.swatches.accent2;
+        const txt = style.swatches.text;
+        const surf = style.swatches.surface2;
+        const brd = style.swatches.borderStrong;
+        return `
+          <svg viewBox="0 0 540 220" width="100%" height="200" role="img" aria-label="توپولوژی تعاملی شبکه سیسکو">
+            <defs>
+              <linearGradient id="linkGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="${a}"/>
+                <stop offset="100%" stop-color="${b}"/>
+              </linearGradient>
+            </defs>
+            <line x1="95" y1="110" x2="225" y2="55" stroke="url(#linkGrad)" stroke-width="3" stroke-dasharray="6 4">
+              <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.4s" repeatCount="indefinite"/>
+            </line>
+            <line x1="95" y1="110" x2="225" y2="165" stroke="url(#linkGrad)" stroke-width="3" stroke-dasharray="6 4">
+              <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.8s" repeatCount="indefinite"/>
+            </line>
+            <line x1="225" y1="55" x2="365" y2="110" stroke="${a}" stroke-width="2.5"/>
+            <line x1="225" y1="165" x2="365" y2="110" stroke="${b}" stroke-width="2.5"/>
+            <line x1="365" y1="110" x2="465" y2="110" stroke="url(#linkGrad)" stroke-width="3.5"/>
+            <circle r="4.5" fill="${b}">
+              <animateMotion dur="2.2s" repeatCount="indefinite" path="M95,110 L225,55 L365,110 L465,110"/>
+            </circle>
+            <circle r="4.5" fill="${a}">
+              <animateMotion dur="2.7s" repeatCount="indefinite" path="M95,110 L225,165 L365,110 L465,110"/>
+            </circle>
+
+            <g class="topo-node" data-node="sw1" style="cursor:pointer">
+              <rect x="35" y="82" width="110" height="56" rx="10" fill="${surf}" stroke="${state.topoNode==='sw1'?a:brd}" stroke-width="2"/>
+              <text x="90" y="107" text-anchor="middle" fill="${txt}" font-size="12" font-weight="800">Core-SW1</text>
+              <text x="90" y="125" text-anchor="middle" fill="${a}" font-size="10">VLAN 10/20 · LACP</text>
+            </g>
+            <g class="topo-node" data-node="r1" style="cursor:pointer">
+              <rect x="175" y="27" width="110" height="56" rx="10" fill="${surf}" stroke="${state.topoNode==='r1'?a:brd}" stroke-width="2"/>
+              <text x="230" y="52" text-anchor="middle" fill="${txt}" font-size="12" font-weight="800">Core-R1</text>
+              <text x="230" y="70" text-anchor="middle" fill="${b}" font-size="10">OSPF · BGP AS65100</text>
+            </g>
+            <g class="topo-node" data-node="fw1" style="cursor:pointer">
+              <rect x="175" y="137" width="110" height="56" rx="10" fill="${surf}" stroke="${state.topoNode==='fw1'?a:brd}" stroke-width="2"/>
+              <text x="230" y="162" text-anchor="middle" fill="${txt}" font-size="12" font-weight="800">Edge-FW</text>
+              <text x="230" y="180" text-anchor="middle" fill="${a}" font-size="10">Zero-Trust · ISE</text>
+            </g>
+            <g class="topo-node" data-node="cloud" style="cursor:pointer">
+              <rect x="345" y="82" width="150" height="56" rx="12" fill="${surf}" stroke="${state.topoNode==='cloud'?a:brd}" stroke-width="2"/>
+              <text x="420" y="107" text-anchor="middle" fill="${txt}" font-size="12" font-weight="800">MPLS / SR-Core</text>
+              <text x="420" y="125" text-anchor="middle" fill="${b}" font-size="10">TI-LFA &lt; 50ms</text>
+            </g>
+          </svg>`;
+      }
+
+      function renderPublicSection(style) {
+        const fac = FACULTIES.find(f => f.id === state.facultyId) || FACULTIES[1];
+        return `
+          <section class="stage-container">
+            <div class="hero-grid">
+              <div class="hero-card">
+                <span class="kicker">${esc(style.enName)} · مسیر آموزشی فارسی سیسکو</span>
+                <h1 class="hero-title">آکادمی مهندسی شبکه و سیسکو — از مبانی تا معماری CCIE و CCDE</h1>
+                <p class="hero-lead">${esc(style.description)} ناوبری کاملاً ساده است: دانشکده را انتخاب کنید، توپولوژی را لمس کنید و با یک کلیک وارد داشبورد یا آزمایشگاه شوید.</p>
+                <div class="hero-actions">
+                  <button class="btn-primary" data-go-view="dashboard">ورود به داشبورد دانشجو ←</button>
+                  <button class="btn" data-scroll-fac>مشاهدهٔ ۷ دانشکده (f0 تا f6)</button>
+                  <span class="badge"><span class="led"></span> ۲۹ درس تعاملی · ۷ دانشکده</span>
+                </div>
+                <div class="kpi-strip">
+                  <div class="kpi-box"><strong>۷ دانشکده</strong><small>از مبانی تا CCNA، CCNP و CCDE</small></div>
+                  <div class="kpi-box"><strong>۲۹ درس ۱۶بخشی</strong><small>توپولوژی، آزمایشگاه IOS و آزمون</small></div>
+                  <div class="kpi-box"><strong>۱۴ سؤال هوشمند</strong><small>تعیین سطح فوری بر پایهٔ دانش شما</small></div>
+                </div>
+              </div>
+
+              <div class="card topo-box">
+                <div class="topo-head">
+                  <strong>توپولوژی زندهٔ شبکه (روی هر نود کلیک کنید)</strong>
+                  <span class="badge mono">PKT-FLOW: ACTIVE</span>
+                </div>
+                <div class="topo-svg-wrap">${renderTopologySvg(style)}</div>
+                <div class="topo-info" id="topo-live-info">${esc(TOPO_NODES[state.topoNode])}</div>
+              </div>
+            </div>
+
+            <div class="sec-head" id="faculties-anchor">
+              <div>
+                <span class="kicker">CURRICULUM ARCHITECTURE</span>
+                <h2>۷ دانشکدهٔ تخصصی — انتخاب مستقیم یا تعیین سطح هوشمند</h2>
+              </div>
+              <small class="muted">روی هر دانشکده کلیک کنید تا سرفصل‌ها و درس‌هایش بلافاصله نمایش داده شود</small>
+            </div>
+
+            <div class="faculty-pills">
+              ${FACULTIES.map(f => `
+                <button type="button" class="faculty-pill ${f.id === state.facultyId ? 'active' : ''}" data-pick-fac="${f.id}">
+                  <small>${esc(f.badge)}</small>
+                  <strong>${esc(f.title)}</strong>
+                </button>`).join('')}
+            </div>
+
+            <div class="faculty-detail">
+              <div class="card">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                  <span class="badge">${esc(fac.badge)} · ${esc(fac.duration)}</span>
+                  <button class="btn-primary" data-go-view="dashboard">شروع این دانشکده در داشبورد ←</button>
+                </div>
+                <h3 style="margin:12px 0 6px">${esc(fac.title)}</h3>
+                <p class="muted" style="margin:0 0 14px;line-height:1.8">${esc(fac.desc)}</p>
+                <div class="lesson-mini-list">
+                  ${fac.lessons.map((title, i) => `
+                    <div class="lesson-mini-row">
+                      <span><strong>۰${i + 1}.</strong> ${esc(title)}</span>
+                      <button class="pill-tab" data-go-view="dashboard">باز کردن ←</button>
+                    </div>`).join('')}
+                </div>
+              </div>
+              <div class="card" style="display:grid;gap:12px;align-content:start">
+                <span class="kicker">چرا این ساختار ساده و سریع است؟</span>
+                <div class="rack-row"><span><span class="led"></span> ناوبری حداکثر ۲ کلیکی به کل بخش‌ها</span><small class="muted">بدون گم‌شدن</small></div>
+                <div class="rack-row"><span><span class="led"></span> پشتیبانی کامل فارسی RTL و خوانایی بالا</span><small class="muted">استاندارد</small></div>
+                <div class="rack-row"><span><span class="led warn"></span> شبیه‌ساز ARP / VLAN / OSPF و CLI</span><small class="muted">درون‌ساخت</small></div>
+                <button class="btn" data-go-view="dashboard">آزمایش در داشبورد دانشجو ←</button>
+              </div>
+            </div>
+          </section>`;
+      }
+
+      function renderDashboardSection(style) {
+        const fac = FACULTIES.find(f => f.id === state.facultyId) || FACULTIES[1];
+        const sub = SUBNET_TABLE[state.cidr];
+        return `
+          <section class="stage-container">
+            <div class="dash-shell">
+              <aside class="card dash-side">
+                <span class="kicker">ناوبری سریع دانشجو</span>
+                <button class="dash-nav-btn active"><span>خانهٔ دانشکدهٔ من</span><span>←</span></button>
+                <button class="dash-nav-btn" data-go-view="public"><span>بازگشت به صفحهٔ عمومی</span><span>⌂</span></button>
+                <button class="dash-nav-btn" data-pick-cli="ospf"><span>آزمایشگاه زندهٔ IOS</span><span>›_</span></button>
+                <button class="dash-nav-btn" data-pick-fac="f3"><span>مسیر CCNP ENCOR</span><span>f3</span></button>
+                <button class="dash-nav-btn" data-pick-fac="f5"><span>مسیر CCIE MPLS</span><span>f5</span></button>
+                <div class="kpi-box" style="margin-top:6px">
+                  <small>پیشرفت کل آکادمی</small>
+                  <strong>۱۲ از ۲۹ درس (۴۱٪)</strong>
+                  <div class="progress-bar"><div class="progress-fill"></div></div>
+                  <small>سطح فعال: ${esc(fac.badge)}</small>
+                </div>
+              </aside>
+
+              <div class="dash-main">
+                <div class="hero-card" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px">
+                  <div>
+                    <span class="badge"><span class="led"></span> ${esc(fac.badge)} · مسیر فعال شما</span>
+                    <h2 style="margin:8px 0 4px">${esc(fac.title)}</h2>
+                    <p class="muted" style="margin:0;font-size:.88rem">قدم پیشنهادی بعدی: <strong>${esc(fac.lessons[0])}</strong> · زمان مطالعهٔ تخمینی: ۴۵ دقیقه</p>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn-primary">ادامهٔ همین درس ←</button>
+                    <button class="btn" data-go-view="public">تغییر دانشکده</button>
+                  </div>
+                </div>
+
+                <div class="dash-grid-2">
+                  <div class="card">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                      <strong>مینی‌ترمینال تعاملی Cisco IOS</strong>
+                      <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button class="pill-tab ${state.cliCmd==='ospf'?'active':''}" data-pick-cli="ospf">OSPF</button>
+                        <button class="pill-tab ${state.cliCmd==='vlan'?'active':''}" data-pick-cli="vlan">VLAN</button>
+                        <button class="pill-tab ${state.cliCmd==='bgp'?'active':''}" data-pick-cli="bgp">BGP</button>
+                      </div>
+                    </div>
+                    <div class="cli-screen">${esc(CLI_OUTPUTS[state.cliCmd])}</div>
+                  </div>
+
+                  <div class="card" style="display:grid;gap:10px;align-content:start">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                      <strong>محاسبه‌گر سریع Subnet</strong>
+                      <div style="display:flex;gap:6px">
+                        ${[24,26,28,30].map(c => `<button class="pill-tab ${state.cidr===c?'active':''}" data-pick-cidr="${c}">/${c}</button>`).join('')}
+                      </div>
+                    </div>
+                    <div class="rack-row"><span>Subnet Mask</span><strong class="mono">${sub.mask}</strong></div>
+                    <div class="rack-row"><span>Wildcard (ACL / OSPF)</span><strong class="mono">${sub.wild}</strong></div>
+                    <div class="rack-row"><span>تعداد آدرس معتبر</span><strong>${sub.hosts}</strong></div>
+                    <div class="rack-row"><span>بازهٔ نمونه</span><small class="mono">${sub.example}</small></div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
+                    <strong>ماژول‌های همین دانشکده (${esc(fac.badge)})</strong>
+                    <span class="badge">۱۶ بخش استاندارد در هر درس</span>
+                  </div>
+                  <div style="display:grid;gap:8px">
+                    ${fac.lessons.map((t, idx) => `
+                      <div class="rack-row">
+                        <div style="display:flex;align-items:center;gap:10px">
+                          <span class="led ${idx===0?'':'warn'}"></span>
+                          <div>
+                            <strong>جلسهٔ ۰${idx+1}: ${esc(t)}</strong>
+                            <small class="muted" style="display:block">شامل دیاگرام، سناریوی CLI و آزمون ۱۲ سؤالی</small>
+                          </div>
+                        </div>
+                        <button class="pill-tab">${idx===0 ? 'آمادهٔ شروع ←' : 'مشاهده درس'}</button>
+                      </div>`).join('')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>`;
+      }
+
+      function renderPreview() {
+        const s = activeStyle();
+        const w = s.swatches;
+        extraCssEl.textContent = s.extraCss || '';
+        const styleVars = `
+          --bg:${w.bg}; --bg2:${w.bg2}; --surface:${w.surface}; --surface2:${w.surface2};
+          --border:${w.border}; --borderStrong:${w.borderStrong};
+          --text:${w.text}; --muted:${w.muted};
+          --accent:${w.accent}; --accent2:${w.accent2}; --accent-text:${w.accentText};
+          --glow:${w.glow}; --radius:${w.radius}; --shadow:${w.shadow};
+        `;
+        const navHtml = `
+          <header class="top-nav">
+            <div class="top-nav-inner">
+              <div class="brand-box">
+                <div class="brand-mark">F</div>
+                <div>
+                  <strong>FAM Academy · ${esc(s.enName)}</strong>
+                  <small>آکادمی جامع مهندسی شبکه و سیسکو (CCNA → CCDE)</small>
+                </div>
+              </div>
+              <div class="nav-links">
+                <button class="pill-tab ${state.view==='public'?'active':''}" data-go-view="public">صفحهٔ عمومی</button>
+                <button class="pill-tab" data-scroll-fac>۷ دانشکده</button>
+                <button class="pill-tab ${state.view==='dashboard'?'active':''}" data-go-view="dashboard">داشبورد دانشجو</button>
+                ${state.standalone ? `<button class="btn" id="btn-back-gallery">← بازگشت به گالری ۲۰ مدل</button>` : ''}
+              </div>
+            </div>
+          </header>`;
+
+        let bodyHtml = '';
+        if (state.view === 'public') bodyHtml = renderPublicSection(s);
+        else if (state.view === 'dashboard') bodyHtml = renderDashboardSection(s);
+        else {
+          bodyHtml = renderPublicSection(s) +
+            `<div class="stage-container"><div class="split-divider">▼ نمای داشبورد کاربری دانشجو در همین سبک (${esc(s.name)}) ▼</div></div>` +
+            renderDashboardSection(s);
+        }
+
+        mainEl.innerHTML = `<div class="preview-stage arch-${esc(s.archetype)} ${state.standalone ? 'standalone' : ''}" style="${styleVars}">${navHtml}${bodyHtml}</div>`;
+
+        mainEl.querySelectorAll('[data-go-view]').forEach(b => {
+          b.onclick = () => { state.view = b.dataset.goView; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        });
+        mainEl.querySelectorAll('[data-scroll-fac]').forEach(b => {
+          b.onclick = () => {
+            if (state.view === 'dashboard') { state.view = 'public'; render(); }
+            setTimeout(() => document.getElementById('faculties-anchor')?.scrollIntoView({ behavior: 'smooth' }), 30);
+          };
+        });
+        mainEl.querySelectorAll('[data-pick-fac]').forEach(b => {
+          b.onclick = () => { state.facultyId = b.dataset.pickFac; render(); };
+        });
+        mainEl.querySelectorAll('.topo-node').forEach(g => {
+          g.onclick = () => { state.topoNode = g.dataset.node; render(); };
+        });
+        mainEl.querySelectorAll('[data-pick-cli]').forEach(b => {
+          b.onclick = () => { state.cliCmd = b.dataset.pickCli; render(); };
+        });
+        mainEl.querySelectorAll('[data-pick-cidr]').forEach(b => {
+          b.onclick = () => { state.cidr = Number(b.dataset.pickCidr); render(); };
+        });
+        document.getElementById('btn-back-gallery')?.addEventListener('click', () => {
+          state.standalone = false; state.mode = 'gallery'; render();
+        });
+      }
+
+      function renderGallery() {
+        extraCssEl.textContent = '';
+        const cats = [
+          ['all', 'همهٔ ۲۰ سبک'],
+          ['dark', 'تیره و NOC / سایبری'],
+          ['light', 'روشن و مینیمال'],
+          ['topology', 'مهندسی و توپولوژی'],
+          ['modern', 'مدرن، لاجوردی و گیمیفای']
+        ];
+        const list = state.filter === 'all' ? STYLES : STYLES.filter(s => s.category === state.filter);
+        mainEl.innerHTML = `
+          <div class="gallery-wrap">
+            <div class="gallery-filters">
+              <div>
+                <h1 style="margin:0 0 4px;font-size:1.35rem">گالری مقایسهٔ ۲۰ سبک بصری و آموزشی</h1>
+                <small style="color:#94a3b8">روی هر مدل کلیک کنید تا صفحهٔ عمومی، داشبورد دانشجو، توپولوژی و ترمینال زندهٔ آن را در مرورگر ببینید.</small>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                ${cats.map(([k, lbl]) => `<button class="studio-btn ${state.filter===k?'active':''}" data-cat="${k}">${lbl}</button>`).join('')}
+              </div>
+            </div>
+            <div class="gallery-grid">
+              ${list.map(s => {
+                const w = s.swatches;
+                return `
+                  <article class="gal-card">
+                    <div class="gal-preview-mini" style="background:${w.bg};background-image:${w.glow};color:${w.text}">
+                      <div class="gal-mini-bar">
+                        <span style="color:${w.accent};font-weight:800">${esc(s.enName)}</span>
+                        <span style="padding:2px 8px;border-radius:999px;background:${w.surface2};border:1px solid ${w.border}">${esc(s.archetype)}</span>
+                      </div>
+                      <div class="gal-mini-hero">${esc(s.tagline)}</div>
+                      <div class="gal-mini-cards">
+                        <div class="gal-mini-box" style="background:${w.surface};border:1px solid ${w.borderStrong}"></div>
+                        <div class="gal-mini-box" style="background:${w.accent};opacity:.9"></div>
+                        <div class="gal-mini-box" style="background:${w.surface2};border:1px solid ${w.border}"></div>
+                      </div>
+                    </div>
+                    <div class="gal-body">
+                      <h3>${esc(s.name)}</h3>
+                      <p>${esc(s.description)}</p>
+                      <div class="gal-pal">${s.palette.map(c => `<span title="${c}" style="background:${c}"></span>`).join('')}</div>
+                    </div>
+                    <div class="gal-actions">
+                      <button class="studio-btn active" data-open-style="${s.id}" data-open-view="public">صفحهٔ عمومی</button>
+                      <button class="studio-btn" data-open-style="${s.id}" data-open-view="dashboard">داشبورد</button>
+                      <button class="studio-btn gold" data-open-standalone="${s.id}">تمام‌صفحه</button>
+                    </div>
+                  </article>`;
+              }).join('')}
+            </div>
+          </div>`;
+
+        mainEl.querySelectorAll('[data-cat]').forEach(b => { b.onclick = () => { state.filter = b.dataset.cat; render(); }; });
+        mainEl.querySelectorAll('[data-open-style]').forEach(b => {
+          b.onclick = () => {
+            state.styleId = Number(b.dataset.openStyle);
+            state.view = b.dataset.openView || 'public';
+            state.mode = 'preview';
+            state.standalone = false;
+            render();
+            window.scrollTo({ top: 0, behavior: 'auto' });
+          };
+        });
+        mainEl.querySelectorAll('[data-open-standalone]').forEach(b => {
+          b.onclick = () => {
+            state.styleId = Number(b.dataset.openStandalone);
+            state.view = 'public';
+            state.mode = 'preview';
+            state.standalone = true;
+            render();
+            window.scrollTo({ top: 0, behavior: 'auto' });
+          };
+        });
+      }
+
+      function render() {
+        syncStudioChrome();
+        if (state.mode === 'gallery') renderGallery();
+        else renderPreview();
+      }
+
+      document.getElementById('btn-mode-gallery').onclick = () => { state.mode = 'gallery'; state.standalone = false; render(); };
+      document.getElementById('btn-prev').onclick = () => { state.styleId = state.styleId <= 1 ? 20 : state.styleId - 1; state.mode = 'preview'; render(); };
+      document.getElementById('btn-next').onclick = () => { state.styleId = state.styleId >= 20 ? 1 : state.styleId + 1; state.mode = 'preview'; render(); };
+      selectEl.onchange = () => { state.styleId = Number(selectEl.value); state.mode = 'preview'; render(); };
+      document.getElementById('btn-view-public').onclick = () => { state.mode = 'preview'; state.view = 'public'; render(); };
+      document.getElementById('btn-view-dash').onclick = () => { state.mode = 'preview'; state.view = 'dashboard'; render(); };
+      document.getElementById('btn-view-split').onclick = () => { state.mode = 'preview'; state.view = 'split'; render(); };
+      document.getElementById('btn-standalone').onclick = () => { state.mode = 'preview'; state.standalone = true; render(); };
+
+      render();
+    })();
+  </script>
+</body>
+</html>
