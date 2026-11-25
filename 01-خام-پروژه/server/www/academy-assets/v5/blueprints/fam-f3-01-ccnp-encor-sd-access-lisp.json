@@ -1,0 +1,390 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f3-01-ccnp-encor-sd-access-lisp",
+  "id": "fam-f3-01-ccnp-encor-sd-access-lisp",
+  "facultyId": "f3",
+  "objectiveId": "F3-01",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-3-ccnp",
+  "title": "معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center",
+  "titleEn": "CCNP ENCOR: SD-Access Fabric, LISP Control Plane & VXLAN",
+  "domain": "دانشکده ۳ · معماری CCNP Enterprise",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 100,
+  "prerequisites": [
+    "fam-f2-03-ospf-multiarea-vrf-redistribution"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f2-03-ospf-multiarea-vrf-redistribution"
+    ],
+    "learningObjectives": [
+      "تفاوت Underlay و Overlay در SD-Access",
+      "نقش Control Plane (LISP)",
+      "Data Plane با VXLAN و SGT",
+      "نقش Nodeها در فابریک"
+    ]
+  },
+  "whyItMatters": "مدرک 350-401 ENCOR از مهندس انتظار دارد به جای مدیریت دستی تک‌تک سوئیچ‌ها با STP و VLANهای پراکنده، معماری Campus Fabric مبتنی بر Intent-Based Networking را بشناسد.",
+  "topology": {
+    "devices": [
+      {
+        "id": "BORDER",
+        "type": "router",
+        "x": 140,
+        "y": 140
+      },
+      {
+        "id": "CP-NODE",
+        "type": "server",
+        "x": 320,
+        "y": 80
+      },
+      {
+        "id": "EDGE-1",
+        "type": "switch",
+        "x": 320,
+        "y": 210
+      },
+      {
+        "id": "EDGE-2",
+        "type": "switch",
+        "x": 500,
+        "y": 210
+      }
+    ],
+    "links": [
+      {
+        "a": "BORDER:Gi0/0",
+        "b": "CP-NODE:eth0"
+      },
+      {
+        "a": "BORDER:Gi0/1",
+        "b": "EDGE-1:Gi0/24"
+      },
+      {
+        "a": "EDGE-1:Gi0/23",
+        "b": "EDGE-2:Gi0/23"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۳ · CCNP Enterprise (ENCOR) — درس ۱ از ۳</div><p><strong>هدف درس:</strong> معماری Cisco SD-Access را به‌صورت سه‌لایه توضیح دهید: Underlay (روتینگ ساده)، Control Plane (LISP برای EID-to-RLOC) و Data Plane (VXLAN با SGT) — و بفهمید هر لایه چه مشکلی از شبکه‌های سنتی را حل می‌کند.</p><p><strong>پیش‌نیازها:</strong> VXLAN و MP-BGP در سطح مفهومی (یا همین‌درس را بعد از f4-02 بخوانید)، OSPF/IS-IS تک‌ناحیه، مفهوم VLAN و MAC learning.</p><p><strong>خروجی یادگیری:</strong> نقش هر گره (Border/Control/Border+Control/Edge)، مسیر یک بستهٔ کلاینت در فابریک، و خواندن وضعیت از <code>show fabric</code>/<code>show lisp</code>.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>شبکه‌های سنتی با VLAN سراسری و STP سه درد بزرگ دارند که SD-Access مستقیماً به آن‌ها می‌زند:</p><ul><li><strong>دامنهٔ لایه ۲ بزرگ:</strong> broadcast، حلقه، و مهاجرت کلاینت بین سایت‌ها = بازپیکربندی دستی. در SD-Access هر access و یک VXLAN segment است و کلاینت هر جا برود، همان EID را نگه می‌دارد ( mobility سراسری).</li><li><strong>پیکربندی پراکنده:</strong> صدها access-list، QoS و VLAN به‌ازای هر switch. در SD-Access سیاست به‌صورت SGT (Security Group Tag) روی کاربر/دستگاه تعریف می‌شود و در سراسر فابریک اعمال می‌گردد — policy در نقطهٔ ورود، اعمال در همه جا.</li><li><strong>کندی ارائهٔ سرویس:</strong> راه‌اندازی یک VLAN/زیرشبکه جدید چند روز کار دارد؛ با fabric به‌صورت template-based در دقیقه انجام می‌شود.</li></ul><div class=\"lesson-callout\"><strong>خلاصهٔ پارادایم:</strong> سنتی = «شبکه را با پیکربندی بساز» · SD-Access = «سیاست را تعریف کن، فابریک خودش زیرساخت را می‌سازد».</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. تفاوت Underlay و Overlay در SD-Access",
+      "html": "<p><strong>Underlay</strong> همان لایهٔ روتینگ فیزیکی است — ساده، یکنواخت و بدون VLANهای کاربری:</p><ul><li>معمولاً IS-IS یا OSPF در یک ناحیه، با loopback هر گره به‌عنوان RLOC (Routing Locator).</li><li>کار وظیفه‌اش فقط رساندن UDP/4789 (VXLAN) و TCP/4342 (LISP) بین گره‌هاست؛ از دید آن، کلاینت‌ها اصلاً وجود ندارند.</li><li>MTU: VXLAN سربار ۵۰ بایتی دارد (8 VNI + 8 UDP + 8 IP + ... + 14/18 لایه ۲)؛ underlay باید پایین‌ترین MTU مسیر را جبران کند یا PMTUD کار کند.</li></ul><p><strong>Overlay</strong> جهان کاربران است: هر VNI یک segment منطقی؛ هر کلاینت یک EID (Endpoint ID) که در LISP registry ثبت می‌شود و به RLOC (آدرس IP لبهٔ VXLAN) نگاشت می‌شود. نتیجه: MAC/IP کلاینت در هر جای فابریک معنای یکسان دارد و لایهٔ ۲ از access فراتر نمی‌رود.</p><table class=\"lesson-data-table\"><thead><tr><th>مفهوم</th><th>سنتی</th><th>SD-Access</th></tr></thead><tbody><tr><td>شناسهٔ کلاینت</td><td>MAC/VLAN محلی</td><td>EID (IP/MAC سراسری) + SGT</td></tr><tr><td>محدودهٔ لینک لایه ۲</td><td>تا مرز VLAN (گاه چند site)</td><td>فقط access تا vEdge (VXLAN tunnel)</td></tr><tr><td>روتینگ داده</td><td>IP سراسری روی همه لینک‌ها</td><td>IP فقط در underlay؛ overlay با VXLAN header</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. نقش Control Plane (LISP)",
+      "html": "<p><strong>LISP</strong> (Locator/ID Separation Protocol) مشکل «آدرس هم هویت است و هم موقعیت» را با دو فضای نام جداسازی می‌کند:</p><ol><li><strong>یتیم‌ها (EID):</strong> آدرسی که کلاینت با خود دارد (IP میزبان). در روتینگ عادی این آدرس باید در جدول سراسری باشد؛ در LISP نه.</li><li><strong>Locator (RLOC):</strong> آدرس IP گرهٔ لبه (vEdge) که در underlay اعلام می‌شود و مثل هر مسیر عادی روت می‌شود.</li><li><strong>کنترل‌پلین:</strong> با MAP-Request/Map-Reply، xTR (ingress/egress) می‌فهمد «IP مقصد → کدام RLOC». کش مسیرها با TTL مشخص ذخیره می‌شود.</li><li><strong>مرکز دادهٔ مسیر (MS/MR):</strong> در SD-Access نقش Control Plane Node را بازی می‌کند — همهٔ نگاشت‌ها را نگه می‌دارد تا edgeها از هم سؤال نکنند.</li></ol><pre><code>Leaf-X# show lisp eid-table ipv4\nLISP EID Table Information for IPv4\n  Prefix               Last Activity     Source\n  10.11.20.55/32       0d00:02:14        site-x\nLeaf-X# show lisp mapping-cache\n  10.11.30.0/24 -> RLOC: 10.0.255.3 (vEdge-B), uptime 5:12:04</code></pre><div class=\"lesson-callout\"><strong>تفکیک کلیدی:</strong> LISP کنترل‌پلین را می‌داند (کجا است؟)؛ VXLAN داده را می‌برد (چطور بفرستم؟). هیچ‌کدام بدون دیگری کامل نیست.</div>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. Data Plane با VXLAN و SGT",
+      "html": "<p>در Data Plane، بستهٔ کلاینت به‌صورت کپسوله VXLAN بین دو لبه جابه‌جا می‌شود و SGT که در control plane تصمیم گرفته شده، همراهش می‌رود:</p><ul><li><strong>VXLAN:</strong> کل فریم (با MAC/L2) داخل UDP/4789 پوشانده می‌شود؛ VNI 24بیتی segment را مشخص می‌کند. نتیجه: MAC فقط در لبهٔ access اهمیت دارد.</li><li><strong>SGT (Scalable Group Tag):</strong> برچسب عددی گروه امنیتی (مثلاً ۱۰=کاربر، ۲۵=چاپگر، ۱۰۰=سرور). در لبهٔ ورود به SGT کلاینت نگاشت می‌شود (از ISE یا CDP/SGV فعال) و در فریم (یا در هدر VXLAN گروه) حمل می‌شود.</li><li><strong>سیاست:</strong> قاعده «SGT 10 ← SGT 100 روی پورت TCP 443» یک‌بار تعریف می‌شود و روی هر لبه اعمال می‌گردد — نه هزار ACL روی هزار پورت.</li><li><strong>ARP/MAC:</strong> فابریک به‌جای flood کردن، ARP را در border پاسخ می‌دهند (anycast gateway + ARP suppression) و MAC را از control plane می‌پرسند — پخش (broadcast) به access محدود می‌شود.</li></ul><p>ترکیب این‌ها یعنی: کلاینت بدون تغییر IP جابه‌جا می‌شود، سیاست همراهش می‌رود، و هیچ لینک لایهٔ ۲ بین ساختمان‌ها وجود ندارد.</p>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. نقش Nodeها در فابریک",
+      "html": "<p>چهار نوع گره در فابریک SD-Access (ترکیبی هم ممکن است):</p><table class=\"lesson-data-table\"><thead><tr><th>نقش</th><th>وظیفه</th><th>معمولاً روی</th></tr></thead><tbody><tr><td><strong>Control Plane Node</strong></td><td>مرکز LISP/MX (Map-Server)؛ نگاشت EID↔RLOC و EID↔SGT</td><td>سه‌گانهٔ سیسکو (C9300/C9500/C9400 یا Cat9k)</td></tr><tr><td><strong>Border Node</strong></td><td>مرز فابریک با بیرون (اینترنت، DC، WAN)؛ مسیرهای خارجی را publish و ترجمه می‌کند</td><td>روتر لبه یا سوییچ لبه</td></tr><tr><td><strong>Edge Node (vEdge)</strong></td><td>ورودی/خروجی فابریک؛ encapsulate/de-encapsulate VXLAN، اعمال سیاست، ثبت EID</td><td>سوییچ دسترسی (Cat9k با رلیز مناسب)</td></tr><tr><td><strong>Fabric Edge + Border</strong></td><td>ترکیب هر دو نقش (برای site کوچک)</td><td>یک سوییچ لبهٔ واحد</td></tr><tr><td>WAN Edge / ISE / DNAC</td><td>مسیریابی WAN مبتنی بر SD، policy، و orchestration</td><td>زیرساخت مکمل</td></tr></tbody></table><p>یک سایت مینیمال: دو Border (برای تحمل خرابی) + چند Edge + یک pair Control Plane. DNAC/Center (یا اسکریپت IaC) همه را از یک design template استخراج می‌کند؛ پیکربندی دستی فقط برای عیب‌یابی باقی می‌ماند.</p>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>راهنما</th></tr></thead><tbody><tr><td>Underlay</td><td>OSPF single-area / IS-IS L1-L2</td><td>IS-IS برای فابریک بزرگ (مقیاس لینک بهتر)؛ OSPF برای تیم‌های آشنا</td></tr><tr><td>مدل آدرس‌دهی overlay</td><td>همان subnet سراسری / per-VNI</td><td>per-VNI یا per-site تا mobility تمیز بماند</td></tr><tr><td>مرکز سیاست</td><td>ISE سنتی / ISE + TrustSec</td><td>ISE برای 802.1X + SGT؛ بدون ISE فقط VXLAN بدون سیاست کلاسیک</td></tr><tr><td>راه‌اندازی</td><td>DNAC/Center / CLI دستی</td><td>برای شروع آموزشی CLI خوب است؛ برای production حتماً controller</td></tr><tr><td>مرز خروج</td><td>Border دوگانه / تکی</td><td>حداقل دو Border در هر site بزرگ؛ خرابی یکی نباید سایت را قطع کند</td></tr><tr><td>سازگاری نسخه</td><td>رلیزهای پشتیبانی‌شده</td><td>جدول سازگاری SD-Access را قبل از خرید چک کنید — Cat9k به رلیز IOS-XE خاصی نیاز دارد</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>مسیر یک بستهٔ کلاینت A (vEdge-1) تا سرور B (vEdge-3):</p><ol><li><strong>ثبت:</strong> کلاینت ARP/IP دارد؛ vEdge-1 آن را به‌عنوان EID با SGT (از ISE) در control plane ثبت می‌کند.</li><li><strong>تصمیم کنترل‌پلین:</strong> برای مقصد EID ب، LISP map-reply می‌گوید: RLOC = 10.0.255.3 (vEdge-3) + SGT مقصد.</li><li><strong>اجازهٔ سیاست:</strong> جفت SGT مبدأ/مقصد با پروتکل/پورت در policy table چک می‌شود؛ deny یعنی بسته همین‌جا drop.</li><li><strong>کپسوله:</strong> فریم با هدر VXLAN (VNI مبدأ = VNI مقصد در همان فابریک) + UDP/4789 + IP مقصد = RLOC بیرون می‌رود؛ underlay آن را OSPF/IS-IS تا vEdge-3 روت می‌کند.</li><li><strong>تخلیه:</strong> vEdge-3 هدر را باز می‌کند، MAC/SGT را چک می‌کند، سپس فریم را در VLAN/VNI مقصد به سرور می‌رساند. مسیر برگشت همین است با نقش‌های برعکس.</li></ol><p>نکتهٔ کنترل‌پلینی: اگر map-cache خالی باشد، اولین بسته MAP-Request می‌زند و بسته در صف می‌ماند (چند میلی‌ثانیه)؛ علامت «اولین پینگ کند است، بقیه سریع» طبیعی است.</p>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): یک سایت کوچک با چهار گره.</p><table class=\"lesson-data-table\"><thead><tr><th>گره</th><th>نقش</th><th>Loopback/RLOC</th></tr></thead><tbody><tr><td>CP-1/CP-2</td><td>Control Plane Pair</td><td>10.0.255.1 / 10.0.255.2</td></tr><tr><td>BR-1/BR-2</td><td>Border (+ مسیر به internet/DC)</td><td>10.0.255.11 / 10.0.255.12</td></tr><tr><td>ED-1..ED-4</td><td>Edge (vEdge) با پورت‌های access</td><td>10.0.255.21..24</td></tr><tr><td>Underlay</td><td>IS-IS L1-L2 روی همهٔ لینک‌ها</td><td>—</td></tr><tr><td>VNI</td><td>10011 = کاربران، 10020 = سرورها</td><td>—</td></tr><tr><td>SGT</td><td>10=users, 20=servers, 30=printers</td><td>—</td></tr></tbody></table><p>در lab می‌توان با سه سوییچ (یکی Border+Control، دو Edge) همین معماری را بالا آورد و همهٔ مسیرهای show را مشاهده کرد.</p>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی دستی برای درک مکانیزم (در production با DNAC) — طراحی‌شده، اجرا نشده:</p><pre><code>! --- Underlay (IS-IS) ---\nED-1(config)# router isis fam-underlay\nED-1(config-router)# net 49.0001.0010.0010.0021.00\nED-1(config-router)# metric-style wide\nED-1(config)# interface loopback0\nED-1(config-if)# ip address 10.0.255.21 255.255.255.255\nED-1(config-if)# clns circuit-type level-2-only\n\n! --- لایهٔ فابریک (روی IOS-XE با قابلیت fabric) ---\nED-1(config)# fabric-access\nED-1(config)# interface GigabitEthernet1/0/1        ! پورت access کلاینت\nED-1(config-if)# access port\nED-1(config-if)# access vlan 10011\nED-1(config-if)# trust auto trust                    ! فعال‌سازی SGT از ISE\n\n! --- مشاهده ---\nED-1# show fabric isis neighbor\nED-1# show lisp site summary\nED-1# show cts role\nED-1# show platform software fed switch active cts policy</code></pre><ul><li><code>net …</code> باید در کل underlay یکسان باشد (Area) و host part متفاوت؛ اشتباه net ← همسایه up نمی‌شود.</li><li>پورت‌های underlay نباید access port باشند؛ پورت‌های کاربری نباید in fabric mode دستی uplink ببینند.</li><li>اسکریپت‌های DNAC همین بلک‌ها را با API تولید می‌کنند؛ یادگیری CLI برای عیب‌یابی، نه برای راه‌اندازی انبوه.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>ED-1# show fabric isis neighbor\nSystem Id        Interface   SNPA           State  Holdtime  Type\nCP-1             Gi1/0/10    50f7.ca55.0001 up     28        L2\n\nED-1# show lisp site summary\nSite name       Last Register   EID-prefix       Registrar\nsite-access-1   00:00:12        10.11.20.0/24    xTR-CP-1, xTR-CP-2\n\nED-1# show lisp eid-table ipv4 database\nPrefix              Last Activity   Origin\n10.11.20.55/32      0d00:00:44      dynamic\n\nED-1# show vxlan tunnel\nInterface  Peer-IP        VNI      Status\nVxlan0     10.0.255.23    10011    up\n\nED-1# show cts role\nSGT: 10  Name: users\nSecurity Group ACL: permit from sgt 10 to sgt 20 tcp 443</code></pre><ul><li><code>show lisp site</code> روی control plane: چند EID ثبت شده و آخرین ثبت کی بوده (اگر قدیمی باشد، edge ریجیستر نمی‌کند).</li><li>تunnel VXLAN باید با هر vEdge مقصد یکی داشته باشد؛ تعداد کمتر از تعداد edgeها ← مسیر اشتباه یا underlay خراب.</li><li><code>show cts role</code> نشان می‌دهد policy واقعاً به پورت رسیده یا فقط SGT تگ خورده.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Wireshark روی لینک underlay (فیلتر <code>udp.port == 4789</code>):</strong> کپسوله‌های VXLAN را ببینید؛ با Decode As می‌توانید هدر داخلی (فریم/ Ethernet) را هم ببینید و VNI را در هدر VXLAN چک کنید.</li><li><strong>فیلتر <code>tcp.port == 4342</code>:</strong> پیام‌های LISP (MAP-Request/Reply). دیدن Request مکرر یعنی cache خراب یا control plane down — علامت «اولین بسته همیشه کند».</li><li><strong>پایش:</strong> تعداد EIDهای فعال per-site، تعداد tunnelهای VXLAN، و نرخ خطا/رد سیاست (SGT deny) در DNAC/مانیتورینگ. آستانه: افت تعداد EID بعد از restart edge.</li><li><strong>تشخیص مشکل MTU:</strong> ping با اندازهٔ بزرگ (مثلاً 1472 بدون DF) بین دو کلاینت در VNI متفاوت؛ شکست با DF و جواب ICMP Frag Needed ← underlay MTU را بالا ببرید یا MSS را کم کنید.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>علت</th><th>راه‌حل</th></tr></thead><tbody><tr><td>اولین ping به کلاینت دیگر کند است</td><td>MAP-Request هنگام خالی بودن cache</td><td>طبیعی؛ اگر مکرر شد، سلامت control plane و ثبت site را چک کنید</td></tr><tr><td>کلاینت بعد از جابه‌جایی IP ندارد/قطع است</td><td>mobility یا ریجیستر نشدن در edge جدید</td><td>show lisp site — آخرین ثبت؛ ISE/SGT را چک کنید</td></tr><tr><td>پینگ بین دو VNI جواب نمی‌دهد</td><td>Inter-VNI فقط در Border مجاز است نه Edge</td><td>یا سیاست Inter-VNI روی Border، یا روتر خارج فابریک</td></tr><tr><td>MTU/بسته‌های بزرگ گم می‌شوند</td><td>سربار VXLAN + PMTUD شکسته</td><td>MTU underlay ≥ 1550 یا کاهش MSS؛ تست با ping بزرگ</td></tr><tr><td>SGT صفر/نامشخص</td><td>ISE پاسخ نداده یا trust auto روی پورت نیست</td><td>show cts role؛ وضعیت authentication پورت؛ fallback policy</td></tr><tr><td>«فابریک بالا آمد ولی اینترنت نداریم»</td><td>مسیر خروج/ NAT در Border تنظیم نشده</td><td>show lisp prefix + show ip route روی Border؛ default-route به بیرون</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> کاربر ساختمان A بعد از جابه‌جایی به ساختمان B، به سرورهای داخلی دسترسی ندارد ولی به اینترنت می‌رسد.</p><ol><li>روی edge مقصد: <code>show lisp eid-table</code> ← آیا EID کاربر ثبت شده؟ اگر نه، edge ریجیستر نکرده ← <code>show fabric isis neighbor</code> و سلامت underlay.</li><li>روی control plane: <code>show lisp site summary</code> ← آخرین ثبت برای prefix کاربر چه زمانی است؟ قدیمی ← edge قبلی هنوز فکر می‌کند مالک است (sticky) — با خاموش شدن یا TTL رفع می‌شود.</li><li>سیاست: <code>show cts role</code> و policy روی پورت ورودی جدید؛ اگر SGT متفاوت از قبل (مثلاً به‌جای users، unauthenticated) گرفته، ISE پورت جدید را 802.1X نکرده ← fallback یا VLAN دیگر.</li><li>مسیر: از کلاینت جدید <code>ping</code> به سرور داخلی، به بیرون؛ تفاوت نشان می‌دهد مشکل داخل فابریک است یا مسیر خروج.</li><li>MTU: اگر فقط وب/فایل سنگین مشکل دارد و ping کوچک سالم است، سربار VXLAN را چک کنید (بند ۱۲).</li><li>پس از رفع: موبیلیت را دوباره تست (جابه‌جایی برگشتی) و مستند کنید که کدام show وضعیت را نشان داد — این مستندات برای runbook آتی لازم است.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>سه لایه: Underlay (روتینگ ساده با loopback = RLOC) · Control (LISP: EID↔RLOC + SGT) · Data (VXLAN/4789 + اعمال سیاست).</li><li>گره‌ها: Control Plane (map-server)، Border (مرز)، Edge (ورودی/خروجی فابریک و ثبت EID).</li><li>SGT جایگزین هزار ACL پراکنده می‌شود؛ سیاست یک‌بار تعریف، همه‌جا اعمال.</li><li>لایهٔ ۲ فقط داخل access؛ بین siteها VXLAN tunnel است نه trunk.</li><li>«پینگ اول کند» علامت پرش cache است؛ اگر مکرر باشد سلامت control plane را بسنجید.</li><li>MTU را فراموش نکنید: سربار VXLAN را حساب کنید.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>خواندن (۱۵ دقیقه):</strong> با یک design template نمونه، نقش هر گره و هر show دستور را روی کاغذ مشخص کنید.</li><li><strong>زیرساخت (۳۰ دقیقه):</strong> در شبیه‌ساز سه‌سوییچی، IS-IS را بالا بیاورید؛ loopbackها را ping کنید؛ با show isis neighbor تأیید کنید.</li><li><strong>Overlay (۳۰ دقیقه):</strong> دو کلاینت در دو edge با یک VNI؛ VXLAN را دستی (یا با template) وصل کنید؛ با show vxlan tunnel و show lisp eid-table پیگیری کنید.</li><li><strong>سیاست (۲۰ دقیقه):</strong> یک SGT جعلی/دستی تعریف و قاعدهٔ deny بسازید؛ با show cts role تأیید کنید بسته رد می‌شود؛ سپس permit کنید.</li><li><strong>خودآزمایی:</strong> مسیر یک بسته را از A تا B با نام هر هدر و هر گره بنویسید؛ تفاوت LISP و VXLAN را در دو جمله بگویید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "ENCOR",
+      "fa": "مفهوم کلیدی ENCOR",
+      "simple": "اصطلاح تخصصی مرتبط با معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center"
+    },
+    {
+      "term": "SD-Access",
+      "fa": "مفهوم کلیدی SD-Access",
+      "simple": "اصطلاح تخصصی مرتبط با معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center"
+    },
+    {
+      "term": "LISP",
+      "fa": "مفهوم کلیدی LISP",
+      "simple": "اصطلاح تخصصی مرتبط با معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center"
+    },
+    {
+      "term": "VXLAN",
+      "fa": "مفهوم کلیدی VXLAN",
+      "simple": "اصطلاح تخصصی مرتبط با معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center"
+    },
+    {
+      "term": "SGT",
+      "fa": "مفهوم کلیدی SGT",
+      "simple": "اصطلاح تخصصی مرتبط با معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center"
+    },
+    {
+      "term": "Underlay",
+      "fa": "مفهوم کلیدی Underlay",
+      "simple": "اصطلاح تخصصی مرتبط با معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center"
+    },
+    {
+      "term": "Overlay",
+      "fa": "مفهوم کلیدی Overlay",
+      "simple": "اصطلاح تخصصی مرتبط با معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center"
+    },
+    {
+      "term": "Catalyst Center",
+      "fa": "مفهوم کلیدی Catalyst Center",
+      "simple": "اصطلاح تخصصی مرتبط با معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — معماری ENCOR: Cisco SD-Access، LISP، VXLAN و DNA Center",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>router lisp\n database-mapping 10.20.0.0/24 192.168.255.10 priority 1 weight 100\nshow lisp session\nshow lisp instance-id 4099 ipv4 map-cache\nshow cts role-based permissions</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "در Cisco SD-Access کدام پروتکل به‌عنوان Control Plane برای نگاشت هویت به مکان استفاده می‌شود؟",
+      "options": [
+        "STP",
+        "LISP (Locator/ID Separation Protocol)",
+        "RIPv2",
+        "HSRP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>LISP نگاشت EID به RLOC را در Control Plane Node مدیریت می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "در اصطلاح‌شناسی LISP، منظور از RLOC چیست؟",
+      "options": [
+        "آدرس مک کارت شبکه کلاینت",
+        "آدرس IP روتینگ سوئیچ لبه (معمولاً Loopback0) که میزبان به آن متصل است",
+        "آدرس سرور DNS",
+        "شماره پورت UDP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>EID هویت میزبان و RLOC مکان فعلی آن در لایه Underlay است.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "Data Plane در فابریک SD-Access بر پایهٔ کدام کپسوله‌سازی عمل می‌کند؟",
+      "options": [
+        "VXLAN (همراه با حمل SGT)",
+        "Frame Relay",
+        "ISL",
+        "GRE بدون هدر"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ترافیک داخل فابریک SD-Access در VXLAN-GPO کپسوله می‌شود تا هم L2/L3 و هم SGT را حمل کند.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "چرا MTU در لینک‌های Underlay فابریک SD-Access باید بالاتر از ۱۵۰۰ (معمولاً ۹۱۰۰) باشد؟",
+      "options": [
+        "به‌دلیل اضافه‌شدن هدرهای VXLAN، UDP و IP بیرونی بدون Fragmentation",
+        "برای کاهش سرعت",
+        "به‌خاطر STP",
+        "زیرا اترنت کار نمی‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>سربار کپسوله‌سازی VXLAN حدود ۵۰ بایت است و MTU بالاتر جلوی Fragmentation را می‌گیرد.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "وظیفهٔ Border Node در SD-Access چیست؟",
+      "options": [
+        "نصب آنتی‌ویروس",
+        "اتصال فابریک SD-Access به شبکه‌های بیرونی (WAN، دیتاسنتر و اینترنت)",
+        "توزیع کابل کشی",
+        "جایگزینی کابل فیبر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Border Node مرز ورودی و خروجی فابریک به سایر شبکه‌هاست.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "در SD-Access مفهوم Virtual Network (VN) معادل چه مفهومی در شبکهٔ سنتی است؟",
+      "options": [
+        "یک VRF مستقل (ایزوله‌سازی ماکرو لایه ۳)",
+        "یک پورت اکسس",
+        "یک آدرس MAC",
+        "یک کابل"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>VNها ایزوله‌سازی کلان (Macro-Segmentation) معادل VRF فراهم می‌کنند.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "میکروسگمنت‌سازی (Micro-Segmentation) درون یک VN چگونه انجام می‌شود؟",
+      "options": [
+        "با SGT (Scalable Group Tag) و سیاست‌های TrustSec",
+        "با تغییر کابل",
+        "با تغییر رمز Wi-Fi",
+        "با NAT"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تگ‌های SGT اجازه می‌دهند حتی داخل یک ساب‌نت سیاست دسترسی بر اساس نقش اعمال شود.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "کدام پروتکل IGP توسط Cisco Catalyst Center به‌طور خودکار برای Underlay پیشنهاد و پیاده‌سازی می‌شود؟",
+      "options": [
+        "IS-IS",
+        "RIP",
+        "IGRP",
+        "BGP فقط روی پورت اکسس"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>اتوماسیون LAN در Catalyst Center به‌صورت پیش‌فرض Underlay را با IS-IS پیکربندی می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "در SD-Access مفهوم Anycast Gateway روی Fabric Edge Nodeها چه مزیتی دارد؟",
+      "options": [
+        "همهٔ Edge Nodeها از یک IP و MAC یکسان برای دروازه استفاده می‌کنند تا کلاینت حین Roaming قطع نشود",
+        "فقط یک سوئیچ در ساختمان روشن می‌ماند",
+        "کلاینت IP نمی‌گیرد",
+        "نیاز به LISP نیست"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Anycast Gateway باعث می‌شود کلاینت در کل فابریک بدون تغییر Gateway جابه‌جا شود.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "برای ارتباط امن به API کاتالیست سنتر (DNA Center) و کنترلرها از چه پروتکلی استفاده می‌شود؟",
+      "options": [
+        "REST API روی HTTPS (پورت 443) با احراز هویت Token",
+        "Telnet",
+        "SNMPv1",
+        "TFTP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>کنترلرهای مدرن از REST API روی HTTPS استفاده می‌کنند.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "تفاوت NETCONF و RESTCONF در اتوماسیون شبکه چیست؟",
+      "options": [
+        "NETCONF بر پایهٔ SSH/XML و RESTCONF بر پایهٔ HTTPS/JSON یا XML است",
+        "هر دو روی UDP کار می‌کنند",
+        "RESTCONF جایگزین TCP است",
+        "تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر دو از مدل دادهٔ YANG استفاده می‌کنند ولی در Transport و فرمت پیام تفاوت دارند.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "یک مدل دادهٔ استاندارد برای تعریف ساختار پیکربندی و وضعیت عملیاتی دستگاه در اتوماسیون چیست؟",
+      "options": [
+        "YANG",
+        "HTML",
+        "MP3",
+        "ARP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>YANG زبان مدل‌سازی داده برای NETCONF و RESTCONF است.</p>"
+    }
+  ]
+}

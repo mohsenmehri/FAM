@@ -148,7 +148,7 @@ class AcademyContentTests(unittest.TestCase):
                 self.assertTrue(local_path.is_file())
 
     def test_served_curriculum_is_curriculum_5_0_only(self):
-        prefixes = ("ccna-v11-", "ccna-v20-", "academy-stage-zero-")
+        prefixes = ("ccna-v11-", "ccna-v20-", "academy-stage-zero-", "fam-f")
         self.assertEqual([p["id"] for p in self.catalog["paths"]], ["fam-c5"])
         for _, _, lesson in self.records:
             with self.subTest(lesson=lesson["id"]):
@@ -196,6 +196,118 @@ class AcademyContentTests(unittest.TestCase):
                 with self.subTest(md=md_file.name, image=match):
                     self.assertIn(content_root.resolve(), target.parents)
                     self.assertTrue(target.is_file())
+
+    def test_academy_shell_exposes_section_switcher_and_directory_views(self):
+        server_root = PACKAGE_ROOT / "server"
+        academy_html = (server_root / "private_ui" / "academy.html").read_text(encoding="utf-8")
+        shell_js = (ASSET_ROOT / "academy-reference-shell.js").read_text(encoding="utf-8")
+        catalog_js = (ASSET_ROOT / "academy-catalog.js").read_text(encoding="utf-8")
+        ui_css = (ASSET_ROOT / "academy-reference-ui.css").read_text(encoding="utf-8")
+        fam_html = (server_root / "private_ui" / "FAM.html").read_text(encoding="utf-8")
+
+        for token in ('id="btn-lessons"', 'id="btn-coverage"', 'id="btn-glossary"', '#/lessons', '#/coverage', '#/glossary'):
+            self.assertIn(token, academy_html)
+        for token in ('/app#/panel', '/app#/equipment/home', '/app#/chooser', 'allowedViews', 'fam-academy-progress-updated'):
+            self.assertIn(token, shell_js)
+        for fn in ('renderLessonsIndex', 'renderCommandCoverage', 'renderGlossaryDirectory'):
+            self.assertIn(fn, catalog_js)
+        self.assertNotIn('.academy-section-head { display:none; }', ui_css)
+        self.assertIn(':root:not([data-theme="light"])', ui_css)
+        self.assertIn("view:'chooser'", fam_html)
+
+    def test_master_curriculum_tree_and_session_one_contract(self):
+        tree_path = ASSET_ROOT / "academy-curriculum-tree.json"
+        self.assertTrue(tree_path.is_file(), "academy-curriculum-tree.json must exist")
+        tree = json.loads(tree_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(len(tree.get("fourOutputs", [])), 4)
+        self.assertEqual(len(tree.get("facultiesSummary", [])), 7)
+        self.assertEqual(len(tree.get("facultyOneCCNA", {}).get("domains", [])), 6)
+        self.assertEqual(len(tree.get("facultyOneCCNA", {}).get("labs", [])), 25)
+        self.assertEqual(len(tree.get("facultyTwoAdvanced", {}).get("courses", [])), 4)
+        self.assertEqual(len(tree.get("facultyTwoAdvanced", {}).get("labs", [])), 12)
+        self.assertEqual(len(tree.get("facultyThreeCCNP", {}).get("concentrations", [])), 6)
+        self.assertEqual(len(tree.get("facultyFourSpecialties", {}).get("tracks", [])), 8)
+        self.assertEqual(len(tree.get("facultyExpertCCIE", {}).get("tracks", [])), 7)
+        self.assertEqual(len(tree.get("facultyArchitectureCCDE", {}).get("topics", [])), 20)
+        self.assertEqual(tree.get("dailySchedule", {}).get("totalMinutes"), 120)
+        self.assertEqual(len(tree.get("dailySchedule", {}).get("weekly", [])), 7)
+        self.assertEqual(len(tree.get("labInfrastructure", {}).get("tools", [])), 11)
+        self.assertEqual(tree.get("evaluation", {}).get("passingScore"), 85)
+        self.assertEqual(len(tree.get("eightYearTimeline", [])), 8)
+        self.assertEqual(len(tree.get("sessionStandard", [])), 11)
+        self.assertEqual(len(tree.get("graduationCriteria", [])), 10)
+
+        first_id = tree.get("termOne30DayPlan", {}).get("firstSessionId")
+        self.assertEqual(first_id, "academy-stage-zero-01-osi-tcpip-fa")
+        self.assertIn(first_id, [l["id"] for _, _, l in self.records])
+
+        academy_html = (PACKAGE_ROOT / "server" / "private_ui" / "academy.html").read_text(encoding="utf-8")
+        catalog_js = (ASSET_ROOT / "academy-catalog.js").read_text(encoding="utf-8")
+        lesson_js = (ASSET_ROOT / "lesson-engine.js").read_text(encoding="utf-8")
+        shell_js = (ASSET_ROOT / "academy-reference-shell.js").read_text(encoding="utf-8")
+        for token in ('id="btn-tree"', '#/tree'):
+            self.assertIn(token, academy_html)
+        self.assertIn("renderAcademyTree", catalog_js)
+        self.assertIn("lesson-toc", lesson_js)
+        self.assertIn("le-notebook-save", lesson_js)
+        self.assertIn("#/tree", shell_js)
+
+    def test_interactive_simulator_and_ios_lab_assets_are_wired(self):
+        academy_html = (PACKAGE_ROOT / "server" / "private_ui" / "academy.html").read_text(encoding="utf-8")
+        shell_js = (ASSET_ROOT / "academy-reference-shell.js").read_text(encoding="utf-8")
+        catalog_js = (ASSET_ROOT / "academy-catalog.js").read_text(encoding="utf-8")
+        lesson_js = (ASSET_ROOT / "lesson-engine.js").read_text(encoding="utf-8")
+
+        for filename in ("academy-sim-engine.js", "academy-sim-ui.js", "academy-sim.css"):
+            self.assertTrue((ASSET_ROOT / filename).is_file(), f"{filename} missing")
+            self.assertIn(filename, academy_html)
+
+        for token in ('id="btn-simulators"', '#/simulators', '#/labs', 'evaluateQuiz'):
+            self.assertIn(token, academy_html)
+        self.assertIn("#/simulators", shell_js)
+        self.assertIn("#/simulators", catalog_js)
+        self.assertIn("evaluateQuiz", lesson_js)
+
+    def test_two_mode_placement_and_clean_academy_redesign_are_wired(self):
+        academy_html = (PACKAGE_ROOT / "server" / "private_ui" / "academy.html").read_text(encoding="utf-8")
+        shell_js = (ASSET_ROOT / "academy-reference-shell.js").read_text(encoding="utf-8")
+        q_path = ASSET_ROOT / "academy-placement-questions.json"
+
+        self.assertTrue(q_path.is_file())
+        self.assertTrue((ASSET_ROOT / "academy-placement.js").is_file())
+        self.assertTrue((ASSET_ROOT / "academy-placement.css").is_file())
+
+        bank = json.loads(q_path.read_text(encoding="utf-8"))
+        faculties = bank.get("faculties", [])
+        questions = bank.get("questions", [])
+        self.assertEqual([f["id"] for f in faculties], ["f0", "f1", "f2", "f3", "f4", "f5", "f6"])
+        self.assertEqual(len(questions), 14)
+        for q in questions:
+            self.assertEqual(len(q.get("options", [])), 4)
+            self.assertIsInstance(q.get("correctIndex"), int)
+            self.assertTrue(0 <= q["correctIndex"] < 4)
+            self.assertTrue(q.get("explanation"))
+
+        for token in ('academy-placement.js', 'academy-placement.css', '#/placement', 'evaluatePlacement', 'needsInitialPlacement', 'startsWith(\'#/\')'):
+            self.assertIn(token, academy_html)
+        self.assertIn("#/placement", shell_js)
+
+        ui_css = (ASSET_ROOT / "academy-reference-ui.css").read_text(encoding="utf-8")
+        self.assertIn("position: sticky !important;", ui_css)
+        self.assertIn("position: static !important;", ui_css)
+
+        covered_faculties = {
+            lesson.get("facultyId") or course.get("facultyId")
+            for _, course, lesson in self.records
+        }
+        self.assertEqual(covered_faculties, {"f0", "f1", "f2", "f3", "f4", "f5", "f6"})
+
+        journey_js = (ASSET_ROOT / "academy-journey.js").read_text(encoding="utf-8")
+        self.assertIn('name="facultyId"', journey_js)
+        self.assertIn("journey-faculty-grid", journey_js)
+        self.assertIn("journey-go-exam", journey_js)
+        self.assertNotIn("کدام مسیر را دنبال می‌کنی؟", journey_js)
 
 
 if __name__ == "__main__":

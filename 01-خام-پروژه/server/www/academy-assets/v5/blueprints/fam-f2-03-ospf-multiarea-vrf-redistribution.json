@@ -1,0 +1,380 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f2-03-ospf-multiarea-vrf-redistribution",
+  "id": "fam-f2-03-ospf-multiarea-vrf-redistribution",
+  "facultyId": "f2",
+  "objectiveId": "F2-03",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-2-rs",
+  "title": "OSPF Multi-Area، LSAها، VRF-Lite و Route Redistribution",
+  "titleEn": "OSPF Multi-Area LSA Types, VRF-Lite & Redistribution",
+  "domain": "دانشکده ۲ · مسیریابی سازمانی پیشرفته",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 100,
+  "prerequisites": [
+    "fam-f2-02-etherchannel-lacp-fhrp"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f2-02-etherchannel-lacp-fhrp"
+    ],
+    "learningObjectives": [
+      "نقش ABR و ASBR و ساختار Multi-Area",
+      "شناخت LSA Type 1, 2, 3, 4, 5 و 7",
+      "ناحیه‌های Stub، Totally Stubby و NSSA",
+      "VRF-Lite و کنترل حلقه در Redistribution"
+    ]
+  },
+  "whyItMatters": "قرار دادن تمام شبکه در Area 0 باعث بزرگی بیش از حد LSDB و اجرای مداوم SPF می‌شود؛ و هنگام ادغام چند دامنه یا ایزوله‌سازی مشتریان، VRF-Lite و Redistribution کلیدی هستند.",
+  "topology": {
+    "devices": [
+      {
+        "id": "ABR1",
+        "type": "router",
+        "x": 200,
+        "y": 140
+      },
+      {
+        "id": "BACKBONE",
+        "type": "router",
+        "x": 380,
+        "y": 140
+      },
+      {
+        "id": "ASBR1",
+        "type": "router",
+        "x": 540,
+        "y": 140
+      }
+    ],
+    "links": [
+      {
+        "a": "ABR1:Gi0/0",
+        "b": "BACKBONE:Gi0/0"
+      },
+      {
+        "a": "BACKBONE:Gi0/1",
+        "b": "ASBR1:Gi0/0"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۲ · مهندسی R&S پیشرفته — درس ۳ از ۳</div><p><strong>هدف درس:</strong> طراحی OSPF چندناحیه‌ای مقیاس‌پذیر (نقش ABR/ASBR، انواع LSA، ناحیه‌های stub)، جداسازی منطقی با VRF-Lite و توزیع امن مسیر (redistribution) بدون ساخت حلقه.</p><p><strong>پیش‌نیازها:</strong> OSPF تک‌ناحیه‌ای و همسایه/DR/BDR (CCNA-Connectivity)، مفهوم AD/Metric، کار با <code>show ip ospf database</code> در سطح مقدماتی.</p><p><strong>خروجی یادگیری:</strong> نقشه‌برداری LSAها، انتخاب نوع ناحیه برای لبه، پیکربندی VRF-Lite و route-target، و کنترل redistribution با route-map/tag تا هیچ مسیری به حلقه نیفتد.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>OSPF تک‌ناحیه‌ای در شبکه‌ای با صدها روتر یک مشکل ساختاری دارد: همه LSDB را با هم همگرا می‌کنند؛ یک تغییر لینک در گوشهٔ شبکه، LSA Type 1 را در کل domain پخش می‌کند و همه روترها دوباره SPF می‌زنند.</p><ul><li><strong>جداسازی خرابی:</strong> ناحیه‌ها LSAهای محلی را قفسه‌بندی می‌کنند؛ خرابی لینک داخل area 1 فقط همان ناحیه را تکان می‌دهد، نه core را.</li><li><strong>کاهش حافظه/CPU:</strong> با stub/not-so-stubby، لبه‌ها مسیرهای external را حذف و فقط مسیر پیش‌فرض دارند.</li><li><strong>چند مشتری/سرویس روی یک زیرساخت:</strong> VRF-Lite دو جدول مسیریابی کاملاً جدا روی یک روتر می‌سازد — پایهٔ مهاجرت به MPLS VPN و تمیز نگه‌داشتن آدرس‌دهی.</li><li><strong>ادغام دو شرکت/دو فروشنده:</strong> redistribution با کنترل، بدون آنکه یک مسیر به‌خاطر AD پایین‌تر اشتباه انتخاب شود.</li></ul><div class=\"lesson-callout\"><strong>قانون طراحی:</strong> اول ساختار ناحیه‌ها را بر اساس نقشهٔ جغرافیایی/سازمانی بکشید، بعد router-id و network statementها را بنویسید — نه برعکس.</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. نقش ABR و ASBR و ساختار Multi-Area",
+      "html": "<p>در OSPF چندناحیه، هر روتر ممکن است یکی از نقش‌های زیر را داشته باشد:</p><table class=\"lesson-data-table\"><thead><tr><th>نقش</th><th>شرط</th><th>مسؤلیت</th></tr></thead><tbody><tr><td>IR (Internal Router)</td><td>همهٔ رابط‌هایش در یک area</td><td>LSA Type 1 خودش + Type 2 آن area</td></tr><tr><td><strong>ABR</strong></td><td>حداقل یک رابط در area 0 و یکی در area غیرصفر</td><td>خلاصهٔ مسیر (Type 3) بین ناحیه‌ها؛ مرز دو LSA domain</td></tr><tr><td><strong>ASBR</strong></td><td>مسیر خارجی را redistribute یا default originate می‌کند</td><td>LSA Type 5 (و Type 7 در NSSA) به کل domain</td></tr><tr><td> Backbone (area 0)</td><td>ناحیهٔ مرکزی اجباری</td><td>همهٔ ناحیه‌ها باید مستقیم یا از طریق ABR به 0 وصل شوند</td></tr></tbody></table><p><strong>قاعدهٔ اتصال:</strong> مناطق غیرصفر نمی‌توانند بین خودشان backbone bypass کنند (به‌استثنای virtual-link موقت و طراحی‌های خاص مثل super-backbone در MPLS). خطاها: یک area بدون ABR، یا ABR بدون رابط در area 0 → همسایه‌ها up ولی مسیر بین مناطق ندارید.</p><p>پیکربندی پایه: <code>router ospf 10</code> ← <code>router-id 10.10.10.10</code> ← <code>network 10.10.4.128 0.0.0.63 area 0</code> ← <code>network 172.16.1.0 0.0.0.255 area 1</code>. امروزه توصیه می‌شود network statement را با <code>ip ospf area</code> روی خود رابط جایگزین کنید تا وابستگی به wildcard حذف شود.</p>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. شناخت LSA Type 1, 2, 3, 4, 5 و 7",
+      "html": "<p>پنج نوع LSA اصلی در OSPFv2 — و اینکه کجا دیده می‌شوند:</p><table class=\"lesson-data-table\"><thead><tr><th>Type</th><th>منبع</th><th>محتوا</th><th>دامنهٔ دید</th></tr></thead><tbody><tr><td>1 (Router)</td><td>هر روتر</td><td>رابط‌ها و همسایگان با cost</td><td>همان area</td></tr><tr><td>2 (Network)</td><td>DR هر subnet</td><td>لیست روترهای متصل به شبکهٔ multi-access</td><td>همان area</td></tr><tr><td>3 (Summary)</td><td>ABR</td><td>خلاصهٔ پیشوندهای area مقابل با cost</td><td>بین areaها</td></tr><tr><td>4 (ASBR Summary)</td><td>ABR</td><td>مسیر تا ASBR</td><td>تا ASBR در area مربوطه</td></tr><tr><td>5 (External)</td><td>ASBR</td><td>پیشوندهای redistribute‌شده</td><td>کل OSPF domain (مگر stub)</td></tr><tr><td>7 (NSSA External)</td><td>ASBR داخل NSSA</td><td>مثل Type 5 ولی فقط داخل NSSA؛ ABR به Type 5 تبدیل می‌کند</td><td>همان NSSA</td></tr></tbody></table><pre><code>R1# show ip ospf database router 10.10.10.10\nR1# show ip ospf database network\nR1# show ip ospf database summary\nR1# show ip ospf database external\nR1# show ip ospf database nssa-external</code></pre><p>نکتهٔ عیب‌یابی: اگر <code>show ip route ospf</code> مسیری را نشان نمی‌دهد ولی در database هست، معمولاً مشکل Type 4/ABR است (مسیر تا ASBR پیدا نشده) یا در ناحیه‌ای هستید که آن LSA را نباید ببیند (stub).</p>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. ناحیه‌های Stub، Totally Stubby و NSSA",
+      "html": "<p>سه سطح «سبک‌سازی» لبه — از کمترین محدودیت تا بیشترین:</p><table class=\"lesson-data-table\"><thead><tr><th>نوع ناحیه</th><th>LSAهای مجاز</th><th>مسیر پیش‌فرض</th><th>کاربرد</th></tr></thead><tbody><tr><td>Standard</td><td>1,2,3,4,5</td><td>نه (مگسیرهای داخلی)</td><td>هسته/منطقه میانی</td></tr><tr><td><strong>Stub</strong></td><td>1,2,3 (بدون 4,5)</td><td>ABR default به ناحیه می‌دهد</td><td>لبهٔ کاربری که فقط باید به بیرون برود</td></tr><tr><td><strong>Totally Stubby</strong></td><td>1,2 فقط؛ فقط default از ABR</td><td>بله</td><td>کوچک‌ترین LSDB در لبه</td></tr><tr><td><strong>NSSA</strong></td><td>1,2,3,7 (+ convert به 5)</td><td>بله (اختیاری)</td><td>لبه‌ای که خودش external دارد (مثلاً پیوند به سایت قدیمی)</td></tr><tr><td>NSSA Totally</td><td>1,2,7 فقط</td><td>بله</td><td>لبه با external محلی و بدون جزئیات بقیهٔ domain</td></tr></tbody></table><pre><code>R-edge(config)# router ospf 10\nR-edge(config-router)# area 1 stub no-summary     ! ABR: Totally Stubby\nR-edge(config-router)# area 2 nssa no-summary     ! ABR: NSSA Totally\nR-leaf(config)# router ospf 10\nR-leaf(config-router)# area 1 stub                ! همهٔ روترهای داخل stub هم باید</code></pre><div class=\"lesson-callout\"><strong>شرط همگرایی:</strong> پارامتر stub/nssa روی ABR و تمام روترهای آن ناحیه باید یکسان باشد؛ فقط ABR می‌تواند no-summary اضافه کند. ناهماهنگی ← «%OSPF: Area mismatch» یا همسایه پایین نمی‌آید.</div>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. VRF-Lite و کنترل حلقه در Redistribution",
+      "html": "<p><strong>VRF-Lite:</strong> با ایجاد VRF روی روتر، یک جدول مسیریابی جدا می‌سازید. رابط‌ها به VRF می‌چسبند و هر VRF همسایه/پروتکل مستقل خودش را دارد — حتی می‌توانید دو VRF هر دو OSPF 10 با router-id یکسان داشته باشید بدون تداخل.</p><pre><code>R1(config)# vrf definition CUST-A\nR1(config-vrf)# address-family ipv4\nR1(config-vrf-af)# exit\nR1(config-vrf)# exit\nR1(config)# interface GigabitEthernet0/0\nR1(config-if)# vrf forwarding CUST-A\nR1(config-if)# ip address 10.20.1.1 255.255.255.0   ! بعد از vrf forwarding باید IP دوباره تعریف شود\nR1(config)# router ospf 10 router-id 1.1.1.1\nR1(config-router)# vrf CUST-A\nR1(config-router)# network 10.20.1.0 0.0.0.255 area 0</code></pre><p><strong>Redistribution و کنترل حلقه:</strong> وقتی مسیری از EIGRP/BGP به OSPF redistribute می‌شود (یا برعکس)، روتر ASBR دو منبع برای یک مسیر دارد. خطر: مسیر برگشتی دوباره redistribute شود و AD پایین‌تر انتخاب شود ← حلقهٔ مسیریابی:</p><ol><li>همهٔ redistributionها را <strong>در یک نقطه</strong> (بهترین ASBR مرکزی) انجام دهید، نه چند‌تایی.</li><li>مسیرهای redistribute‌شده را با <strong>tag</strong> علامت بزنید و در ورودی دیگر، همان tag را بشناسید و رد کنید:</li></ol><pre><code>R1(config)# route-map FROM-EIGRP permit 10\nR1(config-route-map)# match tag 100\nR1(config-route-map)# set tag 200\nR1(config)# router ospf 10\nR1(config-router)# redistribute eigrp 100 metric 20 subnets route-map FROM-EIGRP tag 200\nR1(config)# router eigrp 100\nR1(config-router)# redistribute ospf 10 metric 1 1 1 1 1 route-map DENY-REDISTORED tag 200\n! route-map DENY-REDISTORED: deny 10 with match tag 200</code></pre>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>انتخاب ما</th></tr></thead><tbody><tr><td>تعداد ناحیه‌ها</td><td>یکی بزرگ / چند ناحیهٔ جغرافیایی</td><td>یک ناحیه به‌ازای هر site بزرگ یا نقش (core/distribution/access)</td></tr><tr><td>ناحیهٔ لبه</td><td>standard / stub / totally stub / NSSA</td><td>totally stub مگر لبه external محلی داشته باشد ← NSSA</td></tr><tr><td>ادغام دو شبکهٔ قدیمی</td><td>redistribution دوطرفه / مهاجرت کامل</td><td>redistribution یک‌طرفه + tag؛ بعد مهاجرت تدریجی</td></tr><tr><td>جداسازی مشتری</td><td>VRF-Lite / VRF مجزا با VRF-Aware</td><td>VRF-Lite برای ادغام داخلی؛ VRF-aware routing برای چند لیه (PE-CE)</td></tr><tr><td>مسیر پیش‌فرض لبه</td><td>default originate از ASBR / دستی</td><td>از ABR با <code>default-information originate</code> و metric مشخص</td></tr><tr><td>FAST-HELLO/Throttling</td><td>پیش‌فرض / تنظیم دستی</td><td>روی لینک‌های پرنویز فقط با تحلیل پیش از تغییر</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>مسیر یک بسته از کلاینت area 1 تا اینترنت و نقش هر LSA در کنترل‌پلین:</p><ol><li>کلاینت به گیت‌وی (ABR یا روتر داخلی) می‌رسد؛ روتر با LSDB خودش بهترین مسیر (longest prefix) را انتخاب می‌کند.</li><li>اگر مقصد داخل area دیگر باشد، ABR خلاصه Type 3 داده؛ اگر external باشد، مسیر Type 5 از ASBR و Type 4 برای رسیدن به ASBR.</li><li>SPF روی Type 1/2 اجرا می‌شود؛ Type 3 در محاسبهٔ درخت داخلی همان ناحیه «لبه» محسوب می‌شود (به‌همین‌دلیل تعداد ABRها مهم است).</li><li>در لبهٔ totally stub، فقط default می‌آید: جدول فقط مسیرهای محلی + 0.0.0.0/0 ← همهٔ ترافیک بیرونی در همان ABR تصمیم می‌گیرد. اگر ABR خراب شود، سایت قطع می‌شود ← پس دو ABR با default یکسان و cost متفاوت تعریف کنید.</li><li>در VRF-Lite، همهٔ این مراحل در جدول VRF خودش انجام می‌شود؛ بسته‌ای از CUST-A هرگز جدول CUST-B را نمی‌بیند مگر redistribution صریح بین VRFها.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): backbone و دو ناحیهٔ لبه + لینک قدیمی.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>پیکربندی</th></tr></thead><tbody><tr><td>ABR-1 / ABR-2</td><td>area 0 + area 1؛ dual-homed به core</td></tr><tr><td>Area 0 (core)</td><td>10.10.0.0/24 — دو روتر core با OSPF cost پایین</td></tr><tr><td>Area 1 (site A، لبه)</td><td>172.16.1.0/24 — totally stub با no-summary روی ABRها</td></tr><tr><td>ASBR</td><td>لینک به EIGRP 100 سایت قدیمی 192.168.0.0/16 — redistribute با tag 100</td></tr><tr><td>VRF-Lite</td><td>VRF CUST-A روی ABR-1 برای سرویس جداگانه (10.20.0.0/16)</td></tr></tbody></table><p>این طرح سه سناریوی آزمایشی می‌دهد: همگرایی stub، رد کردن مسیر redistribute‌شده با tag، و جداسازی دو VRF.</p>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی کامل (طراحی‌شده — اجرا نشده):</p><pre><code>! --- ABR ---\nABR1(config)# router ospf 10\nABR1(config-router)# router-id 10.10.10.1\nABR1(config-router)# area 0 authentication message-digest\nABR1(config-router)# area 1 stub no-summary\nABR1(config-router)# network 10.10.0.0 0.0.0.255 area 0\nABR1(config-router)# network 172.16.1.0 0.0.0.255 area 1\nABR1(config-router)# area 0 range 10.10.0.0 255.255.255.0   ! summarization در مرز\n\n! --- لبهٔ area 1 (بدون no-summary) ---\nLEAF1(config)# router ospf 10\nLEAF1(config-router)# router-id 172.16.1.10\nLEAF1(config-router)# area 1 stub\nLEAF1(config-router)# passive-interface default\nLEAF1(config-router)# no passive-interface GigabitEthernet0/0\n\n! --- ASBR: redistribute با tag ---\nASBR(config)# route-map DENY-TAGGED deny 10\nASBR(config-route-map)# match tag 300\nASBR(config)# route-map FROM-OSPF permit 20\nASBR(config)# router eigrp 100\nASBR(config-router)# redistribute ospf 10 metric 10000 100 255 1 1500 route-map FROM-OSPF tag 300\nASBR(config)# router ospf 10\nASBR(config-router)# redistribute eigrp 100 subnets tag 400 route-map DENY-TAGGED\nASBR(config-router)# default-information originate always</code></pre><ul><li><code>area range</code> روی ABR خلاصهٔ Type 3 می‌سازد؛ فقط لبهٔ مرز area 0 آن را دارد.</li><li><code>passive-interface default</code> جلوی hello اضافه روی پورت‌های کاربری را می‌گیرد (امنیت + نویز).</li><li>metric در redistribute باید با پروتکل مقصد سازگار باشد؛ EIGRP به OSPF: bandwidth/delay را به cost OSPF تبدیل کنید یا عدد دستی واقع‌بینانه بدهید.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>ABR1# show ip ospf neighbor\nNeighbor ID     Pri   State           Dead Time   Address         Interface\n10.10.10.2        1   FULL/DR         00:00:34    10.10.0.2       GigabitEthernet0/1\n172.16.1.10       1   FULL/  -        00:00:38    172.16.1.10     GigabitEthernet0/0\n\nABR1# show ip ospf database summary\n           Link ID         ADV Router      Age  Seq#       Checksum\n           10.10.0.0       10.10.10.1       234 0x8000001f  0x00d3\n\nABR1# show ip route ospf\nO IA 172.16.1.0/24 [110/2] via 172.16.1.10, 00:12:44, GigabitEthernet0/0\nO*E2 0.0.0.0/0 [110/1] via 10.10.0.2, 00:03:10, GigabitEthernet0/1\nO E2  192.168.0.0/16 [110/20] via 10.10.0.9, 00:08:02, GigabitEthernet0/1\n\nASBR# show ip ospf database external\n           Link ID         ADV Router      Age  Seq#       Checksum  Tag\n           192.168.0.0     10.10.10.9       482 0x80000012  0x00a1    400\n\nASBR# show ip route eigrp | include 192.168\nD EX 192.168.0.0/16 [170/3072] via 10.99.0.1, 00:15:02, Serial0/0/0</code></pre><ul><li>علامت‌ها: <code>O IA</code> = مسیر inter-area (Type 3) · <code>O E2</code> = external · <code>O*E2</code> = مسیر پیش‌فرض external.</li><li>اگر tag در database خارجی دیدید ولی در جدول نیست ← route-map ورودی آن را رد کرده (درست طراحی شده!) یا AD مشکل دارد.</li><li>اختلاف همسایه‌ها در INIT/EXSTART/2-Way: MTU ناهماهنگ، authentication، یا priority/DR — با <code>show ip ospf interface</code> بررسی کنید.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Wireshark با فیلتر <code>ospf</code>:</strong> Hello هر ۱۰ ثانیه (dead 40s)؛ دیدن Database Description با MTU بزرگ‌تر ← مشکل ناشناخته/MTU؛ دیدن LSA Update بعد از flap، نشان‌دهندهٔ SPF مجدد است.</li><li><strong>پایش تعداد LSA:</strong> <code>show ip ospf database router | count</code> یا مانیتورینگ؛ جهش ناگهانی Type 1 یعنی لینک flap یا روتر جدید.</li><li><strong>زمان همگرایی:</strong> بعد از shutdown یک لینک core، با ping ممتد و لاگ SPF زمان بازیابی را ثبت کنید؛ هدف طراحی: زیر چند ثانیه با OSPF BFD.</li><li><strong>نشانگر redistribution:</strong> تعداد مسیرهای E2 و برچسب‌هایشان در <code>show ip route ospf</code>؛ اگر مسیر داخلی هم E2 شد، مسیر به‌اشتباه redistribute شده ← tag/route-map را بازبینی کنید.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>علت</th><th>راه‌حل</th></tr></thead><tbody><tr><td>«Area mismatch» در neighbor</td><td>یک طرف stub و طرف دیگر standard</td><td>یکسان‌سازی پارامتر روی ABR و همهٔ روترها</td></tr><tr><td>مسیر بین دو ناحیه ندارید ولی همسایه full است</td><td>ABR واقعی نیست (رابطی در area 0 ندارد) یا no-summary ناقص</td><td>show ip ospf interface — رابط‌ها در چه ناحیه‌ای‌اند</td></tr><tr><td>حلقه پس از redistribution دوطرفه</td><td>بدون tag/route-map، مسیر برگشتی دوباره وارد می‌شود</td><td>redistribution فقط در یک نقطه + match tag در ورودی</td></tr><tr><td>مسیر E2 با metric صفر/نامشخص</td><td>metric تخصیص داده نشده یا subnets فراموش</td><td>metric صریح + subnets برای مسیرهای غیرکلاسیک</td></tr><tr><td>«Routing Table has loop» یا مسیر متناوب</td><td>AD دستی پایین‌تر از پروتکل (مثلاً static AD 5)</td><td>distance را واقع‌بینانه کنید یا administrative distance پویا</td></tr><tr><td>وایلدکارت network اشتباه</td><td>10.10.0.0 0.0.255.0 جای 0.0.0.255</td><td>AND آدرس با wildcard و بررسی با show ip ospf interface</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> بعد از افزودن لینک EIGRP جدید، بخشی از کاربران area 1 به سایت قدیمی می‌رسند و بخشی نه؛ بعضی مسیرها نوسان دارند.</p><ol><li>روی ABR: <code>show ip route ospf | include E2</code> ← آیا 192.168.0.0/16 با دو مسیر متفاوت دیده می‌شود؟ دو ASBR؟</li><li>روی هر ASBR: <code>show ip ospf database external</code> ← برچسب (Tag) هر مسیر را بخوانید. اگر هر دو دارند redistribute می‌کنند ← قاعدهٔ «یک نقطه» نقض شده.</li><li>مسیرهای redistribute‌شده را با <code>show ip route | include ^O E</code> دنبال کنید؛ اگر مسیر داخلی OSPF هم E2 دیدید ← حلقهٔ توزیع فعال است.</li><li>اعمال tag: روی هر ورودی redistribution، <code>route-map … match tag</code>ی که خروجی طرف مقابل گذاشته؛ سپس <code>clear ip ospf process</code> (با احتیاط — همهٔ همسایگی‌ها ری‌استارت می‌شود).</li><li>تأیید: هر مسیر دقیقاً یک منبع دارد؛ ping و traceroute ممتد از چند کلاینت؛ پایش ۱۰ دقیقه‌ای برای نوسان.</li><li>در صورت نیاز به جزئیات بیشتر لبه: area 1 را با <code>area 1 stub no-summary</code> به totally stub ببرید و LSDB لبه را با <code>show ip ospf database summary</code> کوچک‌تر کنید.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>ABR دو area دارد و Type 3 می‌سازد؛ ASBR external می‌دهد و Type 4/5 لازم دارد؛ همه چیز به area 0 وصل است.</li><li>Stub/Totally Stubby/NSSA: لبه را سبک کنید؛ پارامتر باید در کل ناحیه یکسان باشد.</li><li>LSA 1,2 داخلی · 3 بین ناحیه · 4 تا ASBR · 5 خارجی · 7 داخل NSSA.</li><li>VRF-Lite جدول‌های جدا می‌سازد؛ <code>vrf forwarding</code> قبل از <code>ip address</code> و بعدش IP را دوباره تعریف کنید.</li><li>Redistribution = یک نقطه + tag + route-map؛ بدون این سه، حلقه فقط زمان می‌خواهد.</li><li>خلاصه‌سازی (<code>area range</code> / <code>summary-address</code>) هم LSDB را کوچک می‌کند هم جلوی نوسان جزئیات را می‌گیرد.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>چندناحیه (۲۵ دقیقه):</strong> area 0 + area 1 بسازید؛ area 1 را totally stub کنید؛ با show ip route و show ip ospf database تفاوت جدول لبه و core را ثبت کنید.</li><li><strong>خرابی عمدی (۱۵ دقیقه):</strong> پارامتر stub را روی یک روتر area 1 بردارید؛ همسایگی را ببینید؛ برگردانید و تأیید کنید.</li><li><strong>Redistribution امن (۲۵ دقیقه):</strong> یک مسیر static/EIGRP را با tag 100 به OSPF توزیع کنید؛ در ورودی مخالف tag 100 را رد کنید؛ با show tag را تأیید کنید.</li><li><strong>VRF-Lite (۲۰ دقیقه):</strong> دو VRF با دو subnet هم‌نام بسازید؛ ثابت کنید ping بین دو VRF بدون redistribution ناممکن است؛ سپس با route-target اجازه بدهید و تفاوت را ببینید.</li><li><strong>خودآزمایی:</strong> نقش ABR و ASBR، تفاوت Type 3 و 4، و سه قدم کنترل حلقه را بنویسید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "OSPF Multi-Area",
+      "fa": "مفهوم کلیدی OSPF Multi-Area",
+      "simple": "اصطلاح تخصصی مرتبط با OSPF Multi-Area، LSAها، VRF-Lite و Route Redistribution"
+    },
+    {
+      "term": "ABR",
+      "fa": "مفهوم کلیدی ABR",
+      "simple": "اصطلاح تخصصی مرتبط با OSPF Multi-Area، LSAها، VRF-Lite و Route Redistribution"
+    },
+    {
+      "term": "ASBR",
+      "fa": "مفهوم کلیدی ASBR",
+      "simple": "اصطلاح تخصصی مرتبط با OSPF Multi-Area، LSAها، VRF-Lite و Route Redistribution"
+    },
+    {
+      "term": "LSA",
+      "fa": "مفهوم کلیدی LSA",
+      "simple": "اصطلاح تخصصی مرتبط با OSPF Multi-Area، LSAها، VRF-Lite و Route Redistribution"
+    },
+    {
+      "term": "VRF-Lite",
+      "fa": "مفهوم کلیدی VRF-Lite",
+      "simple": "اصطلاح تخصصی مرتبط با OSPF Multi-Area، LSAها، VRF-Lite و Route Redistribution"
+    },
+    {
+      "term": "Redistribution",
+      "fa": "مفهوم کلیدی Redistribution",
+      "simple": "اصطلاح تخصصی مرتبط با OSPF Multi-Area، LSAها، VRF-Lite و Route Redistribution"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    },
+    {
+      "term": "Policy",
+      "fa": "سیاست شبکه",
+      "simple": "قواعد کنترلی برای اولویت‌دهی، فیلتر یا هدایت ترافیک"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — OSPF Multi-Area، LSAها، VRF-Lite و Route Redistribution",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>ip vrf CORP-A\n rd 65000:10\nrouter ospf 1 vrf CORP-A\n area 10 stub no-summary\n network 10.10.0.0 0.0.255.255 area 10\n redistribute connected subnets\nshow ip ospf database\nshow ip route vrf CORP-A</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "در OSPF Multi-Area تمام نواحی غیرصفر به‌طور استاندارد باید به کدام ناحیه متصل شوند؟",
+      "options": [
+        "Area 1",
+        "Area 0 (Backbone Area)",
+        "Area 51",
+        "هر ناحیهٔ مجاور"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Area 0 ستون فقرات OSPF است و ترافیک بین دو ناحیهٔ غیرصفر باید از آن عبور کند.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "کدام LSA توسط ABR تولید می‌شود و مسیرهای یک ناحیه را به ناحیهٔ دیگر معرفی می‌کند؟",
+      "options": [
+        "LSA Type 1 (Router)",
+        "LSA Type 3 (Summary)",
+        "LSA Type 5 (External)",
+        "LSA Type 7"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ABR اطلاعات Type 1/2 را به LSA Type 3 خلاصه کرده و به سایر نواحی می‌فرستد.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "در جدول مسیریابی OSPF، علامت <code>O IA</code> به چه معناست؟",
+      "options": [
+        "مسیر درون همان ناحیه",
+        "مسیر بین‌ناحیه‌ای (Inter-Area) از طریق LSA Type 3",
+        "مسیر خارجی BGP",
+        "مسیر استاتیک"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>O IA مخفف OSPF Inter-Area است.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "اگر هنگام دستور <code>redistribute static</code> در OSPF کلیدواژهٔ <code>subnets</code> را فراموش کنید چه می‌شود؟",
+      "options": [
+        "تمام مسیرها با سرعت دو برابر ارسال می‌شوند",
+        "فقط مسیرهای Classful منتقل شده و زیرشبکه‌های Classless نادیده گرفته می‌شوند",
+        "روتر ری‌استارت می‌شود",
+        "OSPF به RIP تبدیل می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در IOS قدیمی/کلاسیک بدون کلمهٔ subnets، مسیرهای subnetted به OSPF تزریق نمی‌شوند.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "تفاوت Metric نوع E2 (پیش‌فرض) با E1 در مسیرهای خارجی OSPF چیست؟",
+      "options": [
+        "E2 هزینهٔ داخلی مسیر تا ASBR را به Cost خارجی اضافه نمی‌کند، اما E1 اضافه می‌کند",
+        "E2 همیشه مسدود است",
+        "E1 فقط برای IPv6 است",
+        "تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>E2 مقدار ثابت خارجی را نگه می‌دارد (پیش‌فرض ۲۰) اما E1 جمع هزینهٔ خارجی و داخلی تا ASBR را محاسبه می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "هدف اصلی از پیکربندی <code>area 10 stub no-summary</code> (Totally Stubby) چیست؟",
+      "options": [
+        "کاهش شدید اندازهٔ LSDB در ناحیهٔ لبه با حذف Type 3 و Type 5 و استفاده از یک Default Route",
+        "اجبار روتر به استفاده از BGP",
+        "غیرفعال کردن Hello",
+        "باز کردن همه پورت‌های Trunk"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Totally Stubby حتی Summary LSAها (Type 3) را هم وارد ناحیه نمی‌کند.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "کدام قابلیت اجازه می‌دهد یک روتر فیزیکی چندین جدول مسیریابی کاملاً مجزا و ایزوله داشته باشد؟",
+      "options": [
+        "VLAN",
+        "VRF (Virtual Routing and Forwarding)",
+        "HSRP",
+        "NAT Overload"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>VRF مجازی‌سازی لایهٔ ۳ روی یک روتر است تا شبکه‌هایی با IP هم‌پوشان یا مجزا ایزوله بمانند.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "وقتی دو پروتکل در دو نقطه (Two-Way Mutual Redistribution) به هم تزریق می‌شوند بزرگ‌ترین خطر چیست؟",
+      "options": [
+        "افزایش سرعت انتقال",
+        "ایجاد Routing Loop و مسیر غیربهینه (Suboptimal Routing)",
+        "از کار افتادن کابل فیبر",
+        "پر شدن حافظهٔ DNS"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون تگ‌گذاری (Route-Tag) و فیلتر، مسیر ممکن است بین دو پروتکل به‌طور چرخشی برگردد.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "کدام LSA فقط در نواحی NSSA وجود دارد و توسط ABR به Type 5 تبدیل می‌شود؟",
+      "options": [
+        "LSA Type 2",
+        "LSA Type 4",
+        "LSA Type 7",
+        "LSA Type 1"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>ASBR داخل NSSA مسیر خارجی را با Type 7 تولید کرده و ABR آن را به Type 5 به Backbone می‌برد.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "تفاوت Administrative Distance در جلوگیری از حلقهٔ Redistribution چگونه استفاده می‌شود؟",
+      "options": [
+        "مسیر پروتکل داخلی معمولاً AD کمتر از مسیر خارجی دارد یا با route-map کنترل می‌شود",
+        "AD همیشه ۲۵۵ است",
+        "AD تأثیری در انتخاب روت ندارد",
+        "فقط برای MAC است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در OSPF می‌توان با فاصلهٔ اداری (مثلاً EIGRP Internal 90 در برابر External 170 یا Route-Tag) از برگشت مسیر جلوگیری کرد.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "دستور مشاهدهٔ جدول مسیر برای یک VRF مشخص با نام CORP-A چیست؟",
+      "options": [
+        "show ip route vrf CORP-A",
+        "show ip ospf neighbor",
+        "show vlan vrf CORP-A",
+        "show running-config"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>برای دیدن جدول روتینگ هر VRF باید نام vrf را در دستور ذکر کنید.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "LSA Type 4 چه اطلاعاتی را در OSPF منتشر می‌کند؟",
+      "options": [
+        "مسیر رسیدن به ASBR برای روترهای خارج از ناحیهٔ ASBR",
+        "آدرس MAC روتر DR",
+        "فهرست VLANها",
+        "لیست پورت‌های Passive"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ABR یک LSA Type 4 تولید می‌کند تا سایر نواحی بفهمند چگونه به ASBR برسند.</p>"
+    }
+  ]
+}

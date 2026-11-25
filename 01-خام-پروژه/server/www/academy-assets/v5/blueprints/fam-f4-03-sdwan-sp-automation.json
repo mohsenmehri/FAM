@@ -1,0 +1,394 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f4-03-sdwan-sp-automation",
+  "id": "fam-f4-03-sdwan-sp-automation",
+  "facultyId": "f4",
+  "objectiveId": "F4-03",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-4-specialties",
+  "title": "تخصص SD-WAN، Service Provider و Infrastructure as Code",
+  "titleEn": "SD-WAN OMP Architecture, SP Core & Network Automation",
+  "domain": "دانشکده ۴ · SD-WAN، Service Provider و Automation",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 95,
+  "prerequisites": [
+    "fam-f4-02-datacenter-evpn-vxlan"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f4-02-datacenter-evpn-vxlan"
+    ],
+    "learningObjectives": [
+      "معماری کنترلرهای SD-WAN",
+      "پروتکل OMP و TLOCها",
+      "پایش SLA و Application-Aware Routing",
+      "تغییر پارادایم با Infrastructure as Code (IaC)"
+    ]
+  },
+  "whyItMatters": "اتصال شعبه‌ها از طریق لینک‌های ترکیبی (MPLS + اینترنت + 5G) و مدیریت صدها روتر بدون خطای انسانی، نیازمند تسلط هم‌زمان بر SD-WAN و اتوماسیون زیرساخت است.",
+  "topology": {
+    "devices": [
+      {
+        "id": "VMANAGE",
+        "type": "server",
+        "x": 160,
+        "y": 80
+      },
+      {
+        "id": "VSMART",
+        "type": "server",
+        "x": 380,
+        "y": 80
+      },
+      {
+        "id": "BRANCH-1",
+        "type": "router",
+        "x": 160,
+        "y": 210
+      },
+      {
+        "id": "DC-EDGE",
+        "type": "router",
+        "x": 380,
+        "y": 210
+      }
+    ],
+    "links": [
+      {
+        "a": "VMANAGE:eth0",
+        "b": "VSMART:eth0"
+      },
+      {
+        "a": "BRANCH-1:Gi0/0",
+        "b": "VSMART:eth1"
+      },
+      {
+        "a": "BRANCH-1:Gi0/1",
+        "b": "DC-EDGE:Gi0/1"
+      },
+      {
+        "a": "DC-EDGE:Gi0/0",
+        "b": "VSMART:eth2"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۴ · مسیر تخصصی SP — درس ۲ از ۲</div><p><strong>هدف درس:</strong> معماری SD-WAN (نقش‌ها، BFD، پلیس آپ‌لینک) و مفاهیم خودکارسازی SP (NETCONF/YANG، model-driven، CI/CD پیکربندی) را یکپارچه بفهمید — و بتوانید یک سیاست مسیر اولویت‌دار (SLA) را از درخواست کسب‌وکار تا اعمال روی edge ترجمه کنید.</p><p><strong>پیش‌نیازها:</strong> BGP/OSPF، مفهوم overlay/underlay، QoS سطح مقدماتی، آشنایی با API و YANG.</p><p><strong>خروجی یادگیری:</strong> توضیح معماری vEdge/cEdge و دو مسیر کنترل/داده، خواندن خروجی اتصال SD-WAN، تفاوت CLI سنتی با NETCONF و اصول پیکربندی تکرارپذیر.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>SD-WAN مشکل قدیمی WAN را در سه محور حل می‌کند:</p><ul><li><strong>هزینه و انعطاف:</strong> به‌جای MPLS اختصاصی بین هر شعبه، از هر اینترنت/لینک موجود استفاده می‌شود؛ MPLS هم می‌تواند یکی از ترنک‌ها باشد نه تنها گزینه.</li><li><strong>کیفیت روی لینک متغیر:</strong> اتصال‌های اینترنتی متفاوت و بی‌ثبات‌اند؛ SD-WAN با BFD چند میلی‌ثانیه‌ای لینک مرده را می‌بیند و ترافیک را به مسیر سالم می‌برد.</li><li><strong>تمرکز سیاست:</strong> سیاست (کدام اپلیکیشن روی کدام لینک با چه کیفیتی) از سیاست مرکزی تعریف می‌شود نه پیکربندی تک‌به‌تک شعبه‌ها.</li></ul><p>در سمت SP، همان نیاز با «خودکارسازی» تلاقی می‌کند: ده‌ها هزار دستگاه، تغییرات مکرر، و نیاز به صحت/بازگشت‌پذیری. CLI سنتی برای مقیاس کافی نیست؛ مدل‌محوری (NETCONF/YANG) و CI/CD وارد می‌شوند.</p><div class=\"lesson-callout\"><strong>قاب ذهنی:</strong> SD-WAN = «خودکارسازی سیاست لایه WAN»؛ SP Automation = «خودکارسازی زندگی دستگاه شبکه». هر دو یک فلسفه‌اند: هدف از API، اجرای امن و تکرارپذیر.</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. معماری کنترلرهای SD-WAN",
+      "html": "<p>معماری چهارجزئی متداول:</p><table class=\"lesson-data-table\"><thead><tr><th>نقش</th><th>کار</th></tr></thead><tbody><tr><td><strong>Controller/Orchestrator (vManage)</strong></td><td>پنجرهٔ مدیریت، API، سیاست‌ها، تجسم، و تأیید سلامت</td></tr><tr><td><strong>Control Plane (vSmart)</strong></td><td>روت‌های overlay را بین edge ها با OMP (روشی مثل BGP روی تونل) توزیع می‌کند</td></tr><tr><td><strong>Edge (vEdge/cEdge)</strong></td><td>نقش داده: تونل‌ها، forwarding، BFD، اعمال سیاست</td></tr><tr><td><strong>vBond</strong></td><td>رمزگشایی و onboarding اولیه؛ edge را به control plane معرفی می‌کند</td></tr></tbody></table><ul><li><strong>OMP:</strong> ویژگی‌های مسیر (پیشوند، TLOC، اولویت/رنگ) را از edge به vSmart و بین edge ها می‌برد — همان نقش iBGP اما برای overlay.</li><li><strong>رنگ لینک (color):</strong> هر ترنک یک «رنگ» دارد (mpls، internet، broadband، 4g…) و سیاست‌ها بر اساس رنگ فیلتر می‌کنند.</li><li><strong>مسیر داده مستقل از کنترل:</strong> قطع شدن controller ترافیک موجود را نمی‌خواباند (فقط مدیریت/سیاست جدید موقتاً در دسترس نیست).</li></ul>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. پروتکل OMP و TLOCها",
+      "html": "<p>دو لایهٔ ارتباطی متمایز:</p><ol><li><strong>Underlay:</strong> هر edge به زیرساخت (اینترنت/MPLS) وصل است؛ IP واقعی، روتینگ ساده، بدون دانستن چیزی از ده‌ها شعبه.</li><li><strong>Overlay (VXLAN/DMVPN-like):</strong> تونل‌های همسایگی بین edge ها روی underlay؛ traffic به «رنگ» مقصد نگاه می‌کند نه به IP نهایی.</li></ol><p><strong>BFD در SD-WAN</strong> سریع و چندمنظوره است (نه فقط دو دستگاه روبه‌رو):</p><ul><li>بین هر جفت edge و همچنین edge↔vSmart روی هر ترنک می‌نشیند؛ حساسیت چند میلی‌ثانیه‌ای + بازتاب در لینک (echo) در بعضی پیاده‌سازی‌ها.</li><li>سیگنال BFD خرابی یا افت کیفیت (با سیاست‌های perf) به controller و سپس به OMP اطلاع می‌دهد؛ تونل/رنگ از مسیر حذف و ترافیک failover می‌شود.</li><li>کنترل‌پلین هم باید سالم باشد: BFD با vSmart قطع شدن control را اعلام می‌کند ولی داده‌ی موجود طبق OMP های قبلی تا زمان expiry ادامه می‌یابد.</li></ul>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. پایش SLA و Application-Aware Routing",
+      "html": "<p>دو اصل که کل پیکربندی SD-WAN را شکل می‌دهند:</p><ol><li><strong>پلیس آپ‌لینک:</strong> هر ترنک «رنگ + محدودیت/ظرفیت» دارد. سیاست می‌گوید: «ترافیک اپلیکیشن X روی رنگ mpls با پهنای باند Y، در اولویت ۱؛ اگر نبود روی internet». ظرفیت واقعی لینک باید صادقانه تعریف شود تا زمان‌سنجی پلیس (token bucket) درست کار کند.</li><li><strong>اپلیکیشن-محور بودن:</strong> شناسایی با DPI؛ سیاست بر اساس نام اپلیکیشن (مثلاً Zoom، SAP) نه فقط IP:port — چون IP های اپلیکیشن‌ها عوض می‌شوند.</li></ol><p>نمونهٔ ترجمهٔ نیاز به سیاست:</p><pre><code># نیاز کسب‌وکار: تماس ویدیویی همیشه روی MPLS، باکیفیت\npolicy:\n  name: VOICE-PRIME\n  data-class: voice\n  match: application-set APPS-RTC\n  track: sla-type latency/jitter/loss\n  preferred-color: mpls\n  fallback-color: internet\n  bandwidth-percent: 20\n\n# پیاده‌سازی (مثلاً روی cEdge):\nvpn 1\n ipfwd\nroute-replicate vpn 1 global\n!\npolicy VOICE-PRIME\n match app APPS-RTC\n set dscp af41\n track sla 1\n! (نام و ساختار دقیق بسته به پلتفرم/کنسول متفاوت است)</code></pre><p>نکته: اول SLA و رنگ را تعریف کنید، بعد bandwidth، بعد application-set — وارونهٔ آن خطاهای سیاست تولید می‌کند.</p>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. تغییر پارادایم با Infrastructure as Code (IaC)",
+      "html": "<p>مدل سنتی پیکربندی (SSH + CLI) در مقیاس SP مشکلات ساختاری دارد:</p><ul><li><strong>غیرقطعی:</strong> هر دستگاه ممکن است وضعیت داخلی متفاوتی داشته باشد؛ «چه چیزی در واقع اجرا شده؟» فقط با show گرفتن می‌شود فهمید.</li><li><strong>اتصال متنی:</strong> خروجی show برای ماشین مبهم است؛ تغییرات تدریجی و بدون نسخهٔ کامل.</li><li><strong>بازگشت‌پذیری ضعیف:</strong> rollback یعنی دستی خلاف را زدن؛ بدون commit/validate.</li></ul><p><strong>NETCONF/YANG</strong> مدل‌محور است:</p><ol><li>پیکربندی به‌صورت XML/JSON ساخت‌یافته روی یک data store (candidate/running) می‌نشیند؛ دستگاه schema (YANG) را می‌دهد و کلاینت می‌فهمد چه فیلدهایی مجاز است.</li><li><strong>validate → commit → (rollback-rollback):</strong> تغییر اول بررسی می‌شود، سپس یکجا اعمال؛ با <code>commit persist</code>/<code>rollback</code> نسخهٔ کامل قابل بازگشت است.</li><li>همه چیز روی transport TLS/SSH با همان مجوزهای AAA؛ قابل لاگ دقیق (چه کسی، چه کانفیگی، کی).</li></ol><div class=\"lesson-callout\"><strong>مقایسه:</strong> CLI مثل «صحبت با هر دستگاه» است؛ NETCONF مثل «فرستادن یک فرم استاندارد» — سریع برای ماشین، کم‌خطاتر برای مقیاس.</div>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>راهنما</th></tr></thead><tbody><tr><td>کانال مدیریت SD-WAN</td><td>از طریق اینترنت / مسیر اختصاصی</td><td>همیشه یک مسیر out-of-band یا حداقل رنگ پایدار برای controller؛ مدیریت نباید به سلامت ترافیک کاربر وابسته باشد</td></tr><tr><td>رنگ‌ها</td><td>پیش‌فرض کارخانه / تعریف سازمانی</td><td>رنگ‌ها را ساده و استاندارد نگه دارید؛ هر رنگ جدید = سیاست جدید = پیچیدگی</td></tr><tr><td>خودکارسازی SP</td><td>CLI + اسکریپت / NETCONF+CI</td><td>برای تغییرات تودرتو و پرتکرار: مدل‌محور + تست قبل از apply؛ CLI فقط برای عیب‌یابی سریع</td></tr><tr><td>منبع حقیقت</td><td>دستگاه‌ها / Git</td><td>Git = source of truth؛ دستگاه state مصرف‌کننده است؛ drift با audit خودکار پیدا می‌شود</td></tr><tr><td>تغییر زنده</td><td>apply مستقیم / blue-green</td><td>برای هسته: تغییر گروهی کوچک + مشاهدهٔ سلامت قبل از ادامه</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>یک چرخهٔ کامل از درخواست تا اعمال سیاست:</p><ol><li>کسب‌وکار: «تماس‌های ویدیویی باید روی MPLS پایدار باشند».</li><li>ارکراتور سیاست (SD-WAN): application-set + SLA (تأخیر/از دست رفتن بسته) + رنگ اولویت + پهنای باند تضمینی.</li><li>کنترل‌پلین سیاست را در قالب OMP برای edge های مرتبط می‌فرستد؛ هر edge پلیس/اینترفیس-لیست و ترتیب رنگ‌ها را اعمال می‌کند.</li><li>BFD روی هر ترنک وضعیت را پایش می‌کند؛ اگر mpls افت کرد، سیاگنال به controller و ترافیک فوراً روی internet (با احتمالاً dscp پایین‌تر) می‌رود.</li><li>در سمت SP automation: همان تغییر از طریق NETCONF در pipeline می‌رود (lint مدل ← validate ← apply به یک گروه ← smoke test ← ادامه).</li><li>audit: کل تغییر در Git ثبت است؛ برگشت = revert + apply همان commit.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): دفتر مرکزی + دو شعبه + SP.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>نقش/مقدار</th></tr></thead><tbody><tr><td>HQ-edge</td><td>دو ترنک: mpls (100M) + internet (50M)</td></tr><tr><td>BR1-edge / BR2-edge</td><td>هر کدام internet + LTE به‌عنوان سوم</td></tr><tr><td>Controller set</td><td>vManage + vSmart + vBond (در دیتاسنتر SP)</td></tr><tr><td>اولویت سیاست</td><td>RTC: mpls → internet → LTE؛ bulk: internet → mpls</td></tr><tr><td>زیرساخت SP</td><td>PE-1/PE-2 با NETCONF فعال + مدل‌های vendor</td></tr><tr><td>منبع حقیقت</td><td>Git repo: سیاست‌ها + اسکریپت‌های apply + تست‌ها</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>نمونهٔ پیکربندی edge (CLI نماینده — طراحی‌شده، اجرا نشده) و کار با NETCONF در SP:</p><pre><code>! --- edge: ترنک و رنگ (ساختار نماینده) ---\nEDGE-BR1(config)# interface GigabitEthernet0/0/0\nEDGE-BR1(config-if)# ip address dhcp\nEDGE-BR1(config-if)# vpn mpls color mpls\nEDGE-BR1(config)# vpn 1\nEDGE-BR1(config-vpn)# ipfwd\nEDGE-BR1(config-vpn)# interface GigabitEthernet0/0/1\nEDGE-BR1(config-vpn-if)# ip address 192.168.10.1 255.255.255.0\nEDGE-BR1(config)# policy VOICE-PRIME\nEDGE-BR1(config-policy)# match application APPS-RTC\nEDGE-BR1(config-policy)# set color preference mpls\nEDGE-BR1(config-policy)# track sla VOICE-SLA\nEDGE-BR1(config-policy)# bandwidth percent 20\n\n! --- SP: NETCONF در خط لوله ---\n# 1) گرفتن مدل دستگاه\n$ nc client get-schema --name ietf-interfaces --version 1.0 PE-1\n# 2) تولید config از template (Jinja2) با متغیرهای از Git\n$ ansible-playbook pe1-apply.yml --check    # validate فقط\n$ ansible-playbook pe1-apply.yml            # commit واقعی\n# 3) تأیید بعد از اعمال\n$ nc client get --filter 'interface[name=\"GigabitEthernet0/0/0\"]' PE-1</code></pre><ul><li>در edge، سیاست و رنگ‌ها را با هم بسازید؛ رنگ بدون ترنک، سیاست بی‌اثر است.</li><li><code>--check</code> در pipeline همیشه قبل از apply؛ برای دستگاه‌های هسته‌ای، apply گروهی + سلامت‌سنجی بین گروه‌ها.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code># وضعیت لینک‌ها و تونل‌ها (نماینده)\nEDGE-BR1# show sdwan wanedge neighbors\nGEO     COLOR    PEER        STATE   UPTIME\nus-west mpls     203.0.113.1  UP     12d04h\nus-west internet  198.51.100.7 UP    12d04h\n\nEDGE-BR1# show sdwan bfd sessions\nSITE  COLOR    PEER         STATE   DETECT     TX/RX\n10    mpls     203.0.113.1  UP      150x10ms   15/15\n10    internet  198.51.100.7 UP     150x10ms   15/15\n\nEDGE-BR1# show sdwan app-reachability\nAPP          COLOR    STATUS    SLA(ms)\nrtc-audio    mpls     REACHABLE 18/10/1   (lat/jit/loss)\nrtc-audio    internet REACHABLE 42/15/3\n\n# SP: خروجی مدل‌محور\nPE-1# show netconf sessions\nSession  User      Source-IP     State   Last-Commit\n241      ops-admin 10.20.0.5     Active  2026-03-02T10:14:02Z\nPE-1# show configuration commit 1024\ncommit 1024 - ops-admin - \"bump BGP timer site-x\"\n  3 statements changed</code></pre><ul><li>BFD UP برای هر رنگ یعنی مسیر در دسترس است؛ STATE پایین + SLA بد ← همان لحظه ترجیح رنگ عوض می‌شود.</li><li><code>show configuration commit</code> تاریخچهٔ کامل تغییرات مدل‌محور است — با Git مقایسه کنید تا drift پیدا شود.</li><li>اگر app-reachability برای یک اپ روی هر دو رنگ UNREACHABLE ← مشکل سیاست/پورت/فایروال داخلی edge است نه لینک.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>در SD-WAN:</strong> ترافیک کاربر و سیگنال‌های کنترلی (به controller) را روی رنگ‌ها تفکیک کنید؛ یک capture روی ترنک اینترنت نشان می‌دهد تونل‌های همسایگی و BFD چقدر پهنای باند مصرف می‌کنند — همین عدد در پلیس آپ‌لینک وارد می‌شود.</li><li><strong>در NETCONF:</strong> XML درخواست edit-config و پاسخ OK/rejected را با فیلتر <code>rpc</code> ببینید؛ خطای validate معمولاً با کد و پیام schema برمی‌گردد — علت را از خود پیام بخوانید نه از حدس.</li><li><strong>پایش:</strong> نرخ failover هر رنگ، مصرف توکن پلیس، تعداد commit های روزانه، و تعداد reject های validate. روند ناگهانی reject ← template یا مدل ناهماهنگ شده.</li><li><strong>نشانگر مثبت:</strong> هر تغییر Git می‌تواند با یک commit دستگاه match شود — اگر نه، کسی خارج از مسیر تغییر داده است.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>علت</th><th>راه‌حل</th></tr></thead><tbody><tr><td>after reboot پیکربندی edge گم شد</td><td>پیکربندی بدون sync به controller یا save نشده</td><td>همیشه از کنسول push کنید؛ وضعیت را با show sdwan vmanage-status بسنجید</td></tr><tr><td>اولویت سیاست اجرا نمی‌شود</td><td>رنگ/SLA تعریف‌نشده یا application-set خالی</td><td>ترتیب: رنگ ← SLA ← match ← bandwidth</td></tr><tr><td>بلک‌هول بعد از failover</td><td>مسیر جدید MTU یا فایروال متفاوت</td><td>آزمایش PMTUD و پورت‌ها روی رنگ جدید قبل از اعلام سلامت</td></tr><tr><td>NETCONF اعمال نکرد ولی CLI چیز دیگری می‌بیند</td><td>candidate/running ناهماهنگ یا دستگاه ساختار قدیمی</td><td>commit compare؛ در صورت نیاز discard + از Git دوباره apply</td></tr><tr><td>تغییر Git به دستگاه نرسید</td><td>pipeline در check مانده یا credential اشتباه</td><td>لاگ job + show netconf sessions؛ هیچ‌گاه apply را دستی خارج از CI نزنید</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> صبح، تماس‌های ویدیویی شعبهٔ BR1 کیفیت بد پیدا کرده ولی ping ساده سالم است.</p><ol><li>روی edge: <code>show sdwan wanedge neighbors</code> و <code>show sdwan bfd sessions</code> ← هر دو رنگ UP هستند؟ لینک مرده نیست، پس مشکل کیفیت است.</li><li><code>show sdwan app-reachability</code> ← SLA تأخیر/جیتر/loss روی mpls و internet؛ کدام رنگ بد است؟</li><li>اگر مpls بد است ولی سیاست هنوز روی آن است ← آیا track sla درست تعریف شده و به سیاست وصل است؟ (رایج: SLA تعریف ولی در policy استفاده نشده).</li><li>پلیس: مصرف bandwidth و رنگ‌های اولویت را چک کنید؛ اگر internet هم overload است، احتمالاً bulk روی همان رنگ و بدون سقف است.</li><li>از طرف SP: آیا تغییر اخیر (مثلاً QoS روی PE یا مسیر جدید) از CI رفته؟ <code>show configuration commit</code> و لاگ pipeline را با هم بخوانید.</li><li>رفع: اول سیاست/SLA را درست کنید (همیشه سیاست قبل از لینک)، سپس اگر لیز واقعی است با SP هماهنگ کنید؛ رفع با CLI خارج از Git ممنوع است.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>SD-WAN: vManage (مدیریت) · vSmart (کنترل/OMP) · vBond (onboard) · Edge (داده) — کنترل و داده جداست.</li><li>BFD سریع + رنگ لینک + SLA = failover کیفیت‌محور؛ پلیس آپ‌لینک سقف واقعی هر رنگ را می‌سنجد.</li><li>سیاست‌ها application-set و SLA دارند، نه فقط IP:port.</li><li>NETCONF/YANG: مدل‌محور، validate→commit، بازگشت‌پذیری نسخه‌محور.</li><li>منبع حقیقت = Git؛ دستگاه state مصرف‌کننده است؛ CLI فقط ابزار عیب‌یابی.</li><li>شش show کلیدی: wanedge neighbors · bfd sessions · app-reachability · vmanage-status · netconf sessions · configuration commit.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>معماری (۱۵ دقیقه):</strong> چهار نقش SD-WAN و مسیر یک بستهٔ کاربر را بکشید؛ علامت بزنید کنترل کجا قطع می‌شود و داده کجا.</li><li><strong>سیاست (۲۵ دقیقه):</strong> از نیاز «ویدیو روی MPLS با پشتیبان اینترنت» یک policy با match/SLA/color/bandwidth بنویسید و ترتیب وابستگی‌هایش را توضیح دهید.</li><li><strong>NETCONF (۲۵ دقیقه):</strong> با یک شبیه‌ساز/دستگاه نمونه، یک interface را با edit-config اضافه، validate و commit کنید؛ بعد آن را rollback بزنید.</li><li><strong>عیب‌یابی (۲۰ دقیقه):</strong> سناریوی «SLA تعریف ولی اعمال نمی‌شود» را با show های بالا گام‌به‌گام اثبات و رفع کنید.</li><li><strong>خودآزمایی:</strong> تفاوت OMP و BGP، دلیل جدایی کنترل/داده، و چرخهٔ validate→commit را در پنج خط بنویسید.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "SD-WAN",
+      "fa": "مفهوم کلیدی SD-WAN",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص SD-WAN، Service Provider و Infrastructure as Code"
+    },
+    {
+      "term": "OMP",
+      "fa": "مفهوم کلیدی OMP",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص SD-WAN، Service Provider و Infrastructure as Code"
+    },
+    {
+      "term": "vManage",
+      "fa": "مفهوم کلیدی vManage",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص SD-WAN، Service Provider و Infrastructure as Code"
+    },
+    {
+      "term": "vSmart",
+      "fa": "مفهوم کلیدی vSmart",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص SD-WAN، Service Provider و Infrastructure as Code"
+    },
+    {
+      "term": "BFD",
+      "fa": "مفهوم کلیدی BFD",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص SD-WAN، Service Provider و Infrastructure as Code"
+    },
+    {
+      "term": "IaC",
+      "fa": "مفهوم کلیدی IaC",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص SD-WAN، Service Provider و Infrastructure as Code"
+    },
+    {
+      "term": "Ansible",
+      "fa": "مفهوم کلیدی Ansible",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص SD-WAN، Service Provider و Infrastructure as Code"
+    },
+    {
+      "term": "Terraform",
+      "fa": "مفهوم کلیدی Terraform",
+      "simple": "اصطلاح تخصصی مرتبط با تخصص SD-WAN، Service Provider و Infrastructure as Code"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — تخصص SD-WAN، Service Provider و Infrastructure as Code",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>show sdwan control connections\nshow sdwan omp peers\nshow sdwan bfd sessions\nshow sdwan app-route stats</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "در معماری Cisco SD-WAN، وظیفهٔ اصلی کنترلر vSmart چیست؟",
+      "options": [
+        "فقط کشیدن کابل",
+        "مدیریت متمرکز Control Plane، توزیع مسیرها با OMP، کلیدهای IPsec و اعمال Policyها",
+        "نگهداری فایل‌های کاربران",
+        "فایروال سخت‌افزاری"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>vSmart نقش مغز متفکر Control Plane را در SD-WAN بازی می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "کدام جزء SD-WAN مسئول احراز هویت اولیه و معرفی روترهای جدید به vManage و vSmart است؟",
+      "options": [
+        "vBond (Orchestrator)",
+        "Switch Access",
+        "DHCP Client",
+        "NTP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>vBond تنها جزئی است که باید IP عمومی قابل دسترس داشته باشد تا روترها در لحظهٔ Zero-Touch Provisioning به آن وصل شوند.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "مفهوم TLOC در پروتکل OMP شامل چه سه مؤلفه‌ای است؟",
+      "options": [
+        "System IP، Color (مثلاً mpls یا biz-internet) و Encapsulation (IPsec/GRE)",
+        "MAC، VLAN و Port",
+        "نام کاربری، رمز و ایمیل",
+        "MTU، TTL و FCS"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>TLOC نقطهٔ اتصال فیزیکی/منطقی تونل‌های SD-WAN روی لینک‌های WAN را مشخص می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "کدام پروتکل در SD-WAN کیفیت لحظه‌ای تونل‌ها (Loss, Latency, Jitter) را پایش می‌کند؟",
+      "options": [
+        "BFD (Bidirectional Forwarding Detection)",
+        "CDP",
+        "TFTP",
+        "FTP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>BFD روی هر تونل IPsec به‌طور پیوسته تأخیر و افت بسته را برای Application-Aware Routing می‌سنجد.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "اگر لینک MPLS دچار تأخیر بالای ۲۰۰ میلی‌ثانیه شود، Application-Aware Routing چه تصمیمی می‌گیرد؟",
+      "options": [
+        "روتر را خاموش می‌کند",
+        "ترافیک حساس (مثل صدا) را طبق SLA به‌صورت خودکار به لینک اینترنت سالم منتقل می‌کند",
+        "کابل را قطع می‌کند",
+        "DNS را تغییر می‌دهد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>سیاست AAR در صورت نقض آستانهٔ SLA، ترافیک را بدون قطعی به TLOC جایگزین هدایت می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "چرا ترافیک Data Plane در SD-WAN معمولاً از vSmart عبور نمی‌کند؟",
+      "options": [
+        "چون Control Plane (vSmart) از Data Plane (مستقیم بین WAN Edgeها با IPsec) جداست",
+        "چون vSmart کارت شبکه ندارد",
+        "چون IPsec کار نمی‌کند",
+        "به دلیل محدودیت VLAN"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تونل‌های رمزنگاری‌شدهٔ Data Plane مستقیماً بین روترهای لبه برقرار می‌شوند تا گلوگاه ایجاد نشود.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "منظور از Idempotency در ابزارهایی مثل Ansible چیست؟",
+      "options": [
+        "اجرای چندبارهٔ یک Playbook بدون ایجاد تغییر تکراری یا خطا در صورتی که سیستم از قبل در وضعیت مطلوب باشد",
+        "پاک شدن تنظیمات بعد از ریبوت",
+        "ارسال دستورات بدون رمز",
+        "فقط یک‌بار اجرا شدن"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Idempotency تضمین می‌کند اجرای مجدد اتوماسیون ایمن و قابل پیش‌بینی است.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "فواید نگهداری پیکربندی و متغیرهای شبکه در مخزن Git (NetDevOps) چیست؟",
+      "options": [
+        "تاریخچهٔ دقیق تغییرات (Audit)، بازگشت سریع (Rollback) و بررسی پیش از اجرا (Peer Review)",
+        "افزایش سرعت کابل",
+        "عدم نیاز به روتر",
+        "حذف BGP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Git منبع حقیقت (Source of Truth) و شفافیت کامل برای تغییرات شبکه ایجاد می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "در SD-WAN، کلیدواژهٔ <code>Service VPN</code> در برابر <code>VPN 0</code> چه معنایی دارد؟",
+      "options": [
+        "VPN 0 مخصوص Transport/WAN است و Service VPNها (مثل VPN 10) شبکه‌های داخلی کاربران هستند",
+        "هر دو یکی هستند",
+        "VPN 0 یعنی اینترنت قطع است",
+        "Service VPN یعنی روتر خاموش است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>جداسازی VPN 0 (لینک‌های بیرونی) از Service VPNها باعث ایزوله‌سازی امن شبکهٔ داخلی می‌شود.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "ابزار Cisco pyATS چه کاربردی در مهندسی شبکه دارد؟",
+      "options": [
+        "تست خودکار وضعیت شبکه، مقایسهٔ Snapshot قبل و بعد از تغییر و اعتبارسنجی عملیاتی",
+        "فشرده‌سازی ویدیو",
+        "ساخت کابل شبکه",
+        "مدیریت پرینتر"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>pyATS و Genie برای تست خودکار خروجی‌های CLI و جلوگیری از خطا در تغییرات استفاده می‌شوند.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "تفاوت مدل Declarative (مانند Terraform) و Imperative در اتوماسیون چیست؟",
+      "options": [
+        "در Declarative وضعیت نهایی مطلوب را تعریف می‌کنید و ابزار مسیر رسیدن به آن را مدیریت می‌کند",
+        "در Declarative باید تک‌تک مراحل دستی نوشته شوند",
+        "تفاوتی ندارند",
+        "فقط در زبان C است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Terraform وضعیت مطلوب (Desired State) را با State فعلی مقایسه و همگام‌سازی می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "دستور بررسی وضعیت برقراری تونل‌های کنترلی DTLS/TLS به vManage و vSmart کدام است؟",
+      "options": [
+        "show sdwan control connections",
+        "show ip arp",
+        "show vlan",
+        "show spanning-tree"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در SD-WAN، control connections سلامت ارتباط روتر با کنترلرها را نمایش می‌دهد.</p>"
+    }
+  ]
+}

@@ -1,0 +1,380 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "fam-f3-03-ccnp-qos-netflow-automation",
+  "id": "fam-f3-03-ccnp-qos-netflow-automation",
+  "facultyId": "f3",
+  "objectiveId": "F3-03",
+  "kind": "curriculum",
+  "track": "FAM Curriculum 5.0",
+  "course": "c5-faculty-3-ccnp",
+  "title": "کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF",
+  "titleEn": "Enterprise QoS (DSCP/LLQ), Flexible NetFlow & RESTCONF",
+  "domain": "دانشکده ۳ · تضمین کیفیت، پایش و اتوماسیون",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "Authored — Multi-Faculty Curriculum",
+  "estimatedMinutes": 90,
+  "prerequisites": [
+    "fam-f3-02-ccnp-bgp-path-selection"
+  ],
+  "beforeYouStart": {
+    "prerequisites": [
+      "fam-f3-02-ccnp-bgp-path-selection"
+    ],
+    "learningObjectives": [
+      "مدل DiffServ و نشانه‌گذاری DSCP",
+      "صف‌بندی LLQ و CBWFQ با ساختار MQC",
+      "تفاوت Policing و Shaping",
+      "تله‌متری و NetFlow در برابر SNMP"
+    ]
+  },
+  "whyItMatters": "در هنگام ازدحام لینک (Congestion)، بدون QoS تماس‌های صوتی قطع می‌شوند؛ و بدون NetFlow و اتوماسیون، عیب‌یابی مصرف پهنای باند و تغییرات انبوه غیرممکن است.",
+  "topology": {
+    "devices": [
+      {
+        "id": "VOICE-GW",
+        "type": "host",
+        "x": 100,
+        "y": 140
+      },
+      {
+        "id": "WAN-R1",
+        "type": "router",
+        "x": 320,
+        "y": 140
+      },
+      {
+        "id": "COLLECTOR",
+        "type": "server",
+        "x": 540,
+        "y": 140
+      }
+    ],
+    "links": [
+      {
+        "a": "VOICE-GW:eth0",
+        "b": "WAN-R1:Gi0/1"
+      },
+      {
+        "a": "WAN-R1:Gi0/0",
+        "b": "COLLECTOR:eth0"
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sec-01",
+      "title": "۱. هدف درس و پیش‌نیازها",
+      "html": "<div class=\"lesson-callout\"><strong>جایگاه در آکادمی:</strong> دانشکده ۳ · CCNP Enterprise (ENCOR) — درس ۳ از ۳</div><p><strong>هدف درس:</strong> QoS مدرن (DiffServ + MQC) را طراحی و پیکربندی کنید — نشانه‌گذاری DSCP، صف‌بندی LLQ/CBWFQ، تفاوت policing و shaping — و با NetFlow/IPFIX ترافیک را اندازه بگیرید تا سیاست QoS بر اساس داده، نه حدس، اصلاح شود.</p><p><strong>پیش‌نیازها:</strong> صف و بسته در لایهٔ ۳، مفهوم پهنای باند لینک و oversubscription، آشنایی با SNMP در سطح مقدماتی.</p><p><strong>خروجی یادگیری:</strong> خواندن یک policy-map، تفسیر خروجی show policy-map interface، تفسیر فلوهای NetFlow و انتخاب پارامتر police/shape بر اساس SLA.</p>"
+    },
+    {
+      "id": "sec-02",
+      "title": "۲. چرا این مبحث در شبکه واقعی حیاتی است؟",
+      "html": "<p>وقتی لینکی اشباع می‌شود، روتر/سوییچ مجبور است بسته دور بریزد؛ بدون سیاست، دور ریختن «سراسری» است و مهم‌ترین ترافیک (VoIP) با ترافیک بی‌اهمیت (دانلود) یکسان قربانی می‌شود:</p><ul><li><strong>VoIP:</strong> تأخیر بیش از ۱۵۰ms یا jitter بالا = مکالمه غیرقابل استفاده. یک دانلود ۱۰۰٪ روی لینک ۱۰۰M می‌تواند queue را چند ثانیه پر کند.</li><li><strong>معاملات و اپلیکیشن‌های حساس:</strong> نیاز به ضمانت پهنای باند یا حداقل jitter دارند.</li><li><strong>بدون داده:</strong> QoS بدون اندازه‌گیری یعنی حدس؛ NetFlow دقیقاً همین شکاف را پر می‌کند: چه کسی، چه ترافیکی، کِی، با چه حجمی.</li><li>در محیط‌های WAN اشتراکی، این سیاست مستقیماً پول و SLA را مدیریت می‌کند.</li></ul><div class=\"lesson-callout\"><strong>حلقهٔ QoS:</strong> اندازه بگیر (NetFlow) ← طراحی کن (DiffServ/MQC) ← اعمال کن (policy-map) ← دوباره اندازه بگیر (counters/flow).</div>"
+    },
+    {
+      "id": "sec-03",
+      "title": "۳. مدل DiffServ و نشانه‌گذاری DSCP",
+      "html": "<p>DiffServ (Differentiated Services) به‌جای انتخاب مسیر هر بسته، <strong>به هر بسته یک برچسب می‌گذارد</strong> و صف‌بندی بر اساس برچسب انجام می‌شود. برچسب در فیلد ۶بیتی DSCP هدر IP ذخیره می‌شود:</p><table class=\"lesson-data-table\"><thead><tr><th>نام</th><th>DSCP</th><th>CoS (L2)</th><th>کاربرد</th></tr></thead><tbody><tr><td>CS6 / EF</td><td>48 / 46</td><td>6 / 5</td><td>کنترل‌پلین / VoIP (بدترین تأخیر)</td></tr><tr><td>AF41</td><td>34</td><td>4</td><td>ترافیک اپلیکیشن مهم (ویدیوی داخلی)</td></tr><tr><td>AF31</td><td>26</td><td>3</td><td>کنترل داده/پایش</td></tr><tr><td>AF21</td><td>18</td><td>2</td><td>کنترل‌پلین اپلیکیشن‌ها</td></tr><tr><td>CS0 / DF</td><td>0</td><td>0</td><td>پیش‌فرض (best effort)</td></tr><tr><td>CS1</td><td>8</td><td>1</td><td>پشتیبان (bulk/backup)</td></tr></tbody></table><ul><li><code>match dscp ef</code> یا <code>match ip dscp 46</code>؛ اگر access-layer سوییچ DSCP ندارد، با trust dscp یا trust cos دستگاه را مجاز کنید علامت‌گذاری کند.</li><li>مرزهای trust: فقط در access ورودی معتبر است؛ بین سوییچ‌ها DSCP باید حفظ شود (پورت trunk/trust).</li></ul>"
+    },
+    {
+      "id": "sec-04",
+      "title": "۴. صف‌بندی LLQ و CBWFQ با ساختار MQC",
+      "html": "<p>MQC سه لایه دارد: <strong>class-map</strong> (چه ترافیکی) → <strong>policy-map</strong> (با آن چه کنیم) → <strong>service-policy</strong> (کجا اعمال شود):</p><pre><code>R1(config)# class-map match-any VOICE\nR1(config-cmap)# match dscp ef\nR1(config-cmap)# match access-group name NET-VoIP\nR1(config)# class-map match-any CRITICAL-APP\nR1(config-cmap)# match dscp af41\nR1(config)# policy-map WAN-EDGE\nR1(config-pmap)# class VOICE\nR1(config-pmap-c)# priority percent 20            ! LLQ: پیش‌خدمت سخت\nR1(config-pmap-c)# set dscp ef\nR1(config)# policy-map WAN-EDGE\nR1(config-pmap)# class CRITICAL-APP\nR1(config-pmap-c)# bandwidth percent 30           ! CBWFQ: ضمانت سهم\nR1(config-pmap-c)# queue-limit packets 100\nR1(config-pmap)# class class-default\nR1(config-pmap-c)# fair-queue\nR1(config-pmap-c)# random-detect dscp-based       ! WRED برای جلوگیری از sync\nR1(config)# interface GigabitEthernet0/1\nR1(config-if)# service-policy output WAN-EDGE</code></pre><ul><li><strong>LLQ</strong> (priority) برای ترافیک زنده: سریع‌ترین صف، ولی باید سقف داشته باشد تا بقیه را گرسنگی ندهد — پس همیشه با CBWFQ در کنارش.</li><li><strong>CBWFQ</strong> سهم پهنای باند هر class را تضمین می‌کند؛ در صورت بی‌استفاده ماندن، class-default می‌تواند اضافه را بگیرد.</li><li><strong>WRED</strong> به‌جای tail-drop، با احتمال بسته‌های بزرگ/بی‌اهمیت را قبل از پر شدن صف drop می‌کند — جلوی TCP global sync را می‌گیرد.</li></ul>"
+    },
+    {
+      "id": "sec-05",
+      "title": "۵. تفاوت Policing و Shaping",
+      "html": "<p>هر دو کنترل از سرریزی جلوگیری می‌کنند، ولی زمان و رفتارشان فرق دارد:</p><table class=\"lesson-data-table\"><thead><tr><th></th><th>Policing</th><th>Shaping</th></tr></thead><tbody><tr><td>رفتار در سرریز</td><td>بسته را بلافاصله drop/market می‌کند (نرم‌تر: re-mark)</td><td>بسته را در صف نگه می‌دارد و دیرتر ارسال می‌کند</td></tr><tr><td>تأخیر</td><td>کم</td><td>اضافه می‌شود (بسته به اندازهٔ صف)</td></tr><tr><td>جای معمول</td><td>ورودی سرویس‌دهنده/لبه، جایی که drop ارزان است</td><td>خروجی لینک WAN کند، جایی که burst سازمان باید جذب شود</td></tr><tr><td>فرمان نمونه</td><td><code>police cir 20000000 bc 2500000 conform-action transmit exceed-action drop</code></td><td><code>shape average 20000000 500000 500000</code></td></tr><tr><td>علامت خرابی</td><td>burstهای ناگهانی قطع (زیرساخت جواب نمی‌دهد ولی TCP کند است)</td><td>تأخیر بالا اما بدون loss — برای VoIP اگر زیاد شود مضر است</td></tr></tbody></table><div class=\"lesson-callout\"><strong>قانون انتخاب:</strong> لینک اشتراکی سازمان ← shape کن (burst خودمان را جمع می‌کنیم) · لینک اپراتور ← policy می‌کنند، شما هم می‌توانید در ورودی re-mark کنید · صف مرزی router ← fair-queue پیش‌فرض.</div>"
+    },
+    {
+      "id": "sec-06",
+      "title": "۶. تله‌متری و NetFlow در برابر SNMP",
+      "html": "<p><strong>NetFlow/IPFIX</strong> جریان‌ها (Flow) را گزارش می‌کند: پنج‌تایی (srcIP, dstIP, srcPort, dstPort, protocol) + ASها + interface + DSCP + تعداد/حجم بایت. در برابر SNMP که فقط شمارندهٔ پورت می‌دهد:</p><table class=\"lesson-data-table\"><thead><tr><th>معیار</th><th>SNMP</th><th>NetFlow/IPFIX</th></tr></thead><tbody><tr><td>پرسش</td><td>«این پورت چقدر شلوغ است؟»</td><td>«چه کسی چه ترافیکی به کجا می‌فرستد و DSCP آن چیست؟»</td></tr><tr><td>تفکیک</td><td>به پورت/دستگاه</td><td>به فلو، برنامه (با port)، مبدأ/مقصد، مسیر AS</td></tr><tr><td>هزینه</td><td>بسیار کم</td><td>متوسط (نیاز به export و storage)</td></tr><tr><td>کاربرد QoS</td><td>آستانه‌های هشدار</td><td>کشف ترافیک برای ساخت class-map و بازبینی سیاست</td></tr></tbody></table><pre><code>R1(config)# flow exporter FAM-EXPORT\nR1(config-flow-export)# destination 10.10.9.20\nR1(config-flow-export)# transport udp 9996\nR1(config-flow-export)# template data timeout 60\nR1(config)# flow monitor FAM-MON\nR1(config-flow-monitor)# record netflow ipv4 ingress\nR1(config-flow-monitor)# exporter FAM-EXPORT\nR1(config-flow-monitor)# cache timeout active 60\nR1(config)# interface GigabitEthernet0/0\nR1(config-if)# ip flow monitor FAM-MON input\nR1# show flow monitor FAM-MON cache format table\nR1# show flow exporter statistics</code></pre><ul><li>timeoutهای کوتاه‌تر = بلادرنگ‌تر ولی فلوی بیشتر؛ برای تحلیل روزانه ۶۰/۳۰۰ ثانیه مناسب است.</li><li>در تحلیل: پرتکل‌ترین فلوها، فلوهایی با DSCP صفر که باید علامت‌دار باشند، و ترافیک east-west غیرمنتظره را بیرون بکشید.</li></ul>"
+    },
+    {
+      "id": "sec-07",
+      "title": "۷. جدول مقایسهٔ فنی و تصمیم‌گیری",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تصمیم</th><th>گزینه‌ها</th><th>راهنما</th></tr></thead><tbody><tr><td>مدل صف روی لینک WAN</td><td>فقط fair-queue / LLQ+CBWFQ کامل</td><td>اگر VoIP دارید حتماً LLQ برای EF؛ بقیه را با CBWFQ سهم‌بندی کنید</td></tr><tr><td>مرز اعتماد DSCP</td><td>trust dscp همه جا / علامت‌گذاری لبه</td><td>در access به دستگاه‌ها trust دهید، در هسته DSCP را پاس بدهید</td></tr><tr><td>policing در برابر shaping</td><td>see above</td><td>خروجی WAN ← shape؛ ورودی از اپراتور ← policy/re-mark</td></tr><tr><td>جمع‌آوری فلو</td><td>NetFlow v9 / IPFIX / sFlow</td><td>IPFIX استاندارد بین فروشنده‌ها؛ sFlow فقط نمونه‌برداری (برای لینک‌های خیلی پرسرعت)</td></tr><tr><td>ذخیره‌سازی</td><td>محلی / سرور collector</td><td>سرور جدا (ELK/Graylog/…) + نگهداری چند هفته‌ای؛ دستگاه نباید بار export بگیرد</td></tr><tr><td>آزمون QoS</td><td>فقط counters / آزمون تأخیر واقعی</td><td>با iperf/زمان‌سنج تأخیر دو طرفه بگیرید؛ counters فقط شرط لازم است</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-08",
+      "title": "۸. جریان بسته و منطق تصمیم در کنترل‌پلین",
+      "html": "<p>یک بستهٔ VoIP (DSCP EF) و یک دانلود هم‌زمان روی لینک WAN:</p><ol><li>در access، پورت کلاینت با trust dscp یا phone profile علامت EF می‌زند؛ فریم وارد ترانک با همان CoS می‌شود.</li><li>روی روتر لبه، <code>service-policy output</code> روی لینک WAN اجرا می‌شود: کلاس VOICE پیدا و در صف priority قرار می‌گیرد.</li><li>لینک اشباع می‌شود (دانلود class-default پر است)؛ بستهٔ VoIP با priority عبور می‌کند چون سقف ۲۰٪ آن پر نشده. بستهٔ دانلود یا در صف می‌ماند یا با WRED drop می‌شود — تأخیرش می‌رود ولی مکالمه سالم است.</li><li>هم‌زمان NetFlow فلوی دانلود (پورت بزرگ، DSCP 0) و فلوی RTP (پورت‌های میانی، DSCP 46) را export می‌کند؛ تحلیل بعدی نشان می‌دهد چه ساعتی رقابت شروع می‌شود.</li><li>اگر سقف priority اشتباه (مثلاً ۸۰٪) باشد، دانلود گرسنگی می‌کشد و TCP کل سایت کند می‌شود — علامت: بدون loss، ولی throughput پایین برای همه به‌جز VoIP.</li></ol>"
+    },
+    {
+      "id": "sec-09",
+      "title": "۹. توپولوژی مرجع آزمایشگاهی",
+      "html": "<p>توپولوژی مرجع (طراحی‌شده — اجرا نشده): دفتر با لینک WAN اشتراکی.</p><table class=\"lesson-data-table\"><thead><tr><th>عنصر</th><th>مقدار</th></tr></thead><tbody><tr><td>لینک WAN</td><td>100 Mbps قراردادی — shape روی خروجی به اپراتور</td></tr><tr><td>VoIP</td><td>DSCP EF — priority 20% (حداکثر ~10 مکالمهٔ هم‌زمان در 100k بایت/ثانیه هر کدام)</td></tr><tr><td>اپلیکیشن حیاتی</td><td>DSCP AF41 — bandwidth 30%</td></tr><tr><td>باقی‌مانده</td><td>class-default + fair-queue + WRED</td></tr><tr><td>NetFlow</td><td>export به collector داخلی 10.10.9.20، timeout 60s</td></tr><tr><td>نقطهٔ اندازه‌گیری</td><td>ورودی از LAN و خروجی به WAN (دو policy جدا)</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-10",
+      "title": "۱۰. دستورات پیکربندی و بررسی در Cisco IOS",
+      "html": "<p>پیکربندی کامل (طراحی‌شده — اجرا نشده):</p><pre><code>R1(config)# class-map match-any VOICE\nR1(config-cmap)# match dscp ef\nR1(config)# class-map match-any CRITICAL-APP\nR1(config-cmap)# match dscp af41\nR1(config-cmap)# match access-group name APP-SIGS\n\nR1(config)# policy-map WAN-OUT\nR1(config-pmap)# class VOICE\nR1(config-pmap-c)# priority percent 20\nR1(config-pmap)# class CRITICAL-APP\nR1(config-pmap-c)# bandwidth percent 30\nR1(config-pmap-c)# queue-limit 150\nR1(config-pmap)# class class-default\nR1(config-pmap-c)# fair-queue\nR1(config-pmap-c)# random-detect dscp-based\n\nR1(config)# policy-map WAN-IN\nR1(config-pmap)# class class-default\nR1(config-pmap-c)# police cir 90000000 bc 3000000\nR1(config-pmap-c)# conform-action transmit\nR1(config-pmap-c)# exceed-action drop\n\nR1(config)# interface GigabitEthernet0/0\nR1(config-if)# service-policy output WAN-OUT\nR1(config)# interface Serial0/0/0\nR1(config-if)# service-policy input WAN-IN\nR1(config-if)# service-policy output WAN-OUT\nR1(config)# interface Serial0/0/0\nR1(config-if)# shape average 95000000 3750000 3750000\nR1(config-if)# service-policy output WAN-OUT   ! ترتیب: shaping ورودی policy را محدود می‌کند</code></pre><ul><li>ترتیب اعمال: در خروجی، اول شکل‌دهی (shape)، بعد policy (صف‌بندی و priority) اعمال می‌شود — خروجی نهایی هر دو را دارد.</li><li>CIR را زیر قرارداد (مثلاً ۹۰٪) بگذارید تا burst خود اپراتور هم جا داشته باشد.</li><li>اگر <code>match access-group name</code> استفاده کردید، ACL مربوطه را هم تعریف کنید؛ در غیر این صورت class خالی می‌ماند و در show policy-map دیده می‌شود.</li></ul>"
+    },
+    {
+      "id": "sec-11",
+      "title": "۱۱. راستی‌آزمایی و خواندن خروجی‌های show",
+      "html": "<pre><code>R1# show policy-map interface Serial0/0/0\nSerial0/0/0\n  Service-policy output: WAN-OUT\n    Class-map: VOICE (match-any)\n      5 minute offered rate 128000 bps, drop rate 0 bps\n      Priority queue: (priority 20%)\n        queue size 0, pkts dropped 0\n        Bandwidth 20 %, burst bytes 23750\n    Class-map: CRITICAL-APP (match-any)\n      5 minute offered rate 3100000 bps, drop rate 0 bps\n      Queue: (bandwidth 30%)\n        queue limit 150 packets\n        pkts dropped 0\n    Class-map: class-default (match-any)\n      5 minute offered rate 54000000 bps, drop rate 900000 bps\n      Fair queue: 64 active queues, avg depth 12\n      random-detect: dscp-based, mean 25, max 40\n\nR1# show policy-map interface Serial0/0/0 class VOICE\n  (pkts/bytes) in: 84122/10515250  out: 84122/10515250  dropped: 0\n\nR1# show flow monitor FAM-MON cache\n  Flows active: 1284   Flows added: 991201\nR1# show flow exporter statistics\n  Export packets sent: 4120   Export packets failed: 0</code></pre><ul><li>علامت سالم: <code>drop rate 0</code> در کلاس‌های priority/bandwidth. اگر class-default پر است ولی VoIP سالم است، سیاست درست کار می‌کند.</li><li>اگر pkts dropped در VOICE غیرصفر شد ← priority سقف را زده یا ترافیک غیرمنتظره EF دارد (با فلو چک کنید شاید کسی علامت EF روی دانلود گذاشته).</li><li><code>offered rate</code> یعنی چه چیزی به policy رسیده، نه چه چیزی خارج شده — تفاوت این دو محل اندازه‌گیری تأثیر policy است.</li></ul>"
+    },
+    {
+      "id": "sec-12",
+      "title": "۱۲. تحلیل بسته و نشانگرهای پایش (Wireshark/Telemetry)",
+      "html": "<ul><li><strong>Wireshark روی لینک (فیلتر <code>ip.dsfield.dscp == 46</code>):</strong> تأیید کنید VoIP واقعاً EF است و در مسیر از بین نمی‌رود. اگر در ورودی EF است و در خروجی صفر شد، دستگاهی re-mark کرده یا از policy عبور کرده بدون اینکه اعمال شود.</li><li><strong>زمان‌سنجی دوطرفه:</strong> ping با بستهٔ کوچک در ساعات شلوغ و خلوت؛ تفاوت تأخیر = صف‌بندی واقعی. هدف: افزایش زیر ۵۰ms برای EF.</li><li><strong>NetFlow:</strong> پرتکل‌ترین فلوها، نسبت DSCP صفر به کل، و فلوهای ناشناختهٔ پورت (اپلیکیشن‌های shadow IT). این داده ورودی طراحی class-map های بعدی است.</li><li><strong>SNMP:</strong> utilization پورت + queue depth اگر MIB دستگاه پشتیبانی کند؛ آستانهٔ هشدار ۷۰٪ مداوم برای لینک shapeشده.</li></ul>"
+    },
+    {
+      "id": "sec-13",
+      "title": "۱۳. تله‌ها و اشتباهات رایج در آزمون و محیط واقعی",
+      "html": "<table class=\"lesson-data-table\"><thead><tr><th>تله</th><th>علت</th><th>راه‌حل</th></tr></thead><tbody><tr><td>VoIP بدتر از قبل شد بعد از QoS</td><td>LLQ بدون سقف یا priority در جای اشتباه (همه چیز EF)</td><td>percent مشخص + فقط ترافیک واقعی EF</td></tr><tr><td>class-map match-any خالی در show</td><td>match ناقص یا DSCP به policy نمی‌رسد</td><td>trust dscp در ورودی؛ match dscp + match access-group</td></tr><tr><td>shaping و policy هم‌زمان روی یک direction</td><td>ترتیب اجرا متفاوت از آنچه فکر می‌کنید</td><td>show policy-map interface بخوانید؛ شکل‌دهی اول است</td></tr><tr><td>NetFlow فلو نمی‌فرستد</td><td>destination/exporter/template timeout یا ACL فایروال</td><td>show flow exporter statistics ← failed non-zero؟ UDP 9996 باز؟</td></tr><tr><td>همه ترافیک DSCP صفر</td><td>access ها trust ندارند یا کلاینت علامت نمی‌زند</td><td>در پورت‌های phone کاربر trust dscp/cos؛ در غیر این صورت policy در لبه</td></tr><tr><td>WRED باعث کاهش throughput کل TCP شد</td><td>mean/max برای ترافیک اشتباه تنظیم شده</td><td>min-threshold را بالاتر ببرید؛ با flow ترافیک bulk را شناسایی و جدا کنید</td></tr></tbody></table>"
+    },
+    {
+      "id": "sec-14",
+      "title": "۱۴. سناریوی عیب‌یابی گام‌به‌گام",
+      "html": "<p><strong>سناریو:</strong> شکایت مکرر از کندی اپلیکیشن داخلی در ساعات ۱۰ تا ۱۲؛ مکالمات VoIP هم گاهی می‌پرد.</p><ol><li>اول داده: <code>show policy-map interface</code> ← کدام کلاس drop دارد؟ offered rate ها چقدر است؟ اگر هنوز policy ندارید، از NetFlow/آمار پورت شروع کنید.</li><li>با فلوها: پرتکل‌ترین فلوها را ببینید؛ اگر ترافیک اپلیکیشن داخلی DSCP صفر دارد و با دانلود مهاجم رقابت می‌کند ← class-map جدید با AF41 و سهم ۳۰٪ بسازید.</li><li>بررسی ورودی: آیا دستگاه‌های منبع علامت می‌زنند؟ <code>show policy-map interface</code> ورودی + <code>match dscp</code> را چک کنید؛ در صورت نیاز trust را در access اضافه کنید.</li><li>بازبینی سقف‌ها: اگر priority همه‌چیز را گرفته، percent ها را با احترام به SLA بازتوزیع کنید؛ CIR شکل‌دهی را با قرارداد تطبیق دهید.</li><li>تأیید: هم‌زمان با ترافیک مصنوعی (iperf) و یک مکالمهٔ آزمایشی، تأخیر EF و drop کلاس‌ها را پایش کنید؛ پس از ۲۴ ساعت دوباره فلوها را بررسی کنید.</li><li>بایگانی: شمارهٔ policy، تاریخ، و نمودار قبل/بعد را مستند کنید — مبنای audit بعدی QoS.</li></ol>"
+    },
+    {
+      "id": "sec-15",
+      "title": "۱۵. جمع‌بندی مهندسی و چک‌لیست طراحی",
+      "html": "<ul><li>DiffServ: برچسب DSCP در لایهٔ ۳؛ EF=46 برای زنده، AF برای مهم‌ها، CS0 پیش‌فرض.</li><li>MQC: class-map ← policy-map ← service-policy روی interface (input/output).</li><li>LLQ = priority با سقف · CBWFQ = ضمانت سهم · WRED = drop هوشمند قبل از پر شدن صف.</li><li>Policiing فوری drop می‌کند؛ shaping صف می‌کشد و تأخیر اضافه می‌کند — خروجی WAN ← shape.</li><li>NetFlow جریان را می‌بیند، SNMP پورت را؛ QoS بدون هر دو ناقص است.</li><li>همیشه قبل و بعد را با counters + flow + زمان‌سنجی تأخیر بسنجید.</li></ul>"
+    },
+    {
+      "id": "sec-16",
+      "title": "۱۶. تمرین پیشنهادی در شبیه‌ساز و لابراتوار",
+      "html": "<ol><li><strong>طبقه‌بندی (۲۰ دقیقه):</strong> سه class-map با match dscp بسازید؛ با یک پکت علامت‌دار (از شبیه‌ساز یا tool) تأیید کنید در کدام class می‌افتد.</li><li><strong>سیاست (۲۵ دقیقه):</strong> policy-map با priority 10% و bandwidth 30% و fair-queue بسازید؛ با show policy-map interface همه را بخوانید.</li><li><strong>شدت سرریز (۱۵ دقیقه):</strong> عمداً CIR پایین بگذارید و ترافیک پرتاب کنید؛ تفاوت رفتار police و shape را با شمارنده‌ها مستند کنید.</li><li><strong>اندازه‌گیری (۲۰ دقیقه):</strong> flow exporter را تنظیم و با show flow exporter/statistics تأیید کنید؛ سپس ۵ فلوی اول را تفسیر کنید.</li><li><strong>خودآزمایی:</strong> چهار خط دربارهٔ تفاوت LLQ و CBWFQ، و اینکه چرا NetFlow را «ورودی طراحی QoS» می‌نامیم.</li></ol><p><em>وضعیت: طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده است.</em></p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "QoS",
+      "fa": "مفهوم کلیدی QoS",
+      "simple": "اصطلاح تخصصی مرتبط با کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF"
+    },
+    {
+      "term": "DSCP",
+      "fa": "مفهوم کلیدی DSCP",
+      "simple": "اصطلاح تخصصی مرتبط با کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF"
+    },
+    {
+      "term": "LLQ",
+      "fa": "مفهوم کلیدی LLQ",
+      "simple": "اصطلاح تخصصی مرتبط با کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF"
+    },
+    {
+      "term": "CBWFQ",
+      "fa": "مفهوم کلیدی CBWFQ",
+      "simple": "اصطلاح تخصصی مرتبط با کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF"
+    },
+    {
+      "term": "NetFlow",
+      "fa": "مفهوم کلیدی NetFlow",
+      "simple": "اصطلاح تخصصی مرتبط با کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF"
+    },
+    {
+      "term": "RESTCONF",
+      "fa": "مفهوم کلیدی RESTCONF",
+      "simple": "اصطلاح تخصصی مرتبط با کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF"
+    },
+    {
+      "term": "Python",
+      "fa": "مفهوم کلیدی Python",
+      "simple": "اصطلاح تخصصی مرتبط با کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF"
+    },
+    {
+      "term": "Control Plane",
+      "fa": "صفحهٔ کنترل",
+      "simple": "بخش تصمیم‌گیری و تبادل اطلاعات مسیریابی و توپولوژی"
+    },
+    {
+      "term": "Data Plane",
+      "fa": "صفحهٔ داده",
+      "simple": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار بر اساس جداول ساخته شده"
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر اندازهٔ بسته",
+      "simple": "بیشترین طول Payload قابل عبور از یک رابط بدون تکه‌تکه شدن"
+    },
+    {
+      "term": "Convergence",
+      "fa": "همگرایی شبکه",
+      "simple": "زمانی که تمام تجهیزات پس از تغییر توپولوژی به دید یکسان می‌رسند"
+    },
+    {
+      "term": "Redundancy",
+      "fa": "افزونگی",
+      "simple": "وجود مسیر یا تجهیز پشتیبان برای حذف نقطهٔ شکست واحد"
+    },
+    {
+      "term": "Latency",
+      "fa": "تأخیر شبکه",
+      "simple": "مدت زمان رسیدن بسته از مبدأ به مقصد"
+    },
+    {
+      "term": "Packet Walk",
+      "fa": "ردیابی مسیر بسته",
+      "simple": "تحلیل گام‌به‌گام تغییرات هدرها از مبدأ تا مقصد"
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای سلامت",
+      "simple": "رفتار و آمار طبیعی شبکه در شرایط عادی برای مقایسه هنگام خطا"
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنهٔ شکست",
+      "simple": "محدوده‌ای از شبکه که از خرابی یک جزء متأثر می‌شود"
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه طراحی‌شده — کیفیت سرویس (QoS)، Flexible NetFlow و اتوماسیون RESTCONF",
+      "status": "طراحی‌شده — در آزمایشگاه واقعی اجرا و تأیید نشده (Designed — Not Run)",
+      "html": "<p><strong>وضعیت اجرا:</strong> این آزمایشگاه طراحی شده اما هنوز روی تجهیزات واقعی اجرا و تأیید نشده است.</p><pre><code>class-map match-any VOICE\n match dscp ef\npolicy-map WAN-OUT\n class VOICE\n  priority percent 20\n class class-default\n  fair-queue\nshow policy-map interface GigabitEthernet0/0</code></pre>"
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پرسش 1",
+      "promptHtml": "مقدار استاندارد DSCP برای ترافیک حساس به تأخیرِ صدا (Voice RTP) چیست؟",
+      "options": [
+        "BE (0)",
+        "EF (46 - Expedited Forwarding)",
+        "CS1 (8)",
+        "AF11 (10)"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ترافیک صدای بلادرنگ با DSCP EF (مقدار اعشاری ۴۶) علامت‌گذاری می‌شود.</p>"
+    },
+    {
+      "title": "پرسش 2",
+      "promptHtml": "در MQC (Modular QoS CLI)، کدام بخش مشخص می‌کند با ترافیک طبقه‌بندی‌شده چه عملی انجام شود؟",
+      "options": [
+        "class-map",
+        "policy-map",
+        "service-policy",
+        "access-list"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>class-map ترافیک را شناسایی می‌کند، policy-map رفتار (priority/bandwidth/shape) را تعیین می‌کند و service-policy آن را به اینترفیس می‌بندد.</p>"
+    },
+    {
+      "title": "پرسش 3",
+      "promptHtml": "مزیت صف‌بندی LLQ (دستور <code>priority</code>) برای ترافیک صدا چیست؟",
+      "options": [
+        "ارسال اولویت‌دار بدون انتظار در صف سایر ترافیک‌ها همراه با محدودکنندهٔ داخلی برای جلوگیری از گرسنگی بقیه صف‌ها",
+        "توقف کامل TCP",
+        "افزایش اندازه MTU",
+        "ذخیره فایل در دیسک"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>LLQ یک صف Strict Priority با Policer داخلی فراهم می‌کند تا Jitter و تأخیر صدا به حداقل برسد.</p>"
+    },
+    {
+      "title": "پرسش 4",
+      "promptHtml": "تفاوت اصلی Traffic Shaping و Traffic Policing چیست؟",
+      "options": [
+        "Shaping ترافیک مازاد را بافر و تأخیر می‌دهد تا هموار شود؛ Policing مازاد را Drop یا Re-mark می‌کند",
+        "Policing همیشه بافر نامحدود دارد",
+        "Shaping فقط در لایه ۱ کار می‌کند",
+        "یکسان هستند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Shaping برای لینک‌های خروجی WAN جهت جلوگیری از افت بسته توسط ISP و Policing برای اعمال سقف نرخ استفاده می‌شود.</p>"
+    },
+    {
+      "title": "پرسش 5",
+      "promptHtml": "مرز اعتماد (Trust Boundary) در QoS شبکهٔ سازمانی معمولاً کجاست؟",
+      "options": [
+        "در روتر اینترنت",
+        "پورت Access سوئیچ (یا تلفن IP)، نه کامپیوتر کاربر",
+        "سرور DNS",
+        "روتر هستهٔ ISP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اگر به مارک‌گذاری PC کاربر اعتماد شود، هر کاربری می‌تواند ترافیک بازی یا دانلود را با DSCP EF بفرستد.</p>"
+    },
+    {
+      "title": "پرسش 6",
+      "promptHtml": "در Flexible NetFlow، یک Flow به‌طور کلاسیک با کدام مشخصات تعریف می‌شود؟",
+      "options": [
+        "فقط آدرس MAC",
+        "Src/Dst IP، Src/Dst Port، Protocol، Type of Service و Input Interface",
+        "نام کاربری ویندوز",
+        "طول کابل"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>NetFlow متادیتای جریان‌ها (و نه کل Payload بسته‌ها) را برای تحلیل مصرف شبکه صادر می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 7",
+      "promptHtml": "تفاوت مدل Push و Pull در پایش/اتوماسیون شبکه چیست؟",
+      "options": [
+        "SNMP Polling مدل Pull و Streaming Telemetry / NetFlow مدل Push است",
+        "هر دو روی پورت ۲۱ هستند",
+        "Push یعنی خاموش کردن روتر",
+        "تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Streaming Telemetry داده‌ها را به‌صورت پیوسته و Event-driven از تجهیز به کالکتور Push می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 8",
+      "promptHtml": "در RESTCONF برای به‌روزرسانی کامل یک منبع پیکربندی معمولاً از کدام متد HTTP استفاده می‌شود؟",
+      "options": [
+        "GET",
+        "PUT (یا PATCH برای اصلاح جزئی)",
+        "HEAD",
+        "TRACE"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>GET برای خواندن، POST برای ایجاد، PUT برای جایگزینی و PATCH برای ویرایش جزئی به کار می‌روند.</p>"
+    },
+    {
+      "title": "پرسش 9",
+      "promptHtml": "کدام کد وضعیت HTTP نشانهٔ موفقیت درخواست خواندن در RESTCONF API است؟",
+      "options": [
+        "200 OK",
+        "401 Unauthorized",
+        "404 Not Found",
+        "503 Service Unavailable"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>200 OK موفقیت در خواندن و 201 Created/204 No Content موفقیت در ایجاد یا تغییر را نشان می‌دهند.</p>"
+    },
+    {
+      "title": "پرسش 10",
+      "promptHtml": "پروتکل CoS (802.1p) در کدام بخش بسته قرار دارد و چند بیت است؟",
+      "options": [
+        "۳ بیت در هدر 802.1Q لایه ۲",
+        "۶ بیت در هدر IP",
+        "۸ بیت در TCP",
+        "در فایل JSON"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>فیلد PCP در تگ 802.1Q شامل ۳ بیت (مقادیر ۰ تا ۷) فقط روی لینک‌های Trunk لایه ۲ است.</p>"
+    },
+    {
+      "title": "پرسش 11",
+      "promptHtml": "کدام ابزار اتوماسیون متن‌باز بدون نیاز به Agent روی روتر (Agentless از طریق SSH/API) عمل می‌کند؟",
+      "options": [
+        "Ansible",
+        "Wireshark",
+        "Ping",
+        "Telnet Server"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Ansible با Playbookهای YAML از طریق SSH یا REST/NETCONF بدون نصب Agent روی تجهیزات کار می‌کند.</p>"
+    },
+    {
+      "title": "پرسش 12",
+      "promptHtml": "دستور مشاهدهٔ آمار بسته‌های Dropشده در صف‌های QoS روی یک اینترفیس سیسکو چیست؟",
+      "options": [
+        "show policy-map interface",
+        "show ip interface brief",
+        "show arp",
+        "show vlan"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>show policy-map interface تعداد بسته‌ها و بایت‌های Matched و Dropped هر کلاس را نمایش می‌دهد.</p>"
+    }
+  ]
+}
