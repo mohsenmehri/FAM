@@ -580,6 +580,9 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(no_ns_res, {"ok": False, "error": "missing_namespace_or_interfaces"})
         bad_xml_res = ns_a5["inspect_payloads"](raw_xml="<interfaces><broken></interfaces>")
         self.assertEqual(bad_xml_res, {"ok": False, "error": "invalid_xml"})
+        # Schema validation: missing/invalid VLAN id must NOT raise KeyError
+        for bad_schema in ('{"vlans": [{"active": true}]}', '{"vlans": [{"id": "10", "active": true}]}', '{"vlans": [{"id": true, "active": true}]}', '{"vlans": ["bad"]}'):
+            self.assertEqual(ns_a5["inspect_payloads"](bad_schema), {"ok": False, "error": "invalid_vlan_entry"}, bad_schema)
 
         a6_lesson = data["lessons"]["auto_06"]
         a6_s = json.dumps(a6_lesson, ensure_ascii=False)
@@ -673,6 +676,8 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("SAN", a7_s)
         self.assertIn("mTLS", a7_s)
         self.assertIn("OAuth 2.0", a7_s)
+        self.assertNotIn("عملیات غیرIdempotent (`POST`, `PUT`, `DELETE`)", a7_s)
+        self.assertIn("عملیات تغییردهندهٔ وضعیتِ Idempotent مانند `PUT` و `DELETE`", a7_s)
         self.assertEqual(a7_lesson["bridge"]["nextId"], "auto_08")
         m_a7_py = re.search(r"```python\n([\s\S]+?)\n```", a7_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a7_py, "auto_07 runnable python block missing")
@@ -683,6 +688,11 @@ class AcademyRedesignTests(unittest.TestCase):
             ns_a7["verify_hs256_jwt"](valid_tok, b"top-secret", expected_iss="fam-auth", expected_aud="net-api", now=1900000000),
             {"ok": True, "claims": {"sub": "netops", "role": "viewer", "iss": "fam-auth", "aud": "net-api", "exp": 2000000000}},
         )
+        # Trailing non-base64url characters ('!!!!') MUST be rejected strictly
+        self.assertEqual(ns_a7["verify_hs256_jwt"](valid_tok + "!!!!", b"top-secret", now=1900000000), {"ok": False, "error": "malformed_token"})
+        # Signed token with exp: NaN (or float('nan')) MUST be rejected
+        nan_tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "exp": float("nan")}, b"top-secret")
+        self.assertEqual(ns_a7["verify_hs256_jwt"](nan_tok, b"top-secret", now=100), {"ok": False, "error": "malformed_token"})
         # Expired token (exp: 1) MUST be rejected
         expired_tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "exp": 1, "iss": "fam-auth", "aud": "net-api"}, b"top-secret")
         self.assertEqual(ns_a7["verify_hs256_jwt"](expired_tok, b"top-secret", expected_iss="fam-auth", expected_aud="net-api", now=100), {"ok": False, "error": "token_expired"})
@@ -701,7 +711,7 @@ class AcademyRedesignTests(unittest.TestCase):
         # Malformed inputs MUST return controlled error without raising JSONDecodeError
         not_json = ns_a7["_b64u_enc"](b"{bad-json")
         list_json = ns_a7["_b64u_enc"](b"[1,2,3]")
-        for bad_tok in ("not-a-jwt", "a.b", "a..c", "!!!.@@@.###", f"{not_json}.{not_json}.{not_json}", f"{list_json}.{list_json}.{not_json}", 12345):
+        for bad_tok in ("not-a-jwt", "a.b", "a..c", "!!!.@@@.###", valid_tok + "=", f"{not_json}.{not_json}.{not_json}", f"{list_json}.{list_json}.{not_json}", 12345):
             self.assertEqual(ns_a7["verify_hs256_jwt"](bad_tok, b"top-secret", now=100), {"ok": False, "error": "malformed_token"}, bad_tok)
 
         a8_lesson = data["lessons"]["auto_08"]
@@ -746,6 +756,27 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(ns_a8["parse_rpc_reply"](nc_reply, "101"), {"ok": True, "msg_id": "101"})
         with self.assertRaises(ValueError):
             mock_nc.edit_config(target="candidate", config=rpc_xml)
+
+        # Wrong root tag / missing NETCONF NS MUST fail!
+        for bad_root_xml in (
+            '<wrong message-id="101"><ok/></wrong>',
+            '<wrong message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><ok/></wrong>',
+            '<rpc-reply message-id="101"><ok/></rpc-reply>',
+        ):
+            r_bad_root = ns_a8["parse_rpc_reply"](bad_root_xml, "101")
+            self.assertEqual(r_bad_root["ok"], False, bad_root_xml)
+            self.assertEqual(r_bad_root["error_tag"], "unexpected-root", bad_root_xml)
+
+        # Contradictory reply containing BOTH <ok/> and <rpc-error> MUST fail!
+        ambig_xml = '<rpc-reply message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><ok/><rpc-error><error-tag>in-use</error-tag></rpc-error></rpc-reply>'
+        r_ambig = ns_a8["parse_rpc_reply"](ambig_xml, "101")
+        self.assertEqual(r_ambig["ok"], False)
+        self.assertEqual(r_ambig["error_tag"], "ambiguous-reply")
+
+        # Empty reply with neither <ok/> nor <rpc-error> MUST fail!
+        r_empty = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"></rpc-reply>', "101")
+        self.assertEqual(r_empty["ok"], False)
+        self.assertEqual(r_empty["error_tag"], "missing-ok-or-error")
 
         # Mismatched message-id MUST fail!
         mismatch_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="999" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><ok/></rpc-reply>', "101")
