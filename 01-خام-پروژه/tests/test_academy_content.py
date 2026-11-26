@@ -143,35 +143,41 @@ class AcademyRedesignTests(unittest.TestCase):
                 ans_dist[q["ans"]] += 1
         self.assertTrue(all(6 <= v <= 10 for v in ans_dist.values()), ans_dist)
 
-        # 2b. Checks for f4 Batch 1..4 (first 20 lessons in f4) + Round-6..11 regressions
-        f4_b1_b2_b3_b4 = data["curriculumGroups"][4]["lessons"][:20]
+        # 2b. Checks for f4 Batch 1..5 (first 25 lessons in f4) + Round-6..14 regressions
+        f4_b1_to_b5 = data["curriculumGroups"][4]["lessons"][:25]
         self.assertEqual(
-            f4_b1_b2_b3_b4,
+            f4_b1_to_b5,
             [
                 "spec_ent", "spec_ent_campus", "spec_ent_sd", "spec_sec", "spec_sec_vpn",
                 "spec_sec_ise", "spec_dc_nx", "s11", "spec_dc_aci", "spec_dc_stor",
                 "spec_sp", "spec_sp_xr", "spec_sp_sr", "spec_wl", "spec_wl_survey",
                 "spec_collab", "spec_collab_gw", "auto_01", "auto_02", "auto_03",
+                "auto_04", "auto_05", "auto_06", "auto_07", "auto_08",
             ],
         )
-        for lid in f4_b1_b2_b3_b4:
+        for lid in f4_b1_to_b5:
             lesson = data["lessons"][lid]
             self.assertEqual(len(lesson.get("exercises", [])), 3, lid)
             self.assertEqual(len(lesson.get("quiz", [])), 3, lid)
             self.assertEqual(len(lesson["lab"]["steps"]), 5, lid)
             s = json.dumps(lesson, ensure_ascii=False)
-            for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "قانون طلایی", "۹۰٪", "۹۹٪", "۱۰۰٪", "۸۰٪", "جادویی"):
+            for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "قانون طلایی", "طلایی", "۹۰٪", "۹۹٪", "۱۰۰٪", "۸۰٪", "جادویی"):
                 self.assertNotIn(bad, s, f"{lid} contains {bad}")
         b3_dist = {0: 0, 1: 0, 2: 0, 3: 0}
-        for lid in f4_b1_b2_b3_b4[10:15]:
+        for lid in f4_b1_to_b5[10:15]:
             for q in data["lessons"][lid]["quiz"]:
                 b3_dist[q["ans"]] += 1
         self.assertEqual(b3_dist, {0: 4, 1: 4, 2: 4, 3: 3})
         b4_dist = {0: 0, 1: 0, 2: 0, 3: 0}
-        for lid in f4_b1_b2_b3_b4[15:20]:
+        for lid in f4_b1_to_b5[15:20]:
             for q in data["lessons"][lid]["quiz"]:
                 b4_dist[q["ans"]] += 1
         self.assertEqual(b4_dist, {0: 4, 1: 4, 2: 4, 3: 3})
+        b5_dist = {0: 0, 1: 0, 2: 0, 3: 0}
+        for lid in f4_b1_to_b5[20:25]:
+            for q in data["lessons"][lid]["quiz"]:
+                b5_dist[q["ans"]] += 1
+        self.assertEqual(b5_dist, {0: 4, 1: 4, 2: 4, 3: 3})
 
         # Round-6 & Round-7 regression assertions
         ent_step = data["lessons"]["spec_ent"]["sections"][1]["steps"][0]
@@ -481,6 +487,12 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(apply_ntp_safely(make_factory(c_save_exc), {"host": "10.255.0.1"}, "10.255.0.1"), "save_failed")
         self.assertEqual(c_save_exc.saved, 1)
 
+        # Empty / whitespace save_config() output MUST return "save_failed"
+        for empty_save in ("", "   \n\t "):
+            c_save_empty = MockConn("R1(config)#ntp server 10.255.0.1\nR1(config)#end", "ntp server 10.255.0.1", save_out=empty_save)
+            self.assertEqual(apply_ntp_safely(make_factory(c_save_empty), {"host": "10.255.0.1"}, "10.255.0.1"), "save_failed")
+            self.assertEqual(c_save_empty.saved, 1)
+
         # Invalid IP rejected before connection factory is called
         c_unused = MockConn("", "")
         before_calls = len(seen_kwargs)
@@ -489,13 +501,131 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(len(seen_kwargs), before_calls)
 
         c_ok = MockConn("R1(config)#ntp server 10.255.0.100\nR1(config)#end", "ntp server 10.255.0.100 prefer")
-        self.assertEqual(apply_ntp_safely(make_factory(c_ok), {"host": "10.255.0.1"}, "10.255.0.100"), "saved")
+        self.assertEqual(apply_ntp_safely(make_factory(c_ok), {"host": "10.255.0.1"}, "10.255.0.100"), "save_no_error_seen")
         self.assertEqual(c_ok.saved, 1)
         self.assertEqual(c_ok.post_checked, 1)
         self.assertTrue(all(kw.get("ssh_strict") is True and kw.get("system_host_keys") is True for kw in seen_kwargs))
         self.assertIn("Rollback", a3_s)
         self.assertIn("تغییرات ذخیره‌نشدهٔ", a3_s)
         self.assertIn("اثبات همگام‌شدن عملیاتی NTP نیست", a3_s)
+        self.assertIn("save_no_error_seen", a3_s)
+        self.assertEqual(a3_lesson["bridge"]["nextTitle"], data["lessons"]["auto_04"]["title"])
+
+        # Round-14 Batch-5 checks (auto_04 .. auto_08 technical content & runnable bash/Python code)
+        a4_lesson = data["lessons"]["auto_04"]
+        a4_s = json.dumps(a4_lesson, ensure_ascii=False)
+        self.assertIn("git switch -c", a4_s)
+        self.assertIn("git add -p", a4_s)
+        self.assertIn("git revert", a4_s)
+        self.assertIn(".gitignore", a4_s)
+        self.assertEqual(a4_lesson["bridge"]["nextId"], "auto_05")
+        m_a4_sh = re.search(r"```bash\n([\s\S]+?)\n```", a4_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a4_sh, "auto_04 runnable bash block missing")
+        if shutil.which("bash") and shutil.which("git"):
+            with tempfile.TemporaryDirectory() as tmpd:
+                git_res = subprocess.run(["bash", "-e", "-c", m_a4_sh.group(1)], cwd=tmpd, capture_output=True, text=True, check=False)
+                self.assertEqual(git_res.returncode, 0, git_res.stderr + git_res.stdout)
+                ls_res = subprocess.run(["git", "ls-files"], cwd=tmpd, capture_output=True, text=True, check=True)
+                self.assertNotIn(".env", ls_res.stdout.splitlines())
+                self.assertIn(".gitignore", ls_res.stdout.splitlines())
+                self.assertIn("inventory.yaml", ls_res.stdout.splitlines())
+                inv_txt = (Path(tmpd) / "inventory.yaml").read_text(encoding="utf-8")
+                self.assertIn("R1", inv_txt)
+                self.assertIn("R2", inv_txt)
+
+        a5_lesson = data["lessons"]["auto_05"]
+        a5_s = json.dumps(a5_lesson, ensure_ascii=False)
+        self.assertIn("yaml.safe_load", a5_s)
+        self.assertIn("defusedxml", a5_s)
+        self.assertIn("YAML 1.1", a5_s)
+        self.assertEqual(a5_lesson["bridge"]["nextId"], "auto_06")
+        m_a5_py = re.search(r"```python\n([\s\S]+?)\n```", a5_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a5_py, "auto_05 runnable python block missing")
+        ns_a5: dict = {}
+        exec(compile(m_a5_py.group(1), "data_formats_lab.py", "exec"), ns_a5)
+        self.assertEqual(
+            ns_a5["inspect_payloads"](),
+            {"device": "R1-CORE", "active_vlans": [10, 105], "xml_interfaces": ["GigabitEthernet0/7"]},
+        )
+
+        a6_lesson = data["lessons"]["auto_06"]
+        a6_s = json.dumps(a6_lesson, ensure_ascii=False)
+        self.assertIn("RFC 5789", a6_s)
+        self.assertIn("406 Not Acceptable", a6_s)
+        self.assertIn("429 Too Many Requests", a6_s)
+        self.assertIn("Retry-After", a6_s)
+        self.assertEqual(a6_lesson["bridge"]["nextId"], "auto_07")
+        m_a6_py = re.search(r"```python\n([\s\S]+?)\n```", a6_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a6_py, "auto_06 runnable python block missing")
+        ns_a6: dict = {}
+        exec(compile(m_a6_py.group(1), "rest_client_safe.py", "exec"), ns_a6)
+        import io
+        import urllib.error
+
+        class FakeResp:
+            def __init__(self, status: int, body: bytes) -> None:
+                self.status = status
+                self._body = body
+            def read(self) -> bytes:
+                return self._body
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+
+        self.assertEqual(
+            ns_a6["fetch_vlans_safely"](lambda req, timeout: FakeResp(200, b'{"vlans":[106]}'), "https://10.255.0.1/vlans", "tok"),
+            {"ok": True, "status": 200, "data": {"vlans": [106]}},
+        )
+        for code, reason in [(401, "auth_failed"), (403, "forbidden"), (429, "rate_limited:12")]:
+            def _err_opener(req, timeout, _code=code):
+                raise urllib.error.HTTPError(req.full_url, _code, "err", {"Retry-After": "12"}, io.BytesIO(b""))
+            self.assertEqual(
+                ns_a6["fetch_vlans_safely"](_err_opener, "https://10.255.0.1/vlans", "tok"),
+                {"ok": False, "status": code, "reason": reason},
+            )
+
+        a7_lesson = data["lessons"]["auto_07"]
+        a7_s = json.dumps(a7_lesson, ensure_ascii=False)
+        self.assertIn("HTTP/3", a7_s)
+        self.assertIn("QUIC", a7_s)
+        self.assertIn("TLS 1.3", a7_s)
+        self.assertIn("0-RTT", a7_s)
+        self.assertIn("SAN", a7_s)
+        self.assertIn("mTLS", a7_s)
+        self.assertIn("OAuth 2.0", a7_s)
+        self.assertEqual(a7_lesson["bridge"]["nextId"], "auto_08")
+        m_a7_py = re.search(r"```python\n([\s\S]+?)\n```", a7_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a7_py, "auto_07 runnable python block missing")
+        ns_a7: dict = {}
+        exec(compile(m_a7_py.group(1), "jwt_verify_lab.py", "exec"), ns_a7)
+        tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "role": "viewer"}, b"top-secret")
+        self.assertEqual(ns_a7["verify_hs256_jwt"](tok, b"top-secret"), {"sub": "netops", "role": "viewer"})
+        hdr_b64, pld_b64, sig_b64 = tok.split(".")
+        tampered_pld = ns_a7["_b64u_enc"](b'{"sub":"netops","role":"admin"}')
+        self.assertIsNone(ns_a7["verify_hs256_jwt"](f"{hdr_b64}.{tampered_pld}.{sig_b64}", b"top-secret"))
+        none_hdr = ns_a7["_b64u_enc"](b'{"alg":"none","typ":"JWT"}')
+        self.assertIsNone(ns_a7["verify_hs256_jwt"](f"{none_hdr}.{tampered_pld}.", b"top-secret"))
+
+        a8_lesson = data["lessons"]["auto_08"]
+        a8_s = json.dumps(a8_lesson, ensure_ascii=False)
+        self.assertIn("RFC 6241", a8_s)
+        self.assertIn("830", a8_s)
+        self.assertIn("Chunked Framing", a8_s)
+        self.assertIn("confirmed-commit", a8_s)
+        self.assertIn("hostkey_verify=True", a8_s)
+        self.assertEqual(a8_lesson["bridge"]["nextId"], "auto_09")
+        m_a8_py = re.search(r"```python\n([\s\S]+?)\n```", a8_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a8_py, "auto_08 runnable python block missing")
+        ns_a8: dict = {}
+        exec(compile(m_a8_py.group(1), "netconf_rpc_lab.py", "exec"), ns_a8)
+        rpc_xml = ns_a8["build_edit_config_rpc"]("101", "candidate", "Gi0/7", "NETCONF-CLIENT")
+        self.assertIn('xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"', rpc_xml)
+        self.assertIn("<candidate/>", rpc_xml)
+        ok_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><ok/></rpc-reply>')
+        self.assertEqual(ok_res, {"ok": True, "msg_id": "101"})
+        err_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><rpc-error><error-tag>lock-denied</error-tag><error-message>Locked by 9</error-message></rpc-error></rpc-reply>')
+        self.assertEqual(err_res, {"ok": False, "error_tag": "lock-denied", "error_message": "Locked by 9"})
 
         gw_s = json.dumps(gw_lesson, ensure_ascii=False)
         self.assertIn("قطعه‌پیکربندی مرجع مفهومی", gw_lesson["lab"]["steps"][4])
@@ -537,9 +667,9 @@ class AcademyRedesignTests(unittest.TestCase):
                 self.fail(msg)
             self.skipTest(msg)
 
-        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1..4 lesson
+        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1..5 lesson
         extracted_labs = {}
-        for lid in f4_b1_b2_b3_b4:
+        for lid in f4_b1_to_b5:
             step_txt = data["lessons"][lid]["lab"]["steps"][2]
             start_idx = step_txt.index("`configure terminal`")
             cmds = re.findall(r"`([^`]+)`", step_txt[start_idx:])
@@ -764,11 +894,36 @@ assertRunLab('auto_03', (sim) => {{
   const gi7 = sim.interfaces['GigabitEthernet0/7'];
   if (!gi7.nonegotiate || gi7.accessVlan !== 99 || gi7.desc !== 'NORNIR-RUNNER') throw new Error('auto_03 Gi0/7');
 }});
+assertRunLab('auto_04', (sim) => {{
+  if (!sim.vlans[104] || sim.vlans[104].name !== 'GIT_REPO') throw new Error('auto_04 VLAN 104');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 104 || gi7.desc !== 'GITOPS-RUNNER') throw new Error('auto_04 Gi0/7');
+}});
+assertRunLab('auto_05', (sim) => {{
+  if (!sim.vlans[105] || sim.vlans[105].name !== 'DATA_MODELS') throw new Error('auto_05 VLAN 105');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 105 || gi7.desc !== 'SCHEMA-LAB') throw new Error('auto_05 Gi0/7');
+}});
+assertRunLab('auto_06', (sim) => {{
+  if (!sim.vlans[106] || sim.vlans[106].name !== 'API_MGMT') throw new Error('auto_06 VLAN 106');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 106 || gi7.desc !== 'API-CLIENT') throw new Error('auto_06 Gi0/7');
+}});
+assertRunLab('auto_07', (sim) => {{
+  if (!sim.vlans[107] || sim.vlans[107].name !== 'TLS_PKI') throw new Error('auto_07 VLAN 107');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 107 || gi7.desc !== 'PKI-GATEWAY') throw new Error('auto_07 Gi0/7');
+}});
+assertRunLab('auto_08', (sim) => {{
+  if (!sim.vlans[108] || sim.vlans[108].name !== 'NETCONF_830') throw new Error('auto_08 VLAN 108');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 108 || gi7.desc !== 'NETCONF-CLIENT') throw new Error('auto_08 Gi0/7');
+}});
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
         self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
 
-        # 4. Safe fenced-code DOM renderer & CSS verification (preserving newlines, indentation, LTR, anti-XSS)
+        # 4. Safe fenced-code DOM renderer, copy-button click/fallback behavior & CSS verification
         styles_css = (ASSET_ROOT / "styles.css").read_text(encoding="utf-8")
         self.assertIn(".code-block{", styles_css)
         self.assertIn("white-space:pre", styles_css)
@@ -811,21 +966,55 @@ const fakeDocument = {{
   createElement(tag) {{ return makeNode(tag); }},
   createTextNode(txt) {{ return {{ nodeType: 3, textContent: String(txt) }}; }}
 }};
+
+let clipboardMode = 'ok';
+let copiedTexts = [];
+let selectedNodes = [];
+let scheduledTimers = [];
+
 const ctx = {{
   document: fakeDocument,
-  glossRegex: /\\b(Python|Netmiko|Nornir|SSH)\\b/g,
+  window: {{
+    getSelection() {{
+      return {{
+        removeAllRanges() {{}},
+        addRange(r) {{ selectedNodes.push(r.node); }}
+      }};
+    }}
+  }},
+  glossRegex: /\\b(Python|Netmiko|Nornir|SSH|REST|JSON|YAML|XML|JWT|NETCONF)\\b/g,
   glossMap: new Map([
     ['python', {{ term: 'Python' }}],
     ['netmiko', {{ term: 'Netmiko' }}],
     ['nornir', {{ term: 'Nornir' }}],
-    ['ssh', {{ term: 'SSH' }}]
+    ['ssh', {{ term: 'SSH' }}],
+    ['rest', {{ term: 'REST' }}],
+    ['json', {{ term: 'JSON' }}],
+    ['yaml', {{ term: 'YAML' }}],
+    ['xml', {{ term: 'XML' }}],
+    ['jwt', {{ term: 'JWT' }}],
+    ['netconf', {{ term: 'NETCONF' }}]
   ]),
   showGlossaryPopover() {{}},
   hideGlossaryPopover() {{}},
   glossHideTimer: null,
-  setTimeout,
-  navigator: {{ clipboard: {{ writeText: async () => {{}} }} }}
+  setTimeout(fn, ms) {{ scheduledTimers.push({{ fn, ms }}); return scheduledTimers.length; }},
+  navigator: {{
+    clipboard: {{
+      writeText(txt) {{
+        if (clipboardMode === 'ok') {{
+          copiedTexts.push(txt);
+          return Promise.resolve();
+        }}
+        return Promise.reject(new Error('NotAllowedError'));
+      }}
+    }}
+  }}
 }};
+fakeDocument.createRange = () => ({{
+  node: null,
+  selectNodeContents(el) {{ this.node = el; }}
+}});
 vm.runInNewContext(elCode + '\\n' + richCode, ctx);
 
 function findNodes(node, pred, acc = []) {{
@@ -834,21 +1023,24 @@ function findNodes(node, pred, acc = []) {{
   return acc;
 }}
 
-const li2 = makeNode('li');
-ctx.appendRichText(li2, ACADEMY.lessons.auto_02.lab.steps[4], 'auto_02');
-const codes2 = findNodes(li2, n => n.tagName === 'CODE');
-const pres2 = findNodes(li2, n => n.tagName === 'PRE');
-if (codes2.length !== 1 || pres2.length !== 1) throw new Error('auto_02 expected 1 pre/code block');
-if (pres2[0].attrs.dir !== 'ltr' || pres2[0].className !== 'code-block') throw new Error('auto_02 pre attrs/class');
-if (findNodes(codes2[0], n => n.tagName === 'BUTTON').length !== 0) throw new Error('glossary injected inside code');
-
-const li3 = makeNode('li');
-ctx.appendRichText(li3, ACADEMY.lessons.auto_03.lab.steps[4], 'auto_03');
-const codes3 = findNodes(li3, n => n.tagName === 'CODE');
-const pres3 = findNodes(li3, n => n.tagName === 'PRE');
-if (codes3.length !== 1 || pres3.length !== 1) throw new Error('auto_03 expected 1 pre/code block');
-if (pres3[0].attrs.dir !== 'ltr' || pres3[0].className !== 'code-block') throw new Error('auto_03 pre attrs/class');
-if (findNodes(codes3[0], n => n.tagName === 'BUTTON').length !== 0) throw new Error('glossary injected inside code');
+const rendered = {{}};
+for (const lid of ['auto_02', 'auto_03', 'auto_04', 'auto_05', 'auto_06', 'auto_07', 'auto_08']) {{
+  const li = makeNode('li');
+  ctx.appendRichText(li, ACADEMY.lessons[lid].lab.steps[4], lid);
+  const codes = findNodes(li, n => n.tagName === 'CODE');
+  const pres = findNodes(li, n => n.tagName === 'PRE');
+  const copyBtns = findNodes(li, n => n.tagName === 'BUTTON' && n.className === 'code-copy-btn');
+  if (codes.length !== 1 || pres.length !== 1 || copyBtns.length !== 1) {{
+    throw new Error(lid + ' expected 1 pre/code/copyBtn');
+  }}
+  if (pres[0].attrs.dir !== 'ltr' || pres[0].className !== 'code-block') throw new Error(lid + ' pre attrs/class');
+  if (findNodes(codes[0], n => n.tagName === 'BUTTON').length !== 0) throw new Error(lid + ' glossary injected inside code');
+  rendered[lid] = codes[0].textContent;
+  if (lid === 'auto_03') {{
+    ctx._testCopyBtn = copyBtns[0];
+    ctx._testCodeEl = codes[0];
+  }}
+}}
 
 // Anti-XSS check: raw <script>/<img> inside text or fenced code never creates SCRIPT/IMG elements
 const liXss = makeNode('li');
@@ -857,10 +1049,48 @@ if (findNodes(liXss, n => n.tagName === 'SCRIPT' || n.tagName === 'IMG').length 
   throw new Error('XSS element created!');
 }}
 
-console.log(JSON.stringify({{
-  auto02_rendered_code: codes2[0].textContent,
-  auto03_rendered_code: codes3[0].textContent
-}}));
+(async () => {{
+  // 1) Successful clipboard write
+  clipboardMode = 'ok';
+  copiedTexts = [];
+  ctx._testCopyBtn.listeners.click();
+  await Promise.resolve();
+  await Promise.resolve();
+  if (copiedTexts[0] !== rendered['auto_03']) throw new Error('copyBtn did not copy exact codeText');
+  if (ctx._testCopyBtn.textContent !== 'کپی شد ✓') throw new Error('copyBtn success label mismatch: ' + ctx._testCopyBtn.textContent);
+  scheduledTimers.pop().fn();
+  if (ctx._testCopyBtn.textContent !== 'کپی کد') throw new Error('copyBtn did not reset label');
+
+  // 2) Rejected clipboard write -> selection fallback
+  clipboardMode = 'reject';
+  selectedNodes = [];
+  ctx._testCopyBtn.listeners.click();
+  await Promise.resolve();
+  await Promise.resolve();
+  if (selectedNodes[0] !== ctx._testCodeEl) throw new Error('fallback did not select code element');
+  if (ctx._testCopyBtn.textContent !== 'انتخاب شد (Ctrl+C)') throw new Error('copyBtn selection fallback label mismatch: ' + ctx._testCopyBtn.textContent);
+  scheduledTimers.pop().fn();
+
+  // 3) Missing navigator.clipboard and missing getSelection -> explicit failure label
+  const ctxNoClip = {{
+    document: fakeDocument,
+    window: {{}},
+    glossRegex: null,
+    glossMap: new Map(),
+    setTimeout(fn, ms) {{ scheduledTimers.push({{ fn, ms }}); }},
+    navigator: undefined
+  }};
+  vm.runInNewContext(elCode + '\\n' + richCode, ctxNoClip);
+  const liNoClip = makeNode('li');
+  ctxNoClip.appendRichText(liNoClip, '```python\\nx = 1\\n```', 'auto_02');
+  const btnNoClip = findNodes(liNoClip, n => n.tagName === 'BUTTON' && n.className === 'code-copy-btn')[0];
+  btnNoClip.listeners.click();
+  if (btnNoClip.textContent !== 'کپی ناموفق (دستی انتخاب کنید)') {{
+    throw new Error('missing clipboard+selection label mismatch: ' + btnNoClip.textContent);
+  }}
+
+  console.log(JSON.stringify(rendered));
+}})().catch(err => {{ console.error(err); process.exit(1); }});
 """
         dom_res = subprocess.run([node_bin, "-e", dom_test_js], capture_output=True, text=True, check=False)
         self.assertEqual(dom_res.returncode, 0, dom_res.stderr + dom_res.stdout)
@@ -869,16 +1099,24 @@ console.log(JSON.stringify({{
         # Verify the exact text rendered inside DOM <pre><code> preserves indentation and executes cleanly in Python
         with tempfile.TemporaryDirectory() as tmpd:
             p2 = Path(tmpd) / "rendered_vlan_audit.py"
-            p2.write_text(rendered_payload["auto02_rendered_code"], encoding="utf-8")
+            p2.write_text(rendered_payload["auto_02"], encoding="utf-8")
             env = dict(os.environ, NETOPS_TOKEN="demo")
             r2 = subprocess.run([sys.executable, str(p2)], cwd=tmpd, env=env, capture_output=True, text=True, check=False)
             self.assertEqual(r2.returncode, 0, r2.stderr + r2.stdout)
             self.assertIn("MISSING: [99]", r2.stdout)
 
         ns_dom_a3: dict = {}
-        exec(compile(rendered_payload["auto03_rendered_code"], "rendered_safe_apply.py", "exec"), ns_dom_a3)
+        exec(compile(rendered_payload["auto_03"], "rendered_safe_apply.py", "exec"), ns_dom_a3)
         c_dom_ok = MockConn("R1(config)#ntp server 10.255.0.1\nR1(config)#end", "ntp server 10.255.0.1")
-        self.assertEqual(ns_dom_a3["apply_ntp_safely"](make_factory(c_dom_ok), {"host": "10.255.0.1"}, "10.255.0.1"), "saved")
+        self.assertEqual(ns_dom_a3["apply_ntp_safely"](make_factory(c_dom_ok), {"host": "10.255.0.1"}, "10.255.0.1"), "save_no_error_seen")
+
+        if shutil.which("bash") and shutil.which("git"):
+            with tempfile.TemporaryDirectory() as tmpd:
+                sh_res = subprocess.run(["bash", "-e", "-c", rendered_payload["auto_04"]], cwd=tmpd, capture_output=True, text=True, check=False)
+                self.assertEqual(sh_res.returncode, 0, sh_res.stderr + sh_res.stdout)
+
+        for lid in ("auto_05", "auto_06", "auto_07", "auto_08"):
+            compile(rendered_payload[lid], f"rendered_{lid}.py", "exec")
 
 
 if __name__ == "__main__":

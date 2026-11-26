@@ -819,20 +819,37 @@
       head.appendChild(el('span', 'code-lang', lang));
       const copyBtn = el('button', 'code-copy-btn', 'کپی کد');
       copyBtn.type = 'button';
+      const pre = el('pre', 'code-block');
+      pre.setAttribute('dir', 'ltr');
+      const codeEl = el('code', '', codeText);
+      pre.appendChild(codeEl);
+      const notifyCopyFallback = () => {
+        let selected = false;
+        try {
+          if (typeof window !== 'undefined' && window.getSelection && document.createRange) {
+            const range = document.createRange();
+            range.selectNodeContents(codeEl);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            selected = true;
+          }
+        } catch (_) {}
+        copyBtn.textContent = selected ? 'انتخاب شد (Ctrl+C)' : 'کپی ناموفق (دستی انتخاب کنید)';
+        setTimeout(() => { copyBtn.textContent = 'کپی کد'; }, 2000);
+      };
       copyBtn.addEventListener('click', () => {
         if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(codeText).then(() => {
             copyBtn.textContent = 'کپی شد ✓';
             setTimeout(() => { copyBtn.textContent = 'کپی کد'; }, 1400);
-          }).catch(() => {});
+          }).catch(notifyCopyFallback);
+        } else {
+          notifyCopyFallback();
         }
       });
       head.appendChild(copyBtn);
       wrap.appendChild(head);
-      const pre = el('pre', 'code-block');
-      pre.setAttribute('dir', 'ltr');
-      const codeEl = el('code', '', codeText);
-      pre.appendChild(codeEl);
       wrap.appendChild(pre);
       parent.appendChild(wrap);
       last = m.index + m[0].length;
