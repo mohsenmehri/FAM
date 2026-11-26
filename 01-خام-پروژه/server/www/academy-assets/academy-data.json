@@ -17072,7 +17072,7 @@
      "h": "۱. معماری `RESTCONF` (`RFC 8040`) و مسیر `{+restconf}/data`",
      "p": [
       "`RESTCONF` یک رابط **`HTTP`** (معمولاً `HTTPS` روی پورت `443`) برای دسترسی به داده‌های مدل‌شده با `YANG` تعریف می‌کند. به جای اینکه مسیرهای `/config` و `/operational` به‌صورت hard-coded تعریف شوند، `RFC 8040` یک **مسیر base `{+restconf}/data`** تعریف می‌کند و با **پارامتر query `content`** تفکیک می‌کند: `content=config` برای داده‌های پیکربندی (معادل داده‌های `<get-config>`) و `content=nonconfig` برای داده‌های عملیاتی (معادل داده‌های غیرپیکربندی که `<get>` برمی‌گرداند).",
-      "به این ترتیب، URIها به‌صورت زیر شکل می‌گیرند: `GET /restconf/data/ietf-interfaces:interfaces?content=config` برای خواندن پیکربندی، و `GET /restconf/data/ietf-interfaces:interfaces?content=nonconfig` برای خواندن داده‌های عملیاتی؛ state هر اینترفیس (مثلاً `oper-status`) در `ietf-interfaces:interfaces/interface=Gi0/7/state` است. در RFC 8343 داده‌های عامل (state) زیر `interfaces/interface/state` زندگی می‌کنند — نه زیر `interfaces-state` و نه مستقیماً زیر `interfaces/state`. این طراحی باعث می‌شود که clientها نیازی به hard-coding مسیرهای جداگانه نداشته باشند و سرور بتواند بر اساس capabilityهای خود پاسخ دهد."
+      "به این ترتیب، URIها به‌صورت زیر شکل می‌گیرند: `GET /restconf/data/ietf-interfaces:interfaces?content=config` برای خواندن پیکربندی، و `GET /restconf/data/ietf-interfaces:interfaces?content=nonconfig` برای خواندن داده‌های عملیاتی. در RFC 8343 داده‌های پیکربندی و state (مانند `oper-status`) هر دو زیر `ietf-interfaces:interfaces/interface[name]` زندگی می‌کنند — مثلاً state اینترفیس Gi0/7 در مسیر `/restconf/data/ietf-interfaces:interfaces/interface=Gi0%2F7/oper-status` است (کلید اینترفیس percent-encode می‌شود). در RFC 8343 زیردرستی جداگانه‌ای به نام `interfaces-state` وجود ندارد ((بقیه legacy RFC 7223) و containerی به نام `state` هم مستقیماً زیر `interface` تعریف نشده است.این طراحی باعث می‌شود که clientها نیازی به hard-coding مسیرهای جداگانه نداشته باشند و سرور بتواند بر اساس capabilityهای خود پاسخ دهد."
      ],
      "bullets": [
       "base URI: `{+restconf}/data`",
@@ -17624,7 +17624,7 @@
     {
      "h": "۴. عیب‌یابی: idempotency، connection errors و handlers",
      "p": [
-      "مسئله‌ی متداول عدم تحقق idempotency است: playbook running second time تغییرات را دوباره اعمال می‌کند. ریشه می‌تواند در عدم تطابق دقیق state desired با state موجود باشد (مثلاً استفاده از `lines` نامطابق با `parents`). پس از هر run، `--check --diff` را برای بررسی تغییرات مقرر استفاده کنید.",
+      "مسئله‌ی متداول عدم تحقق idempotency است: playbook running second time تغییرات را دوباره اعمال می‌کند. ریشه می‌تواند در عدم تطابق دقیق state desired با state موجود باشد (مثلاً استفاده از `lines` نامطابق با `parents`). `--check --diff` تغییرات پیش‌بینی‌شده را گزارش می‌کند (اگر ماژول check mode را پشتیبانی کند؛ `--diff` نیز وابسته به پشتیبانی ماژول است) و لزوماً اجرا بدون تغییر را تضمین نمی‌کند — برای تأیید Idempotency وضعیت را قبل و بعد از run با `--diff` یا `show running-config` بررسی کنید.",
       "خطاهای connection (SSH failures) و task failures را در حین اجرا با `ansible-playbook --verbose` بررسی کنید؛ utilizing `blocks`/`rescue` امکان مدیریت خطاهای task را فراهم می‌کند. برای بررسی اتصال و تحقق target hosts، `ansible-playbook --list-hosts` را اجرا کنید تا ببینید playbook هدف چه hosts را پیدا می‌کند."
      ],
      "bullets": [
@@ -18016,7 +18016,7 @@
     },
     {
      "q": "`-refresh-only` منابع را به وضعیت مطلوب برمی‌گرداند؟",
-     "a": "خیر؛ `-refresh-only` state را با وضعیت مشاهده‌شده‌ی منابع sync می‌کند، اما منابع واقعی را تغییر نمی‌دهد. برای بازگردانی منابع باید پس از بررسی، plan معمولی و روند تغییر کنترل‌شده استفاده شود."
+     "a": "خیر؛ `-refresh-only` state را با وضعیت مشاهده‌شده‌ی منابع sync می‌کند، اما منابع واقعی را تغییر نمی‌دهد. `terraform plan -refresh-only` فقط propose-state را بر حسب وضعیت مشاهده‌شده می‌سازد (بدون تغییر state)، و `terraform apply -refresh-only` آن را در state ثبت می‌کند؛ هر دو منبع واقعی را تغییر نمی‌دهند. برای بازگردانی منابع به وضعیت مطلوب باید پس از بررسی، plan معمولی و روند تغییر کنترل‌شده استفاده شود."
     }
    ],
    "misconceptions": [
@@ -18057,7 +18057,7 @@
       "هیچ‌کدام"
      ],
      "ans": 0,
-     "exp": "`-refresh-only` state را با وضعیت مشاهده‌شده sync می‌کند، اما منابع واقعی را تغییر نمی‌دهد؛ برای بازگردانی منابع باید plan معمولی و روند تغییر کنترل‌شده استفاده شود."
+     "exp": "`-refresh-only` state را با وضعیت مشاهده‌شده sync می‌کند، اما منابع واقعی را تغییر نمی‌دهد؛ `terraform plan -refresh-only` فقط propose-state را بر حسب وضعیت مشاهده‌شده می‌سازد (بدون تغییر state)، و `terraform apply -refresh-only` آن را در state ثبت می‌کند؛ هر دو منبع واقعی را تغییر نمی‌دهند. برای بازگردانی منابع به وضعیت مطلوب باید plan معمولی و روند تغییر کنترل‌شده استفاده شود."
     },
     {
      "q": "برای برطرف state drift در `Terraform`، فرآیند صحیح چیست؟",
@@ -18115,14 +18115,14 @@
     {
      "h": "۳. transaction، rollback و NSO در برابر tools config management",
      "p": [
-      "`Ansible`/`Terraform` tools config management هستند که تغیرات روی equipmentها یا state lifecycle زیرساخت را مدیریت می‌کنند؛ اما `NSO` یک orchestrator است که services را end-to-end provisioning می‌کند. در NSO، provisioning service می‌تواند **تراکنش (transaction)** باشد: تغییرات روی equipmentهای مختلف به‌صورت مرحله‌ای اعمال می‌شوند و در صورت شکست، **تغییرتغییرات ناقص می‌تواند به‌صورت خودکار rollback شود**. مستندات Cisco از rollback خودکار تغییرتغییرات ناقص صحبت می‌کنند، اما **رفتار دقیق در سناریوهای مرحله‌ای و commit queue به تنظیمات و شرایط وابسته است**.",
+      "`Ansible`/`Terraform` tools config management هستند که تغیرات روی equipmentها یا state lifecycle زیرساخت را مدیریت می‌کنند؛ اما `NSO` یک orchestrator است که services را end-to-end provisioning می‌کند. در NSO، provisioning service می‌تواند **تراکنش (transaction)** باشد: تغییرات روی equipmentهای مختلف به‌صورت مرحله‌ای اعمال می‌شوند و در صورت شکست، **تغییرات ناقص می‌تواند به‌صورت خودکار rollback شود**. مستندات Cisco از rollback خودکار تغییرات ناقص صحبت می‌کنند، اما **رفتار دقیق در سناریوهای مرحله‌ای و commit queue به تنظیمات و شرایط وابسته است**.",
       "در یک شبکه پیچیده با servicesمتعددة و equipmentهای heterogeneous، orchestrator متمرکزی مانند NSO services را به‌صورت یکپارچه provisioning می‌کند، در حالی که config management tools معمولاً equipmentها را به‌صورت مجزاتنظیم می‌کنند."
      ],
      "bullets": [
       "config management (`Ansible`/`Terraform`) ←تنظیم equipment یا state lifecycle",
       "orchestrator (`NSO`) ← provisioning end-to-end services",
       "transaction ← تغییرات مرحله‌ای روی equipmentهای مختلف",
-      "rollback ← تغییرتغییرات ناقص می‌تواند خودکار rollback شود (رفتار به تنظیمات و conditions وابسته است)"
+      "rollback ← تغییرات ناقص می‌تواند خودکار rollback شود (رفتار به تنظیمات و conditions وابسته است)"
      ],
      "think": "تفاوت orchestration با config management: config management equipmentها راتنظیم می‌کند؛ orchestration services را از تعریف تا deployment با هماهنگی multi-device و transaction/rollback مدیریت می‌کند. رفتار rollback دقیق در سناریوها و commit queue به تنظیمات وابسته است."
     },
@@ -18137,7 +18137,7 @@
       "عدم تطابق service model با equipment",
       "policy violation",
       "خطای واحد ← می‌تواند provisioning service را ناتمام بگذارد",
-      "transaction/rollback ← برطرف تغییرتغییرات ناقص"
+      "transaction/rollback ← برطرف تغییرات ناقص"
      ],
      "think": "چرا خطای واحد در provisioning service مهم است؟ چون service lifecycle مراحل متوالی روی equipmentهای مختلف دارد؛ خطای یک مرحله می‌تواند کل service را ناتمام بگذارد و نیازمند transaction/rollback (به‌صورت خودکار یا با تنظیمات) است."
     }
@@ -18145,7 +18145,7 @@
    "protocolAnalysis": [
     "**تحلیل northbound interface:** northbound interface NSO با apps/northbound systems کار می‌کند و service requests را می‌پذیرد؛ این رابط معمولاً REST/API است و service requests را به southbound منتقل می‌کند.",
     "**تحلیل southbound interface و NED:** southbound interface NSO با equipmentهای شبکه کار می‌کند و از `NETCONF`/`RESTCONF` یا CLI/SNMP (حسب NED) استفاده می‌کند؛ device driver state lifecycle equipment را مدیریت وتنظیم را انجام می‌دهد.",
-    "**تحلیل service provisioning lifecycle و transaction:** provisioning service lifecycle شامل تعریف service model، تحویل service request، و اجرای provisioning روی equipmentهای دخیل؛ NSO state lifecycle را در یک‌پارچگی و هماهنگی مدیریت می‌کند. خطای واحد می‌تواند service را ناتمام بگذارد و transaction/rollback (به‌صورت خودکار یا با تنظیمات) برای برطرف تغییرتغییرات ناقص ضروری است."
+    "**تحلیل service provisioning lifecycle و transaction:** provisioning service lifecycle شامل تعریف service model، تحویل service request، و اجرای provisioning روی equipmentهای دخیل؛ NSO state lifecycle را در یک‌پارچگی و هماهنگی مدیریت می‌کند. خطای واحد می‌تواند service را ناتمام بگذارد و transaction/rollback (به‌صورت خودکار یا با تنظیمات) برای برطرف تغییرات ناقص ضروری است."
    ],
    "iosCommands": [
     {
@@ -18195,7 +18195,7 @@
    },
    "troubleshooting": {
     "fault": "provisioning service در `NSO` با خطای southbound (`NETCONF`/`RESTCONF` error از equipment) شکست می‌خورد و service در وضعیت نیمه‌کاره (ناتمام) می‌ماند.",
-    "analysis": "خطای southbound می‌تواند ناشی از عدم تطابق service model با equipment، policy violation، یا خطای device driver state lifecycle باشد. provisioning service شامل مراحل متوالی روی equipmentهای مختلف است و خطای واحد می‌تواند provisioning service را ناتمام بگذارد. در NSO، تغییرتغییرات ناقص می‌تواند به‌صورت خودکار rollback شود، اما رفتار دقیق در سناریوهای مرحله‌ای و commit queue به تنظیمات و conditions وابسته است.",
+    "analysis": "خطای southbound می‌تواند ناشی از عدم تطابق service model با equipment، policy violation، یا خطای device driver state lifecycle باشد. provisioning service شامل مراحل متوالی روی equipmentهای مختلف است و خطای واحد می‌تواند provisioning service را ناتمام بگذارد. در NSO، تغییرات ناقص می‌تواند به‌صورت خودکار rollback شود، اما رفتار دقیق در سناریوهای مرحله‌ای و commit queue به تنظیمات و conditions وابسته است.",
     "fix": "لاگ provisioning service و southbound errors را بررسی کنید، service model را با equipment تطابق دهید، و state lifecycle services را با transaction/rollback (خودکار یا با تنظیمات) و policies برطرف کنید."
    },
    "exercises": [
@@ -18215,7 +18215,7 @@
      "level": "پیشرفته",
      "task": "چگونه provisioning service در `NSO` شامل transaction/rollback است و رفتار rollback دقیق به چه چیزی وابسته است؟",
      "hint": "مراحل متوالی، rollback خودکار، تنظیمات و conditions.",
-     "solution": "provisioning service lifecycle شامل مراحل متوالی روی equipmentهای مختلف است؛ خطای واحد می‌تواند service را ناتمام بگذارد و تغییرتغییرات ناقص می‌تواند خودکار rollback شود. **رفتار دقیق rollback در سناریوهای مرحله‌ای و commit queue به تنظیمات و conditions وابسته است.**"
+     "solution": "provisioning service lifecycle شامل مراحل متوالی روی equipmentهای مختلف است؛ خطای واحد می‌تواند service را ناتمام بگذارد و تغییرات ناقص می‌تواند خودکار rollback شود. **رفتار دقیق rollback در سناریوهای مرحله‌ای و commit queue به تنظیمات و conditions وابسته است.**"
     }
    ],
    "table": {
@@ -18253,7 +18253,7 @@
      ],
      [
       "`transaction/rollback`",
-      "تراکنش و rollback تغییرتغییرات ناقص",
+      "تراکنش و rollback تغییرات ناقص",
       "مدیریت multi-device change (رفتار به تنظیمات وابسته)"
      ]
     ]
@@ -18286,9 +18286,9 @@
      "reality": "خیر؛ service point **بخش مسئول mapping سرویس را شناسایی می‌کند** — یعنی شناسایی بخش مسئول service mapping (مانند template یا callback) که params service را به config تبدیل می‌کند."
     }
    ],
-   "analogy": "`Cisco NSO` مانند یک conductor یک ارکستر بزرگ است: او نه تنها هر نوازنده‌ی equipment را به‌صورت جداگانه هدایت نمی‌کند، بلکه هماهنگی کل service را end-to-end انجام می‌دهد — از تعریف service model تا اجرای provisioning روی equipmentهای مختلف — و هر خطای یک‌نوازی می‌تواند کل service را ناتمام بگذارد، سپس تغییرتغییرات ناقص به‌صورت خودکار rollback می‌شود (رفتار دقیق آن به تنظیمات وابسته است).",
+   "analogy": "`Cisco NSO` مانند یک conductor یک ارکستر بزرگ است: او نه تنها هر نوازنده‌ی equipment را به‌صورت جداگانه هدایت نمی‌کند، بلکه هماهنگی کل service را end-to-end انجام می‌دهد — از تعریف service model تا اجرای provisioning روی equipmentهای مختلف — و هر خطای یک‌نوازی می‌تواند کل service را ناتمام بگذارد، سپس تغییرات ناقص به‌صورت خودکار rollback می‌شود (رفتار دقیق آن به تنظیمات وابسته است).",
    "ciscoRef": "Cisco Network Services Orchestrator (NSO) Configuration Guide — Service Orchestration, NEDs & YANG-based Modeling",
-   "summary": "`Cisco NSO` یک orchestrator متمرکز است که services را end-to-end provisioning می‌کند: northbound interface service requests را می‌پذیرد و southbound interface از `NETCONF`/`RESTCONF`/CLI/SNMP (حسب NED) استفاده می‌کند. service point بخش مسئول mapping را شناسایی می‌کند و service package مدل داده + منطق mapping است. provisioning service شامل transaction است و تغییرتغییرات ناقص می‌تواند rollback شود (رفتار دقیق به تنظیمات و conditions وابسته است).",
+   "summary": "`Cisco NSO` یک orchestrator متمرکز است که services را end-to-end provisioning می‌کند: northbound interface service requests را می‌پذیرد و southbound interface از `NETCONF`/`RESTCONF`/CLI/SNMP (حسب NED) استفاده می‌کند. service point بخش مسئول mapping را شناسایی می‌کند و service package مدل داده + منطق mapping است. provisioning service شامل transaction است و تغییرات ناقص می‌تواند rollback شود (رفتار دقیق به تنظیمات و conditions وابسته است).",
    "quiz": [
     {
      "q": "در معماری **`Cisco NSO`**، southbound interface (NED) با چه equipmentها و پروتکل‌هایی کار می‌کند؟",
@@ -18321,7 +18321,7 @@
       "هیچ‌کدام"
      ],
      "ans": 0,
-     "exp": "تغییرتغییرات ناقص می‌تواند خودکار rollback شود، اما **رفتار دقیق rollback در سناریوهای مرحله‌ای و commit queue به تنظیمات و conditions وابسته است**."
+     "exp": "تغییرات ناقص می‌تواند خودکار rollback شود، اما **رفتار دقیق rollback در سناریوهای مرحله‌ای و commit queue به تنظیمات و conditions وابسته است**."
     }
    ],
    "exercise": "سناریوی provisioning service پیچیده در `Cisco NSO`: چگونه در ۳ گام از (الف) خطای southbound، (ب) عدم تطابق service model با equipment و (ج) policy violation در provisioning service و عدم rollback ناقص جلوگیری می‌کنید؟",
