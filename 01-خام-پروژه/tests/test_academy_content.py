@@ -808,6 +808,18 @@ class AcademyRedesignTests(unittest.TestCase):
         ns_a9: dict = {}
         exec(compile(m_a9_py.group(1), "restconf_client_lab.py", "exec"), ns_a9)
 
+        # --- auto_09: REAL _SAFE_OPENER construction in the lesson MUST include _NoRedirectHandler ---
+        # This checks the actual opener object built by the lesson code (not a rebuilt copy).
+        # Mutation `_SAFE_OPENER = urllib.request.build_opener()` MUST fail here.
+        a9_code = m_a9_py.group(1)
+        a9_safe_lines = [ln for ln in a9_code.splitlines() if "_SAFE_OPENER" in ln and "build_opener" in ln]
+        self.assertTrue(a9_safe_lines, "auto_09 _SAFE_OPENER construction line missing")
+        self.assertIn("_NoRedirectHandler", a9_safe_lines[0],
+                      "auto_09 real _SAFE_OPENER construction must include _NoRedirectHandler")
+        a9_real_handlers = [type(h).__name__ for h in ns_a9["_SAFE_OPENER"].handlers]
+        self.assertIn("_NoRedirectHandler", a9_real_handlers,
+                      "auto_09 real _SAFE_OPENER object must contain _NoRedirectHandler handler")
+
         # --- auto_09: non-HTTPS rejection ---
         with self.assertRaises(ValueError):
             ns_a9["get_config"]("http://10.255.0.1/restconf/data?content=config", "tok")
@@ -951,10 +963,22 @@ class AcademyRedesignTests(unittest.TestCase):
             ns_a10["validate_payload_against_model"]({"my-id": "x1", "tag": "t"}, _yang_body),
             {"ok": True},
         )
-        # Missing key: enabled only (no name, no my-id)
+        # Missing key: enabled only (no name, no my-id) — cannot detect any list
         result_missing = ns_a10["validate_payload_against_model"]({"enabled": True}, _yang_body)
         self.assertEqual(result_missing["ok"], False)
-        self.assertEqual(result_missing["error"], "missing_required_key")
+        self.assertEqual(result_missing["error"], "cannot_detect_list")
+        # Unknown list name must NOT succeed
+        result_unknown = ns_a10["validate_payload_against_model"]({}, _yang_body, "nonexistent")
+        self.assertEqual(result_unknown["ok"], False)
+        self.assertEqual(result_unknown["error"], "unknown_list")
+        # Ambiguous payload (keys of two lists) must error, not silently pick one
+        result_amb = ns_a10["validate_payload_against_model"]({"name": "a", "my-id": "b"}, _yang_body)
+        self.assertEqual(result_amb["ok"], False)
+        self.assertEqual(result_amb["error"], "ambiguous_list")
+        # Explicit target_list with wrong payload must fail with missing key
+        result_explicit = ns_a10["validate_payload_against_model"]({"my-id": "b"}, _yang_body, "interfaces")
+        self.assertEqual(result_explicit["ok"], False)
+        self.assertEqual(result_explicit["error"], "missing_required_key")
 
         a11_lesson = data["lessons"]["auto_11"]
         a11_s = json.dumps(a11_lesson, ensure_ascii=False)
@@ -969,6 +993,13 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertNotIn("managed node لزوماً باید python داشته باشد", a11_s)
         # Single host is valid, not wrong
         self.assertNotIn("hosts: بر اساس یک host واحد", a11_s)
+        # Quiz Q3 must have exactly ONE correct answer (combined group/host/pattern)
+        a11_q3 = a11_lesson["quiz"][2]
+        self.assertEqual(a11_q3["ans"], 2)
+        self.assertIn("group", a11_q3["opts"][2])
+        self.assertIn("host واحد", a11_q3["opts"][2])
+        self.assertIn("pattern", a11_q3["opts"][2])
+        self.assertIn("فقط می‌تواند", a11_q3["opts"][0])
         self.assertEqual(a11_lesson["bridge"]["nextId"], "auto_12")
         self.assertEqual(a11_lesson["bridge"]["nextTitle"], data["lessons"]["auto_12"]["title"])
         m_a11_py = re.search(r"```python\n([\s\S]+?)\n```", a11_lesson["lab"]["steps"][4])
