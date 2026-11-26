@@ -1826,5 +1826,96 @@ if (findNodes(liXss, n => n.tagName === 'SCRIPT' || n.tagName === 'IMG').length 
         self.assertTrue(stages["deploy"].skipped, "deploy should be skipped without approval")
 
 
+class RegressionTests(unittest.TestCase):
+    """회귀 테스트: 퀴즈 구조, 그룹화, 저장, HTML 구문, 패리티, 모크 실행 안전성."""
+
+    def test_quiz_structure_all_lessons(self):
+        """모든 수업의 퀴즈는 q/opts/ans/exp 필드를 가져야 함."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        for lid, lesson in data["lessons"].items():
+            with self.subTest(lesson=lid):
+                self.assertIn("quiz", lesson, f"{lid}: quiz missing")
+                self.assertIsInstance(lesson["quiz"], list, f"{lid}: quiz is not list")
+                self.assertGreater(len(lesson["quiz"]), 0, f"{lid}: quiz empty")
+                for qi, q in enumerate(lesson["quiz"]):
+                    self.assertIn("q", q, f"{lid} quiz[{qi}]: q missing")
+                    self.assertIn("opts", q, f"{lid} quiz[{qi}]: opts missing")
+                    self.assertIn("ans", q, f"{lid} quiz[{qi}]: ans missing")
+                    self.assertIn("exp", q, f"{lid} quiz[{qi}]: exp missing")
+                    self.assertIsInstance(q["opts"], list, f"{lid} quiz[{qi}]: opts not list")
+                    self.assertGreaterEqual(len(q["opts"]), 2, f"{lid} quiz[{qi}]: opts < 2")
+                    self.assertIsInstance(q["ans"], int, f"{lid} quiz[{qi}]: ans not int")
+                    self.assertGreaterEqual(q["ans"], 0, f"{lid} quiz[{qi}]: ans < 0")
+                    self.assertLess(q["ans"], len(q["opts"]), f"{lid} quiz[{qi}]: ans out of range")
+
+    def test_grouping_auto_lessons_f4(self):
+        """auto_* 수업은 모두 그룹 f4에 속해야 함."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        for lid in data["lessons"]:
+            if lid.startswith("auto_"):
+                with self.subTest(lesson=lid):
+                    self.assertEqual(
+                        data["lessons"][lid].get("group"),
+                        "f4",
+                        f"{lid}: group should be 'f4', got {data['lessons'][lid].get('group')!r}",
+                    )
+
+    def test_grouping_s12_f4(self):
+        """s12 수업은 그룹 f4에 속해야 함."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            data["lessons"]["s12"].get("group"),
+            "f4",
+            f"s12: group should be 'f4', got {data['lessons']['s12'].get('group')!r}",
+        )
+
+    def test_entrance_exam_is_sample(self):
+        """입학 시험은 isSample: true로 랩핑되어야 함."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        ee = data.get("entranceExam", {})
+        self.assertTrue(ee.get("isSample"), "entranceExam.isSample should be True")
+        self.assertIsInstance(ee.get("questions"), list, "entranceExam.questions should be list")
+        self.assertGreater(len(ee["questions"]), 0, "entranceExam.questions should not be empty")
+
+    def test_html_script_tags_balanced(self):
+        """오프라인 HTML의 <script> 태그가 제대로 닫혀 있어야 함."""
+        html_path = PACKAGE_ROOT.parents[0] / "FAM-Academy-Offline.html"
+        html = html_path.read_text(encoding="utf-8")
+        open_tags = html.count("<script>")
+        close_tags = html.count("</script>")
+        self.assertEqual(
+            open_tags,
+            close_tags,
+            f"HTML script tags unbalanced: {open_tags} open vs {close_tags} close",
+        )
+
+    def test_mock_execution_safety_all_labs(self):
+        """모든 수업의 랩 step 5 파이썬 블록이 컴파일 가능해야 함 (실행 안전성)."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        for lid, lesson in data["lessons"].items():
+            lab = lesson.get("lab", {})
+            steps = lab.get("steps", [])
+            if len(steps) < 5:
+                continue
+            step5 = steps[4]
+            m = re.search(r"```python\n([\s\S]+?)\n```", step5)
+            if m:
+                with self.subTest(lesson=lid):
+                    try:
+                        compile(m.group(1), f"{lid}_lab.py", "exec")
+                    except SyntaxError as e:
+                        self.fail(f"{lid}: python block has syntax error: {e}")
+
+    def test_no_persian_typos_in_quiz(self):
+        """퀴즈 질문에 흔한 페르시아어 오타가 없어야 함."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        for lid, lesson in data["lessons"].items():
+            for qi, q in enumerate(lesson.get("quiz", [])):
+                full_text = q.get("q", "") + " " + " ".join(q.get("opts", [])) + " " + q.get("exp", "")
+                with self.subTest(lesson=lid, quiz=qi):
+                    self.assertNotIn("acadenmی", full_text, f"{lid} quiz[{qi}]: typo 'acadenmی'")
+                    self.assertNotIn("زیرساكت", full_text, f"{lid} quiz[{qi}]: typo 'زیرساكت'")
+
+
 if __name__ == "__main__":
     unittest.main()
