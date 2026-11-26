@@ -17072,7 +17072,7 @@
      "h": "۱. معماری `RESTCONF` (`RFC 8040`) و مسیر `{+restconf}/data`",
      "p": [
       "`RESTCONF` یک رابط **`HTTP`** (معمولاً `HTTPS` روی پورت `443`) برای دسترسی به داده‌های مدل‌شده با `YANG` تعریف می‌کند. به جای اینکه مسیرهای `/config` و `/operational` به‌صورت hard-coded تعریف شوند، `RFC 8040` یک **مسیر base `{+restconf}/data`** تعریف می‌کند و با **پارامتر query `content`** تفکیک می‌کند: `content=config` برای داده‌های پیکربندی (معادل داده‌های `<get-config>`) و `content=nonconfig` برای داده‌های عملیاتی (معادل داده‌های غیرپیکربندی که `<get>` برمی‌گرداند).",
-      "به این ترتیب، URIها به‌صورت زیر شکل می‌گیرند: `GET /restconf/data/ietf-interfaces:interfaces?content=config` برای خواندن پیکربندی، و `GET /restconf/data/ietf-interfaces:interfaces?content=nonconfig` برای خواندن داده‌های عملیاتی. در RFC 8343 ziردرخت `interfaces-state` وجود دارد ولی **deprecated** است (باقی‌مانده legacy RFC 7223); state leafها (مثل `oper-status`) مستقیماً زیر `interface[name]` زندگی می‌کنند — نه در یک container مجزا به نام `state`. مثال: `/restconf/data/ietf-interfaces:interfaces/interface=Gi0%2F7/oper-status` برای خواندن `oper-status` اینترفیس Gi0/7 (کلید اینترفیس percent-encode شده است). این طراحی باعث می‌شود که clientها نیازی به hard-coding مسیرهای جداگانه نداشته باشند و سرور بتواند بر اساس capabilityهای خود پاسخ دهد."
+      "به این ترتیب، URIها به‌صورت زیر شکل می‌گیرند: `GET /restconf/data/ietf-interfaces:interfaces?content=config` برای خواندن پیکربندی، و `GET /restconf/data/ietf-interfaces:interfaces?content=nonconfig` برای خواندن داده‌های عملیاتی. در RFC 8343 زیردرخت `interfaces-state` وجود دارد ولی **deprecated** است (باقی‌مانده legacy RFC 7223); state leafها (مثل `oper-status`) مستقیماً زیر `interface[name]` زندگی می‌کنند — نه در یک container مجزا به نام `state`. مثال: `/restconf/data/ietf-interfaces:interfaces/interface=Gi0%2F7/oper-status` برای خواندن `oper-status` اینترفیس Gi0/7 (کلید اینترفیس percent-encode شده است). این طراحی باعث می‌شود که clientها نیازی به hard-coding مسیرهای جداگانه نداشته باشند و سرور بتواند بر اساس capabilityهای خود پاسخ دهد."
      ],
      "bullets": [
       "base URI: `{+restconf}/data`",
@@ -17690,7 +17690,7 @@
    "troubleshooting": {
     "fault": "playbook `ios_config` به‌صورت non-idempotent عمل می‌کند: اجرای دوم playbook تغییرات را دوباره اعمال می‌کند و `changed > 0` report می‌شود، و check mode نیز به‌درستی diff را نشان نمی‌دهد.",
     "analysis": "module `ios_config` state desired را با state موجود مقایسه می‌کند و فقط تغییرات لازم را اعمال می‌کند. عدم تحقق idempotency معمولاً به‌دلیل عدم تطابق دقیق desired state با state موجود است (مثل استفاده از `lines` نامطابق با `parents`) یا différence در formatting خط‌های config. تحقق idempotency به ماژول، ورودی و دستگاه وابسته است، نه تضمین‌ِ همهٔ playbookها.",
-    "fix": "دقت desired state را با `--check --diff` بررسی کنید، از `parents` معتبر و `lines` مطابق استفاده کنید، و playbook را با `--check` تست کنید تا تحقق idempotency (و diff پیش‌بینی‌شده) را قبل از اجرای واقعی تایید کنید."
+    "fix": "دقت desired state را با `--check --diff` بررسی کنید، از `parents` معتبر و `lines` مطابق استفاده کنید، و playbook را با `--check` تست کنید (فقط پیش‌بینی وابسته به پشتیبانی ماژول); اطمینان از idempotency با اجرای تکراری کنترل‌شده و بررسی مستقل وضعیت قبل و بعد از اجرای واقعی است."
    },
    "exercises": [
     {
@@ -17830,7 +17830,7 @@
   "auto_12": {
    "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
    "lead": "اتوماسیون با `Ansible` تغییرات روی equipmentهای موجود را مدیریت می‌کند، اما زمانی که باید یک زیرساخت کامل را از صفر provisioning کنید، مدیریت state lifecycle زیرساخت نیاز به tool متفاوتی دارد. **`Terraform`** این کار را با تعریف state lifecycle زیرساخت به‌صورت کد (`Infrastructure as Code`) انجام می‌دهد.",
-   "goal": "درک معماری `Terraform` (provider، resource، state file، plan/apply lifecycle)، تفاوت `Terraform` با `Ansible` در مدیریت state lifecycle (با رعایت محدودیت‌های هر tool)، واژه‌های `resource`/`data source`/`variable`/`output`/`modules`، و مفهوم drift و روشهای modern review آن (`terraform plan -refresh-only` proposal-state می‌سازد و `terraform apply -refresh-only` state را commit می‌کند؛ هر دو منبع realities را تغییر نمی-dopedند)، همراه با یک سناریوی عملی python که plan/apply state machine را با mock provider simulation می‌کند (با تفکیک state و واقعیت خارجی).",
+   "goal": "درک معماری `Terraform` (provider، resource، state file، plan/apply lifecycle)، تفاوت `Terraform` با `Ansible` در مدیریت state lifecycle (با رعایت محدودیت‌های هر tool)، واژه‌های `resource`/`data source`/`variable`/`output`/`modules`، و مفهوم drift و روشهای modern review آن (`terraform plan -refresh-only` proposal-state می‌سازد و `terraform apply -refresh-only` state را commit می‌کند؛ هر دو منبع realities را تغییر نمی‌کنند)، همراه با یک سناریوی عملی python که plan/apply state machine را با mock provider simulation می‌کند (با تفکیک state و واقعیت خارجی).",
    "prereq": "آشنایی با `Ansible` (درس ۱۱) و مفاهیم زیرساخت شبکه.",
    "sections": [
     {
@@ -17857,7 +17857,7 @@
       "`terraform plan` ← محاسبه و نمایش plan پیشنهادی (بدون تغییر)",
       "`terraform apply` ← اجرای plan و مدیریت state lifecycle",
       "state drift ← مغایرت state فعلی با definition code",
-      "`-refresh-only` ← در `plan`: proposal-state sync (بدون تغییر state); در `apply`: commit state sync (نه باز defeated reservoirs)",
+      "`-refresh-only` ← در `plan`: proposal-state sync (بدون تغییر state); در `apply`: commit state sync (نه بازگردانی منابع)",
       "فرآیند drift ← refresh-only → بررسی plan → تصمیم → plan معمولی + تغییر کنترل‌شده"
      ],
      "think": "چرا `-refresh-only` را نمی‌توان بازگرداندن منابع دانست؟ چون این دستور **منابع را تغییر نمی‌دهد**؛ تنها proposal تغییر state را بر اساس وضعیت مشاهده‌شده (reality) برمی‌گرداند. state واقعی پس از `apply -refresh-only` به‌روز می‌شود. برای بازگرداندن منابع به وضعیت مطلوب باید پس از بررسی، plan معمولی و apply کنترل‌شده انجام شود. این سناریو به‌صورت شبه‌کد (mock) در آزمایشگاه شبیه‌سازی شده است."
@@ -17942,7 +17942,7 @@
    },
    "troubleshooting": {
     "fault": "`terraform plan` report می‌کند که state lifecycle زیرساخت با definition code مغایرت دارد (state drift)، به‌دلیل تغییرات دستی روی equipment.",
-    "analysis": "state drift به‌دلیل تغییرات دستی روی equipment یا خطاهای apply رخ می‌دهد؛ definition code state lifecycle را تعریف می‌کند و plan این drift را نشان می‌دهد. روش legacy `terraform refresh` به‌دلیل اعمال خودکار state، منسوخ شده است و `terraform plan -refresh-only` proposal-state می‌سازد (بدون تغییر state) و `terraform apply -refresh-only` state را commit می‌کند؛ هر دو منبع realities را تغییر نمی-dopedند.",
+    "analysis": "state drift به‌دلیل تغییرات دستی روی equipment یا خطاهای apply رخ می‌دهد؛ definition code state lifecycle را تعریف می‌کند و plan این drift را نشان می‌دهد. روش legacy `terraform refresh` به‌دلیل اعمال خودکار state، منسوخ شده است و `terraform plan -refresh-only` proposal-state می‌سازد (بدون تغییر state) و `terraform apply -refresh-only` state را commit می‌کند؛ هر دو منبع realities را تغییر نمی‌کنند.",
     "fix": "با `terraform plan -refresh-only` proposal sync state را بررسی کنید و drift را تحلیل کنید، سپس تصمیم بگیرید: یا منابع را به مطلوب برگردانید (manual یا controlled change) یا definition code را به واقعیت تطبیق دهید، و با plan معمولی و روند تغییر کنترل‌شده drift را برطرف کنید."
    },
    "exercises": [
@@ -17956,7 +17956,7 @@
      "level": "متوسط",
      "task": "`-refresh-only` در `Terraform` چه کار می‌کند و چرا آن را به‌عنوان بازگردانی منابع به مطلوب نمی‌توان دانست؟",
      "hint": "sync state با وضعیت مشاهده‌شده، نه تغییر منابع.",
-     "solution": " `terraform plan -refresh-only` proposal-state می‌سازد و `terraform apply -refresh-only` state را commit می‌کند؛ هر دو منبع realities را تغییر نمی-dopedیند یا تغییر کد، باید پس از بررسی، plan معمولی و روند تغییر کنترل‌شده را در نظر گرفت."
+     "solution": " `terraform plan -refresh-only` proposal-state می‌سازد و `terraform apply -refresh-only` state را commit می‌کند؛ هر دو منبع realities را تغییر نمی‌کنند یا تغییر کد، باید پس از بررسی، plan معمولی و روند تغییر کنترل‌شده را در نظر گرفت."
     },
     {
      "level": "پیشرفته",
@@ -18000,7 +18000,7 @@
      ],
      [
       "`-refresh-only`",
-      " در `plan`: proposal-state sync (بدون تغییر state); در `apply`: commit state sync (نه باز defeated reservoirs)",
+      " در `plan`: proposal-state sync (بدون تغییر state); در `apply`: commit state sync (نه بازگردانی منابع)",
       "بررسی drift"
      ]
     ]
@@ -18030,7 +18030,7 @@
     },
     {
      "myth": "`-refresh-only` منابع را به وضعیت مطلوب برمی‌گرداند.",
-     "reality": "خیر؛ `terraform plan -refresh-only` proposal-state می‌سازد (بدون تغییر state) و `terraform apply -refresh-only` state را commit می‌کند؛ هر دو منبع realities را تغییر نمی-dopedند."
+     "reality": "خیر؛ `terraform plan -refresh-only` proposal-state می‌سازد (بدون تغییر state) و `terraform apply -refresh-only` state را commit می‌کند؛ هر دو منبع realities را تغییر نمی‌کنند."
     }
    ],
    "analogy": "`Terraform` مانند یک معمار محاسباتی است که state lifecycle ساختمان را از صفر definieren می‌کند: پیش‌نویس پیشنهادی شامل ایجاد، تغییر یا حذف بخش‌ها را ارائه می‌دهد، و در مرحله‌ی apply، state lifecycle بر اساس همان plan مدیریت می‌شود — همه‌ی تغییرات تکرارپذیر و auditable می‌باشند. `-refresh-only` مانند بررسی موجودیت فعلی ساختمان است، نه بازسازی آن.",
@@ -18068,7 +18068,7 @@
       "هیچ‌کدام"
      ],
      "ans": 1,
-     "exp": "`terraform plan -refresh-only` فقط propose-state را بر حسب وضعیت مشاهده‌شده می‌سازد (بدون تغییر state)، و `terraform apply -refresh-only` آن را در state ثبت می‌کند؛ هر دو منبع واقعی را تغییر نمی‌شوند. فرآیند drift: `-refresh-only` (sync state با واقعیت) → بررسی plan → تصمیم (بازگردانی منابع یا تغییر کد) → plan معمولی و روند تغییر کنترل‌شده."
+     "exp": "`terraform plan -refresh-only` فقط propose-state را بر حسب وضعیت مشاهده‌شده می‌سازد (بدون تغییر state)، و `terraform apply -refresh-only` آن را در state ثبت می‌کند؛ هر دو منبع واقعی را تغییر نمی‌شوند. فرآیند drift: terraform plan -refresh-only (proposal-state، بدون تغییر state) → بررسی plan → تصمیم (بازگردانی منابع یا تغییر کد) → plan معمولی و روند تغییر کنترل‌شده."
     }
    ],
    "exercise": "سناریوی اجرای lifecycle `Terraform` روی زیرساخت شبکه: چگونه در ۳ گام از (الف) state drift، (ب) عدم هماهنگی locking و (ج) سوءتفسیر `-refresh-only` به‌عنوان بازگردانی منابع جلوگیری می‌کنید؟",
