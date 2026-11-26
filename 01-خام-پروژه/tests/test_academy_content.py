@@ -801,6 +801,7 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("content=nonconfig", a9_s)
         self.assertIn("406 Not Acceptable", a9_s)
         self.assertIn("replace-or-create", a9_s)
+        self.assertIn("مسیر پیش‌فرض opener", a9_s)
         self.assertEqual(a9_lesson["bridge"]["nextId"], "auto_10")
         self.assertEqual(a9_lesson["bridge"]["nextTitle"], data["lessons"]["auto_10"]["title"])
         m_a9_py = re.search(r"```python\n([\s\S]+?)\n```", a9_lesson["lab"]["steps"][4])
@@ -812,7 +813,7 @@ class AcademyRedesignTests(unittest.TestCase):
             ns_a9["get_config"]("http://10.255.0.1/restconf/data?content=config", "tok")
         with self.assertRaises(ValueError):
             ns_a9["put_config"]("http://10.255.0.1/restconf/data?content=config", "x", "tok")
-        # Redirect regression: safe opener with _NoRedirectHandler MUST block 302 and NOT leak Authorization
+        # DEFAULT opener path (no injected opener) MUST block redirect and NOT leak token
         import http.server
         import io
         import threading
@@ -841,42 +842,88 @@ class AcademyRedesignTests(unittest.TestCase):
                     resp.msg = "Found"
                     return resp
 
-            a9_safe_opener = urllib.request.build_opener(A9FakeRedirectTransport(), ns_a9["_NoRedirectHandler"]()).open
-            a9_redir = ns_a9["get_config"]("https://10.255.0.1/restconf/data?content=config", "TEST_TOKEN", opener=a9_safe_opener)
-            self.assertEqual(a9_redir["ok"], False)
-            self.assertEqual(a9_redir["status"], 302)
-            self.assertEqual(a9_steal, [], "auto_09 token leaked across redirect!")
+            # DEFAULT path: temporarily swap _SAFE_OPENER with one that has redirect transport + _NoRedirectHandler
+            # This proves the DEFAULT opener (not injected) blocks redirect.
+            orig_safe = ns_a9["_SAFE_OPENER"]
+            try:
+                ns_a9["_SAFE_OPENER"] = urllib.request.build_opener(A9FakeRedirectTransport(), ns_a9["_NoRedirectHandler"]())
+                a9_redir = ns_a9["get_config"]("https://10.255.0.1/restconf/data?content=config", "TEST_TOKEN")
+                self.assertEqual(a9_redir["ok"], False)
+                self.assertEqual(a9_redir["status"], 302)
+                self.assertEqual(a9_steal, [], "auto_09 token leaked across redirect via DEFAULT opener!")
+                # PUT default path too
+                ns_a9["_SAFE_OPENER"] = urllib.request.build_opener(A9FakeRedirectTransport(), ns_a9["_NoRedirectHandler"]())
+                a9_redir_put = ns_a9["put_config"]("https://10.255.0.1/restconf/data?content=config", "<x/>", "TEST_TOKEN")
+                self.assertEqual(a9_redir_put["ok"], False)
+                self.assertEqual(a9_redir_put["status"], 302)
+            finally:
+                ns_a9["_SAFE_OPENER"] = orig_safe
         finally:
             a9_trap.shutdown()
             a9_trap.server_close()
+        # Contract: injected UNSAFE opener CAN bypass protection (documented risk)
+        a9_steal2: list = []
+
+        class A9Steal2Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                a9_steal2.append(dict(self.headers))
+                self.send_response(200)
+                self.end_headers()
+            def log_message(self, *args):
+                pass
+
+        a9_trap2 = http.server.HTTPServer(("127.0.0.1", 0), A9Steal2Handler)
+        a9_port2 = a9_trap2.server_address[1]
+        a9_thread2 = threading.Thread(target=a9_trap2.serve_forever, daemon=True)
+        a9_thread2.start()
+        try:
+            hdrs2 = email.message.Message()
+            hdrs2["Location"] = f"http://127.0.0.1:{a9_port2}/steal2"
+
+            class A9FakeRedirectTransport2(urllib.request.HTTPSHandler):
+                def https_open(self, req):
+                    resp = urllib.request.addinfourl(io.BytesIO(b""), hdrs2, req.full_url, code=302)
+                    resp.msg = "Found"
+                    return resp
+
+            unsafe_opener = urllib.request.build_opener(A9FakeRedirectTransport2()).open
+            a9_leak = ns_a9["get_config"]("https://10.255.0.1/restconf/data?content=config", "TEST_TOKEN", opener=unsafe_opener)
+            # The contract: unsafe injected opener CAN leak the token (steal2 received the Authorization header)
+            self.assertTrue(a9_steal2, "unsafe injected opener should be able to leak token (documented contract)")
+            leaked_hdrs = a9_steal2[0] if a9_steal2 else {}
+            self.assertIn("Authorization", leaked_hdrs)
+            self.assertIn("TEST_TOKEN", leaked_hdrs["Authorization"])
+        finally:
+            a9_trap2.shutdown()
+            a9_trap2.server_close()
 
         a10_lesson = data["lessons"]["auto_10"]
         a10_s = json.dumps(a10_lesson, ensure_ascii=False)
         self.assertIn("RFC 7950", a10_s)
-        self.assertIn("Container", a10_s)
-        self.assertIn("List", a10_s)
-        self.assertIn("grouping", a10_s)
-        self.assertIn("augment", a10_s)
+        self.assertIn("length", a10_s)
+        self.assertIn("mandatory", a10_s)
         self.assertIn("pyang", a10_s)
+        self.assertIn("ناکافی", a10_s)
         self.assertEqual(a10_lesson["bridge"]["nextId"], "auto_11")
         self.assertEqual(a10_lesson["bridge"]["nextTitle"], data["lessons"]["auto_11"]["title"])
         m_a10_py = re.search(r"```python\n([\s\S]+?)\n```", a10_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a10_py, "auto_10 runnable python block missing")
         ns_a10: dict = {}
         exec(compile(m_a10_py.group(1), "yang_model_lab.py", "exec"), ns_a10)
-        # Valid model MUST pass validation; invalid model text MUST fail
         _yang_src = m_a10_py.group(1).split("yang_src = ", 1)[1].strip()
         _yang_body = _yang_src[3:-3] if _yang_src.startswith(chr(39) * 3) else _yang_src
+        # Valid model MUST pass; invalid models MUST fail
         self.assertEqual(ns_a10["validate_yang_text"](_yang_body)["ok"], True)
         self.assertEqual(ns_a10["validate_yang_text"]("this is not yang"), {"ok": False, "error": "missing_module"})
         self.assertEqual(ns_a10["validate_yang_text"]("module x {"), {"ok": False, "error": "missing_namespace"})
-        # Data validation against model MUST catch missing required key
+        self.assertEqual(ns_a10["validate_yang_text"]('module x { namespace "urn:x"; }'), {"ok": False, "error": "missing_prefix"})
+        # Payload validation MUST read the model (extract required keys from yang_src)
         self.assertEqual(
-            ns_a10["validate_payload_against_model"]({"enabled": True}, ["name", "enabled"]),
+            ns_a10["validate_payload_against_model"]({"enabled": True}, _yang_body),
             {"ok": False, "error": "missing_required_key", "key": "name"},
         )
         self.assertEqual(
-            ns_a10["validate_payload_against_model"]({"name": "Gi0/7", "enabled": True}, ["name", "enabled"]),
+            ns_a10["validate_payload_against_model"]({"name": "Gi0/7", "enabled": True}, _yang_body),
             {"ok": True},
         )
 
@@ -889,30 +936,33 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("parents", a11_s)
         self.assertIn("handlers", a11_s)
         self.assertIn("cisco.ios", a11_s)
+        self.assertIn("ios_routers", a11_s)
         self.assertEqual(a11_lesson["bridge"]["nextId"], "auto_12")
         self.assertEqual(a11_lesson["bridge"]["nextTitle"], data["lessons"]["auto_12"]["title"])
         m_a11_py = re.search(r"```python\n([\s\S]+?)\n```", a11_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a11_py, "auto_11 runnable python block missing")
         ns_a11: dict = {}
         exec(compile(m_a11_py.group(1), "ansible_playbook_lab.py", "exec"), ns_a11)
-        # Playbook MUST contain the correct "parents" key (plural), not "parent"
         a11_step_txt = a11_lesson["lab"]["steps"][4]
         self.assertIn("parents:", a11_step_txt)
         self.assertNotIn("parent:", a11_step_txt)
-        # Parse playbook: play name + tasks with ios_config module
+        # Parse playbook: target hosts must be ios_routers, modules FQCN
         _yaml_src = m_a11_py.group(1)
-        _yaml_body = _yaml_src.split("playbook_yaml = ", 1)[1].strip()
-        _yaml_body = _yaml_body[3:-3] if _yaml_body.startswith(chr(39) * 3) else _yaml_body
-        pb = ns_a11["parse_playbook"](_yaml_body + chr(39))
+        _pb_body = _yaml_src.split("playbook_yaml = ", 1)[1].strip()
+        _pb_body = _pb_body[3:-3] if _pb_body.startswith(chr(39) * 3) else _pb_body
+        pb = ns_a11["parse_playbook"](_pb_body + chr(39))
         self.assertTrue(len(pb["plays"]) >= 1)
-        self.assertTrue(any(t["module"] == "ios_config" for t in pb["plays"][0]["tasks"]))
-        # Inventory parse: hosts + connection
-        _inv_src = _yaml_src.split("inventory_yaml = ", 1)[1].strip()
-        _inv_body = _inv_src[3:-3] if _inv_src.startswith(chr(39) * 3) else _inv_src
-        inv = ns_a11["parse_inventory"](_inv_body + chr(39))
-        self.assertIn("router1", inv)
-        self.assertEqual(inv["router1"].get("ansible_connection"), "network_cli")
-        # State comparison: identical state => no changes; different => changes reported
+        self.assertEqual(pb["plays"][0]["hosts"], "ios_routers")
+        self.assertTrue(any(t["module"] == "cisco.ios.ios_config" for t in pb["plays"][0]["tasks"]))
+        # Inventory MUST define ios_routers group containing router1
+        _inv_m = re.search(r"inventory_yaml = " + chr(39) * 3 + r"([\s\S]+?)" + chr(39) * 3, _yaml_src)
+        self.assertIsNotNone(_inv_m, "auto_11 lab inventory_yaml literal missing")
+        _inv_body = _inv_m.group(1)
+        inv = ns_a11["parse_inventory"](_inv_body)
+        self.assertIn("router1", inv["hosts"])
+        self.assertEqual(inv["hosts"]["router1"].get("ansible_connection"), "network_cli")
+        self.assertIn("router1", inv["groups"].get("ios_routers", set()))
+        # State comparison
         self.assertEqual(ns_a11["simulate_state_compare"]({"vlan": 111}, {"vlan": 111})["changed"], 0)
         self.assertEqual(ns_a11["simulate_state_compare"]({"vlan": 111}, {"vlan": 10})["changed"], 1)
 
@@ -926,6 +976,7 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("-refresh-only", a12_s)
         self.assertIn("state drift", a12_s)
         self.assertIn("شبه‌کد", a12_s)
+        self.assertIn("وضعیت مشاهده‌شده", a12_s)
         self.assertEqual(a12_lesson["bridge"]["nextId"], "auto_13")
         self.assertEqual(a12_lesson["bridge"]["nextTitle"], data["lessons"]["auto_13"]["title"])
         m_a12_py = re.search(r"```python\n([\s\S]+?)\n```", a12_lesson["lab"]["steps"][4])
@@ -933,18 +984,21 @@ class AcademyRedesignTests(unittest.TestCase):
         ns_a12: dict = {}
         exec(compile(m_a12_py.group(1), "terraform_lab.py", "exec"), ns_a12)
         # Terraform lifecycle simulation: first run creates, second run is idempotent
-        prov12 = ns_a12["MockProvider"]({"vlan_112": None})
+        prov12 = ns_a12["MockProvider"](state={"vlan_112": None}, reality={"vlan_112": None})
         run1 = ns_a12["run_lifecycle"](prov12, {"vlan_112": "TERRAFORM_IAC"})
         self.assertEqual(run1["changes"], 1)
         self.assertEqual(run1["state"], {"vlan_112": "TERRAFORM_IAC"})
         run2 = ns_a12["run_lifecycle"](prov12, {"vlan_112": "TERRAFORM_IAC"})
         self.assertEqual(run2["changes"], 0)
-        # Drift + refresh-only plan simulation
-        prov12.state["vlan_112"] = "MANUAL_CHANGE"
-        drift_plan = prov12.plan({"vlan_112": "TERRAFORM_IAC"})
-        self.assertEqual(len(drift_plan["changes"]), 1)
-        refresh_plan = prov12.refresh_only_plan({"vlan_112": "TERRAFORM_IAC"})
-        self.assertEqual(len(refresh_plan["changes"]), 1)
+        # Drift: state vs reality separated; refresh-only syncs state with reality but NOT restore resources
+        prov12_drift = ns_a12["MockProvider"](state={"vlan_112": "TERRAFORM_IAC"}, reality={"vlan_112": "MANUAL_CHANGE"})
+        # Drift exists between state and reality (not state vs desired)
+        refresh_result = prov12_drift.refresh_only_plan({"vlan_112": "TERRAFORM_IAC"})
+        # After refresh-only: state synced with reality, but reality NOT restored
+        self.assertEqual(prov12_drift.state, {"vlan_112": "MANUAL_CHANGE"})
+        self.assertEqual(prov12_drift.reality, {"vlan_112": "MANUAL_CHANGE"})  # reality unchanged
+        # The plan after refresh-only shows 1 change (state now == reality, which differs from desired)
+        self.assertEqual(len(refresh_result["changes"]), 1)
 
         a13_lesson = data["lessons"]["auto_13"]
         a13_s = json.dumps(a13_lesson, ensure_ascii=False)
@@ -956,23 +1010,30 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("service point", a13_s)
         self.assertIn("service package", a13_s)
         self.assertIn("NED", a13_s)
+        self.assertIn("transaction", a13_s)
+        self.assertIn("rollback", a13_s)
         self.assertIn("شبه‌کد", a13_s)
+        self.assertIn("غیرنماینده", a13_s)
         self.assertEqual(a13_lesson["bridge"]["nextId"], "auto_14")
         self.assertEqual(a13_lesson["bridge"]["nextTitle"], data["lessons"]["auto_14"]["title"])
         m_a13_py = re.search(r"```python\n([\s\S]+?)\n```", a13_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a13_py, "auto_13 runnable python block missing")
         ns_a13: dict = {}
         exec(compile(m_a13_py.group(1), "nso_service_lab.py", "exec"), ns_a13)
-        # Successful service provisioning MUST record steps
+        # Successful service provisioning MUST record steps and no rollback
         nso13 = ns_a13["MockNso"](reachable_devices={"target-router"})
         res13 = nso13.provision_service("fam-lan", {"target-router": {"lan-vlan": 113}})
         self.assertEqual(res13["ok"], True)
         self.assertEqual(len(res13["steps"]), 1)
         self.assertEqual(res13["steps"][0]["device"], "target-router")
-        # Failure scenario: unreachable device MUST fail with error and partial steps
+        self.assertEqual(res13["rolled_back"], False)
+        # Failure scenario: unreachable device → error + rollback of applied steps
         res13_bad = nso13.provision_service("fam-lan-bad", {"target-router": {"lan-vlan": 113}, "bad-router": {"lan-vlan": 113}})
         self.assertEqual(res13_bad["ok"], False)
         self.assertIn("unreachable", res13_bad["error"])
+        self.assertEqual(res13_bad["rolled_back"], True)
+        # rollback step MUST be recorded
+        self.assertTrue(any(s["action"] == "rollback" for s in res13_bad["steps"]))
 
         # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
@@ -1267,8 +1328,6 @@ assertRunLab('auto_13', (sim) => {{
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
         self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
-
-        # 4. Safe fenced-code DOM renderer, copy-button click/fallback behavior & CSS verification
 
         # 4. Safe fenced-code DOM renderer, copy-button click/fallback behavior & CSS verification
         styles_css = (ASSET_ROOT / "styles.css").read_text(encoding="utf-8")
