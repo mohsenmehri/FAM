@@ -143,19 +143,20 @@ class AcademyRedesignTests(unittest.TestCase):
                 ans_dist[q["ans"]] += 1
         self.assertTrue(all(6 <= v <= 10 for v in ans_dist.values()), ans_dist)
 
-        # 2b. Checks for f4 Batch 1..5 (first 25 lessons in f4) + Round-6..14 regressions
-        f4_b1_to_b5 = data["curriculumGroups"][4]["lessons"][:25]
+        # 2b. Checks for f4 Batch 1..6 (first 30 lessons in f4) + Round-6..17 regressions
+        f4_b1_to_b6 = data["curriculumGroups"][4]["lessons"][:30]
         self.assertEqual(
-            f4_b1_to_b5,
+            f4_b1_to_b6,
             [
                 "spec_ent", "spec_ent_campus", "spec_ent_sd", "spec_sec", "spec_sec_vpn",
                 "spec_sec_ise", "spec_dc_nx", "s11", "spec_dc_aci", "spec_dc_stor",
                 "spec_sp", "spec_sp_xr", "spec_sp_sr", "spec_wl", "spec_wl_survey",
                 "spec_collab", "spec_collab_gw", "auto_01", "auto_02", "auto_03",
                 "auto_04", "auto_05", "auto_06", "auto_07", "auto_08",
+                "auto_09", "auto_10", "auto_11", "auto_12", "auto_13",
             ],
         )
-        for lid in f4_b1_to_b5:
+        for lid in f4_b1_to_b6:
             lesson = data["lessons"][lid]
             self.assertEqual(len(lesson.get("exercises", [])), 3, lid)
             self.assertEqual(len(lesson.get("quiz", [])), 3, lid)
@@ -164,20 +165,25 @@ class AcademyRedesignTests(unittest.TestCase):
             for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "قانون طلایی", "طلایی", "۹۰٪", "۹۹٪", "۱۰۰٪", "۸۰٪", "جادویی"):
                 self.assertNotIn(bad, s, f"{lid} contains {bad}")
         b3_dist = {0: 0, 1: 0, 2: 0, 3: 0}
-        for lid in f4_b1_to_b5[10:15]:
+        for lid in f4_b1_to_b6[10:15]:
             for q in data["lessons"][lid]["quiz"]:
                 b3_dist[q["ans"]] += 1
         self.assertEqual(b3_dist, {0: 4, 1: 4, 2: 4, 3: 3})
         b4_dist = {0: 0, 1: 0, 2: 0, 3: 0}
-        for lid in f4_b1_to_b5[15:20]:
+        for lid in f4_b1_to_b6[15:20]:
             for q in data["lessons"][lid]["quiz"]:
                 b4_dist[q["ans"]] += 1
         self.assertEqual(b4_dist, {0: 4, 1: 4, 2: 4, 3: 3})
         b5_dist = {0: 0, 1: 0, 2: 0, 3: 0}
-        for lid in f4_b1_to_b5[20:25]:
+        for lid in f4_b1_to_b6[20:25]:
             for q in data["lessons"][lid]["quiz"]:
                 b5_dist[q["ans"]] += 1
         self.assertEqual(b5_dist, {0: 4, 1: 4, 2: 4, 3: 3})
+        b6_dist = {0: 0, 1: 0, 2: 0, 3: 0}
+        for lid in f4_b1_to_b6[25:30]:
+            for q in data["lessons"][lid]["quiz"]:
+                b6_dist[q["ans"]] += 1
+        self.assertEqual(b6_dist, {0: 4, 1: 4, 2: 4, 3: 3})
 
         # Round-6 & Round-7 regression assertions
         ent_step = data["lessons"]["spec_ent"]["sections"][1]["steps"][0]
@@ -693,6 +699,9 @@ class AcademyRedesignTests(unittest.TestCase):
         # Signed token with exp: NaN (or float('nan')) MUST be rejected
         nan_tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "exp": float("nan")}, b"top-secret")
         self.assertEqual(ns_a7["verify_hs256_jwt"](nan_tok, b"top-secret", now=100), {"ok": False, "error": "malformed_token"})
+        # Huge int exp (10**400) MUST NOT raise uncaught OverflowError from float()
+        huge_exp_tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "exp": 10**400}, b"top-secret")
+        self.assertEqual(ns_a7["verify_hs256_jwt"](huge_exp_tok, b"top-secret", now=100), {"ok": False, "error": "missing_or_invalid_exp"})
         # Expired token (exp: 1) MUST be rejected
         expired_tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "exp": 1, "iss": "fam-auth", "aud": "net-api"}, b"top-secret")
         self.assertEqual(ns_a7["verify_hs256_jwt"](expired_tok, b"top-secret", expected_iss="fam-auth", expected_aud="net-api", now=100), {"ok": False, "error": "token_expired"})
@@ -783,6 +792,112 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(mismatch_res["ok"], False)
         self.assertEqual(mismatch_res["error_tag"], "mismatched-message-id")
 
+        # ---- Batch 6 (auto_09..auto_13) regression assertions ----
+        a9_lesson = data["lessons"]["auto_09"]
+        a9_s = json.dumps(a9_lesson, ensure_ascii=False)
+        self.assertIn("RFC 8040", a9_s)
+        self.assertIn("yang-data+xml", a9_s)
+        self.assertIn("406 Not Acceptable", a9_s)
+        self.assertIn("GET /operational", a9_s)
+        self.assertEqual(a9_lesson["bridge"]["nextId"], "auto_10")
+        self.assertEqual(a9_lesson["bridge"]["nextTitle"], data["lessons"]["auto_10"]["title"])
+        m_a9_py = re.search(r"```python\n([\s\S]+?)\n```", a9_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a9_py, "auto_09 runnable python block missing")
+        ns_a9: dict = {}
+        exec(compile(m_a9_py.group(1), "restconf_client_lab.py", "exec"), ns_a9)
+        # RESTCONF client MUST reject non-HTTPS and handle 4xx structurally
+        with self.assertRaises(ValueError):
+            ns_a9["get_config"]("http://10.255.0.1/restconf/data/ietf-interfaces:interfaces", "tok")
+
+        a10_lesson = data["lessons"]["auto_10"]
+        a10_s = json.dumps(a10_lesson, ensure_ascii=False)
+        self.assertIn("RFC 7950", a10_s)
+        self.assertIn("Container", a10_s)
+        self.assertIn("List", a10_s)
+        self.assertIn("grouping", a10_s)
+        self.assertIn("augment", a10_s)
+        self.assertEqual(a10_lesson["bridge"]["nextId"], "auto_11")
+        self.assertEqual(a10_lesson["bridge"]["nextTitle"], data["lessons"]["auto_11"]["title"])
+        m_a10_py = re.search(r"```python\n([\s\S]+?)\n```", a10_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a10_py, "auto_10 runnable python block missing")
+        ns_a10: dict = {}
+        exec(compile(m_a10_py.group(1), "yang_model_lab.py", "exec"), ns_a10)
+        # YANG payload validation MUST catch missing required keys
+        self.assertEqual(
+            ns_a10["validate_payload_against_model"](["enabled"], ["name", "enabled"]),
+            {"ok": False, "error": "missing_required_key", "key": "name"},
+        )
+        self.assertEqual(
+            ns_a10["validate_payload_against_model"](["name", "enabled"], ["name", "enabled"]),
+            {"ok": True},
+        )
+
+        a11_lesson = data["lessons"]["auto_11"]
+        a11_s = json.dumps(a11_lesson, ensure_ascii=False)
+        self.assertIn("control node", a11_s)
+        self.assertIn("managed node", a11_s)
+        self.assertIn("inventory", a11_s)
+        self.assertIn("ios_config", a11_s)
+        self.assertIn("handlers", a11_s)
+        self.assertEqual(a11_lesson["bridge"]["nextId"], "auto_12")
+        self.assertEqual(a11_lesson["bridge"]["nextTitle"], data["lessons"]["auto_12"]["title"])
+        m_a11_py = re.search(r"```python\n([\s\S]+?)\n```", a11_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a11_py, "auto_11 runnable python block missing")
+        ns_a11: dict = {}
+        exec(compile(m_a11_py.group(1), "ansible_playbook_lab.py", "exec"), ns_a11)
+        # Playbook parse MUST extract play + tasks
+        _yaml_src = m_a11_py.group(1)
+        _yaml_body = _yaml_src.split("playbook_yaml = ", 1)[1].strip()
+        _yaml_body = _yaml_body[3:-3] if _yaml_body.startswith(chr(39) * 3) else _yaml_body
+        pb = ns_a11["parse_playbook"](_yaml_body + chr(39))
+        self.assertTrue(len(pb["plays"]) >= 1)
+        self.assertTrue(any(t["module"] == "ios_config" for t in pb["plays"][0]["tasks"]))
+        # idempotency simulation: same state => no changes
+        self.assertEqual(ns_a11["simulate_idempotent_run"]({"vlan": 111}, {"vlan": 111}), {"ok": True, "changed": 0, "note": "idempotent - no changes"})
+        self.assertEqual(ns_a11["simulate_idempotent_run"]({"vlan": 111}, {"vlan": 10}), {"ok": True, "changed": 1, "note": "state changed"})
+
+        a12_lesson = data["lessons"]["auto_12"]
+        a12_s = json.dumps(a12_lesson, ensure_ascii=False)
+        self.assertIn("HCL", a12_s)
+        self.assertIn("provider", a12_s)
+        self.assertIn("state lifecycle", a12_s)
+        self.assertIn("terraform plan", a12_s)
+        self.assertIn("terraform apply", a12_s)
+        self.assertIn("state drift", a12_s)
+        self.assertEqual(a12_lesson["bridge"]["nextId"], "auto_13")
+        self.assertEqual(a12_lesson["bridge"]["nextTitle"], data["lessons"]["auto_13"]["title"])
+        m_a12_py = re.search(r"```python\n([\s\S]+?)\n```", a12_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a12_py, "auto_12 runnable python block missing")
+        ns_a12: dict = {}
+        exec(compile(m_a12_py.group(1), "terraform_lab.py", "exec"), ns_a12)
+        # Terraform lifecycle simulation: first run creates, second run is idempotent
+        prov12 = ns_a12["MockProvider"]({"vlan_112": None})
+        run1 = ns_a12["run_lifecycle"](prov12, {"vlan_112": "TERRAFORM_IAC"})
+        self.assertEqual(run1["changes"], 1)
+        self.assertEqual(run1["state"], {"vlan_112": "TERRAFORM_IAC"})
+        run2 = ns_a12["run_lifecycle"](prov12, {"vlan_112": "TERRAFORM_IAC"})
+        self.assertEqual(run2["changes"], 0)
+
+        a13_lesson = data["lessons"]["auto_13"]
+        a13_s = json.dumps(a13_lesson, ensure_ascii=False)
+        self.assertIn("Cisco NSO", a13_s)
+        self.assertIn("northbound", a13_s)
+        self.assertIn("southbound", a13_s)
+        self.assertIn("NETCONF", a13_s)
+        self.assertIn("RESTCONF", a13_s)
+        self.assertIn("service point", a13_s)
+        self.assertIn("device driver", a13_s)
+        self.assertEqual(a13_lesson["bridge"]["nextId"], "auto_14")
+        m_a13_py = re.search(r"```python\n([\s\S]+?)\n```", a13_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a13_py, "auto_13 runnable python block missing")
+        ns_a13: dict = {}
+        exec(compile(m_a13_py.group(1), "nso_service_lab.py", "exec"), ns_a13)
+        # NSO service provisioning simulation MUST succeed and record steps
+        res13 = ns_a13["MockNso"]().provision_service("fam-lan", {"target-router": {"lan-vlan": 113}})
+        self.assertEqual(res13["ok"], True)
+        self.assertEqual(len(res13["steps"]), 1)
+        self.assertEqual(res13["steps"][0]["device"], "target-router")
+
         err_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><rpc-error><error-tag>lock-denied</error-tag><error-message>Locked by 9</error-message></rpc-error></rpc-reply>', "102")
         self.assertEqual(err_res, {"ok": False, "error_tag": "lock-denied", "error_message": "Locked by 9"})
         mal_res = ns_a8["parse_rpc_reply"]("<rpc-reply><broken>", "102")
@@ -828,9 +943,9 @@ class AcademyRedesignTests(unittest.TestCase):
                 self.fail(msg)
             self.skipTest(msg)
 
-        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1..5 lesson
+        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1..6 lesson
         extracted_labs = {}
-        for lid in f4_b1_to_b5:
+        for lid in f4_b1_to_b6:
             step_txt = data["lessons"][lid]["lab"]["steps"][2]
             start_idx = step_txt.index("`configure terminal`")
             cmds = re.findall(r"`([^`]+)`", step_txt[start_idx:])

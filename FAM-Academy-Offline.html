@@ -18192,12 +18192,15 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
           "۲. هدف ساخت `VLAN 107` (`TLS_PKI`) و اختصاص پورت `Gi0/7` به ایستگاه تست سرویس‌های HTTPS/PKI با `switchport nonegotiate` است.",
           "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 107` -> `name TLS_PKI` -> `exit` -> `interface Gi0/7` -> `description PKI-GATEWAY` -> `switchport mode access` -> `switchport access vlan 107` -> `switchport nonegotiate` -> `end`.",
           "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` ثبت تغییرات را تایید نمایید.",
-          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (آزمایش امضای `JWT HS256` با رمزگشایی سخت‌گیرانهٔ `Base64URL`، بررسی عدد متناهی `exp`، صادرکننده `iss`، مخاطب `aud` و رد کنترل‌شدهٔ ورودی بدشکل — فایل `jwt_verify_lab.py`):**\n```python\nimport base64\nimport binascii\nimport hashlib\nimport hmac\nimport json\nimport math\nimport re\nimport time\n\n_B64U_RE = re.compile(r\"^[A-Za-z0-9_-]+$\")\n\ndef _b64u_enc(raw: bytes) -> str:\n    return base64.urlsafe_b64encode(raw).rstrip(b\"=\").decode(\"ascii\")\n\ndef _b64u_dec_strict(txt: str) -> bytes:\n    if not _B64U_RE.fullmatch(txt) or (len(txt) % 4 == 1):\n        raise ValueError(\"invalid base64url segment\")\n    pad = \"=\" * ((4 - len(txt) % 4) % 4)\n    raw = base64.urlsafe_b64decode((txt + pad).encode(\"ascii\"))\n    if _b64u_enc(raw) != txt:\n        raise ValueError(\"non-canonical base64url segment\")\n    return raw\n\ndef _reject_json_const(val: str):\n    raise ValueError(f\"invalid JSON constant: {val}\")\n\ndef create_hs256_jwt(payload: dict, secret: bytes) -> str:\n    hdr = _b64u_enc(json.dumps({\"alg\": \"HS256\", \"typ\": \"JWT\"}, separators=(\",\", \":\")).encode())\n    pld = _b64u_enc(json.dumps(payload, separators=(\",\", \":\")).encode())\n    sig = hmac.new(secret, f\"{hdr}.{pld}\".encode(\"ascii\"), hashlib.sha256).digest()\n    return f\"{hdr}.{pld}.{_b64u_enc(sig)}\"\n\ndef verify_hs256_jwt(\n    token: str,\n    secret: bytes,\n    expected_iss: str | None = None,\n    expected_aud: str | None = None,\n    now: int | None = None,\n) -> dict:\n    if not isinstance(token, str):\n        return {\"ok\": False, \"error\": \"malformed_token\"}\n    parts = token.split(\".\")\n    if len(parts) != 3:\n        return {\"ok\": False, \"error\": \"malformed_token\"}\n    hdr_b64, pld_b64, sig_b64 = parts\n    try:\n        header = json.loads(_b64u_dec_strict(hdr_b64).decode(\"utf-8\"), parse_constant=_reject_json_const)\n        payload = json.loads(_b64u_dec_strict(pld_b64).decode(\"utf-8\"), parse_constant=_reject_json_const)\n        sig = _b64u_dec_strict(sig_b64)\n    except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError, ValueError):\n        return {\"ok\": False, \"error\": \"malformed_token\"}\n    if not isinstance(header, dict) or not isinstance(payload, dict):\n        return {\"ok\": False, \"error\": \"malformed_token\"}\n    if header.get(\"alg\") != \"HS256\":\n        return {\"ok\": False, \"error\": \"unsupported_alg\"}\n    if \"typ\" in header and str(header[\"typ\"]).upper() != \"JWT\":\n        return {\"ok\": False, \"error\": \"invalid_typ\"}\n    expected_sig = hmac.new(secret, f\"{hdr_b64}.{pld_b64}\".encode(\"ascii\"), hashlib.sha256).digest()\n    if not hmac.compare_digest(sig, expected_sig):\n        return {\"ok\": False, \"error\": \"invalid_signature\"}\n    cur_ts = int(time.time()) if now is None else now\n    exp = payload.get(\"exp\")\n    if not isinstance(exp, (int, float)) or isinstance(exp, bool) or not math.isfinite(exp):\n        return {\"ok\": False, \"error\": \"missing_or_invalid_exp\"}\n    if exp <= cur_ts:\n        return {\"ok\": False, \"error\": \"token_expired\"}\n    if expected_iss is not None and payload.get(\"iss\") != expected_iss:\n        return {\"ok\": False, \"error\": \"invalid_iss\"}\n    if expected_aud is not None:\n        aud = payload.get(\"aud\")\n        aud_ok = (aud == expected_aud) or (isinstance(aud, list) and expected_aud in aud)\n        if not aud_ok:\n            return {\"ok\": False, \"error\": \"invalid_aud\"}\n    return {\"ok\": True, \"claims\": payload}\n```\n*(توجه مهم: این نمونه یک آزمایش آموزشی برای بررسی امضای `HS256` و چک‌های پایهٔ `exp`/`iss`/`aud` است، نه یک اعتبارسنج کامل تولیدی؛ در محیط عملی حتماً از کتابخانه‌های معتبر مانند `PyJWT` یا `authlib` با سیاست مشخص کلیدهای مورد اعتماد/`JWKS` استفاده کنید.)* **خروجی مرجع و نشانهٔ موفقیت:** بازگشت `{\"ok\": True, \"claims\": ...}` برای توکن معتبر، و رد کنترل‌شده با کدهای خطای مشخص برای توکن منقضی (`exp: 1 -> token_expired`)، `exp: NaN`، `aud`/`iss` ناهماهنگ، `alg=none`، دستکاری Payload و Base64URL خراب (از جمله افزودن `!!!!` به انتهای امضا، بدون دور زدن اعتبارسنج). **نشانهٔ شکست:** پذیرش کاراکترهای غیرBase64URL به‌صورت بی‌صدا، پذیرش `exp: NaN`، پذیرش `alg=none`، کرش با `JSONDecodeError`، یا قرار دادن رمز در Payload `JWT`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط `VLAN 107` و `Gi0/7` را نگه می‌دارد و سرور HTTPS/TLS یا OAuth ندارد (توابع بالا با تمام حالت‌های منقضی، `exp: NaN`، امضای دارای `!!!!`، مخاطب اشتباه و ورودی بدشکل در تست‌های واحد واقعی Python آزموده می‌شوند)."
+          "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (آزمایش امضای `JWT HS256` با رمزگشایی سخت‌گیرانهٔ `Base64URL`، بررسی عدد متناهی `exp`، صادرکننده `iss`، مخاطب `aud` و رد کنترل‌شدهٔ ورودی بدشکل — فایل `jwt_verify_lab.py`):**\n```python\nimport base64\nimport binascii\nimport hashlib\nimport hmac\nimport json\nimport math\nimport re\nimport time\n\n_B64U_RE = re.compile(r\"^[A-Za-z0-9_-]+$\")\n\ndef _b64u_enc(raw: bytes) -> str:\n    return base64.urlsafe_b64encode(raw).rstrip(b\"=\").decode(\"ascii\")\n\ndef _b64u_dec_strict(txt: str) -> bytes:\n    if not _B64U_RE.fullmatch(txt) or (len(txt) % 4 == 1):\n        raise ValueError(\"invalid base64url segment\")\n    pad = \"=\" * ((4 - len(txt) % 4) % 4)\n    raw = base64.urlsafe_b64decode((txt + pad).encode(\"ascii\"))\n    if _b64u_enc(raw) != txt:\n        raise ValueError(\"non-canonical base64url segment\")\n    return raw\n\ndef _reject_json_const(val: str):\n    raise ValueError(f\"invalid JSON constant: {val}\")\n\ndef _exp_is_valid(exp: object) -> bool:\n    if not isinstance(exp, (int, float)) or isinstance(exp, bool):\n        return False\n    try:\n        return math.isfinite(float(exp))\n    except (OverflowError, ValueError):\n        return False\n\ndef create_hs256_jwt(payload: dict, secret: bytes) -> str:\n    hdr = _b64u_enc(json.dumps({\"alg\": \"HS256\", \"typ\": \"JWT\"}, separators=(\",\", \":\")).encode())\n    pld = _b64u_enc(json.dumps(payload, separators=(\",\", \":\")).encode())\n    sig = hmac.new(secret, f\"{hdr}.{pld}\".encode(\"ascii\"), hashlib.sha256).digest()\n    return f\"{hdr}.{pld}.{_b64u_enc(sig)}\"\n\ndef verify_hs256_jwt(\n    token: str,\n    secret: bytes,\n    expected_iss: str | None = None,\n    expected_aud: str | None = None,\n    now: int | None = None,\n) -> dict:\n    if not isinstance(token, str):\n        return {\"ok\": False, \"error\": \"malformed_token\"}\n    parts = token.split(\".\")\n    if len(parts) != 3:\n        return {\"ok\": False, \"error\": \"malformed_token\"}\n    hdr_b64, pld_b64, sig_b64 = parts\n    try:\n        header = json.loads(_b64u_dec_strict(hdr_b64).decode(\"utf-8\"), parse_constant=_reject_json_const)\n        payload = json.loads(_b64u_dec_strict(pld_b64).decode(\"utf-8\"), parse_constant=_reject_json_const)\n        sig = _b64u_dec_strict(sig_b64)\n    except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError, ValueError):\n        return {\"ok\": False, \"error\": \"malformed_token\"}\n    if not isinstance(header, dict) or not isinstance(payload, dict):\n        return {\"ok\": False, \"error\": \"malformed_token\"}\n    if header.get(\"alg\") != \"HS256\":\n        return {\"ok\": False, \"error\": \"unsupported_alg\"}\n    if \"typ\" in header and str(header[\"typ\"]).upper() != \"JWT\":\n        return {\"ok\": False, \"error\": \"invalid_typ\"}\n    expected_sig = hmac.new(secret, f\"{hdr_b64}.{pld_b64}\".encode(\"ascii\"), hashlib.sha256).digest()\n    if not hmac.compare_digest(sig, expected_sig):\n        return {\"ok\": False, \"error\": \"invalid_signature\"}\n    cur_ts = int(time.time()) if now is None else now\n    exp = payload.get(\"exp\")\n    if not _exp_is_valid(exp):\n        return {\"ok\": False, \"error\": \"missing_or_invalid_exp\"}\n    if float(exp) <= cur_ts:\n        return {\"ok\": False, \"error\": \"token_expired\"}\n    if expected_iss is not None and payload.get(\"iss\") != expected_iss:\n        return {\"ok\": False, \"error\": \"invalid_iss\"}\n    if expected_aud is not None:\n        aud = payload.get(\"aud\")\n        aud_ok = (aud == expected_aud) or (isinstance(aud, list) and expected_aud in aud)\n        if not aud_ok:\n            return {\"ok\": False, \"error\": \"invalid_aud\"}\n    return {\"ok\": True, \"claims\": payload}\n```\n*(توجه مهم: این نمونه یک آزمایش آموزشی برای بررسی امضای `HS256` و چک‌های پایهٔ `exp`/`iss`/`aud` است، نه یک اعتبارسنج کامل تولیدی؛ در محیط عملی حتماً از کتابخانه‌های معتبر مانند `PyJWT` یا `authlib` با سیاست مشخص کلیدهای مورد اعتماد/`JWKS` استفاده کنید.)* **خروجی مرجع و نشانهٔ موفقیت:** بازگشت `{\"ok\": True, \"claims\": ...}` برای توکن معتبر، و رد کنترل‌شده با کدهای خطای مشخص برای توکن منقضی (`exp: 1 -> token_expired`)، `exp: NaN`، `aud`/`iss` ناهماهنگ، `alg=none`، دستکاری Payload و Base64URL خراب (از جمله افزودن `!!!!` به انتهای امضا، بدون دور زدن اعتبارسنج). **نشانهٔ شکست:** پذیرش کاراکترهای غیرBase64URL به‌صورت بی‌صدا، پذیرش `exp: NaN`، پذیرش `alg=none`، کرش با `JSONDecodeError`، یا قرار دادن رمز در Payload `JWT`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط `VLAN 107` و `Gi0/7` را نگه می‌دارد و سرور HTTPS/TLS یا OAuth ندارد (توابع بالا با تمام حالت‌های منقضی، `exp: NaN`، امضای دارای `!!!!`، مخاطب اشتباه و ورودی بدشکل در تست‌های واحد واقعی Python آزموده می‌شوند)."
         ],
         "verifyCmds": [
           "show vlan brief",
           "show interfaces Gi0/7 switchport",
           "show running-config"
+        ],
+        "notes": [
+          "نمونه امضاشده با exp = 10**400 (int بسیار بزرگ) باید با خطای ساختاریافته \"missing_or_invalid_exp\" رد شود؛ float(10**400) OverflowError می‌کند و با try/except کنترل شده است."
         ]
       },
       "troubleshooting": {
@@ -18522,623 +18525,1139 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
       "bridge": {
         "why": "در پایان درس `NETCONF` دیدید که با وجود نقل‌وانتقال تمیز با `XML` یا `JSON`، ستون فقرات واقعی که شکل درختی این داده‌ها را تعریف می‌کند زبان مدل‌سازی **`YANG`** و همتای سبک‌وزن آن روی وب یعنی **`RESTCONF`** است.",
         "nextId": "auto_09",
-        "nextTitle": "۷.۷ Automation (درس ۹ از ۲۰): مدل داده YANG و پروتکل RESTCONF"
+        "nextTitle": "۷.۷ Automation (درس ۹ از ۲۰): پروتکل RESTCONF"
       },
       "exercise": "سناریوی تغییر حساس روی یک روتر مرکزی از راه دور با `ncclient`: چگونه در ۳ گام از (الف) تداخل دو مهندس، (ب) قطع ماندن همیشگی دسترسی مدیریتی در صورت دستور اشتباه و (ج) باقی ماندن تغییر در حال بوت نشدن بعد از ریبوت جلوگیری می‌کنید؟"
     },
     "auto_09": {
-      "id": "auto_09",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۷ Automation (درس ۹ از ۲۰): پروتکل RESTCONF",
-      "lead": "اگر XML و نشست‌های حالت‌دار NETCONF روی پورت ۸۳۰ برایتان کمی سنگین است و دلتان می‌خواهد مستقیم با همان کتابخانه ساده وب (requests / curl / Postman) و با فرمت سبک JSON تنظیمات مدل‌شده YANG را روی روتر اعمال کنید، پاسخ پروتکل RESTCONF است!",
-      "goal": "درک کامل ساختار URL در RESTCONF (/restconf/data/...)، هدرهای اجباری application/yang-data+json، نگاشت افعال HTTP به عملیات RESTCONF و تفاوت دقیق RESTCONF و NETCONF.",
-      "prereq": "آشنایی با REST API، JSON و NETCONF (دروس ۵، ۶ و ۸ اتوماسیون).",
+      "lead": "پس از اینکه `NETCONF` روی `SSH 830` көрсет که پیکربندی شبکه را می‌توان با پیام‌های ساختاریافته `XML` در همان‌اله‌ای منظم تغییر داد، فاصله‌ی بزرگی میان `XML` و ابزارهای اتوماسیونعملیات شبکه را می‌دهد:",
+      "goal": "درک تفاوت دقیق `RESTCONF` (`RFC 8040`) با `NETCONF`، دارایی‌های `Content-Type` و `Accept`، mapping REST verbs به NETCONF operations، مفاهیم `Datastore` و `POST`/`PUT`/`DELETE` روی `/config`، و تفکیک حمل‌ونقل امن با `TLS` از `Bearer`/`OAuth` بر اساس سیاست امنیتی، همراه با یک سناریوی عملی python که درخواست RESTCONF را با `requests` و حقوق `Accept`/`Content-Type` صحیحสร้าง و پاسخ را با تمایزی سخت‌گیرانه parsing می‌کند.",
+      "prereq": "آشنایی با `NETCONF` (`RFC 6241`)، `YANG` (درس ۱۰)، و گقابلبت‌های `REST` (`GET`/`POST`/`PUT`/`DELETE`).",
       "sections": [
         {
-          "h": "۱. کالبدشکافی URL و هدرهای استاندارد در پروتکل RESTCONF (RFC 8040)",
+          "h": "۱. تعریف `RESTCONF` (`RFC 8040`) و معماری دو لایهٔ آن",
           "p": [
-            "پروتکل RESTCONF روی Cisco IOS XE با دو دستور ساده فعال می‌شود: ip http secure-server و restconf. بعد از آن کل ساختار YANG روتر مثل یک درخت فایل روی وب در دسترس قرار می‌گیرد:"
-          ],
-          "bullets": [
-            "مسیر ریشه (Root Resource): با زدن GET به /.well-known/host-meta مسیر پایه پیدا می‌شود که همیشه /restconf است.",
-            "مسیر داده‌ها (/restconf/data/...): برای خواندن یا تغییر دادن تمام تنظیمات Config و State استفاده می‌شود! مثلاً برای خواندن تنظیمات اینترفیس‌ها با مدل IETF مسیر دقیق چنین است: https://<router-ip>/restconf/data/ietf-interfaces:interfaces/interface=GigabitEthernet1 (دقت کنید در RESTCONF اعضای لیست با علامت مساوی = و کاما مشخص می‌شوند نه اسلش!).",
-            "مسیر عملیات (/restconf/operations/...): برای اجرای دستورالعمل‌های اجرایی (RPC مثل save-config یا reload یا ping) استفاده می‌شود.",
-            "هدرهای اجباری (بسیار مهم و امتحانی!): در درخواست RESTCONF نباید application/json خالی بفرستید؛ استاندارد RFC 8040 می‌گوید باید حتماً Accept: application/yang-data+json و در زمان ارسال داده Content-Type: application/yang-data+json بگذارید (در غیر این صورت روتر خطای 406 Not Acceptable یا 415 Unsupported Media Type می‌دهد!)."
+            "`RESTCONF` یک رابط **`HTTP`** (به‌طور معمول `HTTPS` روی پورت `443` یا `830` با `TLS`) برای دسترسی به مدل‌های `YANG` تعریف می‌کند؛ هر درخواست HTTP مستقیماً یک `NETCONF` `RPC` تحت‌الضمن می‌شود، اما کلیاتِ خودکار RPC (مانند `message-id` و فریم‌بندی `]]>]]>`) بر عهده‌ی کاربر نیست. پروتکل به‌صورت دو لایهٔ مجزا عمل می‌کند: **لایه‌ی حمل‌ونقل (`Transport`)** که `HTTP/1.1` یا `HTTP/2` و معمولاً `TLS` است و **لایه‌ی رابط (`Interface`)** که در `URI`ها، `Methods`، و headerهای `Accept`/`Content-Type` مشخص می‌شود.",
+            "مهم‌ترین ماده‌ی `RFC 8040` این است که `RESTCONF` **معادل ساده‌سازی‌ی NETCONF بر HTTP** نیست: هر URI یک namespace از مدل `YANG` را نشان می‌دهد و روش‌های HTTP روی آن به‌صورت دقیقی تعریف‌شده‌اند، از قبیل `GET /config/ietf-interfaces:interfaces` که یک `<get-config>` است و `PUT /config/ietf-interfaces:interfaces/interface/name/Gi0/7` که یک `<edit-config>` با `method=replace` می‌باشد."
           ]
         },
         {
-          "h": "۲. تفاوت افعال POST، PUT، PATCH و DELETE روی درخت YANG روتر",
+          "h": "۲. دارایی‌های `Accept`، `Content-Type` و mapping `Methods`",
           "p": [
-            "در RESTCONF هر فعل HTTP معنای بسیار دقیقی دارد: GET داده را می‌خواند (با پارامتر اختیاری ?content=config فقط تنظیمات و با ?content=nonconfig فقط وضعیت لحظه‌ای را می‌گیرد)؛ POST فقط برای ساخت یک عنصر جدید داخل لیست است (اگر از قبل باشد خطای 409 Conflict می‌دهد!)؛ PUT کل منبع مشخص‌شده در URL را می‌سازد یا کاملاً جایگزین می‌کند؛ PATCH فقط فیلدهای داخل JSON را در همان آدرس تغییر جزئی می‌دهد؛ و DELETE آن شاخه یا اینترفیس مجازی (مثل Loopback10) را پاک می‌کند."
+            "هر درخواست `RESTCONF` باید **با `Accept` صحیح** همراه باشد؛ اگر سرور به‌جز `application/yang-data+xml` قادر به تولید `application/yang-data+json` نیست و کلاینت فقط `application/json` می‌پذیرد، سرور **به‌صورت استاندارد `406 Not Acceptable`** پاسخ می‌دهد و نه یک json خطا. برعکس، در صورت درخواست `yang-data+json`، سرور payload را در فرمت `JSON` با ساختار `data` که ينامی از مدل است return می‌کند.",
+            "`GET` روی `/config` یک `<get-config>` است، `GET` روی `/operational` یک `<get>`، `POST`/`PUT`/`PATCH`/`DELETE` روی `/config` معادل `<edit-config>` با ops مختلف (`merge`، `replace`، `delete`) و `POST` روی `/operational` یک `<get-config>` یا `<rpc>` تعریف‌شده‌در-مدل می‌تواند باشد. این mapping است که درک اینکه `PUT` روی یک `URI` خاص به‌کمک `replace` کل اسناد ناحیه‌ی تحت‌آن را بازنویسی می‌کند، ضروری است."
+          ]
+        },
+        {
+          "h": "۳. حمل‌ونقل امن: `TLS` در برابر `Bearer`/`OAuth 2.0`",
+          "p": [
+            "`RFC 8040` می‌گوید `RESTCONF` **باید** روی `TLS` اجرا شود؛ شناسه‌ی کاربر (`username`) و رمز در session `TLS` (اثر `mutual TLS` یا mTLS) حمل می‌شوند، **نه** در header `Authorization`. اما دربسیاری از پیاده‌سازی‌ها از جمله `Cisco IOS-XE` و `Cisco ASA` از `HTTP` با سرور `Bearer`/`OAuth 2.0` (`RFC 6749`) نیز پشتیبانی می‌شود؛ در این حالت اعتبارسنجی‌ی صریح **مستقل** از `TLS` است و token باید با `iss`، `aud`، `exp` و `scope` بررسی شود و از انتقال آن از طریق redirect ( که خطرات `leak` دارد ) خودداری شود.",
+            "تمایزی مهم: `TLS` فقط **اثربری** و حریم داده را تضمین می‌کند، اما شناسه‌ی کاربر و اجازه‌ی دسترسی (`authorization`) از لایه‌ی حمل‌ونقل جداگانه بررسی می‌شوند؛ بنابراین یک اتصال `TLS` معتبر، لزوماً به معنای **تایید موفقیت‌آمیز کاربر** نیست."
+          ]
+        },
+        {
+          "h": "۴. عیب‌یابی معمول: ۴۰۴، ۴۰۶ و کوکی ",
+          "p": [
+            "خطاهای رایج شامل `404 Not Found` (URI wrong یا مدل پشتیبانی نمی‌شود)، `406 Not Acceptable` (معیار `Accept` اشتباه است، مثلاً درخواست `yang-data+json` که سرور آن را تولید نمی‌کند)، `400 Bad Request` (payload نامطابق با مدل `YANG`)، و `401`/`403` برای تأیید محرمی است. لاگ سرور و `show restconf status` (در `IOS-XE`) معمولاً ریشه‌ی دقیق خطای `4xx` را نشان می‌دهد.",
+            "نکته‌ی ظریف: خطای `403 Forbidden` که در یک سرور `RESTCONF` با `Bearer token` دریافت می‌شود، ممکن است ناشی از توکن‌ی که `exp` آن گذشته یا `scope` آن ناقص است باشد، نه‌ازไร้‌اثر بودن TLS. عیب‌یابی باید این لایه‌ها را به‌طور مجزا بررسی کند."
           ]
         }
       ],
       "protocolAnalysis": [
-        "در تحلیل عملی ۷.۷ Automation (درس ۹ از ۲۰)، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
+        "**تحلیل `HTTP GET` بر `/config`:** یک `GET /config/ietf-interfaces:interfaces` در `RESTCONF` یک `<get-config source=\"running\">` تحت‌الضمن است و پاسخ آن داده‌ی پیکربندی در فرمت XML یا JSON به‌همراه کد وضعیت `200 OK` (در صورت درخواست `yang-data+xml`/`yang-data+json`) است، نه یک پیام `<rpc-reply>` دست‌ساز.",
+        "**تحلیل `PUT` و `DELETE` بر `/config`:** `PUT` یک `<edit-config>` با `method=replace` است؛ کل node موردنظر (و نه فقط بخشی از آن) بازنویسی می‌شود و `DELETE` یک `<edit-config>` با `method=delete` است که node را کاملاً حذف می‌کند. در هر دو حالت اگر node وجود نداشته باشد خطای `404 Not Found`، و اگر مدل یا `URI` نامطابق باشد `400 Bad Request` دریافت می‌شود.",
+        "**تحلیل `406 Not Acceptable`:** این پاسخ استاندارد HTTP برای میان‌بری سرور در تولید فرمت خواسته‌شده است: سرور موافقت می‌کند که `yang-data+xml` بسازد، اما کلاینت فقط `application/json` می‌پذیرد. ساده‌تر راه‌حل، درخواست `Accept: application/yang-data+xml` است و نه قلدری `Accept: */*` که می‌تواند در برخی پیاده‌سازی‌ها در foult produce وضعیت `200` با فرمت غیرقابل‌اعتماد return کند."
       ],
       "iosCommands": [
         {
-          "cmd": "show ip bgp summary",
-          "out": "10.255.0.2  4  65200  1420  1418  128",
-          "note": "پایش همسایگی BGP و تعداد Prefixها"
+          "cmd": "show running-config",
+          "why": "*(در شبیه‌ساز داخلی IOS)* بررسی ثبت VLAN و پورت `Gi0/7` در شبیه‌ساز محلی.",
+          "anatomy": "show running-config",
+          "lookFor": "دیده شدن `vlan` و پورت `Gi0/7` با `nonegotiate`.",
+          "ifUnexpected": "در `configure terminal` تنظیمات VLAN و پورت آزمایشگاه را تکمیل کنید."
         },
         {
-          "cmd": "show ip route",
-          "out": "B  172.16.0.0/16 [20/0] via 10.255.0.2",
-          "note": "بررسی مسیرهای BGP در RIB"
+          "cmd": "show vlan brief",
+          "why": "*(در شبیه‌ساز داخلی IOS)* تایید وجود VLAN و تگ‌گذاری پورت.",
+          "anatomy": "show vlan brief",
+          "lookFor": "دیده شدن VLAN 109 (RESTCONF_830) و وضعیت `active`.",
+          "ifUnexpected": "با `vlan {vlan}` و `name {name}` آن را ایجاد کنید."
+        },
+        {
+          "cmd": "show restconf status",
+          "why": "*(دستور مرجع غیرشبیه‌سازی‌شده روی روتر `IOS-XE`)* بررسی وضعیت سرویس `RESTCONF`، پورت، و وضعیت `TLS` و `session`.",
+          "anatomy": "show restconf status",
+          "lookFor": "دیده شدن وضعیت `enabled` و پورت `443`/`830` و شناساییชัน‌های فعال.",
+          "ifUnexpected": "با `restconf http tls-port 830` (در `IOS-XE`) سرویس را فعال کرده و `restconf http base-uri` را تنظیم کنید."
+        },
+        {
+          "cmd": "show netconf-yang datastores",
+          "why": "*(دستور مرجع غیرشبیه‌سازی‌شده روی روتر `IOS-XE`)* بررسی Datastoreهای `running` و `candidate` که `RESTCONF` بر آن‌ها کار می‌کند.",
+          "anatomy": "show netconf-yang datastores",
+          "lookFor": "دیده شدن `running` و در صورت فعال‌سازی، `candidate`.",
+          "ifUnexpected": "سیاست `restconf` و قابلیت‌های NETCONF را بررسی و با `enable restconf` فعال کنید."
         }
       ],
       "diagramSvg": "topo",
       "lab": {
-        "title": "آزمایشگاه عملی: ۷.۷ Automation (درس ۹ از ۲۰)",
+        "title": "آزمایشگاه عملی: آماده‌سازی VLAN 109 (`RESTCONF_830`) در شبیه‌ساز + درخواست RESTCONF امن با `requests`، تمیز `Accept`/`Content-Type` و بررسی دقیق `4xx`",
         "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۷ Automation (درس ۹ از ۲۰) را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
+          "۱. در ترمینال شبیه‌ساز داخلی IOS با `enable` وارد شوید و با `show vlan brief` و `show interfaces Gi0/7 switchport` وضعیت اولیه را ببینید.",
+          "۲. هدف ساخت `VLAN 109` (`RESTCONF_830`) و اختصاص پورت `Gi0/7` به کلاینت `RESTCONF-CLIENT` با `switchport nonegotiate` است.",
+          "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 109` -> `name RESTCONF_830` -> `exit` -> `interface Gi0/7` -> `description RESTCONF-CLIENT` -> `switchport mode access` -> `switchport access vlan 109` -> `switchport nonegotiate` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
+          "**سناریوی مرجع غیرشبیه‌سازی‌شده (ساخت درخواست RESTCONF امن با `urllib.request` از stdlib، تمیز `Accept`/`Content-Type` و بررسی دقیق `4xx` و فرمت پاسخ — فایل `restconf_client_lab.py`):**\n```python\nimport json\nimport urllib.error\nimport urllib.request\n\nBASE = \"https://10.255.0.1\"\nTOKEN = \"dummy-bearer-token\"  # در محیط واقعی از OAuth 2.0 استفاده کنید\n\nclass _NoRedirectHandler(urllib.request.HTTPRedirectHandler):\n    \"\"\"بلوک‌کنندهٔ redirect: جلوگیری از نشت Authorization به گینه‌ی غیر HTTPS.\"\"\"\n    def redirect_request(self, req, fp, code, msg, headers, newurl):\n        return None\n\ndef get_config(url: str, token: str, opener=None) -> dict:\n    \"\"\"GET بر /config با Accept yang-data+xml؛ تمایز 4xx با تجزیه کد وضعیت.\"\"\"\n    if not url.lower().startswith(\"https://\"):\n        raise ValueError(\"RESTCONF requires an https:// URL\")\n    headers = {\"Accept\": \"application/yang-data+xml\", \"Authorization\": f\"Bearer {token}\"}\n    req = urllib.request.Request(url, headers=headers)\n    try:\n        resp = (opener or urllib.request.build_opener()).open(req, timeout=10)\n        body = resp.read().decode(\"utf-8\", \"replace\")\n        if resp.status != 200:\n            return {\"ok\": False, \"error\": \"http_error\", \"status\": resp.status, \"detail\": body[:200]}\n        return {\"ok\": True, \"status\": 200, \"data\": body}\n    except urllib.error.HTTPError as e:\n        body = e.read().decode(\"utf-8\", \"replace\") if e.fp else \"\"\n        if e.code == 406:\n            return {\"ok\": False, \"error\": \"not_acceptable\", \"status\": 406, \"detail\": body[:200]}\n        if e.code in (400, 401, 403, 404):\n            return {\"ok\": False, \"error\": f\"http_{e.code}\", \"status\": e.code, \"detail\": body[:200]}\n        return {\"ok\": False, \"error\": \"http_error\", \"status\": e.code, \"detail\": body[:200]}\n\ndef put_config(url: str, payload: str, token: str, opener=None) -> dict:\n    \"\"\"PUT بر /config با replace؛ بررسی 400/404/409/403.\"\"\"\n    if not url.lower().startswith(\"https://\"):\n        raise ValueError(\"RESTCONF requires an https:// URL\")\n    headers = {\n        \"Content-Type\": \"application/yang-data+xml\",\n        \"Accept\": \"application/yang-data+xml\",\n        \"Authorization\": f\"Bearer {token}\",\n    }\n    req = urllib.request.Request(url, data=payload.encode(\"utf-8\"), headers=headers, method=\"PUT\")\n    try:\n        resp = (opener or urllib.request.build_opener()).open(req, timeout=10)\n        return {\"ok\": True, \"status\": resp.status}\n    except urllib.error.HTTPError as e:\n        if e.code == 404:\n            return {\"ok\": False, \"error\": \"not_found\", \"status\": 404}\n        if e.code == 400:\n            return {\"ok\": False, \"error\": \"bad_request\", \"status\": 400}\n        if e.code == 403:\n            return {\"ok\": False, \"error\": \"forbidden\", \"status\": 403}\n        return {\"ok\": False, \"error\": \"http_error\", \"status\": e.code}\n\nif __name__ == \"__main__\":\n    print(get_config(f\"{BASE}/restconf/data/ietf-interfaces:interfaces\", TOKEN))\n```"
         ],
         "verifyCmds": [
-          "show ip bgp summary",
-          "show ip route"
+          "show vlan brief",
+          "show interfaces Gi0/7 switchport",
+          "show running-config"
         ]
       },
       "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۷ Automation (درس ۹ از ۲۰)، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
+        "fault": "یک اسکریپت python که درخواست `GET /config` با `Accept: application/json` می‌فرستد، با کد وضعیت `406 Not Acceptable` با کد خطا‌خورد؛ در حالی که درخواست `GET` با `Accept: application/yang-data+xml` به‌درستی پاسخ می‌دهد.",
+        "analysis": "ریشه در معیار `RFC 8040` است: سرور `RESTCONF` `yang-data+xml` می‌سازد ولی `yang-data+json` را پشتیبانی نمی‌کند، و `application/json` (که هم‌خوانی با yang-data+json ندارد) با `406` رد می‌شود. کاهای `Accept: */*` در برخی پیاده‌سازی‌ها احتمال return `200` با فرمت نامطمئن را دارد، ولی استاندارد `RFC 8040` بر صریح بودن `Accept` تأکید دارد.",
+        "fix": "در `Accept` header، دقیقاً `application/yang-data+xml` (یا `application/yang-data+json` اگر سرور آن را پشتیبانی کند) را بفرستید، و در decode پاسخ بر اساس `Content-Type` پاسخ تصمیم بگیرید."
       },
-      "exercise": "برای مبحث «۷.۷ Automation (درس ۹ از ۲۰)» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
-      "quiz": [
+      "exercises": [
         {
-          "q": "در پیاده‌سازی استاندارد «۷.۷ Automation (درس ۹ از ۲۰)» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
-          "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
-          ],
-          "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۷ Automation (درس ۹ از ۲۰) نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
+          "level": "ساده",
+          "task": "در `RESTCONF` (`RFC 8040`) کدام `HTTP Method` برای خواندن کامل پیکربندی اینترفیس‌ها از `running` به‌کار می‌رود و کجای URI باید بنویسید؟",
+          "hint": "`GET` و `/config`.",
+          "solution": "**`GET /config/ietf-interfaces:interfaces`** — یک `<get-config source=\"running\">` تحت‌الضمن است و داده‌ی پیکربندی را return می‌کند."
+        },
+        {
+          "level": "متوسط",
+          "task": "تفاوت دقیق درخواست `GET` با `Accept: application/json` که `406 Not Acceptable` برمی‌گرداند، با درخواست `GET` با `Accept: application/yang-data+xml` چیست؟",
+          "hint": "تبدیل فرمت و پشتیبانی سرور.",
+          "solution": "سرور `RESTCONF` در صورت عدم توانایی تولید فرمت خواسته‌شده، پاسخ استاندارد `406` می‌دهد. درخواست با `Accept: application/yang-data+xml` دقیقاً فرمت پشتیبانی‌شده‌ی `RFC 8040` برای `YANG` داده‌هاست و `200` برمی‌گرداند."
+        },
+        {
+          "level": "پیشرفته",
+          "task": "یک درخواست `PUT` بر یک `URI` `/config/.../interface/name/Gi0/7` با `Content-Type: application/yang-data+xml` و payload نامطابق مدل `YANG`، چه خطایی return می‌کند و چرا؟",
+          "hint": "نمای payload و مدل YANG.",
+          "solution": "`400 Bad Request` return می‌شود؛ payload توسط سرور پردازش نشده و با `RFC 8040` بر اساس تطابق با مدل `YANG` و نمادهای `yang-data+xml`، نامطابقی validation میانگین است. `PUT` معادل `<edit-config>` با `method=replace` است."
         }
       ],
       "table": {
-        "title": "مقایسه جامع فنی بین پروتکل‌های NETCONF و RESTCONF",
+        "title": "جدول mapping مهم‌ترین HTTP Methods در پروتکل RESTCONF (RFC 8040)",
         "headers": [
-          "معیار مقایسه",
-          "NETCONF (RFC 6241)",
-          "RESTCONF (RFC 8040)"
+          "Method و URI در RESTCONF",
+          "معادل NETCONF Operation",
+          "وظیفه و نکته کلیدی"
         ],
         "rows": [
           [
-            "پروتکل انتقال و پورت پیش‌فرض",
-            "SSH (TCP پورت ۸۳۰) — اتصال‌گرا (Stateful)",
-            "HTTPS (TCP پورت ۴۴۳) — بدون حالت (Stateless)"
+            "`GET /config/...`",
+            "`<get-config>`",
+            "خواندن پیکربندی از یک Datastore (معمولاً `running`)"
           ],
           [
-            "فرمت داده",
-            "فقط XML",
-            "JSON یا XML (بسیار محبوب با JSON)"
+            "`GET /operational/...`",
+            "`<get>`",
+            "خواندن داده‌ی عملیاتی زنده (State Data)"
           ],
           [
-            "هدر Media Type استاندارد",
-            "ندارد (درون نشست SSH)",
-            "application/yang-data+json (یا +xml)"
+            "`PUT /config/...`",
+            "`<edit-config method=replace>`",
+            "بازنویسی کامل node در پیکربندی"
           ],
           [
-            "پشتیبانی از Candidate Datastore و Commit/Lock",
-            "بله (کامل: candidate، lock، validate، rollback)",
-            "خیر (به‌صورت مستقیم روی running کار می‌کند؛ بدون lock/candidate استاندارد)"
+            "`POST /config/...`",
+            "`<edit-config method=merge>`",
+            "ترکیب تغییر با موجودیت"
           ],
           [
-            "مناسب‌ترین کاربرد",
-            "تغییرات بزرگ تراکنشی و همگام روی چند روتر (Cisco NSO)",
-            "ادغام سریع با داشبوردهای وب، اسکریپت‌های سبک پایتون و میکروسرویس‌ها"
+            "`DELETE /config/...`",
+            "`<edit-config method=delete>`",
+            "حذف کامل node"
+          ],
+          [
+            "`PATCH /config/...`",
+            "`<edit-config method=merge>`",
+            "ترکیب نسبی بدون بازنویسی کامل"
           ]
         ]
       },
       "faq": [
         {
-          "q": "چرا با وجود ساده بودن RESTCONF و JSON، سیستم‌های ارکستراسیون بزرگ مثل Cisco NSO هنوز به جای آن از NETCONF استفاده می‌کنند؟",
-          "a": "چون در تغییر بزرگ شبکه‌های مخابراتی که ۵۰ روتر باید هم‌زمان تغییر کنند، شما به Lock، مخزن پیش‌نویس Candidate، اعتبارسنجی پیش از اجرا و Rollback یکپارچه نیاز دارید که فقط در NETCONF وجود دارد."
+          "q": "آیا `RESTCONF` می‌تواند بدون `TLS` روی `HTTP` اجرا شود؟",
+          "a": "خیر؛ `RFC 8040` می‌گوید `RESTCONF` باید روی `TLS` (معمولاً پورت `443` یا `830` با `TLS`) اجرا شود. `TLS` برای اثربری داده و احترام به حریم است و **تأیید کاربر** از لایه‌ی حمل‌ونقل جداگانه است."
         },
         {
-          "q": "اگر در RESTCONF با درخواست GET یا PATCH خطای 415 Unsupported Media Type گرفتیم مشکل چیست؟",
-          "a": "حتماً هدر Content-Type را اشتباهی application/json گذاشته‌اید! باید دقیقاً application/yang-data+json بفرستید."
+          "q": "تفاوت `RESTCONF` با `NETCONF` در یک جمله چیست؟",
+          "a": "هر دو بر اساس مدل داده‌ی `YANG` کار می‌کنند؛ `NETCONF` روی `SSH 830` با `XML` و قابلیت‌های کامل RPC (`Lock`, `Candidate`, `Confirmed Commit`) عمل می‌کند، در حالی که `RESTCONF` رابط `HTTP` ساده‌تر بر اساس `RFC 8040` است که RPCها را به `Methods` HTTP mapping می‌کند."
         },
         {
-          "q": "آیا در RESTCONF وقتی یک PUT یا PATCH موفق انجام می‌شود، تنظیمات خودکار در NVRAM (startup-config) هم ذخیره می‌شود؟",
-          "a": "در Cisco IOS XE خیر — تغییرات به صورت پیش‌فرض در running-config می‌نشینند! برای ذخیره دائمی باید به اندپوینت RPC یعنی POST /restconf/operations/cisco-ia:save-config درخواست بفرستید."
+          "q": "چرا `406 Not Acceptable` ممکن است در یک درخواست `GET` `RESTCONF` دریافت کنیم؟",
+          "a": "اگر `Accept` header فرمت‌ی سرور را پشتیبانی نکند (مثلاً درخواست `application/json` در حالی که سرور فقط `yang-data+xml` یا `yang-data+json` می‌سازد)، سرور به‌صورت استاندارد `406` پاسخ می‌دهد."
         }
       ],
-      "analogy": "NETCONF و RESTCONF مثل دو برادرند که هر دو یک کتاب قانون مشترک (مدل داده YANG) را می‌خوانند و یک زبان می‌فهمند؛ ولی برادر بزرگ‌تر (NETCONF) کت‌وشلوار رسمی پوشیده، از در مخصوص SSH 830 وارد می‌شود و روی XML و تراکنش‌های چندمرحله‌ای سخت‌گیر است. برادر کوچک‌تر (RESTCONF) با همان پیراهن راحت وب (HTTPS 443) و بسته‌های سبک JSON کار می‌کند تا هر برنامه‌نویس و ابزار وبی به راحتی در ۳ خط با روتر حرف بزند!",
-      "ciscoRef": "Cisco IOS XE Programmability Configuration Guide — RESTCONF Protocol (RFC 8040)",
-      "summary": "پروتکل RESTCONF پلی میان استاندارد YANG و دنیای وب مدرن است: روی HTTPS پورت ۴۴۳ با فرمت سبک JSON و هدرهای اجباری application/yang-data+json عمل می‌کند و با نگاشت دقیق افعال GET/POST/PUT/PATCH/DELETE اجازه می‌دهد بدون نیاز به نشست پیچیده SSH/XML تجهیزات را برنامه‌نویسی کنید."
+      "misconceptions": [
+        {
+          "myth": "`RESTCONF` به‌دلیل استفاده از `HTTP`، به‌خودی‌خود امن است و نیازی به `TLS` ندارد.",
+          "reality": "خیر؛ `RFC 8040` `TLS` را الزامی می‌کند. `HTTP` خام از نظر امنیتی نامناسب است و باید روی `HTTPS` با `TLS` و معمولاً `mutual TLS` اجرا شود."
+        },
+        {
+          "myth": "خطای `403 Forbidden` در `RESTCONF` همیشه ناشی از `TLS` است.",
+          "reality": "خیر؛ `403` می‌تواند ناشی از توکن‌ی با `exp` گذشته، `scope` نامناسب، یا محرمیتی‌ی کاربر باشد، نه لزوماً ناشی از `TLS`. عیب‌یابی باید لایه‌ی حمل‌ونقل را از لایه‌ی تأیید کاربر جدا کند."
+        },
+        {
+          "myth": "در `RESTCONF`، `PUT` و `DELETE` لزوماً خطرناک یا بی‌اثر هستند.",
+          "reality": "`PUT` (`replace`) و `DELETE` (`delete`) عملیاتی تخریب‌گر یا بازنویسی‌گر هستند و باید بر اساس سیاست تغییر و بررسی‌های قبلی (مثل `candidate`/`validate` در `NETCONF`) با دقت اجرا شوند."
+        }
+      ],
+      "analogy": "`RESTCONF` مثل یک دریچهٔ استاندارد رو به روی بانک شبکه است: شما به جای گفتن دستور `SSH` خط‌به‌خط، درخواست‌های ساختاریافته `HTTP` می‌دهید که هر کدام یک تراکنش معین را نمایندگی می‌کنند. `TLS` مانند قفل دریچهٔ بانکی است که حریم تراکنش را تضمین می‌کند، اما باز شدن دریچه لزوماً به معنای اجازه‌ی انجام تراکنش نیست؛ تأیید کاربر (`authentication`/`authorization`) به‌صورت جداگانه بررسی می‌شود.",
+      "ciscoRef": "Cisco IOS XE RESTCONF Configuration Guide — RFC 8040 & RESTful API Reference",
+      "summary": "`RESTCONF` (`RFC 8040`) رابط `HTTP`/`HTTPS` برای مدل‌های `YANG` است: `GET` بر `/config` معادل `<get-config>`، `GET` بر `/operational` معادل `<get>`، و `PUT`/`POST`/`DELETE`/`PATCH` بر `/config` معادل `<edit-config>` با methods متفاوت. با `Accept`/`Content-Type` دقیق و `TLS` الزامی، `RESTCONF` اتوماسیون شبکه را بر اساس مدل داده‌ی یک‌پارچه فراهم می‌کند.",
+      "quiz": [
+        {
+          "q": "در پروتکل **`RESTCONF` (`RFC 8040`)** برای خواندن داده‌ی عملیاتی زنده (`State Data`) از روتر کدام `URI` و `Method` به‌کار می‌رود؟",
+          "opts": [
+            "`GET /config/ietf-interfaces:interfaces`",
+            "`GET /operational/ietf-interfaces:interfaces`",
+            "`PUT /config/ietf-interfaces:interfaces`",
+            "`DELETE /operational/ietf-interfaces:interfaces`"
+          ],
+          "ans": 1,
+          "exp": "`GET /operational` یک `<get>` تحت‌الضمن است و هم پیکربندی و هم داده‌ی عملیاتی زنده را return می‌کند، در حالی که `GET /config` تنها `<get-config>` است."
+        },
+        {
+          "q": "چرا یک درخواست `RESTCONF` با `Accept: application/json` ممکن است پاسخ `406 Not Acceptable` دریافت کند، در حالی که درخواست با `Accept: application/yang-data+xml` موفقیت‌آمیز است؟",
+          "opts": [
+            "سرور `RESTCONF` `yang-data+xml` می‌سازد ولی `yang-data+json` را پشتیبانی نمی‌کند",
+            "سرور `RESTCONF` تنها `application/json` می‌سازد",
+            "`406` همیشه خطای TCP است",
+            "RFC 8040 `Accept` header را الزامی نمی‌کند"
+          ],
+          "ans": 0,
+          "exp": "در `RFC 8040`، `406` در صورت عدم توانایی سرور در تولید فرمت خواسته‌شده در `Accept` return می‌شود و `yang-data+xml` فرمت استاندارد برای داده‌های `YANG` است."
+        },
+        {
+          "q": "در `RESTCONF`، کدام `HTTP Method` معادل `<edit-config>` با `method=replace` و بازنویسی کامل node است؟",
+          "opts": [
+            "`GET /config/...`",
+            "`POST /config/...`",
+            "`PUT /config/...`",
+            "`PATCH /config/...`"
+          ],
+          "ans": 2,
+          "exp": "`PUT` معادل `<edit-config>` با `method=replace` است و کل node موردنظر را بازنویسی می‌کند؛ `POST` معادل `merge` و `PATCH` نیز معادل `merge` نسبی است."
+        }
+      ],
+      "exercise": "سناریوی تغییر حساس روی یک روتر مرکزی از راه دور با `RESTCONF`: چگونه در ۳ گام از (الف) تداخل دو مهندس، (ب) قطع ماندن دسترسی مدیریتی در صورت دستور اشتباه و (ج) باقی ماندن تغییر در حال بوت نشدن بعد از ریبوت جلوگیری می‌کنید؟",
+      "bridge": {
+        "why": "پس از اینکه `RESTCONF` نشان داد که داده‌های شبکه را می‌توان با `HTTP` و مدل‌های `YANG` به‌صورت ساختاریافته تغییر داد، می‌بینیم که معیار **`YANG`** خود، ابتدا باید شکل داده‌ها، مفاهیم و محدودیت‌های آن‌ها را به‌صورت machine-readable تعریف کند؛ بدون `YANG`، `RESTCONF` و `NETCONF` قابل اعتماد نیستند.",
+        "nextId": "auto_10",
+        "nextTitle": "۷.۷ Automation (درس ۱۰ از ۲۰): زبان مدل‌سازی داده YANG"
+      },
+      "id": "auto_09",
+      "title": "۷.۷ Automation (درس ۹ از ۲۰): پروتکل RESTCONF"
     },
     "auto_10": {
-      "id": "auto_10",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۷ Automation (درس ۱۰ از ۲۰): زبان مدل‌سازی داده YANG",
-      "lead": "هر دو پروتکل NETCONF و RESTCONF فقط یک «وسیله نقلیه» هستند؛ اما باری که حمل می‌کنند بر اساس نقشه دقیق زبان YANG ساخته شده است! اگر YANG را نفهمید نمی‌دانید چطور مسیر URL یا ساختار XML/JSON را بدون خطا بنویسید.",
-      "goal": "تسلط کامل بر ساختار فایل‌های .yang (Container، List، Key، Leaf، Leaf-List، Config True/False)، تفاوت مدل‌های Native، IETF و OpenConfig، و تحلیل درختی فایل‌ها با ابزار pyang و YANG Suite.",
-      "prereq": "آشنایی با XML/JSON، NETCONF و RESTCONF (دروس ۸ و ۹ اتوماسیون).",
+      "lead": "پس از اینکه `RESTCONF` و `NETCONF` نشان دادند که پیکربندی و داده‌های شبکه باید در قالب ساختاریافته منتقل شوند، تساؤل اصلی این است که آن ساختار و محدودیت‌ها دقیقاً کجا و چگونه تعریف می‌شوند. **`YANG`** (`RFC 7950`) پاسخ این پرسش است: یک زبان مدل‌سازی داده که هم‌زمان اعتبارسنجی، شرح، و machine-readable skeleton کلیه‌ی داده‌های شبکه را ارائه می‌دهد.",
+      "goal": "درک دقیق نقش `YANG` در اتوماسیون شبکه (`RFC 7950`)، تفکیک `Container`/`List`/`Leaf`/`Leaf-list`/`Choice`/`Case`/`Container`، مفاهیم `augment`، `grouping`، `refine`، `must`/`min-elements`/`max-elements`، و تناسب `YANG` با `RESTCONF`/`NETCONF`، همراه با یک سناریوی عملی python که با `pyang` یک مدل `YANG` ساده را parse و validation بنیادی model را انجام می‌دهد.",
+      "prereq": "آشنایی با `XML`/`JSON`، `NETCONF` و `RESTCONF` (درس ۹).",
       "sections": [
         {
-          "h": "۱. کالبدشکافی زبان YANG (RFC 6020 و RFC 7950): ۴ بلوک سازنده اصلی",
+          "h": "۱. `YANG` چیست و چرا به آن نیاز داریم (`RFC 7950`)",
           "p": [
-            "یک فایل .yang با تعریف module شروع می‌شود و تمام تنظیمات و آمارهای دستگاه را در یک ساختار درختی منظم توصیف می‌کند که فقط ۴ گره اصلی دارد:"
-          ],
-          "bullets": [
-            "۱. Leaf (برگ): کوچک‌ترین جزء که فقط یک مقدار واحد نگه می‌دارد (مثلاً name = 'GigabitEthernet1' یا mtu = 1500 از نوع uint16 یا enabled = true).",
-            "۲. Leaf-List: آرایه‌ای از مقادیر هم‌نوع (مثلاً لیست سرورهای DNS: ['8.8.8.8', '1.1.1.1']).",
-            "۳. Container (کانتینر): یک پوشه برای دسته‌بندی کردن برگ‌ها و کانتینرهای دیگر بدون تکرار (مثلاً کانتینر <interfaces> یا <ip>).",
-            "۴. List (لیست): مجموعه‌ای تکراری از رکوردها که هر کدام حتماً باید یک کلید یکتا (key) داشته باشند؛ مثلاً لیست interface که کلید آن برگ name است تا بتوانیم ۱۰ تا اینترفیس مختلف داخلش داشته باشیم!"
+            "`YANG` یک زبان **مدل‌سازی داده** است که برای توصیف ساختار و محدودیت‌های داده‌های استفاده‌شده در `NETCONF` طراحی شده و در `RFC 7950` تعریف شده است. مدل `YANG` به سرور اجازه می‌دهد (الف) داده‌های قابل پذیرش را با دقت validate کند، (ب) داده‌های قابل return را شرح دهد، و (ج) clientها را قادر به ساخت درخواست‌های مطابق باmodell بسازد — بدون اینکه client و سرور با یکدیگر `hard-coded` شوند.",
+            "مدل `YANG` به‌صورت یک **درخت** از nodes تعریف می‌شود که هر node یک نوع داده و شروط restrictive دارد؛ به همین دلیل، validation model-driven در `NETCONF`/`RESTCONF` امکان‌پذیر است: سرور می‌تواند داده‌ی نامطابق با مدل را با خطای استاندارد `rpc-error` (`invalid-value`) رد کند."
           ]
         },
         {
-          "h": "۲. تفاوت داده‌های config true و config false و سه خانواده مدل YANG",
+          "h": "۲. انواع Node و ساختار مدل",
           "p": [
-            "در درخت YANG هر گره یا config true (پیش‌فرض — داده‌های پیکربندی که می‌توانید با NETCONF/RESTCONF تغییر دهید) است، یا config false (داده‌های عملیاتی State مثل تعداد بسته‌های ردشده یا وضعیت لینک که فقط با GET یا <get> خواندنی هستند و نوشتن روی آن‌ها خطا می‌دهد).",
-            "در دنیای واقعی همیشه بین ۳ خانواده مدل YANG انتخاب می‌کنید: (۱) مدل‌های بومی سازنده (Vendor Native مثل Cisco-IOS-XE-native.yang) که ۱۰۰٪ تمام قابلیت‌های خاص سیسکو مثل EIGRP یا HSRP را دارند اما روی جونیپر کار نمی‌کنند؛ (۲) مدل‌های استاندارد IETF (مثل ietf-interfaces و ietf-routing)؛ و (۳) مدل‌های بی‌طرف صنعتی OpenConfig (شروع‌شده توسط گوگل و اپراتورها مثل openconfig-interfaces و openconfig-bgp) که هدفشان داشتن یک کد واحد برای تمام برندهای دیتاسنتر و اپراتورهاست."
+            "سه نوع node اصلی `YANG` وجود دارد: **`Container`** (گروه‌بندی nodeها بدون خود داده), **`List`** (گروه‌بندی nodeهای تکرارپذیر با key)، و **`Leaf`**/`Leaf-list` ( مقدار داده‌ی خاص: `string`، `int8`..`uint64`، `boolean`، `enumeration`، `identityref`، و غیره). `Choice` و `Case` یک واحدة انتخاب‌کنندگان ایجاد می‌کنند، در حالی که `grouping` برای اشتراک‌گذاری قطعه‌های تکراری بین مدل‌های مختلف و `augment` برای اضافه‌کردنِ node به مدل‌ی دیگر یا به هذان‌ها استفاده می‌شود.",
+            "محدودیت‌های `YANG` (مثل `min-elements`/`max-elements` بر `List`، `must`/`min-length`/`max-length` بر `Leaf`، و `key`/`min-elements` بر `List`) مستقیماً validation داده‌ی حین پردازش درخواست را تقویت می‌کنند."
           ]
         },
         {
-          "h": "۳. کار با ابزارهای حیاتی مهندس: pyang و Cisco YANG Suite",
+          "h": "۳. `YANG` در `NETCONF` و `RESTCONF`",
           "p": [
-            "ابزار خط فرمان متن‌باز pyang مثل ذره‌بین فایل‌های YANG است: با دستور pyang -f tree ietf-interfaces.yang تمام فایل پیچیده YANG را به یک نمودار درختی بسیار ساده تبدیل می‌کند که در آن علامت rw (خواندن/نوشتن)، ro (فقط‌خواندنی)، * (لیست) و ? (اختیاری) را فوری می‌بینید! همچنین ابزار رایگان Cisco YANG Suite به شکل گرافیکی به روتر شما وصل می‌شود، کل مدل‌های YANG آن نسخه IOS XE را می‌خواند و حتی به طور خودکار XML آماده NETCONF و کد پایتون برایتان تولید می‌کند."
+            "`NETCONF` (`RFC 6241`) و `RESTCONF` (`RFC 8040`) بر اساس مدل‌های `YANG` کار می‌کنند: سرور در `<hello>` یا `Content-Type` capabilities فهرست مدل‌های پشتیبانی‌شده را اعلام می‌کند، و clientها باید درخواست‌های خود را مطابق با آن مدل‌ها بسازند. یک درخواست نامطابق با مدل با خطای استاندارد `invalid-value` یا `invalid-element` پاسخ می‌گیرد.",
+            "در `RESTCONF`، `Content-Type: application/yang-data+xml` یا `application/yang-data+json` و `Accept` header مبتنی بر مدل‌ی قابل‌تعریف در URI انتخاب می‌شوند؛ و در `NETCONF`، `namespace` عناصر XML مستقیماً یک `yang-module` را نشان می‌دهند."
+          ]
+        },
+        {
+          "h": "۴. عیب‌یابی مدل `YANG`: compile، validation و pluginها",
+          "p": [
+            "خطای متداول در کار با `YANG` این است که مدل بدون تأیید اولیه به سرور ارسال شود و در حین `rpc` با خطای `invalid-value` یا `missing-element` شکست بخورد؛ راه‌حل، قبل از ساخت درخواست، modèle را با ابزاری مثل `pyang` compile و validation محلی انجام دادن است و errors و warnings آن را بررسی کردن است.",
+            "قابلیت‌های `YANG` (`augment`، `grouping`، `deviation`) در پیاده‌سازی‌های مختلف (`IOS-XE`، `Junos`، `ASA`) ممکن است با مقداری تفاوت support شوند؛ بنابراین همیشه capabilities سرور و لاگ error دقیق را بررسی کنید."
           ]
         }
       ],
       "protocolAnalysis": [
-        "در تحلیل عملی ۷.۷ Automation (درس ۱۰ از ۲۰)، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
+        "**تحلیل nodeهای `Container`/`List`:** `Container` یک subtree ایجاد می‌کند که nodeهای زیر آن را گردهم می‌آورد؛ `List` nodeهای تکرارپذیری است که با `key` attribute‌ی‌ی service می‌شود و هر مورد از List یک instance مشخص را شناسایی می‌کند، از قبیل `interface` با key `name`.",
+        "**تحلیل validation `YANG`:** محدودیت‌های `must`/`min-elements`/`max-elements`/`min-length`/`max-length` و `enum` مستقیماً در پردازش داده‌ی درخواست validation می‌شوند؛ در صورت نقض، خطای استاندارد `invalid-value` در `<rpc-error>` return می‌شود.",
+        "**تحلیل `augment` و `grouping`:** `grouping` یک قطعه‌ی اشتراک‌گذاری‌شده است که می‌تواند در مدل‌های مختلفی که آن را import می‌کنند reuse شود؛ `augment` امکان اضافه‌کردن nodeها به مدل‌ی دیگر را می‌دهد، تا از تعدد در مدل‌های اصلی جلوگیری شود."
       ],
       "iosCommands": [
         {
-          "cmd": "show ip bgp summary",
-          "out": "10.255.0.2  4  65200  1420  1418  128",
-          "note": "پایش همسایگی BGP و تعداد Prefixها"
+          "cmd": "show running-config",
+          "why": "*(در شبیه‌ساز داخلی IOS)* بررسی ثبت VLAN و پورت `Gi0/7` در شبیه‌ساز محلی.",
+          "anatomy": "show running-config",
+          "lookFor": "دیده شدن `vlan` و پورت `Gi0/7` با `nonegotiate`.",
+          "ifUnexpected": "در `configure terminal` تنظیمات VLAN و پورت آزمایشگاه را تکمیل کنید."
         },
         {
-          "cmd": "show ip route",
-          "out": "B  172.16.0.0/16 [20/0] via 10.255.0.2",
-          "note": "بررسی مسیرهای BGP در RIB"
+          "cmd": "show vlan brief",
+          "why": "*(در شبیه‌ساز داخلی IOS)* تایید وجود VLAN و تگ‌گذاری پورت.",
+          "anatomy": "show vlan brief",
+          "lookFor": "دیده شدن VLAN 110 (YANG_MODELS) و وضعیت `active`.",
+          "ifUnexpected": "با `vlan {vlan}` و `name {name}` آن را ایجاد کنید."
+        },
+        {
+          "cmd": "show yang",
+          "why": "*(دستور مرجع غیرشبیه‌سازی‌شده روی روتر `IOS-XE`)* مشاهده‌ی فهرست مدل‌های `YANG` بارگذاری‌شده روی دستگاه و وضعیت compile آن‌ها.",
+          "anatomy": "show yang",
+          "lookFor": "دیده‌شدن मॉडल‌های `ietf-*` و `Cisco-*` با وضعیت `Loaded`.",
+          "ifUnexpected": "مدل موردنیاز را با `load module` بارگذاری کنید و compile خطاها را بررسی کنید."
+        },
+        {
+          "cmd": "show netconf-yang modules",
+          "why": "*(دستور مرجع غیرشبیه‌سازی‌شده روی روتر `IOS-XE`)* مشاهده‌ی مدل‌های `YANG` که در capability `<hello>` اعلام می‌شوند.",
+          "anatomy": "show netconf-yang modules",
+          "lookFor": "دیده‌شدن models با نام وเวอร์ชัน.",
+          "ifUnexpected": "مدل را با `load module <name>` بارگذاری و `show yang` را بررسی کنید."
         }
       ],
       "diagramSvg": "topo",
       "lab": {
-        "title": "آزمایشگاه عملی: ۷.۷ Automation (درس ۱۰ از ۲۰)",
+        "title": "آزمایشگاه عملی: آماده‌سازی VLAN 110 (`YANG_MODELS`) در شبیه‌ساز + ساخت و validation یک مدل `YANG` ساده با `pyang`",
         "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۷ Automation (درس ۱۰ از ۲۰) را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
+          "۱. در ترمینال شبیه‌ساز داخلی IOS با `enable` وارد شوید و با `show vlan brief` و `show interfaces Gi0/7 switchport` وضعیت اولیه را ببینید.",
+          "۲. هدف ساخت `VLAN 110` (`YANG_MODELS`) و اختصاص پورت `Gi0/7` به کلاینت `YANG-LAB` با `switchport nonegotiate` است.",
+          "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 110` -> `name YANG_MODELS` -> `exit` -> `interface Gi0/7` -> `description YANG-LAB` -> `switchport mode access` -> `switchport access vlan 110` -> `switchport nonegotiate` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
+          "**سناریوی مرجع غیرشبیه‌سازی‌شده (ساخت و validation یک مدل `YANG` ساده با `pyang` و بررسی خطاهای compile — فایل `yang_model_lab.py`):**\n```python\n# مثال مدل YANG ساده برای اینترفیس\nyang_src = '''\nmodule fam-interfaces {\n  namespace \"urn:fam:interfaces\";\n  prefix ifc;\n\n  container interfaces {\n    list interface {\n      key \"name\";\n      leaf name { type string; }\n      leaf enabled { type boolean; }\n      leaf mtu { type uint16; }\n    }\n  }\n}\n'''\n\ndef write_yang(tmp_path, src: str) -> str:\n    p = tmp_path / \"fam-interfaces.yang\"\n    p.write_text(src, encoding=\"utf-8\")\n    return str(p)\n\ndef validate_yang(yang_file: str) -> dict:\n    \"\"\"با pyang مدل را compile و خطاها را جمع‌آوری کنید (عدم نیاز به شبکه).\"\"\"\n    import subprocess\n    r = subprocess.run(\n        [\"pyang\", \"--list-errors\", \"-p\", yang_file, yang_file],\n        capture_output=True, text=True, timeout=30,\n    )\n    errors = [ln for ln in r.stdout.splitlines() if ln.strip()]\n    if r.returncode != 0:\n        return {\"ok\": False, \"error\": \"yang_compile_failed\", \"details\": errors}\n    return {\"ok\": True, \"errors\": []}\n\ndef validate_payload_against_model(payload_keys: list, required: list) -> dict:\n    \"\"\"validation بنیادی داده‌ی client در برابر محدودیت‌های مدل (مانند key presence).\"\"\"\n    for k in required:\n        if k not in payload_keys:\n            return {\"ok\": False, \"error\": \"missing_required_key\", \"key\": k}\n    return {\"ok\": True}\n\nif __name__ == \"__main__\":\n    import tempfile\n    with tempfile.TemporaryDirectory() as d:\n        f = write_yang(d, yang_src)\n        print(validate_yang(f))\n        print(validate_payload_against_model([\"name\", \"enabled\"], [\"name\", \"enabled\"]))\n```"
         ],
         "verifyCmds": [
-          "show ip bgp summary",
-          "show ip route"
+          "show vlan brief",
+          "show interfaces Gi0/7 switchport",
+          "show running-config"
         ]
       },
       "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۷ Automation (درس ۱۰ از ۲۰)، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
+        "fault": "یک اسکریپت client درخواست `edit-config` با payload ساخته‌شده بر اساس مدل `YANG` خود را می‌فرستد، اما سرور با خطای `rpc-error: invalid-value` یا `missing-element` پاسخ می‌دهد، در حالی که مدل client معتبر است.",
+        "analysis": "عموماً دو ریشه وجود دارد: (۱) `namespace` یا `prefix` در payload XML با مدل‌ی سرور مطابقت ندارد (client مدل اشتباهی را import کرده)، و (۲) محدودیت‌های `YANG` مانند `key` در `List` یا `min-elements`/`must` نقض شده است؛ سرور با validation model-driven این نقض‌ها را با `invalid-value` رد می‌کند.",
+        "fix": "قبل از ارسال، مدل را با `pyang` compile کنید، `namespace` و `prefix` payload را با مدل سرور تطبیق دهید، و تمام محدودیت‌های `key`/`must`/`min-elements` را validation کنید."
       },
-      "exercise": "برای مبحث «۷.۷ Automation (درس ۱۰ از ۲۰)» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
-      "quiz": [
+      "exercises": [
         {
-          "q": "در پیاده‌سازی استاندارد «۷.۷ Automation (درس ۱۰ از ۲۰)» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
-          "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
-          ],
-          "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۷ Automation (درس ۱۰ از ۲۰) نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
+          "level": "ساده",
+          "task": "در مدل `YANG`، تفاوت `Container` با `List` چیست و کدام node برای اینترفیس‌های تکرارپذیر با key `name` استفاده می‌شود؟",
+          "hint": "تکرارپذیری و key.",
+          "solution": "`Container` یک زیردرخت ساده است که nodeهای زیر خود را گرد هم می‌آورد و می‌تواند بالای `List` قرار گیرد؛ `List` nodeهای تکرارپذیری است که هر مورد با key (مثل `name`) شناسایی می‌شود و برای `interface` کاربرد دارد."
+        },
+        {
+          "level": "متوسط",
+          "task": "چه محدودیت‌هایی در `YANG` می‌تواند باعث پاسخ `rpc-error: invalid-value` از سرور `NETCONF` شود و چرا؟",
+          "hint": "validation model-driven.",
+          "solution": "محدودیت‌های `must`، `min-elements`، `max-elements`، `min-length`/`max-length`، و نوع داده (`enum`، `identityref` و غیره) در پردازش درخواست validation می‌شوند؛ در صورت نقض، سرور با `invalid-value` پاسخ می‌دهد."
+        },
+        {
+          "level": "پیشرفته",
+          "task": "تفاوت استفاده از `grouping` با `augment` در مدل `YANG` چیست؟",
+          "hint": " اشتراک‌گذاری و افزودن node.",
+          "solution": "`grouping` قطعه‌ی اشتراک‌گذاری‌شده برای reuse در مدل‌های مختلف است، در حالی که `augment` امکان افزودن node به یک مدل دیگر را می‌دهد، بدون اینکه مدل اصلی را تغییر دهد."
         }
       ],
       "table": {
-        "title": "راهنمای خواندن نمادهای خروجی درختی دستور pyang -f tree",
+        "title": "جدول انواع Node اصلی در زبان مدل‌سازی YANG (RFC 7950)",
         "headers": [
-          "نماد در خروجی pyang",
-          "معنای دقیق فنی",
-          "مثال واقعی"
+          "نوع Node در YANG",
+          "وظیفه",
+          "نکته کلیدی"
         ],
         "rows": [
           [
-            "+--rw",
-            "گره قابل خواندن و نوشتن (config true)",
-            "+--rw description?   string"
+            "`Container`",
+            "گروه‌بندی nodeهای زیر",
+            "بدون مقدار داده‌ی خودش"
           ],
           [
-            "+--ro",
-            "گره فقط‌خواندنی عملیاتی (config false / State)",
-            "+--ro oper-status    enumeration"
+            "`List`",
+            "گروه‌بندی nodeهای تکرارپذیر",
+            "با key attribute تمیز می‌شود"
           ],
           [
-            "+--rw interface* [name]",
-            "یک List که کلید یکتای آن فیلد [name] است",
-            "لیست اینترفیس‌های روتر در ietf-interfaces"
+            "`Leaf`",
+            "یک مقدار داده‌ی خاص",
+            "نوع داده واضح (`string`, `int`, `boolean` و غیره)"
           ],
           [
-            "?",
-            "فیلد اختیاری (Optional)",
-            "description? ممکن است پر نشده باشد"
+            "`Leaf-list`",
+            "لیست مقادیر داده",
+            "تکرارپذیر، بدون key"
           ],
           [
-            "+--:(choice)",
-            "انتخاب یکی از چند گزینه (Case / Choice)",
-            "انتخاب بین IPv4 استاتیک یا DHCP"
+            "`Choice`/`Case`",
+            "انتخابหนึ่งใน چندین زیردرخت",
+            "exactly-one behaviour"
+          ],
+          [
+            "`Augment`",
+            "افزودن node به مدل دیگر",
+            " بدون تغییر مدل اصلی"
           ]
         ]
       },
       "faq": [
         {
-          "q": "اگر بخواهیم یک قابلیت خیلی خاص سیسکو (مثل DMVPN یا VTP) را با NETCONF تنظیم کنیم چرا در مدل‌های OpenConfig یا IETF پیدایش نمی‌کنیم؟",
-          "a": "چون OpenConfig و IETF فقط قابلیت‌های مشترک استاندارد بین تمام برندها را پوشش می‌دهند! برای قابلیت‌های اختصاصی یا پیچیده سیسکو همیشه باید سراغ مدل‌های Vendor Native مثل Cisco-IOS-XE-native و زیرمدل‌هایش بروید."
+          "q": "چرا `YANG` در اتوماسیون شبکه اهمیت دارد؟",
+          "a": "`YANG` ساختار و محدودیت‌های داده‌های شبکه را machine-readable تعریف می‌کند، به سرور اجازه می‌دهد داده‌های نامطابق را با `invalid-value` validation کند و clientها را از ساخت درخواست نامطابق prevention می‌کند."
         },
         {
-          "q": "از کجا کل فایل‌های YANG دقیقاً متناسب با نسخه سیستم‌عامل روتر خودمان را دانلود کنیم؟",
-          "a": "دو راه بسیار سریع دارید: اول دانلود از مخزن رسمی گیت‌هاب YangModels/yang، و دوم دریافت مستقیم از خود روتر با دستور NETCONF <get-schema> (ابزار Cisco YANG Suite این کار را با یک کلیک برایتان انجام می‌دهد)."
+          "q": "تفاوت `Container` و `List` در `YANG` چیست؟",
+          "a": "`Container` یک زیردرخت ساده است و `List` nodeهای تکرارپذیری است که هر مورد با key تمیز می‌شود؛ مثلاً `interface` یک `List` با key `name` است."
         },
         {
-          "q": "در زبان YANG عبارت xpath چیست و کجا کاربرد دارد؟",
-          "a": "XPath مثل آدرس دقیق فایل در درخت YANG است (مثلاً /interfaces/interface[name='Gi1']/ipv4) که هم در شرط‌های اعتبارسنجی داخل فایل YANG (when / must) و هم در فیلترهای NETCONF و Subscriptionهای Streaming Telemetry استفاده می‌شود."
+          "q": "آیا `YANG` تنها برای `NETCONF` کاربرد دارد؟",
+          "a": "خیر؛ `YANG` هم‌زمان مدل داده‌ی `NETCONF` و `RESTCONF` است، و توکن‌های `yang-data+xml`/`yang-data+json` در `RESTCONF` مستقیماً بر اساس مدل‌های `YANG` ساخته می‌شوند."
         }
       ],
-      "analogy": "فرض کنید می‌خواهید یک قطعه خودرو سفارش دهید. زبان YANG مثل کاتالوگ فنی استاندارد و نقشه‌های سه‌بعدی کارخانه است که می‌گوید: «تحت بخش چرخ‌ها، باید دقیقاً شماره رینگ (عدد صحیح بین ۱۴ تا ۲۲)، فشار باد (اعشاری) و نام تایر (رشته) را وارد کنی — و ستون کیلومترشمار فقط خواندنی است (State)، نمی‌توانی دستکاری‌اش کنی!». به کمک ابزارهای YANG، قبل از اینکه حتی یک پیام به روتر بفرستید می‌دانید فرمت دقیق داده‌ها چیست!",
-      "ciscoRef": "RFC 7950 (YANG 1.1), Cisco DevNet YANG Suite Docs & YangModels/yang GitHub Repository",
-      "summary": "زبان مدل‌سازی YANG ستون فقرات اتوماسیون مدرن است که ساختار پیکربندی (rw) و وضعیت زنده (ro) را با Container، List، Key و Leaf دقیق تعریف می‌کند. با شناخت تفاوت مدل‌های Native، IETF و OpenConfig و تحلیل درختی سریع به کمک pyang -f tree و Cisco YANG Suite، ساخت پیام‌های بدون خطای NETCONF و RESTCONF بسیار ساده می‌شود."
+      "misconceptions": [
+        {
+          "myth": "`YANG` یک پروتکل انتقال است.",
+          "reality": "خیر؛ `YANG` یک زبان مدل‌سازی داده است و پروتکل انتقال `NETCONF` (`RFC 6241`) یا `RESTCONF` (`RFC 8040`) مبتنی بر آن است."
+        },
+        {
+          "myth": "تمام تجهیزات سیسکو از تمام ویژگی‌های `YANG` (`augment`، `deviation`) پشتیبانی می‌کنند.",
+          "reality": "تفاوت در پیاده‌سازی‌های مختلف وجود دارد؛ پشتیبانی دقیق از capabilities سرور در `<hello>` خوانده می‌شود و باید قبل از اتصال بررسی شود."
+        },
+        {
+          "myth": "model `YANG` فقط برای توضیح داده‌ی return است.",
+          "reality": "خیر؛ `YANG` validation داده‌های ورودی را نیز فراهم می‌کند و در صورت نقض محدودیت‌های مدل، سرور با `invalid-value` پاسخ می‌دهد."
+        }
+      ],
+      "analogy": "مدل `YANG` مانند نقشه‌ی ساختاریافته و قانونی یک ساختمان است: آن چیست که در هر اتاق قرار می‌تواند (`Leaf`)، کجا تکرار می‌شود (`List`)، و چه محدودیت‌هایی دارد (مثل ارتفاع سقف یا تعداد درها).จนقل هر درخواست تغیر (مثلاً ساخت اتاق جدید) باید بر اساس این نقشه باشد، و در صورت نقض، سرپرست (سرور) درخواست را رد می‌کند.",
+      "ciscoRef": "Cisco YANG Modeling Guide — RFC 7950 (YANG 1.1) & IOS XE YANG Library",
+      "summary": "`YANG` (`RFC 7950`) زبان مدل‌سازی داده‌ی شبکه است: `Container`، `List`، `Leaf`/`Leaf-list`، `Choice`/`Case`، `grouping` و `augment` ساختار و محدودیت‌های داده‌ها را machine-readable تعریف می‌کنند. `NETCONF` و `RESTCONF` بر اساس این مدل‌ها validation می‌کنند و داده‌های نامطابق را با `invalid-value` رد می‌کنند.",
+      "quiz": [
+        {
+          "q": "در مدل **`YANG`**، کدام node برای گروه‌بندی nodeهای تکرارپذیر با key مانند `interface` به‌کار می‌رود؟",
+          "opts": [
+            "`List`",
+            "`Container`",
+            "`Leaf`",
+            "`Choice`"
+          ],
+          "ans": 0,
+          "exp": "`List` nodeهای تکرارپذیری است که هر مورد با `key` تمیز می‌شود؛ `Container` تنها گروه‌بندی ساده است و `Leaf` مقدار داده‌ی خاص است."
+        },
+        {
+          "q": "چه محدودیت‌هایی در `YANG` می‌تواند باعث پاسخ `rpc-error: invalid-value` از سرور `NETCONF` شود؟",
+          "opts": [
+            "تنها `key` در `List`",
+            "محدودیت‌های `must`، `min-elements`، `max-elements`، و تطابق نوع داده",
+            "تنها `prefix` در فایل مدل",
+            "تنها طول نام modul"
+          ],
+          "ans": 1,
+          "exp": "validation model-driven `YANG` محدودیت‌های `must`، `min-elements`، `max-elements`، و نوع داده را بررسی می‌کند و در صورت نقض، `invalid-value` return می‌کند."
+        },
+        {
+          "q": "در `YANG`، تفاوت `grouping` با `augment` چیست؟",
+          "opts": [
+            "`grouping` برای افزودن node به مدل دیگر است",
+            "هیچ‌کدام",
+            "`grouping` قطعه‌ی اشتراک‌گذاری‌شده است و `augment` nodeها را به مدل دیگر اضافه می‌کند",
+            "`augment` برای تعریف `key` است"
+          ],
+          "ans": 2,
+          "exp": "`grouping` قطعه‌ی reusable برای اشتراک‌گذاری بین مدل‌هاست؛ `augment` امکان افزودن node به یک مدل دیگر را می‌دهد."
+        }
+      ],
+      "exercise": "سناریوی تعمیر یک مدل `YANG` مختلط که client و سرور اختلاف نظر دارند: چگونه در ۳ گام از (الف) نقص در `namespace`، (ب) نقض محدودیت `must` و (ج) استفاده از capability ناشناخته جلوگیری می‌کنید؟",
+      "bridge": {
+        "why": "مدل‌های `YANG` توضیح می‌دهند که داده‌ها چگونه باید ساختار و محدودیت داشته‌باشند، اما تنفيذ تمامی تغییرات روی تجهیزات شبکه فقط با شرح مدل‌ها حاصل نمی‌شود؛ ما نیاز به یک موتور اتوماسیون داریم که این مدل‌ها را متحرک کند و تغییرات را روی دستگاه‌ها با سازماندهی و تکرارپذیری اعمال کند — اینجاست که **`Ansible`** کار می‌کند.",
+        "nextId": "auto_11",
+        "nextTitle": "۷.۷ Automation (درس ۱۱ از ۲۰): اتوماسیون با Ansible (Playbook & Inventory)"
+      },
+      "id": "auto_10",
+      "title": "۷.۷ Automation (درس ۱۰ از ۲۰): زبان مدل‌سازی داده YANG"
     },
     "auto_11": {
-      "id": "auto_11",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۷ Automation (درس ۱۱ از ۲۰): اتوماسیون با Ansible (Playbook & Inventory)",
-      "lead": "چرا Ansible محبوب‌ترین ابزار اتوماسیون در میان مهندسان شبکه دنیاست؟ چون بدون نصب حتی یک برنامه روی روتر، با فایل‌های ساده YAML می‌توانید وضعیت صدها سوئیچ را چک کنید، تنظیمات استاندارد را یکجا اعمال کنید و مطمئن شوید اجرای تکراری هیچ چیز را به هم نمی‌ریزد.",
-      "goal": "طراحی ساختار پروژه Ansible (ansible.cfg، Inventory چندگروهی، group_vars و host_vars)، نوشتن Playbookهای استاندارد سیسکو با کالکشن cisco.ios، استفاده از قالب‌های Jinja2 و حفاظت از رمزها با Ansible Vault.",
-      "prereq": "آشنایی با YAML، لینوکس و مفاهیم اتوماسیون (دروس ۱، ۴ و ۵ اتوماسیون).",
+      "lead": "وقتی ده‌ها یا صدها روتر باید همان تغییرات را در همان زمان و به‌صورت یکسان دریافت کنند، دست زدن به هر دستگاه با CLI یا even `NETCONF` جداگانه، یک غول از errors، تداخل و ترلیون‌های ناهمگن ایجاد می‌کند. **`Ansible`** با تعریف deklarative state و नियंत्रण بدون agent (`SSH` استاندارد) این 문제 را با playbookهای تکرارپذیر حل می‌کند.",
+      "goal": "درک معماری `Ansible` (control node، inventory، playbook، play، task، module)، تفاوت `ad-hoc` با `playbook`، واژه‌های کلیدی `vars`/`facts`/`handlers`/`loop`/`conditionals`/`block`، و تفکیک `push` (Ansible) از `pull` در modelها، همراه با یک سناریوی عملی python که یک playbook ساده را parse می‌کند و state machine rough model از اجرای tasks را با mock inventory simulation می‌کند.",
+      "prereq": "آشنایی با `SSH`، `YAML`، و اتوماسیون شبکه (درس‌های قبل).",
       "sections": [
         {
-          "h": "۱. معماری بدون Agent در Ansible و ۴ جزء اصلی هر پروژه شبکه‌ای",
+          "h": "۱. معماری `Ansible`: control node، managed node و inventory",
           "p": [
-            "Ansible روی لینوکس/مک به عنوان Control Node نصب می‌شود و هیچ نیازی به Agent روی تجهیزات سیسکو ندارد؛ ارتباط با روترهای شبکه از طریق پلاگین network_cli (روی SSH)، یا httpapi (برای RESTCONF/NX-API) و netconf برقرار می‌شود. یک پروژه حرفه‌ای Ansible همیشه این ۴ بخش را دارد:"
-          ],
-          "bullets": [
-            "۱. فایل ansible.cfg: تنظیمات محلی پروژه (مسیر inventory، غیرفعال کردن چک کلید SSH در لب، تعداد اجرای موازی forks = 20).",
-            "۲. Inventory (فایل hosts یا hosts.yaml): دفترچه آدرس روترها و گروه‌بندی آن‌ها (مثلاً گروه [routers]، گروه [switches] و گروه کلی [campus:children]).",
-            "۳. متغیرها (group_vars و host_vars): نکته طلایی استاندارد! هیچ آدرس IP یا یوزر/پسوردی را داخل Playbook ننویسید؛ برای تمام روترهای گروه تنظیمات مشترک را در group_vars/routers.yml (شامل ansible_network_os: cisco.ios.ios و ansible_connection: ansible.netcommon.network_cli) و IPهای اختصاصی هر دستگاه را در host_vars/R1.yml بگذارید.",
-            "۴. Playbooks و Roles: فایل YAML شامل یک یا چند Play و مجموعه Taskهایی که از ماژول‌های رسمی کالکشن‌هایی مثل cisco.ios، cisco.nxos، cisco.iosxr و cisco.ise استفاده می‌کنند (مثلاً cisco.ios.ios_vlans یا ios_l3_interfaces که کاملاً Resource Module هستند و Idempotency واقعی می‌دهند!)."
+            "`Ansible` بر مبنای یک **control node** (مرکز کنترل) کار می‌کند که playbookها را اجرا می‌کند و با **managed nodes** (دیواله‌های هدف) از طریق `SSH` استاندارد ارتباط برقرار می‌کند؛ به این دلیل نیازی به installing agent روی managed node وجود ندارد. **inventory** (فایل grouping دستگاه‌ها) نام، آدرس و متغیرهای هر host را تعریف می‌کند و playbookها بر اساس آن مجموعه‌ی دستگاه‌های هدف را انتخاب می‌کنند.",
+            "از منظر behaviour، `Ansible` یک engine **`push`** است: control node با SSH به هر دستگاه می‌رود و module (packet kecil python) را می‌فرستد و نتیجه‌ی اجرای آن را جمع‌آوری می‌کند؛ در مقابل، model‌ی **`pull`** (مثل puppet/chef) بر server متمرکز است. این design ساده‌ی deployment و کنترل متمرکز را فراهم می‌کند."
           ]
         },
         {
-          "h": "۲. قدرت موتور قالب‌سازی Jinja2 (تولید خودکار کانفیگ برای ۱۰۰ روتر از یک الگو)",
+          "h": "۲. ساختار playbook: play، task و module",
           "p": [
-            "وقتی ۱۰ یا ۱۰۰ روتر دارید که ساختار OSPF یا NTP همه یکسان است ولی فقط آدرس Loopback و همسایه‌هایشان فرق می‌کند، به جای کپی-پیست دستی، یک فایل الگو با پسوند .j2 (Jinja2) می‌نویسید: داخل آن با {{ variable }} متغیرها را می‌گذارید و با {% for iface in interfaces %} و {% if ... %} حلقه‌ها و شرط‌ها را پیاده می‌کنید! سپس Ansible با ترکیب این الگو و فایل‌های متغیر هر روتر (یا ماژول template)، کانفیگ ۱۰۰٪ دقیق تک‌تک روترها را تولید و اعمال می‌کند."
+            "یک playbook یک فایل `YAML` است که واحدبندی اجرای work را تعریف می‌کند؛ هر **play** یک مجموعه‌ی target hosts را تعریف می‌کند و یک sequence از **tasks** را روی آن‌ها اجرا می‌کند؛ هر task یک **module** (مثل `ios_config`، `gather_facts`، `copy`) را با arguments مشخص فراخوانی می‌کند. `handlers` tasks هستند که فقط در صورتی اجرا می‌شوند که taskهای مرتبط به‌صورت `notify` آن‌ها را احضار کرده‌باشند.",
+            "قابلیت‌های کلیدی شامل `loop`/`with_items` برای تکرار tasks، `conditionals` (`when`) برای توجه شرطی، `blocks`/`rescue` برای مدیریت خطاهای task، `vars`/`vars_files` برای متغیرهای قابل استفاده در کل playbook، و `facts` برای اطلاعات جمع‌آوری‌شده از hosts است."
           ]
         },
         {
-          "h": "۳. نگهداری امن رمزها با Ansible Vault و بررسی تغییر قبل از اجرا (Check Mode)",
+          "h": "۳. moduleها برای شبکه: `ios_config` و تحقق state",
           "p": [
-            "در پروژه واقعی، فایل رمزهای SSH و Enable را با دستور ansible-vault encrypt group_vars/vault.yml با AES-256 رمزنگاری می‌کنید تا حتی اگر مخزن را در GitHub آپلود کردید هیچ کس نتواند رمزها را ببیند (هنگام اجرا فقط --ask-vault-pass یا فایل کلید امن می‌دهید). همچنین قبل از اعمال تغییر روی شبکه تولیدی، حتماً با پرچم --check --diff اجرا کنید تا Ansible بدون دست زدن به روترها نشان دهد دقیقاً چه خط‌هایی تغییر خواهند کرد!"
+            "`Ansible` مجموعه‌ای از modules مخصوص شبکه (`ios_config`، `nxos_config`، `ios_command` و غیره) ارائه می‌دهد که با쓱 خواندن state هدف، تغییرات لازم را محاسبه و آن‌ها را اعمال می‌کنند. module `ios_config` توضیح هدف state را (مثلاً وجود VLAN خاص) می‌پذیرد و فقط تغییرات لازم را اعمال می‌کند — یک تغییر تکراری، دوباره اجرا می‌شود (idempotent).",
+            "از نکات مهم: حتماً پس از تغییر، tasks verification (`ios_command` با `show vlan brief` و غیره) را در playbook تعریف کنید تا playbook فقط وضعیت desired state را ایجاد نکند، بلکه آن را نیز proof کند."
+          ]
+        },
+        {
+          "h": "۴. عیب‌یابی: idempotency، connection errors و handlers",
+          "p": [
+            "مسئله‌ی متداول عدم تحقق idempotency است: playbook running second time تغییرات را دوباره اعمال می‌کند. ریشه می‌تواند در عدم تطابق دقیق state desired با state موجود باشد (مثلاً استفاده از `line` به جای structured config در `ios_config`). پس از هر run، `--check` و `--diff` را برای بررسی تغییرات مقرر استفاده کنید.",
+            "خطاهای connection (SSH failures) و task failures را در حین اجرا با `ansible-playbook` با `--verbose` و در `handlers` با `notify` بررسی کنید؛ utilizing `blocks`/`rescue` امکان مدیریت خطاهای task را فراهم می‌کند."
           ]
         }
       ],
       "protocolAnalysis": [
-        "در تحلیل عملی ۷.۷ Automation (درس ۱۱ از ۲۰)، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
+        "**تحلیل lifecycle یک play:** playbook -> play -> tasks; control node هر task را روی host هدف از طریق SSH اجرا می‌کند، module (packet python) را می‌فرستد، output را جمع‌آوری و نتیجه‌ی آن را گزارش می‌دهد؛ play با تمام شدن tasks پایان می‌شود.",
+        "**تحلیل idempotency در module `ios_config`:** module state desired را با state فعلی مقایسه می‌کند و فقط تغییرات لازم را اعمال می‌کند؛ playbook دو بار اجرا شود، در اجرای دوم با از before state بدون تغییر، playbook report `changed=0` می‌دهد (idempotent).",
+        "**تحلیل `handlers`:** tasks می‌توانند `notify: <handler>` برای احضار handlers در پایان play (یا در صورت لزوم) تعریف کنند؛ handlers بالعکس برای انجام workهایی مانند ریبوٹ یا سرویس دهیِ پس از change استفاده می‌شوند."
       ],
       "iosCommands": [
         {
-          "cmd": "show ip bgp summary",
-          "out": "10.255.0.2  4  65200  1420  1418  128",
-          "note": "پایش همسایگی BGP و تعداد Prefixها"
+          "cmd": "show running-config",
+          "why": "*(در شبیه‌ساز داخلی IOS)* بررسی ثبت VLAN و پورت `Gi0/7` در شبیه‌ساز محلی.",
+          "anatomy": "show running-config",
+          "lookFor": "دیده شدن `vlan` و پورت `Gi0/7` با `nonegotiate`.",
+          "ifUnexpected": "در `configure terminal` تنظیمات VLAN و پورت آزمایشگاه را تکمیل کنید."
         },
         {
-          "cmd": "show ip route",
-          "out": "B  172.16.0.0/16 [20/0] via 10.255.0.2",
-          "note": "بررسی مسیرهای BGP در RIB"
+          "cmd": "show vlan brief",
+          "why": "*(در شبیه‌ساز داخلی IOS)* تایید وجود VLAN و تگ‌گذاری پورت.",
+          "anatomy": "show vlan brief",
+          "lookFor": "دیده شدن VLAN 111 (ANSIBLE_CONTROL) و وضعیت `active`.",
+          "ifUnexpected": "با `vlan {vlan}` و `name {name}` آن را ایجاد کنید."
+        },
+        {
+          "cmd": "ansible all -i inventory.yml -m ping",
+          "why": "*(در control node)* بررسی اتصال SSH و agents به managed nodes با module ساده `ping`.",
+          "anatomy": "ansible all -i inventory.yml -m ping",
+          "lookFor": "answer `ok` برای هر host و عدم خطای connection.",
+          "ifUnexpected": "سخت‌افزار firewall، key SSH و inventory را بررسی کنید."
+        },
+        {
+          "cmd": "ansible-playbook site.yml --check --diff",
+          "why": "*(در control node)* اجرای playbook در حالت check-only با نمایش تغییرات مقرر پیش از اجرا.",
+          "anatomy": "ansible-playbook site.yml --check --diff",
+          "lookFor": "دیده‌شدن diffها و عدم تغییر در اجرای check (changed=0).",
+          "ifUnexpected": "تطبیق desired state را در playbook بررسی و playbook را اصلاح کنید."
         }
       ],
       "diagramSvg": "topo",
       "lab": {
-        "title": "آزمایشگاه عملی: ۷.۷ Automation (درس ۱۱ از ۲۰)",
+        "title": "آزمایشگاه عملی: آماده‌سازی VLAN 111 (`ANSIBLE_CONTROL`) در شبیه‌ساز + ساخت و simulation یک playbook با `ansible-playbook --check`",
         "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۷ Automation (درس ۱۱ از ۲۰) را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
+          "۱. در ترمینال شبیه‌ساز داخلی IOS با `enable` وارد شوید و با `show vlan brief` و `show interfaces Gi0/7 switchport` وضعیت اولیه را ببینید.",
+          "۲. هدف ساخت `VLAN 111` (`ANSIBLE_CONTROL`) و اختصاص پورت `Gi0/7` به کلاینت `ANSIBLE-CTRL` با `switchport nonegotiate` است.",
+          "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 111` -> `name ANSIBLE_CONTROL` -> `exit` -> `interface Gi0/7` -> `description ANSIBLE-CTRL` -> `switchport mode access` -> `switchport access vlan 111` -> `switchport nonegotiate` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
+          "**سناریوی مرجع غیرشبیه‌سازی‌شده (ساخت playbook `YAML`، parse و simulation state machine و اجرای `--check` با mock — فایل `ansible_playbook_lab.py`):**\n```python\nplaybook_yaml = '''\n- name: Apply AUTOMATION-BATCH6 VLAN config\n  hosts: ios_routers\n  gather_facts: false\n  tasks:\n    - name: Ensure VLAN exists\n      ios_config:\n        lines:\n          - vlan 111\n          - name AUTOMATION_BATCH6\n        parent: vlan\n      register: vlan_result\n    - name: Show VLAN state (verification)\n      ios_command:\n        commands:\n          - show vlan brief\n      register: vlan_check\n'''\n\ndef parse_playbook(text: str) -> dict:\n    \"\"\"parse ساده playbook YAML و استخراج play، tasks و moduleها (بدون وابستگی به PyYAML).\"\"\"\n    lines = [ln.rstrip() for ln in text.splitlines() if ln.strip()]\n    play_name = None\n    tasks = []\n    in_tasks = False\n    current_task = None\n    known_modules = (\"ios_config\", \"ios_command\", \"nxos_config\", \"gather_facts\", \"copy\", \"template\")\n    for ln in lines:\n        s = ln.strip()\n        if s == \"tasks:\":\n            in_tasks = True\n            continue\n        if s.startswith(\"- name:\") and play_name is None:\n            play_name = s.split(\":\", 1)[1].strip()\n        if in_tasks and s.startswith(\"- name:\"):\n            current_task = {\"name\": s.split(\":\", 1)[1].strip(), \"module\": None}\n            tasks.append(current_task)\n            continue\n        if in_tasks and current_task is not None:\n            for mod in known_modules:\n                if mod + \":\" in ln:\n                    current_task[\"module\"] = mod\n                    break\n    return {\"plays\": [{\"name\": play_name or \"playbook\", \"tasks\": tasks}]}\n\ndef simulate_idempotent_run(desired_state: dict, current_state: dict) -> dict:\n    \"\"\"simulation ساده idempotency: فقط اگر state متفاوت باشد changed=True.\"\"\"\n    if desired_state == current_state:\n        return {\"ok\": True, \"changed\": 0, \"note\": \"idempotent - no changes\"}\n    return {\"ok\": True, \"changed\": 1, \"note\": \"state changed\"}\n\nif __name__ == \"__main__\":\n    pb = parse_playbook(playbook_yaml)\n    print(pb)\n    print(simulate_idempotent_run({\"vlan\": 111}, {\"vlan\": 111}))\n    print(simulate_idempotent_run({\"vlan\": 111}, {\"vlan\": 10}))\n```"
         ],
         "verifyCmds": [
-          "show ip bgp summary",
-          "show ip route"
+          "show vlan brief",
+          "show interfaces Gi0/7 switchport",
+          "show running-config"
         ]
       },
       "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۷ Automation (درس ۱۱ از ۲۰)، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
+        "fault": "playbook `ios_config` به‌صورت non-idempotent عمل می‌کند: اجرای دوم playbook تغییرات را دوباره اعمال می‌کند و `changed > 0` report می‌شود.",
+        "analysis": "module `ios_config` state desired را با state موجود مقایسه می‌کند و فقط در صورت تفاوت تغییر می‌کند. عدم تحقق idempotency معمولاً به‌دلیل عدم تطابق دقیق desired state با state موجود است (مثل استفاده از `line` به جای structured config) یا دلیل différence در formatting خطهای config.",
+        "fix": "دقت desired state را با `--diff` بررسی کنید، از structured config و `lines`/`parent` مطابق استفاده کنید، و playbook را با `--check` تست کنید تا تحقق idempotency را قبل از اجرای واقعی تایید کنید."
       },
-      "exercise": "برای مبحث «۷.۷ Automation (درس ۱۱ از ۲۰)» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
-      "quiz": [
+      "exercises": [
         {
-          "q": "در پیاده‌سازی استاندارد «۷.۷ Automation (درس ۱۱ از ۲۰)» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
-          "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
-          ],
-          "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۷ Automation (درس ۱۱ از ۲۰) نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
+          "level": "ساده",
+          "task": "در `Ansible`، تفاوت control node با managed node چیست و managed node به چه دلیل نیازی به installing agent ندارد؟",
+          "hint": "SSH و نه agent.",
+          "solution": "control node playbookها را اجرا می‌کند؛ managed nodes هدف‌ها هستند و از طریق `SSH` استاندارد کنترل می‌شوند؛ به همین دلیل نیازی به installing agent روی managed node نیست."
+        },
+        {
+          "level": "متوسط",
+          "task": "تفاوت `ad-hoc` command با `playbook` در `Ansible` چیست؟",
+          "hint": "تکرارپذیری و توجه شرطی.",
+          "solution": "`ad-hoc` برای اجرای واحد و سریع است، اما `playbook` به صورت تکرارپذیر، با tasks شرطی (`when`)، handlers و looping کل work را مدیریت می‌کند."
+        },
+        {
+          "level": "پیشرفته",
+          "task": "چگونه `handlers` در playbook `Ansible` برای انجام workهای پس از تغییر (مثل ریبوٹ) استفاده می‌شوند؟",
+          "hint": "notify و handler.",
+          "solution": "taskهای اصلی با `notify: <handler_name>` handlerها را احضار می‌کنند؛ handler در پایان play (یا در صورت لزوم) اجرا می‌شود — مثلاً taskِ `restart ssh` بعد از تغییر config."
         }
       ],
       "table": {
-        "title": "مقایسه ماژول‌های قدیمی CLI در برابر Resource Modules مدرن در Ansible شبکه",
+        "title": "جدول مفاهیم کلیدی در Ansible",
         "headers": [
-          "نوع ماژول در cisco.ios",
-          "مثال دستور",
-          "رفتار و مزایا"
+          "مفهمِ کلیدی در Ansible",
+          "توضیح",
+          "کاربرد"
         ],
         "rows": [
           [
-            "ios_command",
-            "ارسال دستورات نمایشی مثل show ip bgp summary",
-            "برای جمع‌آوری اطلاعات و تست و ممیزی شبکه (Read-Only)"
+            "`control node`",
+            "مرکز اجرای playbook",
+            "اجرا و سازماندهی tasks"
           ],
           [
-            "ios_config",
-            "ارسال خطوط متنی دستی زیر parents: interface Gi0/1",
-            "انعطاف بالا برای تنظیماتی که Resource Module ندارند، ولی Idempotency محدودتر"
+            "`managed node`",
+            "دیواله‌های هدف",
+            "پذیرش commands از طریق SSH"
           ],
           [
-            "Resource Modules (مثلاً ios_vlans، ios_bgp_global)",
-            "توصیف وضعیت مطلوب به صورت دیکشنری YAML با state: merged/replaced/deleted",
-            "مدل‌محور، Idempotent واقعی، قابلیت پاک کردن تنظیمات اضافه با overridden!"
+            "`inventory`",
+            "فهرست hosts و متغیرها",
+            "تعیین target hosts"
+          ],
+          [
+            "`playbook`",
+            "فایل YAML contained plays",
+            "تکرارپذیری و مدیریت state"
+          ],
+          [
+            "`task`/`module`",
+            "واحد اجرای work",
+            "مثل `ios_config`، `gather_facts`"
+          ],
+          [
+            "`handler`",
+            "task پُست-تغییر",
+            "اعمال پس از change (مثل ریبوٹ)"
           ]
         ]
       },
       "faq": [
         {
-          "q": "چرا هنگام نوشتن Playbook برای تجهیزات شبکه باید در بالای Play حتماً gather_facts: false (یا استفاده از ios_facts) بگذاریم؟",
-          "a": "چون در پیش‌فرض Ansible سعی می‌کند اسکریپت پایتون Gather Facts مخصوص سرورهای لینوکس را به روتر بفرستد که روی Cisco IOS با خطا شکست می‌خورد! برای جمع‌آوری اطلاعات روتر باید gather_facts: false بزنید و از ماژول cisco.ios.ios_facts استفاده کنید."
+          "q": "آیا `Ansible` نیاز به installing agent روی managed node دارد؟",
+          "a": "خیر؛ `Ansible` با `SSH` استاندارد به managed nodes متصل می‌شود و module python را اجرا می‌کند، بنابراین نیازی به installing agent ندارد."
         },
         {
-          "q": "تفاوت state: merged و state: overridden در Resource Moduleهای جدید Ansible چیست؟",
-          "a": "حالت merged فقط VLANها یا تنظیمات نوشته‌شده در فایل YAML شما را اضافه/آپدیت می‌کند و به بقیه کار ندارد؛ اما overridden کل VLANهای اضافه و غیرمجازی که در فایل YAML شما نیستند را هم از روی سوئیچ پاک می‌کند تا سوئیچ ۱۰۰٪ مطابق فایل Git شما باشد!"
+          "q": "تفاوت `push` و `pull` در modelهای اتوماسیون چیست؟",
+          "a": "`Ansible` یک engine push است (control node به managed node می‌رود)، در حالی که modelهای pull (puppet/chef) بر server متمرکز هستند و managed nodes خودشان نتیجه‌ی configuration را می‌گیرند."
         },
         {
-          "q": "برای اجرای سریع‌تر روی ۵۰ روتر هم‌زمان کدام پارامتر ansible.cfg را تنظیم کنیم؟",
-          "a": "مقدار forks = 20 یا ۵۰ (پیش‌فرض فقط ۵ است، یعنی در هر لحظه فقط به ۵ روتر وصل می‌شود!)."
+          "q": "چرا playbook `Ansible` برای اتوماسیون شبکه idempotent است؟",
+          "a": "module `ios_config` state desired را با state موجود مقایسه می‌کند و فقط تغییرات لازم را اعمال می‌کند؛ در اجرای دوم playbook اگر state تغییر نکرده باشد، `changed=0` report می‌شود."
         }
       ],
-      "analogy": "اگر اسکریپت پایتون مثل نوشتن دستورالعمل آشپزی با توضیح قدم‌به‌قدم «اول پیاز را سرخ کن، بعد نمک بزن» (Imperative) باشد، Ansible مثل سفارش دادن وضعیت نهایی اتاق است: شما در فایل YAML می‌نویسید «مطمئن شو VLAN 10 و VLAN 20 روی همه این ۵۰ سوئیچ وجود دارند!». اگر قبلاً روی سوئیچ ۵ بوده‌اند، Ansible هیچ کاری نمی‌کند و می‌گوید ok؛ اگر نبودند، می‌سازد و می‌گوید changed! هر چند بار که اجراش کنید نتیجه همیشه تمیز و یکسان (Idempotent) است.",
-      "ciscoRef": "Cisco DevNet & Red Hat Ansible Network Automation Docs (cisco.ios / cisco.nxos Collections)",
-      "summary": "Ansible با ساختار Agentless، فایل‌های خوانای YAML، تفکیک داده‌ها در Inventory و group_vars/host_vars، ماژول‌های ساختاریافته Resource Modules، قالب‌های Jinja2 و رمزنگاری Ansible Vault، مدیریت هماهنگ و تکرارپذیر صدها تجهیز شبکه را با قابلیت پیش‌نمایش --check --diff ممکن می‌سازد."
+      "misconceptions": [
+        {
+          "myth": "`Ansible` نیاز به installing agent روی هر managed node دارد.",
+          "reality": "خیر؛ `Ansible` از `SSH` استاندارد استفاده می‌کند و نیازی به installing agent ندارد."
+        },
+        {
+          "myth": "playbook `Ansible` همیشه non-idempotent است.",
+          "reality": "moduleهای `Ansible` state desired را با state موجود مقایسه می‌کنند و فقط تغییرات لازم را اعمال می‌کنند؛ playbook دو بار اجرا شود، در اجرای دوم با `changed=0`، idempotent عمل می‌کند."
+        },
+        {
+          "myth": "`Ansible` تنها برای servers کاربرد دارد و برای شبکه مناسب نیست.",
+          "reality": "خیر؛ `Ansible` مجموعه‌ای از modules مخصوص شبکه (`ios_config`، `nxos_config` و غیره) ارائه می‌دهد که make آن برای اتوماسیون تجهیزات شبکه مناسب است."
+        }
+      ],
+      "analogy": "`Ansible` مانند یک مدیر پروژه‌ی متمرکز است که به دنباله‌ی دستورات استاندارد (SSH) به هر کارمند (managed node) می‌رود و workهای تکرارپذیر را با docی دقیق و قابل تکرار (playbook) سازماندهی می‌کند؛ در اجرای بعدی، او فقط workهایی را انجام می‌دهد که نیاز به انجام باشد، نه همه‌ی workها را دوباره — این idempotency است.",
+      "ciscoRef": "Cisco Ansible Network Automation Guide — Ansible Network Collections & ios_config Module",
+      "summary": "`Ansible` با control node و managed nodes (بدون agent، از طریق SSH) playbookهای تکرارپذیری را اجرا می‌کند؛ tasks با modules (مثل `ios_config`) state desired را ایجاد می‌کنند و با تحقق idempotency، اجرای دوم playbook بدون تغییرات اضافی ادامه می‌دهد.",
+      "quiz": [
+        {
+          "q": "در `Ansible`، managed node به چه دلیل نیازی به installing agent ندارد؟",
+          "opts": [
+            "از `SNMP` استفاده می‌کند",
+            "از `SSH` استاندارد برای ارتباط با control node استفاده می‌کند",
+            "از `NETCONF` استفاده می‌کند",
+            "تنها commands محلی اجرا می‌کند"
+          ],
+          "ans": 1,
+          "exp": "`Ansible` با `SSH` استاندارد به managed nodes متصل می‌شود و module python را اجرا می‌کند، بدون نیاز به installing agent."
+        },
+        {
+          "q": "در playbook `Ansible`، چه workها در `handlers` انجام می‌شود؟",
+          "opts": [
+            "workهای اولیه play",
+            "workهای gather_facts",
+            "workهای پس از change (مثل ریبوٹ) که taskهای اصلی با `notify` آن‌ها را احضار می‌کنند",
+            "هیچ‌کدام"
+          ],
+          "ans": 2,
+          "exp": "handlers taskهایی هستند که فقط در صورت احضار شدن توسط `notify` از taskهای اصلی اجرا می‌شوند و معمولاً برای workهای پس از change (مثل ریبوٹ) استفاده می‌شوند."
+        },
+        {
+          "q": "چرا playbook `Ansible` برای اتوماسیون شبکه idempotent است؟",
+          "opts": [
+            "از `SNMP` استفاده می‌کند",
+            "تنها commands محلی اجرا می‌کند",
+            "هیچ‌کدام",
+            "module state desired را با state موجود مقایسه می‌کند و فقط تغییرات لازم را اعمال می‌کند"
+          ],
+          "ans": 3,
+          "exp": "moduleهای `Ansible` state desired را با state موجود مقایسه می‌کنند و فقط تغییرات لازم را اعمال می‌کنند، به‌صورت idempotent."
+        }
+      ],
+      "exercise": "سناریوی اجرای playbook `Ansible` روی گروهی از روترها: چگونه در ۳ گام از (الف) عدم تحقق idempotency، (ب) خطاهای connection SSH و (ج) عدم اجرای handlers پس از تغییر جلوگیری می‌کنید؟",
+      "bridge": {
+        "why": "`Ansible` تغییرات را روی equipmentهای موجود به‌صورت deklarative انجام می‌دهد، اما زمانی که باید زیرساختِ خودِ equipmentها — مثل VLANها، routing domains و حتی دستگاه‌های جدید — به‌صورت کد تعریف و provisioning شود، به یک tool مدرن‌تر برای مدیریت state lifecycle زیرساخت نیاز داریم؛ این است که **`Terraform`** کار می‌کند.",
+        "nextId": "auto_12",
+        "nextTitle": "۷.۷ Automation (درس ۱۲ از ۲۰): زیرساخت به عنوان کد با Terraform"
+      },
+      "id": "auto_11",
+      "title": "۷.۷ Automation (درس ۱۱ از ۲۰): اتوماسیون با Ansible (Playbook & Inventory)"
     },
     "auto_12": {
-      "id": "auto_12",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۷ Automation (درس ۱۲ از ۲۰): زیرساخت به عنوان کد با Terraform",
-      "lead": "اگر Ansible برای پیکربندی روترها و سرورهای موجود عالی است، پس چطور خودِ شبکه‌های ابری (AWS VPC، Azure VNet)، فایروال‌های ابری و کنترلرهای ACI و SD-WAN را از صفر بسازیم، ردیابی کنیم و با یک دستور حذف کنیم؟ این قلمرو تخصصی Terraform است!",
-      "goal": "درک کامل مدل Declarative در Terraform (زبان HCL)، چرخه حیات init/plan/apply/destroy، مدیریت حیاتی State File (و Remote Backend با State Locking) و استفاده از Providerهای شبکه‌ای سیسکو و کلود.",
-      "prereq": "آشنایی با Cloud (VPC/VNet)، REST API و Git (دروس قبل).",
+      "lead": "اتوماسیون با `Ansible` تغیرات روی equipmentهای موجود را مدیریت می‌کند، اما when شما باید یک زیرساخت کامل (VLAN، routing domain، همان دستگاه‌های مجازی جدید) را از صفر provisioning کنید، مدیریتِ lifecycle زیرساخت نیاز به tool متفاوتی دارد. **`Terraform`** این کار را با تعریف state lifecycle زیرساخت به‌صورت کد (`Infrastructure as Code`) انجام می‌دهد.",
+      "goal": "درک معماری `Terraform` (provider، resource، state file، plan/apply lifecycle)، تفاوت `Terraform` با `Ansible` در مدیریت state lifecycle زیرساخت، واژه‌های `resource`/`data source`/`variable`/`output`/`modules`، و مفهوم هم‌زمانی و locking، همراه با یک سناریوی عملی python که plan/apply state machine را با mock provider simulation می‌کند.",
+      "prereq": "آشنایی با `Ansible` (درس ۱۱) و مفاهیم زیرساخت شبکه.",
       "sections": [
         {
-          "h": "۱. تفاوت اصلی Terraform با ابزارهای اسکریپتی: فایل State و طراحی Declarative",
+          "h": "۱. معماری `Terraform`: provider، resource و state",
           "p": [
-            "ابزار HashiCorp Terraform با زبان بسیار ساده و خوانای HCL (HashiCorp Configuration Language) نوشته می‌شود (فایل‌های .tf). تفاوت بنیادین آن با بسیاری از ابزارهای دیگر وجود فایل وضعیت یعنی terraform.tfstate است! این فایل یک عکس دقیق JSON از تمام منابعی است که Terraform ساخته (از AWS Transit Gateway گرفته تا EPG و Bridge Domain در Cisco ACI یا قوانین Meraki).",
-            "به لطف این State File، قبل از اعمال هر تغییری با زدن terraform plan می‌توانید دقیقاً ببینید چه چیزی قرار است ساخته شود (+)، تغییر کند (~) یا تخریب و بازسازی شود (-/+)! این شفافیت باعث می‌شود هرگز اشتباهی یک سابنت عملیاتی را حذف نکنید."
+            "`Terraform` با زبان declarative **`HCL`** (`HashiCorp Configuration Language`) زیرساخت را به‌صورت کد تعریف می‌کند. هر **provider** (مثل `cisco`، `aws`، `azure`) pluginی است که API زیرساخت را می‌شناسد و **resource**ها را تعریف می‌کند؛ `Terraform` با خواندن **state file** (کنتور state فعلی زیرساخت)، plan تغییرات را محاسبه می‌کند و apply می‌کند.",
+            "مهم‌ترین نکته: `Terraform` **state lifecycle** زیرساخت را مدیریت می‌کند — ایجاد، تغییر، حذف — و در همین راستا plan/apply lifecycle را با locking و هماهنگی انجام می‌دهد، که سبب می‌شود تغییرات زیرساخت تکرارپذیر و auditable باشند."
           ]
         },
         {
-          "h": "۲. جریان کاری ۴ مرحله‌ای Terraform و همکاری امن تیمی با Remote State",
+          "h": "۲. plan و apply: lifecycle تغییرات",
           "p": [
-            "کار روزانه با Terraform همیشه ۴ دستور اصلی دارد: (۱) terraform init (دانلود پلاگین Providerهای لازم مثل hashicorp/aws یا CiscoDevNet/aci)؛ (۲) terraform plan (بررسی نقشه تغییرات با State فعلی بدون دستکاری شبکه)؛ (۳) terraform apply (اجرای واقعی تغییرات روی API کنترلر یا ابر)؛ و (۴) terraform destroy (پاک‌سازی تمیز کل محیط آزمایشگاهی بعد از تست).",
-            "دو قانون طلایی امنیت و کار تیمی در Terraform: اول، فایل terraform.tfstate ممکن است حاوی کلیدها یا پسوردها باشد و همچنین اگر دو نفر هم‌زمان از روی لپ‌تاپ خودشان تغییر دهند State خراب می‌شود؛ پس هرگز فایل tfstate را روی گیت‌هاب نگذارید! بلکه از Remote Backend (مثل AWS S3 + DynamoDB یا Terraform Cloud) با قابلیت State Locking استفاده کنید تا قفل تیمی برقرار شود. دوم، از ماژول‌ها (Modules) برای تکرار تمیز الگوهای شبکه (مثلاً ماژول ساخت یک شعبه کامل ابری) استفاده کنید."
+            "اجراى `terraform plan`، plan تغییرات پیشنهادی را بر اساس state فعلی و definition code زیرساخت محاسبه می‌کند و گزارش می‌دهد چه resources ایجاد، تغییر یا حذف خواهند شد. اجراى `terraform apply` plan را اعمال می‌کند؛ `Terraform` با مدیریت state lifecycle و locking، هم‌زمانی تغییرات را کنترل می‌کند.",
+            "قابلیت‌های کلیدی شامل `data source` (خواندنข้อมูล از زیرساخت موجود)، `variable`/`output` (متغیرهای قابل استفاده در code و خروجی‌ها)، `modules` (اشتراک‌گذاری قطعه‌های reusable code) و `workspace` (مدیریت stateهای مختلف زیرساخت) است."
+          ]
+        },
+        {
+          "h": "۳. `Terraform` در شبکه: providerهای `cisco` و مدیریت state lifecycle",
+          "p": [
+            "`Terraform` با providerهای مخصوص شبکه مانند `cisco` (management of IOS-XE devices، VLANها، routing و غیره) می‌تواند state lifecycle زیرساخت شبکه را مدیریت کند. برعکس `Ansible` که روی equipmentهای موجود کار می‌کند، `Terraform` state lifecycle را از ابتدا مدیریت می‌کند — ایجاد، تغییر و حذف — که برای provisioning زیرساخت جدید و مدیریت long-lived state مناسب است.",
+            "نکته مهم: `Terraform` state lifecycle را مدیریت می‌کند، در حالی که `Ansible` تغیرات روی equipmentهای موجود را مدیریت می‌کند؛ بنابراین در طراحی اتوماسیون، `Terraform` برای مدیریت state lifecycle زیرساخت و `Ansible` برایتنظیم تجهیزات استفاده می‌شود."
+          ]
+        },
+        {
+          "h": "۴. عیب‌یابی: plan مغایرت، state drift و locking",
+          "p": [
+            "مسئله‌ی متداول drift است: state فعلی زیرساخت با definition code (یعنی `terraform plan`) مغایرت دارد، به‌دلیل تغییرات دستی یا خطاهای apply. راه‌حل، اجرای `terraform plan` برای بررسی drift و `terraform apply` برای همگون‌سازی است.",
+            "خطاهای apply معمولاً به‌دلیل مغایرت state lifecycle یا عدم هماهنگی locking است؛ `terraform plan` و `terraform apply` با locking، هم‌زمانی تغییرات را کنترل می‌کنند. لاگ دقیق plan/apply و state file را بررسی کنید."
           ]
         }
       ],
       "protocolAnalysis": [
-        "در تحلیل عملی ۷.۷ Automation (درس ۱۲ از ۲۰)، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
+        "**تحلیل lifecycle `terraform plan`:** `Terraform` state فعلی زیرساخت را با definition code مقایسه می‌کند و plan پیشنهادی (create/update/delete) را محاسبه و گزارش می‌دهد؛ plan فقط پیش‌نمایش است و تغییری ایجاد نمی‌کند.",
+        "**تحلیل lifecycle `terraform apply`:** apply plan را اجرا می‌کند و state lifecycle را مدیریت می‌کند؛ `Terraform` با locking، هم‌زمانی تغییرات را کنترل و state file را بر اساس نتیجه‌ی apply update می‌کند.",
+        "**تحلیل difference با Ansible:** `Ansible` تغیرات روی equipmentهای موجود را مدیریت می‌کند، در حالی که `Terraform` state lifecycle زیرساخت را از ابتدا مدیریت می‌کند — create، update، delete — که برای provisioning زیرساخت مناسب است."
       ],
       "iosCommands": [
         {
-          "cmd": "show ip bgp summary",
-          "out": "10.255.0.2  4  65200  1420  1418  128",
-          "note": "پایش همسایگی BGP و تعداد Prefixها"
+          "cmd": "show running-config",
+          "why": "*(در شبیه‌ساز داخلی IOS)* بررسی ثبت VLAN و پورت `Gi0/7` در شبیه‌ساز محلی.",
+          "anatomy": "show running-config",
+          "lookFor": "دیده شدن `vlan` و پورت `Gi0/7` با `nonegotiate`.",
+          "ifUnexpected": "در `configure terminal` تنظیمات VLAN و پورت آزمایشگاه را تکمیل کنید."
         },
         {
-          "cmd": "show ip route",
-          "out": "B  172.16.0.0/16 [20/0] via 10.255.0.2",
-          "note": "بررسی مسیرهای BGP در RIB"
+          "cmd": "show vlan brief",
+          "why": "*(در شبیه‌ساز داخلی IOS)* تایید وجود VLAN و تگ‌گذاری پورت.",
+          "anatomy": "show vlan brief",
+          "lookFor": "دیده شدن VLAN 112 (TERRAFORM_IAC) و وضعیت `active`.",
+          "ifUnexpected": "با `vlan {vlan}` و `name {name}` آن را ایجاد کنید."
+        },
+        {
+          "cmd": "terraform plan",
+          "why": "*(در directory پروژه Terraform)* محاسبه و نمایش plan تغییرات پیشنهادی بر اساس state فعلی و definition code.",
+          "anatomy": "terraform plan",
+          "lookFor": "دیده‌شدن plan create/update/delete و عدم مغایرت state lifecycle.",
+          "ifUnexpected": "state lifecycle را با `terraform refresh` بررسی و drift را همگون‌سازی کنید."
+        },
+        {
+          "cmd": "terraform apply",
+          "why": "*(در directory پروژه Terraform)* اجرای plan و مدیریت state lifecycle زیرساخت.",
+          "anatomy": "terraform apply",
+          "lookFor": "تغییرات اعمال‌شده و update state lifecycle.",
+          "ifUnexpected": "لاگ apply را بررسی و state lifecycle را با `terraform refresh` refresh کنید."
         }
       ],
       "diagramSvg": "topo",
       "lab": {
-        "title": "آزمایشگاه عملی: ۷.۷ Automation (درس ۱۲ از ۲۰)",
+        "title": "آزمایشگاه عملی: آماده‌سازی VLAN 112 (`TERRAFORM_IAC`) در شبیه‌ساز + simulation lifecycle plan/apply با mock provider",
         "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۷ Automation (درس ۱۲ از ۲۰) را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
+          "۱. در ترمینال شبیه‌ساز داخلی IOS با `enable` وارد شوید و با `show vlan brief` و `show interfaces Gi0/7 switchport` وضعیت اولیه را ببینید.",
+          "۲. هدف ساخت `VLAN 112` (`TERRAFORM_IAC`) و اختصاص پورت `Gi0/7` به کلاینت `TF-PROVIDER` با `switchport nonegotiate` است.",
+          "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 112` -> `name TERRAFORM_IAC` -> `exit` -> `interface Gi0/7` -> `description TF-PROVIDER` -> `switchport mode access` -> `switchport access vlan 112` -> `switchport nonegotiate` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
+          "**سناریوی مرجع غیرشبیه‌سازی‌شده (ساخت definition code `HCL`، simulation lifecycle plan/apply و مدیریت state lifecycle با mock provider — فایل `terraform_lab.py`):**\n```python\nhcl_code = '''\nresource \"cisco_vlan\" \"tf_lab\" {\n  vlan_id = 112\n  name    = \"TERRAFORM_IAC\"\n}\n'''\n\nclass MockProvider:\n    \"\"\"provider مجازی: state فعلی زیرساخت را نگه می‌دارد.\"\"\"\n    def __init__(self, current_state: dict) -> None:\n        self.state = dict(current_state)\n\n    def plan(self, desired_state: dict) -> dict:\n        changes = []\n        for k, v in desired_state.items():\n            if self.state.get(k) != v:\n                changes.append({\"key\": k, \"action\": \"create-or-update\", \"old\": self.state.get(k), \"new\": v})\n        return {\"changes\": changes}\n\n    def apply(self, desired_state: dict) -> dict:\n        for k, v in desired_state.items():\n            self.state[k] = v\n        return {\"state\": dict(self.state)}\n\ndef run_lifecycle(provider: MockProvider, desired_state: dict) -> dict:\n    plan = provider.plan(desired_state)\n    if not plan[\"changes\"]:\n        return {\"plan_ok\": True, \"changes\": 0, \"note\": \"no changes (idempotent)\"}\n    result = provider.apply(desired_state)\n    return {\"plan_ok\": True, \"changes\": len(plan[\"changes\"]), \"state\": result[\"state\"]}\n\nif __name__ == \"__main__\":\n    prov = MockProvider({\"vlan_112\": None})\n    print(run_lifecycle(prov, {\"vlan_112\": \"TERRAFORM_IAC\"}))\n    print(run_lifecycle(prov, {\"vlan_112\": \"TERRAFORM_IAC\"}))\n```"
         ],
         "verifyCmds": [
-          "show ip bgp summary",
-          "show ip route"
+          "show vlan brief",
+          "show interfaces Gi0/7 switchport",
+          "show running-config"
         ]
       },
       "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۷ Automation (درس ۱۲ از ۲۰)، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
+        "fault": "`terraform plan` report می‌کند که state lifecycle زیرساخت با definition code مغایرت دارد (state drift)، به‌دلیل تغییرات دستی روی equipment.",
+        "analysis": "state drift به‌دلیل تغییرات دستی روی equipment یا خطاهای apply رخ می‌دهد؛ definition code state lifecycle را تعریف می‌کند و `terraform plan` این drift را نشان می‌دهد. بدون همگون‌سازی، زیرساخت غیرهمگن و غیرقابل اعتماد می‌شود.",
+        "fix": "با `terraform refresh` state lifecycle را refresh کنید، `terraform plan` را برای بررسی drift اجرا کنید، و با `terraform apply` state lifecycle را با definition code synchron کنید."
       },
-      "exercise": "برای مبحث «۷.۷ Automation (درس ۱۲ از ۲۰)» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
-      "quiz": [
+      "exercises": [
         {
-          "q": "در پیاده‌سازی استاندارد «۷.۷ Automation (درس ۱۲ از ۲۰)» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
-          "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
-          ],
-          "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۷ Automation (درس ۱۲ از ۲۰) نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
+          "level": "ساده",
+          "task": "تفاوت `terraform plan` با `terraform apply` در lifecycle تغییرات چیست؟",
+          "hint": "پیش‌نمایش و اجرا.",
+          "solution": "`terraform plan` plan تغییرات پیشنهادی را محاسبه و گزارش می‌دهد (بدون ایجاد تغییر)؛ `terraform apply` plan را اجرا و state lifecycle زیرساخت را مدیریت می‌کند."
+        },
+        {
+          "level": "متوسط",
+          "task": "تفاوت `Terraform` با `Ansible` در مدیریت زیرساخت چیست؟",
+          "hint": "state lifecycle زیرساخت در برابرتنظیم تجهیزات موجود.",
+          "solution": "`Terraform` state lifecycle زیرساخت را از ابتدا مدیریت می‌کند (create/update/delete)، در حالی که `Ansible` تغیرات روی equipmentهای موجود را مدیریت می‌کند."
+        },
+        {
+          "level": "پیشرفته",
+          "task": "چگونه state drift در `Terraform` شناسایی و همگون‌سازی می‌شود؟",
+          "hint": "plan و apply.",
+          "solution": "`terraform plan` state lifecycle را با definition code مقایسه می‌کند و drift را نشان می‌دهد؛ `terraform apply` state lifecycle را با definition code synchron می‌کند و drift را برطرف می‌کند."
         }
       ],
       "table": {
-        "title": "مقایسه تخصصی Ansible و Terraform در اتوماسیون شبکه و ابر (چه زمانی از کدام استفاده کنیم؟)",
+        "title": "جدول مفاهیم کلیدی در Terraform",
         "headers": [
-          "معیار",
-          "Terraform (Provisioning / Lifecycle)",
-          "Ansible (Configuration Management)"
+          "مفهمِ کلیدی در Terraform",
+          "توضیح",
+          "کاربرد"
         ],
         "rows": [
           [
-            "نقطه قوت اصلی",
-            "ساخت، تغییر و حذف چرخه کامل زیرساخت ابری و SDN (VPC، ACI، Meraki)",
-            "پیکربندی تجهیزات موجود روتر/سوئیچ (IOS/NX-OS) و سیستم‌عامل‌ها"
+            "`provider`",
+            "pluginی که API زیرساخت را می‌شناسد",
+            "مثل provider `cisco`"
           ],
           [
-            "نگهداری وضعیت (State)",
-            "دارد (فایل tfstate — می‌داند چه چیزی را خودش ساخته و حذف می‌کند)",
-            "Stateless (هر بار وضعیت هدف را روی دستگاه چک و اعمال می‌کند)"
+            "`resource`",
+            "یک resource زیرساخت",
+            "مثل `cisco_vlan`"
           ],
           [
-            "نیاز به SSH روی تجهیز",
-            "خیر (فقط از طریق API با Providerها صحبت می‌کند)",
-            "عمدتاً با SSH / NETCONF / API"
+            "`state file`",
+            "کنتور state فعلی زیرساخت",
+            "محاسبه plan و apply"
           ],
           [
-            "استفاده ترکیبی (Best Practice)",
-            "۱. Terraform زیرساخت ابری و روترهای مجازی را می‌سازد ->",
-            "۲. سپس Ansible داخل آن روترها BGP/OSPF را کانفیگ می‌کند!"
+            "`plan`",
+            "محاسبه و نمایش تغییرات پیشنهادی",
+            "پیش‌نمایش تغییرات"
+          ],
+          [
+            "`apply`",
+            "اجرای plan و مدیریت state lifecycle",
+            "انجام تغییرات"
+          ],
+          [
+            "`module`",
+            "قطعه‌ی reusable code",
+            "اشتراک‌گذاری و reuse"
           ]
         ]
       },
       "faq": [
         {
-          "q": "اگر یک همکار دستی از داخل پنل وب AWS یا APIC یک قانون را عوض کند، Terraform با وجود فایل tfstate چطور واکنش نشان می‌دهد؟",
-          "a": "این همان مفهوم Configuration Drift است! دفعه بعدی که terraform plan بزنید، Terraform وضعیت واقعی ابر/APIC را با فایل tfstate مقایسه می‌کند، انحراف را کشف می‌کند و پیشنهاد می‌دهد تغییر دستی را به وضعیت استاندارد کد برگرداند."
+          "q": "تفاوت `Terraform` با `Ansible` چیست؟",
+          "a": "`Terraform` state lifecycle زیرساخت را از ابتدا مدیریت می‌کند (create/update/delete) و برای provisioning زیرساخت مناسب است، در حالی که `Ansible` تغیرات روی equipmentهای موجود را مدیریت می‌کند."
         },
         {
-          "q": "آیا سیسکو برای تجهیزات و کنترلرهای خودش Provider رسمی Terraform دارد؟",
-          "a": "بله! در رجیستری رسمی Terraform پلاگین‌های قدرتمندی از سوی CiscoDevNet برای Cisco ACI، Cisco SD-WAN، Cisco Meraki، Cisco Catalyst Center، Cisco Nexus (NX-OS / NDFC) و Cisco Secure Firewall (FMC) منتشر شده‌اند."
+          "q": "state drift در `Terraform` چیست و چگونه برطرف می‌شود؟",
+          "a": "state drift یعنی state فعلی زیرساخت با definition code مغایرت دارد؛ با `terraform refresh` refresh، `terraform plan` بررسی و `terraform apply` همگون‌سازی می‌شود."
         },
         {
-          "q": "در خروجی terraform plan وقتی کنار یک منبع عبارت (-/+) یا forces replacement می‌بینیم یعنی چه؟",
-          "a": "هشدار قرمز! یعنی تغییر آن پارامتر (مثلاً تغییر رنج CIDR یک VPC یا تغییر نام برخی فیلدهای فایروال) از طریق ویرایش درجا ممکن نیست و Terraform مجبور است اول منبع فعلی را نابود (Destroy) و از نو بسازد! همیشه این علامت را با دقت چک کنید."
+          "q": "چرا `Terraform` برای اتوماسیون شبکه مناسب است؟",
+          "a": "`Terraform` با providerهای مخصوص شبکه (مثل `cisco`) state lifecycle زیرساخت شبکه را مدیریت می‌کند و provisioning زیرساخت را تکرارپذیر و auditable می‌سازد."
         }
       ],
-      "analogy": "تفاوت Ansible و Terraform مثل تفاوت دکوراتور داخلی و مهندس سازنده ساختمان است! مهندس سازنده (Terraform) نقشه کل شهرک (کل زیرساخت AWS، سابنت‌ها، روترها، فایروال و قوانین ACI) را می‌گیرد، در یک دفترچه ثبت املاک (State File) یادداشت می‌کند که «من ۳ تا VPC و ۲ تا فایروال ساختم»؛ اگر فردا یک فایروال را از نقشه پاک کنید، Terraform خودش دفترچه املاک را چک می‌کند و می‌فهمد باید آن فایروال را خراب کند! سپس دکوراتور (Ansible) می‌آید و داخل سرورها و روترها تنظیمات دقیق نرم‌افزار و مسیریابی را می‌چیند.",
-      "ciscoRef": "HashiCorp Terraform Docs & Cisco DevNet IaC Guide (CiscoDevNet Providers for ACI, SD-WAN, Meraki)",
-      "summary": "Terraform ستون اصلی Infrastructure as Code برای مدیریت چرخه حیات زیرساخت ابر و کنترلرهای شبکه (ACI، SD-WAN، Meraki) است: با زبان HCL، پیش‌نمایش دقیق terraform plan پیش از اجرا، نگهداری وضعیت در Remote State با Locking و هم‌افزایی کامل در کنار Ansible."
+      "misconceptions": [
+        {
+          "myth": "`Terraform` و `Ansible` کار یکسانی را انجام می‌دهند.",
+          "reality": "خیر؛ `Terraform` state lifecycle زیرساخت را مدیریت می‌کند (create/update/delete)، در حالی که `Ansible` تغیرات روی equipmentهای موجود را مدیریت می‌کند."
+        },
+        {
+          "myth": "`terraform plan` تغییرات را اعمال می‌کند.",
+          "reality": "خیر؛ `terraform plan` فقط plan تغییرات پیشنهادی را محاسبه و گزارش می‌دهد؛ `terraform apply` plan را اجرا و state lifecycle را مدیریت می‌کند."
+        },
+        {
+          "myth": "state drift در `Terraform` غیرقابل رفع است.",
+          "reality": "خیر؛ state drift با `terraform refresh`، `terraform plan` و `terraform apply` همگون‌سازی می‌شود."
+        }
+      ],
+      "analogy": "`Terraform` مانند یک معمار محاسباتی است که state lifecycle ساختمان را از صفر definieren می‌کند: план (plan) پیشنهادی شامل ایجاد، تغییر یا حذف بخش‌ها را ارائه می‌دهد، و در مرحله‌ی apply، state lifecycle ساختمان بر اساس همان plan مدیریت می‌شود — همه‌ی تغییرات تکرارپذیر و auditable می‌باشند.",
+      "ciscoRef": "Terraform Cisco Provider Docs — Infrastructure as Code & State Lifecycle Management",
+      "summary": "`Terraform` با زبان `HCL`، provider و resourceها، state lifecycle زیرساخت را مدیریت می‌کند: `plan` تغییرات پیشنهادی را محاسبه و `apply` state lifecycle را اجرا می‌کند. `Terraform` state lifecycle را از ابتدا مدیریت می‌کند، در حالی که `Ansible`تنظیم equipmentهای موجود را مدیریت می‌کند.",
+      "quiz": [
+        {
+          "q": "در lifecycle `Terraform`، کدام دستور plan تغییرات پیشنهادی را محاسبه و گزارش می‌دهد، بدون اینکه تغییری ایجاد کند؟",
+          "opts": [
+            "`terraform plan`",
+            "`terraform apply`",
+            "`terraform refresh`",
+            "`terraform state`"
+          ],
+          "ans": 0,
+          "exp": "`terraform plan` plan تغییرات پیشنهادی را محاسبه و گزارش می‌دهد؛ `terraform apply` plan را اجرا و state lifecycle را مدیریت می‌کند."
+        },
+        {
+          "q": "تفاوت اصلی `Terraform` با `Ansible` در مدیریت زیرساخت چیست؟",
+          "opts": [
+            "`Terraform` تغیرات روی equipmentهای موجود را مدیریت می‌کند",
+            "`Terraform` state lifecycle زیرساخت را از ابتدا مدیریت می‌کند (create/update/delete)",
+            "`Ansible` state lifecycle زیرساخت را مدیریت می‌کند",
+            "هیچ‌کدام"
+          ],
+          "ans": 1,
+          "exp": "`Terraform` state lifecycle زیرساخت را از ابتدا مدیریت می‌کند (create/update/delete)، در حالی که `Ansible`تنظیم equipmentهای موجود را مدیریت می‌کند."
+        },
+        {
+          "q": "state drift در `Terraform` چگونه شناسایی و برطرف می‌شود؟",
+          "opts": [
+            "با `terraform apply` فقط",
+            "با `terraform module` فقط",
+            "هیچ‌کدام",
+            "با `terraform refresh`، `terraform plan` و `terraform apply`"
+          ],
+          "ans": 3,
+          "exp": "state drift با `terraform refresh` refresh، `terraform plan` بررسی و `terraform apply` همگون‌سازی می‌شود."
+        }
+      ],
+      "exercise": "سناریوی اجرای lifecycle `Terraform` روی زیرساخت شبکه: چگونه در ۳ گام از (الف) state drift، (ب) عدم هماهنگی locking در apply و (ج) عدم تطابق plan با state فعلی جلوگیری می‌کنید؟",
+      "bridge": {
+        "why": "`Terraform` state lifecycle زیرساخت را به‌صورت کد مدیریت می‌کند، اما زمانی که باید چندین equipment شبکه — و profiles و services آن‌ها — را به‌صورت یک‌پارچه، هم‌زمان و مطابق policies سازمان‌دهی کنید، نیاز به orchestrator متمرکزی دارید که state lifecycle و هماهنگی services را مدیریت کند؛ اینجاست که **`Cisco NSO`** وارد عمل می‌شود.",
+        "nextId": "auto_13",
+        "nextTitle": "۷.۷ Automation (درس ۱۳ از ۲۰): Cisco NSO (Network Services Orchestrator)"
+      },
+      "id": "auto_12",
+      "title": "۷.۷ Automation (درس ۱۲ از ۲۰): زیرساخت به عنوان کد با Terraform"
     },
     "auto_13": {
-      "id": "auto_13",
       "faculty": "دانشکده ۴ · ۸ تخصص پیشرفته",
-      "title": "۷.۷ Automation (درس ۱۳ از ۲۰): Cisco NSO (Network Services Orchestrator)",
-      "lead": "چطور یک سرویس شبکه پیچیده (مثل راه‌اندازی یک مشتری جدید MPLS L3VPN روی ۵۰ روتر مختلف از ۳ برند سیسکو، جونیپر و هواوی) را در یک مرحله طوری اجرا کنیم که اگر روتر شماره ۴۹ خطا داد، تغییرات هر ۴۸ روتر قبلی خودکار برگردد؟ این قدرت پلتفرم ارکستراسیون Cisco NSO است!",
-      "goal": "درک معماری چندلایه Cisco NSO (Service Manager، CDB، FastMap، Device Manager با NEDهای چندبرندی)، چرخه سرویس‌های YANG-based و مدیریت تغییر بدون خطا در شبکه اپراتوری.",
-      "prereq": "تسلط بر YANG، NETCONF و مفاهیم MPLS/Service Provider (دروس ۸ و ۱۰ اتوماسیون).",
+      "lead": "وقتی شبکه شامل ده‌ها equipment با different models، services و policies است و نیاز به orchestrating services پیچیده (end-to-end provisioning) دارید، مدیریت state lifecycle تنها با tools آماده کافی نیست. **`Cisco NSO`** (Network Services Orchestrator) یک orchestrator متمرکز است که modelهای داده‌ی `YANG` را به‌صورت یکپارچه متحرک می‌کند و services را end-to-end provisioning می‌کند.",
+      "goal": "درک معماری `Cisco NSO` (service orchestration، northbound/southbound interfaces، service point، service package، device driver)، نقش `YANG` و `NETCONF`/`RESTCONF` در southbound interface، و تفاوت orchestration (`NSO`) با config management (`Ansible`/`Terraform`)، همراه با یک سناریوی عملی python که service provisioning lifecycle را با mock service model simulation می‌کند.",
+      "prereq": "آشنایی با `YANG` (درس ۱۰)، `NETCONF`/`RESTCONF` (درس ۹)، `Ansible` (درس ۱۱) و `Terraform` (درس ۱۲).",
       "sections": [
         {
-          "h": "۱. تفاوت اتوماسیون دستگاه‌محور با ارکستراسیون سرویس‌محور در Cisco NSO",
+          "h": "۱. `Cisco NSO` چیست؟ orchestration در یک‌پارچگی services",
           "p": [
-            "در اسکریپت‌نویسی معمولی (Device-Centric) شما باید بدانید برای وصل کردن یک مشتری باید روی روتر PE1 چه VRF بسازید، چه ساب‌اینترفیسی بزنید و در MP-BGP چه Route-Targetی بگذارید؛ تازه اگر بعداً مشتری بخواهد سرویسش را لغو یا سرعتش را کم کند باید یک اسکریپت پاک‌سازی جدا بنویسید!",
-            "Cisco NSO (برگرفته از Tail-f) مفهوم Service-Centric Orchestration را می‌آورد: شما فقط مدل سرویس (Service Model با YANG) را تعریف می‌کنید (مثلاً: نام مشتری، پهنای باند، دو سر اتصال). الگوریتم جادویی FastMap داخل NSO نه تنها در لحظه اول تمام کانفیگ‌های لازم را محاسبه و به دستگاه‌ها می‌فرستد، بلکه وقتی یک فیلد سرویس را عوض می‌کنید یا سرویس را حذف می‌کنید، خود FastMap بدون اینکه یک خط کد اضافی بنویسید می‌داند دقیقاً کدام خطوط کانفیگ در کدام روترها باید اصلاح یا پاک شوند!"
+            "`Cisco NSO` یک orchestrator متمرکز برای شبکه است که services را end-to-end provisioning می‌کند: از تعریف service (مثل VPN،ไฟروال یا مجموعه‌ی equipment) تا deployment آن روی equipmentهای مختلف با هماهنگی state lifecycle و policies. NSO بر اساس modelهای داده‌ی `YANG` کار می‌کند و services را در قالب service models تعریف می‌کند.",
+            "NSO در دو سطح کار می‌کند: **northbound** (رابط با apps و northbound systems، معمولاً REST/API) که service requests را می‌پذیرد و **southbound** (رابط با equipmentهای شبکه) که از `NETCONF`/`RESTCONF` (و در مواردی CLI/SNMP) استفاده می‌کند. این تفکیک، orchestration services را به‌صورت یکپارچه و تکرارپذیر فراهم می‌کند."
           ]
         },
         {
-          "h": "۲. اجزای معماری NSO: پایگاه‌داده CDB و درایورهای NED (پشتیبانی واقعی چندبرندی!)",
+          "h": "۲. مفاهیم کلیدی NSO: service point، service package و device driver",
           "p": [
-            "معماری داخلی NSO از سه بخش کلیدی تشکیل شده است: (۱) CDB (Configuration Database — یک دیتابیس تراکنشی در حافظه که آینه دقیق وضعیت کل شبکه را در لحظه نگه می‌دارد و به سرعت با شبکه sync-from / check-sync مقایسه می‌شود تا تغییر دستی خارج از NSO فوراً لو برود!)؛ (۲) Service Manager و موتور FastMap با پکیج‌های پایتون یا XML Template؛ و (۳) Device Manager با پلاگین‌های NED (Network Element Driver). نقش NED مثل درایور پرینتر است: NSO در بالا فقط با زبان استاندارد YANG و NETCONF کار می‌کند، اما NED آن را به زبان بومی تجهیز مقصد (چه NETCONF روی IOS XR باشد، چه CLI روی IOS قدیمی، چه API روی Palo Alto/Juniper/Arista) ترجمه می‌کند و پشتیبانی از تراکنش شبکه (Network-Wide Transaction Commit) را فراهم می‌سازد!"
+            "**service point** یک نقطه‌ی تعریف‌شده‌ی service است که characterize می‌کند چه equipmentها و params در یک service دخیل هستند؛ **service package** یک فایل `YANG` است که service model را تعریف می‌کند و **device driver** رابط NSO با equipment است که state lifecycle equipment را از طریق `NETCONF`/`RESTCONF` مدیریت می‌کند. این مجموعه، provisioning services را تکرارپذیر و auditable می‌سازد.",
+            "نکته مهم: NSO modelهای data و services را بر اساس `YANG` مدیریت می‌کند، و southbound interface آن با `NETCONF`/`RESTCONF` کار می‌کند؛ این تفکیک سبب می‌شود services end-to-end provisioning شوند، به‌صورتی که policy و state lifecycle در یک‌پارچگی مدیریت شوند."
+          ]
+        },
+        {
+          "h": "۳. NSO در مقابل tools config management",
+          "p": [
+            "`Ansible`/`Terraform` tools config management هستند که تغیرات روی equipmentها یا state lifecycle زیرساخت را مدیریت می‌کنند؛ اما `NSO` یک orchestrator است که services را end-to-end provisioning می‌کند: آن نه تنها equipmentها راتنظیم می‌کند، بلکه services را در قالب service models تعریف، هماهنگی state lifecycle و policies را مدیریت می‌کند.",
+            "در یک شبکه پیچیده با servicesمتعددة و equipmentهای heterogeneous، orchestrator متمرکزی مانند NSO سبب می‌شود services به‌صورت یکپارچه provisioning شوند، در حالی که config management tools به‌صورت مجزا equipmentها راتنظیم می‌کنند."
+          ]
+        },
+        {
+          "h": "۴. عیب‌یابی services: state lifecycle، policies و southbound errors",
+          "p": [
+            "خطاهای معمول در provisioning services شامل southbound errors (خطای `NETCONF`/`RESTCONF` از equipment)، عدم تطابق service model با equipment، و policy violations است. NSO لاگ‌های دقیق provisioning و state lifecycle را ارائه می‌دهد که ریشه‌ی خطاهای service را مشخص می‌کند.",
+            "نکته ظریف: provisioning service ممکن است شامل مراحل متوالی روی equipmentهای مختلف باشد (multi-device state lifecycle) و خطای واحد می‌تواند provisioning service را ناتمام بگذارد؛ در این صورت، همگون‌سازی state lifecycle و policies برای برطرف کردن خطای service ضروری است."
           ]
         }
       ],
       "protocolAnalysis": [
-        "در تحلیل عملی ۷.۷ Automation (درس ۱۳ از ۲۰)، همیشه وضعیت فعلی جدول‌ها و تایمرها را با دستورات show و در صورت نیاز Packet Capture در Wireshark راستی‌آزمایی کنید."
+        "**تحلیل northbound interface:** northbound interface NSO با apps/northbound systems کار می‌کند و service requests را می‌پذیرد؛ این رابط معمولاً REST/API است و service requests را به southbound منتقل می‌کند.",
+        "**تحلیل southbound interface:** southbound interface NSO با equipmentهای شبکه کار می‌کند و از `NETCONF`/`RESTCONF` (و در مواردی CLI/SNMP) استفاده می‌کند؛ device driver state lifecycle equipment را مدیریت وتنظیم را انجام می‌دهد.",
+        "**تحلیل service provisioning lifecycle:** provisioning service lifecycle شامل تعریف service model، تحویل service request، و اجرای provisioning روی equipmentهای دخیل؛ NSO state lifecycle را در یک‌پارچگی و هماهنگی مدیریت می‌کند و services را end-to-end provisioning می‌کند."
       ],
       "iosCommands": [
         {
-          "cmd": "show ip bgp summary",
-          "out": "10.255.0.2  4  65200  1420  1418  128",
-          "note": "پایش همسایگی BGP و تعداد Prefixها"
+          "cmd": "show running-config",
+          "why": "*(در شبیه‌ساز داخلی IOS)* بررسی ثبت VLAN و پورت `Gi0/7` در شبیه‌ساز محلی.",
+          "anatomy": "show running-config",
+          "lookFor": "دیده شدن `vlan` و پورت `Gi0/7` با `nonegotiate`.",
+          "ifUnexpected": "در `configure terminal` تنظیمات VLAN و پورت آزمایشگاه را تکمیل کنید."
         },
         {
-          "cmd": "show ip route",
-          "out": "B  172.16.0.0/16 [20/0] via 10.255.0.2",
-          "note": "بررسی مسیرهای BGP در RIB"
+          "cmd": "show vlan brief",
+          "why": "*(در شبیه‌ساز داخلی IOS)* تایید وجود VLAN و تگ‌گذاری پورت.",
+          "anatomy": "show vlan brief",
+          "lookFor": "دیده شدن VLAN 113 (NSO_ORCHESTRATION) و وضعیت `active`.",
+          "ifUnexpected": "با `vlan {vlan}` و `name {name}` آن را ایجاد کنید."
+        },
+        {
+          "cmd": "nso_cli --context admin show services",
+          "why": "*(در محیط NSO)* مشاهده‌ی خدمات provisioning‌شده و وضعیت state lifecycle آن‌ها.",
+          "anatomy": "nso_cli --context admin show services",
+          "lookFor": "دیده‌شدن services با وضعیت provisioning و state lifecycle.",
+          "ifUnexpected": "لاگ provisioning service و southbound errors را بررسی کنید."
+        },
+        {
+          "cmd": "nso_cli --context admin show devices",
+          "why": "*(در محیط NSO)* مشاهده‌ی equipmentهای متصل و device driver state lifecycle آن‌ها.",
+          "anatomy": "nso_cli --context admin show devices",
+          "lookFor": "دیده‌شدن equipmentها با وضعیت sync و state lifecycle.",
+          "ifUnexpected": "device driver و southbound interface را بررسی و sync کنید."
         }
       ],
       "diagramSvg": "topo",
       "lab": {
-        "title": "آزمایشگاه عملی: ۷.۷ Automation (درس ۱۳ از ۲۰)",
+        "title": "آزمایشگاه عملی: آماده‌سازی VLAN 113 (`NSO_ORCHESTRATION`) در شبیه‌ساز + simulation service provisioning lifecycle با mock service model",
         "steps": [
-          "۱. پیش از اعمال تغییرات، دستورات راستی‌آزمایی ۷.۷ Automation (درس ۱۳ از ۲۰) را در ترمینال اجرا کنید.",
-          "۲. خروجی‌های وضعیت لایه ۱ تا ۳ و جدول‌های مسیریابی/همسایگی را با مقدار مطلوب مقایسه نمایید.",
-          "۳. سناریوی عیب‌یابی زیر را تحلیل و نتیجه را در بخش مستندسازی ثبت کنید."
+          "۱. در ترمینال شبیه‌ساز داخلی IOS با `enable` وارد شوید و با `show vlan brief` و `show interfaces Gi0/7 switchport` وضعیت اولیه را ببینید.",
+          "۲. هدف ساخت `VLAN 113` (`NSO_ORCHESTRATION`) و اختصاص پورت `Gi0/7` به کلاینت `NSO-ORCH` با `switchport nonegotiate` است.",
+          "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 113` -> `name NSO_ORCHESTRATION` -> `exit` -> `interface Gi0/7` -> `description NSO-ORCH` -> `switchport mode access` -> `switchport access vlan 113` -> `switchport nonegotiate` -> `end`.",
+          "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
+          "**سناریوی مرجع غیرشبیه‌سازی‌شده (simulation service provisioning lifecycle با mock service model، شامل مراحل multi-device state lifecycle — فایل `nso_service_lab.py`):**\n```python\nservice_model = \"\"\"\nservice fam-lan-service {\n  device target-router {\n    params { lan-vlan int; }\n  }\n  provision() {\n    device target-router {\n      configure-vlan ${lan-vlan};\n    }\n  }\n}\n\"\"\"\n\nclass MockNso:\n    \"\"\"simulation lifecycle provisioning service در NSO.\"\"\"\n    def __init__(self) -> None:\n        self.provisioned: dict = {}\n\n    def provision_service(self, service_name: str, params: dict) -> dict:\n        steps = []\n        try:\n            for device, device_params in params.items():\n                # تحقق state lifecycle device وتنظیم\n                steps.append({\n                    \"device\": device,\n                    \"action\": \"provision\",\n                    \"params\": device_params,\n                    \"status\": \"ok\",\n                })\n            self.provisioned[service_name] = params\n            return {\"ok\": True, \"service\": service_name, \"steps\": steps}\n        except Exception as exc:\n            return {\"ok\": False, \"service\": service_name, \"error\": str(exc), \"steps\": steps}\n\nif __name__ == \"__main__\":\n    nso = MockNso()\n    print(nso.provision_service(\"fam-lan\", {\"target-router\": {\"lan-vlan\": 113}}))\n```"
         ],
         "verifyCmds": [
-          "show ip bgp summary",
-          "show ip route"
+          "show vlan brief",
+          "show interfaces Gi0/7 switchport",
+          "show running-config"
         ]
       },
       "troubleshooting": {
-        "fault": "خرابی عمدی: پس از تغییر تنظیمات ۷.۷ Automation (درس ۱۳ از ۲۰)، ارتباط سرویس‌گیرنده‌ها ناپایدار شده یا برقرار نمی‌شود.",
-        "analysis": "ابتدا لایه فیزیکی/لینک، سپس تطابق پارامترهای پروتکل در دو سر ارتباط و در نهایت سیاست‌های امنیتی/ACL را بررسی کنید.",
-        "fix": "اصلاح پارامتر ناهماهنگ، تست مجدد End-to-End و ذخیره نهایی پیکربندی."
+        "fault": "provisioning service در `NSO` با خطای southbound (`NETCONF` error از equipment) شکست می‌خورد و service در وضعیت نیمه‌کاره (ناتمام) می‌ماند.",
+        "analysis": "خطای southbound می‌تواند ناشی از عدم تطابق service model با equipment، policy violation، یا خطای device driver state lifecycle باشد. provisioning service شامل مراحل متوالی روی equipmentهای مختلف است و خطای واحد می‌تواند service را ناتمام بگذارد.",
+        "fix": "لاگ provisioning service و southbound errors را بررسی کنید، service model را با equipment تطابق دهید، و state lifecycle services را با همگون‌سازی و policies برطرف کنید."
       },
-      "exercise": "برای مبحث «۷.۷ Automation (درس ۱۳ از ۲۰)» یک سناریوی واقعی سازمانی طراحی کنید و ۵ دستور یا معیار کلیدی راستی‌آزمایی آن را در دفترچه آکادمی بنویسید.",
-      "quiz": [
+      "exercises": [
         {
-          "q": "در پیاده‌سازی استاندارد «۷.۷ Automation (درس ۱۳ از ۲۰)» کدام رویکرد مطابق اصول آکادمی سیسکو صحیح است؟",
-          "opts": [
-            "کپی کردن دستورات بدون بررسی رفتار پروتکل",
-            "درک مفهومی + پیکربندی دقیق + راستی‌آزمایی با CLI/Packet + عیب‌یابی",
-            "نادیده گرفتن مستندسازی و تست خطا"
-          ],
-          "ans": 0,
-          "exp": "در تمام مباحث آکادمی، تسلط واقعی بر ۷.۷ Automation (درس ۱۳ از ۲۰) نیازمند تحقق هر ۴ خروجی مفهومی، CLI، آزمایشگاهی و عیب‌یابی است."
+          "level": "ساده",
+          "task": "تفاوت northbound interface با southbound interface در معماری `Cisco NSO` چیست؟",
+          "hint": "با apps و equipment.",
+          "solution": "northbound interface با apps/northbound systems کار می‌کند و service requests را می‌پذیرد؛ southbound interface با equipmentهای شبکه کار می‌کند و از `NETCONF`/`RESTCONF` استفاده می‌کند."
+        },
+        {
+          "level": "متوسط",
+          "task": "تفاوت `Cisco NSO` با `Ansible`/`Terraform` در مدیریت services چیست؟",
+          "hint": "orchestration services در برابرتنظیم equipment.",
+          "solution": "`NSO` services را end-to-end provisioning می‌کند و هماهنگی state lifecycle و policies را مدیریت می‌کند، در حالی که `Ansible`/`Terraform`تنظیم equipmentها را مدیریت می‌کنند."
+        },
+        {
+          "level": "پیشرفته",
+          "task": "چگونه provisioning service در `NSO` شامل مراحل multi-device state lifecycle است و خطای واحد چگونه می‌تواند service را ناتمام بگذارد؟",
+          "hint": "مراحل متوالی و هماهنگی state lifecycle.",
+          "solution": "provisioning service lifecycle شامل مراحل متوالی روی equipmentهای مختلف است؛ خطای واحد در یک مرحله می‌تواند provisioning service را ناتمام بگذارد و state lifecycle services باید با همگون‌سازی برطرف شود."
         }
       ],
       "table": {
-        "title": "مقایسه Ansible و Cisco NSO در مدیریت شبکه‌های سازمانی و مخابراتی",
+        "title": "جدول مفاهیم کلیدی در Cisco NSO",
         "headers": [
-          "معیار",
-          "Ansible",
-          "Cisco NSO (Network Services Orchestrator)"
+          "مفهمِ کلیدی در NSO",
+          "توضیح",
+          "کاربرد"
         ],
         "rows": [
           [
-            "مدل کارکرد",
-            "وظیفه‌محور / دستگاه‌محور (Task/Playbook)",
-            "سرویس‌محور (Service Model YANG + الگوریتم FastMap)"
+            "`northbound interface`",
+            "رابط با apps/northbound systems",
+            "پذیرش service requests"
           ],
           [
-            "حذف یا ویرایش سرویس پیچیده",
-            "نیازمند نوشتن Playbook جداگانه برای پاک کردن",
-            "کاملاً خودکار توسط FastMap (Rollback و Diff دقیق در لحظه)"
+            "`southbound interface`",
+            "رابط با equipmentهای شبکه",
+            "از `NETCONF`/`RESTCONF`"
           ],
           [
-            "تراکنش سرتاسری چندتجهیزی",
-            "اگر دستگاه دهم خطا بدهد، ۹ تای قبلی تغییر کرده‌اند!",
-            "Two-Phase Commit سرتاسری (همه با هم اعمال یا همه برگردانده می‌شوند)"
+            "`service point`",
+            "نقطه‌ی تعریف‌شده‌ی service",
+            "characterize equipment و params"
           ],
           [
-            "کشور وضعیت شبکه (Out-of-Band Drift)",
-            "ندارد (در هر اجرا به دستگاه وصل می‌شود)",
-            "پایگاه‌داده داخلی CDB با تشخیص فوری تغییر دستی (check-sync)"
+            "`service package`",
+            "فایل `YANG` service model",
+            "تعریف service model"
+          ],
+          [
+            "`device driver`",
+            "رابط NSO با equipment",
+            "مدیریت state lifecycle equipment"
+          ],
+          [
+            "`service orchestration`",
+            "هماهنگ‌سازی services",
+            "provisioning end-to-end"
           ]
         ]
       },
       "faq": [
         {
-          "q": "مفهوم Dry-Run در Cisco NSO چیست و چرا مهندسان اپراتور عاشقش هستند؟",
-          "a": "قبل از اجرای واقعی تغییر در شبکه با دستور commit dry-run outformat native، NSO دقیقاً تک‌تک خطوط CLI یا XMLی که قرار است روی تک‌تک روترهای سیسکو و جونیپر تایپ شود را شبیه‌سازی و به شما نشان می‌دهد تا با اطمینان ۱۰۰٪ کلید commit نهایی را بزنید!"
+          "q": "تفاوت `Cisco NSO` با `Ansible` چیست؟",
+          "a": "`NSO` services را end-to-end provisioning می‌کند و orchestration services را در یک‌پارچگی مدیریت می‌کند، در حالی که `Ansible`تنظیم equipmentهای موجود را مدیریت می‌کند."
         },
         {
-          "q": "اگر یک مهندس از بیرون از NSO با SSH دستی وارد روتر شود و تنظیماتی را دستکاری کند چه اتفاقی می‌افتد؟",
-          "a": "وقتی دستور check-sync اجرا شود، NSO با مقایسه هش تراکنش متوجه می‌شود که دستگاه با CDB ناهماهنگ (Out-of-Sync) شده و اجازه تغییر کورکورانه نمی‌دهد تا با compare-config اختلاف را ببینید و تصمیم بگیرید."
+          "q": "northbound و southbound interface در `NSO` چیست؟",
+          "a": "northbound interface با apps/northbound systems کار می‌کند و service requests را می‌پذیرد؛ southbound interface با equipmentهای شبکه کار می‌کند و از `NETCONF`/`RESTCONF` استفاده می‌کند."
         },
         {
-          "q": "آیا برای ساخت یک سرویس جدید در Cisco NSO حتماً باید کد پیچیده جاوا بنویسیم؟",
-          "a": "خیر! امروز اکثر سرویس‌ها بدون حتی یک خط جاوا و به سادگی با ترکیب یک مدل YANG، یک فایل XML Template و در صورت نیاز منطق کوتاه پایتون ساخته می‌شوند."
+          "q": "چرا `NSO` برای orchestration services پیچیده مناسب است؟",
+          "a": "`NSO` services را end-to-end provisioning می‌کند، state lifecycle equipmentهای مختلف را در یک‌پارچگی و هماهنگی مدیریت می‌کند و policies را بر اساس service models اعمال می‌کند."
         }
       ],
-      "analogy": "ابزارهای معمولی مثل Ansible مثل فرستادن فرمان به تک‌تک نوازندگان هستند که اگر نوازنده آخر نت اشتباه بزند بقیه به راهشان ادامه می‌دهند. اما Cisco NSO (Network Services Orchestrator) مثل یک رهبر ارکستر فوق‌هوشمند با پایگاه‌داده مرکزی CDB است: شما یک فرم ساده پر می‌کنید «مشتری الف، سرعت ۱ گیگابیت بین تهران و تبریز وصل شود»؛ NSO خودش از روی فایل YANG تمام دستورات دقیق برای روتر سیسکو IOS XR و جونیپر و هواوی را می‌سازد، هم‌زمان با دو-فاز Commit روی کل شبکه اعمال می‌کند و اگر یکی خطا داد، کل شبکه به ثانیه قبل بازمی‌گردد!",
-      "ciscoRef": "Cisco Network Services Orchestrator (NSO) Essentials & Cisco DevNet CCNP Automation (300-435 / 350-901 DEVCOR)",
-      "summary": "Cisco NSO استاندارد جهانی ارکستراسیون شبکه‌های بزرگ و اپراتوری است که با پایگاه‌داده CDB، درایورهای چندبرندی NED، تراکنش دو-فازی سرتاسری (با dry-run و Rollback کل شبکه) و الگوریتم FastMap، ساخت، ویرایش و حذف سرویس‌های پیچیده شبکه را به یک مدل ساده و بدون خطا تبدیل می‌کند."
+      "misconceptions": [
+        {
+          "myth": "`Cisco NSO` یک tool config management مانند `Ansible` است.",
+          "reality": "خیر؛ `NSO` یک orchestrator است که services را end-to-end provisioning می‌کند، در حالی که `Ansible`تنظیم equipmentهای موجود را مدیریت می‌کند."
+        },
+        {
+          "myth": "southbound interface `NSO` فقط از `CLI` استفاده می‌کند.",
+          "reality": "خیر؛ southbound interface `NSO` از `NETCONF`/`RESTCONF` استفاده می‌کند (و در مواردی CLI/SNMP) و device driver state lifecycle equipment را مدیریت می‌کند."
+        },
+        {
+          "myth": "provisioning service در `NSO` خطای واحدی را در نظر نمی‌گیرد.",
+          "reality": "provisioning service lifecycle شامل مراحل متوالی روی equipmentهای مختلف است؛ خطای واحد می‌تواند provisioning service را ناتمام بگذارد."
+        }
+      ],
+      "analogy": "`Cisco NSO` مانند یک conductor یک ارکستر بزرگ است: او نه تنها هر نوازنده‌ی equipment را به‌صورت جداگانه هدایت نمی‌کند، بلکه harmonisّه‌ی کل service را end-to-end هماهنگی می‌کند — از تعریف service model تا اجرای provisioning روی equipmentهای مختلف — و هر خطای one-نوازی می‌تواند کل service را ناتمام بگذارد.",
+      "ciscoRef": "Cisco Network Services Orchestrator (NSO) Configuration Guide — Service Orchestration & YANG-based Modeling",
+      "summary": "`Cisco NSO` یک orchestrator متمرکز است که services را end-to-end provisioning می‌کند: northbound interface service requests را می‌پذیرد و southbound interface از `NETCONF`/`RESTCONF` استفاده می‌کند. بر اساس `YANG` و service models کار می‌کند و services را در یک‌پارچگی و هماهنگی provisioning می‌کند.",
+      "quiz": [
+        {
+          "q": "در معماری **`Cisco NSO`**، southbound interface با چه equipmentها و پروتکل‌هایی کار می‌کند؟",
+          "opts": [
+            "با apps و `REST`",
+            "تنها با `CLI`",
+            "با equipmentهای شبکه و `NETCONF`/`RESTCONF`",
+            "تنها با `SNMP`"
+          ],
+          "ans": 2,
+          "exp": "southbound interface `NSO` با equipmentهای شبکه کار می‌کند و از `NETCONF`/`RESTCONF` (و در مواردی CLI/SNMP) استفاده می‌کند."
+        },
+        {
+          "q": "تفاوت اصلی `Cisco NSO` با `Ansible` در مدیریت services چیست؟",
+          "opts": [
+            "`NSO` services را end-to-end provisioning می‌کند و orchestration services را مدیریت می‌کند",
+            "`NSO`تنظیم equipmentهای موجود را مدیریت می‌کند",
+            "`Ansible` services را end-to-end provisioning می‌کند",
+            "هیچ‌کدام"
+          ],
+          "ans": 0,
+          "exp": "`NSO` services را end-to-end provisioning می‌کند و هماهنگی state lifecycle و policies را مدیریت می‌کند، در حالی که `Ansible`تنظیم equipmentهای موجود را مدیریت می‌کند."
+        },
+        {
+          "q": "چرا خطای واحد در provisioning service در `NSO` می‌تواند service را ناتمام بگذارد؟",
+          "opts": [
+            "چۈنكى provisioning service فقط یک مرحله دارد",
+            "چون `NSO` equipment راتنظیم نمی‌کند",
+            "هیچ‌کدام",
+            "چون provisioning service lifecycle شامل مراحل متوالی روی equipmentهای مختلف است"
+          ],
+          "ans": 3,
+          "exp": "provisioning service lifecycle شامل مراحل متوالی روی equipmentهای مختلف است و خطای واحد می‌تواند provisioning service را ناتمام بگذارد."
+        }
+      ],
+      "exercise": "سناریوی provisioning service پیچیده در `Cisco NSO`: چگونه در ۳ گام از (الف) خطای southbound، (ب) عدم تطابق service model با equipment و (ج) policy violation در provisioning service جلوگیری می‌کنید؟",
+      "bridge": {
+        "why": "پس از اینکه `NSO` نشان داد که services را می‌توان با یک‌پارچگی و هماهنگی provisioning کرد، یادگیری این دوره را با مرور کل پره‌ی اتوماسیون — از `NETCONF`/`RESTCONF` تا `YANG`، `Ansible`، `Terraform` و `NSO` — تکمیل می‌کنیم و به سناریوی کاربردیِ دستهٔ بعدی می‌رسیم.",
+        "nextId": "auto_14",
+        "nextTitle": "۷.۷ Automation (درس ۱۴ از ۲۰): عنوان درس ۱۴"
+      },
+      "id": "auto_13",
+      "title": "۷.۷ Automation (درس ۱۳ از ۲۰): Cisco NSO (Network Services Orchestrator)"
     },
     "auto_14": {
       "id": "auto_14",
