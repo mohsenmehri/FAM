@@ -1115,6 +1115,71 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(res13_bad["rolled_back"], True)
         self.assertTrue(any(s["action"] == "rollback" for s in res13_bad["steps"]))
 
+        # ---- Batch 7 (auto_14..auto_20) regression assertions ---
+        for n in range(14, 21):
+            k = f"auto_{n:02d}"
+            L = data["lessons"][k]
+            Ls = json.dumps(L, ensure_ascii=False)
+            # 4 sections, each with think
+            self.assertEqual(len(L["sections"]), 4, f"{k} sections: {len(L['sections'])}")
+            for s in L["sections"]:
+                self.assertIn("think", s, f"{k} missing think")
+            # 3 quiz questions
+            self.assertEqual(len(L["quiz"]), 3, f"{k} quiz: {len(L['quiz'])}")
+            # bridge (except auto_20 which is last)
+            if k != "auto_20":
+                self.assertIn("bridge", L, f"{k} missing bridge")
+                self.assertEqual(L["bridge"]["nextId"], f"auto_{n+1:02d}")
+                self.assertEqual(L["bridge"]["nextTitle"], data["lessons"][f"auto_{n+1:02d}"]["title"])
+            # runnable python lab block in step 4
+            m_py = re.search(r"```python\n([\s\S]+?)\n```", L["lab"]["steps"][4])
+            self.assertIsNotNone(m_py, f"{k} runnable python block missing")
+            ns: dict = {}
+            exec(compile(m_py.group(1), f"{k}_lab.py", "exec"), ns)
+            # no multilingual garble
+            self.assertNotIn("realities", Ls)
+            self.assertNotIn("doped", Ls)
+            self.assertNotIn("defeated", Ls)
+            self.assertNotIn("ziردرخت", Ls)
+            # no Cyrillic garble
+            cyr = re.findall(r"[\u0400-\u04FF]+", Ls)
+            self.assertEqual(cyr, [], f"Cyrillic garble in {k}: {cyr}")
+
+        # Per-lesson spot checks
+        a14 = data["lessons"]["auto_14"]
+        self.assertIn("dnacentersdk", json.dumps(a14, ensure_ascii=False))
+        self.assertIn("meraki", json.dumps(a14, ensure_ascii=False))
+        self.assertIn("webexteamssdk", json.dumps(a14, ensure_ascii=False))
+        self.assertIn("Sandbox", a14["sections"][0]["p"][0])
+
+        a15 = data["lessons"]["auto_15"]
+        self.assertIn("HCL", json.dumps(a15, ensure_ascii=False))
+        self.assertIn("state lifecycle", json.dumps(a15, ensure_ascii=False))
+        self.assertIn("-refresh-only", json.dumps(a15, ensure_ascii=False))
+
+        a16 = data["lessons"]["auto_16"]
+        self.assertIn("CI/CD", json.dumps(a16, ensure_ascii=False))
+        self.assertIn("GitLab", json.dumps(a16, ensure_ascii=False))
+
+        a17 = data["lessons"]["auto_17"]
+        self.assertIn("Dockerfile", json.dumps(a17, ensure_ascii=False))
+        self.assertIn("Macvlan", json.dumps(a17, ensure_ascii=False))
+
+        a18 = data["lessons"]["auto_18"]
+        self.assertIn("pyATS", json.dumps(a18, ensure_ascii=False))
+        self.assertIn("Genie", json.dumps(a18, ensure_ascii=False))
+        self.assertIn("Batfish", json.dumps(a18, ensure_ascii=False))
+
+        a19 = data["lessons"]["auto_19"]
+        self.assertIn("MDT", json.dumps(a19, ensure_ascii=False))
+        self.assertIn("gNMI", json.dumps(a19, ensure_ascii=False))
+        self.assertIn("Grafana", json.dumps(a19, ensure_ascii=False))
+
+        a20 = data["lessons"]["auto_20"]
+        self.assertIn("AIOps", json.dumps(a20, ensure_ascii=False))
+        self.assertIn("حلقه بسته", json.dumps(a20, ensure_ascii=False))
+        self.assertNotIn("bridge", a20, "auto_20 is last lesson, no bridge")
+
         # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
         self.assertIsNotNone(m_mode)
