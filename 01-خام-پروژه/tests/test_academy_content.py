@@ -270,6 +270,50 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("Asymmetric Link", survey_lesson["sections"][2]["p"][0])
         self.assertEqual(survey_lesson["bridge"]["nextId"], "spec_collab")
 
+        # Round-10 regression assertions (Batch 2 AAA/FCoE clarifications & Batch 3 review fixes)
+        self.assertIn("به پلتفرم و نسخهٔ IOS/IOS-XE وابسته است", ise_lesson["lab"]["steps"][4])
+        self.assertIn("هر کاربرِ از قبل احراز هویت‌شده", ise_lesson["troubleshooting"]["analysis"])
+
+        self.assertNotIn("FCoE", stor_lesson["table"]["rows"][2][2])
+        self.assertIn("class-fcoe", stor_lesson["sections"][2]["p"][0])
+        self.assertIn("class-default", stor_lesson["sections"][2]["p"][0])
+        self.assertIn("mtu 2158", stor_lesson["table"]["rows"][3][2])
+        self.assertIn("mtu 9216", stor_lesson["table"]["rows"][3][2])
+
+        self.assertIn("no central switching", wl_lesson["sections"][2]["p"][0])
+        self.assertIn("no central switching", wl_lesson["lab"]["steps"][4])
+        self.assertIn("wireless profile flex BRANCH_FLEX_PROF", wl_lesson["lab"]["steps"][4])
+        self.assertIn("no central switching", wl_lesson["quiz"][2]["opts"][0])
+        self.assertIn("Enhanced Open (OWE", wl_lesson["sections"][1]["steps"][1])
+        self.assertIn("PMF", wl_lesson["sections"][1]["steps"][1])
+        self.assertIn("Enhanced Open (OWE)", wl_lesson["quiz"][1]["opts"][3])
+
+        survey_s = json.dumps(survey_lesson, ensure_ascii=False)
+        self.assertNotIn("channel dca width", survey_s)
+        self.assertNotIn("rssi-threshold", survey_s)
+        self.assertIn("channel chan-width 40", survey_lesson["lab"]["steps"][4])
+        self.assertIn("coverage data rssi threshold -75", survey_lesson["lab"]["steps"][4])
+        self.assertIn("شماتیک/خلاصه‌شدهٔ مرجع آموزشی", survey_lesson["iosCommands"][0]["note"])
+        self.assertIn("شماتیک/خلاصه‌شدهٔ مرجع آموزشی", survey_lesson["iosCommands"][1]["note"])
+        self.assertNotIn("دچار اشباع `Airtime` نمی‌شود", survey_s)
+        self.assertIn("برآورد اولیه", survey_lesson["exercises"][1]["solution"])
+        self.assertIn("تصمیم نهایی Roaming با الگوریتم و درایور خودِ **کلاینت** است", survey_lesson["protocolAnalysis"][1])
+
+        sr_s = json.dumps(sr_lesson, ensure_ascii=False)
+        self.assertIn("RFC 9855", sr_s)
+        self.assertNotIn("تغییر مسیر دوم یا افتی رخ ندهد", sr_s)
+        self.assertNotIn("حداکثر `1` یا `2` برچسب", sr_s)
+        self.assertIn("MSD", sr_lesson["sections"][1]["steps"][2])
+        self.assertIn("Micro-loop", sr_lesson["misconceptions"][1]["reality"])
+
+        xr_s5 = xr_lesson["lab"]["steps"][4]
+        self.assertIn("network 10.255.0.1/32", xr_s5)
+        self.assertIn("advertised-routes", xr_s5)
+        self.assertIn("received-routes", xr_s5)
+        self.assertIn("10.10.0.1 255.255.255.252", xr_s5)
+        self.assertNotIn("در کسری از ثانیه ریستارت می‌گردد بدون اینکه", xr_lesson["sections"][0]["bullets"][0])
+        self.assertIn("NSF / Graceful Restart", xr_lesson["sections"][0]["bullets"][0])
+
         # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
         self.assertIsNotNone(m_mode)
