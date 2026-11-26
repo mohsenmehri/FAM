@@ -141,17 +141,18 @@ class AcademyRedesignTests(unittest.TestCase):
                 ans_dist[q["ans"]] += 1
         self.assertTrue(all(6 <= v <= 10 for v in ans_dist.values()), ans_dist)
 
-        # 2b. Checks for f4 Batch 1, 2 & 3 (first 15 lessons in f4) + Round-6/7/8/9 regressions
-        f4_b1_b2_b3 = data["curriculumGroups"][4]["lessons"][:15]
+        # 2b. Checks for f4 Batch 1..4 (first 20 lessons in f4) + Round-6..11 regressions
+        f4_b1_b2_b3_b4 = data["curriculumGroups"][4]["lessons"][:20]
         self.assertEqual(
-            f4_b1_b2_b3,
+            f4_b1_b2_b3_b4,
             [
                 "spec_ent", "spec_ent_campus", "spec_ent_sd", "spec_sec", "spec_sec_vpn",
                 "spec_sec_ise", "spec_dc_nx", "s11", "spec_dc_aci", "spec_dc_stor",
                 "spec_sp", "spec_sp_xr", "spec_sp_sr", "spec_wl", "spec_wl_survey",
+                "spec_collab", "spec_collab_gw", "auto_01", "auto_02", "auto_03",
             ],
         )
-        for lid in f4_b1_b2_b3:
+        for lid in f4_b1_b2_b3_b4:
             lesson = data["lessons"][lid]
             self.assertEqual(len(lesson.get("exercises", [])), 3, lid)
             self.assertEqual(len(lesson.get("quiz", [])), 3, lid)
@@ -160,10 +161,15 @@ class AcademyRedesignTests(unittest.TestCase):
             for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "قانون طلایی", "۹۰٪", "۹۹٪", "۱۰۰٪", "۸۰٪", "جادویی"):
                 self.assertNotIn(bad, s, f"{lid} contains {bad}")
         b3_dist = {0: 0, 1: 0, 2: 0, 3: 0}
-        for lid in f4_b1_b2_b3[10:15]:
+        for lid in f4_b1_b2_b3_b4[10:15]:
             for q in data["lessons"][lid]["quiz"]:
                 b3_dist[q["ans"]] += 1
         self.assertEqual(b3_dist, {0: 4, 1: 4, 2: 4, 3: 3})
+        b4_dist = {0: 0, 1: 0, 2: 0, 3: 0}
+        for lid in f4_b1_b2_b3_b4[15:20]:
+            for q in data["lessons"][lid]["quiz"]:
+                b4_dist[q["ans"]] += 1
+        self.assertEqual(b4_dist, {0: 4, 1: 4, 2: 4, 3: 3})
 
         # Round-6 & Round-7 regression assertions
         ent_step = data["lessons"]["spec_ent"]["sections"][1]["steps"][0]
@@ -314,6 +320,46 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertNotIn("در کسری از ثانیه ریستارت می‌گردد بدون اینکه", xr_lesson["sections"][0]["bullets"][0])
         self.assertIn("NSF / Graceful Restart", xr_lesson["sections"][0]["bullets"][0])
 
+        # Round-11 regressions: Round-10 follow-ups (spec_wl_survey rate disable / numeric hedging, spec_wl FlexConnect wording) + Batch 4 semantic checks
+        self.assertNotIn("rate RATE_6M unsupported", survey_s)
+        self.assertNotIn("rate RATE_9M unsupported", survey_s)
+        self.assertIn("rate RATE_6M disable", survey_lesson["lab"]["steps"][4])
+        self.assertIn("rate RATE_9M disable", survey_lesson["lab"]["steps"][4])
+        self.assertNotIn("نصف می‌گردد", survey_s)
+        self.assertNotIn("نصف می‌شود", survey_s)
+
+        self.assertNotIn("مد سویچینگ (`Site Tag`)", wl_lesson["iosCommands"][1]["why"])
+        self.assertIn("در سناریوی چند-VLAN", wl_lesson["sections"][2]["p"][0])
+        self.assertIn("Access", wl_lesson["sections"][2]["p"][0])
+
+        collab_lesson = data["lessons"]["spec_collab"]
+        self.assertIn("87.2 kbps", collab_lesson["sections"][1]["bullets"][0])
+        self.assertIn("31.2 kbps", collab_lesson["sections"][1]["bullets"][1])
+        self.assertIn("Line CSS", collab_lesson["sections"][2]["think"]["a"])
+        self.assertEqual(collab_lesson["bridge"]["nextId"], "spec_collab_gw")
+
+        gw_lesson = data["lessons"]["spec_collab_gw"]
+        self.assertIn("ip address trusted list", gw_lesson["sections"][0]["bullets"][0])
+        self.assertIn("Dial-Peer 0", gw_lesson["sections"][1]["p"][0])
+        self.assertIn("Split-Horizon DNS", gw_lesson["sections"][2]["p"][1])
+        self.assertEqual(gw_lesson["bridge"]["nextId"], "auto_01")
+
+        a1_lesson = data["lessons"]["auto_01"]
+        self.assertIn("chmod 600", a1_lesson["sections"][0]["bullets"][0])
+        self.assertIn("iproute2", a1_lesson["sections"][1]["p"][1])
+        self.assertIn("-nn", a1_lesson["sections"][1]["p"][1])
+        self.assertEqual(a1_lesson["bridge"]["nextId"], "auto_02")
+
+        a2_lesson = data["lessons"]["auto_02"]
+        self.assertIn("PEP 668", a2_lesson["sections"][1]["bullets"][0])
+        self.assertIn("os.environ.get", a2_lesson["sections"][1]["bullets"][1])
+        self.assertEqual(a2_lesson["bridge"]["nextId"], "auto_03")
+
+        a3_lesson = data["lessons"]["auto_03"]
+        self.assertIn("isinstance(parsed, list)", a3_lesson["sections"][1]["bullets"][0])
+        self.assertIn("Blast Radius", a3_lesson["sections"][2]["think"]["a"])
+        self.assertEqual(a3_lesson["bridge"]["nextId"], "auto_04")
+
         # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
         self.assertIsNotNone(m_mode)
@@ -327,9 +373,9 @@ class AcademyRedesignTests(unittest.TestCase):
                 self.fail(msg)
             self.skipTest(msg)
 
-        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1, 2 & 3 lesson
+        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1..4 lesson
         extracted_labs = {}
-        for lid in f4_b1_b2_b3:
+        for lid in f4_b1_b2_b3_b4:
             step_txt = data["lessons"][lid]["lab"]["steps"][2]
             start_idx = step_txt.index("`configure terminal`")
             cmds = re.findall(r"`([^`]+)`", step_txt[start_idx:])
@@ -527,6 +573,32 @@ assertRunLab('spec_wl_survey', (sim) => {{
   if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 195) throw new Error('spec_wl_survey Gi0/7');
   const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
   if (!allowed.includes(190) || !allowed.includes(195)) throw new Error('spec_wl_survey trunk');
+}});
+assertRunLab('spec_collab', (sim) => {{
+  if (!sim.vlans[30] || sim.vlans[30].name !== 'VOICE') throw new Error('spec_collab VLAN 30');
+  const gi3 = sim.interfaces['GigabitEthernet0/3'];
+  if (!gi3.nonegotiate || gi3.mode !== 'access' || gi3.accessVlan !== 10 || gi3.voiceVlan !== 30) throw new Error('spec_collab Gi0/3');
+}});
+assertRunLab('spec_collab_gw', (sim) => {{
+  if (!sim.vlans[30] || sim.vlans[30].name !== 'VOICE') throw new Error('spec_collab_gw VLAN 30');
+  if (!sim.interfaces['GigabitEthernet0/1'].allowedVlans.includes(30)) throw new Error('spec_collab_gw Gi0/1 trunk 30');
+  const gi6 = sim.interfaces['GigabitEthernet0/6'];
+  if (gi6.mode !== 'trunk' || !gi6.nonegotiate || gi6.nativeVlan !== 10 || !gi6.allowedVlans.includes(30) || gi6.desc !== 'CUBE-GW') throw new Error('spec_collab_gw Gi0/6');
+}});
+assertRunLab('auto_01', (sim) => {{
+  if (!sim.vlans[99] || sim.vlans[99].name !== 'MGMT') throw new Error('auto_01 VLAN 99');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 99 || gi7.desc !== 'LINUX-NETOPS') throw new Error('auto_01 Gi0/7');
+}});
+assertRunLab('auto_02', (sim) => {{
+  if (!sim.vlans[99] || sim.vlans[99].name !== 'NETOPS') throw new Error('auto_02 VLAN 99');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 99 || gi7.desc !== 'PY-CONTROLLER') throw new Error('auto_02 Gi0/7');
+}});
+assertRunLab('auto_03', (sim) => {{
+  if (!sim.vlans[99] || sim.vlans[99].name !== 'AUTOMATION') throw new Error('auto_03 VLAN 99');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 99 || gi7.desc !== 'NORNIR-RUNNER') throw new Error('auto_03 Gi0/7');
 }});
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
