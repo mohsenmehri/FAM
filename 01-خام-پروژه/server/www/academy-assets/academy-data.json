@@ -18357,7 +18357,7 @@
     {
      "h": "۲. کار با SDKهای رسمی پایتون سیسکو",
      "p": [
-      "به جای تکرار کدهای requests، سیسکو کتابخانه‌های رسمی (SDK) برای تمام پلتفرم‌ها منتشر کرده است. این کتابخانه‌ها احراز هویت، تمدید خودکار توکن، مدیریت Rate Limit و Pagination را به صورت داخلی انجام می‌دهند و مهندس فقط لاجیک کسب‌وکار را بنویسد.",
+      "به جای تکرار کدهای requests، سیسکو کتابخانه‌های رسمی (SDK) برای پلتفرم‌های خود منتشر کرده است. این کتابخانه‌ها معمولاً احراز هویت، مدیریت Rate Limit و Pagination را ساده‌تر می‌کنند (با توجه به قابلیت‌های هر SDK)، و مهندس روی لاجیک کسب‌وکار تمرکز می‌کند.",
       "استفاده از requests خام یعنی شما باید هدر توکن خودتان بسازید، زمان انقضا را پایش کنید، خطای 429 را صبر کنید و Pagination را به صورت دستی بنویسید — این منابع خطا زیاد است. SDKهای سیسکو این همه کار را به صورت خودکار انجام می‌دهند و توسعه را سریع‌تر و باگ‌ها را کمتر می‌کند."
      ],
      "bullets": [
@@ -18584,7 +18584,7 @@
      "h": "۴. State drift، بازگردانی و بهترین روش‌ها",
      "p": [
       "State drift زمانی رخ می‌دهد که حالت فعلی زیرساخت با state file ناهماهنگ باشد (مثل تغییر دستی روی روتر). برای برطرف کردن drift: `terraform plan -refresh-only` state را با حالت مشاهده‌شده همگام می‌کند، سپس بررسی plan و تصمیم (بازگردانی منابع یا تغییر کد).",
-      "بهترین روش‌ها: (۱) state file را نه روی لپ‌تاپ Engineer، بلکه در backend مناسب با کنترل دسترسی و (در صورت پشتیبانی) locking ذخیره کنید؛ state و credentialها هرگز در VCS ذخیره نشوند؛ (۲) هر تغییر را ابتدا در sandbox/test البيئية تست کنید."
+      "بهترین روش‌ها: (۱) state file را نه روی لپ‌تاپ Engineer، بلکه در backend مناسب با کنترل دسترسی و (در صورت پشتیبانی) locking ذخیره کنید؛ state و credentialها هرگز در VCS ذخیره نشوند؛ (۲) هر تغییر را ابتدا در sandbox/test البيئية تست کنید؛ (۳) `terraform plan -refresh-only` فقط proposed state می‌سازد، برای commit state، `terraform apply -refresh-only` اجرا شود."
      ],
      "bullets": [
       "State drift ← ناهماهنگی state file با حالت واقعی زیرساخت",
@@ -18617,7 +18617,7 @@
      "۲. هدف ساخت `VLAN 115` (`IAC_NET`) و اختصاص پورت `Gi0/7` به کلاینت `IAC-CLIENT` با `switchport nonegotiate` است. **مرزهای شبیه‌ساز:** شبیه‌ساز تنها CLI IOS راپشتیبانی می‌کند؛ این مرحله فقط آماده‌سازی توپولوژی است و محتوای موضوع درس در مرحله ۵ (سناریوی مرجع خارج از شبیه‌ساز) انجام می‌شود.",
      "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 115` -> `name IAC_NET` -> `exit` -> `interface Gi0/7` -> `description IAC-CLIENT` -> `switchport mode access` -> `switchport access vlan 115` -> `switchport nonegotiate` -> `end`.",
      "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
-     "```python\n\"\"\"iac_state_lab.py — شبیه‌ساز state machine Terraform (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی Terraform.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی Terraform/NetBox.\n\"\"\"\n\nimport copy\n\n\nclass MockProvider:\n    \"\"\"provider مجازی: state و reality را جدا نگه می‌دارد.\"\"\"\n\n    def __init__(self):\n        self.state = {\"vlans\": {}}\n        self.reality = {\"vlans\": {}}\n\n    def refresh_only_plan(self) -> dict:\n        \"\"\"\"-refresh-only: فقط proposed plan می‌سازد، state را تغییر نمی‌دهد.\n\n        مهم: منابع که فقط در reality وجود دارند و در state نیستند،\n        به صورت \"create\" در plan نشان داده نمی‌شوند چون Terraform واقعی\n        منابع unmanaged را به صورت خود descobrir نمی‌کند؛ فقط منابعی که\n        در state ثبت شده‌اند ولی reality با آن‌ها متفاوت است، نشان داده می‌شود.\n        \"\"\"\n        proposed = {}\n        for vid in self.state[\"vlans\"]:\n            if vid not in self.reality[\"vlans\"]:\n                proposed[vid] = \"delete (در state است، در realidad نیست)\"\n            elif self.state[\"vlans\"][vid] != self.reality[\"vlans\"][vid]:\n                proposed[vid] = \"update (ناهماهنگی)\"\n        return proposed\n\n    def apply_refresh_only(self):\n        \"\"\"\"apply -refresh-only: state را بر اساس reality به‌روزرسانی می‌کند.\n\n        این عمل state را تغییر می‌دهد اما منابع واقعی را تغییر نمی‌دهد.\n        تنها منابعی که قبلاً در state ثبت شده‌اند، از reality به‌روزرسانی می‌شوند.\n        منابعی که فقط در reality وجود دارند، وارد state نمی‌شوند (Terraform واقعی\n        منابع unmanaged را به صورت خود descubrir نمی‌کند).\n        کپی عمیق (deep copy) استفاده می‌شود تا state و reality مستقل remain.\n        \"\"\"\n        for vid in list(self.state[\"vlans\"].keys()):\n            if vid in self.reality[\"vlans\"]:\n                self.state[\"vlans\"][vid] = copy.deepcopy(self.reality[\"vlans\"][vid])\n\n\ndef main():\n    prov = MockProvider()\n    prov.reality[\"vlans\"][115] = {\"name\": \"IAC_TEST\", \"status\": \"active\"}\n    prov.state[\"vlans\"][110] = {\"name\": \"OLD\", \"status\": \"active\"}\n    print(\"Plan (refresh-only):\", prov.refresh_only_plan())\n    prov.apply_refresh_only()\n    print(\"State after apply:\", prov.state)\n    # VLAN 110 was in state and reality → updated from reality\n    # VLAN 115 was only in reality → NOT added to state (unmanaged)\n    assert 115 not in prov.state[\"vlans\"], \"Unmanaged VLAN should not enter state!\"\n    assert prov.state[\"vlans\"][110][\"name\"] == \"OLD\"  # reality has no 110, state keeps old\n    print(\"✓ Unmanaged source (115) did not enter state after apply_refresh_only\")\n\n\nif __name__ == \"__main__\":\n    main()\n```"
+     "```python\n\"\"\"iac_state_lab.py — شبیه‌ساز state machine Terraform (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی Terraform.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی Terraform/NetBox.\n\"\"\"\n\nimport copy\n\n\nclass MockProvider:\n    \"\"\"provider مجازی: state و reality را جدا نگه می‌دارد.\"\"\"\n\n    def __init__(self):\n        self.state = {\"vlans\": {}}\n        self.reality = {\"vlans\": {}}\n\n    def refresh_only_plan(self) -> dict:\n        \"\"\"\"-refresh-only: فقط proposed plan می‌سازد، state را تغییر نمی‌دهد.\n\n        مهم: منابع که فقط در reality وجود دارند و در state نیستند،\n        به صورت \"create\" در plan نشان داده نمی‌شوند چون Terraform واقعی\n        منابع unmanaged را به صورت خود descobrir نمی‌کند؛ فقط منابعی که\n        در state ثبت شده‌اند ولی reality با آن‌ها متفاوت است، نشان داده می‌شود.\n        \"\"\"\n        proposed = {}\n        for vid in self.state[\"vlans\"]:\n            if vid not in self.reality[\"vlans\"]:\n                proposed[vid] = \"delete (در state است، در realidad نیست)\"\n            elif self.state[\"vlans\"][vid] != self.reality[\"vlans\"][vid]:\n                proposed[vid] = \"update (ناهماهنگی)\"\n        return proposed\n\n    def apply_refresh_only(self):\n        \"\"\"\"apply -refresh-only: state را بر اساس reality به‌روزرسانی می‌کند.\n\n        این عمل state را تغییر می‌دهد اما منابع واقعی را تغییر نمی‌دهد.\n        منابعی که در state هستند اما در reality نیستند (delete proposal)،\n        از state حذف می‌شوند. منابعی که در هر دو هستند، از reality به‌روزرسانی می‌شوند.\n        منابعی که فقط در reality وجود دارند، وارد state نمی‌شوند (unmanaged).\n        کپی عمیق (deep copy) استفاده می‌شود تا state و reality مستقل remain.\n        \"\"\"\n        # حذف منابعی که در state هستند اما در reality نیستند\n        for vid in list(self.state[\"vlans\"].keys()):\n            if vid not in self.reality[\"vlans\"]:\n                del self.state[\"vlans\"][vid]\n        # به‌روزرسانی منابع مشترک از reality\n        for vid in self.state[\"vlans\"]:\n            if vid in self.reality[\"vlans\"]:\n                self.state[\"vlans\"][vid] = copy.deepcopy(self.reality[\"vlans\"][vid])\n\n\ndef main():\n    prov = MockProvider()\n    prov.reality[\"vlans\"][115] = {\"name\": \"IAC_TEST\", \"status\": \"active\"}\n    prov.reality[\"vlans\"][110] = {\"name\": \"REALITY_110\", \"status\": \"active\"}\n    prov.state[\"vlans\"][110] = {\"name\": \"OLD\", \"status\": \"active\"}\n    prov.state[\"vlans\"][111] = {\"name\": \"GHOST\", \"status\": \"active\"}  # only in state\n    print(\"Plan (refresh-only):\", prov.refresh_only_plan())\n    prov.apply_refresh_only()\n    print(\"State after apply:\", prov.state)\n    # VLAN 110 was in both → updated from reality\n    assert prov.state[\"vlans\"][110][\"name\"] == \"REALITY_110\"\n    # VLAN 111 was only in state (ghost) → deleted from state\n    assert 111 not in prov.state[\"vlans\"], \"Ghost VLAN should be deleted from state!\"\n    # VLAN 115 was only in reality (unmanaged) → NOT added to state\n    assert 115 not in prov.state[\"vlans\"], \"Unmanaged VLAN should not enter state!\"\n    print(\"✓ apply_refresh_only correctly deletes ghosts and ignores unmanaged\")\n\n\nif __name__ == \"__main__\":\n    main()\n```"
     ],
     "verifyCmds": [
      "show ip interface brief",
@@ -18746,8 +18746,8 @@
     {
      "h": "۲. آناتومی ۵ مرحله‌ای یک Pipeline واقعی شبکه",
      "p": [
-      "یک pipeline شبکه واقعی دارای ۵ مرحله است: (۱) commit — توسعه‌دهنده کد پیکربندی را به VCS push می‌کند؛ (۲) test — تست‌های اتوماتیک (syntax check، unit test، Ansible --check) اجرا می‌شوند؛ (۳) security scan — بررسی نقاط الضعف و Sheridan politiche؛ (۴) deploy — تغییرات تایید شده به محیط تست/تولید اعمال می‌شوند؛ (۵) verify — تایید نهایی با دستورات show و compare با حالت مورد نظر.",
-      "هر مرحله می‌تواند موفق یا ناموفق باشد؛ اگر هر مرحله‌ای شکست بخورد، pipeline متوقف می‌شود و تغییرات اعمال نمی‌شوند. این تضمین می‌کند فقط تغییرات معتبر و تست‌شدهست‌شدهست‌شده به تولید می‌رسند. اما continuous delivery (تأیید قبل از استقرار) و continuous deployment (استقرار خودکار پس از تست) دو مفهوم متفاوت هستند؛ در شبکه معمولاً continuous delivery استفاده می‌شود تا engineer قبل از استقرار نهایی تایید کند. اما continuous delivery (تأیید قبل از استقرار) و continuous deployment (استقرار خودکار پس از تست) دو مفهوم متفاوت هستند؛ در شبکه معمولاً continuous delivery استفاده می‌شود تا engineer قبل از استقرار نهایی تایید کند."
+      "یک مثال pipeline شبکه (طراحی نمونه) دارای ۵ مرحله است: (۱) commit — توسعه‌دهنده کد پیکربندی را به VCS push می‌کند؛ (۲) test — تست‌های اتوماتیک (syntax check، unit test، Ansible --check) اجرا می‌شوند؛ (۳) security scan — بررسی نقاط الضعف و Sheridan politiche؛ (۴) deploy — تغییرات تایید شده به محیط تست/تولید اعمال می‌شوند؛ (۵) verify — تایید نهایی با دستورات show و compare با حالت مورد نظر.",
+      "هر مرحله می‌تواند موفق یا ناموفق باشد. اگر تست یا security scan شکست بخورد، deploy اجرا نمی‌شود. اما verify می‌تواند بعد از deploy هم شکست بخورد (مثلاً اگر دستور show وضعیت مورد نظر را تایید نکند). در این حالت rollback لازم است. این تضمین می‌کند فقط تغییرات معتبر و تست‌شدهست‌شدهست‌شده به تولید می‌رسند. continuous delivery (تأیید قبل از استقرار) و continuous deployment (استقرار خودکار پس از تست) دو مفهوم متفاوت هستند؛ در شبکه معمولاً continuous delivery استفاده می‌شود تا engineer قبل از استقرار نهایی تایید کند. اما continuous delivery (تأیید قبل از استقرار) و continuous deployment (استقرار خودکار پس از تست) دو مفهوم متفاوت هستند؛ در شبکه معمولاً continuous delivery استفاده می‌شود تا engineer قبل از استقرار نهایی تایید کند."
      ],
      "bullets": [
       "Commit ← push کد پیکربندی به VCS",
@@ -18756,7 +18756,7 @@
       "Deploy ← اعمال تغییرات تایید شده",
       "Verify ← تایید نهایی با دستورات show"
      ],
-     "think": "چرا هر مرحله pipeline می‌تواند متوقف کند؟ چون اگر تست یا security scan شکست بخورد، تغییرات ناامن یا نادرست به تولید اعمال نمی‌شوند و ریسک خرابی شبکه حذف می‌گردد."
+     "think": "چرا هر مرحله pipeline می‌تواند متوقف کند؟ چون اگر تست یا security scan شکست بخورد، تغییرات ناامن یا نادرست به تولید اعمال نمی‌شوند؛ همچنین verify می‌تواند بعد از deploy شکست بخورد و rollback لازم باشد."
     },
     {
      "h": "۳. GitLab CI / GitHub Actions برای شبکه",
@@ -18847,13 +18847,13 @@
     {
      "q": "چرا هر مرحله pipeline می‌تواند متوقف شود؟",
      "opts": [
-      "چون اگر هر مرحله‌ای (مثل تست یا security scan) شکست بخورد، تغییرات اعمال نمی‌شوند و ریسک حذف می‌گره",
       "چون engineer بخواهد",
-      "چون VCS کند است",
+      "چون اگر تست یا security scan شکست بخورد، deploy اجرا نمی‌شود",
+      "چون verify می‌تواند بعد از deploy هم شکست بخورد و rollback لازم باشد",
       "هیچ‌کدام"
      ],
-     "ans": 0,
-     "exp": "اگر هر مرحله‌ای شکست بخورد، pipeline متوقف می‌شود و تغییرات ناامن یا نادرست به تولید اعمال نمی‌شوند."
+     "ans": 2,
+     "exp": "اگر تست یا security scan شکست بخورد، deploy اجرا نمی‌شود. اما verify می‌تواند بعد از deploy هم شکست بخورد، در این صورت rollback لازم است."
     }
    ],
    "table": {
@@ -19129,7 +19129,7 @@
       "pyATS اجازه می‌دهد تست‌های اتوماتیک بنویسید که وضعیت تجهیزات را بررسی می‌کنند و نتائج را گزارش می‌کنند. این تست‌ها قبل از اعمال تغییرات روی تولید اجرا می‌شوند تا خطاهای امكان پیدا شوند."
      ],
      "bullets": [
-      "pyATS ← چارچوب تست پلتفرم-بسته شبکه",
+      "pyATS ← چارچوب تست پلتفرم-agnostic (مستقل از پلتفرم) شبکه",
       "Genie ← کتابخانه آماده برای دستگاه‌های Cisco روی pyATS",
       "تست اتوماتیک ← بررسی وضعیت تجهیزات قبل از تغییرات تولید"
      ],
@@ -19138,7 +19138,7 @@
     {
      "h": "۲. نوشتن تست‌های خودکار با AEtest و Dq",
      "p": [
-      "AEtest subsistem pyATS است که اجازه می‌دهد تست‌های خودکار در Python بنویسید. تست‌ها به صورت کلاس‌های derived از `CommonSetup` و `CommonCleanup` نوشته می‌شوند و `testcase`ها تست‌های واقعی هستند.",
+      "AEtest بخش pyATS است که اجازه می‌دهد تست‌های خودکار در Python بنویسید. تست‌ها به صورت کلاس‌های derived از `CommonSetup` و `CommonCleanup` نوشته می‌شوند و `testcase`ها تست‌های واقعی هستند.",
       "Dq (Dictionary query) ابزاری است برای جستجو و فیلتر کردن در دیتاهای پیچیده (مثل خروجی show). می‌توانید Dq استفاده کنید تا مقادیر خاصی (مثل وضعیت اینترفیس) را از خروجی استخراج کنید."
      ],
      "bullets": [
@@ -19217,13 +19217,13 @@
     {
      "q": "**pyATS** چیست و چه برای چه استفاده می‌شود؟",
      "opts": [
-      " چارچوب تست پلتفرم-آज्ञاست (توسعه‌یافته برای سیسکو اما قابل گسترش برای پلتفرم‌های دیگر)",
+      " چارچوب تست پلتفرم-agnostic (توسعه‌یافته برای سیسکو اما قابل گسترش برای پلتفرم‌های دیگر)",
       "ابزار مانیتورینگ ترافیک",
       "ابزار پیکربندی روتر",
       "ابزار امنیت"
      ],
      "ans": 0,
-     "exp": "pyATS/Genie توسط سیسکو توسعه یافته اما طراحی‌اش مستقلی از پلتفرم است و قابل گسترش برای پلتفرم‌های شبکه دیگر است."
+     "exp": "pyATS/Genie توسط سیسکو توسعه یافته اما طراحی‌اش مستقل از پلتفرم است و قابل گسترش برای پلتفرم‌های شبکه دیگر است."
     },
     {
      "q": "**Dq** در pyATS چه کاربرد دارد؟",
@@ -19259,7 +19259,7 @@
      [
       "pyATS",
       "چارچوب تست شبکه",
-      "پلتفرم-بسته، Cisco"
+      "پلتفرم-agnostic، Cisco"
      ],
      [
       "Genie",
@@ -19276,7 +19276,7 @@
    "faq": [
     {
      "q": "pyATS چیست؟",
-     "a": "چارچوب تست پلتفرم-بسته شبکه که توسط Cisco برای تست و اعتبارسنجی ساخته شده است."
+     "a": "چارچوب تست پلتفرم-agnostic (مستقل از پلتفرم) شبکه که توسط Cisco برای تست و اعتبارسنجی ساخته شده است."
     },
     {
      "q": "Batfish چه خطاهایی را پیدا می‌کند؟",
@@ -19317,7 +19317,7 @@
      "h": "۱. چرا SNMPbazنشسته می‌شود و Model-Driven Telemetry (MDT) چیست؟",
      "p": [
       "SNMP پروتکل قدیمی مانیتورینگ است که Poll-based است (سرور مدیریت پرسیده می‌شود و جواب می‌گیرد) و محدودیت‌هایی دارد (فقط اعداد، keine ساختار پیچیده). MDT (Model-Driven Telemetry) رویکرد جدیدتر است که Push-based است (تجهیزات داده‌ها را به سرور می‌فرستند) و بر اساس مدل YANG ساختار دارد.",
-      "MDT مزایا دارد: داده‌ها بلافاصله (push) ارسال می‌شوند، ساختار دارند (YANG)، و می‌توانند فرکانس بالا داشته باشند. این باعث می‌شود مانیتورینگ شبکه دقیق‌تر و בזين حقيقيتر باشد."
+      "MDT مزایا دارد: داده‌ها بلافاصله (push) ارسال می‌شوند، ساختار دارند (YANG)، و می‌توانند فرکانس بالا داشته باشند. gNMI حالت‌های ONCE، POLL و subscribe را دارد. این باعث می‌شود مانیتورینگ شبکه دقیق‌تر و בזين حقيقيتر باشد."
      ],
      "bullets": [
       "SNMP ← Poll-based، محدود، قدیمی",
@@ -19330,7 +19330,7 @@
      "h": "۲. پروتکل‌های انتقال (gRPC / gNMI) و کدگذاری داده‌ها (JSON، Protobuf)",
      "p": [
       "gRPC پروتکل ارتباطی سریع بر پایه HTTP/2 است که برای MDT استفاده می‌شود. gNMI (gRPC Network Management Interface) interface استاندارد برای مدیریت شبکه با gRPC است. داده‌ها می‌توانند با JSON یا Protobuf (فرمت فشردهتر و سریعتر) کدگذاری شوند.",
-      "Protobuf به جای JSON اندازه پیام را کاهش می‌دهد و سرعت ارسال را افزایش می‌دهد، که برایテレmetry با فرکانس بالا مهم است."
+      "Protobuf به جای JSON معمولاً اندازه پیام را کاهش می‌دهد اما سرعت Compare به JSON به پیاده‌سازی و شرایط Netzwerk وابسته است (نه سرعت قطعی سریع‌تر)."
      ],
      "bullets": [
       "gRPC ← پروتکل ارتباطی سریع (HTTP/2)",
@@ -19518,7 +19518,7 @@
     {
      "h": "۲. حلقه بسته خودترمیم (Closed-Loop Self-Healing)",
      "p": [
-      "حلقه بسته خودتر می‌کنند شامل ۴ مرحله است: (۱) پایش — داده‌ها را جمع‌آوری می‌کنید؛ (۲) تشخیص —عدمالامonialها را پیدا می‌کنید؛ (۳) تشخیص ریشه‌ای —دلیل را پیدا می‌کنید؛ (۴) اقدام — تغییرات را اعمال می‌کنید (بیشتراً با تایید بشر).",
+      "حلقه بسته خودترمی‌کنند شامل ۴ مرحله است: (۱) پایش — داده‌ها را جمع‌آوری می‌کنید؛ (۲) تشخیص —عدمالامonialها را پیدا می‌کنید؛ (۳) تشخیص ریشه‌ای —دلیل را پیدا می‌کنید؛ (۴) اقدام — تغییرات را اعمال می‌کنید (بیشتراً با تایید بشر).",
       "مثال: اگر CPU روتر > 90٪ باشد، AIOps می‌دهد تغییرات را پیشنهادی دهد (مثل Move ترافیک، اضافه کردن bandwidth) و با تایید Engineer اعمال شود."
      ],
      "bullets": [
@@ -19591,7 +19591,7 @@
    "troubleshooting": {
     "fault": "هشدارهای AIOps زیاد است و Engineerها آنها را نادیده می‌گیرند (Alert Fatigue).",
     "analysis": "بررسی کنید آیا هشدارها بسیار هستند یا خیر و آیاthresholdها مناسب است.",
-    "fix": "هشدارها را تن کنید، thresholdها را تنظیم کنید و فقط اقدامات قابلاجرای بفرستید."
+    "fix": "هشدارها راチュن کنید، thresholdها را تنظیم کنید و فقط اقدامات قابلاجرای بفرستید."
    },
    "exercise": "یک معماری اتوماسیون برای شبکه ۵۰۰ شعبه‌ای طراحی کنید: ۴ لایه و ابزار مربوط به هر لایه را مشخص کنید.",
    "quiz": [
@@ -19607,7 +19607,7 @@
      "exp": "AIOps از AI/ML برای پایش، تحلیل و عملیات شبکه استفاده می‌کند و مشکل را پیش از occurrence پیش‌بینی می‌کند."
     },
     {
-     "q": "حلقه بسته خودتر می‌کنند (Closed-Loop Self-Healing) چه مراحل دارد؟",
+     "q": "حلقه بسته خودترمی‌کنند (Closed-Loop Self-Healing) چه مراحل دارد؟",
      "opts": [
       "فقط پایش",
       "پایش، تشخیص، تشخیص ریشه‌ای، اقدام (با تایید بشر)",
@@ -19665,7 +19665,7 @@
      "a": "استفاده از AI/ML برای پایش، تحلیل و عملیات زیرساخت شبکه."
     },
     {
-     "q": "حلقه بسته خودتر می‌کنند چه مراحل دارد؟",
+     "q": "حلقه بسته خودترمی‌کنند چه مراحل دارد؟",
      "a": "پایش، تشخیص، تشخیص ریشه‌ای، اقدام (با تایید بشر)."
     },
     {
@@ -19685,7 +19685,7 @@
    ],
    "analogy": "AIOps مثل یک د.attachمتخصص در شبکه است:آنتها را تحلیل می‌کند،دلیل را پیدا می‌کند و پیشنهادات رفع می‌دهد، اما تصمیم نهایی یا با بشر است.",
    "ciscoRef": "Cisco AIOps Documentation — AI for IT Operations",
-   "summary": "AIOps از AI/ML برای پایش و تحلیل شبکه استفاده می‌کند. حلقه بسته خودتر می‌کنند شامل پایش، تشخیص، تشخیص ریشه‌ای و اقدام است. معماری لایه‌ای برای شبکه ۵۰۰ شعبه‌ای مناسب است."
+   "summary": "AIOps از AI/ML برای پایش و تحلیل شبکه استفاده می‌کند. حلقه بسته خودترمی‌کنند شامل پایش، تشخیص، تشخیص ریشه‌ای و اقدام است. معماری لایه‌ای برای شبکه ۵۰۰ شعبه‌ای مناسب است."
   },
   "spec_cyber_hunt": {
    "id": "spec_cyber_hunt",

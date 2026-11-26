@@ -1782,6 +1782,21 @@ if (findNodes(liXss, n => n.tagName === 'SCRIPT' || n.tagName === 'IMG').length 
         prov.apply_refresh_only()
         self.assertNotIn(115, prov.state["vlans"], "Unmanaged VLAN 115 must not enter state after apply_refresh_only")
 
+    def test_auto15_apply_refresh_only_deletes_ghost_from_state(self):
+        """apply_refresh_only must delete state-only (ghost) resources from state."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        lab = data["lessons"]["auto_15"]["lab"]["steps"][4]
+        m_py = re.search(r"```python\n([\s\S]+?)\n```", lab)
+        self.assertIsNotNone(m_py)
+        ns: dict = {}
+        exec(compile(m_py.group(1), "auto15_ghost_test.py", "exec"), ns)
+        prov = ns["MockProvider"]()
+        prov.reality["vlans"][115] = {"name": "IAC_TEST", "status": "active"}
+        prov.state["vlans"][111] = {"name": "GHOST", "status": "active"}  # only in state, not reality
+        prov.apply_refresh_only()
+        self.assertNotIn(111, prov.state["vlans"], "Ghost VLAN 111 must be deleted from state after apply_refresh_only")
+        self.assertNotIn(115, prov.state["vlans"], "Unmanaged VLAN 115 must not enter state")
+
     def test_auto16_verify_not_pass_after_test_failure(self):
         """verify stage must not be PASS when test stage failed."""
         data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
