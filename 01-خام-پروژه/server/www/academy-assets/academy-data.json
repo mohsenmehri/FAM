@@ -17072,7 +17072,7 @@
      "h": "۱. معماری `RESTCONF` (`RFC 8040`) و مسیر `{+restconf}/data`",
      "p": [
       "`RESTCONF` یک رابط **`HTTP`** (معمولاً `HTTPS` روی پورت `443`) برای دسترسی به داده‌های مدل‌شده با `YANG` تعریف می‌کند. به جای اینکه مسیرهای `/config` و `/operational` به‌صورت hard-coded تعریف شوند، `RFC 8040` یک **مسیر base `{+restconf}/data`** تعریف می‌کند و با **پارامتر query `content`** تفکیک می‌کند: `content=config` برای داده‌های پیکربندی (معادل داده‌های `<get-config>`) و `content=nonconfig` برای داده‌های عملیاتی (معادل داده‌های غیرپیکربندی که `<get>` برمی‌گرداند).",
-      "به این ترتیب، URIها به‌صورت زیر شکل می‌گیرند: `GET /restconf/data/ietf-interfaces:interfaces?content=config` برای خواندن پیکربندی، و `GET /restconf/data/ietf-interfaces:interfaces-state?content=nonconfig` برای خواندن داده‌های عملیاتی (مثلاً `oper-status` در `ietf-interfaces:interfaces-state/interface`). در RFC 8343 داده‌های عامل زیر `interfaces-state` زندگی می‌کنند، نه زیر `interfaces/state`. این طراحی باعث می‌شود که clientها نیازی به hard-coding مسیرهای جداگانه نداشته باشند و سرور بتواند بر اساس capabilityهای خود پاسخ دهد."
+      "به این ترتیب، URIها به‌صورت زیر شکل می‌گیرند: `GET /restconf/data/ietf-interfaces:interfaces?content=config` برای خواندن پیکربندی، و `GET /restconf/data/ietf-interfaces:interfaces?content=nonconfig` برای خواندن داده‌های عملیاتی؛ state هر اینترفیس (مثلاً `oper-status`) در `ietf-interfaces:interfaces/interface=Gi0/7/state` است. در RFC 8343 داده‌های عامل (state) زیر `interfaces/interface/state` زندگی می‌کنند — نه زیر `interfaces-state` و نه مستقیماً زیر `interfaces/state`. این طراحی باعث می‌شود که clientها نیازی به hard-coding مسیرهای جداگانه نداشته باشند و سرور بتواند بر اساس capabilityهای خود پاسخ دهد."
      ],
      "bullets": [
       "base URI: `{+restconf}/data`",
@@ -17370,12 +17370,12 @@
      "h": "۴. `YANG` در `NETCONF` و `RESTCONF` و عیب‌یابی",
      "p": [
       "`NETCONF` (`RFC 6241`) و `RESTCONF` (`RFC 8040`) بر اساس مدل‌های `YANG` کار می‌کنند: سرور در پیام `<hello>` capabilityهای model را اعلام می‌کند و clientها باید درخواست‌های خود را مطابق با آن مدل‌ها بسازند. یک درخواست نامطابق با مدل با خطای استاندارد `invalid-value` یا `invalid-element` پاسخ می‌گیرد. (تأکید: capability مدل‌ها در پیام `<hello>` اعلام می‌شوند، نه در header `Content-Type`.)",
-      "خطای متداول این است که مدل بدون تأیید اولیه به سرور ارسال شود و در حین `rpc` با خطا شکست بخورد. راه‌حل: ابتدا مدل را compile و validation محلی انجام دهید، `namespace` و `prefix` payload را با مدل سرور تطابق دهید، و تمام محدودیت‌های `key`/`must`/`min-elements` را در client validation کنید."
+      "خطای متداول این است که مدل بدون تأیید اولیه به سرور ارسال شود و در حین `rpc` با خطا شکست بخورد. راه‌حل: ابتدا مدل را compile و validation محلی انجام دهید، `namespace` payload را با مدل سرور تطابق دهید (prefix فقط نام مستعار محلی است)، و تمام محدودیت‌های `key`/`must`/`min-elements` را در client validation کنید."
      ],
      "bullets": [
       "capability مدل‌ها در پیام `<hello>` اعلام می‌شوند",
       "داده‌ی نامطابق → `invalid-value` / `invalid-element`",
-      "validation محلی: compile مدل + بررسی namespace/prefix + محدودیت‌ها"
+      "validation محلی: compile مدل + بررسی namespace + محدودیت‌ها"
      ],
      "think": "چرا قبل از ارسال درخواست، validation محلی انجام می‌دهیم؟ چون خطای validation در سرور (بعد از ارسال) عیب‌یابی‌اش هزینه‌برتر است؛ validation محلی client خطاها را زودهنگام و با پیام دقیق‌تر برطرف می‌کند."
     }
@@ -17433,8 +17433,8 @@
    },
    "troubleshooting": {
     "fault": "یک client درخواست `edit-config` با payload ساخته‌شده بر اساس مدل `YANG` خود را می‌فرستد، اما سرور با خطای `rpc-error: invalid-value` یا `missing-element` پاسخ می‌دهد، در حالی که مدل client معتبر است.",
-    "analysis": "عموماً دو لایه دخیل است: (۱) مدل خود نامعتبر است (syntax یا reference error) و باید با `pyang` compile شود؛ (۲) مدل معتبر است اما داده‌ی نمونه نامطابق است — مثلاً `namespace`/`prefix` payload با مدل سرور مطابقت ندارد، یا الزام `key` در `List` یا محدودیت `must` نقض شده است. سرور با validation model-driven این نقض‌ها را با `invalid-value` رد می‌کند.",
-    "fix": "ابتدا مدل خود را با `pyang` compile و validation محلی کنید، سپس `namespace`/`prefix` payload را با مدل سرور تطابق دهید و تمام محدودیت‌های `key`/`must`/`min-elements` را در client validation کنید."
+    "analysis": "عموماً دو لایه دخیل است: (۱) مدل خود نامعتبر است (syntax یا reference error) و باید با `pyang` compile شود؛ (۲) مدل معتبر است اما داده‌ی نمونه نامطابق است — مثلاً ``namespace` payload با مدل سرور مطابقت ندارد، یا الزام `key` در `List` یا محدودیت `must` نقض شده است. سرور با validation model-driven این نقض‌ها را با `invalid-value` رد می‌کند.",
+    "fix": "ابتدا مدل خود را با `pyang` compile و validation محلی کنید، سپس `namespace` payload را با مدل سرور تطابق دهید و تمام محدودیت‌های `key`/`must`/`min-elements` را در client validation کنید."
    },
    "exercises": [
     {
@@ -17639,7 +17639,7 @@
    "protocolAnalysis": [
     "**تحلیل lifecycle یک play:** playbook -> play -> tasks; control node هر task را روی host هدف از طریق SSH اجرا می‌کند، state desired را با state موجود مقایسه و work را انجام می‌دهد؛ play با تمام شدن tasks پایان می‌شود.",
     "**تحلیل idempotency در module `ios_config`:** module state desired را با state موجود مقایسه می‌کند و فقط تغییرات لازم را اعمال می‌کند؛ تحقق idempotency به ماژول، ورودی (lines/parents) و دستگاه وابسته است، نه تضمین‌ِ همهٔ playbookها.",
-    "**تحلیل `--check` و `--list-hosts`:** check mode تغییرات پیش‌بینی‌شده را محاسبه و گزارش می‌دهد؛ changed=0 فقط در صورت همگونی کامل state است. `--list-hosts` target hosts را بر اساس group `hosts:` و inventory نشان می‌دهد. handlers با `notify` برای workهای پس از change (مثل ریبوٹ) احضار می‌شوند."
+    "**تحلیل `--check` و `--list-hosts`:** check mode تغییرات پیش‌بینی‌شده را محاسبه و گزارش می‌دهد (اگر ماژول check mode را پشتیبانی کند؛ ماژولهایی که پشتیبانی نمی‌کنند ممکن است تغییری گزارش نکنند). `changed=0` در check mode تضمین‌کننده‌ی اجرا بدون تغییر نیست — وضعیت را با `--diff` یا بررسی مستقل state تأیید کنید. `--list-hosts` target hosts را بر اساس group `hosts:` و inventory نشان می‌دهد. handlers با `notify` برای workهای پس از change (مثل ریبوٹ) احضار می‌شوند."
    ],
    "iosCommands": [
     {
@@ -17763,7 +17763,7 @@
     },
     {
      "q": "چرا check mode لزوماً changed=0 نیست؟",
-     "a": "check mode تغییرات پیش‌بینی‌شده را محاسبه و گزارش می‌دهد؛ changed=0 فقط در صورت همگونی کامل state desired با state موجود است."
+     "a": "check mode تغییرات پیش‌بینی‌شده را محاسبه و گزارش می‌دهد؛ changed=0 در check mode تضمین‌کننده‌ی اجرا بدون تغییر نیست — وضعیت را با `--diff` یا بررسی مستقل state تأیید کنید."
     }
    ],
    "misconceptions": [
@@ -17777,10 +17777,10 @@
     },
     {
      "myth": "check mode (`--check`) همیشه changed=0 است.",
-     "reality": "خیر؛ check mode تغییرات پیش‌بینی‌شده را گزارش می‌دهد. changed=0 فقط در صورت همگونی کامل state است."
+     "reality": "خیر؛ check mode تغییرات پیش‌بینی‌شده را گزارش می‌دهد. changed=0 در check mode تضمین‌کننده‌ی اجرا بدون تغییر نیست؛ ماژولهایی که check mode را پشتیبانی نمی‌کنند ممکن است تغییری گزارش نکنند. تأیید مستقل وضعیت (مثلاً `--diff` یا `show running-config`) لازم است."
     }
    ],
-   "analogy": "`Ansible` مانند یک مدیر پروژه‌ی متمرکز است که با دنباله‌ی دستورات استاندارد (SSH) به هر کارمند (managed node) می‌رود و workهای تکرارپذیر را با docی دقیق و قابل تکرار (playbook) سازماندهی می‌کند؛ در اجرای بعدی، او فقط workهایی را انجام می‌دهد که نیاز به انجام باشد — نه همه‌ی workها را دوباره.",
+   "analogy": "`Ansible` مانند یک مدیر پروژه‌ی متمرکز است که با دنباله‌ی دستورات استاندارد (SSH) به هر کارمند (managed node) می‌رود و workهای تکرارپذیر را با دستورالعمل دقیق و قابل تکرار (playbook) سازماندهی می‌کند؛ در اجرای بعدی، او فقط workهایی را انجام می‌دهد که نیاز به انجام باشد — نه همه‌ی workها را دوباره.",
    "ciscoRef": "Cisco Ansible Network Automation Guide — Ansible Network Collections (cisco.ios) & ios_config Module",
    "summary": "`Ansible` با control node و managed nodes (بدون agent، از طریق SSH) playbookهای تکرارپذیری را اجرا می‌کند؛ tasks با نام کامل ماژول شبکه (`cisco.ios.ios_config` با `parents` معتبر) state desired را ایجاد می‌کنند. playbook هدف باید با group `ios_routers` در inventory تطبیق داشته باشد؛ تحقق idempotency به ماژول، ورودی و دستگاه وابسته است و check mode تغییرات پیش‌بینی‌شده را گزارش می‌دهد.",
    "quiz": [
@@ -17878,7 +17878,7 @@
     {
      "h": "۴. قفل‌گذاری (locking) و عیب‌یابی drift",
      "p": [
-      "`Terraform` با state locking، هم‌زمانی تغییرات را کنترل می‌کند؛ اما **اثر قفل به نوع backend و تنظیمات آن وابسته است**، نه تضمینی برای همه‌ی حالت‌ها. **Backend محلی (local backend) از قفل فایل سیستمی (راه‌انداز سیستم عامل) پشتیبانی می‌کند**، در حالی که برخی backendها locking را پشتیبانی نمی‌کنند؛ در آن‌ها هم‌زمانی تضمین نمی‌شود و باید با policyهای داخلی (مثل change freeze) مدیریت شود.",
+      "`Terraform` با state locking هم‌زمانی تغییرات را کنترل می‌کند، اما اثر قفل به نوع backend وابسته است — **تضمینی برای همه‌ی حالت‌ها نیست**. `local backend` state را روی دیسک محلی نگه می‌دارد و هم‌زمانی را از طریق **قفل فایل سیستمی (OS-level file locking)** محافظت می‌کند (محافظت محدود به فرآیندهای روی همان host). برخی backendهای ریموت locking را کامل پشتیبانی نمی‌کنند؛ در آن‌ها هم‌زمانی تضمین نمی‌شود و باید با policyهای داخلی (مثل change freeze / اجرایシリーズ) مدیریت شود.",
       "خطاهای apply معمولاً به‌دلیل مغایرت state lifecycle یا عدم هماهنگی locking است؛ `terraform plan -refresh-only` و `terraform apply -refresh-only` برای sync state با واقعیت و `terraform plan` (معمولی) برای تصمیم‌گیری در برطرف drift استفاده می‌شود."
      ],
      "bullets": [
@@ -18317,7 +18317,7 @@
      "opts": [
       "به تنظیمات و conditions (در سناریوهای مرحله‌ای و commit queue)",
       "به تضمین قطعی و مستقل از تنظیمات",
-      "به تجهیزات ağ‌ی",
+      "به تجهیزات شبکه",
       "هیچ‌کدام"
      ],
      "ans": 0,
