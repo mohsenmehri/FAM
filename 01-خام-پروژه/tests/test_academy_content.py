@@ -189,6 +189,36 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertNotIn("همیشه باید حداقل دو لینک", camp_lesson["sections"][1]["think"]["a"])
         self.assertNotIn("BFD", camp_lesson["sections"][1]["steps"][1])
 
+        # Round-8 regression assertions (f4 Batch 2 review fixes)
+        ise_lesson = data["lessons"]["spec_sec_ise"]
+        self.assertIn("authorization commands 15 VTY_CMD", ise_lesson["lab"]["steps"][4])
+        self.assertIn("DEAD/ERROR", ise_lesson["lab"]["steps"][4])
+        self.assertIn("FAIL", ise_lesson["troubleshooting"]["analysis"])
+        self.assertIn("ERROR / DEAD", ise_lesson["troubleshooting"]["analysis"])
+
+        nx_lesson = data["lessons"]["spec_dc_nx"]
+        self.assertIn("استثنای حیاتی مسیر پشتیبان", nx_lesson["sections"][1]["steps"][2])
+        self.assertIn("vpc orphan-port suspend", nx_lesson["sections"][2]["p"][0])
+        self.assertIn("وابسته به مسیر و تنظیمات", nx_lesson["misconceptions"][1]["reality"])
+
+        s11_lesson = data["lessons"]["s11"]
+        self.assertIn("MTU لایه ۳", s11_lesson["sections"][1]["steps"][0])
+        self.assertIn("Ethernet داخلی", s11_lesson["protocolAnalysis"][1])
+        self.assertIn("Ethernet داخلی", s11_lesson["exercises"][2]["solution"])
+
+        aci_lesson = data["lessons"]["spec_dc_aci"]
+        self.assertIn("فاقد Data Plane واقعی", aci_lesson["lab"]["steps"][0])
+        self.assertIn("Data Plane واقعی", aci_lesson["iosCommands"][0]["note"])
+        self.assertIn("خروجی نمونهٔ ثابت آموزشی برمی‌گرداند", aci_lesson["iosCommands"][2]["note"])
+        self.assertNotIn("جداسازی کامل Failure Domain سیاستی", aci_lesson["quiz"][2]["opts"][3])
+        self.assertIn("NDO", aci_lesson["sections"][2]["p"][0])
+
+        stor_lesson = data["lessons"]["spec_dc_stor"]
+        self.assertIn("LUN Mapping / LUN Masking", stor_lesson["lab"]["steps"][4])
+        self.assertIn("HBA / Storage Rescan", stor_lesson["lab"]["steps"][4])
+        self.assertIn("LUN Mapping / LUN Masking", stor_lesson["troubleshooting"]["analysis"])
+        self.assertIn("Rescan", stor_lesson["troubleshooting"]["fix"])
+
         # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
         self.assertIsNotNone(m_mode)
@@ -233,8 +263,14 @@ function run(cmds) {{
   }};
 }}
 function isSimError(out) {{
-  const t = (out || '').trim();
-  return t.startsWith('%') || t.includes('Invalid') || t.includes('Command rejected') || t.includes('پشتیبانی نمی‌شود') || t.includes('مجاز نیست') || t.includes('ابتدا');
+  const lines = (out || '').split(/\\r?\\n/);
+  return lines.some(raw => {{
+    const line = raw.trim();
+    if (!line.startsWith('%')) return false;
+    // Healthy informational syslog notifications (not errors)
+    if (/^%(LINK|LINEPROTO)-\\d+-/.test(line)) return false;
+    return true;
+  }});
 }}
 
 const r = run(['enable','configure terminal','interface Gi0/2','switchport mode access','switchport nonegotiate','end','show running-config','configure terminal','interface Gi0/2','switchport mode access','end','show running-config','configure terminal','interface Gi0/2','no switchport nonegotiate','end','show interfaces Gi0/2 switchport']);
@@ -260,18 +296,23 @@ function assertRunLab(id, verifyFn) {{
   verifyFn(res.sim, res.out[secondRunIdx]);
 }}
 
-// Negative test: ensure unsupported commands & mode errors are caught by assertRunLab/isSimError
-let caughtUnsupported = false;
-try {{
-  const bad = run(['enable'].concat(extractedLabs['spec_ent']).concat(['totally unsupported command']));
-  for (const o of bad.out) {{ if (isSimError(o)) throw new Error('caught unsupported'); }}
-}} catch (err) {{ caughtUnsupported = true; }}
-if (!caughtUnsupported) throw new Error('Negative test failed: totally unsupported command was not caught!');
-
-const modeErr1 = run(['enable', 'configure terminal', 'shutdown']);
-if (!isSimError(modeErr1.out[2])) throw new Error('Negative test failed: shutdown in global config not rejected');
-const modeErr2 = run(['configure terminal']);
-if (!isSimError(modeErr2.out[0])) throw new Error('Negative test failed: configure terminal in user mode not rejected');
+// Negative & positive tests for line-by-line error detection
+for (const badCmds of [
+  ['enable'].concat(extractedLabs['spec_ent']).concat(['totally unsupported command']),
+  ['enable', 'configure terminal', 'interface Gi0/99'],
+  ['enable', 'configure terminal', 'vlan 9999'],
+  ['enable', 'configure terminal', 'shutdown'],
+  ['configure terminal']
+]) {{
+  const res = run(badCmds);
+  if (!res.out.some(o => isSimError(o))) {{
+    throw new Error('Negative test failed to catch simulator error for: ' + JSON.stringify(badCmds));
+  }}
+}}
+const healthyInfo = run(['enable', 'configure terminal', 'interface Gi0/2', 'shutdown', 'no shutdown']);
+if (isSimError(healthyInfo.out[3]) || isSimError(healthyInfo.out[4])) {{
+  throw new Error('Informational syslog (%LINK/%LINEPROTO) was misclassified as simulator error');
+}}
 
 // Explicit per-VLAN and per-port assertions for all 10 f4 lessons (Batch 1 + Batch 2)
 assertRunLab('spec_ent', (sim) => {{
