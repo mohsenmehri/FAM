@@ -761,7 +761,7 @@
     });
   }
 
-  function appendRichText(parent, text, currentLessonId) {
+  function appendPlainRichText(parent, text, currentLessonId) {
     const str = String(text || '');
     if (!glossRegex || !str) {
       parent.appendChild(document.createTextNode(str));
@@ -795,6 +795,50 @@
     }
     if (last < str.length) {
       parent.appendChild(document.createTextNode(str.slice(last)));
+    }
+  }
+
+  function appendRichText(parent, text, currentLessonId) {
+    const str = String(text || '');
+    if (!str.includes('```')) {
+      appendPlainRichText(parent, str, currentLessonId);
+      return;
+    }
+    const fenceRe = /```([A-Za-z0-9_-]*)\r?\n([\s\S]*?)```/g;
+    let last = 0;
+    let m;
+    while ((m = fenceRe.exec(str)) !== null) {
+      if (m.index > last) {
+        appendPlainRichText(parent, str.slice(last, m.index), currentLessonId);
+      }
+      const lang = (m[1] || 'code').trim() || 'code';
+      const codeText = m[2].replace(/\r\n/g, '\n').replace(/\n+$/, '');
+      const wrap = el('div', 'code-block-wrap');
+      wrap.setAttribute('dir', 'ltr');
+      const head = el('div', 'code-block-head');
+      head.appendChild(el('span', 'code-lang', lang));
+      const copyBtn = el('button', 'code-copy-btn', 'کپی کد');
+      copyBtn.type = 'button';
+      copyBtn.addEventListener('click', () => {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(codeText).then(() => {
+            copyBtn.textContent = 'کپی شد ✓';
+            setTimeout(() => { copyBtn.textContent = 'کپی کد'; }, 1400);
+          }).catch(() => {});
+        }
+      });
+      head.appendChild(copyBtn);
+      wrap.appendChild(head);
+      const pre = el('pre', 'code-block');
+      pre.setAttribute('dir', 'ltr');
+      const codeEl = el('code', '', codeText);
+      pre.appendChild(codeEl);
+      wrap.appendChild(pre);
+      parent.appendChild(wrap);
+      last = m.index + m[0].length;
+    }
+    if (last < str.length) {
+      appendPlainRichText(parent, str.slice(last), currentLessonId);
     }
   }
 
@@ -1243,7 +1287,11 @@
     simNote.style.color = '#93c5fd';
     b7.appendChild(simNote);
     const ul7 = el('ul', 'step-list');
-    lessonObj.lab.steps.forEach(s => ul7.appendChild(el('li', '', s)));
+    lessonObj.lab.steps.forEach(s => {
+      const li = el('li');
+      appendRichText(li, s, lessonObj.id);
+      ul7.appendChild(li);
+    });
     b7.appendChild(ul7);
 
     const qRow = el('div', 'cli-quick');

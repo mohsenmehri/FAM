@@ -417,9 +417,11 @@ class AcademyRedesignTests(unittest.TestCase):
         apply_ntp_safely = ns_a3["apply_ntp_safely"]
 
         class MockConn:
-            def __init__(self, cfg_out: str, post_out: str) -> None:
+            def __init__(self, cfg_out: str, post_out: str, save_out: str = "Building configuration...\n[OK]", save_exc: Exception | None = None) -> None:
                 self.cfg_out = cfg_out
                 self.post_out = post_out
+                self.save_out = save_out
+                self.save_exc = save_exc
                 self.saved = 0
                 self.enabled = False
                 self.post_checked = 0
@@ -442,6 +444,9 @@ class AcademyRedesignTests(unittest.TestCase):
 
             def save_config(self):
                 self.saved += 1
+                if self.save_exc is not None:
+                    raise self.save_exc
+                return self.save_out
 
         seen_kwargs = []
 
@@ -461,11 +466,36 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(c_post_fail.saved, 0)
         self.assertEqual(c_post_fail.post_checked, 1)
 
-        c_ok = MockConn("R1(config)#ntp server 10.255.0.100\nR1(config)#end", "ntp server 10.255.0.100")
+        # Boundary test: 10.255.0.1 MUST NOT match "ntp server 10.255.0.10"
+        c_prefix_trap = MockConn("R1(config)#ntp server 10.255.0.1\nR1(config)#end", "ntp server 10.255.0.10")
+        self.assertEqual(apply_ntp_safely(make_factory(c_prefix_trap), {"host": "10.255.0.1"}, "10.255.0.1"), "postcheck_failed")
+        self.assertEqual(c_prefix_trap.saved, 0)
+        self.assertEqual(c_prefix_trap.post_checked, 1)
+
+        # Save error output & exception MUST NOT report "saved"
+        c_save_err = MockConn("R1(config)#ntp server 10.255.0.1\nR1(config)#end", "ntp server 10.255.0.1", save_out="% Error copying configuration (Timed out)")
+        self.assertEqual(apply_ntp_safely(make_factory(c_save_err), {"host": "10.255.0.1"}, "10.255.0.1"), "save_failed")
+        self.assertEqual(c_save_err.saved, 1)
+
+        c_save_exc = MockConn("R1(config)#ntp server 10.255.0.1\nR1(config)#end", "ntp server 10.255.0.1", save_exc=OSError("NVRAM read-only"))
+        self.assertEqual(apply_ntp_safely(make_factory(c_save_exc), {"host": "10.255.0.1"}, "10.255.0.1"), "save_failed")
+        self.assertEqual(c_save_exc.saved, 1)
+
+        # Invalid IP rejected before connection factory is called
+        c_unused = MockConn("", "")
+        before_calls = len(seen_kwargs)
+        with self.assertRaises(ValueError):
+            apply_ntp_safely(make_factory(c_unused), {"host": "10.255.0.1"}, "10.255.0.1\nno ip routing")
+        self.assertEqual(len(seen_kwargs), before_calls)
+
+        c_ok = MockConn("R1(config)#ntp server 10.255.0.100\nR1(config)#end", "ntp server 10.255.0.100 prefer")
         self.assertEqual(apply_ntp_safely(make_factory(c_ok), {"host": "10.255.0.1"}, "10.255.0.100"), "saved")
         self.assertEqual(c_ok.saved, 1)
         self.assertEqual(c_ok.post_checked, 1)
         self.assertTrue(all(kw.get("ssh_strict") is True and kw.get("system_host_keys") is True for kw in seen_kwargs))
+        self.assertIn("Rollback", a3_s)
+        self.assertIn("تغییرات ذخیره‌نشدهٔ", a3_s)
+        self.assertIn("اثبات همگام‌شدن عملیاتی NTP نیست", a3_s)
 
         gw_s = json.dumps(gw_lesson, ensure_ascii=False)
         self.assertIn("قطعه‌پیکربندی مرجع مفهومی", gw_lesson["lab"]["steps"][4])
@@ -737,6 +767,118 @@ assertRunLab('auto_03', (sim) => {{
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
         self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
+
+        # 4. Safe fenced-code DOM renderer & CSS verification (preserving newlines, indentation, LTR, anti-XSS)
+        styles_css = (ASSET_ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertIn(".code-block{", styles_css)
+        self.assertIn("white-space:pre", styles_css)
+        self.assertIn("direction:ltr", styles_css)
+        self.assertIn("appendRichText(li, s, lessonObj.id)", app_js)
+
+        dom_test_js = f"""
+const fs = require('fs');
+const vm = require('vm');
+const ACADEMY = JSON.parse(fs.readFileSync({json.dumps(str(ASSET_ROOT / 'academy-data.json'))}, 'utf8'));
+const appCode = fs.readFileSync({json.dumps(str(ASSET_ROOT / 'app.js'))}, 'utf8');
+
+const sEl = appCode.indexOf('function el(');
+const eEl = appCode.indexOf('/* ---------- هماهنگی با نشست');
+const elCode = appCode.slice(sEl, eEl);
+
+const sRich = appCode.indexOf('function appendPlainRichText(');
+const eRich = appCode.indexOf('function fillBars(');
+const richCode = appCode.slice(sRich, eRich);
+
+function makeNode(tag) {{
+  return {{
+    tagName: tag.toUpperCase(),
+    className: '',
+    attrs: {{}},
+    children: [],
+    listeners: {{}},
+    _text: '',
+    setAttribute(k, v) {{ this.attrs[k] = String(v); }},
+    addEventListener(ev, fn) {{ this.listeners[ev] = fn; }},
+    appendChild(child) {{ this.children.push(child); return child; }},
+    set textContent(v) {{ this._text = String(v); this.children = []; }},
+    get textContent() {{
+      if (this.children.length) return this.children.map(c => c.textContent).join('');
+      return this._text;
+    }}
+  }};
+}}
+const fakeDocument = {{
+  createElement(tag) {{ return makeNode(tag); }},
+  createTextNode(txt) {{ return {{ nodeType: 3, textContent: String(txt) }}; }}
+}};
+const ctx = {{
+  document: fakeDocument,
+  glossRegex: /\\b(Python|Netmiko|Nornir|SSH)\\b/g,
+  glossMap: new Map([
+    ['python', {{ term: 'Python' }}],
+    ['netmiko', {{ term: 'Netmiko' }}],
+    ['nornir', {{ term: 'Nornir' }}],
+    ['ssh', {{ term: 'SSH' }}]
+  ]),
+  showGlossaryPopover() {{}},
+  hideGlossaryPopover() {{}},
+  glossHideTimer: null,
+  setTimeout,
+  navigator: {{ clipboard: {{ writeText: async () => {{}} }} }}
+}};
+vm.runInNewContext(elCode + '\\n' + richCode, ctx);
+
+function findNodes(node, pred, acc = []) {{
+  if (pred(node)) acc.push(node);
+  for (const c of (node.children || [])) findNodes(c, pred, acc);
+  return acc;
+}}
+
+const li2 = makeNode('li');
+ctx.appendRichText(li2, ACADEMY.lessons.auto_02.lab.steps[4], 'auto_02');
+const codes2 = findNodes(li2, n => n.tagName === 'CODE');
+const pres2 = findNodes(li2, n => n.tagName === 'PRE');
+if (codes2.length !== 1 || pres2.length !== 1) throw new Error('auto_02 expected 1 pre/code block');
+if (pres2[0].attrs.dir !== 'ltr' || pres2[0].className !== 'code-block') throw new Error('auto_02 pre attrs/class');
+if (findNodes(codes2[0], n => n.tagName === 'BUTTON').length !== 0) throw new Error('glossary injected inside code');
+
+const li3 = makeNode('li');
+ctx.appendRichText(li3, ACADEMY.lessons.auto_03.lab.steps[4], 'auto_03');
+const codes3 = findNodes(li3, n => n.tagName === 'CODE');
+const pres3 = findNodes(li3, n => n.tagName === 'PRE');
+if (codes3.length !== 1 || pres3.length !== 1) throw new Error('auto_03 expected 1 pre/code block');
+if (pres3[0].attrs.dir !== 'ltr' || pres3[0].className !== 'code-block') throw new Error('auto_03 pre attrs/class');
+if (findNodes(codes3[0], n => n.tagName === 'BUTTON').length !== 0) throw new Error('glossary injected inside code');
+
+// Anti-XSS check: raw <script>/<img> inside text or fenced code never creates SCRIPT/IMG elements
+const liXss = makeNode('li');
+ctx.appendRichText(liXss, 'قبل <script>alert(1)</script>\\n```python\\nprint("<img src=x onerror=alert(1)>")\\n```', 'auto_02');
+if (findNodes(liXss, n => n.tagName === 'SCRIPT' || n.tagName === 'IMG').length !== 0) {{
+  throw new Error('XSS element created!');
+}}
+
+console.log(JSON.stringify({{
+  auto02_rendered_code: codes2[0].textContent,
+  auto03_rendered_code: codes3[0].textContent
+}}));
+"""
+        dom_res = subprocess.run([node_bin, "-e", dom_test_js], capture_output=True, text=True, check=False)
+        self.assertEqual(dom_res.returncode, 0, dom_res.stderr + dom_res.stdout)
+        rendered_payload = json.loads(dom_res.stdout)
+
+        # Verify the exact text rendered inside DOM <pre><code> preserves indentation and executes cleanly in Python
+        with tempfile.TemporaryDirectory() as tmpd:
+            p2 = Path(tmpd) / "rendered_vlan_audit.py"
+            p2.write_text(rendered_payload["auto02_rendered_code"], encoding="utf-8")
+            env = dict(os.environ, NETOPS_TOKEN="demo")
+            r2 = subprocess.run([sys.executable, str(p2)], cwd=tmpd, env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(r2.returncode, 0, r2.stderr + r2.stdout)
+            self.assertIn("MISSING: [99]", r2.stdout)
+
+        ns_dom_a3: dict = {}
+        exec(compile(rendered_payload["auto03_rendered_code"], "rendered_safe_apply.py", "exec"), ns_dom_a3)
+        c_dom_ok = MockConn("R1(config)#ntp server 10.255.0.1\nR1(config)#end", "ntp server 10.255.0.1")
+        self.assertEqual(ns_dom_a3["apply_ntp_safely"](make_factory(c_dom_ok), {"host": "10.255.0.1"}, "10.255.0.1"), "saved")
 
 
 if __name__ == "__main__":
