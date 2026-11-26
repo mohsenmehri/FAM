@@ -794,33 +794,13 @@ def create_app(config=None):
     def academy_assets(filename):
         # Client assets stay behind the same FAM session as /academy; login.html
         # only loads /login.css and /login.js.
-        if Path(filename).suffix.lower() not in {'.css', '.js', '.json', '.jpg', '.jpeg', '.png', '.webp'}:
+        if Path(filename).suffix.lower() not in {'.css', '.js', '.json', '.jpg', '.jpeg', '.png', '.webp', '.svg'}:
             fail(404, 'فایل مورد نظر یافت نشد.')
         with connect() as db:
             user_and_session(db)
         return send_from_directory(ROOT/'www'/'academy-assets', filename, max_age=0)
 
-    @app.get('/academy-content/<path:filename>')
-    def academy_content(filename):
-        # Course documents and diagrams stay behind the same FAM session as /academy.
-        if filename != 'catalog.json' and not (
-                re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*\.md', filename) or
-                re.fullmatch(r'images/[a-z0-9]+(?:-[a-z0-9]+)*\.svg', filename)):
-            fail(404, 'فایل مورد نظر یافت نشد.')
-        with connect() as db:
-            user_and_session(db)
-        response = send_from_directory(ROOT/'www'/'academy-content', filename, max_age=0)
-        if filename.endswith('.md'):
-            response.headers['Content-Type'] = 'text/markdown; charset=utf-8'
-        elif filename.endswith('.svg'):
-            response.headers['Content-Security-Policy'] = (
-                "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; "
-                "script-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
-            response.headers['Content-Disposition'] = 'inline'
-        return response
-
-    @app.get('/academy')
-    def academy():
+    def render_academy_page(template_name):
         # Serve Academy only after authenticating the same FAM session used by
         # the main app. Progress is looked up by the server-derived user id.
         with connect() as db:
@@ -829,14 +809,46 @@ def create_app(config=None):
         progress = json.loads(row['payload']) if row else {}
         if not isinstance(progress, dict):
             fail(500, 'وضعیت آکادمی معتبر نیست؛ با مدیر سامانه تماس بگیرید.')
-        bootstrap = {'userName': user['name'], 'csrf': session['csrf'], 'progress': progress}
+        bootstrap = {
+            'userName': user['name'],
+            'csrf': session['csrf'],
+            'progress': progress,
+            'allowedViews': {
+                'panel': bool(
+                    (DATA_PERMISSIONS & set(user['permissions']))
+                    if is_custom_user(user)
+                    else user['role'] in (1, 2, 3, 4)
+                ),
+                'equipment': bool(
+                    ('equipment-operations' in user['permissions'] or 'manage-users' in user['permissions'])
+                    if is_custom_user(user)
+                    else user['role'] <= 2
+                ),
+            },
+        }
         encoded = json.dumps(bootstrap, ensure_ascii=True, separators=(',', ':'))
         encoded = encoded.replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
-        page = (ROOT/'private_ui'/'academy.html').read_text(encoding='utf-8')
+        page = (ROOT/'private_ui'/template_name).read_text(encoding='utf-8')
         marker = '__FAM_ACADEMY_BOOTSTRAP__'
         if page.count(marker) != 1:
             raise RuntimeError('FAM Academy bootstrap marker missing or duplicated.')
         return private_html_response(page.replace(marker, encoded))
+
+    @app.get('/academy')
+    def academy():
+        return render_academy_page('academy.html')
+
+    @app.get('/academy/dashboard')
+    def academy_dashboard():
+        return render_academy_page('academy_dashboard.html')
+
+    @app.get('/academy/index.html')
+    def academy_index_redirect():
+        return redirect('/academy', code=302)
+
+    @app.get('/academy/dashboard.html')
+    def academy_dashboard_redirect():
+        return redirect('/academy/dashboard', code=302)
 
     @app.get('/api/real/status')
     def real_device_status():
