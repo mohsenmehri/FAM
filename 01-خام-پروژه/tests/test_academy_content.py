@@ -511,27 +511,52 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("save_no_error_seen", a3_s)
         self.assertEqual(a3_lesson["bridge"]["nextTitle"], data["lessons"]["auto_04"]["title"])
 
-        # Round-14 Batch-5 checks (auto_04 .. auto_08 technical content & runnable bash/Python code)
+        # Round-14/15 Batch-5 checks (auto_04 .. auto_08 technical content & runnable bash/Python code + security/error-path tests)
         a4_lesson = data["lessons"]["auto_04"]
         a4_s = json.dumps(a4_lesson, ensure_ascii=False)
         self.assertIn("git switch -c", a4_s)
         self.assertIn("git add -p", a4_s)
         self.assertIn("git revert", a4_s)
         self.assertIn(".gitignore", a4_s)
+        self.assertIn("git >= 2.28", a4_lesson["lab"]["steps"][4])
+        self.assertIn("mktemp -d", a4_lesson["lab"]["steps"][4])
         self.assertEqual(a4_lesson["bridge"]["nextId"], "auto_05")
         m_a4_sh = re.search(r"```bash\n([\s\S]+?)\n```", a4_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a4_sh, "auto_04 runnable bash block missing")
         if shutil.which("bash") and shutil.which("git"):
-            with tempfile.TemporaryDirectory() as tmpd:
-                git_res = subprocess.run(["bash", "-e", "-c", m_a4_sh.group(1)], cwd=tmpd, capture_output=True, text=True, check=False)
+            with tempfile.TemporaryDirectory() as outer_dir:
+                # Verify running the lab script from an existing directory does NOT overwrite existing files
+                sentinel = Path(outer_dir) / "inventory.yaml"
+                sentinel.write_text("existing-keep\n", encoding="utf-8")
+                run_cmd = m_a4_sh.group(1) + '\nprintf "LAB_DIR=%s\\n" "$LAB_DIR"\n'
+                git_res = subprocess.run(["bash", "-e", "-c", run_cmd], cwd=outer_dir, capture_output=True, text=True, check=False)
                 self.assertEqual(git_res.returncode, 0, git_res.stderr + git_res.stdout)
-                ls_res = subprocess.run(["git", "ls-files"], cwd=tmpd, capture_output=True, text=True, check=True)
-                self.assertNotIn(".env", ls_res.stdout.splitlines())
-                self.assertIn(".gitignore", ls_res.stdout.splitlines())
-                self.assertIn("inventory.yaml", ls_res.stdout.splitlines())
-                inv_txt = (Path(tmpd) / "inventory.yaml").read_text(encoding="utf-8")
-                self.assertIn("R1", inv_txt)
-                self.assertIn("R2", inv_txt)
+                self.assertEqual(sentinel.read_text(encoding="utf-8"), "existing-keep\n")
+                m_lab = re.search(r"LAB_DIR=(.+)", git_res.stdout)
+                self.assertIsNotNone(m_lab)
+                lab_path = Path(m_lab.group(1).strip())
+                try:
+                    ls_res = subprocess.run(["git", "ls-files"], cwd=lab_path, capture_output=True, text=True, check=True)
+                    self.assertNotIn(".env", ls_res.stdout.splitlines())
+                    self.assertIn(".gitignore", ls_res.stdout.splitlines())
+                    self.assertIn("inventory.yaml", ls_res.stdout.splitlines())
+                    inv_txt = (lab_path / "inventory.yaml").read_text(encoding="utf-8")
+                    self.assertIn("R1", inv_txt)
+                    self.assertIn("R2", inv_txt)
+
+                    # Failure mode: conflicting concurrent edits on same line cause real merge conflict
+                    subprocess.run(["git", "switch", "-c", "branch-a"], cwd=lab_path, check=True, capture_output=True)
+                    (lab_path / "inventory.yaml").write_text("routers:\n  - R1-A\n", encoding="utf-8")
+                    subprocess.run(["git", "commit", "-am", "edit A"], cwd=lab_path, check=True, capture_output=True)
+                    subprocess.run(["git", "switch", "main"], cwd=lab_path, check=True, capture_output=True)
+                    subprocess.run(["git", "switch", "-c", "branch-b"], cwd=lab_path, check=True, capture_output=True)
+                    (lab_path / "inventory.yaml").write_text("routers:\n  - R1-B\n", encoding="utf-8")
+                    subprocess.run(["git", "commit", "-am", "edit B"], cwd=lab_path, check=True, capture_output=True)
+                    conflict = subprocess.run(["git", "merge", "branch-a"], cwd=lab_path, capture_output=True, text=True, check=False)
+                    self.assertNotEqual(conflict.returncode, 0)
+                    self.assertIn("CONFLICT", conflict.stdout + conflict.stderr)
+                finally:
+                    shutil.rmtree(lab_path, ignore_errors=True)
 
         a5_lesson = data["lessons"]["auto_05"]
         a5_s = json.dumps(a5_lesson, ensure_ascii=False)
@@ -545,8 +570,16 @@ class AcademyRedesignTests(unittest.TestCase):
         exec(compile(m_a5_py.group(1), "data_formats_lab.py", "exec"), ns_a5)
         self.assertEqual(
             ns_a5["inspect_payloads"](),
-            {"device": "R1-CORE", "active_vlans": [10, 105], "xml_interfaces": ["GigabitEthernet0/7"]},
+            {"ok": True, "device": "R1-CORE", "active_vlans": [10, 105], "xml_interfaces": ["GigabitEthernet0/7"]},
         )
+        # Failure modes: trailing comma in JSON, missing XML namespace, malformed XML
+        bad_json_res = ns_a5["inspect_payloads"]('{"device": "R1", "vlans": [1,],}')
+        self.assertFalse(bad_json_res["ok"])
+        self.assertTrue(bad_json_res["error"].startswith("invalid_json"))
+        no_ns_res = ns_a5["inspect_payloads"](raw_xml="<interfaces><interface><name>Gi0/7</name></interface></interfaces>")
+        self.assertEqual(no_ns_res, {"ok": False, "error": "missing_namespace_or_interfaces"})
+        bad_xml_res = ns_a5["inspect_payloads"](raw_xml="<interfaces><broken></interfaces>")
+        self.assertEqual(bad_xml_res, {"ok": False, "error": "invalid_xml"})
 
         a6_lesson = data["lessons"]["auto_06"]
         a6_s = json.dumps(a6_lesson, ensure_ascii=False)
@@ -554,13 +587,18 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("406 Not Acceptable", a6_s)
         self.assertIn("429 Too Many Requests", a6_s)
         self.assertIn("Retry-After", a6_s)
+        self.assertIn("allow_redirects=False", a6_s)
+        self.assertIn("لزوماً اثبات نمی‌کند هویت کاربر تایید شده", a6_s)
         self.assertEqual(a6_lesson["bridge"]["nextId"], "auto_07")
         m_a6_py = re.search(r"```python\n([\s\S]+?)\n```", a6_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a6_py, "auto_06 runnable python block missing")
         ns_a6: dict = {}
         exec(compile(m_a6_py.group(1), "rest_client_safe.py", "exec"), ns_a6)
+        import http.server
         import io
+        import threading
         import urllib.error
+        import urllib.request
 
         class FakeResp:
             def __init__(self, status: int, body: bytes) -> None:
@@ -574,22 +612,63 @@ class AcademyRedesignTests(unittest.TestCase):
                 return False
 
         self.assertEqual(
-            ns_a6["fetch_vlans_safely"](lambda req, timeout: FakeResp(200, b'{"vlans":[106]}'), "https://10.255.0.1/vlans", "tok"),
+            ns_a6["fetch_vlans_safely"]("https://10.255.0.1/vlans", "tok", opener=lambda req, timeout: FakeResp(200, b'{"vlans":[106]}')),
             {"ok": True, "status": 200, "data": {"vlans": [106]}},
         )
+        # Non-HTTPS URL must be rejected before any opener call
+        with self.assertRaises(ValueError):
+            ns_a6["fetch_vlans_safely"]("http://10.255.0.1/vlans", "tok")
+
         for code, reason in [(401, "auth_failed"), (403, "forbidden"), (429, "rate_limited:12")]:
             def _err_opener(req, timeout, _code=code):
                 raise urllib.error.HTTPError(req.full_url, _code, "err", {"Retry-After": "12"}, io.BytesIO(b""))
             self.assertEqual(
-                ns_a6["fetch_vlans_safely"](_err_opener, "https://10.255.0.1/vlans", "tok"),
+                ns_a6["fetch_vlans_safely"]("https://10.255.0.1/vlans", "tok", opener=_err_opener),
                 {"ok": False, "status": code, "reason": reason},
             )
+
+        # Redirect regression test: real urllib redirect pipeline with _NoRedirectHandler MUST block 302 to HTTP target without sending Authorization
+        steal_hits = []
+
+        class StealTrapHandler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                steal_hits.append(dict(self.headers))
+                self.send_response(200)
+                self.end_headers()
+            def log_message(self, *args):
+                pass
+
+        trap_srv = http.server.HTTPServer(("127.0.0.1", 0), StealTrapHandler)
+        trap_port = trap_srv.server_address[1]
+        trap_thread = threading.Thread(target=trap_srv.serve_forever, daemon=True)
+        trap_thread.start()
+        try:
+            import email.message
+            hdrs = email.message.Message()
+            hdrs["Location"] = f"http://127.0.0.1:{trap_port}/steal"
+
+            class FakeHttpsRedirectTransport(urllib.request.HTTPSHandler):
+                def https_open(self, req):
+                    resp = urllib.request.addinfourl(io.BytesIO(b""), hdrs, req.full_url, code=302)
+                    resp.msg = "Found"
+                    return resp
+
+            safe_redirect_opener = urllib.request.build_opener(FakeHttpsRedirectTransport(), ns_a6["_NoRedirectHandler"]()).open
+            redir_res = ns_a6["fetch_vlans_safely"]("https://10.255.0.1/vlans", "secret-token", opener=safe_redirect_opener)
+            self.assertEqual(redir_res, {"ok": False, "status": 302, "reason": "redirect_blocked"})
+            self.assertEqual(steal_hits, [], "Token leaked across redirect!")
+        finally:
+            trap_srv.shutdown()
+            trap_srv.server_close()
 
         a7_lesson = data["lessons"]["auto_07"]
         a7_s = json.dumps(a7_lesson, ensure_ascii=False)
         self.assertIn("HTTP/3", a7_s)
         self.assertIn("QUIC", a7_s)
         self.assertIn("TLS 1.3", a7_s)
+        self.assertIn("PSK-only", a7_s)
+        self.assertIn("psk_ke", a7_s)
+        self.assertIn("Anti-Replay", a7_s)
         self.assertIn("0-RTT", a7_s)
         self.assertIn("SAN", a7_s)
         self.assertIn("mTLS", a7_s)
@@ -599,13 +678,31 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIsNotNone(m_a7_py, "auto_07 runnable python block missing")
         ns_a7: dict = {}
         exec(compile(m_a7_py.group(1), "jwt_verify_lab.py", "exec"), ns_a7)
-        tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "role": "viewer"}, b"top-secret")
-        self.assertEqual(ns_a7["verify_hs256_jwt"](tok, b"top-secret"), {"sub": "netops", "role": "viewer"})
-        hdr_b64, pld_b64, sig_b64 = tok.split(".")
-        tampered_pld = ns_a7["_b64u_enc"](b'{"sub":"netops","role":"admin"}')
-        self.assertIsNone(ns_a7["verify_hs256_jwt"](f"{hdr_b64}.{tampered_pld}.{sig_b64}", b"top-secret"))
+        valid_tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "role": "viewer", "iss": "fam-auth", "aud": "net-api", "exp": 2000000000}, b"top-secret")
+        self.assertEqual(
+            ns_a7["verify_hs256_jwt"](valid_tok, b"top-secret", expected_iss="fam-auth", expected_aud="net-api", now=1900000000),
+            {"ok": True, "claims": {"sub": "netops", "role": "viewer", "iss": "fam-auth", "aud": "net-api", "exp": 2000000000}},
+        )
+        # Expired token (exp: 1) MUST be rejected
+        expired_tok = ns_a7["create_hs256_jwt"]({"sub": "netops", "exp": 1, "iss": "fam-auth", "aud": "net-api"}, b"top-secret")
+        self.assertEqual(ns_a7["verify_hs256_jwt"](expired_tok, b"top-secret", expected_iss="fam-auth", expected_aud="net-api", now=100), {"ok": False, "error": "token_expired"})
+        # Missing exp MUST be rejected
+        no_exp_tok = ns_a7["create_hs256_jwt"]({"sub": "netops"}, b"top-secret")
+        self.assertEqual(ns_a7["verify_hs256_jwt"](no_exp_tok, b"top-secret", now=100), {"ok": False, "error": "missing_or_invalid_exp"})
+        # Wrong audience / issuer MUST be rejected
+        self.assertEqual(ns_a7["verify_hs256_jwt"](valid_tok, b"top-secret", expected_aud="wrong-api", now=1900000000), {"ok": False, "error": "invalid_aud"})
+        self.assertEqual(ns_a7["verify_hs256_jwt"](valid_tok, b"top-secret", expected_iss="wrong-iss", now=1900000000), {"ok": False, "error": "invalid_iss"})
+        # Tampered payload & alg=none MUST be rejected
+        hdr_b64, pld_b64, sig_b64 = valid_tok.split(".")
+        tampered_pld = ns_a7["_b64u_enc"](b'{"sub":"netops","role":"admin","exp":2000000000}')
+        self.assertEqual(ns_a7["verify_hs256_jwt"](f"{hdr_b64}.{tampered_pld}.{sig_b64}", b"top-secret", now=1900000000), {"ok": False, "error": "invalid_signature"})
         none_hdr = ns_a7["_b64u_enc"](b'{"alg":"none","typ":"JWT"}')
-        self.assertIsNone(ns_a7["verify_hs256_jwt"](f"{none_hdr}.{tampered_pld}.", b"top-secret"))
+        self.assertEqual(ns_a7["verify_hs256_jwt"](f"{none_hdr}.{tampered_pld}.{sig_b64}", b"top-secret", now=1900000000), {"ok": False, "error": "unsupported_alg"})
+        # Malformed inputs MUST return controlled error without raising JSONDecodeError
+        not_json = ns_a7["_b64u_enc"](b"{bad-json")
+        list_json = ns_a7["_b64u_enc"](b"[1,2,3]")
+        for bad_tok in ("not-a-jwt", "a.b", "a..c", "!!!.@@@.###", f"{not_json}.{not_json}.{not_json}", f"{list_json}.{list_json}.{not_json}", 12345):
+            self.assertEqual(ns_a7["verify_hs256_jwt"](bad_tok, b"top-secret", now=100), {"ok": False, "error": "malformed_token"}, bad_tok)
 
         a8_lesson = data["lessons"]["auto_08"]
         a8_s = json.dumps(a8_lesson, ensure_ascii=False)
@@ -614,18 +711,51 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("Chunked Framing", a8_s)
         self.assertIn("confirmed-commit", a8_s)
         self.assertIn("hostkey_verify=True", a8_s)
+        self.assertIn("Shared", a8_s)
+        self.assertIn("persist", a8_s)
         self.assertEqual(a8_lesson["bridge"]["nextId"], "auto_09")
         m_a8_py = re.search(r"```python\n([\s\S]+?)\n```", a8_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a8_py, "auto_08 runnable python block missing")
         ns_a8: dict = {}
         exec(compile(m_a8_py.group(1), "netconf_rpc_lab.py", "exec"), ns_a8)
-        rpc_xml = ns_a8["build_edit_config_rpc"]("101", "candidate", "Gi0/7", "NETCONF-CLIENT")
-        self.assertIn('xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"', rpc_xml)
-        self.assertIn("<candidate/>", rpc_xml)
-        ok_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><ok/></rpc-reply>')
-        self.assertEqual(ok_res, {"ok": True, "msg_id": "101"})
-        err_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><rpc-error><error-tag>lock-denied</error-tag><error-message>Locked by 9</error-message></rpc-error></rpc-reply>')
+        import xml.etree.ElementTree as ET
+        # XML builder MUST escape '&' and tag-like text cleanly without ParseError or XML injection
+        tricky_desc = "R&D </description><evil/>"
+        cfg_payload = ns_a8["build_ncclient_config_payload"]("Gi0/7", tricky_desc)
+        cfg_root = ET.fromstring(cfg_payload)
+        self.assertTrue(cfg_root.tag.endswith("}config"))
+        self.assertIsNone(cfg_root.find(".//evil"))
+        self.assertEqual(cfg_root.findtext(".//{urn:ietf:params:xml:ns:yang:ietf-interfaces}description"), tricky_desc)
+
+        rpc_xml = ns_a8["build_edit_config_rpc"]("101", "candidate", "Gi0/7", tricky_desc)
+        rpc_root = ET.fromstring(rpc_xml)
+        self.assertTrue(rpc_root.tag.endswith("}rpc"))
+        self.assertEqual(rpc_root.attrib.get("message-id"), "101")
+        self.assertEqual(rpc_root.findtext(".//{urn:ietf:params:xml:ns:yang:ietf-interfaces}description"), tricky_desc)
+
+        # Simulate ncclient.edit_config expecting <config> root (and rejecting full <rpc>)
+        class MockNcSession:
+            def edit_config(self, target: str, config: str):
+                root = ET.fromstring(config)
+                if not root.tag.endswith("}config"):
+                    raise ValueError("ncclient.edit_config expects <config> root, not <rpc>")
+                return '<rpc-reply message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><ok/></rpc-reply>'
+
+        mock_nc = MockNcSession()
+        nc_reply = mock_nc.edit_config(target="candidate", config=cfg_payload)
+        self.assertEqual(ns_a8["parse_rpc_reply"](nc_reply, "101"), {"ok": True, "msg_id": "101"})
+        with self.assertRaises(ValueError):
+            mock_nc.edit_config(target="candidate", config=rpc_xml)
+
+        # Mismatched message-id MUST fail!
+        mismatch_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="999" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><ok/></rpc-reply>', "101")
+        self.assertEqual(mismatch_res["ok"], False)
+        self.assertEqual(mismatch_res["error_tag"], "mismatched-message-id")
+
+        err_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><rpc-error><error-tag>lock-denied</error-tag><error-message>Locked by 9</error-message></rpc-error></rpc-reply>', "102")
         self.assertEqual(err_res, {"ok": False, "error_tag": "lock-denied", "error_message": "Locked by 9"})
+        mal_res = ns_a8["parse_rpc_reply"]("<rpc-reply><broken>", "102")
+        self.assertEqual(mal_res["error_tag"], "malformed-xml")
 
         gw_s = json.dumps(gw_lesson, ensure_ascii=False)
         self.assertIn("قطعه‌پیکربندی مرجع مفهومی", gw_lesson["lab"]["steps"][4])
@@ -1112,11 +1242,19 @@ if (findNodes(liXss, n => n.tagName === 'SCRIPT' || n.tagName === 'IMG').length 
 
         if shutil.which("bash") and shutil.which("git"):
             with tempfile.TemporaryDirectory() as tmpd:
-                sh_res = subprocess.run(["bash", "-e", "-c", rendered_payload["auto_04"]], cwd=tmpd, capture_output=True, text=True, check=False)
+                sh_env = dict(os.environ, TMPDIR=tmpd)
+                sh_res = subprocess.run(["bash", "-e", "-c", rendered_payload["auto_04"]], cwd=tmpd, env=sh_env, capture_output=True, text=True, check=False)
                 self.assertEqual(sh_res.returncode, 0, sh_res.stderr + sh_res.stdout)
 
+        ns_dom_b5: dict = {}
         for lid in ("auto_05", "auto_06", "auto_07", "auto_08"):
-            compile(rendered_payload[lid], f"rendered_{lid}.py", "exec")
+            ns_dom_b5[lid] = {}
+            exec(compile(rendered_payload[lid], f"rendered_{lid}.py", "exec"), ns_dom_b5[lid])
+        self.assertTrue(ns_dom_b5["auto_05"]["inspect_payloads"]()["ok"])
+        with self.assertRaises(ValueError):
+            ns_dom_b5["auto_06"]["fetch_vlans_safely"]("http://10.255.0.1/vlans", "tok")
+        self.assertEqual(ns_dom_b5["auto_07"]["verify_hs256_jwt"]("bad.token", b"k")["error"], "malformed_token")
+        self.assertIn("R&amp;D", ns_dom_b5["auto_08"]["build_ncclient_config_payload"]("Gi0/7", "R&D"))
 
 
 if __name__ == "__main__":
