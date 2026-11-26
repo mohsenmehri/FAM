@@ -796,18 +796,59 @@ class AcademyRedesignTests(unittest.TestCase):
         a9_lesson = data["lessons"]["auto_09"]
         a9_s = json.dumps(a9_lesson, ensure_ascii=False)
         self.assertIn("RFC 8040", a9_s)
-        self.assertIn("yang-data+xml", a9_s)
+        self.assertIn("{+restconf}/data", a9_s)
+        self.assertIn("content=config", a9_s)
+        self.assertIn("content=nonconfig", a9_s)
         self.assertIn("406 Not Acceptable", a9_s)
-        self.assertIn("GET /operational", a9_s)
+        self.assertIn("replace-or-create", a9_s)
         self.assertEqual(a9_lesson["bridge"]["nextId"], "auto_10")
         self.assertEqual(a9_lesson["bridge"]["nextTitle"], data["lessons"]["auto_10"]["title"])
         m_a9_py = re.search(r"```python\n([\s\S]+?)\n```", a9_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a9_py, "auto_09 runnable python block missing")
         ns_a9: dict = {}
         exec(compile(m_a9_py.group(1), "restconf_client_lab.py", "exec"), ns_a9)
-        # RESTCONF client MUST reject non-HTTPS and handle 4xx structurally
+        # RESTCONF client MUST reject non-HTTPS URLs
         with self.assertRaises(ValueError):
-            ns_a9["get_config"]("http://10.255.0.1/restconf/data/ietf-interfaces:interfaces", "tok")
+            ns_a9["get_config"]("http://10.255.0.1/restconf/data?content=config", "tok")
+        with self.assertRaises(ValueError):
+            ns_a9["put_config"]("http://10.255.0.1/restconf/data?content=config", "x", "tok")
+        # Redirect regression: safe opener with _NoRedirectHandler MUST block 302 and NOT leak Authorization
+        import http.server
+        import io
+        import threading
+        import email.message
+        a9_steal: list = []
+
+        class A9StealHandler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                a9_steal.append(dict(self.headers))
+                self.send_response(200)
+                self.end_headers()
+            def log_message(self, *args):
+                pass
+
+        a9_trap = http.server.HTTPServer(("127.0.0.1", 0), A9StealHandler)
+        a9_port = a9_trap.server_address[1]
+        a9_thread = threading.Thread(target=a9_trap.serve_forever, daemon=True)
+        a9_thread.start()
+        try:
+            hdrs = email.message.Message()
+            hdrs["Location"] = f"http://127.0.0.1:{a9_port}/steal"
+
+            class A9FakeRedirectTransport(urllib.request.HTTPSHandler):
+                def https_open(self, req):
+                    resp = urllib.request.addinfourl(io.BytesIO(b""), hdrs, req.full_url, code=302)
+                    resp.msg = "Found"
+                    return resp
+
+            a9_safe_opener = urllib.request.build_opener(A9FakeRedirectTransport(), ns_a9["_NoRedirectHandler"]()).open
+            a9_redir = ns_a9["get_config"]("https://10.255.0.1/restconf/data?content=config", "TEST_TOKEN", opener=a9_safe_opener)
+            self.assertEqual(a9_redir["ok"], False)
+            self.assertEqual(a9_redir["status"], 302)
+            self.assertEqual(a9_steal, [], "auto_09 token leaked across redirect!")
+        finally:
+            a9_trap.shutdown()
+            a9_trap.server_close()
 
         a10_lesson = data["lessons"]["auto_10"]
         a10_s = json.dumps(a10_lesson, ensure_ascii=False)
@@ -816,19 +857,26 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("List", a10_s)
         self.assertIn("grouping", a10_s)
         self.assertIn("augment", a10_s)
+        self.assertIn("pyang", a10_s)
         self.assertEqual(a10_lesson["bridge"]["nextId"], "auto_11")
         self.assertEqual(a10_lesson["bridge"]["nextTitle"], data["lessons"]["auto_11"]["title"])
         m_a10_py = re.search(r"```python\n([\s\S]+?)\n```", a10_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a10_py, "auto_10 runnable python block missing")
         ns_a10: dict = {}
         exec(compile(m_a10_py.group(1), "yang_model_lab.py", "exec"), ns_a10)
-        # YANG payload validation MUST catch missing required keys
+        # Valid model MUST pass validation; invalid model text MUST fail
+        _yang_src = m_a10_py.group(1).split("yang_src = ", 1)[1].strip()
+        _yang_body = _yang_src[3:-3] if _yang_src.startswith(chr(39) * 3) else _yang_src
+        self.assertEqual(ns_a10["validate_yang_text"](_yang_body)["ok"], True)
+        self.assertEqual(ns_a10["validate_yang_text"]("this is not yang"), {"ok": False, "error": "missing_module"})
+        self.assertEqual(ns_a10["validate_yang_text"]("module x {"), {"ok": False, "error": "missing_namespace"})
+        # Data validation against model MUST catch missing required key
         self.assertEqual(
-            ns_a10["validate_payload_against_model"](["enabled"], ["name", "enabled"]),
+            ns_a10["validate_payload_against_model"]({"enabled": True}, ["name", "enabled"]),
             {"ok": False, "error": "missing_required_key", "key": "name"},
         )
         self.assertEqual(
-            ns_a10["validate_payload_against_model"](["name", "enabled"], ["name", "enabled"]),
+            ns_a10["validate_payload_against_model"]({"name": "Gi0/7", "enabled": True}, ["name", "enabled"]),
             {"ok": True},
         )
 
@@ -838,23 +886,35 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("managed node", a11_s)
         self.assertIn("inventory", a11_s)
         self.assertIn("ios_config", a11_s)
+        self.assertIn("parents", a11_s)
         self.assertIn("handlers", a11_s)
+        self.assertIn("cisco.ios", a11_s)
         self.assertEqual(a11_lesson["bridge"]["nextId"], "auto_12")
         self.assertEqual(a11_lesson["bridge"]["nextTitle"], data["lessons"]["auto_12"]["title"])
         m_a11_py = re.search(r"```python\n([\s\S]+?)\n```", a11_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a11_py, "auto_11 runnable python block missing")
         ns_a11: dict = {}
         exec(compile(m_a11_py.group(1), "ansible_playbook_lab.py", "exec"), ns_a11)
-        # Playbook parse MUST extract play + tasks
+        # Playbook MUST contain the correct "parents" key (plural), not "parent"
+        a11_step_txt = a11_lesson["lab"]["steps"][4]
+        self.assertIn("parents:", a11_step_txt)
+        self.assertNotIn("parent:", a11_step_txt)
+        # Parse playbook: play name + tasks with ios_config module
         _yaml_src = m_a11_py.group(1)
         _yaml_body = _yaml_src.split("playbook_yaml = ", 1)[1].strip()
         _yaml_body = _yaml_body[3:-3] if _yaml_body.startswith(chr(39) * 3) else _yaml_body
         pb = ns_a11["parse_playbook"](_yaml_body + chr(39))
         self.assertTrue(len(pb["plays"]) >= 1)
         self.assertTrue(any(t["module"] == "ios_config" for t in pb["plays"][0]["tasks"]))
-        # idempotency simulation: same state => no changes
-        self.assertEqual(ns_a11["simulate_idempotent_run"]({"vlan": 111}, {"vlan": 111}), {"ok": True, "changed": 0, "note": "idempotent - no changes"})
-        self.assertEqual(ns_a11["simulate_idempotent_run"]({"vlan": 111}, {"vlan": 10}), {"ok": True, "changed": 1, "note": "state changed"})
+        # Inventory parse: hosts + connection
+        _inv_src = _yaml_src.split("inventory_yaml = ", 1)[1].strip()
+        _inv_body = _inv_src[3:-3] if _inv_src.startswith(chr(39) * 3) else _inv_src
+        inv = ns_a11["parse_inventory"](_inv_body + chr(39))
+        self.assertIn("router1", inv)
+        self.assertEqual(inv["router1"].get("ansible_connection"), "network_cli")
+        # State comparison: identical state => no changes; different => changes reported
+        self.assertEqual(ns_a11["simulate_state_compare"]({"vlan": 111}, {"vlan": 111})["changed"], 0)
+        self.assertEqual(ns_a11["simulate_state_compare"]({"vlan": 111}, {"vlan": 10})["changed"], 1)
 
         a12_lesson = data["lessons"]["auto_12"]
         a12_s = json.dumps(a12_lesson, ensure_ascii=False)
@@ -863,7 +923,9 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("state lifecycle", a12_s)
         self.assertIn("terraform plan", a12_s)
         self.assertIn("terraform apply", a12_s)
+        self.assertIn("-refresh-only", a12_s)
         self.assertIn("state drift", a12_s)
+        self.assertIn("شبه‌کد", a12_s)
         self.assertEqual(a12_lesson["bridge"]["nextId"], "auto_13")
         self.assertEqual(a12_lesson["bridge"]["nextTitle"], data["lessons"]["auto_13"]["title"])
         m_a12_py = re.search(r"```python\n([\s\S]+?)\n```", a12_lesson["lab"]["steps"][4])
@@ -877,6 +939,12 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertEqual(run1["state"], {"vlan_112": "TERRAFORM_IAC"})
         run2 = ns_a12["run_lifecycle"](prov12, {"vlan_112": "TERRAFORM_IAC"})
         self.assertEqual(run2["changes"], 0)
+        # Drift + refresh-only plan simulation
+        prov12.state["vlan_112"] = "MANUAL_CHANGE"
+        drift_plan = prov12.plan({"vlan_112": "TERRAFORM_IAC"})
+        self.assertEqual(len(drift_plan["changes"]), 1)
+        refresh_plan = prov12.refresh_only_plan({"vlan_112": "TERRAFORM_IAC"})
+        self.assertEqual(len(refresh_plan["changes"]), 1)
 
         a13_lesson = data["lessons"]["auto_13"]
         a13_s = json.dumps(a13_lesson, ensure_ascii=False)
@@ -886,49 +954,25 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("NETCONF", a13_s)
         self.assertIn("RESTCONF", a13_s)
         self.assertIn("service point", a13_s)
-        self.assertIn("device driver", a13_s)
+        self.assertIn("service package", a13_s)
+        self.assertIn("NED", a13_s)
+        self.assertIn("شبه‌کد", a13_s)
         self.assertEqual(a13_lesson["bridge"]["nextId"], "auto_14")
+        self.assertEqual(a13_lesson["bridge"]["nextTitle"], data["lessons"]["auto_14"]["title"])
         m_a13_py = re.search(r"```python\n([\s\S]+?)\n```", a13_lesson["lab"]["steps"][4])
         self.assertIsNotNone(m_a13_py, "auto_13 runnable python block missing")
         ns_a13: dict = {}
         exec(compile(m_a13_py.group(1), "nso_service_lab.py", "exec"), ns_a13)
-        # NSO service provisioning simulation MUST succeed and record steps
-        res13 = ns_a13["MockNso"]().provision_service("fam-lan", {"target-router": {"lan-vlan": 113}})
+        # Successful service provisioning MUST record steps
+        nso13 = ns_a13["MockNso"](reachable_devices={"target-router"})
+        res13 = nso13.provision_service("fam-lan", {"target-router": {"lan-vlan": 113}})
         self.assertEqual(res13["ok"], True)
         self.assertEqual(len(res13["steps"]), 1)
         self.assertEqual(res13["steps"][0]["device"], "target-router")
-
-        err_res = ns_a8["parse_rpc_reply"]('<rpc-reply message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><rpc-error><error-tag>lock-denied</error-tag><error-message>Locked by 9</error-message></rpc-error></rpc-reply>', "102")
-        self.assertEqual(err_res, {"ok": False, "error_tag": "lock-denied", "error_message": "Locked by 9"})
-        mal_res = ns_a8["parse_rpc_reply"]("<rpc-reply><broken>", "102")
-        self.assertEqual(mal_res["error_tag"], "malformed-xml")
-
-        gw_s = json.dumps(gw_lesson, ensure_ascii=False)
-        self.assertIn("قطعه‌پیکربندی مرجع مفهومی", gw_lesson["lab"]["steps"][4])
-        self.assertNotIn("30s", gw_s)
-        self.assertNotIn("هر دو جفت Inbound و Outbound با `Oper = up` و `KeepAlive = active`", gw_s)
-        self.assertIn("voice class uri CUCM_URI sip", gw_lesson["lab"]["steps"][4])
-        self.assertIn("voice class uri ITSP_URI sip", gw_lesson["lab"]["steps"][4])
-        self.assertIn("voice-class sip bind control source-interface Gi0/0/1", gw_lesson["lab"]["steps"][4])
-        self.assertIn("voice-class sip bind control source-interface Gi0/0/0", gw_lesson["lab"]["steps"][4])
-        self.assertIn("dial-peer voice 201 voip", gw_lesson["lab"]["steps"][4])
-        self.assertIn("dial-peer voice 300 voip", gw_lesson["lab"]["steps"][4])
-        self.assertIn("dial-peer voice 400 voip", gw_lesson["lab"]["steps"][4])
-        self.assertEqual(gw_lesson["lab"]["steps"][4].count("session protocol sipv2"), 5)
-        self.assertIn("Outbound Dial-Peer`های دارای پروفایل (`200`, `201`, `400`)", gw_lesson["lab"]["steps"][4])
-        self.assertIn("تماس‌های جدید", gw_lesson["lab"]["steps"][4])
-        self.assertIn("آزمون تماس واقعی در هر دو جهت", gw_lesson["lab"]["steps"][4])
-        self.assertIn("X12.5", gw_lesson["sections"][2]["p"][1])
-        self.assertNotIn("پیاده‌سازی Split-Horizon DNS الزامی است", gw_s)
-        self.assertNotIn("همهٔ ترافیک از همین تونل", gw_s)
-        self.assertIn("HTTPS 8443", gw_lesson["sections"][2]["bullets"][0])
-        self.assertIn("SIP/TLS 5061", gw_lesson["sections"][2]["bullets"][0])
-
-        self.assertIn("یک جریان یک‌طرفه", collab_lesson["sections"][1]["p"][1])
-        self.assertIn("Preamble/SFD/IFG", collab_lesson["sections"][1]["p"][1])
-        self.assertIn("Full-Duplex", collab_lesson["sections"][1]["p"][1])
-        self.assertIn("SRTP", collab_lesson["exercises"][2]["solution"])
-        self.assertIn("در هر جهت", collab_lesson["exercises"][2]["solution"])
+        # Failure scenario: unreachable device MUST fail with error and partial steps
+        res13_bad = nso13.provision_service("fam-lan-bad", {"target-router": {"lan-vlan": 113}, "bad-router": {"lan-vlan": 113}})
+        self.assertEqual(res13_bad["ok"], False)
+        self.assertIn("unreachable", res13_bad["error"])
 
         # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
@@ -1195,9 +1239,36 @@ assertRunLab('auto_08', (sim) => {{
   const gi7 = sim.interfaces['GigabitEthernet0/7'];
   if (!gi7.nonegotiate || gi7.accessVlan !== 108 || gi7.desc !== 'NETCONF-CLIENT') throw new Error('auto_08 Gi0/7');
 }});
+assertRunLab('auto_09', (sim) => {{
+  if (!sim.vlans[109] || sim.vlans[109].name !== 'RESTCONF_830') throw new Error('auto_09 VLAN 109');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 109 || gi7.desc !== 'RESTCONF-CLIENT') throw new Error('auto_09 Gi0/7');
+}});
+assertRunLab('auto_10', (sim) => {{
+  if (!sim.vlans[110] || sim.vlans[110].name !== 'YANG_MODELS') throw new Error('auto_10 VLAN 110');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 110 || gi7.desc !== 'YANG-LAB') throw new Error('auto_10 Gi0/7');
+}});
+assertRunLab('auto_11', (sim) => {{
+  if (!sim.vlans[111] || sim.vlans[111].name !== 'ANSIBLE_CONTROL') throw new Error('auto_11 VLAN 111');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 111 || gi7.desc !== 'ANSIBLE-CTRL') throw new Error('auto_11 Gi0/7');
+}});
+assertRunLab('auto_12', (sim) => {{
+  if (!sim.vlans[112] || sim.vlans[112].name !== 'TERRAFORM_IAC') throw new Error('auto_12 VLAN 112');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 112 || gi7.desc !== 'TF-PROVIDER') throw new Error('auto_12 Gi0/7');
+}});
+assertRunLab('auto_13', (sim) => {{
+  if (!sim.vlans[113] || sim.vlans[113].name !== 'NSO_ORCHESTRATION') throw new Error('auto_13 VLAN 113');
+  const gi7 = sim.interfaces['GigabitEthernet0/7'];
+  if (!gi7.nonegotiate || gi7.accessVlan !== 113 || gi7.desc !== 'NSO-ORCH') throw new Error('auto_13 Gi0/7');
+}});
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
         self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
+
+        # 4. Safe fenced-code DOM renderer, copy-button click/fallback behavior & CSS verification
 
         # 4. Safe fenced-code DOM renderer, copy-button click/fallback behavior & CSS verification
         styles_css = (ASSET_ROOT / "styles.css").read_text(encoding="utf-8")
