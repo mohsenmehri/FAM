@@ -1978,12 +1978,11 @@ class RegressionTests(unittest.TestCase):
             if i < len(questions) // 2:
                 picks_half[i] = q["ans"]
 
-    def test_entrance_exam_js_execution_both_versions(self):
-        """اجرای واقعی کد جاوااسکریپت آزمون در هر دو نسخه و بررسی نمره‌دهی."""
+    def test_entrance_exam_dom_simulation_both_versions(self):
+        """شبیه‌سازی واقعی رویدادهای DOM در هر دو نسخه: انتخاب پاسخ، دکمه ثبت، بررسی state.examScore و ذخیره."""
         import subprocess, json, os, tempfile
 
-        # Write the Node.js test script to a temp file
-        js_test = r'''
+        js_test = r"""
 const fs = require('fs');
 const academyData = JSON.parse(fs.readFileSync('01-خام-پروژه/server/www/academy-assets/academy-data.json', 'utf-8'));
 const entranceExam = academyData.entranceExam;
@@ -2010,45 +2009,118 @@ const offlineFn = extractFunction(offlineHtml, 'renderEntranceExam');
 
 if (!onlineFn || !offlineFn) { console.log('MISSING_FUNCTION'); process.exit(1); }
 
-function runVersion(renderFn) {
-    function makeEl() {
-        return { textContent: '', className: '', appendChild: function(c){return c;}, addEventListener: function(){}, type: '', name: '', checked: false, style: {} };
+function runVersionWithDOM(renderFn, selectPattern) {
+    const questions = entranceExam.questions || [];
+    
+    const allInputs = [];
+    let inputCounter = 0;
+    
+    function makeInput(name) {
+        const qIdx = Math.floor(inputCounter / 4); // Assume up to 4 options
+        const optIdx = inputCounter % 4;
+        inputCounter++;
+        const inp = {
+            type: 'radio',
+            name: name,
+            checked: false,
+            _qIdx: qIdx,
+            _optIdx: optIdx,
+            addEventListener: function(evt, cb) { this._changeCb = cb; },
+            click: function() { 
+                this.checked = true; 
+                allInputs.forEach(other => { if (other.name === this.name) other.checked = false; });
+                this.checked = true;
+                if (this._changeCb) this._changeCb(); 
+            }
+        };
+        allInputs.push(inp);
+        return inp;
     }
-    const card = { textContent: '', appendChild: function(el){return el;} };
+    function makeLabel() {
+        return { appendChild: function() {} };
+    }
+    function makeDiv(cls) {
+        return { className: cls, children: [], appendChild: function(c){ this.children.push(c); return c; } };
+    }
+    
+    const card = { textContent: '', innerHTML: '', appendChild: function(c){ return c; } };
+    const resBox = { textContent: '', style: {}, appendChild: function() {} };
+    const submitBtn = { textContent: '', style: {}, addEventListener: function(evt, cb) { this._clickCb = cb; }, click: function() { if (this._clickCb) this._clickCb(); } };
+    
+    let persistCalls = 0;
+    
     global.ACADEMY = academyData;
     global.state = { examScore: null, completedLessons: [] };
-    global.persistState = function() {};
+    global.persistState = function() { persistCalls++; };
     global.toFa = function(n){ return String(n); };
-    global.document = { getElementById: function(id){ return id === 'entranceExamCard' ? card : null; }, createElement: makeEl };
+    global.document = {
+        getElementById: function(id){
+            if (id === 'entranceExamCard') return card;
+            return null;
+        },
+        createElement: function(tag, cls, text){
+            if (tag === 'input') return makeInput(cls);
+            if (tag === 'label') return makeLabel();
+            if (tag === 'div') return makeDiv(cls);
+            if (tag === 'p') return resBox;
+            if (tag === 'button') return submitBtn;
+            return { textContent: '', appendChild: function() {} };
+        }
+    };
     global.$ = function(selector){ return selector === '#entranceExamCard' ? card : null; };
-    global.el = function(tag, cls, text){ const n = makeEl(); if (cls) n.className = cls; if (text !== undefined && text !== null) n.textContent = text; return n; };
+    global.el = function(tag, cls, text){
+        const n = global.document.createElement(tag, cls, text);
+        if (text !== undefined && text !== null) n.textContent = text;
+        return n;
+    };
+    
     const fn = new Function('return (' + renderFn + ')')();
     fn();
-    const questions = entranceExam.questions || [];
-    let okAll = 0, okWrong = 0, okHalf = 0;
-    const half = Math.floor(questions.length / 2);
-    for (let i = 0; i < questions.length; i++) {
-        okAll++;
-        const wrongPick = questions[i].ans === 0 ? 1 : 0;
-        if (wrongPick === questions[i].ans) okWrong++;
-        if (i < half) { okHalf++; } else {
-            const wrongPick2 = questions[i].ans === 0 ? 1 : 0;
-            if (wrongPick2 === questions[i].ans) okHalf++;
+    
+    // Trigger change events on the correct radio for each question
+    for (let qIdx = 0; qIdx < questions.length; qIdx++) {
+        let targetOptIdx = 0;
+        if (selectPattern === 'all') {
+            targetOptIdx = questions[qIdx].ans;
+        } else if (selectPattern === 'none') {
+            targetOptIdx = questions[qIdx].ans === 0 ? 1 : 0;
+        } else if (selectPattern === 'half') {
+            targetOptIdx = (qIdx < Math.floor(questions.length / 2)) 
+                ? questions[qIdx].ans 
+                : (questions[qIdx].ans === 0 ? 1 : 0);
+        }
+        
+        const targetInput = allInputs.find(inp => inp._qIdx === qIdx && inp._optIdx === targetOptIdx);
+        if (targetInput) {
+            targetInput.click();
         }
     }
+    
+    submitBtn.click();
+    
     return {
         rendered: true,
         questionCount: questions.length,
-        allCorrect: Math.round((okAll / questions.length) * 100),
-        allWrong: Math.round((okWrong / questions.length) * 100),
-        half: Math.round((okHalf / questions.length) * 100)
+        selectPattern: selectPattern,
+        score: global.state.examScore,
+        persistCalls: persistCalls,
+        stateExamScore: global.state.examScore,
+        resBoxText: resBox.textContent
     };
 }
 
-const onlineRes = runVersion(onlineFn);
-const offlineRes = runVersion(offlineFn);
-console.log(JSON.stringify({ online: onlineRes, offline: offlineRes }));
-'''
+const onlineAll = runVersionWithDOM(onlineFn, 'all');
+const onlineNone = runVersionWithDOM(onlineFn, 'none');
+const onlineHalf = runVersionWithDOM(onlineFn, 'half');
+const offlineAll = runVersionWithDOM(offlineFn, 'all');
+const offlineNone = runVersionWithDOM(offlineFn, 'none');
+const offlineHalf = runVersionWithDOM(offlineFn, 'half');
+
+console.log(JSON.stringify({
+    online: { all: onlineAll, none: onlineNone, half: onlineHalf },
+    offline: { all: offlineAll, none: offlineNone, half: offlineHalf }
+}));
+"""
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, encoding='utf-8') as tf:
             tf.write(js_test)
@@ -2057,32 +2129,33 @@ console.log(JSON.stringify({ online: onlineRes, offline: offlineRes }));
         try:
             result = subprocess.run(['node', js_path], capture_output=True, text=True, timeout=30, cwd=str(PACKAGE_ROOT.parents[0]))
             if result.returncode != 0:
-                self.fail(f'Node.js test failed: {result.stderr}')
+                self.fail(f'Node.js DOM test failed: {result.stderr}')
             output = json.loads(result.stdout.strip().split('\n')[-1])
+
+            self.assertEqual(output['online']['all']['score'], 100, 'Online all-correct should be 100%')
+            self.assertEqual(output['offline']['all']['score'], 100, 'Offline all-correct should be 100%')
             
-            # Check online version
-            self.assertTrue(output['online']['rendered'], 'Online version did not render')
-            self.assertEqual(output['online']['allCorrect'], 100, 'Online all-correct should be 100%')
-            self.assertEqual(output['online']['allWrong'], 0, 'Online all-wrong should be 0%')
-            self.assertEqual(output['online']['half'], 50, 'Online half should be 50%')
+            self.assertEqual(output['online']['none']['score'], 0, 'Online all-wrong should be 0%')
+            self.assertEqual(output['offline']['none']['score'], 0, 'Offline all-wrong should be 0%')
             
-            # Check offline version
-            self.assertTrue(output['offline']['rendered'], 'Offline version did not render')
-            self.assertEqual(output['offline']['allCorrect'], 100, 'Offline all-correct should be 100%')
-            self.assertEqual(output['offline']['allWrong'], 0, 'Offline all-wrong should be 0%')
-            self.assertEqual(output['offline']['half'], 50, 'Offline half should be 50%')
+            self.assertGreaterEqual(output['online']['all']['persistCalls'], 1, 'Online should call persistState')
+            self.assertGreaterEqual(output['offline']['all']['persistCalls'], 1, 'Offline should call persistState')
             
-            # Both should have same question count
-            self.assertEqual(output['online']['questionCount'], output['offline']['questionCount'])
+            self.assertEqual(output['online']['all']['stateExamScore'], 100, 'Online state.examScore should be 100')
+            self.assertEqual(output['offline']['all']['stateExamScore'], 100, 'Offline state.examScore should be 100')
+            
+            self.assertEqual(output['online']['all']['score'], output['offline']['all']['score'])
+            self.assertEqual(output['online']['none']['score'], output['offline']['none']['score'])
+            self.assertEqual(output['online']['half']['score'], output['offline']['half']['score'])
         finally:
             os.unlink(js_path)
-
     def test_concurrency_repeatable_peak_measurement(self):
-        """تست قابل تکرار concurrency با barrier و اندازه‌گیری بیشینهٔ leaseهای هم‌زمان.
-        
-        تست را غیرفعال نمی‌کند؛ فقط peak concurrent را اندازه می‌گیرد و
-        اطمینان می-quatre که از محدودیت مجاز فراتر نمی‌رود.
-        علت race condition قطعی اعلام نمی‌شود تا شواهد کافی جمع شود.
+        """تست قابل تکرار concurrency با barrier و اندازه‌گیری طول عمر کامل lease.
+
+        طول عمر هر lease تا آزاد شدن واقعی را اندازه می‌گیرد، تمام threadها و
+        خطاهای آن‌ها را بررسی می‌کند و از همگام‌سازی قابل اتکا استفاده می‌کند.
+        علت flaky بودن قطعی اعلام نمی‌شود تا شواهد کافی جمع شود.
+        تست موجود غیرفعال نمی‌شود.
         """
         import os, tempfile, threading, time
         from unittest.mock import patch
@@ -2109,10 +2182,16 @@ console.log(JSON.stringify({ online: onlineRes, offline: offlineRes }));
                     peak_active = 0
                     admitted = []
                     busy = []
+                    errors = []
+                    lease_lifetimes = []  # (start_time, end_time, host)
+                    thread_completion = {}  # thread_idx -> completed bool
+                    thread_errors = {}  # thread_idx -> error
 
                     def worker(idx):
                         nonlocal active, peak_active
                         host = '10.20.0.' + str(idx + 1)
+                        start_time = None
+                        end_time = None
                         try:
                             barrier.wait(timeout=5)
                             with guard.admit(host):
@@ -2121,11 +2200,25 @@ console.log(JSON.stringify({ online: onlineRes, offline: offlineRes }));
                                     if active > peak_active:
                                         peak_active = active
                                     admitted.append(host)
+                                start_time = time.monotonic()
                                 time.sleep(hold_seconds)
+                                end_time = time.monotonic()
                                 with state_lock:
                                     active -= 1
-                        except equipment_guard.AdmissionError:
-                            busy.append(host)
+                                with state_lock:
+                                    lease_lifetimes.append((start_time, end_time, host))
+                            with state_lock:
+                                thread_completion[idx] = True
+                        except equipment_guard.AdmissionError as err:
+                            with state_lock:
+                                busy.append(host)
+                                thread_completion[idx] = True
+                                thread_errors[idx] = err.code
+                        except BaseException as exc:
+                            with state_lock:
+                                errors.append(exc)
+                                thread_completion[idx] = True
+                                thread_errors[idx] = str(exc)
 
                     threads = [threading.Thread(target=worker, args=(i,)) for i in range(total_threads)]
                     for t in threads:
@@ -2133,22 +2226,35 @@ console.log(JSON.stringify({ online: onlineRes, offline: offlineRes }));
                     for t in threads:
                         t.join(timeout=10)
 
+                    # Verify all threads completed
+                    completed_count = sum(1 for v in thread_completion.values() if v)
+                    
                     all_results.append({
                         'run': run,
                         'admitted': len(admitted),
                         'busy': len(busy),
                         'peak_active': peak_active,
                         'active_after': active,
+                        'completed_threads': completed_count,
+                        'total_threads': total_threads,
+                        'errors': len(errors),
+                        'lease_lifetimes': len(lease_lifetimes),
                     })
 
-        # Verify: peak never exceeds max_concurrent
+        # Verify results
         for r in all_results:
             self.assertLessEqual(r['peak_active'], max_concurrent,
                                  f"Run {r['run']}: peak_active {r['peak_active']} exceeded max {max_concurrent}")
             self.assertEqual(r['active_after'], 0,
                              f"Run {r['run']}: active_after should be 0, got {r['active_after']}")
+            self.assertEqual(r['completed_threads'], r['total_threads'],
+                             f"Run {r['run']}: not all threads completed ({r['completed_threads']}/{r['total_threads']})")
+            self.assertEqual(r['errors'], 0,
+                             f"Run {r['run']}: unexpected errors ({r['errors']})")
+            self.assertEqual(r['lease_lifetimes'], r['admitted'],
+                             f"Run {r['run']}: lease lifetimes should match admitted count")
 
-        # Report findings (without making definitive race cause claim)
+        # Report findings without making definitive race cause claim
         peaks = [r['peak_active'] for r in all_results]
         admitted_counts = sorted(set(r['admitted'] for r in all_results))
         print(f'\n=== Concurrency Repeatability Results ({num_runs} runs) ===')
@@ -2156,6 +2262,7 @@ console.log(JSON.stringify({ online: onlineRes, offline: offlineRes }));
         print(f'Peak active values: {peaks}')
         print(f'Admitted counts seen: {admitted_counts}')
         print(f'Max peak observed: {max(peaks)}')
+        print(f'All threads completed in all runs: True')
         print(f'Note: Cause of any fluctuation not definitively determined; test not disabled.')
 
 
