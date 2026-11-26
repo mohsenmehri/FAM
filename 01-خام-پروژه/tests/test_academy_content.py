@@ -408,16 +408,80 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("ssh_strict=True", a3_s)
         self.assertIn("known_hosts", a3_s)
         self.assertIn("system_host_keys", a3_s)
+        self.assertIn("فیلتر محافظه‌کارانه", a3_lesson["sections"][1]["bullets"][1])
         self.assertIn("Post-Check", a3_lesson["sections"][1]["bullets"][1])
-        self.assertIn('if "%" in cfg_out or "Invalid" in cfg_out', a3_lesson["lab"]["steps"][4])
+        m_a3_py = re.search(r"```python\n([\s\S]+?)\n```", a3_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_a3_py, "auto_03 runnable safe_apply.py block missing")
+        ns_a3: dict = {}
+        exec(compile(m_a3_py.group(1), "safe_apply.py", "exec"), ns_a3)
+        apply_ntp_safely = ns_a3["apply_ntp_safely"]
+
+        class MockConn:
+            def __init__(self, cfg_out: str, post_out: str) -> None:
+                self.cfg_out = cfg_out
+                self.post_out = post_out
+                self.saved = 0
+                self.enabled = False
+                self.post_checked = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def enable(self):
+                self.enabled = True
+
+            def send_config_set(self, cmds):
+                return self.cfg_out
+
+            def send_command(self, cmd):
+                self.post_checked += 1
+                return self.post_out
+
+            def save_config(self):
+                self.saved += 1
+
+        seen_kwargs = []
+
+        def make_factory(conn_obj):
+            def factory(**kwargs):
+                seen_kwargs.append(kwargs)
+                return conn_obj
+            return factory
+
+        c_cli_err = MockConn("% Invalid input detected at '^' marker.", "ntp server 10.255.0.100")
+        self.assertEqual(apply_ntp_safely(make_factory(c_cli_err), {"host": "10.255.0.1"}, "10.255.0.100"), "cli_error")
+        self.assertEqual(c_cli_err.saved, 0)
+        self.assertEqual(c_cli_err.post_checked, 0)
+
+        c_post_fail = MockConn("R1(config)#ntp server 10.255.0.100\nR1(config)#end", "")
+        self.assertEqual(apply_ntp_safely(make_factory(c_post_fail), {"host": "10.255.0.1"}, "10.255.0.100"), "postcheck_failed")
+        self.assertEqual(c_post_fail.saved, 0)
+        self.assertEqual(c_post_fail.post_checked, 1)
+
+        c_ok = MockConn("R1(config)#ntp server 10.255.0.100\nR1(config)#end", "ntp server 10.255.0.100")
+        self.assertEqual(apply_ntp_safely(make_factory(c_ok), {"host": "10.255.0.1"}, "10.255.0.100"), "saved")
+        self.assertEqual(c_ok.saved, 1)
+        self.assertEqual(c_ok.post_checked, 1)
+        self.assertTrue(all(kw.get("ssh_strict") is True and kw.get("system_host_keys") is True for kw in seen_kwargs))
 
         gw_s = json.dumps(gw_lesson, ensure_ascii=False)
+        self.assertIn("قطعه‌پیکربندی مرجع مفهومی", gw_lesson["lab"]["steps"][4])
+        self.assertNotIn("30s", gw_s)
+        self.assertNotIn("هر دو جفت Inbound و Outbound با `Oper = up` و `KeepAlive = active`", gw_s)
         self.assertIn("voice class uri CUCM_URI sip", gw_lesson["lab"]["steps"][4])
         self.assertIn("voice class uri ITSP_URI sip", gw_lesson["lab"]["steps"][4])
+        self.assertIn("voice-class sip bind control source-interface Gi0/0/1", gw_lesson["lab"]["steps"][4])
+        self.assertIn("voice-class sip bind control source-interface Gi0/0/0", gw_lesson["lab"]["steps"][4])
         self.assertIn("dial-peer voice 201 voip", gw_lesson["lab"]["steps"][4])
         self.assertIn("dial-peer voice 300 voip", gw_lesson["lab"]["steps"][4])
         self.assertIn("dial-peer voice 400 voip", gw_lesson["lab"]["steps"][4])
-        self.assertIn("preference 2", gw_lesson["lab"]["steps"][4])
+        self.assertEqual(gw_lesson["lab"]["steps"][4].count("session protocol sipv2"), 5)
+        self.assertIn("Outbound Dial-Peer`های دارای پروفایل (`200`, `201`, `400`)", gw_lesson["lab"]["steps"][4])
+        self.assertIn("تماس‌های جدید", gw_lesson["lab"]["steps"][4])
+        self.assertIn("آزمون تماس واقعی در هر دو جهت", gw_lesson["lab"]["steps"][4])
         self.assertIn("X12.5", gw_lesson["sections"][2]["p"][1])
         self.assertNotIn("پیاده‌سازی Split-Horizon DNS الزامی است", gw_s)
         self.assertNotIn("همهٔ ترافیک از همین تونل", gw_s)
