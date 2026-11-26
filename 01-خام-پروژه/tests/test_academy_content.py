@@ -8,6 +8,8 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import unittest
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -359,6 +361,74 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("isinstance(parsed, list)", a3_lesson["sections"][1]["bullets"][0])
         self.assertIn("Blast Radius", a3_lesson["sections"][2]["think"]["a"])
         self.assertEqual(a3_lesson["bridge"]["nextId"], "auto_04")
+
+        # Round-12 regressions (Batch 4 review fixes: awk quoting, IndexError/vlan_audit.py, ssh_strict/post-check, CUBE URI/failover, MRA X12.5+, VoIP stream direction bounds)
+        a1_s = json.dumps(a1_lesson, ensure_ascii=False)
+        self.assertNotIn('awk "', a1_s)
+        self.assertIn("awk '{print $1, $2, $NF}'", a1_lesson["sections"][0]["bullets"][1])
+        self.assertIn("awk '{print $1, $2, $3, $NF}'", a1_lesson["lab"]["steps"][4])
+        m_pipe = re.search(r"`(grep -E \"BGP\|SSH\|TIMEOUT\" /var/log/syslog \| awk '[^']+' \| sort \| uniq -c)`", a1_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_pipe, "auto_01 awk pipeline missing")
+        if shutil.which("bash") and shutil.which("awk"):
+            with tempfile.TemporaryDirectory() as tmpd:
+                log_file = Path(tmpd) / "syslog"
+                log_file.write_text(
+                    "Nov 23 10:01:02 R1 BGP: peer 10.255.0.2 Down\n"
+                    "Nov 23 10:01:02 R1 SSH: timeout 10.255.0.2\n"
+                    "Nov 23 10:02:00 R1 LINK: up\n"
+                    "Nov 23 10:01:02 R1 BGP: peer 10.255.0.2 Down\n",
+                    encoding="utf-8",
+                )
+                pipeline_cmd = m_pipe.group(1).replace("/var/log/syslog", str(log_file))
+                pipe_res = subprocess.run(["bash", "-lc", pipeline_cmd], capture_output=True, text=True, check=False)
+                self.assertEqual(pipe_res.returncode, 0, pipe_res.stderr)
+                self.assertIn("2 Nov 23 10:01:02 Down", pipe_res.stdout)
+                self.assertIn("1 Nov 23 10:01:02 10.255.0.2", pipe_res.stdout)
+
+        a2_s = json.dumps(a2_lesson, ensure_ascii=False)
+        self.assertIn("IndexError", a2_lesson["sections"][1]["p"][1])
+        self.assertIn("len(cols) < 6", a2_lesson["sections"][1]["think"]["a"])
+        m_py = re.search(r"```python\n([\s\S]+?)\n```", a2_lesson["lab"]["steps"][4])
+        self.assertIsNotNone(m_py, "auto_02 runnable vlan_audit.py block missing")
+        with tempfile.TemporaryDirectory() as tmpd:
+            script_path = Path(tmpd) / "vlan_audit.py"
+            script_path.write_text(m_py.group(1), encoding="utf-8")
+            env = dict(os.environ, NETOPS_TOKEN="demo")
+            py_res = subprocess.run([sys.executable, str(script_path)], cwd=tmpd, env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(py_res.returncode, 0, py_res.stderr + py_res.stdout)
+            self.assertIn("UP: ['GigabitEthernet0/0', 'GigabitEthernet0/1']", py_res.stdout)
+            self.assertIn("SKIPPED: ['BAD_TRUNCATED_LINE     unassigned']", py_res.stdout)
+            self.assertIn("MISSING: [99]", py_res.stdout)
+            self.assertIn("BAD_VLAN: ['bad_id']", py_res.stdout)
+            plan_txt = (Path(tmpd) / "config_plan.txt").read_text(encoding="utf-8")
+            self.assertIn("vlan 99", plan_txt)
+            self.assertIn("name NETOPS_99", plan_txt)
+
+        a3_s = json.dumps(a3_lesson, ensure_ascii=False)
+        self.assertIn("ssh_strict=True", a3_s)
+        self.assertIn("known_hosts", a3_s)
+        self.assertIn("system_host_keys", a3_s)
+        self.assertIn("Post-Check", a3_lesson["sections"][1]["bullets"][1])
+        self.assertIn('if "%" in cfg_out or "Invalid" in cfg_out', a3_lesson["lab"]["steps"][4])
+
+        gw_s = json.dumps(gw_lesson, ensure_ascii=False)
+        self.assertIn("voice class uri CUCM_URI sip", gw_lesson["lab"]["steps"][4])
+        self.assertIn("voice class uri ITSP_URI sip", gw_lesson["lab"]["steps"][4])
+        self.assertIn("dial-peer voice 201 voip", gw_lesson["lab"]["steps"][4])
+        self.assertIn("dial-peer voice 300 voip", gw_lesson["lab"]["steps"][4])
+        self.assertIn("dial-peer voice 400 voip", gw_lesson["lab"]["steps"][4])
+        self.assertIn("preference 2", gw_lesson["lab"]["steps"][4])
+        self.assertIn("X12.5", gw_lesson["sections"][2]["p"][1])
+        self.assertNotIn("پیاده‌سازی Split-Horizon DNS الزامی است", gw_s)
+        self.assertNotIn("همهٔ ترافیک از همین تونل", gw_s)
+        self.assertIn("HTTPS 8443", gw_lesson["sections"][2]["bullets"][0])
+        self.assertIn("SIP/TLS 5061", gw_lesson["sections"][2]["bullets"][0])
+
+        self.assertIn("یک جریان یک‌طرفه", collab_lesson["sections"][1]["p"][1])
+        self.assertIn("Preamble/SFD/IFG", collab_lesson["sections"][1]["p"][1])
+        self.assertIn("Full-Duplex", collab_lesson["sections"][1]["p"][1])
+        self.assertIn("SRTP", collab_lesson["exercises"][2]["solution"])
+        self.assertIn("در هر جهت", collab_lesson["exercises"][2]["solution"])
 
         # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
