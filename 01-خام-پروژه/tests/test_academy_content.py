@@ -1751,16 +1751,36 @@ if (findNodes(liXss, n => n.tagName === 'SCRIPT' || n.tagName === 'IMG').length 
         exec(compile(m_py.group(1), "auto15_refresh_test.py", "exec"), ns)
         prov = ns["MockProvider"]()
         prov.reality["vlans"][115] = {"name": "IAC_TEST", "status": "active"}
+        prov.reality["vlans"][110] = {"name": "REALITY_110", "status": "active"}
         prov.state["vlans"][110] = {"name": "OLD", "status": "active"}
-        state_before = dict(prov.state)
-        reality_before = dict(prov.reality)
+        import copy
+        state_before = copy.deepcopy(prov.state)
+        reality_before = copy.deepcopy(prov.reality)
         plan = prov.refresh_only_plan()
         self.assertEqual(prov.state, state_before, "plan -refresh-only mutated state!")
         self.assertEqual(prov.reality, reality_before, "plan -refresh-only mutated reality!")
-        # apply_refresh_only changes state but not reality
+        # apply_refresh_only changes state (for managed resources) but not reality
         prov.apply_refresh_only()
-        self.assertNotEqual(prov.state, state_before, "apply -refresh-only should update state")
+        self.assertNotEqual(prov.state, state_before, "apply -refresh-only should update state for managed resources")
         self.assertEqual(prov.reality, reality_before, "apply -refresh-only should not change reality")
+        # VLAN 110 was in both state and reality → state updated from reality
+        self.assertEqual(prov.state["vlans"][110]["name"], "REALITY_110")
+        # VLAN 115 was only in reality (unmanaged) → NOT added to state
+        self.assertNotIn(115, prov.state["vlans"], "Unmanaged VLAN 115 must not enter state after apply_refresh_only")
+
+    def test_auto15_apply_refresh_only_no_unmanaged_in_state(self):
+        """apply_refresh_only must NOT add unmanaged (reality-only) sources to state."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        lab = data["lessons"]["auto_15"]["lab"]["steps"][4]
+        m_py = re.search(r"```python\n([\s\S]+?)\n```", lab)
+        self.assertIsNotNone(m_py)
+        ns: dict = {}
+        exec(compile(m_py.group(1), "auto15_unmanaged_test.py", "exec"), ns)
+        prov = ns["MockProvider"]()
+        prov.reality["vlans"][115] = {"name": "IAC_TEST", "status": "active"}
+        prov.state["vlans"][110] = {"name": "OLD", "status": "active"}
+        prov.apply_refresh_only()
+        self.assertNotIn(115, prov.state["vlans"], "Unmanaged VLAN 115 must not enter state after apply_refresh_only")
 
     def test_auto16_verify_not_pass_after_test_failure(self):
         """verify stage must not be PASS when test stage failed."""
