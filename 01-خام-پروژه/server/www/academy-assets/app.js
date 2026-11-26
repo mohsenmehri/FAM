@@ -1691,9 +1691,11 @@
     if (!card || !ACADEMY) return;
     card.textContent = '';
     card.appendChild(el('h3', '', 'آزمون ورودی ارزیابی مبانی (۱۰ سؤال نمونه از بانک ۵۰+۱۰ سؤالی)'));
+    const ee = ACADEMY.entranceExam || {};
+    const questions = ee.questions || [];
     const qBox = el('div', 'quiz-box');
     const picks = {};
-    ACADEMY.entranceExam.forEach((q, i) => {
+    questions.forEach((q, i) => {
       const qc = el('div', 'q-card');
       qc.appendChild(el('b', '', `${toFa(i + 1)}. [${q.topic}] ${q.q}`));
       const opts = el('div', 'q-opts');
@@ -1718,13 +1720,13 @@
     sub.style.marginTop = '14px';
     sub.addEventListener('click', () => {
       let ok = 0;
-      ACADEMY.entranceExam.forEach((q, i) => { if (picks[i] === q.ans) ok++; });
-      const pct = Math.round((ok / ACADEMY.entranceExam.length) * 100);
+      questions.forEach((q, i) => { if (picks[i] === q.ans) ok++; });
+      const pct = Math.round((ok / questions.length) * 100);
       state.examScore = pct;
       persistState();
       resBox.textContent = pct >= 85
-        ? `عالی! نمره ${toFa(pct)} از ۱۰۰ — آماده ورود مستقیم به دانشکده ۱ (CCNA 200-301) هستید.`
-        : `نمره ${toFa(pct)} از ۱۰۰ — پیشنهاد می‌شود ترم اول (هفته ۱ تا ۴ مبانی و Subnetting) را کامل بگذرانید تا به بالای ۸۵ برسید.`;
+        ? `نمره ${toFa(pct)} از ۱۰۰ — نتیجه مناسب (این آزمون ۱۰‌سؤالی است؛ برای ورود قطعی به دانشکده ۱، آزمون کامل ۵۰‌سوالی را پاسخ دهید).`
+        : `نمره ${toFa(pct)} از ۱۰۰ — پیشنهاد می‌شود ترم اول (هفته ۱ تا ۴ مبانی و Subnetting) را در نظر بگیرید (این آزمون ۱۰‌سؤالی است، نه آزمون نهایی).`;
       resBox.style.color = pct >= 85 ? '#34d399' : '#fbbf24';
     });
     card.appendChild(sub);
