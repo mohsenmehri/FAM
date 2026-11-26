@@ -19884,7 +19884,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
      "۲. هدف ساخت `VLAN 114` (`DEVNET_SDK`) و اختصاص پورت `Gi0/7` به کلاینت `DEVNET-CLIENT` با `switchport nonegotiate` است. **مرزهای شبیه‌ساز:** شبیه‌ساز تنها CLI IOS راپشتیبانی می‌کند؛ این مرحله فقط آماده‌سازی توپولوژی است و محتوای موضوع درس در مرحله ۵ (سناریوی مرجع خارج از شبیه‌ساز) انجام می‌شود.",
      "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 114` -> `name DEVNET_SDK` -> `exit` -> `interface Gi0/7` -> `description DEVNET-CLIENT` -> `switchport mode access` -> `switchport access vlan 114` -> `switchport nonegotiate` -> `end`.",
      "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
-     "```python\n\"\"\"devnet_sdk_lab.py — استفاده از SDKهای رسمی سیسکو (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است و نه کد واقعی. FakeDNACenter یک شبیه‌ساز محلی است نه کنترلر واقعی Cisco DevNet Sandbox؛RESTCONF/TLS واقعی نیست.\nاین شبیه‌ساز نه RESTCONF/TLS واقعی است و نه Adjacency Cisco اصلی.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import Optional\nimport time\n\n\n@dataclass\nclass Device:\n    device_id: str\n    management_ip: str\n    platform: str\n    status: str\n\n\nclass FakeDNACenter:\n    \"\"\"شبیه‌ساز ساده‌ی Catalyst Center برای آزمایش — نه کنترلر واقعی.\"\"\"\n\n    def __init__(self):\n        self.token: Optional[str] = None\n        self.token_expiry = 0.0\n        self.devices = [\n            Device(\"R1\", \"10.255.0.1\", \"IOS-XE\", \"online\"),\n            Device(\"R2\", \"10.255.0.2\", \"IOS-XE\", \"online\"),\n        ]\n\n    def get_token(self) -> str:\n        now = time.time()\n        if self.token and now < self.token_expiry:\n            return self.token\n        self.token = \"FAKE_TOKEN_123\"\n        self.token_expiry = now + 3600\n        return self.token\n\n    def get_device_list(self):\n        self.get_token()  # احراز هویت و تمدید توکن\n        return self.devices\n\n\ndef main():\n    dnac = FakeDNACenter()\n    token = dnac.get_token()\n    print(f\"Token: {token}\")\n    devices = dnac.get_device_list()\n    for dev in devices:\n        print(f\"{dev.device_id} | {dev.management_ip} | {dev.platform} | {dev.status}\")\n\n\nif __name__ == \"__main__\":\n    main()\n```"
+     "```python\n\"\"\"devnet_sdk_lab.py — استفاده از SDKهای رسمی سیسکو (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرا علیه Sandbox واقعی.\nمرز شبیه‌ساز: FakeDNACenter یک شبیه‌ساز محلی است نه کنترلر Cisco DevNet Sandbox.\n\"\"\"\n\nimport time\nfrom dataclasses import dataclass\nfrom typing import Optional, List\n\n\n@dataclass\nclass Device:\n    device_id: str\n    management_ip: str\n    platform: str\n    status: str\n\n\nclass FakeDNACenter:\n    \"\"\"شبیه‌ساز ساده Catalyst Center — نه کنترلر واقعی.\"\"\"\n\n    def __init__(self):\n        self.token: Optional[str] = None\n        self.token_expiry = 0.0\n        self.devices = [\n            Device(\"R1\", \"10.255.0.1\", \"IOS-XE\", \"online\"),\n            Device(\"R2\", \"10.255.0.2\", \"IOS-XE\", \"online\"),\n        ]\n        self.request_count = 0\n        self.rate_limit = 10\n\n    def get_token(self) -> str:\n        now = time.time()\n        if self.token and now < self.token_expiry:\n            return self.token\n        self.token = \"FAKE_TOKEN_123\"\n        self.token_expiry = now + 3600\n        return self.token\n\n    def get_device_list(self) -> List[Device]:\n        self.request_count += 1\n        if self.request_count > self.rate_limit:\n            raise RuntimeError(\"HTTP 429: Too Many Requests - Rate Limit exceeded\")\n        self.get_token()\n        return self.devices\n\n\ndef main():\n    dnac = FakeDNACenter()\n\n    token = dnac.get_token()\n    print(f\"Token: {token}\")\n    devices = dnac.get_device_list()\n    for dev in devices:\n        print(f\"{dev.device_id} | {dev.management_ip} | {dev.platform} | {dev.status}\")\n\n    print(\"\\n=== Rate Limit test ===\")\n    for i in range(12):\n        try:\n            dnac.get_device_list()\n            print(f\"Request {i+1}: OK\")\n        except RuntimeError as e:\n            print(f\"Request {i+1}: {e}\")\n            break\n\n\nif __name__ == \"__main__\":\n    main()\n```python\n\"\"\"devnet_sdk_lab.py — استفاده از SDKهای رسمی سیسکو (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرا علیه Sandbox واقعی.\nمرز شبیه‌ساز: FakeDNACenter یک شبیه‌ساز محلی است نه کنترلر Cisco DevNet Sandbox.\n\"\"\"\n\nimport time\nfrom dataclasses import dataclass\nfrom typing import Optional, List\n\n\n@dataclass\nclass Device:\n    device_id: str\n    management_ip: str\n    platform: str\n    status: str\n\n\nclass FakeDNACenter:\n    \"\"\"شبیه‌ساز ساده Catalyst Center — نه کنترلر واقعی.\"\"\"\n\n    def __init__(self):\n        self.token: Optional[str] = None\n        self.token_expiry = 0.0\n        self.devices = [\n            Device(\"R1\", \"10.255.0.1\", \"IOS-XE\", \"online\"),\n            Device(\"R2\", \"10.255.0.2\", \"IOS-XE\", \"online\"),\n        ]\n        self.request_count = 0\n        self.rate_limit = 10\n\n    def get_token(self) -> str:\n        now = time.time()\n        if self.token and now < self.token_expiry:\n            return self.token\n        self.token = \"FAKE_TOKEN_123\"\n        self.token_expiry = now + 3600\n        return self.token\n\n    def get_device_list(self) -> List[Device]:\n        now = time.time()\n        self.request_count += 1\n        if self.request_count > self.rate_limit:\n            raise RuntimeError(\"HTTP 429: Too Many Requests - Rate Limit exceeded\")\n        self.get_token()\n        return self.devices\n\n\ndef main():\n    dnac = FakeDNACenter()\n\n    token = dnac.get_token()\n    print(f\"Token: {token}\")\n    devices = dnac.get_device_list()\n    for dev in devices:\n        print(f\"{dev.device_id} | {dev.management_ip} | {dev.platform} | {dev.status}\")\n\n    print(\"\\n=== Rate Limit test ===\")\n    for i in range(12):\n        try:\n            dnac.get_device_list()\n            print(f\"Request {i+1}: OK\")\n        except RuntimeError as e:\n            print(f\"Request {i+1}: {e}\")\n            break\n\n\nif __name__ == \"__main__\":\n    main()\n"
     ],
     "verifyCmds": [
      "show ip interface brief",
@@ -20084,7 +20084,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
      "۲. هدف ساخت `VLAN 115` (`IAC_NET`) و اختصاص پورت `Gi0/7` به کلاینت `IAC-CLIENT` با `switchport nonegotiate` است. **مرزهای شبیه‌ساز:** شبیه‌ساز تنها CLI IOS راپشتیبانی می‌کند؛ این مرحله فقط آماده‌سازی توپولوژی است و محتوای موضوع درس در مرحله ۵ (سناریوی مرجع خارج از شبیه‌ساز) انجام می‌شود.",
      "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 115` -> `name IAC_NET` -> `exit` -> `interface Gi0/7` -> `description IAC-CLIENT` -> `switchport mode access` -> `switchport access vlan 115` -> `switchport nonegotiate` -> `end`.",
      "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
-     "```python\n\"\"\"iac_state_lab.py — شبیه‌ساز state machine Terraform (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی Terraform.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی Terraform/NetBox.\n\"\"\"\n\nimport copy\n\n\nclass MockProvider:\n    \"\"\"provider مجازی: state و reality را جدا نگه می‌دارد.\"\"\"\n\n    def __init__(self):\n        self.state = {\"vlans\": {}}\n        self.reality = {\"vlans\": {}}\n\n    def refresh_only_plan(self) -> dict:\n        \"\"\"\"-refresh-only: فقط proposed plan می‌سازد، state را تغییر نمی‌دهد.\n\n        مهم: منابع که فقط در reality وجود دارند و در state نیستند،\n        به صورت \"create\" در plan نشان داده نمی‌شوند چون Terraform واقعی\n        منابع unmanaged را به صورت خود descobrir نمی‌کند؛ فقط منابعی که\n        در state ثبت شده‌اند ولی reality با آن‌ها متفاوت است، نشان داده می‌شود.\n        \"\"\"\n        proposed = {}\n        for vid in self.state[\"vlans\"]:\n            if vid not in self.reality[\"vlans\"]:\n                proposed[vid] = \"delete (در state است، در realidad نیست)\"\n            elif self.state[\"vlans\"][vid] != self.reality[\"vlans\"][vid]:\n                proposed[vid] = \"update (ناهماهنگی)\"\n        return proposed\n\n    def apply_refresh_only(self):\n        \"\"\"\"apply -refresh-only: state را بر اساس reality به‌روزرسانی می‌کند.\n\n        این عمل state را تغییر می‌دهد اما منابع واقعی را تغییر نمی‌دهد.\n        منابعی که در state هستند اما در reality نیستند (delete proposal)،\n        از state حذف می‌شوند. منابعی که در هر دو هستند، از reality به‌روزرسانی می‌شوند.\n        منابعی که فقط در reality وجود دارند، وارد state نمی‌شوند (unmanaged).\n        کپی عمیق (deep copy) استفاده می‌شود تا state و reality مستقل remain.\n        \"\"\"\n        # حذف منابعی که در state هستند اما در reality نیستند\n        for vid in list(self.state[\"vlans\"].keys()):\n            if vid not in self.reality[\"vlans\"]:\n                del self.state[\"vlans\"][vid]\n        # به‌روزرسانی منابع مشترک از reality\n        for vid in self.state[\"vlans\"]:\n            if vid in self.reality[\"vlans\"]:\n                self.state[\"vlans\"][vid] = copy.deepcopy(self.reality[\"vlans\"][vid])\n\n\ndef main():\n    prov = MockProvider()\n    prov.reality[\"vlans\"][115] = {\"name\": \"IAC_TEST\", \"status\": \"active\"}\n    prov.reality[\"vlans\"][110] = {\"name\": \"REALITY_110\", \"status\": \"active\"}\n    prov.state[\"vlans\"][110] = {\"name\": \"OLD\", \"status\": \"active\"}\n    prov.state[\"vlans\"][111] = {\"name\": \"GHOST\", \"status\": \"active\"}  # only in state\n    print(\"Plan (refresh-only):\", prov.refresh_only_plan())\n    prov.apply_refresh_only()\n    print(\"State after apply:\", prov.state)\n    # VLAN 110 was in both → updated from reality\n    assert prov.state[\"vlans\"][110][\"name\"] == \"REALITY_110\"\n    # VLAN 111 was only in state (ghost) → deleted from state\n    assert 111 not in prov.state[\"vlans\"], \"Ghost VLAN should be deleted from state!\"\n    # VLAN 115 was only in reality (unmanaged) → NOT added to state\n    assert 115 not in prov.state[\"vlans\"], \"Unmanaged VLAN should not enter state!\"\n    print(\"✓ apply_refresh_only correctly deletes ghosts and ignores unmanaged\")\n\n\nif __name__ == \"__main__\":\n    main()\n```"
+     "```python\n\"\"\"iac_state_lab.py — شبیه‌ساز state machine Terraform (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی Terraform.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی Terraform/NetBox.\n\"\"\"\n\nimport copy\n\n\nclass MockProvider:\n    def __init__(self):\n        self.state = {\"vlans\": {}}\n        self.reality = {\"vlans\": {}}\n\n    def refresh_only_plan(self) -> dict:\n        proposed = {}\n        for vid in self.state[\"vlans\"]:\n            if vid not in self.reality[\"vlans\"]:\n                proposed[vid] = \"delete (در state است، در realidad نیست)\"\n            elif self.state[\"vlans\"][vid] != self.reality[\"vlans\"][vid]:\n                proposed[vid] = \"update (ناهماهنگی)\"\n        return proposed\n\n    def apply_refresh_only(self):\n        for vid in list(self.state[\"vlans\"].keys()):\n            if vid not in self.reality[\"vlans\"]:\n                del self.state[\"vlans\"][vid]\n        for vid in list(self.state[\"vlans\"].keys()):\n            if vid in self.reality[\"vlans\"]:\n                self.state[\"vlans\"][vid] = copy.deepcopy(self.reality[\"vlans\"][vid])\n\n\ndef main():\n    prov = MockProvider()\n    prov.reality[\"vlans\"][115] = {\"name\": \"IAC_TEST\", \"status\": \"active\"}\n    prov.reality[\"vlans\"][110] = {\"name\": \"REALITY_110\", \"status\": \"active\"}\n    prov.state[\"vlans\"][110] = {\"name\": \"OLD\", \"status\": \"active\"}\n    prov.state[\"vlans\"][111] = {\"name\": \"GHOST\", \"status\": \"active\"}\n\n    state_before = copy.deepcopy(prov.state)\n    reality_before = copy.deepcopy(prov.reality)\n    plan = prov.refresh_only_plan()\n    print(\"Plan (refresh-only):\", plan)\n    assert prov.state == state_before, \"plan -refresh-only mutated state!\"\n    assert prov.reality == reality_before, \"plan -refresh-only mutated reality!\"\n    print(\"OK: plan -refresh-only does not mutate state or reality\")\n\n    prov.apply_refresh_only()\n    print(\"State after apply:\", prov.state)\n    assert prov.state[\"vlans\"][110][\"name\"] == \"REALITY_110\"\n    assert 111 not in prov.state[\"vlans\"], \"Ghost VLAN should be deleted!\"\n    assert 115 not in prov.state[\"vlans\"], \"Unmanaged VLAN should not enter state!\"\n    assert prov.reality == reality_before, \"apply -refresh-only should not change reality!\"\n    print(\"OK: apply_refresh_only deletes ghost, updates shared, ignores unmanaged\")\n\n\nif __name__ == \"__main__\":\n    main()\n```python\n\"\"\"iac_state_lab.py — شبیه‌ساز state machine Terraform (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی Terraform.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی Terraform/NetBox.\n\"\"\"\n\nimport copy\n\n\nclass MockProvider:\n    def __init__(self):\n        self.state = {\"vlans\": {}}\n        self.reality = {\"vlans\": {}}\n\n    def refresh_only_plan(self) -> dict:\n        proposed = {}\n        for vid in self.state[\"vlans\"]:\n            if vid not in self.reality[\"vlans\"]:\n                proposed[vid] = \"delete (در state است، در realidad نیست)\"\n            elif self.state[\"vlans\"][vid] != self.reality[\"vlans\"][vid]:\n                proposed[vid] = \"update (ناهماهنگی)\"\n        return proposed\n\n    def apply_refresh_only(self):\n        for vid in list(self.state[\"vlans\"].keys()):\n            if vid not in self.reality[\"vlans\"]:\n                del self.state[\"vlans\"][vid]\n        for vid in list(self.state[\"vlans\"].keys()):\n            if vid in self.reality[\"vlans\"]:\n                self.state[\"vlans\"][vid] = copy.deepcopy(self.reality[\"vlans\"][vid])\n\n\ndef main():\n    prov = MockProvider()\n    prov.reality[\"vlans\"][115] = {\"name\": \"IAC_TEST\", \"status\": \"active\"}\n    prov.reality[\"vlans\"][110] = {\"name\": \"REALITY_110\", \"status\": \"active\"}\n    prov.state[\"vlans\"][110] = {\"name\": \"OLD\", \"status\": \"active\"}\n    prov.state[\"vlans\"][111] = {\"name\": \"GHOST\", \"status\": \"active\"}\n\n    state_before = copy.deepcopy(prov.state)\n    reality_before = copy.deepcopy(prov.reality)\n    plan = prov.refresh_only_plan()\n    print(\"Plan (refresh-only):\", plan)\n    assert prov.state == state_before, \"plan -refresh-only mutated state!\"\n    assert prov.reality == reality_before, \"plan -refresh-only mutated reality!\"\n    print(\"OK: plan -refresh-only does not mutate state or reality\")\n\n    prov.apply_refresh_only()\n    print(\"State after apply:\", prov.state)\n    assert prov.state[\"vlans\"][110][\"name\"] == \"REALITY_110\"\n    assert 111 not in prov.state[\"vlans\"], \"Ghost VLAN should be deleted!\"\n    assert 115 not in prov.state[\"vlans\"], \"Unmanaged VLAN should not enter state!\"\n    assert prov.reality == reality_before, \"apply -refresh-only should not change reality!\"\n    print(\"OK: apply_refresh_only deletes ghost, updates shared, ignores unmanaged\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
     ],
     "verifyCmds": [
      "show ip interface brief",
@@ -20275,7 +20275,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
      "۲. هدف ساخت `VLAN 116` (`CI_CD_NET`) و اختصاص پورت `Gi0/7` به کلاینت `CI_CD-CLIENT` با `switchport nonegotiate` است. **مرزهای شبیه‌ساز:** شبیه‌ساز تنها CLI IOS راپشتیبانی می‌کند؛ این مرحله فقط آماده‌سازی توپولوژی است و محتوای موضوع درس در مرحله ۵ (سناریوی مرجع خارج از شبیه‌ساز) انجام می‌شود.",
      "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 116` -> `name CI_CD_NET` -> `exit` -> `interface Gi0/7` -> `description CI_CD-CLIENT` -> `switchport mode access` -> `switchport access vlan 116` -> `switchport nonegotiate` -> `end`.",
      "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
-     "```python\n\"\"\"cicd_pipeline_lab.py — شبیه‌ساز ۵ مرحله pipeline شبکه (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی CI/CD.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی GitLab/GitHub Actions.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List\n\n\n@dataclass\nclass PipelineResult:\n    stage: str\n    passed: bool\n    message: str\n    skipped: bool = False\n\n\ndef run_pipeline(config_change: str, manual_approval: bool = False) -> List[PipelineResult]:\n    \"\"\"اجرا simulating pipeline با تفکیک مراحل.\n\n    - اگر test شکست بخورد، deploy اجرا نمی‌شود و verify به صورت skipped علامت‌گذاری می‌شود.\n    - اگر deploy موفق باشد، verify اجرا می‌شود (دستورات show روی تجهیزات).\n    - continuous delivery = تایید بشر قبل از استقرار؛ continuous deployment = استقرار خودکار.\n    \"\"\"\n    results = []\n    results.append(PipelineResult(\"commit\", True, \"کد پیکربندی به VCS push شد\"))\n\n    if \"invalid\" in config_change:\n        results.append(PipelineResult(\"test\", False, \"خطای سینتکسی در کد پیکربندی\"))\n        results.append(PipelineResult(\"security\", False, \"تست قبلی شکست خورد، امنیتی بررسی نشد\", skipped=True))\n        results.append(PipelineResult(\"deploy\", False, \"استقرار متوقف شد به دلیل شکست در مرحله قبل\", skipped=True))\n        results.append(PipelineResult(\"verify\", False, \"verify اجرا نشد چون deploy اجرا نشد\", skipped=True))\n        return results\n\n    results.append(PipelineResult(\"test\", True, \"تست‌های اتوماتیک موفق\"))\n    results.append(PipelineResult(\"security\", True, \"هیچ نقطه ضعیف یافت نشد\"))\n\n    if not manual_approval:\n        # continuous delivery: نیاز به تایید بشر قبل از deploy\n        results.append(PipelineResult(\"deploy\", False, \"در انتظار تایید بشر (manual approval)\", skipped=True))\n        results.append(PipelineResult(\"verify\", False, \"verify اجرا نشد چون deploy اجرا نشد\", skipped=True))\n        return results\n\n    results.append(PipelineResult(\"deploy\", True, \"تغییرات تایید شده به تولید اعمال شدند\"))\n    results.append(PipelineResult(\"verify\", True, \"تایید نهایی با دستورات show روی تجهیزات\"))\n    return results\n\n\ndef main():\n    print(\"=== Invalid config (test fails) ===\")\n    for r in run_pipeline(\"invalid vlan 999\"):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n    print(\"\\n=== Valid config, no manual approval (continuous delivery waits) ===\")\n    for r in run_pipeline(\"vlan 116 name NETOPS\", manual_approval=False):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n    print(\"\\n=== Valid config, with manual approval ===\")\n    for r in run_pipeline(\"vlan 116 name NETOPS\", manual_approval=True):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n\nif __name__ == \"__main__\":\n    main()\n```"
+     "```python\n\"\"\"cicd_pipeline_lab.py — شبیه‌ساز ۵ مرحله pipeline شبکه (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی CI/CD.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی GitLab/GitHub Actions.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List\n\n\n@dataclass\nclass PipelineResult:\n    stage: str\n    passed: bool\n    message: str\n    skipped: bool = False\n\n\ndef run_pipeline(config_change: str, manual_approval: bool = False) -> List[PipelineResult]:\n    results = []\n    results.append(PipelineResult(\"commit\", True, \"کد پیکربندی به VCS push شد\"))\n\n    if \"invalid\" in config_change:\n        results.append(PipelineResult(\"test\", False, \"خطای سینتکسی در کد پیکربندی\"))\n        results.append(PipelineResult(\"security\", False, \"تست قبلی شکست خورد، امنیتی بررسی نشد\", skipped=True))\n        results.append(PipelineResult(\"deploy\", False, \"استقرار متوقف شد به دلیل شکست در مرحله قبل\", skipped=True))\n        results.append(PipelineResult(\"verify\", False, \"verify اجرا نشد چون deploy اجرا نشد\", skipped=True))\n        return results\n\n    results.append(PipelineResult(\"test\", True, \"تست‌های اتوماتیک موفق\"))\n    results.append(PipelineResult(\"security\", True, \"هیچ نقطه ضعیف یافت نشد\"))\n\n    if not manual_approval:\n        results.append(PipelineResult(\"deploy\", False, \"در انتظار تایید بشر (manual approval)\", skipped=True))\n        results.append(PipelineResult(\"verify\", False, \"verify اجرا نشد چون deploy اجرا نشد\", skipped=True))\n        return results\n\n    results.append(PipelineResult(\"deploy\", True, \"تغییرات تایید شده به تولید اعمال شدند\"))\n    results.append(PipelineResult(\"verify\", True, \"تایید نهایی با دستورات show روی تجهیزات\"))\n    return results\n\n\ndef main():\n    print(\"\\n=== Invalid config (test fails) ===\")\n    for r in run_pipeline(\"invalid vlan 999\"):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n    print(\"\\n=== Valid config, no manual approval (continuous delivery waits) ===\")\n    for r in run_pipeline(\"vlan 116 name NETOPS\", manual_approval=False):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n    print(\"\\n=== Valid config, with manual approval ===\")\n    for r in run_pipeline(\"vlan 116 name NETOPS\", manual_approval=True):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n\nif __name__ == \"__main__\":\n    main()\n```python\n\"\"\"cicd_pipeline_lab.py — شبیه‌ساز ۵ مرحله pipeline شبکه (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی CI/CD.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی GitLab/GitHub Actions.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List\n\n\n@dataclass\nclass PipelineResult:\n    stage: str\n    passed: bool\n    message: str\n    skipped: bool = False\n\n\ndef run_pipeline(config_change: str, manual_approval: bool = False) -> List[PipelineResult]:\n    results = []\n    results.append(PipelineResult(\"commit\", True, \"کد پیکربندی به VCS push شد\"))\n\n    if \"invalid\" in config_change:\n        results.append(PipelineResult(\"test\", False, \"خطای سینتکسی در کد پیکربندی\"))\n        results.append(PipelineResult(\"security\", False, \"تست قبلی شکست خورد، امنیتی بررسی نشد\", skipped=True))\n        results.append(PipelineResult(\"deploy\", False, \"استقرار متوقف شد به دلیل شکست در مرحله قبل\", skipped=True))\n        results.append(PipelineResult(\"verify\", False, \"verify اجرا نشد چون deploy اجرا نشد\", skipped=True))\n        return results\n\n    results.append(PipelineResult(\"test\", True, \"تست‌های اتوماتیک موفق\"))\n    results.append(PipelineResult(\"security\", True, \"هیچ نقطه ضعیف یافت نشد\"))\n\n    if not manual_approval:\n        results.append(PipelineResult(\"deploy\", False, \"در انتظار تایید بشر (manual approval)\", skipped=True))\n        results.append(PipelineResult(\"verify\", False, \"verify اجرا نشد چون deploy اجرا نشد\", skipped=True))\n        return results\n\n    results.append(PipelineResult(\"deploy\", True, \"تغییرات تایید شده به تولید اعمال شدند\"))\n    results.append(PipelineResult(\"verify\", True, \"تایید نهایی با دستورات show روی تجهیزات\"))\n    return results\n\n\ndef main():\n    print(\"\\n=== Invalid config (test fails) ===\")\n    for r in run_pipeline(\"invalid vlan 999\"):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n    print(\"\\n=== Valid config, no manual approval (continuous delivery waits) ===\")\n    for r in run_pipeline(\"vlan 116 name NETOPS\", manual_approval=False):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n    print(\"\\n=== Valid config, with manual approval ===\")\n    for r in run_pipeline(\"vlan 116 name NETOPS\", manual_approval=True):\n        print(f\"{r.stage}: {'PASS' if r.passed else 'FAIL'} - {r.message}\" + (\" (skipped)\" if r.skipped else \"\"))\n\n\nif __name__ == \"__main__\":\n    main()\n"
     ],
     "verifyCmds": [
      "show ip interface brief",
@@ -20476,7 +20476,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
      "۲. هدف ساخت `VLAN 117` (`DOCKER_NET`) و اختصاص پورت `Gi0/7` به کلاینت `DOCKER-CLIENT` با `switchport nonegotiate` است. **مرزهای شبیه‌ساز:** شبیه‌ساز تنها CLI IOS راپشتیبانی می‌کند؛ این مرحله فقط آماده‌سازی توپولوژی است و محتوای موضوع درس در مرحله ۵ (سناریوی مرجع خارج از شبیه‌ساز) انجام می‌شود.",
      "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 117` -> `name DOCKER_NET` -> `exit` -> `interface Gi0/7` -> `description DOCKER-CLIENT` -> `switchport mode access` -> `switchport access vlan 117` -> `switchport nonegotiate` -> `end`.",
      "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
-     "```python\n\"\"\"docker_network_lab.py — شبیه‌ساز شبکه Docker (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی Docker.\n\"\"\"\n\nclass Container:\n    def __init__(self, name: str, image: str):\n        self.name = name\n        self.image = image\n        self.status = \"stopped\"\n        self.network = None\n\n    def start(self):\n        self.status = \"running\"\n\n    def stop(self):\n        self.status = \"stopped\"\n\n\ndef main():\n    web = Container(\"web\", \"nginx:latest\")\n    db = Container(\"db\", \"postgres:latest\")\n    web.start()\n    db.start()\n    print(f\"{web.name}: {web.status} on {web.image}\")\n    print(f\"{db.name}: {db.status} on {db.image}\")\n\n\nif __name__ == \"__main__\":\n    main()\n```"
+     "```python\n\"\"\"docker_network_lab.py — شبیه‌ساز شبکه‌سازی Docker (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی Docker.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی Docker/Compose.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import Dict, List\n\n\n@dataclass\nclass Container:\n    name: str\n    image: str\n    network: str\n    running: bool = False\n\n\n@dataclass\nclass Network:\n    name: str\n    driver: str\n    containers: List[str]\n\n\nclass MockDocker:\n    def __init__(self):\n        self.networks: Dict[str, Network] = {}\n        self.containers: Dict[str, Container] = {}\n\n    def create_network(self, name: str, driver: str) -> bool:\n        if name in self.networks:\n            print(f\"Network '{name}' already exists\")\n            return False\n        self.networks[name] = Network(name, driver, [])\n        print(f\"Created network '{name}' with driver '{driver}'\")\n        return True\n\n    def run_container(self, name: str, image: str, network: str) -> bool:\n        if network not in self.networks:\n            print(f\"Network '{network}' not found\")\n            return False\n        if name in self.containers:\n            print(f\"Container '{name}' already exists\")\n            return False\n        c = Container(name, image, network, running=True)\n        self.containers[name] = c\n        self.networks[network].containers.append(name)\n        print(f\"Container '{name}' ({image}) running on network '{network}'\")\n        return True\n\n    def inspect(self, name: str) -> dict:\n        c = self.containers.get(name)\n        if not c:\n            return {\"error\": f\"Container '{name}' not found\"}\n        return {\n            \"name\": c.name,\n            \"image\": c.image,\n            \"network\": c.network,\n            \"running\": c.running,\n        }\n\n\ndef main():\n    docker = MockDocker()\n\n    docker.create_network(\"fam-bridge\", \"bridge\")\n    docker.run_container(\"web1\", \"nginx:latest\", \"fam-bridge\")\n    docker.run_container(\"db1\", \"postgres:latest\", \"fam-missing\")\n\n    docker.create_network(\"fam-macvlan\", \"macvlan\")\n    docker.run_container(\"switch1\", \"ios-xe:latest\", \"fam-macvlan\")\n\n    docker.create_network(\"fam-host\", \"host\")\n    docker.run_container(\"monitor1\", \"prometheus:latest\", \"fam-missing\")\n\n    print(\"\\n=== Container inspection ===\")\n    for name in [\"web1\", \"db1\", \"switch1\", \"monitor1\"]:\n        info = docker.inspect(name)\n        print(info)\n\n\nif __name__ == \"__main__\":\n    main()\n```python\n\"\"\"docker_network_lab.py — شبیه‌ساز شبکه‌سازی Docker (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی Docker.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی Docker/Compose.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import Dict, List\n\n\n@dataclass\nclass Container:\n    name: str\n    image: str\n    network: str\n    running: bool = False\n\n\n@dataclass\nclass Network:\n    name: str\n    driver: str\n    containers: List[str]\n\n\nclass MockDocker:\n    def __init__(self):\n        self.networks: Dict[str, Network] = {}\n        self.containers: Dict[str, Container] = {}\n\n    def create_network(self, name: str, driver: str) -> bool:\n        if name in self.networks:\n            print(f\"Network '{name}' already exists\")\n            return False\n        self.networks[name] = Network(name, driver, [])\n        print(f\"Created network '{name}' with driver '{driver}'\")\n        return True\n\n    def run_container(self, name: str, image: str, network: str) -> bool:\n        if network not in self.networks:\n            print(f\"Network '{network}' not found\")\n            return False\n        if name in self.containers:\n            print(f\"Container '{name}' already exists\")\n            return False\n        c = Container(name, image, network, running=True)\n        self.containers[name] = c\n        self.networks[network].containers.append(name)\n        print(f\"Container '{name}' ({image}) running on network '{network}'\")\n        return True\n\n    def inspect(self, name: str) -> dict:\n        c = self.containers.get(name)\n        if not c:\n            return {\"error\": f\"Container '{name}' not found\"}\n        return {\n            \"name\": c.name,\n            \"image\": c.image,\n            \"network\": c.network,\n            \"running\": c.running,\n        }\n\n\ndef main():\n    docker = MockDocker()\n\n    docker.create_network(\"fam-bridge\", \"bridge\")\n    docker.run_container(\"web1\", \"nginx:latest\", \"fam-bridge\")\n    docker.run_container(\"db1\", \"postgres:latest\", \"fam-missing\")\n\n    docker.create_network(\"fam-macvlan\", \"macvlan\")\n    docker.run_container(\"switch1\", \"ios-xe:latest\", \"fam-macvlan\")\n\n    docker.create_network(\"fam-host\", \"host\")\n    docker.run_container(\"monitor1\", \"prometheus:latest\", \"fam-missing\")\n\n    print(\"\\n=== Container inspection ===\")\n    for name in [\"web1\", \"db1\", \"switch1\", \"monitor1\"]:\n        info = docker.inspect(name)\n        print(info)\n\n\nif __name__ == \"__main__\":\n    main()\n"
     ],
     "verifyCmds": [
      "show ip interface brief",
@@ -20667,7 +20667,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
      "۲. هدف ساخت `VLAN 118` (`TEST_NET`) و اختصاص پورت `Gi0/7` به کلاینت `TEST-CLIENT` با `switchport nonegotiate` است. **مرزهای شبیه‌ساز:** شبیه‌ساز تنها CLI IOS راپشتیبانی می‌کند؛ این مرحله فقط آماده‌سازی توپولوژی است و محتوای موضوع درس در مرحله ۵ (سناریوی مرجع خارج از شبیه‌ساز) انجام می‌شود.",
      "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 118` -> `name TEST_NET` -> `exit` -> `interface Gi0/7` -> `description TEST-CLIENT` -> `switchport mode access` -> `switchport access vlan 118` -> `switchport nonegotiate` -> `end`.",
      "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
-     "```python\n\"\"\"pats_lab.py — شبیه‌ساز تست pyATS/Genie (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی pyATS.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import Dict\n\n\n@dataclass\nclass Interface:\n    name: str\n    status: str\n    protocol: str\n\n\nclass MockDevice:\n    \"\"\"شبیه‌ساز ساده‌ی دستگاه برای تست pyATS.\"\"\"\n\n    def __init__(self, name: str):\n        self.name = name\n        self.interfaces: Dict[str, Interface] = {\n            \"Gi0/7\": Interface(\"Gi0/7\", \"up\", \"up\"),\n            \"Gi0/8\": Interface(\"Gi0/8\", \"down\", \"down\"),\n        }\n\n    def learn_interface(self, name: str) -> Interface:\n        return self.interfaces.get(name)\n\n\ndef test_interface_up(device: MockDevice, name: str) -> bool:\n    intf = device.learn_interface(name)\n    return intf is not None and intf.status == \"up\" and intf.protocol == \"up\"\n\n\ndef main():\n    dev = MockDevice(\"R1\")\n    assert test_interface_up(dev, \"Gi0/7\"), \"Gi0/7 should be up/up\"\n    print(\"Test passed: Gi0/7 is up/up\")\n\n\nif __name__ == \"__main__\":\n    main()\n```"
+     "```python\n\"\"\"pats_lab.py — شبیه‌ساز تست pyATS/Genie (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی pyATS.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی pyATS/Batfish.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List\n\n\n@dataclass\nclass TestResult:\n    name: str\n    passed: bool\n    message: str\n\n\n@dataclass\nclass Device:\n    name: str\n    os: str\n    connected: bool\n\n\nclass MockGenie:\n    def parse(self, command: str, device: Device) -> dict:\n        if not device.connected:\n            return {\"error\": f\"Device {device.name} not connected\"}\n        if \"show ip route\" in command:\n            return {\n                \"vrf\": {\n                    \"default\": {\n                        \"address_family\": {\n                            \"ipv4\": {\n                                \"routes\": {\n                                    \"10.1.1.0/24\": {\"active\": True},\n                                    \"10.2.2.0/24\": {\"active\": True},\n                                }\n                            }\n                        }\n                    }\n                }\n            }\n        return {\"error\": f\"Unknown command: {command}\"}\n\n\nclass MockAEtest:\n    def __init__(self):\n        self.results: List[TestResult] = []\n\n    def test(self, name: str, condition: bool, message: str = \"\"):\n        self.results.append(TestResult(name, condition, message))\n        status = \"PASS\" if condition else \"FAIL\"\n        print(f\"[{status}] {name}: {message}\")\n\n\nclass MockBatfish:\n    def analyze(self, config: str) -> List[str]:\n        errors = []\n        if \"route-loop\" in config:\n            errors.append(\"Loop detected: R1 <-> R2 circular default route\")\n        if \"black-hole\" in config:\n            errors.append(\"Black hole detected: null0 static route for 10.0.0.0/8\")\n        if \"inaccessible\" in config:\n            errors.append(\"Inaccessible destination: 10.99.99.0/24 unreachable\")\n        return errors\n\n\ndef main():\n    genie = MockGenie()\n    aetest = MockAEtest()\n    batfish = MockBatfish()\n\n    dev = Device(\"R1\", \"iosxe\", True)\n    parsed = genie.parse(\"show ip route\", dev)\n    print(\"Genie parse:\", parsed)\n\n    aetest.test(\"check_route_10_1_1_0\", \"10.1.1.0/24\" in str(parsed), \"Route exists\")\n    aetest.test(\"check_route_10_99_99_0\", \"10.99.99.0/24\" in str(parsed), \"Route missing -> expected FAIL\")\n\n    config_with_errors = \"ip route 0.0.0.0 0.0.0.0 route-loop\\nip route 10.0.0.0 255.0.0.0 Null0 black-hole\"\n    errors = batfish.analyze(config_with_errors)\n    print(\"\\nBatfish errors:\")\n    for e in errors:\n        print(f\"  - {e}\")\n\n\nif __name__ == \"__main__\":\n    main()\n```python\n\"\"\"pats_lab.py — شبیه‌ساز تست pyATS/Genie (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی pyATS.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی pyATS/Batfish.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List\n\n\n@dataclass\nclass TestResult:\n    name: str\n    passed: bool\n    message: str\n\n\n@dataclass\nclass Device:\n    name: str\n    os: str\n    connected: bool\n\n\nclass MockGenie:\n    def parse(self, command: str, device: Device) -> dict:\n        if not device.connected:\n            return {\"error\": f\"Device {device.name} not connected\"}\n        if \"show ip route\" in command:\n            return {\n                \"vrf\": {\n                    \"default\": {\n                        \"address_family\": {\n                            \"ipv4\": {\n                                \"routes\": {\n                                    \"10.1.1.0/24\": {\"active\": True},\n                                    \"10.2.2.0/24\": {\"active\": True},\n                                }\n                            }\n                        }\n                    }\n                }\n            }\n        return {\"error\": f\"Unknown command: {command}\"}\n\n\nclass MockAEtest:\n    def __init__(self):\n        self.results: List[TestResult] = []\n\n    def test(self, name: str, condition: bool, message: str = \"\"):\n        self.results.append(TestResult(name, condition, message))\n        status = \"PASS\" if condition else \"FAIL\"\n        print(f\"[{status}] {name}: {message}\")\n\n\nclass MockBatfish:\n    def analyze(self, config: str) -> List[str]:\n        errors = []\n        if \"route-loop\" in config:\n            errors.append(\"Loop detected: R1 <-> R2 circular default route\")\n        if \"black-hole\" in config:\n            errors.append(\"Black hole detected: null0 static route for 10.0.0.0/8\")\n        if \"inaccessible\" in config:\n            errors.append(\"Inaccessible destination: 10.99.99.0/24 unreachable\")\n        return errors\n\n\ndef main():\n    genie = MockGenie()\n    aetest = MockAEtest()\n    batfish = MockBatfish()\n\n    dev = Device(\"R1\", \"iosxe\", True)\n    parsed = genie.parse(\"show ip route\", dev)\n    print(\"Genie parse:\", parsed)\n\n    aetest.test(\"check_route_10_1_1_0\", \"10.1.1.0/24\" in str(parsed), \"Route exists\")\n    aetest.test(\"check_route_10_99_99_0\", \"10.99.99.0/24\" in str(parsed), \"Route missing -> expected FAIL\")\n\n    config_with_errors = \"ip route 0.0.0.0 0.0.0.0 route-loop\\nip route 10.0.0.0 255.0.0.0 Null0 black-hole\"\n    errors = batfish.analyze(config_with_errors)\n    print(\"\\nBatfish errors:\")\n    for e in errors:\n        print(f\"  - {e}\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
     ],
     "verifyCmds": [
      "show ip interface brief",
@@ -20856,7 +20856,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
      "۲. هدف ساخت `VLAN 119` (`TELEMETRY`) و اختصاص پورت `Gi0/7` به کلاینت `TELEMETRY-CLIENT` با `switchport nonegotiate` است. **مرزهای شبیه‌ساز:** شبیه‌ساز تنها CLI IOS راپشتیبانی می‌کند؛ این مرحله فقط آماده‌سازی توپولوژی است و محتوای موضوع درس در مرحله ۵ (سناریوی مرجع خارج از شبیه‌ساز) انجام می‌شود.",
      "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 119` -> `name TELEMETRY` -> `exit` -> `interface Gi0/7` -> `description TELEMETRY-CLIENT` -> `switchport mode access` -> `switchport access vlan 119` -> `switchport nonegotiate` -> `end`.",
      "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
-     "```python\n\"\"\"telemetry_lab.py — شبیه‌ساز Streaming Telemetry (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی gRPC/gNMI.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List\nimport time\n\n\n@dataclass\nclass TelemetrySample:\n    timestamp: float\n    cpu_percent: float\n    interface: str\n    status: str\n\n\nclass MockTelemetry:\n    \"\"\"شبیه‌ساز ساده‌ی telemetry برای تست.\"\"\"\n\n    def __init__(self):\n        self.samples: List[TelemetrySample] = []\n\n    def collect(self, interface: str, cpu: float, status: str):\n        self.samples.append(TelemetrySample(time.time(), cpu, interface, status))\n\n    def get_high_cpu(self, threshold: float = 90.0):\n        return [s for s in self.samples if s.cpu_percent > threshold]\n\n\ndef main():\n    tm = MockTelemetry()\n    tm.collect(\"Gi0/7\", 95.0, \"up\")\n    tm.collect(\"Gi0/8\", 45.0, \"up\")\n    high = tm.get_high_cpu(90.0)\n    print(f\"High CPU samples: {len(high)}\")\n    for s in high:\n        print(f\"  {s.interface}: CPU {s.cpu_percent}%\")\n\n\nif __name__ == \"__main__\":\n    main()\n```"
+     "```python\n\"\"\"telemetry_lab.py — شبیه‌ساز Streaming Telemetry (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی gRPC/gNMI.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی SNMP/MDT/gNMI.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List, Dict\nimport time\n\n\n@dataclass\nclass SnmpTrap:\n    oid: str\n    value: str\n    timestamp: float\n\n\n@dataclass\nclass GNMIMessage:\n    mode: str\n    path: str\n    value: str\n\n\nclass MockSnmp:\n    def __init__(self):\n        self.traps: List[SnmpTrap] = []\n        self.poll_data: Dict[str, str] = {\n            \"1.3.6.1.2.1.1.1.0\": \"Cisco IOS XE\",\n            \"1.3.6.1.2.1.1.3.0\": \"100000\",\n        }\n\n    def poll(self, oid: str) -> str:\n        return self.poll_data.get(oid, \"No such OID\")\n\n    def receive_trap(self, trap: SnmpTrap):\n        self.traps.append(trap)\n        print(f\"Trap received: {trap.oid} = {trap.value} at {trap.timestamp}\")\n\n\nclass MockGNMI:\n    def __init__(self):\n        self.datastore: Dict[str, str] = {\n            \"/interfaces/interface[name=Gi0/7]/state/oper-status\": \"up\",\n            \"/interfaces/interface[name=Gi0/7]/state/counters/in-octets\": \"0\",\n        }\n\n    def get(self, mode: str, path: str) -> GNMIMessage:\n        if mode not in (\"ONCE\", \"POLL\", \"SUBSCRIBE\"):\n            raise ValueError(f\"Unknown gNMI mode: {mode}\")\n        value = self.datastore.get(path, \"not found\")\n        return GNMIMessage(mode, path, value)\n\n\ndef main():\n    snmp = MockSnmp()\n    gnmi = MockGNMI()\n\n    sys_descr = snmp.poll(\"1.3.6.1.2.1.1.1.0\")\n    print(f\"SNMP poll sysDescr: {sys_descr}\")\n    snmp.receive_trap(SnmpTrap(\"1.3.6.1.6.3.1.1.4.1.0\", \"linkDown\", time.time()))\n\n    once = gnmi.get(\"ONCE\", \"/interfaces/interface[name=Gi0/7]/state/oper-status\")\n    print(f\"gNMI ONCE: {once.path} = {once.value}\")\n    poll = gnmi.get(\"POLL\", \"/interfaces/interface[name=Gi0/7]/state/counters/in-octets\")\n    print(f\"gNMI POLL: {poll.path} = {poll.value}\")\n\n    try:\n        gnmi.get(\"INVALID\", \"/test\")\n    except ValueError as e:\n        print(f\"gNMI invalid mode: {e}\")\n\n\nif __name__ == \"__main__\":\n    main()\n```python\n\"\"\"telemetry_lab.py — شبیه‌ساز Streaming Telemetry (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی gRPC/gNMI.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی SNMP/MDT/gNMI.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List, Dict\nimport time\n\n\n@dataclass\nclass SnmpTrap:\n    oid: str\n    value: str\n    timestamp: float\n\n\n@dataclass\nclass GNMIMessage:\n    mode: str\n    path: str\n    value: str\n\n\nclass MockSnmp:\n    def __init__(self):\n        self.traps: List[SnmpTrap] = []\n        self.poll_data: Dict[str, str] = {\n            \"1.3.6.1.2.1.1.1.0\": \"Cisco IOS XE\",\n            \"1.3.6.1.2.1.1.3.0\": \"100000\",\n        }\n\n    def poll(self, oid: str) -> str:\n        return self.poll_data.get(oid, \"No such OID\")\n\n    def receive_trap(self, trap: SnmpTrap):\n        self.traps.append(trap)\n        print(f\"Trap received: {trap.oid} = {trap.value} at {trap.timestamp}\")\n\n\nclass MockGNMI:\n    def __init__(self):\n        self.datastore: Dict[str, str] = {\n            \"/interfaces/interface[name=Gi0/7]/state/oper-status\": \"up\",\n            \"/interfaces/interface[name=Gi0/7]/state/counters/in-octets\": \"0\",\n        }\n\n    def get(self, mode: str, path: str) -> GNMIMessage:\n        if mode not in (\"ONCE\", \"POLL\", \"SUBSCRIBE\"):\n            raise ValueError(f\"Unknown gNMI mode: {mode}\")\n        value = self.datastore.get(path, \"not found\")\n        return GNMIMessage(mode, path, value)\n\n\ndef main():\n    snmp = MockSnmp()\n    gnmi = MockGNMI()\n\n    sys_descr = snmp.poll(\"1.3.6.1.2.1.1.1.0\")\n    print(f\"SNMP poll sysDescr: {sys_descr}\")\n    snmp.receive_trap(SnmpTrap(\"1.3.6.1.6.3.1.1.4.1.0\", \"linkDown\", time.time()))\n\n    once = gnmi.get(\"ONCE\", \"/interfaces/interface[name=Gi0/7]/state/oper-status\")\n    print(f\"gNMI ONCE: {once.path} = {once.value}\")\n    poll = gnmi.get(\"POLL\", \"/interfaces/interface[name=Gi0/7]/state/counters/in-octets\")\n    print(f\"gNMI POLL: {poll.path} = {poll.value}\")\n\n    try:\n        gnmi.get(\"INVALID\", \"/test\")\n    except ValueError as e:\n        print(f\"gNMI invalid mode: {e}\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
     ],
     "verifyCmds": [
      "show ip interface brief",
@@ -21048,7 +21048,7 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
      "۲. هدف ساخت `VLAN 120` (`AIOPS_NET`) و اختصاص پورت `Gi0/7` به کلاینت `AIOPS-CLIENT` با `switchport nonegotiate` است. **مرزهای شبیه‌ساز:** شبیه‌ساز تنها CLI IOS راپشتیبانی می‌کند؛ این مرحله فقط آماده‌سازی توپولوژی است و محتوای موضوع درس در مرحله ۵ (سناریوی مرجع خارج از شبیه‌ساز) انجام می‌شود.",
      "۳. دستورات کامل زیر را به‌ترتیب در شبیه‌ساز وارد کنید: `configure terminal` -> `vlan 120` -> `name AIOPS_NET` -> `exit` -> `interface Gi0/7` -> `description AIOPS-CLIENT` -> `switchport mode access` -> `switchport access vlan 120` -> `switchport nonegotiate` -> `end`.",
      "۴. با `show vlan brief`، `show interfaces Gi0/7 switchport` و `show running-config` تغییرات پورت و VLAN را تایید نمایید.",
-     "```python\n\"\"\"aiops_lab.py — شبیه‌ساز AIOps ساده (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی AIOps.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List\n\n\n@dataclass\nclass Alert:\n    device: str\n    metric: str\n    value: float\n    threshold: float\n\n\ndef analyze_alerts(alerts: List[Alert]) -> List[str]:\n    actions = []\n    for alert in alerts:\n        if alert.value > alert.threshold:\n            actions.append(f\"{alert.device}: {alert.metric} {alert.value} > {alert.threshold} — پیشنهاد: بررسی و اقدام\")\n    return actions\n\n\ndef main():\n    alerts = [\n        Alert(\"R1\", \"cpu_percent\", 95.0, 90.0),\n        Alert(\"R2\", \"cpu_percent\", 45.0, 90.0),\n    ]\n    for action in analyze_alerts(alerts):\n        print(action)\n\n\nif __name__ == \"__main__\":\n    main()\n```"
+     "```python\n\"\"\"aiops_lab.py — شبیه‌ساز AIOps ساده (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی AIOps.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی AIOps/ML.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List, Optional\n\n\n@dataclass\nclass Alert:\n    device: str\n    metric: str\n    value: float\n    threshold: float\n    timestamp: float\n\n\n@dataclass\nclass Action:\n    device: str\n    action_type: str\n    description: str\n    approved: bool = False\n\n\nclass MockAIOps:\n    def __init__(self):\n        self.alerts: List[Alert] = []\n        self.actions: List[Action] = []\n\n    def ingest(self, alert: Alert):\n        self.alerts.append(alert)\n        print(f\"Alert ingested: {alert.device} {alert.metric}={alert.value} (threshold={alert.threshold})\")\n\n    def analyze(self, alert: Alert) -> str:\n        if alert.value > alert.threshold * 1.5:\n            return \"critical\"\n        elif alert.value > alert.threshold:\n            return \"warning\"\n        return \"normal\"\n\n    def propose_action(self, alert: Alert, severity: str) -> Optional[Action]:\n        if severity == \"critical\":\n            return Action(alert.device, \"move_traffic\", f\"Move traffic from {alert.device} to backup path\")\n        elif severity == \"warning\":\n            return Action(alert.device, \"increase_bandwidth\", f\"Increase bandwidth on {alert.device}\")\n        return None\n\n    def execute(self, action: Action, human_approved: bool) -> bool:\n        if not human_approved:\n            print(f\"Action {action.action_type} on {action.device}: PENDING human approval\")\n            return False\n        self.actions.append(action)\n        print(f\"Action {action.action_type} on {action.device}: EXECUTED - {action.description}\")\n        return True\n\n\ndef main():\n    aiops = MockAIOps()\n\n    alert1 = Alert(\"R1\", \"cpu_percent\", 95.0, 90.0, 1000.0)\n    aiops.ingest(alert1)\n    severity1 = aiops.analyze(alert1)\n    print(f\"Severity: {severity1}\")\n    action1 = aiops.propose_action(alert1, severity1)\n    if action1:\n        aiops.execute(action1, human_approved=False)\n\n    alert2 = Alert(\"R2\", \"cpu_percent\", 150.0, 90.0, 1001.0)\n    aiops.ingest(alert2)\n    severity2 = aiops.analyze(alert2)\n    print(f\"Severity: {severity2}\")\n    action2 = aiops.propose_action(alert2, severity2)\n    if action2:\n        aiops.execute(action2, human_approved=True)\n\n    print(\"\\nTotal actions executed:\", len(aiops.actions))\n    for a in aiops.actions:\n        print(f\"  - {a.device}: {a.action_type} - {a.description}\")\n\n\nif __name__ == \"__main__\":\n    main()\n```python\n\"\"\"aiops_lab.py — شبیه‌ساز AIOps ساده (شبیه‌ساز/مock)\n\nاین فایل شبه‌کد است نه کد اجرایی AIOps.\nمرز شبیه‌ساز: این کد فقط conceptual است و نه تست واقعی AIOps/ML.\n\"\"\"\n\nfrom dataclasses import dataclass\nfrom typing import List, Optional\n\n\n@dataclass\nclass Alert:\n    device: str\n    metric: str\n    value: float\n    threshold: float\n    timestamp: float\n\n\n@dataclass\nclass Action:\n    device: str\n    action_type: str\n    description: str\n    approved: bool = False\n\n\nclass MockAIOps:\n    def __init__(self):\n        self.alerts: List[Alert] = []\n        self.actions: List[Action] = []\n\n    def ingest(self, alert: Alert):\n        self.alerts.append(alert)\n        print(f\"Alert ingested: {alert.device} {alert.metric}={alert.value} (threshold={alert.threshold})\")\n\n    def analyze(self, alert: Alert) -> str:\n        if alert.value > alert.threshold * 1.5:\n            return \"critical\"\n        elif alert.value > alert.threshold:\n            return \"warning\"\n        return \"normal\"\n\n    def propose_action(self, alert: Alert, severity: str) -> Optional[Action]:\n        if severity == \"critical\":\n            return Action(alert.device, \"move_traffic\", f\"Move traffic from {alert.device} to backup path\")\n        elif severity == \"warning\":\n            return Action(alert.device, \"increase_bandwidth\", f\"Increase bandwidth on {alert.device}\")\n        return None\n\n    def execute(self, action: Action, human_approved: bool) -> bool:\n        if not human_approved:\n            print(f\"Action {action.action_type} on {action.device}: PENDING human approval\")\n            return False\n        self.actions.append(action)\n        print(f\"Action {action.action_type} on {action.device}: EXECUTED - {action.description}\")\n        return True\n\n\ndef main():\n    aiops = MockAIOps()\n\n    alert1 = Alert(\"R1\", \"cpu_percent\", 95.0, 90.0, 1000.0)\n    aiops.ingest(alert1)\n    severity1 = aiops.analyze(alert1)\n    print(f\"Severity: {severity1}\")\n    action1 = aiops.propose_action(alert1, severity1)\n    if action1:\n        aiops.execute(action1, human_approved=False)\n\n    alert2 = Alert(\"R2\", \"cpu_percent\", 150.0, 90.0, 1001.0)\n    aiops.ingest(alert2)\n    severity2 = aiops.analyze(alert2)\n    print(f\"Severity: {severity2}\")\n    action2 = aiops.propose_action(alert2, severity2)\n    if action2:\n        aiops.execute(action2, human_approved=True)\n\n    print(\"\\nTotal actions executed:\", len(aiops.actions))\n    for a in aiops.actions:\n        print(f\"  - {a.device}: {a.action_type} - {a.description}\")\n\n\nif __name__ == \"__main__\":\n    main()\n"
     ],
     "verifyCmds": [
      "show ip interface brief",
@@ -24326,6 +24326,1064 @@ window.__FAM_OFFLINE_ACADEMY_DATA__ = {
    "summary": "معمار CCDE هم‌زمان با دو چشم نگاه می‌کند: با یک چشم نیازهای تجاری، بودجه، قانون و توان تیم را می‌بیند و با چشم دیگر تمام مکانیزم‌های دقیق پروتکل‌ها، تاب‌آوری، امنیت، ظرفیت و مهاجرت را می‌چیند. دفاع حرفه‌ای با سند HLD مبتنی بر ماتریس موازنه، دوری از مهندسی افراطی و توجه همیشگی به محدودیت‌ها و Rollback، امضای نهایی یک معمار بزرگ شبکه است."
   }
  },
+ "entranceExam": [
+  {
+   "id": "q1",
+   "topic": "OSI",
+   "q": "در مدل OSI، مسیریابی منطقی بر اساس IP در کدام لایه انجام می‌شود؟",
+   "opts": [
+    "لایه ۲ (Data Link)",
+    "لایه ۳ (Network)",
+    "لایه ۴ (Transport)",
+    "لایه ۷ (Application)"
+   ],
+   "ans": 1
+  },
+  {
+   "id": "q2",
+   "topic": "MAC & ARP",
+   "q": "برای یافتن آدرس MAC متناظر با یک آدرس IP در شبکه محلی از چه پروتکلی استفاده می‌شود؟",
+   "opts": [
+    "DNS",
+    "DHCP",
+    "ARP",
+    "SNMP"
+   ],
+   "ans": 2
+  },
+  {
+   "id": "q3",
+   "topic": "Subnetting",
+   "q": "تعداد آدرس هاست قابل استفاده در یک زیرشبکه /28 چقدر است؟",
+   "opts": [
+    "۱۶",
+    "۱۴",
+    "۳۰",
+    "۶"
+   ],
+   "ans": 1
+  },
+  {
+   "id": "q4",
+   "topic": "VLSM",
+   "q": "مناسب‌ترین ماسک زیرشبکه برای یک لینک نقطه‌به‌نقطه (P2P) بین دو روتر چیست؟",
+   "opts": [
+    "/24",
+    "/28",
+    "/30",
+    "/16"
+   ],
+   "ans": 2
+  },
+  {
+   "id": "q5",
+   "topic": "TCP vs UDP",
+   "q": "کدام پروتکل بدون برقراری اتصال (Connectionless) و با کمترین سربار کار می‌کند؟",
+   "opts": [
+    "TCP",
+    "UDP",
+    "SSH",
+    "HTTP"
+   ],
+   "ans": 1
+  },
+  {
+   "id": "q6",
+   "topic": "Ports",
+   "q": "پورت پیش‌فرض پروتکل امن SSH کدام است؟",
+   "opts": [
+    "21",
+    "22",
+    "23",
+    "443"
+   ],
+   "ans": 1
+  },
+  {
+   "id": "q7",
+   "topic": "VLAN",
+   "q": "استاندارد بین‌المللی تگ‌گذاری فریم‌ها روی لینک Trunk کدام است؟",
+   "opts": [
+    "IEEE 802.1Q",
+    "IEEE 802.3af",
+    "IEEE 802.11ax",
+    "IEEE 802.1X"
+   ],
+   "ans": 0
+  },
+  {
+   "id": "q8",
+   "topic": "Routing",
+   "q": "Administrative Distance پیش‌فرض پروتکل OSPF در روترهای سیسکو چند است؟",
+   "opts": [
+    "۹۰",
+    "۱۰۰",
+    "۱۱۰",
+    "۱۲۰"
+   ],
+   "ans": 2
+  },
+  {
+   "id": "q9",
+   "topic": "NAT",
+   "q": "ترجمه چندین آدرس IP خصوصی به یک آدرس عمومی با استفاده از شماره پورت چه نام دارد؟",
+   "opts": [
+    "Static NAT",
+    "PAT / NAT Overload",
+    "ARP Proxy",
+    "STP"
+   ],
+   "ans": 1
+  },
+  {
+   "id": "q10",
+   "topic": "Troubleshooting",
+   "q": "خروجی show ip interface brief نشان می‌دهد پورت down/down است و کابل قطع شده؛ مشکل در کدام لایه است؟",
+   "opts": [
+    "لایه ۱ (Physical)",
+    "لایه ۴ (Transport)",
+    "لایه ۵ (Session)",
+    "لایه ۷ (Application)"
+   ],
+   "ans": 0
+  }
+ ],
+ "cliResponses": {
+  "help": "دستورات شبیه‌ساز آکادمی FAM:\n  enable\n  configure terminal\n  show ip interface brief\n  show interfaces status\n  show interfaces trunk\n  show vlan brief\n  show mac address-table\n  show arp\n  show ip route\n  show ip ospf neighbor\n  show ip bgp summary\n  ping <ip>  |  traceroute <ip>  |  clear",
+  "enable": "وارد سطح دسترسی Privileged EXEC (#) شدید.",
+  "configure terminal": "Enter configuration commands, one per line. End with CNTL/Z.\n(config)# آماده دریافت دستورات پیکربندی.",
+  "show ip interface brief": "Interface              IP-Address      OK? Method Status                Protocol\nGigabitEthernet0/0     10.10.0.1       YES manual up                    up\nGigabitEthernet0/1     10.20.0.1       YES manual up                    up\nLoopback0              10.255.0.1      YES manual up                    up",
+  "show interfaces status": "Port      Name               Status       Vlan       Duplex  Speed Type\nGi0/1     UPLINK-SPINE1      connected    trunk      a-full  a-1000 1000BaseLX\nGi0/2     UPLINK-SPINE2      connected    trunk      a-full  a-1000 1000BaseLX\nGi0/3     USER-ACCESS-10     connected    10         a-full  a-1000 10/100/1000BaseTX",
+  "show interfaces trunk": "Port        Mode             Encapsulation  Status        Native vlan\nGi0/1       on               802.1q         trunking      99\nGi0/2       on               802.1q         trunking      99\n\nPort        Vlans allowed on trunk\nGi0/1       10,20,30,99\nGi0/2       10,20,30,99",
+  "show vlan brief": "VLAN Name                             Status    Ports\n---- -------------------------------- --------- -------------------------------\n1    default                          active    \n10   USERS                            active    Gi0/3, Gi0/4\n20   SERVERS                          active    Gi0/5, Gi0/6\n30   VOIP                             active    Gi0/7\n99   NATIVE_UNUSED                    active    ",
+  "show mac address-table": "          Mac Address Table\n-------------------------------------------\nVlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n  10    0050.7966.6801    DYNAMIC     Gi0/3\n  10    0050.7966.6802    DYNAMIC     Gi0/4\n  20    aabb.cc00.1020    DYNAMIC     Gi0/5",
+  "show arp": "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\nInternet  10.10.0.1               -   aabb.cc00.0100  ARPA   GigabitEthernet0/0\nInternet  10.10.0.2               3   aabb.cc00.0200  ARPA   GigabitEthernet0/0\nInternet  10.20.0.10             12   0050.7966.6801  ARPA   GigabitEthernet0/1",
+  "show ip route": "Codes: C - connected, O - OSPF, B - BGP, S - static\nC    10.10.0.0/24 is directly connected, GigabitEthernet0/0\nC    10.20.0.0/26 is directly connected, GigabitEthernet0/1\nO    10.255.0.2/32 [110/2] via 10.10.0.2, 01:14:22, GigabitEthernet0/0\n                   [110/2] via 10.20.0.2, 01:14:22, GigabitEthernet0/1\nB    172.16.0.0/16 [20/0] via 10.255.0.2, 00:42:10",
+  "show ip ospf neighbor": "Neighbor ID     Pri   State           Dead Time   Address         Interface\n10.255.0.2        1   FULL/DR         00:00:34    10.10.0.2       GigabitEthernet0/0\n10.255.0.3        1   FULL/BDR        00:00:31    10.20.0.2       GigabitEthernet0/1",
+  "show ip bgp summary": "BGP router identifier 10.255.0.1, local AS number 65100\nNeighbor        V           AS MsgRcvd MsgSent   TblVer  Up/Down  State/PfxRcd\n10.255.0.2      4        65200    1420    1418       42 02:18:10          128"
+ },
+ "curriculumGroups": [
+  {
+   "facultyId": "f0",
+   "title": "دانشکده ۰ · ارزیابی و مبانی (ترم ۱)",
+   "lessons": [
+    "s01",
+    "s02",
+    "s03",
+    "s04",
+    "s05",
+    "s06",
+    "s07",
+    "s08",
+    "s09"
+   ]
+  },
+  {
+   "facultyId": "f1",
+   "title": "دانشکده ۱ · CCNA 200-301 (۱۵ درس کامل)",
+   "lessons": [
+    "ccna_01",
+    "ccna_v1",
+    "ccna_02_vlan",
+    "s10",
+    "ccna_02",
+    "ccna_wl",
+    "ccna_03",
+    "ccna_v6",
+    "ccna_dhcp",
+    "ccna_nat",
+    "ccna_04",
+    "ccna_qos_ssh",
+    "ccna_05",
+    "ccna_acl",
+    "ccna_06"
+   ]
+  },
+  {
+   "facultyId": "f2",
+   "title": "دانشکده ۲ · مهندسی پیشرفته (۱۲ درس)",
+   "lessons": [
+    "adv_01",
+    "adv_pvl",
+    "adv_ec",
+    "adv_02",
+    "adv_eigrp",
+    "adv_redist",
+    "adv_bgp",
+    "adv_03",
+    "adv_qos",
+    "adv_mcast",
+    "adv_bfd",
+    "adv_04"
+   ]
+  },
+  {
+   "facultyId": "f3",
+   "title": "دانشکده ۳ · CCNP Enterprise (11 درس)",
+   "lessons": [
+    "ccnp_01",
+    "ccnp_enc_arch",
+    "ccnp_enc_inf",
+    "ccnp_enc_sec",
+    "ccnp_enc_auto",
+    "ccnp_02",
+    "ccnp_ensdwi",
+    "ccnp_ensld",
+    "ccnp_enauto",
+    "ccnp_encc",
+    "ccnp_enna"
+   ]
+  },
+  {
+   "facultyId": "f4",
+   "title": "دانشکده ۴ · ۸ تخصص پیشرفته (39 درس)",
+   "lessons": [
+    "spec_ent",
+    "spec_ent_campus",
+    "spec_ent_sd",
+    "spec_sec",
+    "spec_sec_vpn",
+    "spec_sec_ise",
+    "spec_dc_nx",
+    "s11",
+    "spec_dc_aci",
+    "spec_dc_stor",
+    "spec_sp",
+    "spec_sp_xr",
+    "spec_sp_sr",
+    "spec_wl",
+    "spec_wl_survey",
+    "spec_collab",
+    "spec_collab_gw",
+    "auto_01",
+    "auto_02",
+    "auto_03",
+    "auto_04",
+    "auto_05",
+    "auto_06",
+    "auto_07",
+    "auto_08",
+    "auto_09",
+    "auto_10",
+    "auto_11",
+    "auto_12",
+    "auto_13",
+    "auto_14",
+    "auto_15",
+    "auto_16",
+    "auto_17",
+    "auto_18",
+    "auto_19",
+    "auto_20",
+    "spec_cyber",
+    "spec_cyber_hunt"
+   ]
+  },
+  {
+   "facultyId": "f5",
+   "title": "دانشکده ۵ · ۷ مسیر CCIE (۷ درس)",
+   "lessons": [
+    "ccie_01",
+    "ccie_sec",
+    "ccie_dc",
+    "ccie_sp",
+    "ccie_wl",
+    "ccie_collab",
+    "ccie_auto"
+   ]
+  },
+  {
+   "facultyId": "f6",
+   "title": "دانشکده ۶ · معماری CCDE 400-007 (۲۰ درس)",
+   "lessons": [
+    "ccde_01",
+    "ccde_02",
+    "ccde_03",
+    "ccde_04",
+    "ccde_05",
+    "ccde_06",
+    "ccde_07",
+    "ccde_08",
+    "ccde_09",
+    "ccde_10",
+    "ccde_11",
+    "ccde_12",
+    "ccde_13",
+    "ccde_14",
+    "ccde_15",
+    "ccde_16",
+    "ccde_17",
+    "ccde_18",
+    "ccde_19",
+    "ccde_20"
+   ]
+  }
+ ],
+ "glossary": [
+  {
+   "term": "OSI",
+   "full": "Open Systems Interconnection",
+   "desc": "مدل مرجع ۷ لایه‌ای استاندارد ISO برای تفکیک وظایف ارتباطی شبکه از لایه فیزیکی (۱) تا کاربردی (۷).",
+   "ref": "s01"
+  },
+  {
+   "term": "TCP/IP",
+   "full": "Transmission Control Protocol / Internet Protocol",
+   "desc": "پشته عملی و استاندارد اینترنت شامل لایه‌های Application، Transport، Internet و Network Access.",
+   "ref": "s01"
+  },
+  {
+   "term": "Encapsulation",
+   "full": "کپسوله‌سازی داده",
+   "desc": "فرآیند افزودن هدر (و تریلر) هر لایه به داده هنگام حرکت از لایه‌های بالا به پایین پیش از ارسال روی لینک.",
+   "ref": "s01"
+  },
+  {
+   "term": "Decapsulation",
+   "full": "بازگشایی بسته",
+   "desc": "فرآیند خواندن و جدا کردن هدرها از لایه ۱ به سمت لایه ۷ در دستگاه گیرنده.",
+   "ref": "s01"
+  },
+  {
+   "term": "PDU",
+   "full": "Protocol Data Unit",
+   "desc": "واحد داده در هر لایه: Data (لایه ۷-۵)، Segment (لایه ۴)، Packet (لایه ۳)، Frame (لایه ۲) و Bit (لایه ۱).",
+   "ref": "s01"
+  },
+  {
+   "term": "MAC",
+   "full": "Media Access Control Address",
+   "desc": "شناسه فیزیکی ۴۸ بیتی (۱۲ رقم هگزادسیمال) ثبت‌شده روی کارت شبکه برای ارتباط در لایه ۲.",
+   "ref": "s02"
+  },
+  {
+   "term": "Ethernet",
+   "full": "IEEE 802.3 Ethernet",
+   "desc": "پروتکل استاندارد شبکه محلی (LAN) در لایه ۱ و ۲ که فریم‌ها را با آدرس MAC و کد خطای FCS منتقل می‌کند.",
+   "ref": "s02"
+  },
+  {
+   "term": "ARP",
+   "full": "Address Resolution Protocol",
+   "desc": "پروتکل کشف آدرس MAC متناظر با یک IPv4 در شبکه محلی از طریق ارسال Broadcast.",
+   "ref": "s02"
+  },
+  {
+   "term": "FCS",
+   "full": "Frame Check Sequence",
+   "desc": "فیلد ۴ بایتی انتهای فریم اترنت (CRC) برای تشخیص خرابی بیت‌ها حین انتقال.",
+   "ref": "s02"
+  },
+  {
+   "term": "Collision Domain",
+   "full": "دامنه تصادم",
+   "desc": "محدوده‌ای از شبکه که بسته‌های ارسالی در آن امکان برخورد دارند؛ در سوئیچ هر پورت یک دامنه مستقل است.",
+   "ref": "s03"
+  },
+  {
+   "term": "Broadcast Domain",
+   "full": "دامنه همه‌پخشی",
+   "desc": "محدوده‌ای که فریم Broadcast در آن پخش می‌شود؛ فقط روتر یا تفکیک VLAN این دامنه را می‌شکند.",
+   "ref": "s03"
+  },
+  {
+   "term": "TCP",
+   "full": "Transmission Control Protocol",
+   "desc": "پروتکل انتقال اتصال‌گرا و مطمئن در لایه ۴ با Three-Way Handshake، شماره ترتیب و کنترل جریان.",
+   "ref": "s03"
+  },
+  {
+   "term": "UDP",
+   "full": "User Datagram Protocol",
+   "desc": "پروتکل انتقال بدون اتصال و کم‌تأخیر در لایه ۴ مناسب DNS، DHCP، VoIP و VXLAN.",
+   "ref": "s03"
+  },
+  {
+   "term": "Three-Way Handshake",
+   "full": "توافق سه‌مرحله‌ای TCP",
+   "desc": "تبادل بسته‌های SYN، SYN-ACK و ACK برای برقراری نشست مطمئن TCP پیش از ارسال داده.",
+   "ref": "s03"
+  },
+  {
+   "term": "Subnetting",
+   "full": "زیرشبکه‌بندی IPv4",
+   "desc": "تقسیم یک شبکه بزرگ IP به زیرشبکه‌های کوچک‌تر با قرض گرفتن بیت از بخش Host.",
+   "ref": "s04"
+  },
+  {
+   "term": "VLSM",
+   "full": "Variable Length Subnet Mask",
+   "desc": "استفاده از ماسک‌های متغیر در زیرشبکه‌های مختلف (مثل /25 و /30) برای جلوگیری از هدررفت IP.",
+   "ref": "s04"
+  },
+  {
+   "term": "CIDR",
+   "full": "Classless Inter-Domain Routing",
+   "desc": "نمایش پیشوند با اسلش (/24) و تجمیع مسیرها بدون محدودیت کلاس‌های سنتی A/B/C.",
+   "ref": "s04"
+  },
+  {
+   "term": "Summarization",
+   "full": "خلاصه‌سازی مسیر (Route Aggregation)",
+   "desc": "ادغام چند پیشوند پیوسته در یک مسیر واحد برای کوچک نگه داشتن Routing Table و پایداری هسته.",
+   "ref": "s05"
+  },
+  {
+   "term": "Longest Prefix Match",
+   "full": "تطابق طولانی‌ترین پیشوند",
+   "desc": "قاعده طلایی روتر: میان چند مسیر منطبق، همیشه مسیر با ماسک دقیق‌تر (/26 نسبت به /24) انتخاب می‌شود.",
+   "ref": "ccna_v6"
+  },
+  {
+   "term": "IPv6",
+   "full": "Internet Protocol version 6",
+   "desc": "نسل جدید آدرس‌دهی ۱۲۸ بیتی با فضای آدرس وسیع، بدون نیاز به NAT و با NDP جایگزین ARP.",
+   "ref": "s06"
+  },
+  {
+   "term": "ICMP",
+   "full": "Internet Control Message Protocol",
+   "desc": "پروتکل پیام‌های کنترلی و خطای لایه ۳ که ابزارهای Ping و Traceroute بر پایه آن کار می‌کنند.",
+   "ref": "s06"
+  },
+  {
+   "term": "NDP",
+   "full": "Neighbor Discovery Protocol",
+   "desc": "پروتکل مبتنی بر ICMPv6 در IPv6 برای کشف همسایه‌ها، کشف روتر و SLAAC به جای ARP.",
+   "ref": "s06"
+  },
+  {
+   "term": "SLAAC",
+   "full": "Stateless Address Autoconfiguration",
+   "desc": "گرفتن خودکار IPv6 توسط کلاینت با دریافت Router Advertisement بدون نیاز به DHCPv6 سرور.",
+   "ref": "s06"
+  },
+  {
+   "term": "DHCP",
+   "full": "Dynamic Host Configuration Protocol",
+   "desc": "پروتکل تخصیص خودکار IP، Subnet Mask، Gateway و DNS از طریق ۴ پیام DORA.",
+   "ref": "ccna_dhcp"
+  },
+  {
+   "term": "DNS",
+   "full": "Domain Name System",
+   "desc": "سیستم ترجمه نام دامنه به آدرس IP (و برعکس) روی پورت ۵۳ UDP/TCP.",
+   "ref": "ccna_dhcp"
+  },
+  {
+   "term": "NAT",
+   "full": "Network Address Translation",
+   "desc": "ترجمه آدرس‌های IP خصوصی داخلی (RFC 1918) به آدرس‌های عمومی معتبر در روتر مرزی.",
+   "ref": "ccna_nat"
+  },
+  {
+   "term": "PAT",
+   "full": "Port Address Translation (NAT Overload)",
+   "desc": "ترجمه چندین IP خصوصی به یک IP عمومی با تمایزگذاری از طریق شماره پورت مبدأ.",
+   "ref": "ccna_nat"
+  },
+  {
+   "term": "SSH",
+   "full": "Secure Shell",
+   "desc": "پروتکل امن و رمزنگاری‌شده (پورت TCP 22) برای مدیریت از راه دور تجهیزات سیسکو به جای Telnet.",
+   "ref": "ccna_qos_ssh"
+  },
+  {
+   "term": "Cisco IOS",
+   "full": "Cisco Internetwork Operating System",
+   "desc": "سیستم‌عامل اصلی روترها و سوئیچ‌های سیسکو با محیط‌های User EXEC، Privileged EXEC و Global Config.",
+   "ref": "s08"
+  },
+  {
+   "term": "Routing Table",
+   "full": "جدول مسیریابی (RIB)",
+   "desc": "جدول اصلی روتر شامل شبکه‌های Connected، Static و مسیرهای آموخته‌شده از OSPF/EIGRP/BGP.",
+   "ref": "s09"
+  },
+  {
+   "term": "Administrative Distance",
+   "full": "فاصله اداری (AD)",
+   "desc": "معیار اعتبار منبع مسیر در روترهای سیسکو (Connected=0، Static=1، eBGP=20، EIGRP=90، OSPF=110).",
+   "ref": "ccna_v6"
+  },
+  {
+   "term": "VLAN",
+   "full": "Virtual Local Area Network",
+   "desc": "تفکیک منطقی لایه ۲ در سوئیچ که هر کدام یک Broadcast Domain کاملاً مجزا می‌سازد.",
+   "ref": "ccna_02_vlan"
+  },
+  {
+   "term": "802.1Q",
+   "full": "IEEE 802.1Q VLAN Tagging",
+   "desc": "استاندارد افزودن تگ ۴ بایتی شماره VLAN به فریم اترنت روی لینک‌های Trunk بین سوئیچ‌ها.",
+   "ref": "s10"
+  },
+  {
+   "term": "Trunk",
+   "full": "لینک ترانک",
+   "desc": "پورتی که ترافیک چندین VLAN را همزمان با تگ 802.1Q بین سوئیچ‌ها یا روتر عبور می‌دهد.",
+   "ref": "s10"
+  },
+  {
+   "term": "Native VLAN",
+   "full": "ویلن بومی بدون تگ",
+   "desc": "تنها VLAN روی لینک Trunk که فریم‌هایش بدون تگ 802.1Q ارسال می‌شوند؛ باید روی دو طرف یکسان و غیرپیش‌فرض باشد.",
+   "ref": "ccna_02_vlan"
+  },
+  {
+   "term": "Inter-VLAN Routing",
+   "full": "مسیریابی بین VLANها",
+   "desc": "برقراری ارتباط لایه ۳ میان VLANهای جدا از طریق Router-on-a-Stick یا SVI سوئیچ لایه ۳.",
+   "ref": "s10"
+  },
+  {
+   "term": "SVI",
+   "full": "Switch Virtual Interface",
+   "desc": "اینترفیس لایه ۳ مجازی (`interface vlan X`) روی سوئیچ چندلایه برای Gateway کاربران.",
+   "ref": "s10"
+  },
+  {
+   "term": "STP",
+   "full": "Spanning Tree Protocol (802.1D)",
+   "desc": "پروتکل جلوگیری از حلقه لایه ۲ با انتخاب Root Bridge و مسدود کردن مسیرهای اضافی.",
+   "ref": "ccna_02"
+  },
+  {
+   "term": "RSTP",
+   "full": "Rapid Spanning Tree Protocol (802.1w)",
+   "desc": "نسخه سریع STP با همگرایی ۱ تا ۲ ثانیه‌ای و نقش‌های Alternate/Backup.",
+   "ref": "ccna_02"
+  },
+  {
+   "term": "MST",
+   "full": "Multiple Spanning Tree (802.1s)",
+   "desc": "نگاشت صدها VLAN داخل چند Instance محدود STP برای کاهش بار CPU و توزیع بار لینک‌ها.",
+   "ref": "adv_01"
+  },
+  {
+   "term": "BPDU",
+   "full": "Bridge Protocol Data Unit",
+   "desc": "فریم‌های کنترلی که سوئیچ‌ها هر ۲ ثانیه برای ساخت درخت بدون حلقه STP تبادل می‌کنند.",
+   "ref": "ccna_02"
+  },
+  {
+   "term": "Root Bridge",
+   "full": "سوئیچ ریشه در STP",
+   "desc": "سوئیچ مرجع درخت Spanning Tree با کمترین Bridge ID (Priority + MAC).",
+   "ref": "ccna_02"
+  },
+  {
+   "term": "EtherChannel",
+   "full": "تجمیع لینک‌ها",
+   "desc": "ترکیب ۲ تا ۸ لینک فیزیکی موازی در یک Port-Channel منطقی واحد با افزایش پهنای باند و افزونگی.",
+   "ref": "ccna_02"
+  },
+  {
+   "term": "LACP",
+   "full": "Link Aggregation Control Protocol (802.3ad)",
+   "desc": "پروتکل استاندارد مذاکره و نگهداری EtherChannel با مدهای Active و Passive.",
+   "ref": "ccna_02"
+  },
+  {
+   "term": "OSPF",
+   "full": "Open Shortest Path First",
+   "desc": "پروتکل مسیریابی Link-State استاندارد (AD=110) مبتنی بر الگوریتم Dijkstra و معیار Cost.",
+   "ref": "ccna_03"
+  },
+  {
+   "term": "EIGRP",
+   "full": "Enhanced Interior Gateway Routing Protocol",
+   "desc": "پروتکل مسیریابی Advanced Distance Vector (AD=90) با الگوریتم DUAL و همگرایی بسیار سریع.",
+   "ref": "adv_eigrp"
+  },
+  {
+   "term": "BGP",
+   "full": "Border Gateway Protocol",
+   "desc": "پروتکل مسیریابی اینترنت و بین سیستم‌های مستقل (AS) با کنترل دقیق سیاست مسیرها (TCP 179).",
+   "ref": "adv_bgp"
+  },
+  {
+   "term": "MP-BGP",
+   "full": "Multiprotocol BGP",
+   "desc": "توسعه BGP برای حمل آدرس‌های متنوع نظیر IPv6، VPNv4 MPLS و EVPN (MAC/IP) در یک نشست.",
+   "ref": "spec_sp_xr"
+  },
+  {
+   "term": "IS-IS",
+   "full": "Intermediate System to Intermediate System",
+   "desc": "پروتکل Link-State بسیار مقیاس‌پذیر روی لایه ۲، محبوب اپراتورها و شبکه Underlay در Fabricها.",
+   "ref": "spec_ent"
+  },
+  {
+   "term": "HSRP",
+   "full": "Hot Standby Router Protocol",
+   "desc": "پروتکل افزونگی Gateway (FHRP) با Virtual IP/MAC مشترک بین روتر Active و Standby.",
+   "ref": "ccna_04"
+  },
+  {
+   "term": "VRRP",
+   "full": "Virtual Router Redundancy Protocol",
+   "desc": "نسخه استاندارد باز (RFC) افزونگی Gateway مشابه HSRP میان تجهیزات چندسازنده‌ای.",
+   "ref": "adv_ec"
+  },
+  {
+   "term": "GLBP",
+   "full": "Gateway Load Balancing Protocol",
+   "desc": "پروتکل افزونگی Gateway سیسکو با قابلیت توزیع بار همزمان بین چند روتر (AVG/AVF).",
+   "ref": "adv_ec"
+  },
+  {
+   "term": "NTP",
+   "full": "Network Time Protocol",
+   "desc": "همگام‌سازی ساعت تمام تجهیزات شبکه روی پورت UDP 123 برای صحت لاگ‌ها و گواهی‌ها.",
+   "ref": "ccna_04"
+  },
+  {
+   "term": "Syslog",
+   "full": "System Logging Protocol",
+   "desc": "ارسال رخدادهای تجهیز با ۸ سطح Severity روی پورت UDP 514 به سرور متمرکز.",
+   "ref": "ccna_04"
+  },
+  {
+   "term": "SNMP",
+   "full": "Simple Network Management Protocol",
+   "desc": "پروتکل پایش سلامت و دریافت متریک تجهیزات (CPU، ترافیک پورت) و ارسال Trap.",
+   "ref": "ccna_04"
+  },
+  {
+   "term": "QoS",
+   "full": "Quality of Service",
+   "desc": "مجموعه تکنیک‌های اولویت‌بندی ترافیک حساس (صوت/تصویر) با Classification، Marking و Queuing.",
+   "ref": "adv_qos"
+  },
+  {
+   "term": "DSCP",
+   "full": "Differentiated Services Code Point",
+   "desc": "فیلد ۶ بیتی در هدر IP برای نشانه‌گذاری اولویت بسته (مثل EF=46 برای VoIP).",
+   "ref": "adv_qos"
+  },
+  {
+   "term": "ACL",
+   "full": "Access Control List",
+   "desc": "فهرست قوانین فیلترینگ ترافیک در روتر و سوئیچ بر اساس IP، پروتکل و پورت (با Implicit Deny).",
+   "ref": "ccna_05"
+  },
+  {
+   "term": "Port Security",
+   "full": "امنیت پورت لایه ۲",
+   "desc": "محدودسازی تعداد آدرس MAC مجاز روی پورت Access و واکنش خودکار در برابر اتصال غیرمجاز.",
+   "ref": "ccna_05"
+  },
+  {
+   "term": "DHCP Snooping",
+   "full": "بازرسی پیام‌های DHCP",
+   "desc": "جلوگیری از حمله Rogue DHCP با محدود کردن سرور به پورت‌های Trusted و ساخت جدول Binding.",
+   "ref": "ccna_05"
+  },
+  {
+   "term": "DAI",
+   "full": "Dynamic ARP Inspection",
+   "desc": "اعتبارسنجی بسته‌های ARP بر اساس جدول DHCP Snooping برای جلوگیری از ARP Spoofing.",
+   "ref": "ccna_05"
+  },
+  {
+   "term": "802.1X",
+   "full": "IEEE 802.1X Port-Based NAC",
+   "desc": "احراز هویت دستگاه‌ها پیش از دسترسی به شبکه از طریق Supplicant، سوئیچ و سرور ISE/RADIUS.",
+   "ref": "spec_sec_ise"
+  },
+  {
+   "term": "SDN",
+   "full": "Software-Defined Networking",
+   "desc": "جداسازی Control Plane از تجهیزات و تمرکز تصمیم‌گیری شبکه در کنترلر نرم‌افزاری مرکزی.",
+   "ref": "ccna_06"
+  },
+  {
+   "term": "Catalyst Center",
+   "full": "Cisco Catalyst Center (DNA Center)",
+   "desc": "کنترلر مرکزی سیسکو برای مدیریت خودکار Campus، SD-Access و پایش Assurance.",
+   "ref": "ccna_06"
+  },
+  {
+   "term": "REST API",
+   "full": "Representational State Transfer API",
+   "desc": "واسط برنامه‌نویسی بر بستر HTTP/HTTPS با متدهای GET/POST/PUT/DELETE و فرمت JSON.",
+   "ref": "auto_06"
+  },
+  {
+   "term": "JSON",
+   "full": "JavaScript Object Notation",
+   "desc": "فرمت متن‌پایه و سبک کلید-مقدار برای تبادل داده میان اسکریپت‌ها و APIهای شبکه.",
+   "ref": "auto_05"
+  },
+  {
+   "term": "YAML",
+   "full": "YAML Ain't Markup Language",
+   "desc": "فرمت خوانای پیکربندی با تورفتگی، مورد استفاده در Playbookهای Ansible و CI/CD.",
+   "ref": "auto_05"
+  },
+  {
+   "term": "VRF",
+   "full": "Virtual Routing and Forwarding",
+   "desc": "مجازی‌سازی جدول مسیریابی لایه ۳ روی یک روتر برای ایزوله‌سازی کامل ترافیک مشتریان و دپارتمان‌ها.",
+   "ref": "adv_03"
+  },
+  {
+   "term": "IP SLA",
+   "full": "Cisco IP Service Level Agreements",
+   "desc": "اندازه‌گیری فعال دسترس‌پذیری و تأخیر مسیر برای سوئیچ خودکار ترافیک هنگام خرابی پشت لینک.",
+   "ref": "adv_03"
+  },
+  {
+   "term": "Multicast",
+   "full": "ارسال یک-به-چند بهینه",
+   "desc": "ارسال همزمان ترافیک به گروه مشخصی از گیرندگان (224.0.0.0/4) با IGMP و PIM.",
+   "ref": "adv_mcast"
+  },
+  {
+   "term": "BFD",
+   "full": "Bidirectional Forwarding Detection",
+   "desc": "پروتکل سبک کشف خرابی لینک در چند ده میلی‌ثانیه برای همگرایی فوق‌سریع OSPF و BGP.",
+   "ref": "adv_bfd"
+  },
+  {
+   "term": "NetFlow",
+   "full": "Flexible NetFlow",
+   "desc": "فناوری ثبت و تحلیل دقیق جریان‌های ترافیکی (مبدأ، مقصد، پورت، حجم) به سمت Collector.",
+   "ref": "adv_bfd"
+  },
+  {
+   "term": "Redistribution",
+   "full": "توزیع مجدد مسیرها",
+   "desc": "معرفی مسیرهای یک پروتکل مسیریابی (مثلاً OSPF) به داخل پروتکل دیگر (مثلاً BGP) با کنترل Loop.",
+   "ref": "adv_redist"
+  },
+  {
+   "term": "Route-Map",
+   "full": "نقشه سیاست مسیر",
+   "desc": "ابزار شرطی قدرتمند (match/set) برای فیلترینگ، Tagگذاری و تغییر Attributeهای BGP و Redistribution.",
+   "ref": "adv_redist"
+  },
+  {
+   "term": "Prefix-List",
+   "full": "فهرست تطبیق پیشوند",
+   "desc": "ابزار دقیق فیلترینگ شبکه‌ها بر اساس محدوده IP و طول ماسک (/le /ge).",
+   "ref": "adv_redist"
+  },
+  {
+   "term": "DMVPN",
+   "full": "Dynamic Multipoint VPN",
+   "desc": "ساخت خودکار تونل‌های مستقیم IPsec بین شعب (Spoke-to-Spoke) با mGRE و NHRP.",
+   "ref": "ccnp_02"
+  },
+  {
+   "term": "NHRP",
+   "full": "Next Hop Resolution Protocol",
+   "desc": "نگاشت IP داخلی تونل به IP عمومی واقعی در شبکه DMVPN.",
+   "ref": "ccnp_02"
+  },
+  {
+   "term": "GRE",
+   "full": "Generic Routing Encapsulation",
+   "desc": "پروتکل تونل لایه ۳ قادر به عبور Multicast و ترافیک پروتکل‌های مسیریابی (معمولاً روی IPsec).",
+   "ref": "ccnp_01"
+  },
+  {
+   "term": "IPsec",
+   "full": "Internet Protocol Security",
+   "desc": "مجموعه پروتکل رمزنگاری و احراز هویت بسته‌های IP با ESP و تبادل کلید IKEv2.",
+   "ref": "spec_sec_vpn"
+  },
+  {
+   "term": "MPLS",
+   "full": "Multiprotocol Label Switching",
+   "desc": "ارسال فوق‌سریع بسته‌ها در هسته مخابراتی بر پایه برچسب‌های کوتاه به جای جستجوی طولانی IP.",
+   "ref": "spec_sp"
+  },
+  {
+   "term": "L3VPN",
+   "full": "MPLS Layer 3 VPN",
+   "desc": "سرویس ارتباطی مشتریان روی شبکه اپراتور با تفکیک VRF، برچسب‌های دوگانه و MP-BGP.",
+   "ref": "spec_sp"
+  },
+  {
+   "term": "Segment Routing",
+   "full": "SR-MPLS / SRv6",
+   "desc": "مسیریابی مبدأمحور بدون LDP و RSVP با کدگذاری مسیر در لیست Segment IDها.",
+   "ref": "spec_sp_sr"
+  },
+  {
+   "term": "TI-LFA",
+   "full": "Topology-Independent Loop-Free Alternate",
+   "desc": "مکانیزم محافظت زیر ۵۰ میلی‌ثانیه در Segment Routing برای سوئیچ به مسیر پشتیبان بدون حلقه.",
+   "ref": "spec_sp_sr"
+  },
+  {
+   "term": "Leaf-Spine",
+   "full": "معماری Spine-and-Leaf",
+   "desc": "توپولوژی دولایه دیتاسنتری Full-Mesh بین Leaf و Spine با Latency ثابت و بدون STP.",
+   "ref": "s11"
+  },
+  {
+   "term": "ECMP",
+   "full": "Equal-Cost Multi-Path",
+   "desc": "توزیع همزمان ترافیک روی تمام مسیرهای موازی هم‌هزینه در لایه ۳.",
+   "ref": "s11"
+  },
+  {
+   "term": "East-West Traffic",
+   "full": "ترافیک شرق به غرب",
+   "desc": "ارتباط داخلی بین سرور به سرور و کانتینرها داخل دیتاسنتر که بخش عمده ترافیک مدرن است.",
+   "ref": "s11"
+  },
+  {
+   "term": "VXLAN",
+   "full": "Virtual Extensible LAN",
+   "desc": "کپسوله‌سازی فریم لایه ۲ داخل UDP روی شبکه لایه ۳ IP Fabric با پشتیبانی تا ۱۶ میلیون VNI.",
+   "ref": "s11"
+  },
+  {
+   "term": "EVPN",
+   "full": "Ethernet VPN (BGP EVPN)",
+   "desc": "کنترل‌پلین استاندارد VXLAN بر پایه MP-BGP برای توزیع کنترل‌شده MAC و IP.",
+   "ref": "s11"
+  },
+  {
+   "term": "VTEP",
+   "full": "VXLAN Tunnel Endpoint",
+   "desc": "نقطه شروع و پایان تونل VXLAN (معمولاً روی سوئیچ Leaf) که کپسوله‌سازی را انجام می‌دهد.",
+   "ref": "s11"
+  },
+  {
+   "term": "Underlay",
+   "full": "شبکه فیزیکی زیرساخت (IP Fabric)",
+   "desc": "بستر لایه ۳ پایدار (Leaf/Spine + OSPF/BGP) که تونل‌های Overlay روی آن سوار می‌شوند.",
+   "ref": "s11"
+  },
+  {
+   "term": "Overlay",
+   "full": "شبکه منطقی مجازی",
+   "desc": "لایه منطقی سوار بر Underlay (مانند VXLAN یا SD-WAN) مستقل از توپولوژی فیزیکی زیرین.",
+   "ref": "s11"
+  },
+  {
+   "term": "Control Plane",
+   "full": "صفحه کنترل",
+   "desc": "بخش محاسبه و تصمیم‌گیری مسیر و وضعیت شبکه (OSPF، BGP، EVPN، STP).",
+   "ref": "adv_04"
+  },
+  {
+   "term": "Data Plane",
+   "full": "صفحه داده (Forwarding Plane)",
+   "desc": "بخش ارسال پرسرعت بسته‌ها در سخت‌افزار ASIC/CEF بر پایه جدول‌های ساخته‌شده.",
+   "ref": "adv_04"
+  },
+  {
+   "term": "NX-OS",
+   "full": "Cisco NX-OS",
+   "desc": "سیستم‌عامل دیتاسنتری سوئیچ‌های Cisco Nexus با پشتیبانی از vPC، VXLAN EVPN و Telemetry.",
+   "ref": "spec_dc_nx"
+  },
+  {
+   "term": "vPC",
+   "full": "Virtual Port Channel",
+   "desc": "قابلیت اتصال سرور به دو سوئیچ Nexus مجزا به صورت یک Port-Channel واحد Active/Active.",
+   "ref": "spec_dc_nx"
+  },
+  {
+   "term": "Cisco ACI",
+   "full": "Application Centric Infrastructure",
+   "desc": "راهکار SDN دیتاسنتری سیسکو با کنترلر APIC، مدل Policy-Based و فابریک Leaf-Spine.",
+   "ref": "spec_dc_aci"
+  },
+  {
+   "term": "Cisco ISE",
+   "full": "Identity Services Engine",
+   "desc": "پلتفرم مرکزی کنترل دسترسی شبکه (NAC)، 802.1X، RADIUS/TACACS+ و TrustSec.",
+   "ref": "spec_sec_ise"
+  },
+  {
+   "term": "RADIUS",
+   "full": "Remote Authentication Dial-In User Service",
+   "desc": "پروتکل AAA مبتنی بر UDP (1812/1813) برای احراز هویت کاربران 802.1X، Wi-Fi و VPN.",
+   "ref": "spec_sec_ise"
+  },
+  {
+   "term": "TACACS+",
+   "full": "Terminal Access Controller Access-Control System Plus",
+   "desc": "پروتکل AAA سیسکو روی TCP 49 با رمزنگاری کامل بسته و کنترل تک‌تک دستورات CLI ادمین‌ها.",
+   "ref": "spec_sec_ise"
+  },
+  {
+   "term": "TrustSec",
+   "full": "Cisco TrustSec (SGT)",
+   "desc": "اعمال سیاست امنیتی بر پایه برچسب نقش (Security Group Tag) به جای آدرس IP.",
+   "ref": "spec_sec_ise"
+  },
+  {
+   "term": "FTD",
+   "full": "Cisco Secure Firewall Threat Defense",
+   "desc": "فایروال نسل جدید سیسکو با ترکیب بازرسی Stateful، IPS، فیلتر اپلیکیشن و مدیریت FMC.",
+   "ref": "spec_sec"
+  },
+  {
+   "term": "CAPWAP",
+   "full": "Control and Provisioning of Wireless Access Points",
+   "desc": "پروتکل تونل استاندارد (UDP 5246/5247) بین Access Pointها و کنترلر WLC.",
+   "ref": "spec_wl"
+  },
+  {
+   "term": "WLC",
+   "full": "Wireless LAN Controller",
+   "desc": "تجهیز مدیریت مرکزی تمام APها، کانال‌های رادیویی، SSIDها و Roaming کلاینت‌ها.",
+   "ref": "spec_wl"
+  },
+  {
+   "term": "SIP",
+   "full": "Session Initiation Protocol",
+   "desc": "پروتکل سیگنالینگ متن‌پایه برای برقراری، مدیریت و پایان تماس‌های صوتی/تصویری VoIP.",
+   "ref": "spec_collab"
+  },
+  {
+   "term": "RTP",
+   "full": "Real-time Transport Protocol",
+   "desc": "پروتکل انتقال جریان بلادرنگ صدا و تصویر روی UDP پس از برقراری تماس با SIP.",
+   "ref": "spec_collab"
+  },
+  {
+   "term": "CUCM",
+   "full": "Cisco Unified Communications Manager",
+   "desc": "سرور مرکزی مدیریت تماس، داخلی‌ها، Dial Plan و تلفن‌های IP در راهکار Collaboration سیسکو.",
+   "ref": "spec_collab"
+  },
+  {
+   "term": "CUBE",
+   "full": "Cisco Unified Border Element",
+   "desc": "دروازه مرزی امن صوت و تصویر (Session Border Controller) بین سازمان و اپراتور مخابراتی.",
+   "ref": "spec_collab_gw"
+  },
+  {
+   "term": "Python",
+   "full": "زبان برنامه‌نویسی پایتون در شبکه",
+   "desc": "زبان اصلی اتوماسیون شبکه با کتابخانه‌هایی چون Netmiko، Nornir، Requests و pyATS.",
+   "ref": "auto_02"
+  },
+  {
+   "term": "Netmiko",
+   "full": "کتابخانه SSH چندسازنده‌ای پایتون",
+   "desc": "کتابخانه محبوب پایتون برای ارسال و دریافت خودکار دستورات CLI روی تجهیزات شبکه.",
+   "ref": "auto_03"
+  },
+  {
+   "term": "NETCONF",
+   "full": "Network Configuration Protocol",
+   "desc": "پروتکل استاندارد مهندسی شبکه روی SSH پورت ۸۳۰ با خروجی XML، قفل‌گذاری و Rollback.",
+   "ref": "auto_08"
+  },
+  {
+   "term": "RESTCONF",
+   "full": "RESTful Configuration Protocol",
+   "desc": "واسط HTTP/HTTPS برای خواندن و تغییر داده‌های مدل‌سازی‌شده با YANG در قالب JSON یا XML.",
+   "ref": "auto_09"
+  },
+  {
+   "term": "YANG",
+   "full": "Yet Another Next Generation",
+   "desc": "زبان استاندارد مدل‌سازی ساختار داده‌های پیکربندی و وضعیت عملیاتی در تجهیزات شبکه.",
+   "ref": "auto_10"
+  },
+  {
+   "term": "Ansible",
+   "full": "ابزار اتوماسیون بدون Agent",
+   "desc": "مدیریت و پیکربندی همزمان صدها تجهیز شبکه با فایل‌های YAML Playbook و قالب Jinja2.",
+   "ref": "auto_11"
+  },
+  {
+   "term": "Terraform",
+   "full": "ابزار Infrastructure as Code",
+   "desc": "ساخت و نگهداری زیرساخت ابری، فایروال و ACI با فایل‌های State و پیکربندی اعلانی.",
+   "ref": "auto_12"
+  },
+  {
+   "term": "IaC",
+   "full": "Infrastructure as Code",
+   "desc": "نگهداری و اعمال تمام تنظیمات شبکه به عنوان کد نسخه‌بندی‌شده در Git همراه با تست خودکار.",
+   "ref": "auto_15"
+  },
+  {
+   "term": "CI/CD",
+   "full": "Continuous Integration / Continuous Delivery",
+   "desc": "خط لوله تست و استقرار خودکار تغییرات شبکه پس از بررسی کد در Git.",
+   "ref": "auto_16"
+  },
+  {
+   "term": "Telemetry",
+   "full": "Model-Driven Streaming Telemetry",
+   "desc": "ارسال پیوسته و بلادرنگ متریک‌های سلامت شبکه از تجهیز به Grafana/ELK با gRPC.",
+   "ref": "auto_19"
+  },
+  {
+   "term": "AIOps",
+   "full": "Artificial Intelligence for IT Operations",
+   "desc": "استفاده از یادگیری ماشین برای پیش‌بینی خرابی، کشف ریشه خطا و خودترمیمی شبکه.",
+   "ref": "auto_20"
+  },
+  {
+   "term": "SIEM",
+   "full": "Security Information and Event Management",
+   "desc": "پلتفرم جمع‌آوری و همبسته‌سازی هوشمند لاگ‌های امنیتی و شبکه‌ای در مرکز SOC.",
+   "ref": "spec_cyber"
+  },
+  {
+   "term": "SOC",
+   "full": "Security Operations Center",
+   "desc": "مرکز پایش، کشف، تحلیل و پاسخگویی ۲۴/۷ به تهدیدات و رخدادهای سایبری سازمان.",
+   "ref": "spec_cyber"
+  },
+  {
+   "term": "Zero Trust",
+   "full": "معماری اعتماد صفر",
+   "desc": "اصل امنیتی «هرگز اعتماد نکن، همیشه راستی‌آزمایی کن» برای هر کاربر و نشست در داخل و خارج.",
+   "ref": "spec_sec"
+  },
+  {
+   "term": "Failure Domain",
+   "full": "دامنه خرابی",
+   "desc": "محدوده‌ای از شبکه که در صورت بروز یک خطا یا خرابی تحت تأثیر قرار می‌گیرد؛ طراحی خوب آن را کوچک نگه می‌دارد.",
+   "ref": "ccde_09"
+  },
+  {
+   "term": "HLD",
+   "full": "High-Level Design",
+   "desc": "سند معماری کلان شامل توپولوژی، انتخاب فناوری، Trade-offها و الزامات کسب‌وکار.",
+   "ref": "ccde_19"
+  },
+  {
+   "term": "LLD",
+   "full": "Low-Level Design",
+   "desc": "سند فنی جزئیات اجرا شامل جدول IP، VLAN، پورت‌ها، کانفیگ و قوانین دقیق.",
+   "ref": "ccde_19"
+  },
+  {
+   "term": "MTU",
+   "full": "Maximum Transmission Unit",
+   "desc": "حداکثر اندازه بسته لایه ۳ قابل عبور از یک لینک (استاندارد اترنت ۱۵۰۰ بایت؛ در VXLAN حدود ۹۲۱۶ بایت).",
+   "ref": "adv_04"
+  },
+  {
+   "term": "MSS",
+   "full": "Maximum Segment Size",
+   "desc": "حداکثر حجم داده خالص در یک Segment TCP (معمولاً ۱۴۶۰ بایت یا ۱۳۶۰ در تونل‌های GRE/IPsec).",
+   "ref": "adv_04"
+  },
+  {
+   "term": "Asymmetric Routing",
+   "full": "مسیریابی نامتقارن",
+   "desc": "عبور بسته رفت و برگشت از دو مسیر یا دو فایروال متفاوت که اغلب باعث Drop شدن ترافیک Stateful می‌شود.",
+   "ref": "adv_04"
+  }
+ ]
+};;,
  "entranceExam": [
   {
    "id": "q1",
