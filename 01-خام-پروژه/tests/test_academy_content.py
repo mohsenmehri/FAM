@@ -141,16 +141,17 @@ class AcademyRedesignTests(unittest.TestCase):
                 ans_dist[q["ans"]] += 1
         self.assertTrue(all(6 <= v <= 10 for v in ans_dist.values()), ans_dist)
 
-        # 2b. Checks for f4 Batch 1 & Batch 2 (first 10 lessons in f4) + Round-6/7 regressions
-        f4_b1_b2 = data["curriculumGroups"][4]["lessons"][:10]
+        # 2b. Checks for f4 Batch 1, 2 & 3 (first 15 lessons in f4) + Round-6/7/8/9 regressions
+        f4_b1_b2_b3 = data["curriculumGroups"][4]["lessons"][:15]
         self.assertEqual(
-            f4_b1_b2,
+            f4_b1_b2_b3,
             [
                 "spec_ent", "spec_ent_campus", "spec_ent_sd", "spec_sec", "spec_sec_vpn",
                 "spec_sec_ise", "spec_dc_nx", "s11", "spec_dc_aci", "spec_dc_stor",
+                "spec_sp", "spec_sp_xr", "spec_sp_sr", "spec_wl", "spec_wl_survey",
             ],
         )
-        for lid in f4_b1_b2:
+        for lid in f4_b1_b2_b3:
             lesson = data["lessons"][lid]
             self.assertEqual(len(lesson.get("exercises", [])), 3, lid)
             self.assertEqual(len(lesson.get("quiz", [])), 3, lid)
@@ -158,6 +159,11 @@ class AcademyRedesignTests(unittest.TestCase):
             s = json.dumps(lesson, ensure_ascii=False)
             for bad in ("192.168", "1921.6800", "فوق‌العاده", "بی‌نظیر", "قانون طلایی", "۹۰٪", "۹۹٪", "۱۰۰٪", "۸۰٪", "جادویی"):
                 self.assertNotIn(bad, s, f"{lid} contains {bad}")
+        b3_dist = {0: 0, 1: 0, 2: 0, 3: 0}
+        for lid in f4_b1_b2_b3[10:15]:
+            for q in data["lessons"][lid]["quiz"]:
+                b3_dist[q["ans"]] += 1
+        self.assertEqual(b3_dist, {0: 4, 1: 4, 2: 4, 3: 3})
 
         # Round-6 & Round-7 regression assertions
         ent_step = data["lessons"]["spec_ent"]["sections"][1]["steps"][0]
@@ -219,6 +225,51 @@ class AcademyRedesignTests(unittest.TestCase):
         self.assertIn("LUN Mapping / LUN Masking", stor_lesson["troubleshooting"]["analysis"])
         self.assertIn("Rescan", stor_lesson["troubleshooting"]["fix"])
 
+        # Round-9 regression assertions (3 remaining Batch 2 fixes + Batch 3 semantic checks)
+        self.assertIn("سوئیچِ مبدأ که فریم را از روی `Peer-Link` می‌فرستد", nx_lesson["sections"][1]["steps"][2])
+        self.assertNotIn("روی سوئیچ دریافت‌کننده قطع شده باشد", nx_lesson["sections"][1]["steps"][2])
+        self.assertIn("مبدأ عبور از Peer-Link", nx_lesson["exercises"][1]["solution"])
+
+        self.assertIn("Global Configuration", ise_lesson["troubleshooting"]["fix"])
+        self.assertIn("اعمال همین لیست‌های نام‌دار زیر `line vty 0 4`", ise_lesson["troubleshooting"]["fix"])
+
+        stor_s = json.dumps(stor_lesson, ensure_ascii=False)
+        self.assertNotIn("فریم کامل `2112B` FC", stor_s)
+        self.assertNotIn("فریم ۲۱۱2 بایتی FC", stor_s)
+        self.assertNotIn("فریم‌های `2112` بایتی FC", stor_s)
+        self.assertIn("2148", stor_lesson["sections"][2]["p"][0])
+        self.assertIn("Payload", stor_lesson["sections"][2]["p"][0])
+        self.assertIn("Nexus 5000", stor_lesson["sections"][2]["p"][0])
+
+        sp_lesson = data["lessons"]["spec_sp"]
+        self.assertIn("Implicit Null", sp_lesson["sections"][1]["steps"][1])
+        self.assertIn("LDP-IGP", sp_lesson["sections"][1]["think"]["a"])
+        self.assertEqual(sp_lesson["bridge"]["nextId"], "spec_sp_xr")
+
+        xr_lesson = data["lessons"]["spec_sp_xr"]
+        self.assertIn("RFC 8212", xr_lesson["sections"][1]["steps"][1])
+        self.assertIn("commit confirmed", xr_lesson["sections"][0]["bullets"][1])
+        self.assertNotIn("commit confirm ", json.dumps(xr_lesson, ensure_ascii=False))
+        self.assertEqual(xr_lesson["bridge"]["nextId"], "spec_sp_sr")
+
+        sr_lesson = data["lessons"]["spec_sp_sr"]
+        self.assertIn("SRGB", sr_lesson["sections"][0]["bullets"][0])
+        self.assertIn("SRH", sr_lesson["sections"][1]["steps"][1])
+        self.assertIn("Post-Convergence", sr_lesson["sections"][1]["steps"][2])
+        self.assertEqual(sr_lesson["bridge"]["nextId"], "spec_wl")
+
+        wl_lesson = data["lessons"]["spec_wl"]
+        self.assertIn("SNR", wl_lesson["sections"][0]["bullets"][1])
+        self.assertIn("OFDMA", wl_lesson["sections"][1]["steps"][0])
+        self.assertIn("FlexConnect", wl_lesson["sections"][2]["p"][0])
+        self.assertEqual(wl_lesson["bridge"]["nextId"], "spec_wl_survey")
+
+        survey_lesson = data["lessons"]["spec_wl_survey"]
+        self.assertIn("AP-on-a-Stick", survey_lesson["sections"][0]["bullets"][1])
+        self.assertIn("3D Channel Planning", survey_lesson["sections"][1]["steps"][1])
+        self.assertIn("Asymmetric Link", survey_lesson["sections"][2]["p"][0])
+        self.assertEqual(survey_lesson["bridge"]["nextId"], "spec_collab")
+
         # 3. Simulator persistence & extracted lab commands verification
         m_mode = re.search(r"low === 'switchport mode access'[\s\S]*?(?=\} else if)", app_js)
         self.assertIsNotNone(m_mode)
@@ -232,9 +283,9 @@ class AcademyRedesignTests(unittest.TestCase):
                 self.fail(msg)
             self.skipTest(msg)
 
-        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1 & Batch 2 lesson
+        # Extract CLI commands directly from lab.steps[2] of each f4 Batch 1, 2 & 3 lesson
         extracted_labs = {}
-        for lid in f4_b1_b2:
+        for lid in f4_b1_b2_b3:
             step_txt = data["lessons"][lid]["lab"]["steps"][2]
             start_idx = step_txt.index("`configure terminal`")
             cmds = re.findall(r"`([^`]+)`", step_txt[start_idx:])
@@ -392,6 +443,46 @@ assertRunLab('spec_dc_stor', (sim) => {{
   if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 145) throw new Error('spec_dc_stor Gi0/7');
   const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
   if (!allowed.includes(140) || allowed.includes(145)) throw new Error('spec_dc_stor trunk isolation');
+}});
+assertRunLab('spec_sp', (sim) => {{
+  if (!sim.vlans[150] || sim.vlans[150].name !== 'CUST_A_CE_HANDOFF') throw new Error('spec_sp VLAN 150');
+  if (!sim.vlans[155] || sim.vlans[155].name !== 'CUST_B_CE_HANDOFF') throw new Error('spec_sp VLAN 155');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 150) throw new Error('spec_sp Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 155) throw new Error('spec_sp Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(150) || !allowed.includes(155)) throw new Error('spec_sp trunk');
+}});
+assertRunLab('spec_sp_xr', (sim) => {{
+  if (!sim.vlans[160] || sim.vlans[160].name !== 'XR_CORE_LINK') throw new Error('spec_sp_xr VLAN 160');
+  if (!sim.vlans[165] || sim.vlans[165].name !== 'XR_EBGP_PEER') throw new Error('spec_sp_xr VLAN 165');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 160) throw new Error('spec_sp_xr Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 165) throw new Error('spec_sp_xr Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(160) || !allowed.includes(165)) throw new Error('spec_sp_xr trunk');
+}});
+assertRunLab('spec_sp_sr', (sim) => {{
+  if (!sim.vlans[170] || sim.vlans[170].name !== 'SR_UNDERLAY_P1') throw new Error('spec_sp_sr VLAN 170');
+  if (!sim.vlans[175] || sim.vlans[175].name !== 'SR_ANYCAST_P2') throw new Error('spec_sp_sr VLAN 175');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 170) throw new Error('spec_sp_sr Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 175) throw new Error('spec_sp_sr Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(170) || !allowed.includes(175)) throw new Error('spec_sp_sr trunk');
+}});
+assertRunLab('spec_wl', (sim) => {{
+  if (!sim.vlans[180] || sim.vlans[180].name !== 'WL_CORP_DATA') throw new Error('spec_wl VLAN 180');
+  if (!sim.vlans[185] || sim.vlans[185].name !== 'WL_GUEST_CAPWAP') throw new Error('spec_wl VLAN 185');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 180) throw new Error('spec_wl Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 185) throw new Error('spec_wl Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(180) || !allowed.includes(185)) throw new Error('spec_wl trunk');
+}});
+assertRunLab('spec_wl_survey', (sim) => {{
+  if (!sim.vlans[190] || sim.vlans[190].name !== 'WL_FLOOR_5_PROD') throw new Error('spec_wl_survey VLAN 190');
+  if (!sim.vlans[195] || sim.vlans[195].name !== 'WL_FLOOR_6_PROD') throw new Error('spec_wl_survey VLAN 195');
+  if (!sim.interfaces['GigabitEthernet0/6'].nonegotiate || sim.interfaces['GigabitEthernet0/6'].accessVlan !== 190) throw new Error('spec_wl_survey Gi0/6');
+  if (!sim.interfaces['GigabitEthernet0/7'].nonegotiate || !sim.interfaces['GigabitEthernet0/7'].adminUp || sim.interfaces['GigabitEthernet0/7'].accessVlan !== 195) throw new Error('spec_wl_survey Gi0/7');
+  const allowed = sim.interfaces['GigabitEthernet0/1'].allowedVlans;
+  if (!allowed.includes(190) || !allowed.includes(195)) throw new Error('spec_wl_survey trunk');
 }});
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
