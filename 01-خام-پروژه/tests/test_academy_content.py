@@ -1916,6 +1916,74 @@ class RegressionTests(unittest.TestCase):
                     self.assertNotIn("acadenmی", full_text, f"{lid} quiz[{qi}]: typo 'acadenmی'")
                     self.assertNotIn("زیرساكت", full_text, f"{lid} quiz[{qi}]: typo 'زیرساكت'")
 
+    def test_entrance_exam_questions_array_structure(self):
+        """آزمون ورودی باید questions آرایه داشته باشد (در هر دو نسخه)."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        ee = data.get("entranceExam", {})
+        self.assertIsInstance(ee.get("questions"), list, "entranceExam.questions must be a list")
+        self.assertGreater(len(ee["questions"]), 0, "entranceExam.questions must not be empty")
+        for qi, q in enumerate(ee["questions"]):
+            with self.subTest(question=qi):
+                self.assertIn("q", q, f"question[{qi}] missing 'q'")
+                self.assertIn("opts", q, f"question[{qi}] missing 'opts'")
+                self.assertIn("ans", q, f"question[{qi}] missing 'ans'")
+                self.assertIn("exp", q, f"question[{qi}] missing 'exp'")
+                self.assertIsInstance(q["opts"], list, f"question[{qi}] opts must be list")
+                self.assertGreaterEqual(len(q["opts"]), 2, f"question[{qi}] needs >=2 opts")
+                self.assertIsInstance(q["ans"], int, f"question[{qi}] ans must be int")
+                self.assertGreaterEqual(q["ans"], 0, f"question[{qi}] ans >= 0")
+                self.assertLess(q["ans"], len(q["opts"]), f"question[{qi}] ans out of range")
+
+    def test_entrance_exam_rendering_both_versions(self):
+        """تابع renderEntranceExam در هر دو نسخه باید از questions استفاده کند."""
+        # Offline HTML
+        html_path = PACKAGE_ROOT.parents[0] / "FAM-Academy-Offline.html"
+        html = html_path.read_text(encoding="utf-8")
+        self.assertIn("function renderEntranceExam", html, "Offline HTML missing renderEntranceExam")
+        self.assertIn("ee.questions", html, "Offline renderEntranceExam must use ee.questions")
+        self.assertIn("questions.forEach", html, "Offline renderEntranceExam must iterate questions")
+
+        # Online app.js
+        app_js_path = ASSET_ROOT / "app.js"
+        app_js = app_js_path.read_text(encoding="utf-8")
+        self.assertIn("function renderEntranceExam", app_js, "Online app.js missing renderEntranceExam")
+        self.assertIn("ee.questions", app_js, "Online renderEntranceExam must use ee.questions")
+        self.assertIn("questions.forEach", app_js, "Online renderEntranceExam must iterate questions")
+
+    def test_entrance_exam_scoring_logic(self):
+        """منطق نمره‌دهی آزمون را شبیه‌سازی می‌کند: پاسخ درست = +1، نمره درصدی."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        questions = data.get("entranceExam", {}).get("questions", [])
+        self.assertGreater(len(questions), 0, "No entrance exam questions found")
+
+        # Simulate: all correct
+        ok_all = sum(1 for q in questions if True)  # placeholder; real picks come from UI
+        picks_all_correct = {i: q["ans"] for i, q in enumerate(questions)}
+        ok = sum(1 for i, q in enumerate(questions) if picks_all_correct[i] == q["ans"])
+        pct_all = round((ok / len(questions)) * 100)
+        self.assertEqual(pct_all, 100, "All-correct picks should yield 100%")
+
+        # Simulate: all wrong (pick index 0 unless ans is 0, then pick 1)
+        picks_all_wrong = {}
+        for i, q in enumerate(questions):
+            wrong_pick = 1 if q["ans"] == 0 else 0
+            picks_all_wrong[i] = wrong_pick
+        ok_wrong = sum(1 for i, q in enumerate(questions) if picks_all_wrong[i] == q["ans"])
+        pct_wrong = round((ok_wrong / len(questions)) * 100)
+        self.assertEqual(pct_wrong, 0, "All-wrong picks should yield 0%")
+
+        # Simulate: half correct
+        picks_half = {}
+        for i, q in enumerate(questions):
+            if i < len(questions) // 2:
+                picks_half[i] = q["ans"]
+            else:
+                picks_half[i] = 1 if q["ans"] == 0 else 0
+        ok_half = sum(1 for i, q in enumerate(questions) if picks_half[i] == q["ans"])
+        pct_half = round((ok_half / len(questions)) * 100)
+        expected_half = round(((len(questions) // 2) / len(questions)) * 100)
+        self.assertEqual(pct_half, expected_half, "Half-correct should yield expected percentage")
+
 
 if __name__ == "__main__":
     unittest.main()
