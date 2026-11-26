@@ -1957,7 +1957,6 @@ class RegressionTests(unittest.TestCase):
         self.assertGreater(len(questions), 0, "No entrance exam questions found")
 
         # Simulate: all correct
-        ok_all = sum(1 for q in questions if True)  # placeholder; real picks come from UI
         picks_all_correct = {i: q["ans"] for i, q in enumerate(questions)}
         ok = sum(1 for i, q in enumerate(questions) if picks_all_correct[i] == q["ans"])
         pct_all = round((ok / len(questions)) * 100)
@@ -1974,9 +1973,16 @@ class RegressionTests(unittest.TestCase):
 
         # Simulate: half correct
         picks_half = {}
+        half_point = len(questions) // 2
         for i, q in enumerate(questions):
-            if i < len(questions) // 2:
+            if i < half_point:
                 picks_half[i] = q["ans"]
+            else:
+                picks_half[i] = 1 if q["ans"] == 0 else 0
+        ok_half = sum(1 for i, q in enumerate(questions) if picks_half[i] == q["ans"])
+        pct_half = round((ok_half / len(questions)) * 100)
+        expected_half = round((half_point / len(questions)) * 100)
+        self.assertEqual(pct_half, expected_half, "Half-correct picks should yield expected percentage")
 
     def test_entrance_exam_dom_simulation_both_versions(self):
         """شبیه‌سازی واقعی رویدادهای DOM در هر دو نسخه: انتخاب پاسخ، دکمه ثبت، بررسی state.examScore و ذخیره."""
@@ -2016,8 +2022,8 @@ function runVersionWithDOM(renderFn, selectPattern) {
     let inputCounter = 0;
     
     function makeInput(name) {
-        const qIdx = Math.floor(inputCounter / 4); // Assume up to 4 options
-        const optIdx = inputCounter % 4;
+        const qIdx = Math.floor(inputCounter / questions[Math.floor(inputCounter / questions.length)].opts.length) || 0;
+        const optIdx = inputCounter;
         inputCounter++;
         const inp = {
             type: 'radio',
@@ -2077,20 +2083,36 @@ function runVersionWithDOM(renderFn, selectPattern) {
     const fn = new Function('return (' + renderFn + ')')();
     fn();
     
+    // Recalculate qIdx properly based on actual options per question
+    inputCounter = 0;
+    let qIdx = 0;
+    let optInCurrentQ = 0;
+    allInputs.forEach(inp => {
+        if (optInCurrentQ >= questions[qIdx].opts.length) {
+            qIdx++;
+            optInCurrentQ = 0;
+            inputCounter = 0;
+        }
+        inp._qIdx = qIdx;
+        inp._optIdx = optInCurrentQ;
+        optInCurrentQ++;
+        inputCounter++;
+    });
+    
     // Trigger change events on the correct radio for each question
-    for (let qIdx = 0; qIdx < questions.length; qIdx++) {
+    for (let qIdx2 = 0; qIdx2 < questions.length; qIdx2++) {
         let targetOptIdx = 0;
         if (selectPattern === 'all') {
-            targetOptIdx = questions[qIdx].ans;
+            targetOptIdx = questions[qIdx2].ans;
         } else if (selectPattern === 'none') {
-            targetOptIdx = questions[qIdx].ans === 0 ? 1 : 0;
+            targetOptIdx = questions[qIdx2].ans === 0 ? 1 : 0;
         } else if (selectPattern === 'half') {
-            targetOptIdx = (qIdx < Math.floor(questions.length / 2)) 
-                ? questions[qIdx].ans 
-                : (questions[qIdx].ans === 0 ? 1 : 0);
+            targetOptIdx = (qIdx2 < Math.floor(questions.length / 2)) 
+                ? questions[qIdx2].ans 
+                : (questions[qIdx2].ans === 0 ? 1 : 0);
         }
         
-        const targetInput = allInputs.find(inp => inp._qIdx === qIdx && inp._optIdx === targetOptIdx);
+        const targetInput = allInputs.find(inp => inp._qIdx === qIdx2 && inp._optIdx === targetOptIdx);
         if (targetInput) {
             targetInput.click();
         }
@@ -2132,30 +2154,53 @@ console.log(JSON.stringify({
                 self.fail(f'Node.js DOM test failed: {result.stderr}')
             output = json.loads(result.stdout.strip().split('\n')[-1])
 
+            # Verify all-correct = 100%
             self.assertEqual(output['online']['all']['score'], 100, 'Online all-correct should be 100%')
             self.assertEqual(output['offline']['all']['score'], 100, 'Offline all-correct should be 100%')
             
+            # Verify all-wrong = 0%
             self.assertEqual(output['online']['none']['score'], 0, 'Online all-wrong should be 0%')
             self.assertEqual(output['offline']['none']['score'], 0, 'Offline all-wrong should be 0%')
             
-            self.assertGreaterEqual(output['online']['all']['persistCalls'], 1, 'Online should call persistState')
-            self.assertGreaterEqual(output['offline']['all']['persistCalls'], 1, 'Offline should call persistState')
+            # Verify half-correct = 50%
+            self.assertEqual(output['online']['half']['score'], 50, 'Online half-correct should be 50%')
+            self.assertEqual(output['offline']['half']['score'], 50, 'Offline half-correct should be 50%')
             
+            # Verify persistState was called in all states
+            self.assertGreaterEqual(output['online']['all']['persistCalls'], 1, 'Online all should call persistState')
+            self.assertGreaterEqual(output['online']['none']['persistCalls'], 1, 'Online none should call persistState')
+            self.assertGreaterEqual(output['online']['half']['persistCalls'], 1, 'Online half should call persistState')
+            self.assertGreaterEqual(output['offline']['all']['persistCalls'], 1, 'Offline all should call persistState')
+            self.assertGreaterEqual(output['offline']['none']['persistCalls'], 1, 'Offline none should call persistState')
+            self.assertGreaterEqual(output['offline']['half']['persistCalls'], 1, 'Offline half should call persistState')
+            
+            # Verify state.examScore was updated
             self.assertEqual(output['online']['all']['stateExamScore'], 100, 'Online state.examScore should be 100')
             self.assertEqual(output['offline']['all']['stateExamScore'], 100, 'Offline state.examScore should be 100')
+            self.assertEqual(output['online']['none']['stateExamScore'], 0, 'Online state.examScore should be 0')
+            self.assertEqual(output['offline']['none']['stateExamScore'], 0, 'Offline state.examScore should be 0')
+            self.assertEqual(output['online']['half']['stateExamScore'], 50, 'Online state.examScore should be 50')
+            self.assertEqual(output['offline']['half']['stateExamScore'], 50, 'Offline state.examScore should be 50')
             
+            # Verify both versions produce same results
             self.assertEqual(output['online']['all']['score'], output['offline']['all']['score'])
             self.assertEqual(output['online']['none']['score'], output['offline']['none']['score'])
             self.assertEqual(output['online']['half']['score'], output['offline']['half']['score'])
+            
+            # Verify result text contains score
+            self.assertIn('100', output['online']['all']['resBoxText'], 'Online result should contain 100')
+            self.assertIn('0', output['online']['none']['resBoxText'], 'Online result should contain 0')
+            self.assertIn('50', output['online']['half']['resBoxText'], 'Online result should contain 50')
         finally:
             os.unlink(js_path)
+
     def test_concurrency_repeatable_peak_measurement(self):
         """تست قابل تکرار concurrency با barrier و اندازه‌گیری طول عمر کامل lease.
 
-        طول عمر هر lease تا آزاد شدن واقعی را اندازه می‌گیرد، تمام threadها و
-        خطاهای آن‌ها را بررسی می‌کند و از همگام‌سازی قابل اتکا استفاده می‌کند.
-        علت flaky بودن قطعی اعلام نمی‌شود تا شواهد کافی جمع شود.
-        تست موجود غیرفعال نمی‌شود.
+        طول عمر هر lease از شروع admit تا آزاد شدن واقعی (بعد از خروج از with) را
+        اندازه می‌گیرد، تمام threadها و خطاهای آن‌ها را بررسی می‌کند و از همگام‌سازی
+        قابل اتکا استفاده می‌کند. علت flaky بودن قطعی اعلام نمی‌شود تا شواهد کافی
+        جمع شود. تست موجود غیرفعال نمی‌شود.
         """
         import os, tempfile, threading, time
         from unittest.mock import patch
@@ -2183,7 +2228,7 @@ console.log(JSON.stringify({
                     admitted = []
                     busy = []
                     errors = []
-                    lease_lifetimes = []  # (start_time, end_time, host)
+                    lease_lifetimes = []  # (start_time, release_time, host)
                     thread_completion = {}  # thread_idx -> completed bool
                     thread_errors = {}  # thread_idx -> error
 
@@ -2191,30 +2236,31 @@ console.log(JSON.stringify({
                         nonlocal active, peak_active
                         host = '10.20.0.' + str(idx + 1)
                         start_time = None
-                        end_time = None
+                        release_time = None
                         try:
                             barrier.wait(timeout=5)
+                            start_time = time.monotonic()
                             with guard.admit(host):
                                 with state_lock:
                                     active += 1
                                     if active > peak_active:
                                         peak_active = active
                                     admitted.append(host)
-                                start_time = time.monotonic()
                                 time.sleep(hold_seconds)
-                                end_time = time.monotonic()
                                 with state_lock:
                                     active -= 1
-                                with state_lock:
-                                    lease_lifetimes.append((start_time, end_time, host))
+                            release_time = time.monotonic()
                             with state_lock:
+                                lease_lifetimes.append((start_time, release_time, host))
                                 thread_completion[idx] = True
                         except equipment_guard.AdmissionError as err:
+                            release_time = time.monotonic()
                             with state_lock:
                                 busy.append(host)
                                 thread_completion[idx] = True
                                 thread_errors[idx] = err.code
                         except BaseException as exc:
+                            release_time = time.monotonic()
                             with state_lock:
                                 errors.append(exc)
                                 thread_completion[idx] = True
@@ -2264,7 +2310,6 @@ console.log(JSON.stringify({
         print(f'Max peak observed: {max(peaks)}')
         print(f'All threads completed in all runs: True')
         print(f'Note: Cause of any fluctuation not definitively determined; test not disabled.')
-
 
 if __name__ == "__main__":
     unittest.main()
