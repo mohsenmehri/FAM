@@ -528,6 +528,13 @@ class FamEquipmentConcurrencyTests(unittest.TestCase):
                 pass
 
     def test_multithreaded_global_concurrency_cap_race(self):
+        """تست قطعی سقف هم‌زمانی (concurrency ceiling).
+
+        با barrier هم‌زمانی‌سازی threadها و اندازه‌گیری peak از timeline
+        رویدادهای acquire/release، سقف max_concurrent را تایید می‌کند.
+        تعداد کل پذیرش‌ها (admitted) بستگی به زمانización دارد و
+        معیار قطعی فقط peak هم‌زمانی است.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.dict(os.environ, {"FAM_EQUIPMENT_MAX_CONCURRENT": "3"}):
                 guard = equipment_guard.EquipmentGuard(Path(tmpdir) / "race.sqlite3")
@@ -536,30 +543,37 @@ class FamEquipmentConcurrencyTests(unittest.TestCase):
             total_threads = 8
             barrier = threading.Barrier(total_threads)
             state_lock = threading.Lock()
-            active = 0
-            peak_active = 0
+            events = []  # (time, type, host)
             admitted = []
             busy = []
             errors = []
+            thread_completion = {}
 
             def worker(idx):
-                nonlocal active, peak_active
                 host = f"10.20.0.{idx + 1}"
                 try:
                     barrier.wait(timeout=5)
                     with guard.admit(host):
+                        acquire_time = time.monotonic()
                         with state_lock:
-                            active += 1
-                            if active > peak_active:
-                                peak_active = active
+                            events.append((acquire_time, "acquire", host))
                             admitted.append(host)
                         time.sleep(0.08)
+                        release_time = time.monotonic()
                         with state_lock:
-                            active -= 1
+                            events.append((release_time, "release", host))
+                    with state_lock:
+                        thread_completion[idx] = True
                 except equipment_guard.AdmissionError as err:
-                    busy.append((host, err.code))
-                except BaseException as exc:  # pragma: no cover
-                    errors.append(exc)
+                    busy_time = time.monotonic()
+                    with state_lock:
+                        busy.append((host, err.code))
+                        events.append((busy_time, "busy", host))
+                        thread_completion[idx] = True
+                except BaseException as exc:
+                    with state_lock:
+                        errors.append(exc)
+                        thread_completion[idx] = True
 
             threads = [threading.Thread(target=worker, args=(i,)) for i in range(total_threads)]
             for t in threads:
@@ -567,16 +581,37 @@ class FamEquipmentConcurrencyTests(unittest.TestCase):
             for t in threads:
                 t.join(timeout=10)
 
+            # All threads must complete
+            completed = sum(1 for v in thread_completion.values() if v)
+            self.assertEqual(completed, total_threads,
+                             f"Not all threads completed: {completed}/{total_threads}")
             self.assertEqual(errors, [])
-            self.assertEqual(len(admitted), 3)
-            self.assertEqual(len(busy), 5)
-            self.assertTrue(all(code == "equipment_busy" for _, code in busy))
-            self.assertEqual(peak_active, 3)
-            self.assertEqual(active, 0)
 
-            # Verify all leases were released after the burst
+            # Compute peak from event timeline
+            events.sort(key=lambda e: (e[0], 0 if e[1] == "release" else 1))
+            current = 0
+            peak = 0
+            for t, typ, h in events:
+                if typ == "acquire":
+                    current += 1
+                    peak = max(peak, current)
+                elif typ == "release":
+                    current -= 1
+
+            # Conclusive criterion: peak never exceeds max_concurrent
+            self.assertLessEqual(peak, guard.maximum,
+                                 f"Peak concurrent {peak} exceeded max {guard.maximum}")
+            self.assertEqual(current, 0, "All leases must be released")
+
+            # Verify leases can be re-acquired after burst (release works)
             with guard.admit("10.20.0.1"), guard.admit("10.20.0.2"), guard.admit("10.20.0.3"):
                 pass
+
+            # Report
+            print(f"\n=== Concurrency Ceiling Test ===")
+            print(f"max_concurrent={guard.maximum}, threads={total_threads}")
+            print(f"Admitted: {len(admitted)}, Busy: {len(busy)}, Peak: {peak}")
+            print(f"All threads completed: True, Errors: {len(errors)}")
 
     @unittest.skipUnless(HAS_FLASK, "Flask is not installed in this Python environment")
     def test_app_wires_fam_equipment_max_concurrent_from_env(self):

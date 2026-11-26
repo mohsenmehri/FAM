@@ -2198,11 +2198,12 @@ console.log(JSON.stringify({
     def test_concurrency_repeatable_peak_measurement(self):
         """تست قابل تکرار concurrency با barrier و اندازه‌گیری طول عمر کامل lease.
 
-        طول عمر هر lease از زمان acquire (قبل از ورود به with) تا زمان release (بعد از خروج از with)
-        با timestamp ثبت می‌شود. Peak concurrent با بررسی timeline leaseها محاسبه می‌شود، نه فقط شمارنده.
-        زمان انتظار پیش از پذیرش (barrier) با عمر واقعی lease اشتباه نمی‌شود.
-        تمام threadها و خطاها بررسی می‌شوند و از همگام‌سازی قابل اتکا استفاده می‌شود.
-        علت flaky بودن قطعی اعلام نمی‌شود تا شواهد کافی جمع شود. تست موجود غیرفعال نمی‌شود.
+        معیار سقف هم‌زمانی همان max_concurrent است (نه max_concurrent + 1).
+        طول عمر هر lease از زمان acquire (داخل بلوک with، پس ازเรียนگیری قفل واقعی)
+        تا زمان release (بعد از خروج از with) ثبت می‌شود.
+        زمان انتظار پیش از پذیرش (barrier یا قفل SQLite) با عمرlease اشتباه نمی‌شود.
+        تمام threadها و خطاها بررسی می‌شوند. اگر سقف نقض شود، تست失败 می‌کند.
+        تست موجود غیرفعال نمی‌شود.
         """
         import os, tempfile, threading, time
         from unittest.mock import patch
@@ -2236,16 +2237,15 @@ console.log(JSON.stringify({
                         host = '10.20.0.' + str(idx + 1)
                         try:
                             barrier.wait(timeout=5)
-                            acquire_time = time.monotonic()
                             with guard.admit(host):
+                                acquire_time = time.monotonic()  #After actual lease acquisition
                                 with state_lock:
                                     events.append((acquire_time, 'acquire', host))
                                     admitted.append(host)
                                 time.sleep(hold_seconds)
-                                release_time = time.monotonic()
-                                with state_lock:
-                                    events.append((release_time, 'release', host))
+                            release_time = time.monotonic()  #After lease released (finally ran)
                             with state_lock:
+                                events.append((release_time, 'release', host))
                                 thread_completion[idx] = True
                         except equipment_guard.AdmissionError as err:
                             busy_time = time.monotonic()
@@ -2270,16 +2270,15 @@ console.log(JSON.stringify({
                     completed_count = sum(1 for v in thread_completion.values() if v)
 
                     # Compute peak concurrent from event timeline
-                    events.sort(key=lambda e: (e[0], 0 if e[1] == 'release' else 1))  # releases before acquires at same time
+                    # Sort by time; at same time, release before acquire (to avoid false peak)
+                    events.sort(key=lambda e: (e[0], 0 if e[1] == 'release' else 1))
                     current_active = 0
                     peak_active = 0
-                    peak_timestamp = None
                     for t, typ, host in events:
                         if typ == 'acquire':
                             current_active += 1
                             if current_active > peak_active:
                                 peak_active = current_active
-                                peak_timestamp = t
                         elif typ == 'release':
                             current_active -= 1
 
@@ -2288,7 +2287,6 @@ console.log(JSON.stringify({
                         'admitted': len(admitted),
                         'busy': len(busy),
                         'peak_active': peak_active,
-                        'peak_timestamp': peak_timestamp,
                         'active_after': current_active,
                         'completed_threads': completed_count,
                         'total_threads': total_threads,
@@ -2296,11 +2294,10 @@ console.log(JSON.stringify({
                         'total_events': len(events),
                     })
 
-        # Verify results
+        # Verify results - conclusive assertions
         for r in all_results:
-            # Peak may occasionally exceed max_concurrent due to SQLite lock timing;
-            # we report it but do not fail definitively until root cause is determined.
-            self.assertLessEqual(r['peak_active'], max_concurrent + 1,
+            # Criterion: peak must not exceed configured max_concurrent
+            self.assertLessEqual(r['peak_active'], max_concurrent,
                                  f"Run {r['run']}: peak_active {r['peak_active']} exceeded max {max_concurrent}")
             self.assertEqual(r['active_after'], 0,
                              f"Run {r['run']}: active_after should be 0, got {r['active_after']}")
@@ -2308,12 +2305,11 @@ console.log(JSON.stringify({
                              f"Run {r['run']}: not all threads completed ({r['completed_threads']}/{r['total_threads']})")
             self.assertEqual(r['errors'], 0,
                              f"Run {r['run']}: unexpected errors ({r['errors']})")
-            # acquire count should equal release count (each admitted thread releases exactly once)
-            acquire_count = sum(1 for r in all_results if True)  # placeholder
+            # Each admitted thread must have one acquire and one release
             self.assertGreaterEqual(r['total_events'], r['admitted'],
                                     f"Run {r['run']}: total events should be at least admitted count")
 
-        # Report findings without making definitive race cause claim
+        # Report findings
         peaks = [r['peak_active'] for r in all_results]
         admitted_counts = sorted(set(r['admitted'] for r in all_results))
         print(f'\n=== Concurrency Repeatability Results ({num_runs} runs) ===')
@@ -2322,7 +2318,10 @@ console.log(JSON.stringify({
         print(f'Admitted counts seen: {admitted_counts}')
         print(f'Max peak observed: {max(peaks)}')
         print(f'All threads completed in all runs: True')
-        print(f'Note: Cause of any fluctuation not definitively determined; test not disabled.')
+        if max(peaks) > max_concurrent:
+            print('WARNING: Peak exceeded max_concurrent - requires investigation of EquipmentGuard race condition')
+        else:
+            print('PASS: Peak never exceeded max_concurrent in all runs')
 
 if __name__ == "__main__":
     unittest.main()
