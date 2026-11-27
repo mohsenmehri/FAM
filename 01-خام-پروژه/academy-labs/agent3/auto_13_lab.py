@@ -12,12 +12,20 @@ import copy
 import json
 
 
+def _require_non_empty_str(val: object, name: str) -> str:
+    if not isinstance(val, str) or not val.strip():
+        raise ValueError(f"{name} must be a non-empty str, got {val!r}")
+    return val
+
+
 class NsoOrchestratorMock:
     def __init__(self) -> None:
         self.cdb_devices = {"PE1-IOSXE": [], "PE2-JUNOS": []}
         self.live_devices = copy.deepcopy(self.cdb_devices)
 
     def render_ned_commands(self, vrf_name: str, rd: str) -> dict[str, list[str]]:
+        _require_non_empty_str(vrf_name, "vrf_name")
+        _require_non_empty_str(rd, "rd")
         return {
             "PE1-IOSXE": [f"vrf definition {vrf_name}", f" rd {rd}", " address-family ipv4"],
             "PE2-JUNOS": [f"set routing-instances {vrf_name} instance-type vrf", f"set routing-instances {vrf_name} route-distinguisher {rd}"],
@@ -25,6 +33,8 @@ class NsoOrchestratorMock:
 
     def commit_service(self, vrf_name: str, rd: str, fail_on_device: str | None = None) -> dict:
         rendered = self.render_ned_commands(vrf_name, rd)
+        if fail_on_device is not None and fail_on_device not in rendered:
+            raise ValueError(f"Unknown fail_on_device {fail_on_device!r}; expected one of {sorted(rendered)}")
         cdb_backup = copy.deepcopy(self.cdb_devices)
         live_backup = copy.deepcopy(self.live_devices)
         try:
@@ -41,6 +51,8 @@ class NsoOrchestratorMock:
             return {"status": "aborted", "error": str(exc), "rollback_triggered": True}
 
     def check_sync(self, device: str) -> str:
+        if device not in self.cdb_devices:
+            raise ValueError(f"Unknown NSO device: {device!r}")
         return "in-sync" if self.cdb_devices[device] == self.live_devices[device] else "out-of-sync"
 
 

@@ -190,4 +190,16 @@
 | Automation | `auto_08` | استفاده از `assert` در منطق پروتکل/قفل (آسیب‌پذیر در `python -O`) و تک‌تکه بودن RFC 6242. | RFC 6241 / RFC 6242 §4.2 | جایگزینی با `ValueError`/`RuntimeError` + پشتیبانی چندتکه‌ای RFC 6242. | `test_phase8c1_automation_core_labs` | شبیه‌ساز محلی؛ بازبینی نویسنده. |
 | Automation | `auto_10` | کرش روی ورودی غیر-dict و پذیرش `dhcp="False"` در اعتبارسنج YANG. | RFC 7950 | بررسی نوع dict و بررسی سخت‌گیرانه `bool` برای `dhcp`. | `test_phase8c1_automation_core_labs` | اعتبارسنج محلی (جایگزین `pyang` نیست)؛ بازبینی نویسنده. |
 
+---
+
+## بخش ۸C-2: بازبینی فنی فاز ۸C-2 (2026-11-27 — تکمیل ۱۰۰٪ مسیر Automation با ۵ درس پایانی)
+
+| دسته | شناسه درس | ایراد شناسایی‌شده | منبع معتبر | اصلاح انجام‌شده | تست مرتبط | محدودیت |
+|---|---|---|---|---|---|---|
+| Automation | `auto_11` | نبود `_require_bool` روی `check_mode` و عدم تفکیک `handler_actually_executed`. | Ansible `--check` / Handlers | `_require_bool` + افزودن `handler_actually_executed`. | `test_phase8c2_remaining_automation_labs` | شبیه‌ساز محلی؛ بازبینی نویسنده. |
+| Automation | `auto_13` | پذیرش `vrf_name`/`rd` خالی و `KeyError` خام روی تجهیز ناشناخته. | Cisco NSO FASTMAP | `_require_non_empty_str` و `ValueError` روی تجهیز ناشناخته. | `test_phase8c2_remaining_automation_labs` | شبیه‌ساز محلی؛ بازبینی نویسنده. |
+| Automation | `auto_14` | حلقه بی‌نهایت روی `page_size<=0`، global بودن `RATE_STATE` و نبود سقف `max_retries`. | Catalyst Center API / RFC 9110 | `MockCatalystServer.rate_hits`، `page_size > 0` و `max_retries`. | `test_phase8c2_remaining_automation_labs` | سرور محلی `127.0.0.1`؛ بازبینی نویسنده. |
+| Automation | `auto_18` | کرش `AttributeError` روی ورودی غیر-dict/خالی در توابع Dq و Batfish. | pyATS/Genie و Batfish | اعتبارسنجی نوع `dict`/`str` با `ValueError`. | `test_phase8c2_remaining_automation_labs` | شبیه‌ساز محلی؛ بازبینی نویسنده. |
+| Automation | `auto_19` | نبود شرط `clear_thresh < high_thresh`، بازه `cpu_pct` و عبارات مطلق بخش ۱/۷/Q3. | gNMI/MDT و Hysteresis | شرط `clear_thresh < high_thresh`، بازه `0..100` و تعدیل متن. | `test_phase8c2_remaining_automation_labs` | مدل محلی Python 3؛ بازبینی نویسنده. |
+
 > **یادآوری پایانی:** با وجود این ممیزی فنی و معنایی عمیق و آزمون‌های رگرسیون خودکار، این گزارش همچنان **بازبینی نویسنده** است و پیش از انتشار رسمی عمومی، **بازبینی مستقل توسط متخصص شبکه/امنیت انسانی (Independent Human SME Review)** توصیه می‌شود.

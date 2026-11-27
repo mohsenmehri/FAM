@@ -2,8 +2,9 @@
 """
 FAM Academy Lab — auto_14: Cisco DevNet SDK Pattern & ChatOps RBAC Loopback Lab.
 Execution boundary: Local loopback HTTP server on 127.0.0.1 modeling Catalyst
-Center token auth (/dna/system/api/v1/auth/token), automatic pagination,
-429 Retry-After handling, and ChatOps allowlist + audit trail. No live DevNet Sandbox.
+Center token auth (/dna/system/api/v1/auth/token), automatic pagination (with
+positive page_size & retry cap guards), 429 Retry-After handling, and ChatOps
+allowlist + audit trail. No live DevNet Sandbox.
 """
 
 from __future__ import annotations
@@ -17,7 +18,12 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 DEVICES = [{"id": f"dev-{i}", "hostname": f"BRANCH-R{i}", "platform": "C8300"} for i in range(1, 6)]
-RATE_STATE = {"hits": 0}
+
+
+class MockCatalystServer(HTTPServer):
+    def __init__(self, server_address, handler_cls):
+        super().__init__(server_address, handler_cls)
+        self.rate_hits = 0
 
 
 class MockCatalystCenter(BaseHTTPRequestHandler):
@@ -43,14 +49,17 @@ class MockCatalystCenter(BaseHTTPRequestHandler):
         if self.headers.get("X-Auth-Token") != "mock-dna-token-123":
             self._json(401, {"error": "invalid token"})
             return
-        RATE_STATE["hits"] += 1
-        if RATE_STATE["hits"] == 1:
+        self.server.rate_hits += 1
+        if self.server.rate_hits == 1:
             self._json(429, {"error": "rate limit"}, {"Retry-After": "0"})
             return
         parsed = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed.query)
         offset = int(qs.get("offset", ["1"])[0]) - 1
         limit = int(qs.get("limit", ["2"])[0])
+        if offset < 0 or limit <= 0:
+            self._json(400, {"error": "invalid offset or limit"})
+            return
         self._json(200, {"response": DEVICES[offset : offset + limit]})
 
 
@@ -65,7 +74,12 @@ class MiniSdkClient:
         with urllib.request.urlopen(req, timeout=5) as resp:
             return json.loads(resp.read().decode("utf-8"))["Token"]
 
-    def get_all_devices(self, page_size: int = 2) -> list[dict]:
+    def get_all_devices(self, page_size: int = 2, max_retries: int = 5) -> list[dict]:
+        if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size <= 0:
+            raise ValueError(f"page_size must be a positive int (not bool), got {page_size!r}")
+        if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0:
+            raise ValueError(f"max_retries must be a non-negative int (not bool), got {max_retries!r}")
+
         collected = []
         offset = 1
         while True:
@@ -75,7 +89,7 @@ class MiniSdkClient:
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     batch = json.loads(resp.read().decode("utf-8"))["response"]
             except urllib.error.HTTPError as exc:
-                if exc.code == 429:
+                if exc.code == 429 and self.retries_handled < max_retries:
                     self.retries_handled += 1
                     time.sleep(float(exc.headers.get("Retry-After", "0")))
                     continue
@@ -94,12 +108,14 @@ CHATOPS_ALLOWLIST = {
 
 
 def chatops_execute(user: str, role: str, command: str) -> dict:
+    if not all(isinstance(x, str) and x.strip() for x in (user, role, command)):
+        raise ValueError("user, role, and command must be non-empty str")
     allowed = command in CHATOPS_ALLOWLIST.get(role, set())
     return {"user": user, "role": role, "command": command, "allowed": allowed, "audited": True}
 
 
 def main() -> None:
-    server = HTTPServer(("127.0.0.1", 0), MockCatalystCenter)
+    server = MockCatalystServer(("127.0.0.1", 0), MockCatalystCenter)
     port = server.server_address[1]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

@@ -1084,6 +1084,65 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         errs = a10.validate_vlan_payload({"vlans": [{"vlan-id": 10, "name": "CORP", "dhcp": "False"}]})
         self.assertTrue(any("boolean" in e for e in errs))
 
+    def test_phase8c2_remaining_automation_labs(self):
+        """Phase 8C-2: complete 100% of Automation track (auto_11, auto_13, auto_14, auto_18, auto_19)."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. auto_11: strict bool check_mode + handler_actually_executed
+        a11 = load_module(AGENT3_LAB_DIR / "auto_11_lab.py", "auto_11_phase8c2_testmod")
+        for bad in ("False", "True", 0, 1, None):
+            with self.assertRaises(ValueError):
+                a11.run_ios_config_task("core_routers", ["interface Loopback0"], ["desc X"], check_mode=bad)
+
+        # 2. auto_13: empty VRF/RD & unknown device rejected
+        a13 = load_module(AGENT3_LAB_DIR / "auto_13_lab.py", "auto_13_phase8c2_testmod")
+        nso = a13.NsoOrchestratorMock()
+        with self.assertRaises(ValueError):
+            nso.commit_service("", "65000:1")
+        with self.assertRaises(ValueError):
+            nso.check_sync("NON_EXISTENT_DEV")
+
+        # 3. auto_14: page_size<=0 rejected & server 429 state is per-instance (repeatable!)
+        a14 = load_module(AGENT3_LAB_DIR / "auto_14_lab.py", "auto_14_phase8c2_testmod")
+        with self.assertRaises(ValueError):
+            a14.chatops_execute("", "noc-read", "show_inventory")
+        # Run loopback server twice to prove 429 retry is repeatable per instance
+        import threading as _th
+        for _ in range(2):
+            srv = a14.MockCatalystServer(("127.0.0.1", 0), a14.MockCatalystCenter)
+            t = _th.Thread(target=srv.serve_forever, daemon=True)
+            t.start()
+            try:
+                sdk = a14.MiniSdkClient(f"http://127.0.0.1:{srv.server_address[1]}")
+                with self.assertRaises(ValueError):
+                    sdk.get_all_devices(page_size=0)
+                devs = sdk.get_all_devices(page_size=2)
+                self.assertEqual(len(devs), 5)
+                self.assertEqual(sdk.retries_handled, 1)
+            finally:
+                srv.shutdown()
+                srv.server_close()
+
+        # 4. auto_18: non-dict & empty router/prefix rejected
+        a18 = load_module(AGENT3_LAB_DIR / "auto_18_lab.py", "auto_18_phase8c2_testmod")
+        with self.assertRaises(ValueError):
+            a18.dq_filter_down_bgp_peers("not-a-dict")
+        with self.assertRaises(ValueError):
+            a18.batfish_style_trace({}, "", "10.0.0.0/24")
+
+        # 5. auto_19: inverted hysteresis thresholds & out-of-range cpu_pct rejected
+        a19 = load_module(AGENT3_LAB_DIR / "auto_19_lab.py", "auto_19_phase8c2_testmod")
+        with self.assertRaises(ValueError):
+            a19.evaluate_alert_hysteresis([80, 90], high_thresh=80.0, clear_thresh=85.0)
+        with self.assertRaises(ValueError):
+            a19.encode_compact_metric(1000, 1, 100, 105.0)
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

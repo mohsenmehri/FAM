@@ -13,6 +13,8 @@ import json
 
 
 def dq_filter_down_bgp_peers(bgp_parsed: dict) -> list[str]:
+    if not isinstance(bgp_parsed, dict):
+        raise ValueError(f"bgp_parsed must be a dict, got {type(bgp_parsed).__name__}")
     down = []
     for vrf_data in bgp_parsed.get("vrf", {}).values():
         for peer_ip, info in vrf_data.get("neighbor", {}).items():
@@ -22,6 +24,12 @@ def dq_filter_down_bgp_peers(bgp_parsed: dict) -> list[str]:
 
 
 def batfish_style_trace(rib: dict[str, dict[str, str]], start_router: str, dst_prefix: str) -> dict:
+    if not isinstance(rib, dict):
+        raise ValueError("rib must be a dict mapping router -> {prefix: next_hop}")
+    if not isinstance(start_router, str) or not start_router.strip():
+        raise ValueError("start_router must be a non-empty str")
+    if not isinstance(dst_prefix, str) or not dst_prefix.strip():
+        raise ValueError("dst_prefix must be a non-empty str")
     visited: list[str] = []
     cur = start_router
     while True:
