@@ -429,6 +429,15 @@
     const stageLabels = { concept: 'مفهوم', example: 'مثال', practice: 'تمرین', lab: 'آزمایشگاه', quiz: 'آزمون', summary: 'جمع‌بندی' };
     const stageIcons = { concept:'M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2ZM9 21h6', example:'M5 3h14v18H5z M8 7h8M8 11h8M8 15h5', practice:'M4 20l4-1 11-11-3-3L5 16z M14 7l3 3', lab:'M9 3v7l-5 8a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-8V3 M8 3h8 M7 16h10', quiz:'M9 9a3 3 0 1 1 5 2c-1 .8-2 1-2 3 M12 18h.01 M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20', summary:'M5 4h14v17H5z M8 8h8 M8 12h8 M8 16h5' };
     const stageIcon = (id, index) => stageIcons[id] ? `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${stageIcons[id]}"/></svg>` : String(index + 1);
+    // Absence or an unfamiliar status is never presented as an approval.
+    const review = typeof bp.reviewStatus === 'string' ? bp.reviewStatus.trim() : '';
+    const pending = /\b(draft|pending)\b/i.test(review);
+    const reviewLabel = !review ? 'وضعیت بازبینی مشخص نیست' : pending
+      ? 'پیش‌نویس؛ در انتظار بازبینی فنی و محتوایی' : `وضعیت ثبت‌شده: ${review}`;
+    const evidence = typeof bp.evidence === 'string' ? bp.evidence.trim() : '';
+    const evidenceLabel = /^Designed\s*[—–-]\s*Not Run$/i.test(evidence)
+      ? 'آزمایشگاه طراحی شده است؛ اجرای واقعی آن تأیید نشده است.'
+      : evidence ? `وضعیت اجرای ثبت‌شده: ${evidence}` : 'وضعیت اجرای آزمایشگاه مشخص نیست.';
 
     container.innerHTML = `
       <div class="lesson-layout lesson-reference-unit">
@@ -447,6 +456,9 @@
             </div>
           </div>
         </header>
+        <aside class="lesson-review-status" role="status" aria-label="وضعیت بازبینی و آزمایش درس" style="margin:12px 0;padding:12px 16px;border:1px solid #b45309;border-radius:10px;background:#fff7ed;color:#7c2d12;line-height:1.7">
+          <strong>${escapeHtml(reviewLabel)}</strong><br><span>${escapeHtml(evidenceLabel)}</span>
+        </aside>
         ${hasStages(bp) ? `
           <nav id="le-stage-bar" class="stepper lesson-stepper" aria-label="بخش‌های درس">
             ${sections.map((s, idx) => `<button type="button" id="side-sec-${escapeHtml(s.id)}" class="stepper-item le-stage-pill" data-stage-idx="${idx}" data-stage-id="${escapeHtml(s.id)}" aria-label="بخش ${idx + 1}: ${escapeHtml(s.title)}"><span class="stepper-dot">${stageIcon(s.id, idx)}</span><span class="stepper-label">${escapeHtml(stageLabels[s.id] || s.title)}</span></button>`).join('')}

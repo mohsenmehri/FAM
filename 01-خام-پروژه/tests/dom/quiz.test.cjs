@@ -58,3 +58,24 @@ assert.equal(JSON.parse(w.localStorage.getItem('fam_academy_quiz_v1'))[bp.lesson
 render();
 assert.match(result(), /آخرین نتیجه ثبت‌شده: 0 از 12/);
 console.log('jsdom quiz: zero, partial, full, retry, persistence, account isolation: passed');
+// Render the actual current catalog blueprints and verify the warning is
+// visible in the lesson header, not just present in JSON metadata.
+const catalog = JSON.parse(fs.readFileSync(path.join(root, 'server/www/academy-assets/curriculum-catalog.json'), 'utf8'));
+for (const item of catalog.paths.flatMap(track => track.courses.flatMap(course => course.lessons))) {
+  const asset = item.blueprint.replace('/academy-assets/', 'server/www/academy-assets/');
+  const lesson = JSON.parse(fs.readFileSync(path.join(root, asset), 'utf8'));
+  w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), lesson);
+  const notice = w.document.querySelector('.lesson-review-status');
+  assert(notice, `${item.id} must display a review notice`);
+  assert.match(notice.textContent, /در انتظار بازبینی/);
+  assert.match(notice.textContent, /اجرای واقعی آن تأیید نشده/);
+}
+const unknown = {...bp, reviewStatus: '', evidence: ''};
+w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), unknown);
+assert.match(w.document.querySelector('.lesson-review-status').textContent, /وضعیت بازبینی مشخص نیست/);
+assert.match(w.document.querySelector('.lesson-review-status').textContent, /وضعیت اجرای آزمایشگاه مشخص نیست/);
+const unsafe = {...bp, reviewStatus: '<img src=x onerror=alert(1)>', evidence: '<img src=x>'};
+w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), unsafe);
+assert.equal(w.document.querySelector('.lesson-review-status img'), null);
+assert.match(w.document.querySelector('.lesson-review-status').textContent, /<img/);
+console.log('jsdom: review and execution status visible for all current lessons; unknown and escaping passed');
