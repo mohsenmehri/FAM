@@ -43,8 +43,13 @@ def inspect(base, inventory):
             if bp.get('schema') != 'fam-app-blueprint-v1':
                 raise ValueError('unexpected schema')
             lab_source = lab_data.decode('utf-8')
-            embedded = lab_source in html.unescape(bp['stages']['lab']['html'])
-            if not embedded:
+            lab_html = html.unescape(bp['stages']['lab']['html'])
+            embedded = lab_source in lab_html
+            # A missing final line terminator in the HTML code block is not a
+            # Python source change; flag it explicitly instead of concealing it.
+            final_newline_only = (not embedded and lab_source.endswith('\n')
+                                  and lab_source[:-1] in lab_html)
+            if not embedded and not final_newline_only:
                 raise ValueError('embedded lab does not match source')
             tree = ast.parse(lab_source, filename=lab_path)
             imports = set()
@@ -58,6 +63,7 @@ def inspect(base, inventory):
                 'labSha256': hashlib.sha256(lab_data).hexdigest(),
                 'reviewSha256': hashlib.sha256(review_data).hexdigest(),
                 'flaggedImports': sorted(imports & FLAGGED),
+                'embeddedLabMatch': 'missing-final-newline' if final_newline_only else 'exact',
                 'status': bp.get('reviewStatus', ''),
             }
         except (OSError, ValueError, KeyError, TypeError, UnicodeError, SyntaxError) as exc:

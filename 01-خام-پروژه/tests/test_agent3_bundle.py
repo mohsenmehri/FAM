@@ -35,6 +35,16 @@ class Agent3BundleTests(unittest.TestCase):
         self.lab.write_text(self.code + 'changed = True\n')
         self.assertIn('embedded lab', m.inspect(self.root, self.inventory)['errors'][0]['error'])
 
+    def test_missing_final_newline_is_reported(self):
+        self.data['stages']['lab']['html'] = html.escape(self.code[:-1])
+        self.bp.write_text(json.dumps(self.data))
+        result = m.inspect(self.root, self.inventory)
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['records']['auto_01']['embeddedLabMatch'], 'missing-final-newline')
+        self.data['stages']['lab']['html'] = html.escape(self.code[:-2])
+        self.bp.write_text(json.dumps(self.data))
+        self.assertTrue(m.inspect(self.root, self.inventory)['errors'])
+
     def test_missing_and_wrong_id_and_escape(self):
         self.review.unlink()
         self.assertEqual(len(m.inspect(self.root, self.inventory)['errors']), 1)
