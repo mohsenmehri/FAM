@@ -973,6 +973,69 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             scyb.score_dns_tunneling("")
 
+    def test_phase8b_ccie_and_remaining_specialist_labs(self):
+        """Phase 8B: strict bool & boundary checks completing 100% of CCIE and Specialist tracks."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        bad_bools = ("False", "True", 0, 1, None)
+
+        # 1. ccie_sp: strict bools & prefix_sid_index
+        csp = load_module(AGENT3_LAB_DIR / "ccie_sp_lab.py", "ccie_sp_phase8b_testmod")
+        ok_pe1 = {"igp_lo0_reachable": True, "prefix_sid_index": 1, "rt_export": ["65000:100"], "xr_ebgp_rpl_attached": True}
+        ok_pe2 = {"igp_lo0_reachable": True, "prefix_sid_index": 2, "rt_import": ["65000:100"], "xr_ebgp_rpl_attached": True}
+        for bad in bad_bools:
+            with self.assertRaises(ValueError):
+                csp.debug_mpls_l3vpn_bottom_up(ok_pe1, {**ok_pe2, "xr_ebgp_rpl_attached": bad})
+        with self.assertRaises(ValueError):
+            csp.debug_mpls_l3vpn_bottom_up({**ok_pe1, "prefix_sid_index": True}, ok_pe2)
+
+        # 2. ccie_auto: dry_run strict bool + multi-service fastmap_clean
+        cauto = load_module(AGENT3_LAB_DIR / "ccie_auto_lab.py", "ccie_auto_phase8b_testmod")
+        nso = cauto.MockNSOEngine()
+        for bad in bad_bools:
+            with self.assertRaises(ValueError):
+                nso.apply_l3vpn_service("S1", "VRF1", "65000:1", dry_run=bad)
+        nso.apply_l3vpn_service("S1", "VRF1", "65000:1", dry_run=False)
+        nso.apply_l3vpn_service("S2", "VRF2", "65000:2", dry_run=False)
+        del_s1 = nso.delete_l3vpn_service("S1")
+        self.assertTrue(del_s1["deleted"])
+        self.assertTrue(del_s1["fastmap_clean"])
+        self.assertIn("VRF2", nso.device_cdb["PE1"]["vrfs"])
+
+        # 3. spec_collab_gw: strict bools & empty dialed_number
+        cgw = load_module(AGENT3_LAB_DIR / "spec_collab_gw_lab.py", "spec_collab_gw_phase8b_testmod")
+        for bad in bad_bools:
+            with self.assertRaises(ValueError):
+                cgw.evaluate_branch_phone_state(bad, True)
+            with self.assertRaises(ValueError):
+                cgw.match_outbound_dial_peer("911", primary_trunk_up=bad)
+        with self.assertRaises(ValueError):
+            cgw.match_outbound_dial_peer("")
+
+        # 4. spec_sec_ise: strict bools + leading-whitespace TACACS+ deny normalization
+        ise = load_module(AGENT3_LAB_DIR / "spec_sec_ise_lab.py", "spec_sec_ise_phase8b_testmod")
+        self.assertFalse(ise.tacacs_authorize_command("net-admin", "   reload"))
+        for bad in bad_bools:
+            with self.assertRaises(ValueError):
+                ise.evaluate_posture_and_pxgrid("u@corp", "10.0.0.1", av_updated=bad, os_patched=True)
+
+        # 5. spec_sp_sr: unknown mode, short hybrid path, invalid MSD rejected
+        sr = load_module(AGENT3_LAB_DIR / "spec_sp_sr_lab.py", "spec_sp_sr_phase8b_testmod")
+        with self.assertRaises(ValueError):
+            sr.build_sr_te_stack(["PE1", "P1", "P3", "PE2"], mode="invalid_mode")
+        with self.assertRaises(ValueError):
+            sr.build_sr_te_stack(["PE1", "PE2"], mode="hybrid")
+        with self.assertRaises(ValueError):
+            sr.compute_ti_lfa_backup(("P1", "P2"), "PE2", ("P1", "P3"), hardware_msd=True)
+        with self.assertRaises(ValueError):
+            sr.compute_ti_lfa_backup(("P1", "P2"), "PE2", ("P1", "P3"), hardware_msd=0)
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

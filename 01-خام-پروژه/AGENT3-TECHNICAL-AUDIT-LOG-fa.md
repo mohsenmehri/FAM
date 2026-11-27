@@ -164,4 +164,18 @@
 | Specialist Core | `spec_collab` | نبود `_require_bool` روی `dot1q`/wire و `ZeroDivisionError` در `packetization_ms=0`. | ITU-T G.711/G.729، RFC 3550، CUCM | `_require_bool`، `packetization_ms > 0`، سربار غیرمنفی و `dialed_number` غیرخالی. | `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` | مدل محلی بدون CUCM/CUBE؛ بازبینی نویسنده. |
 | Specialist Core | `spec_cyber` | پذیرش `threshold<=0`، `window_sec<0`، `max_cv<0`، `ts=bool` و `fqdn` خالی. | NIST SP 800-61r3 و MITRE ATT&CK | نگهبان‌های نوع و بازه روی توابع SIEM/Beaconing/DNS. | `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` | داده‌های مصنوعی محلی بدون SIEM؛ بازبینی نویسنده. |
 
+---
+
+## بخش ۸B: بازبینی فنی فاز ۸B (2026-11-27 — تکمیل ۱۰۰٪ ممیزی عمیق مسیرهای CCIE و Specialist)
+
+با اتمام این دسته، هر ۷ درس مسیر CCIE و هر ۱۶ درس مسیر Specialist به‌طور کامل از نظر صحت فنی، عبارات مطلق، نوع بولی سخت‌گیرانه و تست‌های مرزی بازبینی شدند:
+
+| دسته | شناسه درس | ایراد شناسایی‌شده | منبع معتبر | اصلاح انجام‌شده | تست مرتبط | محدودیت |
+|---|---|---|---|---|---|---|
+| CCIE | `ccie_sp` | نبود `_require_bool` روی IGP/RPL، نبود اعتبارسنجی `prefix_sid_index` و عبارت «بدون خطای دستی» در بخش ۹. | RFC 8212، RFC 8660 | `_require_bool`/`_require_prefix_sid` + تعدیل بخش ۹. | `test_phase8b_ccie_and_remaining_specialist_labs` | مدل محلی؛ بازبینی نویسنده (نه مستقل). |
+| CCIE | `ccie_auto` | `dry_run="False"` مانع commit می‌شد؛ باگ `fastmap_clean` در چندسرویسه؛ «تضمین می‌کند» در Q5. | Cisco NSO FASTMAP | `_require_bool`، اصلاح `fastmap_clean` و تعدیل Q5. | `test_phase8b_ccie_and_remaining_specialist_labs` | مدل محلی؛ بازبینی نویسنده (نه مستقل). |
+| Specialist | `spec_collab_gw` | نبود `_require_bool` روی `primary_trunk_up`/`wan_to_cucm_up`/`srst_configured` و `dialed_number` خالی. | Cisco CUBE/SRST | `_require_bool`، اعتبارسنجی `dialed_number` + assertها. | `test_phase8b_ccie_and_remaining_specialist_labs` | مدل محلی؛ بازبینی نویسنده (نه مستقل). |
+| Specialist | `spec_sec_ise` | `av_updated="False"` وضعیت Compliant می‌داد؛ دور زدن TACACS با `' reload'`. | Cisco ISE Posture/TACACS+ | `_require_bool` و نرمال‌سازی `.strip().lower()` در TACACS+. | `test_phase8b_ccie_and_remaining_specialist_labs` | مدل محلی؛ بازبینی نویسنده (نه مستقل). |
+| Specialist | `spec_sp_sr` | پذیرش `mode` ناشناخته، `IndexError` مسیر کوتاه، نبود نگهبان `hardware_msd` و عبارات مطلق بخش ۳/۹. | RFC 8660، MSD/TI-LFA | اعتبارسنجی کامل `mode`/مسیر/MSD + تعدیل بخش ۳/۹. | `test_phase8b_ccie_and_remaining_specialist_labs` | مدل محلی؛ بازبینی نویسنده (نه مستقل). |
+
 > **یادآوری پایانی:** با وجود این ممیزی فنی و معنایی عمیق و آزمون‌های رگرسیون خودکار، این گزارش همچنان **بازبینی نویسنده** است و پیش از انتشار رسمی عمومی، **بازبینی مستقل توسط متخصص شبکه/امنیت انسانی (Independent Human SME Review)** توصیه می‌شود.

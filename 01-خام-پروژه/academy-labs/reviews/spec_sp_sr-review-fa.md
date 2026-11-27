@@ -11,3 +11,10 @@
 - مسئله ۱: ادعای مطلق «۱۰۰٪ پوشش TI-LFA زیر ۵۰ms در هر توپولوژی دلخواه» بدون ذکر پیش‌نیاز توپولوژی ۲-همبند، محدودیت MSD سخت‌افزار و وابستگی <50ms به تشخیص قطعی لینک/BFD. منبع: IETF `draft-ietf-rtgwg-segment-routing-ti-lfa`.
 - مسئله ۲: در `spec_sp_sr_lab.py` حالت `hybrid` آرگومان ورودی `nodes` را نادیده می‌گرفت و سناریوی منفی نداشت. اصلاح کد + افزودن تست‌های MSD و Cut-Edge.
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions` + اجرای زنده `spec_sp_sr_lab.py`).
+
+## بازبینی فنی فاز ۸B (2026-11-27)
+- **ایراد:** پذیرش `mode` ناشناخته بدون خطا، `IndexError` در حالت `hybrid` با مسیر کوتاه‌تر از ۴ گره، نبود نگهبان `hardware_msd <= 0`/bool و عبارات مطلق بخش‌های ۳ و ۹.
+- **منبع معتبر:** RFC 8660 (SR-MPLS)، RFC 8491/MSD و TI-LFA.
+- **اصلاح انجام‌شده:** اعتبارسنجی `VALID_SR_TE_MODES`، طول مسیر، وجود لینک در `ADJ_SIDS`، `hardware_msd > 0` و تعدیل بخش‌های ۳ و ۹.
+- **تست مرتبط:** `test_phase8b_ccie_and_remaining_specialist_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** مدل محلی بدون روتر SR-MPLS زنده؛ بازبینی نویسنده (نه مستقل).

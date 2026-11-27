@@ -11,3 +11,10 @@
 - مسئله: عبارت مطلق «همیشه باید» در توضیح پرسش ۵.
 - منبع: Cisco Unified Border Element (CUBE) Configuration Guide.
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions`).
+
+## بازبینی فنی فاز ۸B (2026-11-27)
+- **ایراد:** نبود `_require_bool` روی `primary_trunk_up`، `wan_to_cucm_up` و `srst_configured` و عدم رد `dialed_number` خالی.
+- **منبع معتبر:** Cisco CUBE Dial-Peer Longest Match و SRST Survivability.
+- **اصلاح انجام‌شده:** اعمال `_require_bool`، اعتبارسنجی `dialed_number` و افزودن assertها.
+- **تست مرتبط:** `test_phase8b_ccie_and_remaining_specialist_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** مدل محلی بدون CUBE/CUCM زنده؛ بازبینی نویسنده (نه مستقل).
