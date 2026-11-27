@@ -4,3 +4,10 @@
 
 - همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش و مدل‌ساز `01-خام-پروژه/academy-labs/agent3/ccde_09_lab.py` بررسی و اجرا شدند.
 - هیچ تجهیز تولیدی متصل نشده است.
+
+## بازبینی فنی فاز ۶ (2026-11-27 — رفع کامل یافته‌های `agent-intake-837fad64-fa.md` روی `ccde_18` و ممیزی مرزی درس‌های باقی‌مانده)
+- **ایراد:** پذیرش `flaps_in_60s < 0` و برگرداندن پیام `Clean single fault` برای `flaps_in_60s == 0` در `simulate_flap_dampening`.
+- **منبع معتبر:** Cisco IOS-XE/XR IP Event Dampening و معماری تاب‌آوری ۵لایه CCDE.
+- **اصلاح انجام‌شده:** رد مقادیر منفی/نامعتبر، تفکیک حالت `0` فلپ (`NO_FAULT_STEADY_STATE`) از خطای منفرد، و افزودن assertها در `ccde_09_lab.py`.
+- **تست مرتبط:** `test_phase6_ccde_18_remediation_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** شبیه‌ساز محلی بدون روتر یا فیبر واقعی؛ بازبینی نویسنده (نه مستقل).

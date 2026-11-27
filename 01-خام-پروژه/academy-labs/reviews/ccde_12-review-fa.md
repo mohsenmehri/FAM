@@ -4,3 +4,10 @@
 
 - همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش و مدل‌ساز `01-خام-پروژه/academy-labs/agent3/ccde_12_lab.py` بررسی و اجرا شدند.
 - هیچ روتر تولیدی متصل نشده است.
+
+## بازبینی فنی فاز ۶ (2026-11-27 — رفع کامل یافته‌های `agent-intake-837fad64-fa.md` روی `ccde_18` و ممیزی مرزی درس‌های باقی‌مانده)
+- **ایراد:** نبود اعتبارسنجی روی `routers`، `route_reflectors > routers` و مقادیر منفی/صفر در معادلات iBGP/Scaling Walls.
+- **منبع معتبر:** RFC 4456 (BGP Route Reflection) و ریاضیات گراف کامل `N(N-1)/2`.
+- **اصلاح انجام‌شده:** افزودن `_require_pos_int` و شرط `route_reflectors <= routers` همراه با assertها در `ccde_12_lab.py`.
+- **تست مرتبط:** `test_phase6_ccde_18_remediation_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** مدل‌ساز محلی بدون شبکه تولیدی؛ بازبینی نویسنده (نه مستقل).

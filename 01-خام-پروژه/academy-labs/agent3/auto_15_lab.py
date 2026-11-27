@@ -3,8 +3,8 @@
 FAM Academy Lab — auto_15: Infrastructure as Code (IaC), Terraform State Drift
 & NetBox Source-of-Truth Local Mock.
 Execution boundary: Pure Python 3 stdlib simulation of declarative plan/apply,
-state file tracking, refresh-only drift detection, and IPAM overlap checks.
-No real Terraform binary, cloud provider, or NetBox server executed.
+state file tracking, refresh-only drift detection, and dual-stack (IPv4 + IPv6)
+IPAM overlap checks. No real Terraform binary, cloud provider, or NetBox server executed.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def validate_sot_prefixes(prefixes: list[str]) -> list[str]:
     overlaps = []
     for i in range(len(nets)):
         for j in range(i + 1, len(nets)):
-            if nets[i].overlaps(nets[j]):
+            if nets[i].version == nets[j].version and nets[i].overlaps(nets[j]):
                 overlaps.append(f"{nets[i]} overlaps {nets[j]}")
     return overlaps
 
@@ -66,8 +66,8 @@ def main() -> None:
     # plan -refresh-only must NOT mutate state or live!
     assert iac.state["vlan_20"]["name"] == "VOICE"
 
-    # NetBox/Nautobot SoT prefix overlap detection
-    overlaps = validate_sot_prefixes(["10.10.10.0/24", "10.10.10.128/25", "10.10.20.0/24"])
+    # NetBox/Nautobot SoT dual-stack (IPv4 + IPv6) prefix overlap detection
+    overlaps = validate_sot_prefixes(["10.10.10.0/24", "10.10.10.128/25", "10.10.20.0/24", "2001:db8:1::/48"])
     assert len(overlaps) == 1
 
     print("=== auto_15 IaC State Drift & SoT Local Mock ===")

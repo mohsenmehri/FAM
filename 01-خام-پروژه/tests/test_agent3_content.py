@@ -419,23 +419,26 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         base_ok = {
             "dc_distance_km": 5000,
             "storage_replication": "asynchronous",
+            "target_rpo_minutes": 15,
             "dci_l2_stretched": False,
+            "gslb_enabled": True,
             "wan_model": "hybrid_sdwan_regional_hubs_plus_sase",
             "cloud_hub": "dual_colo_cloud_exchange_direct_connect",
             "macro_vrfs": 4,
             "micro_sgt_enabled": True,
             "eu_residency_policy_enforced": True,
-            "cross_border_transfer_basis": "eu_eea_residency_policy",
-            "encryption_in_transit": True,
+            "eu_personal_data_transferred_outside_eea": False,
+            "chapter_v_transfer_safeguard": None,
+            "encryption_in_transit_assumed": True,
         }
         res_ok = c18_mod.validate_pars_global_hld(base_ok, "vmware_vmsc_netapp_metrocluster")
         self.assertTrue(res_ok["all_architectural_checks_passed"])
-        self.assertIn("Chapter V", res_ok["domain_validations"][3]["compliance_scope_note"])
-        self.assertIn("technical controls only", res_ok["domain_validations"][3]["compliance_scope_note"])
+        self.assertIn("unverified HLD design assumptions", res_ok["domain_validations"][3]["assumption_disclaimer"])
+        self.assertIn("not legal opinions", res_ok["domain_validations"][3]["assumption_disclaimer"])
 
         # Metro distance (150 km) where sync IS feasible: note MUST say "within", NEVER "exceeds"!
         metro_sync_ok = c18_mod.validate_pars_global_hld(
-            {**base_ok, "dc_distance_km": 150, "storage_replication": "synchronous"},
+            {**base_ok, "dc_distance_km": 150, "assumed_equipment_and_detour_overhead_ms": 1.0, "storage_replication": "synchronous", "target_rpo_minutes": 0},
             "vmware_vsan_stretched",
         )
         self.assertTrue(metro_sync_ok["all_architectural_checks_passed"])
@@ -448,7 +451,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
 
         # Metro distance with L2 stretched: replication_ok is True, l2_stretch_policy_ok is False
         metro_l2_bad = c18_mod.validate_pars_global_hld(
-            {**base_ok, "dc_distance_km": 150, "storage_replication": "synchronous", "dci_l2_stretched": True},
+            {**base_ok, "dc_distance_km": 150, "assumed_equipment_and_detour_overhead_ms": 1.0, "storage_replication": "synchronous", "target_rpo_minutes": 0, "dci_l2_stretched": True},
             "vmware_vsan_stretched",
         )
         self.assertFalse(metro_l2_bad["all_architectural_checks_passed"])
@@ -458,8 +461,8 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertNotIn("exceeds", dci_metro_bad["note"])
         self.assertIn("policy", dci_metro_bad["note"])
 
-        # Missing encryption or transfer basis must fail compliance technical controls
-        bad_comp = c18_mod.validate_pars_global_hld({**base_ok, "encryption_in_transit": False})
+        # Missing encryption assumption must fail compliance technical controls
+        bad_comp = c18_mod.validate_pars_global_hld({**base_ok, "encryption_in_transit_assumed": False})
         self.assertFalse(bad_comp["all_architectural_checks_passed"])
         self.assertFalse(bad_comp["domain_validations"][3]["pass"])
 
@@ -618,6 +621,152 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertTrue(len(a17.audit_dockerfile(["FROM python:3.11-slim", "USER appuser", "USER root"])) >= 1)
         self.assertTrue(len(a17.audit_dockerfile(["FROM python:3.11-slim", "USER appuser", "ENV API_TOKEN=xyz"])) >= 1)
         self.assertEqual(a17.audit_dockerfile(["FROM python:3.11-slim", "USER appuser"]), [])
+
+    def test_phase6_ccde_18_remediation_and_remaining_labs(self):
+        """Phase 6 negative & boundary tests: ccde_18 Agent 2 findings + ccde_04, ccde_09, ccde_12, ccde_13, auto_15."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+
+        def student_text(lid: str) -> str:
+            d = json.loads((BLUEPRINT_DIR / f"{lid}.json").read_text(encoding="utf-8"))
+            return json.dumps(
+                {k: d.get(k) for k in ("title", "sections", "glossary", "stages", "interactiveQuiz")},
+                ensure_ascii=False,
+            )
+
+        # --- Part A: ccde_18 complete remediation ---
+        c18 = load_module(AGENT3_LAB_DIR / "ccde_18_lab.py", "ccde_18_phase6_testmod")
+        valid_design = {
+            "dc_distance_km": 5000,
+            "storage_replication": "asynchronous",
+            "target_rpo_minutes": 15,
+            "dci_l2_stretched": False,
+            "gslb_enabled": True,
+            "wan_model": "hybrid_sdwan_regional_hubs_plus_sase",
+            "cloud_hub": "dual_colo_cloud_exchange_direct_connect",
+            "macro_vrfs": 4,
+            "micro_sgt_enabled": True,
+            "eu_residency_policy_enforced": True,
+            "eu_personal_data_transferred_outside_eea": False,
+            "chapter_v_transfer_safeguard": None,
+            "encryption_in_transit_assumed": True,
+        }
+
+        # 1. Negative, zero, bool, NaN, inf distances MUST raise ValueError
+        for bad_dist in (-500, 0, True, float("nan"), float("inf")):
+            with self.subTest(bad_dist=bad_dist):
+                with self.assertRaises(ValueError):
+                    c18.validate_pars_global_hld({**valid_design, "dc_distance_km": bad_dist})
+
+        # Unknown sync product profile MUST raise ValueError
+        with self.assertRaises(ValueError):
+            c18.validate_pars_global_hld(valid_design, "unknown_storage_product")
+
+        # 2. Invalid storage_replication mode at metro distance (150 km) MUST fail & NEVER say "is supported"
+        bad_mode = c18.validate_pars_global_hld(
+            {**valid_design, "dc_distance_km": 150, "assumed_equipment_and_detour_overhead_ms": 1.0, "storage_replication": "not-a-real-mode"},
+            "vmware_vsan_stretched",
+        )
+        self.assertFalse(bad_mode["all_architectural_checks_passed"])
+        dci_bad = bad_mode["domain_validations"][0]
+        self.assertFalse(dci_bad["storage_replication_valid"])
+        self.assertFalse(dci_bad["replication_ok"])
+        self.assertFalse(dci_bad["pass"])
+        self.assertIn("unsupported storage_replication mode", dci_bad["note"])
+        self.assertNotIn("is supported", dci_bad["note"])
+
+        # 3. GSLB & RPO explicitly checked
+        no_gslb = c18.validate_pars_global_hld({**valid_design, "gslb_enabled": False})
+        self.assertFalse(no_gslb["all_architectural_checks_passed"])
+        self.assertFalse(no_gslb["domain_validations"][0]["gslb_ok"])
+        self.assertIn("REJECTED (GSLB)", no_gslb["domain_validations"][0]["note"])
+
+        async_rpo0 = c18.validate_pars_global_hld({**valid_design, "target_rpo_minutes": 0})
+        self.assertFalse(async_rpo0["all_architectural_checks_passed"])
+        self.assertFalse(async_rpo0["domain_validations"][0]["rpo_ok"])
+        self.assertIn("REJECTED (RPO)", async_rpo0["domain_validations"][0]["note"])
+
+        # 4. Residency vs Chapter V transfer separation
+        # 4a) Corporate residency enforced + no transfer outside EEA + safeguard=None => PASS
+        res_local_only = c18.validate_pars_global_hld(valid_design)
+        self.assertTrue(res_local_only["all_architectural_checks_passed"])
+        # 4b) Contradiction: residency enforced=True AND transferred_outside_eea=True => FAIL
+        res_contradiction = c18.validate_pars_global_hld({
+            **valid_design,
+            "eu_residency_policy_enforced": True,
+            "eu_personal_data_transferred_outside_eea": True,
+            "chapter_v_transfer_safeguard": "adequacy_decision",
+        })
+        self.assertFalse(res_contradiction["all_architectural_checks_passed"])
+        self.assertFalse(res_contradiction["domain_validations"][3]["residency_consistency_ok"])
+        # 4c) Transfer outside EEA without safeguard => FAIL
+        res_missing_safeguard = c18.validate_pars_global_hld({
+            **valid_design,
+            "eu_residency_policy_enforced": False,
+            "eu_personal_data_transferred_outside_eea": True,
+            "chapter_v_transfer_safeguard": None,
+        })
+        self.assertFalse(res_missing_safeguard["all_architectural_checks_passed"])
+        self.assertFalse(res_missing_safeguard["domain_validations"][3]["chapter_v_ok"])
+        # 4d) Transfer outside EEA WITH valid Chapter V safeguard (SCCs + TIA) => PASS
+        res_valid_scc = c18.validate_pars_global_hld({
+            **valid_design,
+            "eu_residency_policy_enforced": False,
+            "eu_personal_data_transferred_outside_eea": True,
+            "chapter_v_transfer_safeguard": "sccs_plus_tia_supplementary_measures",
+        })
+        self.assertTrue(res_valid_scc["all_architectural_checks_passed"])
+
+        # 5. Latency assumption alignment & ccde_18.json text regressions
+        dci_5000 = res_local_only["domain_validations"][0]
+        self.assertEqual(dci_5000["propagation_only_min_rtt_ms"], 50.0)
+        self.assertEqual(dci_5000["routed_propagation_only_rtt_ms"], 70.0)
+        self.assertEqual(dci_5000["assumed_total_end_to_end_rtt_ms"], 105.0)
+        self.assertIn("not measured carrier RTT", dci_5000["latency_assumption_note"])
+
+        c18_txt = student_text("ccde_18")
+        self.assertNotIn("جلوی حرکت افقی باج‌افزار را می‌گیرد", c18_txt)
+        self.assertNotIn("بدون هیچ تغییر در هسته!", c18_txt)
+        self.assertNotIn("امکان ارتباط بی‌وقفه میان شعبی که هنوز روی MPLS قدیمی هستند", c18_txt)
+        self.assertIn("کنترل ضدحلقه", c18_txt)
+
+        # --- Part B: Remaining audited labs (ccde_04, ccde_09, ccde_12, ccde_13, auto_15) ---
+        c04 = load_module(AGENT3_LAB_DIR / "ccde_04_lab.py", "ccde_04_phase6_testmod")
+        with self.assertRaises(ValueError):
+            c04.clos_3stage_max_servers(3, 3.0)
+        with self.assertRaises(ValueError):
+            c04.clos_3stage_max_servers(64, 0.0)
+        with self.assertRaises(ValueError):
+            c04.clos_5stage_max_servers(64, 65, 1.0)
+        self.assertFalse(
+            c04.audit_ai_ml_fabric({"name": "X", "oversubscription": 1.0, "ecn_enabled": True, "pfc_enabled": True, "load_balancing": "garbage"})["ai_fabric_ready"]
+        )
+
+        c09 = load_module(AGENT3_LAB_DIR / "ccde_09_lab.py", "ccde_09_phase6_testmod")
+        with self.assertRaises(ValueError):
+            c09.simulate_flap_dampening(-1)
+        self.assertEqual(c09.simulate_flap_dampening(0)["action"], "NO_FAULT_STEADY_STATE")
+
+        c12 = load_module(AGENT3_LAB_DIR / "ccde_12_lab.py", "ccde_12_phase6_testmod")
+        with self.assertRaises(ValueError):
+            c12.ibgp_rr_sessions(2, route_reflectors=3)
+        with self.assertRaises(ValueError):
+            c12.ibgp_full_mesh_sessions(0)
+
+        c13 = load_module(AGENT3_LAB_DIR / "ccde_13_lab.py", "ccde_13_phase6_testmod")
+        with self.assertRaises(ValueError):
+            c13.simulate_post_failure_te({"A": {"capacity_gbps": 100}}, 10, 10, "NONEXISTENT")
+        with self.assertRaises(ValueError):
+            c13.simulate_post_failure_te({"A": {"capacity_gbps": 100}}, 10, 10, "A")
+        self.assertNotIn("Drop فوری ۱۰۰٪ نشست‌ها", student_text("ccde_13"))
+
+        a15 = load_module(AGENT3_LAB_DIR / "auto_15_lab.py", "auto_15_phase6_testmod")
+        self.assertEqual(a15.validate_sot_prefixes(["10.0.0.0/24", "2001:db8:1::/48"]), [])
+        self.assertEqual(len(a15.validate_sot_prefixes(["10.0.0.0/24", "2001:db8::/32", "2001:db8:1::/48"])), 1)
 
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))

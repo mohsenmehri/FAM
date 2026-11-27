@@ -21,3 +21,10 @@
 ` پایانی.
 - **تست مرتبط:** `test_phase4_ccde_18_ccde_19_dynamic_labs_and_regressions` و `test_blueprints_schema_svg_quiz_lab_and_review_integrity` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** آزمایشگاه همچنان اعتبارسنج محلی Python 3 بدون اتصال به دیتاسنتر واقعی یا ارزیابی حقوقی DPO/QSA است و بازبینی نهایی انسانی مستقل انجام نشده است.
+
+## بازبینی فنی فاز ۶ (2026-11-27 — رفع کامل یافته‌های `agent-intake-837fad64-fa.md` روی `ccde_18` و ممیزی مرزی درس‌های باقی‌مانده)
+- **ایراد:** ۱) پذیرش فاصله منفی و چاپ پیام متناقض `supported` برای `storage_replication='not-a-real-mode'`؛ ۲) اشاره به انتخاب GSLB بدون ورودی/بررسی GSLB و نبود بررسی RPO؛ ۳) اجبار برچسب مبنای انتقال هنگام نبود انتقال خارج از EEA و نبود disclaimer فرض بودن بولین‌های انطباق؛ ۴) ناهماهنگی ~70ms آزمایشگاه با ~95-130ms متن و ادعاهای قطعی در Q9، Q10، Q11 و بخش‌های ۵، ۷، ۸، ۹ و ۱۲.
+- **منبع معتبر:** گزارش بازبینی همتای Agent 2 (`agent-intake-837fad64-fa.md`)، [EDPB — International Data Transfers (GDPR Chapter V)](https://www.edpb.europa.eu/sme/be-compliant/international-data-transfers_en)، PCI-DSS v4.0 (Req 4 & QSA scope)، مستندات VMware vSAN (≤5ms) / MetroCluster / vMSC (≤10ms).
+- **اصلاح انجام‌شده:** بازنویسی کامل `ccde_18_lab.py` با اعتبارسنجی فاصله مثبت متناهی، رد صریح mode نامعتبر، مدل‌سازی صریح `gslb_enabled` و `target_rpo_minutes`، تفکیک شفاف مدل فرضی تأخیر (50ms / 70ms / ~105ms در بازه ~95-130ms)، تفکیک سیاست اقامت EU از وضعیت انتقال خارج EEA و تضمین فصل ۵ + disclaimer فرض بودن بولین‌ها؛ اصلاح Q9، Q10، Q11 و بخش‌های ۳، ۵، ۷، ۸، ۹، ۱۲ و ۱۳ در `ccde_18.json`.
+- **تست مرتبط:** `test_phase6_ccde_18_remediation_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** اعتبارسنج محلی Python 3؛ اعداد تأخیر و هزینه صرفاً فرضی هستند و بولین‌های انطباق جایگزین DPO/QSA نیستند؛ بازبینی مستقل انجام نشده است.
