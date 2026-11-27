@@ -1,4 +1,6 @@
+import ast
 import html
+import importlib.util
 import json
 import re
 import subprocess
@@ -158,13 +160,61 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             _, t = load_student_text(lid)
             self.assertNotIn("همیشه باید", t)
 
-        # 10. Upgraded lab mocks must exercise both negative and positive assertions
+        # 10. Phase 3 technical & semantic regressions across additional lessons
+        # ccde_10: N+1=4 over N=3 is ~33.3% extra cost (NOT 25%), plus Common-Mode independence caveat
+        _, c10_txt = load_student_text("ccde_10")
+        self.assertNotIn("تنها با ۲۵٪ هزینه اضافه", c10_txt)
+        self.assertIn("۳۳٫۳٪", c10_txt)
+        self.assertIn("Common-Mode", c10_txt)
+
+        # spec_dc_aci: Multi-Pod/Multi-Site Spine IPN/ISN exception explicitly noted
+        self.assertIn("IPN/ISN", aci_txt)
+
+        # spec_wl_survey: Section 7 harmonized with Q1 (no unconditional 'مطلقاً فقط')
+        _, wls_txt = load_student_text("spec_wl_survey")
+        self.assertNotIn("مطلقاً فقط از کانال‌های", wls_txt)
+        self.assertIn("ETSI", wls_txt)
+
+        # ccie_01: EIGRP External AD=170 distinguished from Internal AD=90 & illustrative thresholds noted
+        _, ei_txt = load_student_text("ccie_01")
+        self.assertIn("EIGRP External", ei_txt)
+        self.assertIn("AD=90", ei_txt)
+
+        # ccie_dc: official 7-domain weights & no guaranteed <3min / unverified 90%/95%
+        _, dc_txt = load_student_text("ccie_dc")
+        self.assertNotIn("حل تضمینی مشکلات اتصال بین EPGها در کمتر از ۳ دقیقه", dc_txt)
+        self.assertNotIn("بیش از ۹۰٪ مشکلات", dc_txt)
+        self.assertIn("Sec/Svc (10%)", dc_txt)
+
+        # ccie_wl: no unverified 90% stat & 2026 WLCOR naming
+        _, cwl_txt = load_student_text("ccie_wl")
+        self.assertNotIn("۹۰٪ مشکلات «پخش نشدن SSID»", cwl_txt)
+        self.assertIn("350-101 WLCOR", cwl_txt)
+
+        # ccde_03, ccde_05, ccde_16: remove unverified/categorical stats & unconditional TI-LFA in lab
+        _, c03_txt = load_student_text("ccde_03")
+        self.assertNotIn("دسترسی تضمینی به ۱۰۰٪ اینترنت جهانی", c03_txt)
+        self.assertNotIn("gives 100% <50ms TI-LFA", c03_txt)
+        _, c05_txt = load_student_text("ccde_05")
+        self.assertNotIn("بیش از ۸۰٪ سازمان‌ها", c05_txt)
+        self.assertNotIn("بیش از ۸۰٪ کسب‌وکارها", c05_txt)
+        _, c16_txt = load_student_text("ccde_16")
+        self.assertNotIn("در ۹۵٪ پروژه‌های واقعی", c16_txt)
+
+        # auto_09: NMDA RFC 8343 ?content=nonconfig uses ietf-interfaces:interfaces (not deprecated interfaces-state)
+        _, a09_txt = load_student_text("auto_09")
+        self.assertIn("RFC 8343", a09_txt)
+        self.assertNotIn("ietf-interfaces:interfaces-state", (AGENT3_LAB_DIR / "auto_09_lab.py").read_text(encoding="utf-8"))
+
+        # 11. Upgraded lab scripts must exercise both negative and positive assertions
         for lid, expected_tokens in (
             ("ccde_18", ["rejected_sync_l2_proposal", "approved_hld_validation", "vmware_vsan_stretched"]),
             ("ccde_05", ["vmware_vsan_stretched", "netapp_metrocluster_or_vmsc"]),
             ("spec_sp_sr", ["ti_lfa_blocked_by_low_msd", "ti_lfa_singly_homed_cut_edge"]),
             ("ccde_19", ["rejected_flat_forklift_proposal", "approved_hld_validation"]),
-            ("auto_05", ["invalid_rfc8259_json_rejected"]),
+            ("auto_05", ["nan_constant", "pos_infinity", "neg_infinity", "strict_parser_rejected"]),
+            ("auto_07", ["alg=none attack rejected", "Expired JWT rejected"]),
+            ("ccie_01", ["Illustrative thresholds only"]),
         ):
             proc = subprocess.run(
                 [sys.executable, str(AGENT3_LAB_DIR / f"{lid}_lab.py")],
@@ -175,6 +225,81 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, proc.stderr)
             for tok in expected_tokens:
                 self.assertIn(tok, proc.stdout, f"{lid}_lab.py missing expected output token {tok!r}")
+
+    def test_auto_05_strict_rfc8259_and_auto_07_jwt_unit_checks(self):
+        """Directly test auto_05_lab strict RFC 8259 parser (NaN/Infinity/-Infinity/duplicates) & auto_07_lab JWT/SAN."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+
+        auto05 = load_module(AGENT3_LAB_DIR / "auto_05_lab.py", "auto_05_lab_testmod")
+        self.assertEqual(auto05.parse_json_strict('{"ok": true, "n": 42}'), {"ok": True, "n": 42})
+        # Non-RFC 8259 constants accepted by plain json.loads MUST be rejected by parse_json_strict
+        for bad_const in ('{"x": NaN}', '{"x": Infinity}', '{"x": -Infinity}'):
+            with self.subTest(bad_const=bad_const):
+                with self.assertRaises(ValueError):
+                    auto05.parse_json_strict(bad_const)
+                res = auto05.check_invalid_json_rejected(bad_const)
+                self.assertTrue(res["rejected"], f"{bad_const} must be rejected")
+
+        # Duplicate keys: RFC 8259 Sec 4 (SHOULD be unique -> Python default last-wins vs strict rejection)
+        with self.assertRaises(ValueError):
+            auto05.parse_json_strict('{"k": 1, "k": 2}', reject_duplicate_keys=True)
+        dup = auto05.demonstrate_duplicate_key_behavior('{"k": 1, "k": 2}')
+        self.assertEqual(dup["python_default_last_wins"], {"k": 2})
+        self.assertTrue(dup["strict_parser_rejected"])
+
+        # auto_07: alg="none", expired token, and leading-dot SAN edge case must all be rejected
+        auto07 = load_module(AGENT3_LAB_DIR / "auto_07_lab.py", "auto_07_lab_testmod")
+        secret = b"unit-test-secret"
+        now_ts = 1764201600
+        good_tok = auto07.build_hs256_jwt({"sub": "u", "exp": now_ts + 3600}, secret)
+        self.assertTrue(auto07.verify_hs256_jwt(good_tok, secret, now_ts=now_ts)["valid"])
+
+        parts = good_tok.split(".")
+        none_hdr = auto07.b64url_encode(json.dumps({"alg": "none", "typ": "JWT"}).encode("utf-8"))
+        self.assertFalse(auto07.verify_hs256_jwt(f"{none_hdr}.{parts[1]}.", secret, now_ts=now_ts)["valid"])
+
+        exp_tok = auto07.build_hs256_jwt({"sub": "u", "exp": now_ts - 10}, secret)
+        exp_res = auto07.verify_hs256_jwt(exp_tok, secret, now_ts=now_ts)
+        self.assertFalse(exp_res["valid"])
+        self.assertEqual(exp_res["reason"], "token_expired")
+
+        self.assertTrue(auto07.verify_san_match("api.netops.example", ["*.netops.example"]))
+        self.assertFalse(auto07.verify_san_match("a.b.netops.example", ["*.netops.example"]))
+        self.assertFalse(auto07.verify_san_match(".netops.example", ["*.netops.example"]))
+
+    def test_lab_execution_classification_accuracy(self):
+        """Ensure real-CLI (auto_04) and loopback-HTTP labs are classified accurately, never mislabeled as all-Mock."""
+        audit_text = (ROOT / "AGENT3-TECHNICAL-AUDIT-LOG-fa.md").read_text(encoding="utf-8")
+        guide_text = (ROOT / "AGENT3-INTEGRATION-GUIDE-fa.md").read_text(encoding="utf-8")
+
+        # Verify actual AST capabilities match reported classification
+        def imported_modules(path: Path) -> set[str]:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            mods = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    mods.update(n.name.split(".")[0] for n in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    mods.add(node.module.split(".")[0])
+            return mods
+
+        self.assertIn("subprocess", imported_modules(AGENT3_LAB_DIR / "auto_04_lab.py"))
+        for lid in ("auto_06", "auto_09", "auto_14"):
+            self.assertIn("http", imported_modules(AGENT3_LAB_DIR / f"{lid}_lab.py"))
+
+        # Every single one of the 64 lab filenames must appear explicitly in the audit execution matrix
+        for lid in sorted(AGENT3_ALLOWED_IDS):
+            self.assertIn(f"`{lid}_lab.py`", audit_text, f"{lid}_lab.py missing from execution classification table")
+
+        # Neither report may falsely claim all 64 labs are purely Local Mock
+        self.assertIn("auto_04_lab.py", guide_text)
+        self.assertIn("اجرای باینری خارجی واقعی", guide_text)
+        self.assertNotIn("اما این اسکریپت‌ها **شبیه‌ساز / مدل‌ساز محلی (Local Mock)** هستند", guide_text)
 
     def test_blueprints_schema_svg_quiz_lab_and_review_integrity(self):
         discovered = discover_agent3_blueprints()

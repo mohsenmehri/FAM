@@ -12,3 +12,8 @@
 - منبع: Cisco ACI Multi-Pod White Paper (c11-737855) و Cisco ACI Multi-Site Architecture White Paper (c11-739609).
 - اصلاح: تفکیک دقیق Multi-Pod (تا 50ms بین Podها از ACI 2.3+) از Multi-Site (بدون سقف سخت ACI روی Data Plane بین سایت‌ها؛ NDO-to-APIC تا 500ms و بین نودهای ND تا 50ms در برابر 150ms در MSO قدیمی).
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions`).
+
+## ممیزی فنی و معنایی مرحله ۳ (۲۰۲۶-۱۱-۲۷)
+
+- **دقیق‌سازی قاعده اتصال Spine/Leaf در بخش ۵ و Q4:** تصریح شد که سرورها، فایروال‌ها، APICها و L3Outهای استاندارد منحصراً به Leaf متصل می‌شوند، با ذکر استثنای رسمی اتصال Spine به IPN/ISN در ACI Multi-Pod و Multi-Site.
+- **وضعیت بازبینی:** خودبازبینی نویسنده (`author-agent-self-review-not-independent`)؛ بازبینی مستقل انجام نشده است.

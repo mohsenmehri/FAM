@@ -11,3 +11,8 @@
 - مسئله: اسکریپت `auto_05_lab.py` صرفاً JSON معتبر را پارس می‌کرد و سناریوی منفی رد JSON نامعتبر RFC 8259 را نمی‌آزمود.
 - منبع: RFC 8259 (JSON Data Interchange Format).
 - آزمون مرتبط: `test_agent3_content.py` (اجرای زنده `auto_05_lab.py` با assert رد JSON نامعتبر).
+
+## ممیزی فنی و معنایی مرحله ۳ (۲۰۲۶-۱۱-۲۷)
+
+- **اصلاح `parse_json_strict` مطابق RFC 8259 (رفع ایراد پذیرش `NaN`/`Infinity`/`-Infinity` در `json.loads` پیش‌فرض پایتون):** پارامتر `parse_constant` برای رد قطعی `NaN`، `Infinity` و `-Infinity` و پارامتر `object_pairs_hook` برای رد کلیدهای تکراری با توضیح دقیق قید `SHOULD be unique` بخش ۴ RFC 8259 (در برابر رفتار پیش‌فرض last-key-wins پایتون) به `auto_05_lab.py`، متن درس، آزمون و تست‌های واحد اضافه شد.
+- **وضعیت بازبینی:** همچنان خودبازبینی نویسنده (`author-agent-self-review-not-independent`)؛ بازبینی مستقل انجام نشده است.

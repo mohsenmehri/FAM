@@ -19,7 +19,7 @@ def select_cloud_interconnect(bandwidth_gbps: float, needs_deterministic_latency
     if needs_deterministic_latency or bandwidth_gbps > 1.25:
         return {
             "recommended": "Redundant Dedicated Direct Connect / ExpressRoute (Dual Diversely Routed Locations) + IPsec Backup",
-            "reason": "Bypasses public internet jitter, exceeds 1.25Gbps single-tunnel IPsec limit, and cuts cloud egress rate",
+            "reason": "Bypasses public internet jitter, exceeds classic 1.25Gbps single-tunnel IPsec throughput (without ECMP/higher SKUs), and typically lowers cloud egress rates (provider/region/tier-dependent)",
         }
     return {
         "recommended": "Redundant Site-to-Site IPsec VPN (BGP ECMP) over Dual ISP",

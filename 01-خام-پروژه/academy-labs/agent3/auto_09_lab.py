@@ -50,9 +50,14 @@ class RestconfHandler(BaseHTTPRequestHandler):
             if content == "config":
                 self._send(200, {"ietf-interfaces:interfaces": {"interface": list(CONFIG_STORE.values())}})
             elif content == "nonconfig":
-                self._send(200, {"ietf-interfaces:interfaces-state": {"interface": list(STATE_STORE.values())}})
+                # RFC 8040 Sec 4.8.1 + RFC 8343 (NMDA): filter nonconfig descendants under the requested resource
+                self._send(200, {"ietf-interfaces:interfaces": {"interface": list(STATE_STORE.values())}})
             else:
-                self._send(200, {"config": list(CONFIG_STORE.values()), "nonconfig": list(STATE_STORE.values())})
+                merged = [
+                    {**CONFIG_STORE.get(name, {}), **STATE_STORE.get(name, {})}
+                    for name in sorted(set(CONFIG_STORE) | set(STATE_STORE))
+                ]
+                self._send(200, {"ietf-interfaces:interfaces": {"interface": merged}})
             return
         self._send(404, {"error": "resource not found"})
 
@@ -90,11 +95,13 @@ def main() -> None:
     headers = {"Accept": YANG_JSON, "Content-Type": YANG_JSON, "Authorization": "Bearer lab-token"}
 
     try:
-        # 1. content=nonconfig returns operational state only
+        # 1. content=nonconfig returns operational state nodes under the requested NMDA resource
         req_state = urllib.request.Request(f"{base}/restconf/data/ietf-interfaces:interfaces?content=nonconfig", headers=headers)
         with opener.open(req_state, timeout=5) as resp:
             nonconfig_body = json.loads(resp.read().decode("utf-8"))
-        assert "ietf-interfaces:interfaces-state" in nonconfig_body
+        assert "ietf-interfaces:interfaces" in nonconfig_body
+        assert "oper-status" in nonconfig_body["ietf-interfaces:interfaces"]["interface"][0]
+        assert "description" not in nonconfig_body["ietf-interfaces:interfaces"]["interface"][0]
 
         # 2. POST creates child (201); duplicate POST returns 409 Conflict
         lo0 = json.dumps({"name": "Loopback0", "description": "Router-ID", "enabled": True}).encode("utf-8")
@@ -127,7 +134,7 @@ def main() -> None:
 
     print("=== auto_09 RESTCONF RFC 8040 Loopback Lab ===")
     print(json.dumps({
-        "nonconfig_oper_status": nonconfig_body["ietf-interfaces:interfaces-state"]["interface"][0]["oper-status"],
+        "nonconfig_oper_status": nonconfig_body["ietf-interfaces:interfaces"]["interface"][0]["oper-status"],
         "post_create_status": post_create_code,
         "post_duplicate_status": post_dup_code,
         "put_replace_status": put_replace_code,

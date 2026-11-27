@@ -11,17 +11,25 @@ import json
 
 
 def evaluate_ccie_exam_gate(design_pct: float, doo_pct: float, min_mod: float = 65.0, min_total: float = 75.0) -> dict:
-    # Weighted 3h Design (37.5%) + 5h DOO (62.5%) illustrative model
+    # Illustrative model thresholds (Cisco does NOT publish exact numeric CCIE pass cutoffs;
+    # only the dual-gate rule — passing both modules AND the overall score — is official).
     weighted = round(design_pct * 0.375 + doo_pct * 0.625, 2)
     passed = design_pct >= min_mod and doo_pct >= min_mod and weighted >= min_total
     reasons = []
     if design_pct < min_mod:
-        reasons.append(f"Design score {design_pct}% below module minimum {min_mod}%")
+        reasons.append(f"Design score {design_pct}% below illustrative module cutoff {min_mod}%")
     if doo_pct < min_mod:
-        reasons.append(f"DOO score {doo_pct}% below module minimum {min_mod}%")
+        reasons.append(f"DOO score {doo_pct}% below illustrative module cutoff {min_mod}%")
     if weighted < min_total:
-        reasons.append(f"Aggregate {weighted}% below overall cutoff {min_total}%")
-    return {"design_pct": design_pct, "doo_pct": doo_pct, "weighted_total": weighted, "passed": passed, "reasons": reasons}
+        reasons.append(f"Aggregate {weighted}% below illustrative overall cutoff {min_total}%")
+    return {
+        "design_pct": design_pct,
+        "doo_pct": doo_pct,
+        "weighted_total": weighted,
+        "passed": passed,
+        "reasons": reasons,
+        "threshold_note": "Illustrative thresholds only; Cisco does not publicly disclose numeric CCIE cutoffs.",
+    }
 
 
 def simulate_redistribution(prefix: str, origin_proto: str, tag: int | None, filter_enabled: bool) -> dict:
@@ -68,6 +76,10 @@ def main() -> None:
         },
         "sda_fusion_verification": check_sda_fusion_vrf("CORP_VN", border_bgp_up=True, fusion_route_leaked=True, sgt_mapped=True),
     }
+    assert report["exam_gate_simulations"]["high_cli_but_failed_design"]["passed"] is False
+    assert report["exam_gate_simulations"]["balanced_pass"]["passed"] is True
+    assert report["mutual_redistribution_check"]["without_route_tags"]["loop_detected"] is True
+    assert report["mutual_redistribution_check"]["with_route_tag_90"]["loop_detected"] is False
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 

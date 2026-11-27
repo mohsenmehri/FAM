@@ -12,3 +12,8 @@
 - منبع: AWS Direct Connect SLA (99.9% = 2 connections across 2 locations; 99.99% Maximum Resiliency = >=4 dedicated connections across >=2 locations) و Microsoft Azure ExpressRoute SLA (99.95% standard).
 - اصلاح: بازنویسی دقیق پرسش ۵ و توضیح آن، شرط‌دار کردن نرخ Egress و سقف کلاسیک 1.25 Gbps تونل IPsec در بخش ۳.
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions`).
+
+## ممیزی فنی و معنایی مرحله ۳ (۲۰۲۶-۱۱-۲۷)
+
+- **هم‌راستاسازی `ccde_07_lab.py`:** متن توضیحی خروجی آزمایشگاه با قیدهای شرطی Egress و IPsec ECMP/SKU در متن درس هماهنگ و بازتعبیه شد.
+- **وضعیت بازبینی:** خودبازبینی نویسنده (`author-agent-self-review-not-independent`)؛ بازبینی مستقل انجام نشده است.

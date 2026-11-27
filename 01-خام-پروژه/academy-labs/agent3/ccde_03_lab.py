@@ -29,7 +29,7 @@ def select_sp_transport(legacy_ldp_only: bool, needs_5g_slicing_and_tilfa: bool)
     if needs_5g_slicing_and_tilfa and not legacy_ldp_only:
         return {
             "recommended": "SR-MPLS (or SRv6) + Flex-Algo + TI-LFA + EVPN",
-            "reason": "Eliminates LDP/RSVP state in Core, gives 100% <50ms TI-LFA and latency-based Flex-Algo slices",
+            "reason": "Eliminates LDP/RSVP state in Core, enables TI-LFA loop-free protection on 2-connected topologies within hardware MSD (<50ms target with fast detection) and latency-based Flex-Algo slices",
         }
     if needs_5g_slicing_and_tilfa and legacy_ldp_only:
         return {
