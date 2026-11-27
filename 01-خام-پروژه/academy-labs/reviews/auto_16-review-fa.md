@@ -11,3 +11,7 @@
 - **اصلاح انجام‌شده:** افزودن `not isinstance(vlan_id, bool)` و تست‌های منفی کاراکتر Tab، `vlan_id=True` و `vlan_id=5000`.
 - **تست مرتبط:** `test_phase5_remaining_tracks_labs_and_regressions` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** شبیه‌ساز خط لوله محلی بدون GitHub Actions یا تجهیز واقعی؛ بازبینی مستقل انجام نشده است.
+
+## به‌روزرسانی فاز ۱۰E — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن `_require_bool` سخت‌گیرانه برای `post_verify_ok` (جلوگیری از ردشدن rollback با رشته `"False"`) و اعتبارسنجی نوع `change_cfg`/`raw_yaml`.
+- **وضعیت اجرا:** اجرای محلی Python بدون تجهیز شبکه یا سرویس بیرونی زنده؛ تطابق دقیق بایتی کد HTML با `auto_16_lab.py` تأیید شد.

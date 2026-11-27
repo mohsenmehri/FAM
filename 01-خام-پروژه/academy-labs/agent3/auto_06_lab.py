@@ -53,20 +53,29 @@ def run_local_rest_lab() -> dict[str, object]:
             if body is None or "id" not in body or "name" not in body:
                 self._send_json(400, {"error": "invalid_or_incomplete_payload"})
                 return
-            vid = str(body["id"])
+            if isinstance(body["id"], bool) or not isinstance(body["name"], str) or not body["name"].strip():
+                self._send_json(400, {"error": "invalid_field_types"})
+                return
+            vid = str(body["id"]).strip()
+            if not vid.isdigit() or not (1 <= int(vid) <= 4094):
+                self._send_json(400, {"error": "invalid_vlan_id_range"})
+                return
             if vid in store:
                 self._send_json(409, {"error": "already_exists"})
                 return
-            store[vid] = {"id": vid, "name": str(body["name"]), "state": str(body.get("state", "active"))}
+            store[vid] = {"id": vid, "name": body["name"], "state": str(body.get("state", "active"))}
             self._send_json(201, store[vid])
 
         def do_PUT(self):
             vid = self.path.strip("/").split("/")[-1]
             body = self._read_json()
-            if body is None or "name" not in body:
+            if body is None or "name" not in body or not isinstance(body["name"], str) or not body["name"].strip():
                 self._send_json(400, {"error": "invalid_or_incomplete_payload"})
                 return
-            store[vid] = {"id": vid, "name": str(body["name"]), "state": str(body.get("state", "active"))}
+            if not vid.isdigit() or not (1 <= int(vid) <= 4094):
+                self._send_json(400, {"error": "invalid_vlan_id_range"})
+                return
+            store[vid] = {"id": vid, "name": body["name"], "state": str(body.get("state", "active"))}
             self._send_json(200, store[vid])
 
         def do_PATCH(self):
@@ -75,10 +84,10 @@ def run_local_rest_lab() -> dict[str, object]:
                 self._send_json(404, {"error": "not_found"})
                 return
             body = self._read_json()
-            if body is None:
-                self._send_json(400, {"error": "invalid_json"})
+            if body is None or not body or any(k not in ("name", "state") for k in body):
+                self._send_json(400, {"error": "invalid_or_unsupported_patch_fields"})
                 return
-            store[vid].update(body)
+            store[vid].update({k: str(v) for k, v in body.items()})
             self._send_json(200, store[vid])
 
         def do_DELETE(self):

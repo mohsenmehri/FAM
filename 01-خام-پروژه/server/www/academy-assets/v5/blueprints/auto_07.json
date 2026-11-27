@@ -1,345 +1,345 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "auto_07",
- "objectiveId": "auto_07",
- "kind": "lesson",
- "track": "Automation",
- "course": "automation-foundations",
- "title": "۷.۷ Automation (درس ۷ از ۲۰): پروتکل HTTP و HTTPS در برنامه‌نویسی شبکه",
- "titleEn": "Automation 07: HTTP/1.1 to HTTP/3 (QUIC), TLS 1.3, X.509 SAN, mTLS, OAuth 2.0 & JWT",
- "domain": "Network Automation",
- "source": "Legacy auto_07 rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [],
- "sections": [
-  {
-   "id": "auto_07-section-1",
-   "title": "مسئله واقعی: چرا اسکریپت‌های API با verify=False و توکن‌های نامحدود، دروازه نفوذ می‌شوند؟",
-   "html": "<p>در بسیاری از سازمان‌ها، اسکریپت اتوماسیون هنگام اتصال به کنترلر شبکه با خطای گواهینامه TLS مواجه می‌شود و برنامه‌نویس به‌سرعت <code>verify=False</code> می‌گذارد؛ یا تصور می‌کند چون توکن <strong>JWT</strong> رشته‌ای نامفهوم است، پس رمزنگاری شده و می‌توان رمز عبور یا اسرار داخلی را درون آن گذاشت! از سوی دیگر در شبکه‌های WAN با افت بسته، درک تفاوت <strong>HTTP/1.1</strong>، <strong>HTTP/2</strong> و <strong>HTTP/3 (QUIC)</strong> توضیح می‌دهد چرا گاهی APIها یا داشبوردها روی لینک‌های پرتأخیر کند می‌شوند.</p>"
-  },
-  {
-   "id": "auto_07-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با TCP/UDP، REST API (درس <code>auto_06</code>) و مبانی رمزنگاری.</p><ul><li>تبیین تکامل <strong>HTTP/1.1</strong> به <strong>HTTP/2 (RFC 9113)</strong> و <strong>HTTP/3 / QUIC (RFC 9000 &amp; 9114)</strong> و تفکیک App-level از TCP-level Head-of-Line Blocking.</li><li>کالبدشکافی <strong>TLS 1.3 (RFC 8446)</strong>: دست‌دادن 1-RTT، Forward Secrecy با ECDHE (در برابر حالت PSK-only)، و ریسک <strong>Replay Attack در 0-RTT</strong>.</li><li>اعتبارسنجی گواهینامه <strong>X.509</strong> (زنجیره Trust، تاریخ انقضا، فیلد <strong>SAN</strong>) و کاربرد <strong>mTLS</strong> در ارتباط ماشین-به-ماشین.</li><li>تمایز دقیق <strong>Basic Auth</strong>، <strong>OAuth 2.0 (RFC 6749)</strong> و ساختار <strong>JWT / JWS (RFC 7519)</strong>.</li></ul>"
-  },
-  {
-   "id": "auto_07-section-3",
-   "title": "تکامل HTTP: از HTTP/1.1 تا Multiplexing در HTTP/2 و QUIC در HTTP/3",
-   "html": "<table><thead><tr><th>نسخه</th><th>پروتکل انتقال</th><th>مکانیسم کلیدی</th><th>محدودیت / ویژگی مهم</th></tr></thead><tbody><tr><td><strong>HTTP/1.1</strong></td><td>TCP</td><td>متنی؛ یک درخواست در صف روی هر اتصال (Pipelining عملاً متروک)</td><td><strong>HTTP-level HoL Blocking</strong>؛ نیاز به باز کردن چند اتصال موازی</td></tr><tr><td><strong>HTTP/2 (RFC 9113)</strong></td><td>TCP</td><td>فریم‌بندی باینری، Multiplexing چند Stream روی یک TCP و فشرده‌سازی هدر HPACK</td><td>در صورت افت یک بسته TCP، کرنل همه Streamها را متوقف می‌کند (<strong>TCP-level HoL Blocking</strong>)</td></tr><tr><td><strong>HTTP/3 (RFC 9114)</strong></td><td><strong>QUIC روی UDP 443</strong></td><td>جریان‌های مستقل درون QUIC، یکپارچه‌سازی بومی TLS 1.3 و Connection Migration</td><td>افت یک بسته فقط همان Stream را معطل می‌کند؛ حذف TCP HoL Blocking</td></tr></tbody></table>"
-  },
-  {
-   "id": "auto_07-section-4",
-   "title": "نمودار یکپارچه لایه انتقال HTTP/3، امنیت TLS 1.3 و احراز هویت JWT/OAuth2",
-   "html": "<p>نمودار زیر سه لایه حیاتی ارتباط امن API در اتوماسیون شبکه را کنار هم نمایش می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"HTTP/1.1 to HTTP/3 QUIC, TLS 1.3 and JWT/OAuth2 Security\"><rect x=\"12\" y=\"18\" width=\"228\" height=\"184\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"126\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">HTTP Transport Evolution</text><text x=\"126\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">HTTP/1.1: Text, App HoL Blocking</text><text x=\"126\" y=\"102\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">HTTP/2: Binary Multiplexing</text><text x=\"126\" y=\"118\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">(Still suffers TCP HoL Blocking)</text><text x=\"126\" y=\"148\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1d4ed8\">HTTP/3: QUIC over UDP 443</text><text x=\"126\" y=\"166\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Independent streams + TLS 1.3</text><rect x=\"266\" y=\"18\" width=\"228\" height=\"184\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">TLS 1.3 (RFC 8446) &amp; PKI</text><text x=\"380\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">1-RTT Handshake + ECDHE (FS)</text><text x=\"380\" y=\"98\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">0-RTT: Replay Risk (Safe ops only)</text><text x=\"380\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">X.509 Verify: Chain + Expiry + SAN</text><text x=\"380\" y=\"150\" text-anchor=\"middle\" font-size=\"10\" fill=\"#166534\">mTLS: Mutual Client + Server Cert</text><text x=\"380\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Avoid verify=False in production!</text><rect x=\"520\" y=\"18\" width=\"228\" height=\"184\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"634\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">API Auth: OAuth 2.0 &amp; JWT</text><text x=\"634\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">JWT (JWS): Header.Payload.Sig</text><text x=\"634\" y=\"98\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">Base64URL != Encryption!</text><text x=\"634\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Signature guards integrity</text><text x=\"634\" y=\"150\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">OAuth 2.0 Client Credentials</text><text x=\"634\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">Short-lived token + least scope</text></svg>"
-  },
-  {
-   "id": "auto_07-section-5",
-   "title": "زیر کاپوت TLS 1.3 (RFC 8446): سرعت 1-RTT، Forward Secrecy و خط قرمز 0-RTT",
-   "html": "<p><strong>TLS 1.3 (RFC 8446)</strong> هم امنیت و هم سرعت را نسبت به TLS 1.2 جهش داد: الگوریتم‌های ضعیف و قدیمی (مانند RC4، SHA-1، CBC، تبادل کلید ایستا RSA بدون Forward Secrecy) را حذف کرد و Handshake کامل را به <strong>1-RTT</strong> کاهش داد.</p><ul><li><strong>Forward Secrecy (ECDHE):</strong> با تبادل کلید موقت (Ephemeral) ECDHE، حتی اگر کلید خصوصی سرور سال‌ها بعد لو برود، ترافیک ضبط‌شده گذشته قابل رمزگشایی نیست. <em>نکته دقت فنی:</em> در حالت خاص از سرگیری نشست <code>PSK-only</code> (بدون <code>psk_dhe_ke</code>) خاصیت Forward Secrecy وجود ندارد؛ به همین دلیل در عمل <code>psk_dhe_ke</code> توصیه می‌شود.</li><li><strong>هشدار 0-RTT (Early Data):</strong> داده‌های 0-RTT از نظر رمزنگاری در برابر <strong>Replay Attack</strong> مصون نیستند؛ بنابراین نباید برای عملیات غیرایمن/غیر-Idempotent (مثل POST تغییر پیکربندی یا انتقال وجه) مجاز شوند.</li></ul>"
-  },
-  {
-   "id": "auto_07-section-6",
-   "title": "اعتبارسنجی گواهینامه X.509: زنجیره PKI، فیلد SAN و خطر verify=False",
-   "html": "<p>هنگام اتصال HTTPS به یک کنترلر شبکه، کلاینت چهار بررسی حیاتی انجام می‌دهد: (۱) اعتبار امضای زنجیره گواهینامه تا یک <strong>Root CA مورد اعتماد</strong>، (۲) معتبر بودن بازه زمانی (<code>NotBefore / NotAfter</code>)، (۳) ابطال نشدن گواهینامه (CRL/OCSP)، و (۴) تطابق نام میزبان یا IP مقصد با فیلد <strong>SAN (Subject Alternative Name)</strong> — در کلاینت‌های مدرن فیلد قدیمی <code>CN (Common Name)</code> بدون SAN دیگر کافی نیست (RFC 9525 / RFC 6125).</p><p>گذاشتن <code>verify=False</code> کل محافظت در برابر <strong>Man-in-the-Middle (MitM)</strong> را خنثی می‌کند؛ مهاجم روی مسیر می‌تواند با یک گواهینامه جعلی توکن API شما را بخواند! راه‌حل صحیح برای CA داخلی سازمان، معرفی فایل PEM آن CA به <code>verify=\"/path/to/corp-ca.pem\"</code> است.</p>"
-  },
-  {
-   "id": "auto_07-section-7",
-   "title": "احراز هویت متقابل (mTLS) برای ارتباط ماشین-به-ماشین",
-   "html": "<p>در HTTPS عادی فقط <strong>سرور</strong> گواهینامه خود را به کلاینت نشان می‌دهد تا کلاینت به سرور اعتماد کند. در <strong>mTLS (Mutual TLS)</strong>، سرور نیز از کلاینت (مثلاً اسکریپت CI/CD یا سرور Telemetry) می‌خواهد <strong>گواهینامه کلاینت X.509</strong> امضاشده توسط CA سازمان را ارائه دهد. mTLS یکی از قوی‌ترین روش‌های احراز هویت Zero Trust برای سرویس‌های بدون کاربر انسانی است.</p>"
-  },
-  {
-   "id": "auto_07-section-8",
-   "title": "احراز هویت APIها: Basic Auth، API Key و OAuth 2.0 (RFC 6749)",
-   "html": "<ul><li><strong>HTTP Basic Auth:</strong> ترکیب <code>user:pass</code> با کدگذاری <strong>Base64</strong> در هدر <code>Authorization: Basic ...</code>. Base64 هیچ رمزنگاری نیست و ارسال Basic Auth بدون HTTPS افشای کامل رمز عبور است!</li><li><strong>API Key / Static Token:</strong> ساده ولی در صورت بلندمدت بودن و نبود چرخش منظم، در صورت نشت خطرناک است.</li><li><strong>OAuth 2.0 (RFC 6749):</strong> چارچوب تفویض مجوز با توکن‌های <strong>کوتاه‌عمر (Access Token)</strong> و دسترسی محدود (<strong>Scope</strong>). برای اسکریپت‌های اتوماسیون ماشین-به-ماشین معمولاً جریان <strong>Client Credentials Grant</strong> به کار می‌رود.</li></ul>"
-  },
-  {
-   "id": "auto_07-section-9",
-   "title": "کالبدشکافی JWT (JWS در RFC 7519): کدگذاری Base64URL ≠ رمزنگاری!",
-   "html": "<p>یک <strong>JWT امضاشده (JWS)</strong> از سه بخش جداشده با نقطه تشکیل شده است: <code>Header.Payload.Signature</code>.</p><ul><li><strong>Header:</strong> نوع توکن و الگوریتم امضا (مثل <code>HS256</code> یا <code>RS256/ES256</code>) با کدگذاری <code>Base64URL</code>.</li><li><strong>Payload (Claims):</strong> داده‌هایی مانند <code>sub</code>، <code>scope</code>، <code>iss</code>، <code>aud</code> و <code>exp</code> (زمان انقضا) — <strong>فقط با Base64URL کدگذاری شده و رمزنگاری نیست!</strong> هر کسی با داشتن توکن می‌تواند Payload آن را فوری بخواند؛ پس هرگز رمز عبور یا داده محرمانه در Payload JWS نگذارید (برای محرمانگی خود بدنه از <strong>JWE</strong> استفاده می‌شود).</li><li><strong>Signature:</strong> تضمین <strong>یکپارچگی (Integrity) و اصالت</strong>؛ تغییر حتی یک کاراکتر در Header یا Payload (مثلاً تغییر <code>scope</code> به <code>admin</code>) باعث شکست فوری راستی‌آزمایی امضا در سرور می‌شود.</li></ul>"
-  },
-  {
-   "id": "auto_07-section-10",
-   "title": "آسیب‌پذیری‌های کلاسیک JWT و قوانین دفاعی",
-   "html": "<p>در پیاده‌سازی و مصرف JWT رعایت این اصول حیاتی است: (۱) هرگز الگوریتم <code>\"alg\": \"none\"</code> را نپذیرید و فهرست الگوریتم مجاز را در سمت سرور قفل کنید؛ (۲) همیشه فیلدهای <code>exp</code>، <code>iss</code> و <code>aud</code> را بررسی نمایید؛ (۳) از <code>hmac.compare_digest()</code> (مقایسه زمان-ثابت) برای جلوگیری از Timing Attack استفاده کنید؛ و (۴) توکن‌های JWT را همیشه روی <strong>HTTPS (TLS 1.3)</strong> منتقل کنید.</p>"
-  },
-  {
-   "id": "auto_07-section-11",
-   "title": "کژفهمی‌های رایج درباره HTTP/3، TLS و JWT",
-   "html": "<ul><li><strong>کژفهمی ۱: «Payload درون JWT رمزنگاری شده است، پس جایگزین HTTPS است.»</strong> واقعیت: در JWT استاندارد (JWS)، بخش Payload فقط Base64URL است و بدون کلید قابل خواندن است؛ علاوه بر این اگر توکن بدون HTTPS شنود شود، مهاجم می‌تواند همان توکن معتبر را بازپخش (Bearer Theft) کند!</li><li><strong>کژفهمی ۲: «چون HTTP/3 روی UDP است، پس تحویل مطمئن ندارد.»</strong> واقعیت: پروتکل QUIC قابلیت اطمینان، کنترل ازدحام و ارسال مجدد را خودش در سطح هر Stream مستقل روی UDP پیاده‌سازی می‌کند تا از TCP HoL Blocking رها شود.</li><li><strong>کژفهمی ۳: «قرار دادن نام میزبان در Common Name (CN) گواهینامه برای کلاینت‌های جدید کافی است.»</strong> واقعیت: کلاینت‌های مدرن و استانداردهای جاری نام میزبان یا IP را در <strong>SAN (Subject Alternative Name)</strong> بررسی می‌کنند.</li></ul>"
-  },
-  {
-   "id": "auto_07-section-12",
-   "title": "عیب‌یابی خطاهای HTTPS و گواهینامه در برنامه‌نویسی شبکه",
-   "html": "<p><strong>خطای ۱ — <code>SSLCertVerificationError: IP address mismatch / Hostname mismatch</code>:</strong> نام یا IPای که با آن وصل شده‌اید در فیلد <strong>SAN</strong> گواهینامه کنترلر نیست (مثلاً گواهینامه فقط برای <code>dnac.corp.local</code> صادر شده ولی شما با IP مستقیم وصل شده‌اید). راه‌حل: اتصال با FQDN ثبت‌شده در SAN یا صدور گواهینامه با SAN کامل.</p><p><strong>خطای ۲ — <code>unable to get local issuer certificate</code>:</strong> گواهینامه توسط CA داخلی سازمان امضا شده اما زنجیره CA داخلی به Trust Store پایتون معرفی نشده است؛ راه‌حل: تنظیم <code>REQUESTS_CA_BUNDLE</code> یا پارامتر <code>verify=\"/path/to/corp-ca.pem\"</code> به جای <code>verify=False</code>.</p>"
-  },
-  {
-   "id": "auto_07-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> اگر گواهینامه کنترلر دارای <code>SAN = [\"*.netops.example\"]</code> باشد، آیا اتصال به <code>api.netops.example</code> و <code>a.b.netops.example</code> هر دو معتبرند؟ <strong>پاسخ:</strong> <code>api.netops.example</code> معتبر است (تطابق تک‌برچسبی Wildcard)، اما <code>a.b.netops.example</code> مطابق RFC 6125/9525 <strong>رد می‌شود</strong> زیرا Wildcard (<code>*</code>) فقط یک سطح زیردامنه را پوشش می‌دهد.</p><p><strong>تمرین ۲:</strong> مهاجمی یک JWS معتبر را به دست آورده و Payload را به <code>{\"scope\": \"admin:*\"}</code> تغییر می‌دهد بدون آنکه کلید امضای سرور را بداند. آیا سرور آن را می‌پذیرد؟ <strong>پاسخ:</strong> خیر؛ بخش Signature با Header و Payload جدید تطابق ندارد و راستی‌آزمایی امضا شکست می‌خورد (به شرطی که سرور امضا را درست بررسی کند و <code>alg: none</code> را نپذیرد).</p>"
-  },
-  {
-   "id": "auto_07-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8446\" target=\"_blank\" rel=\"noopener\">RFC 8446 (TLS 1.3)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc9114\" target=\"_blank\" rel=\"noopener\">RFC 9114 (HTTP/3)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc7519\" target=\"_blank\" rel=\"noopener\">RFC 7519 (JWT)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc6749\" target=\"_blank\" rel=\"noopener\">RFC 6749 (OAuth 2.0)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc9525\" target=\"_blank\" rel=\"noopener\">RFC 9525 (Service Identity in TLS / SAN)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس با Python 3 stdlib ساخت/بازگشایی/رد دستکاری JWT (HS256) و تطابق SAN را محلی اجرا و تست کرده است؛ هیچ Handshake زنده TLS 1.3/QUIC روی اینترنت یا سرور OAuth تولیدی در این محیط اجرا نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "HTTP/2 (RFC 9113)",
-   "fa": "پروتکل HTTP/2",
-   "simple": "نسخه باینری HTTP با Multiplexing روی یک اتصال TCP و فشرده‌سازی هدر HPACK."
-  },
-  {
-   "term": "HTTP/3 (RFC 9114)",
-   "fa": "پروتکل HTTP/3",
-   "simple": "نسخه مدرن HTTP بر بستر QUIC/UDP که مشکل TCP-level HoL Blocking را حل می‌کند."
-  },
-  {
-   "term": "QUIC (RFC 9000)",
-   "fa": "پروتکل QUIC",
-   "simple": "پروتکل انتقال امن روی UDP (با TLS 1.3 داخلی) و جریان‌های مستقل بدون قفل‌شدن متقابل."
-  },
-  {
-   "term": "HoL Blocking",
-   "fa": "مسدودسازی سر صف",
-   "simple": "معطل ماندن سایر بسته‌ها یا جریان‌ها در انتظار دریافت مجدد یک بسته گم‌شده."
-  },
-  {
-   "term": "TLS 1.3 (RFC 8446)",
-   "fa": "پروتکل TLS 1.3",
-   "simple": "جدیدترین نسخه TLS با دست‌دادن 1-RTT، حذف رمزهای ضعیف و تاکید بر Forward Secrecy."
-  },
-  {
-   "term": "Forward Secrecy",
-   "fa": "محرمانگی پیشرو",
-   "simple": "ویژگی تبادل کلید موقت (ECDHE) که مانع رمزگشایی ترافیک گذشته پس از افشای کلید سرور می‌شود."
-  },
-  {
-   "term": "0-RTT Early Data",
-   "fa": "داده زودهنگام 0-RTT",
-   "simple": "ارسال سریع داده در ازسرگیری TLS 1.3 که ریسک Replay Attack دارد و برای عملیات غیرایمن ممنوع است."
-  },
-  {
-   "term": "X.509 SAN",
-   "fa": "فیلد SAN گواهینامه",
-   "simple": "Subject Alternative Name؛ محل استاندارد تطابق نام دامنه/IP سرور در اعتبارسنجی HTTPS."
-  },
-  {
-   "term": "mTLS",
-   "fa": "احراز متقابل TLS",
-   "simple": "احراز هویت دوطرفه با گواهینامه X.509 در هر دو سمت کلاینت و سرور."
-  },
-  {
-   "term": "Basic Auth",
-   "fa": "احراز هویت پایه HTTP",
-   "simple": "ارسال user:pass با کدگذاری Base64 (نه رمزنگاری!) که حتماً نیازمند HTTPS است."
-  },
-  {
-   "term": "OAuth 2.0",
-   "fa": "چارچوب OAuth 2.0",
-   "simple": "استاندارد صدور توکن دسترسی کوتاه‌عمر با دامنه مجوز محدود (Scope)."
-  },
-  {
-   "term": "JWT / JWS (RFC 7519)",
-   "fa": "توکن JWT امضاشده",
-   "simple": "توکن سه‌بخشی Header.Payload.Signature؛ Payload فقط Base64URL است نه رمزنگاری."
-  },
-  {
-   "term": "JWE",
-   "fa": "توکن JWT رمزنگاری‌شده",
-   "simple": "نسخه رمزنگاری‌شده JWT برای مواردی که خود بدنه Claims باید محرمانه بماند."
-  },
-  {
-   "term": "Replay Attack",
-   "fa": "حمله بازپخش",
-   "simple": "ارسال مجدد یک بسته یا درخواست معتبر ضبط‌شده توسط مهاجم."
-  },
-  {
-   "term": "MitM",
-   "fa": "حمله مرد میانی",
-   "simple": "شنود یا دستکاری ارتباط میان کلاینت و سرور؛ با اعتبارسنجی صحیح زنجیره TLS و SAN دفع می‌شود."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه محلی Python 3 (ساخت/رد دستکاری JWT و بررسی X.509 SAN) — سرور OAuth/TLS زنده اجرا نشده",
-   "executionStatus": "اسکریپت محلی Python 3 اجرا و تست شده؛ هیچ سرور تولیدی OAuth/HTTPS یا روتر واقعی متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اسکریپت محلی واقعی Python 3 (رمزنگاری stdlib)</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور OAuth زنده، Handshake واقعی TLS 1.3/QUIC یا تجهیز شبکه در این آزمایشگاه متصل نشده است.</p><p>در این آزمایشگاه محلی Python 3، یک JWT (HS256) می‌سازید، می‌بینید که Payload آن بدون داشتن کلید فقط با Base64URL خوانا است، تغییر غیرمجاز <code>scope</code> به <code>admin:*</code> را با شکست امضای HMAC-SHA256 رد می‌کنید و قواعد Wildcard تک‌برچسبی فیلد SAN را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_07_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_07_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Crypto/JWT/X.509 SAN Lab for auto_07.\n\nRuns real Python 3 stdlib HMAC-SHA256 / Base64URL cryptography and SAN matching locally;\nno live TLS 1.3 handshake or production OAuth server is contacted.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport base64\nimport hashlib\nimport hmac\nimport json\n\n\ndef b64url_encode(raw: bytes) -&gt; str:\n    return base64.urlsafe_b64encode(raw).rstrip(b&quot;=&quot;).decode(&quot;ascii&quot;)\n\n\ndef b64url_decode(segment: str) -&gt; bytes:\n    padding = &quot;=&quot; * (-len(segment) % 4)\n    return base64.urlsafe_b64decode(segment + padding)\n\n\ndef build_hs256_jwt(payload: dict[str, object], secret: bytes) -&gt; str:\n    header = {&quot;alg&quot;: &quot;HS256&quot;, &quot;typ&quot;: &quot;JWT&quot;}\n    h_b64 = b64url_encode(json.dumps(header, separators=(&quot;,&quot;, &quot;:&quot;)).encode(&quot;utf-8&quot;))\n    p_b64 = b64url_encode(json.dumps(payload, separators=(&quot;,&quot;, &quot;:&quot;)).encode(&quot;utf-8&quot;))\n    sig = hmac.new(secret, f&quot;{h_b64}.{p_b64}&quot;.encode(&quot;ascii&quot;), hashlib.sha256).digest()\n    return f&quot;{h_b64}.{p_b64}.{b64url_encode(sig)}&quot;\n\n\ndef verify_hs256_jwt(token: str, secret: bytes, now_ts: int = 1764201600) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Decode JWS payload and enforce pinned alg==&#x27;HS256&#x27;, HMAC-SHA256 signature, and exp claim.&quot;&quot;&quot;\n    parts = token.split(&quot;.&quot;)\n    if len(parts) != 3:\n        return {&quot;valid&quot;: False, &quot;reason&quot;: &quot;malformed_jwt&quot;}\n    h_b64, p_b64, s_b64 = parts\n    header = json.loads(b64url_decode(h_b64))\n    payload = json.loads(b64url_decode(p_b64))\n\n    # RFC 8725: Pin allowed algorithm explicitly to block alg=&quot;none&quot; / algorithm confusion\n    alg_ok = header.get(&quot;alg&quot;) == &quot;HS256&quot;\n    expected_sig = b64url_encode(\n        hmac.new(secret, f&quot;{h_b64}.{p_b64}&quot;.encode(&quot;ascii&quot;), hashlib.sha256).digest()\n    )\n    sig_ok = alg_ok and hmac.compare_digest(s_b64, expected_sig)\n    exp = payload.get(&quot;exp&quot;)\n    not_expired = isinstance(exp, int) and exp &gt; now_ts\n\n    reason = &quot;ok&quot;\n    if not alg_ok:\n        reason = f&quot;disallowed_alg:{header.get(&#x27;alg&#x27;)}&quot;\n    elif not sig_ok:\n        reason = &quot;invalid_signature&quot;\n    elif not not_expired:\n        reason = &quot;token_expired&quot;\n\n    return {\n        &quot;header&quot;: header,\n        &quot;payload&quot;: payload,\n        &quot;alg_pinned_hs256&quot;: alg_ok,\n        &quot;signature_valid&quot;: sig_ok,\n        &quot;not_expired&quot;: not_expired,\n        &quot;valid&quot;: alg_ok and sig_ok and not_expired,\n        &quot;reason&quot;: reason,\n    }\n\n\ndef verify_san_match(target_host: str, cert_sans: list[str]) -&gt; bool:\n    &quot;&quot;&quot;Simplified RFC 6125/9525 SAN match (exact or non-empty single-label left wildcard).&quot;&quot;&quot;\n    host = target_host.lower().strip()\n    if not host or host.startswith(&quot;.&quot;) or host.endswith(&quot;.&quot;):\n        return False\n    for san in cert_sans:\n        pattern = san.lower().strip()\n        if pattern == host:\n            return True\n        if pattern.startswith(&quot;*.&quot;) and host.endswith(pattern[1:]):\n            left_label = host[: -len(pattern[1:])]\n            if left_label and &quot;.&quot; not in left_label:\n                return True\n    return False\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python stdlib JWT/SAN crypto lab — no external HTTPS/OAuth server or router is contacted.&quot;)\n    secret = b&quot;lab-only-not-production-secret&quot;\n    now_ts = 1764201600  # 2025-11-27T00:00:00Z reference timestamp\n\n    valid_tok = build_hs256_jwt({&quot;sub&quot;: &quot;netops-bot&quot;, &quot;scope&quot;: &quot;read:interfaces&quot;, &quot;exp&quot;: 1893456000}, secret)\n    valid_res = verify_hs256_jwt(valid_tok, secret, now_ts=now_ts)\n    assert valid_res[&quot;valid&quot;] is True\n    print(&quot;Valid JWT check:&quot;, valid_res)\n\n    # Negative 1: Tampered payload\n    parts = valid_tok.split(&quot;.&quot;)\n    forged_payload = b64url_encode(json.dumps({&quot;sub&quot;: &quot;netops-bot&quot;, &quot;scope&quot;: &quot;admin:*&quot;, &quot;exp&quot;: 1893456000}).encode(&quot;utf-8&quot;))\n    tampered_res = verify_hs256_jwt(f&quot;{parts[0]}.{forged_payload}.{parts[2]}&quot;, secret, now_ts=now_ts)\n    assert tampered_res[&quot;valid&quot;] is False and tampered_res[&quot;reason&quot;] == &quot;invalid_signature&quot;\n    print(&quot;Tampered JWT rejected:&quot;, tampered_res)\n\n    # Negative 2: alg=&quot;none&quot; attack rejected explicitly\n    none_hdr = b64url_encode(json.dumps({&quot;alg&quot;: &quot;none&quot;, &quot;typ&quot;: &quot;JWT&quot;}).encode(&quot;utf-8&quot;))\n    none_res = verify_hs256_jwt(f&quot;{none_hdr}.{parts[1]}.&quot;, secret, now_ts=now_ts)\n    assert none_res[&quot;valid&quot;] is False and none_res[&quot;alg_pinned_hs256&quot;] is False\n    print(&quot;alg=none attack rejected:&quot;, none_res)\n\n    # Negative 3: Expired token rejected\n    expired_tok = build_hs256_jwt({&quot;sub&quot;: &quot;netops-bot&quot;, &quot;scope&quot;: &quot;read:interfaces&quot;, &quot;exp&quot;: 1700000000}, secret)\n    expired_res = verify_hs256_jwt(expired_tok, secret, now_ts=now_ts)\n    assert expired_res[&quot;valid&quot;] is False and expired_res[&quot;reason&quot;] == &quot;token_expired&quot;\n    print(&quot;Expired JWT rejected:&quot;, expired_res)\n\n    # SAN checks (positive + negative)\n    assert verify_san_match(&quot;api.netops.example&quot;, [&quot;*.netops.example&quot;]) is True\n    assert verify_san_match(&quot;a.b.netops.example&quot;, [&quot;*.netops.example&quot;]) is False\n    assert verify_san_match(&quot;.netops.example&quot;, [&quot;*.netops.example&quot;]) is False\n    print(&quot;SAN checks passed (exact/single-label accepted; multi-label &amp; leading-dot rejected).&quot;)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> توکن اصلی <code>valid: True</code>، رد صریح توکن دستکاری‌شده، رد حمله <code>alg: none</code>، رد توکن منقضی‌شده (<code>exp</code>)، و پذیرش <code>api.netops.example</code> در برابر رد <code>a.b.netops.example</code> و <code>.netops.example</code> در SAN.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>دستور مرجع بررسی گواهینامه و SAN یک سرور آزمایشی با OpenSSL (اجرا نشده روی سرور تولیدی):</strong></p><pre dir=\"ltr\"><code># Reference diagnostic command (NOT executed against live internet hosts)\nopenssl s_client -connect controller.example:443 -servername controller.example &lt;/dev/null 2&gt;/dev/null | openssl x509 -noout -text | grep -A1 \"Subject Alternative Name\"</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس پروتکل HTTP و HTTPS در برنامه‌نویسی شبکه",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "کدام گزاره درباره ساختار JWT امضاشده (JWS در RFC 7519) کاملاً صحیح است؟",
-   "options": [
-    "Payload به‌طور پیش‌فرض رمزنگاری AES-256 است",
-    "JWT جایگزین HTTPS است و روی HTTP پورت ۸۰ کاملاً امن است",
-    "تغییر یک کاراکتر در Payload تأثیری بر امضا ندارد",
-    "Payload فقط با Base64URL کدگذاری شده و خوانا است، اما Signature یکپارچگی و اصالت آن را در برابر دستکاری تضمین می‌کند"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>در JWS استاندارد، Payload رمزنگاری نیست (برای محرمانگی بدنه از JWE و برای محرمانگی انتقال از HTTPS استفاده می‌شود)، اما دستکاری آن امضا را باطل می‌کند.</p>"
-  },
-  {
-   "title": "علت اصلی استفاده HTTP/3 از پروتکل QUIC بر بستر UDP چیست؟",
-   "options": [
-    "زیرا UDP هرگز بسته‌ای گم نمی‌کند",
-    "برای حذف رمزنگاری TLS",
-    "برای حذف TCP-level Head-of-Line Blocking تا افت یک بسته فقط همان Stream را معطل کند نه کل اتصال را",
-    "برای استفاده از پورت ۲۳"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>در HTTP/2 روی TCP، گم شدن یک بسته TCP همه Streamهای مالتی‌پلکس‌شده را متوقف می‌کند؛ QUIC جریان‌ها را مستقل مدیریت می‌کند.</p>"
-  },
-  {
-   "title": "در اعتبارسنجی گواهینامه X.509 در HTTPS مدرن، نام میزبان یا IP سرور باید در کدام بخش گواهینامه باشد؟",
-   "options": [
-    "فیلد SAN (Subject Alternative Name)",
-    "فیلد Serial Number",
-    "کلید خصوصی کلاینت",
-    "فقط در کامنت فایل hosts"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>مطابق RFC 6125/9525، کلاینت‌های مدرن نام میزبان/IP را با فیلد <code>SAN</code> تطبیق می‌دهند نه صرفاً CN قدیمی.</p>"
-  },
-  {
-   "title": "چرا ارسال عملیات غیرایمن (مانند POST تغییر پیکربندی) درون 0-RTT Early Data در TLS 1.3 خطرناک است؟",
-   "options": [
-    "زیرا 0-RTT از HTTP/1.1 پشتیبانی نمی‌کند",
-    "زیرا داده‌های 0-RTT در برابر حمله بازپخش (Replay Attack) آسیب‌پذیرند",
-    "زیرا 0-RTT کلید خصوصی را حذف می‌کند",
-    "زیرا 0-RTT فقط روی پورت ۲۲ کار می‌کند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>مهاجم روی مسیر می‌تواند بسته 0-RTT را دوباره ارسال کند؛ لذا 0-RTT تنها برای درخواست‌های ایمن/Idempotent مجاز است.</p>"
-  },
-  {
-   "title": "خاصیت Forward Secrecy در TLS 1.3 (با ECDHE) چه حفاظتی ایجاد می‌کند؟",
-   "options": [
-    "مانع استفاده از گواهینامه X.509 می‌شود",
-    "رمزنگاری را خاموش می‌کند",
-    "حتی اگر کلید خصوصی بلندمدت سرور در آینده افشا شود، ترافیک ضبط‌شده نشست‌های قبلی قابل رمزگشایی نیست",
-    "سرعت DNS را دو برابر می‌کند"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>کلیدهای نشست با تبادل موقت ECDHE ساخته و پس از نشست نابود می‌شوند (توجه: حالت PSK-only بدون DHE فاقد FS است).</p>"
-  },
-  {
-   "title": "کدام جمله درباره امنیت HTTP Basic Auth صحیح است؟",
-   "options": [
-    "نام کاربری و رمز با AES-256 رمزنگاری می‌شوند",
-    "بدون HTTPS کاملاً امن است",
-    "فقط با گواهینامه کلاینت کار می‌کند",
-    "صرفاً کدگذاری Base64 است (نه رمزنگاری) و بدون HTTPS معادل ارسال رمز متن‌باز روی شبکه است"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>Base64 در کسری از ثانیه بازگشایی می‌شود؛ Basic Auth هرگز نباید روی HTTP بدون TLS ارسال شود.</p>"
-  },
-  {
-   "title": "در ارتباط امن ماشین-به-ماشین (مثلاً سیستم CI/CD با کنترلر شبکه)، تفاوت mTLS با HTTPS معمولی چیست؟",
-   "options": [
-    "در mTLS علاوه بر سرور، کلاینت نیز گواهینامه X.509 خود را ارائه می‌دهد و احراز هویت متقابل انجام می‌شود",
-    "در mTLS رمزنگاری خاموش است",
-    "در mTLS از UDP پورت ۵۳ استفاده می‌شود",
-    "در mTLS نیازی به CA نیست"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>Mutual TLS هویت هر دو سمت را با PKI تصدیق می‌کند و برای ارتباط سرویس‌ها بسیار قوی است.</p>"
-  },
-  {
-   "title": "وقتی اسکریپت پایتون به کنترلری با گواهینامه CA داخلی وصل می‌شود و خطای SSLCertVerificationError می‌دهد، راه‌حل امن چیست؟",
-   "options": [
-    "گذاشتن verify=False در محیط تولید",
-    "ارائه مسیر فایل PEM گواهینامه CA داخلی سازمان به پارامتر verify (یا REQUESTS_CA_BUNDLE)",
-    "مهاجرت از HTTPS به HTTP پورت ۸۰",
-    "حذف هدر Authorization"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>خاموش کردن اعتبارسنجی TLS (<code>verify=False</code>) در را برای حمله MitM باز می‌گذارد؛ معرفی CA داخلی راه‌حل صحیح است.</p>"
-  },
-  {
-   "title": "کدام جریان OAuth 2.0 معمولاً برای احراز هویت اسکریپت‌های اتوماسیون بدون تعامل کاربر انسانی (Machine-to-Machine) استفاده می‌شود؟",
-   "options": [
-    "Implicit Flow قدیمی مرورگر",
-    "ارسال رمز در URL",
-    "Client Credentials Grant",
-    "Telnet Login"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>در Client Credentials Grant سرویس با <code>client_id</code> و <code>client_secret</code> (یا assertion) توکن کوتاه‌عمر با Scope محدود می‌گیرد.</p>"
-  },
-  {
-   "title": "برای یک گواهینامه با SAN = *.netops.example، کدام نام میزبان معتبر و کدام رد می‌شود؟",
-   "options": [
-    "هر دو api.netops.example و a.b.netops.example معتبرند",
-    "هر دو رد می‌شوند",
-    "فقط a.b.netops.example معتبر است",
-    "api.netops.example معتبر است اما a.b.netops.example به دلیل چندسطحی بودن رد می‌شود"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>Wildcard در SAN فقط یک برچسب (Single-label) سمت چپ را پوشش می‌دهد.</p>"
-  },
-  {
-   "title": "اگر بخواهیم خود محتوای Claims داخل یک توکن JWT برای ناظر بیرونی خوانا نباشد (محرمانگی بدنه)، کدام استاندارد به کار می‌رود؟",
-   "options": [
-    "JWE (JSON Web Encryption)",
-    "فقط تغییر Base64 به Hex",
-    "تنظیم alg روی none",
-    "استفاده از HTTP/1.0"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>JWS فقط امضا (Integrity) می‌دهد؛ برای رمزنگاری خود بدنه توکن از JWE (RFC 7516) استفاده می‌شود.</p>"
-  },
-  {
-   "title": "آزمایشگاه Python این درس چه چیزی را محلی بررسی کرده است؟",
-   "options": [
-    "تست زنده HTTP/3 QUIC روی اینترنت",
-    "ساخت و بررسی JWT (قفل alg=HS256، امضای HMAC-SHA256 و exp)، رد توکن دستکاری‌شده/alg=none/منقضی و منطق تطابق SAN در Python 3 stdlib بدون اتصال به سرور تولیدی",
-    "صدور گواهینامه واقعی از Let's Encrypt",
-    "شنود ترافیک HTTPS سازمان"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>آزمایشگاه محلی در Python 3 stdlib اجرا شده و هیچ سرور OAuth یا TLS تولیدی درگیر نشده است.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.3",
-  "legacyId": "auto_07",
-  "sources": [
-   "https://www.rfc-editor.org/rfc/rfc8446",
-   "https://www.rfc-editor.org/rfc/rfc9113",
-   "https://www.rfc-editor.org/rfc/rfc9114",
-   "https://www.rfc-editor.org/rfc/rfc7519",
-   "https://www.rfc-editor.org/rfc/rfc6749",
-   "https://www.rfc-editor.org/rfc/rfc9525",
-   "https://www.rfc-editor.org/rfc/rfc8725"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "auto_07",
+  "objectiveId": "auto_07",
+  "kind": "lesson",
+  "track": "Automation",
+  "course": "automation-foundations",
+  "title": "۷.۷ Automation (درس ۷ از ۲۰): پروتکل HTTP و HTTPS در برنامه‌نویسی شبکه",
+  "titleEn": "Automation 07: HTTP/1.1 to HTTP/3 (QUIC), TLS 1.3, X.509 SAN, mTLS, OAuth 2.0 & JWT",
+  "domain": "Network Automation",
+  "source": "Legacy auto_07 rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [],
+  "sections": [
+    {
+      "id": "auto_07-section-1",
+      "title": "مسئله واقعی: چرا اسکریپت‌های API با verify=False و توکن‌های نامحدود، دروازه نفوذ می‌شوند؟",
+      "html": "<p>در بسیاری از سازمان‌ها، اسکریپت اتوماسیون هنگام اتصال به کنترلر شبکه با خطای گواهینامه TLS مواجه می‌شود و برنامه‌نویس به‌سرعت <code>verify=False</code> می‌گذارد؛ یا تصور می‌کند چون توکن <strong>JWT</strong> رشته‌ای نامفهوم است، پس رمزنگاری شده و می‌توان رمز عبور یا اسرار داخلی را درون آن گذاشت! از سوی دیگر در شبکه‌های WAN با افت بسته، درک تفاوت <strong>HTTP/1.1</strong>، <strong>HTTP/2</strong> و <strong>HTTP/3 (QUIC)</strong> توضیح می‌دهد چرا گاهی APIها یا داشبوردها روی لینک‌های پرتأخیر کند می‌شوند.</p>"
+    },
+    {
+      "id": "auto_07-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با TCP/UDP، REST API (درس <code>auto_06</code>) و مبانی رمزنگاری.</p><ul><li>تبیین تکامل <strong>HTTP/1.1</strong> به <strong>HTTP/2 (RFC 9113)</strong> و <strong>HTTP/3 / QUIC (RFC 9000 &amp; 9114)</strong> و تفکیک App-level از TCP-level Head-of-Line Blocking.</li><li>کالبدشکافی <strong>TLS 1.3 (RFC 8446)</strong>: دست‌دادن 1-RTT، Forward Secrecy با ECDHE (در برابر حالت PSK-only)، و ریسک <strong>Replay Attack در 0-RTT</strong>.</li><li>اعتبارسنجی گواهینامه <strong>X.509</strong> (زنجیره Trust، تاریخ انقضا، فیلد <strong>SAN</strong>) و کاربرد <strong>mTLS</strong> در ارتباط ماشین-به-ماشین.</li><li>تمایز دقیق <strong>Basic Auth</strong>، <strong>OAuth 2.0 (RFC 6749)</strong> و ساختار <strong>JWT / JWS (RFC 7519)</strong>.</li></ul>"
+    },
+    {
+      "id": "auto_07-section-3",
+      "title": "تکامل HTTP: از HTTP/1.1 تا Multiplexing در HTTP/2 و QUIC در HTTP/3",
+      "html": "<table><thead><tr><th>نسخه</th><th>پروتکل انتقال</th><th>مکانیسم کلیدی</th><th>محدودیت / ویژگی مهم</th></tr></thead><tbody><tr><td><strong>HTTP/1.1</strong></td><td>TCP</td><td>متنی؛ یک درخواست در صف روی هر اتصال (Pipelining عملاً متروک)</td><td><strong>HTTP-level HoL Blocking</strong>؛ نیاز به باز کردن چند اتصال موازی</td></tr><tr><td><strong>HTTP/2 (RFC 9113)</strong></td><td>TCP</td><td>فریم‌بندی باینری، Multiplexing چند Stream روی یک TCP و فشرده‌سازی هدر HPACK</td><td>در صورت افت یک بسته TCP، کرنل همه Streamها را متوقف می‌کند (<strong>TCP-level HoL Blocking</strong>)</td></tr><tr><td><strong>HTTP/3 (RFC 9114)</strong></td><td><strong>QUIC روی UDP 443</strong></td><td>جریان‌های مستقل درون QUIC، یکپارچه‌سازی بومی TLS 1.3 و Connection Migration</td><td>افت یک بسته فقط همان Stream را معطل می‌کند؛ حذف TCP HoL Blocking</td></tr></tbody></table>"
+    },
+    {
+      "id": "auto_07-section-4",
+      "title": "نمودار یکپارچه لایه انتقال HTTP/3، امنیت TLS 1.3 و احراز هویت JWT/OAuth2",
+      "html": "<p>نمودار زیر سه لایه حیاتی ارتباط امن API در اتوماسیون شبکه را کنار هم نمایش می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"HTTP/1.1 to HTTP/3 QUIC, TLS 1.3 and JWT/OAuth2 Security\"><rect x=\"12\" y=\"18\" width=\"228\" height=\"184\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"126\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">HTTP Transport Evolution</text><text x=\"126\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">HTTP/1.1: Text, App HoL Blocking</text><text x=\"126\" y=\"102\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">HTTP/2: Binary Multiplexing</text><text x=\"126\" y=\"118\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">(Still suffers TCP HoL Blocking)</text><text x=\"126\" y=\"148\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1d4ed8\">HTTP/3: QUIC over UDP 443</text><text x=\"126\" y=\"166\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Independent streams + TLS 1.3</text><rect x=\"266\" y=\"18\" width=\"228\" height=\"184\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">TLS 1.3 (RFC 8446) &amp; PKI</text><text x=\"380\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">1-RTT Handshake + ECDHE (FS)</text><text x=\"380\" y=\"98\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">0-RTT: Replay Risk (Safe ops only)</text><text x=\"380\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">X.509 Verify: Chain + Expiry + SAN</text><text x=\"380\" y=\"150\" text-anchor=\"middle\" font-size=\"10\" fill=\"#166534\">mTLS: Mutual Client + Server Cert</text><text x=\"380\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Avoid verify=False in production!</text><rect x=\"520\" y=\"18\" width=\"228\" height=\"184\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"634\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">API Auth: OAuth 2.0 &amp; JWT</text><text x=\"634\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">JWT (JWS): Header.Payload.Sig</text><text x=\"634\" y=\"98\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">Base64URL != Encryption!</text><text x=\"634\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Signature guards integrity</text><text x=\"634\" y=\"150\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">OAuth 2.0 Client Credentials</text><text x=\"634\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">Short-lived token + least scope</text></svg>"
+    },
+    {
+      "id": "auto_07-section-5",
+      "title": "زیر کاپوت TLS 1.3 (RFC 8446): سرعت 1-RTT، Forward Secrecy و خط قرمز 0-RTT",
+      "html": "<p><strong>TLS 1.3 (RFC 8446)</strong> هم امنیت و هم سرعت را نسبت به TLS 1.2 جهش داد: الگوریتم‌های ضعیف و قدیمی (مانند RC4، SHA-1، CBC، تبادل کلید ایستا RSA بدون Forward Secrecy) را حذف کرد و Handshake کامل را به <strong>1-RTT</strong> کاهش داد.</p><ul><li><strong>Forward Secrecy (ECDHE):</strong> با تبادل کلید موقت (Ephemeral) ECDHE، حتی اگر کلید خصوصی سرور سال‌ها بعد لو برود، ترافیک ضبط‌شده گذشته قابل رمزگشایی نیست. <em>نکته دقت فنی:</em> در حالت خاص از سرگیری نشست <code>PSK-only</code> (بدون <code>psk_dhe_ke</code>) خاصیت Forward Secrecy وجود ندارد؛ به همین دلیل در عمل <code>psk_dhe_ke</code> توصیه می‌شود.</li><li><strong>هشدار 0-RTT (Early Data):</strong> داده‌های 0-RTT از نظر رمزنگاری در برابر <strong>Replay Attack</strong> مصون نیستند؛ بنابراین نباید برای عملیات غیرایمن/غیر-Idempotent (مثل POST تغییر پیکربندی یا انتقال وجه) مجاز شوند.</li></ul>"
+    },
+    {
+      "id": "auto_07-section-6",
+      "title": "اعتبارسنجی گواهینامه X.509: زنجیره PKI، فیلد SAN و خطر verify=False",
+      "html": "<p>هنگام اتصال HTTPS به یک کنترلر شبکه، کلاینت چهار بررسی حیاتی انجام می‌دهد: (۱) اعتبار امضای زنجیره گواهینامه تا یک <strong>Root CA مورد اعتماد</strong>، (۲) معتبر بودن بازه زمانی (<code>NotBefore / NotAfter</code>)، (۳) ابطال نشدن گواهینامه (CRL/OCSP)، و (۴) تطابق نام میزبان یا IP مقصد با فیلد <strong>SAN (Subject Alternative Name)</strong> — در کلاینت‌های مدرن فیلد قدیمی <code>CN (Common Name)</code> بدون SAN دیگر کافی نیست (RFC 9525 / RFC 6125).</p><p>گذاشتن <code>verify=False</code> کل محافظت در برابر <strong>Man-in-the-Middle (MitM)</strong> را خنثی می‌کند؛ مهاجم روی مسیر می‌تواند با یک گواهینامه جعلی توکن API شما را بخواند! راه‌حل صحیح برای CA داخلی سازمان، معرفی فایل PEM آن CA به <code>verify=\"/path/to/corp-ca.pem\"</code> است.</p>"
+    },
+    {
+      "id": "auto_07-section-7",
+      "title": "احراز هویت متقابل (mTLS) برای ارتباط ماشین-به-ماشین",
+      "html": "<p>در HTTPS عادی فقط <strong>سرور</strong> گواهینامه خود را به کلاینت نشان می‌دهد تا کلاینت به سرور اعتماد کند. در <strong>mTLS (Mutual TLS)</strong>، سرور نیز از کلاینت (مثلاً اسکریپت CI/CD یا سرور Telemetry) می‌خواهد <strong>گواهینامه کلاینت X.509</strong> امضاشده توسط CA سازمان را ارائه دهد. mTLS یکی از قوی‌ترین روش‌های احراز هویت Zero Trust برای سرویس‌های بدون کاربر انسانی است.</p>"
+    },
+    {
+      "id": "auto_07-section-8",
+      "title": "احراز هویت APIها: Basic Auth، API Key و OAuth 2.0 (RFC 6749)",
+      "html": "<ul><li><strong>HTTP Basic Auth:</strong> ترکیب <code>user:pass</code> با کدگذاری <strong>Base64</strong> در هدر <code>Authorization: Basic ...</code>. Base64 هیچ رمزنگاری نیست و ارسال Basic Auth بدون HTTPS افشای کامل رمز عبور است!</li><li><strong>API Key / Static Token:</strong> ساده ولی در صورت بلندمدت بودن و نبود چرخش منظم، در صورت نشت خطرناک است.</li><li><strong>OAuth 2.0 (RFC 6749):</strong> چارچوب تفویض مجوز با توکن‌های <strong>کوتاه‌عمر (Access Token)</strong> و دسترسی محدود (<strong>Scope</strong>). برای اسکریپت‌های اتوماسیون ماشین-به-ماشین معمولاً جریان <strong>Client Credentials Grant</strong> به کار می‌رود.</li></ul>"
+    },
+    {
+      "id": "auto_07-section-9",
+      "title": "کالبدشکافی JWT (JWS در RFC 7519): کدگذاری Base64URL ≠ رمزنگاری!",
+      "html": "<p>یک <strong>JWT امضاشده (JWS)</strong> از سه بخش جداشده با نقطه تشکیل شده است: <code>Header.Payload.Signature</code>.</p><ul><li><strong>Header:</strong> نوع توکن و الگوریتم امضا (مثل <code>HS256</code> یا <code>RS256/ES256</code>) با کدگذاری <code>Base64URL</code>.</li><li><strong>Payload (Claims):</strong> داده‌هایی مانند <code>sub</code>، <code>scope</code>، <code>iss</code>، <code>aud</code> و <code>exp</code> (زمان انقضا) — <strong>فقط با Base64URL کدگذاری شده و رمزنگاری نیست!</strong> هر کسی با داشتن توکن می‌تواند Payload آن را فوری بخواند؛ پس هرگز رمز عبور یا داده محرمانه در Payload JWS نگذارید (برای محرمانگی خود بدنه از <strong>JWE</strong> استفاده می‌شود).</li><li><strong>Signature:</strong> تضمین <strong>یکپارچگی (Integrity) و اصالت</strong>؛ تغییر حتی یک کاراکتر در Header یا Payload (مثلاً تغییر <code>scope</code> به <code>admin</code>) باعث شکست فوری راستی‌آزمایی امضا در سرور می‌شود.</li></ul>"
+    },
+    {
+      "id": "auto_07-section-10",
+      "title": "آسیب‌پذیری‌های کلاسیک JWT و قوانین دفاعی",
+      "html": "<p>در پیاده‌سازی و مصرف JWT رعایت این اصول حیاتی است: (۱) هرگز الگوریتم <code>\"alg\": \"none\"</code> را نپذیرید و فهرست الگوریتم مجاز را در سمت سرور قفل کنید؛ (۲) همیشه فیلدهای <code>exp</code>، <code>iss</code> و <code>aud</code> را بررسی نمایید؛ (۳) از <code>hmac.compare_digest()</code> (مقایسه زمان-ثابت) برای جلوگیری از Timing Attack استفاده کنید؛ و (۴) توکن‌های JWT را همیشه روی <strong>HTTPS (TLS 1.3)</strong> منتقل کنید.</p>"
+    },
+    {
+      "id": "auto_07-section-11",
+      "title": "کژفهمی‌های رایج درباره HTTP/3، TLS و JWT",
+      "html": "<ul><li><strong>کژفهمی ۱: «Payload درون JWT رمزنگاری شده است، پس جایگزین HTTPS است.»</strong> واقعیت: در JWT استاندارد (JWS)، بخش Payload فقط Base64URL است و بدون کلید قابل خواندن است؛ علاوه بر این اگر توکن بدون HTTPS شنود شود، مهاجم می‌تواند همان توکن معتبر را بازپخش (Bearer Theft) کند!</li><li><strong>کژفهمی ۲: «چون HTTP/3 روی UDP است، پس تحویل مطمئن ندارد.»</strong> واقعیت: پروتکل QUIC قابلیت اطمینان، کنترل ازدحام و ارسال مجدد را خودش در سطح هر Stream مستقل روی UDP پیاده‌سازی می‌کند تا از TCP HoL Blocking رها شود.</li><li><strong>کژفهمی ۳: «قرار دادن نام میزبان در Common Name (CN) گواهینامه برای کلاینت‌های جدید کافی است.»</strong> واقعیت: کلاینت‌های مدرن و استانداردهای جاری نام میزبان یا IP را در <strong>SAN (Subject Alternative Name)</strong> بررسی می‌کنند.</li></ul>"
+    },
+    {
+      "id": "auto_07-section-12",
+      "title": "عیب‌یابی خطاهای HTTPS و گواهینامه در برنامه‌نویسی شبکه",
+      "html": "<p><strong>خطای ۱ — <code>SSLCertVerificationError: IP address mismatch / Hostname mismatch</code>:</strong> نام یا IPای که با آن وصل شده‌اید در فیلد <strong>SAN</strong> گواهینامه کنترلر نیست (مثلاً گواهینامه فقط برای <code>dnac.corp.local</code> صادر شده ولی شما با IP مستقیم وصل شده‌اید). راه‌حل: اتصال با FQDN ثبت‌شده در SAN یا صدور گواهینامه با SAN کامل.</p><p><strong>خطای ۲ — <code>unable to get local issuer certificate</code>:</strong> گواهینامه توسط CA داخلی سازمان امضا شده اما زنجیره CA داخلی به Trust Store پایتون معرفی نشده است؛ راه‌حل: تنظیم <code>REQUESTS_CA_BUNDLE</code> یا پارامتر <code>verify=\"/path/to/corp-ca.pem\"</code> به جای <code>verify=False</code>.</p>"
+    },
+    {
+      "id": "auto_07-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> اگر گواهینامه کنترلر دارای <code>SAN = [\"*.netops.example\"]</code> باشد، آیا اتصال به <code>api.netops.example</code> و <code>a.b.netops.example</code> هر دو معتبرند؟ <strong>پاسخ:</strong> <code>api.netops.example</code> معتبر است (تطابق تک‌برچسبی Wildcard)، اما <code>a.b.netops.example</code> مطابق RFC 6125/9525 <strong>رد می‌شود</strong> زیرا Wildcard (<code>*</code>) فقط یک سطح زیردامنه را پوشش می‌دهد.</p><p><strong>تمرین ۲:</strong> مهاجمی یک JWS معتبر را به دست آورده و Payload را به <code>{\"scope\": \"admin:*\"}</code> تغییر می‌دهد بدون آنکه کلید امضای سرور را بداند. آیا سرور آن را می‌پذیرد؟ <strong>پاسخ:</strong> خیر؛ بخش Signature با Header و Payload جدید تطابق ندارد و راستی‌آزمایی امضا شکست می‌خورد (به شرطی که سرور امضا را درست بررسی کند و <code>alg: none</code> را نپذیرد).</p>"
+    },
+    {
+      "id": "auto_07-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8446\" target=\"_blank\" rel=\"noopener\">RFC 8446 (TLS 1.3)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc9114\" target=\"_blank\" rel=\"noopener\">RFC 9114 (HTTP/3)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc7519\" target=\"_blank\" rel=\"noopener\">RFC 7519 (JWT)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc6749\" target=\"_blank\" rel=\"noopener\">RFC 6749 (OAuth 2.0)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc9525\" target=\"_blank\" rel=\"noopener\">RFC 9525 (Service Identity in TLS / SAN)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس با Python 3 stdlib ساخت/بازگشایی/رد دستکاری JWT (HS256) و تطابق SAN را محلی اجرا و تست کرده است؛ هیچ Handshake زنده TLS 1.3/QUIC روی اینترنت یا سرور OAuth تولیدی در این محیط اجرا نشده است.</p>"
+    }
   ],
-  "limitations": [
-   "آزمایشگاه محلی منطق JWT/HMAC و SAN را در Python 3 اجرا و تست کرده است؛ هیچ Handshake زنده TLS 1.3/QUIC یا سرور OAuth واقعی در این محیط اجرا نشده است."
+  "glossary": [
+    {
+      "term": "HTTP/2 (RFC 9113)",
+      "fa": "پروتکل HTTP/2",
+      "simple": "نسخه باینری HTTP با Multiplexing روی یک اتصال TCP و فشرده‌سازی هدر HPACK."
+    },
+    {
+      "term": "HTTP/3 (RFC 9114)",
+      "fa": "پروتکل HTTP/3",
+      "simple": "نسخه مدرن HTTP بر بستر QUIC/UDP که مشکل TCP-level HoL Blocking را حل می‌کند."
+    },
+    {
+      "term": "QUIC (RFC 9000)",
+      "fa": "پروتکل QUIC",
+      "simple": "پروتکل انتقال امن روی UDP (با TLS 1.3 داخلی) و جریان‌های مستقل بدون قفل‌شدن متقابل."
+    },
+    {
+      "term": "HoL Blocking",
+      "fa": "مسدودسازی سر صف",
+      "simple": "معطل ماندن سایر بسته‌ها یا جریان‌ها در انتظار دریافت مجدد یک بسته گم‌شده."
+    },
+    {
+      "term": "TLS 1.3 (RFC 8446)",
+      "fa": "پروتکل TLS 1.3",
+      "simple": "جدیدترین نسخه TLS با دست‌دادن 1-RTT، حذف رمزهای ضعیف و تاکید بر Forward Secrecy."
+    },
+    {
+      "term": "Forward Secrecy",
+      "fa": "محرمانگی پیشرو",
+      "simple": "ویژگی تبادل کلید موقت (ECDHE) که مانع رمزگشایی ترافیک گذشته پس از افشای کلید سرور می‌شود."
+    },
+    {
+      "term": "0-RTT Early Data",
+      "fa": "داده زودهنگام 0-RTT",
+      "simple": "ارسال سریع داده در ازسرگیری TLS 1.3 که ریسک Replay Attack دارد و برای عملیات غیرایمن ممنوع است."
+    },
+    {
+      "term": "X.509 SAN",
+      "fa": "فیلد SAN گواهینامه",
+      "simple": "Subject Alternative Name؛ محل استاندارد تطابق نام دامنه/IP سرور در اعتبارسنجی HTTPS."
+    },
+    {
+      "term": "mTLS",
+      "fa": "احراز متقابل TLS",
+      "simple": "احراز هویت دوطرفه با گواهینامه X.509 در هر دو سمت کلاینت و سرور."
+    },
+    {
+      "term": "Basic Auth",
+      "fa": "احراز هویت پایه HTTP",
+      "simple": "ارسال user:pass با کدگذاری Base64 (نه رمزنگاری!) که حتماً نیازمند HTTPS است."
+    },
+    {
+      "term": "OAuth 2.0",
+      "fa": "چارچوب OAuth 2.0",
+      "simple": "استاندارد صدور توکن دسترسی کوتاه‌عمر با دامنه مجوز محدود (Scope)."
+    },
+    {
+      "term": "JWT / JWS (RFC 7519)",
+      "fa": "توکن JWT امضاشده",
+      "simple": "توکن سه‌بخشی Header.Payload.Signature؛ Payload فقط Base64URL است نه رمزنگاری."
+    },
+    {
+      "term": "JWE",
+      "fa": "توکن JWT رمزنگاری‌شده",
+      "simple": "نسخه رمزنگاری‌شده JWT برای مواردی که خود بدنه Claims باید محرمانه بماند."
+    },
+    {
+      "term": "Replay Attack",
+      "fa": "حمله بازپخش",
+      "simple": "ارسال مجدد یک بسته یا درخواست معتبر ضبط‌شده توسط مهاجم."
+    },
+    {
+      "term": "MitM",
+      "fa": "حمله مرد میانی",
+      "simple": "شنود یا دستکاری ارتباط میان کلاینت و سرور؛ با اعتبارسنجی صحیح زنجیره TLS و SAN دفع می‌شود."
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش همراه با جزئیات دقیق Forward Secrecy (ECDHE vs PSK-only)، 0-RTT Replay و JWS vs JWE.",
-   "افزودن آزمایشگاه قابل اجرای محلی برای ساخت/تأیید/رد دستکاری JWT و قواعد Wildcard در SAN."
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه محلی Python 3 (ساخت/رد دستکاری JWT و بررسی X.509 SAN) — سرور OAuth/TLS زنده اجرا نشده",
+      "executionStatus": "اسکریپت محلی Python 3 اجرا و تست شده؛ هیچ سرور تولیدی OAuth/HTTPS یا روتر واقعی متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اسکریپت محلی واقعی Python 3 (رمزنگاری stdlib)</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور OAuth زنده، Handshake واقعی TLS 1.3/QUIC یا تجهیز شبکه در این آزمایشگاه متصل نشده است.</p><p>در این آزمایشگاه محلی Python 3، یک JWT (HS256) می‌سازید، می‌بینید که Payload آن بدون داشتن کلید فقط با Base64URL خوانا است، تغییر غیرمجاز <code>scope</code> به <code>admin:*</code> را با شکست امضای HMAC-SHA256 رد می‌کنید و قواعد Wildcard تک‌برچسبی فیلد SAN را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_07_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_07_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Crypto/JWT/X.509 SAN Lab for auto_07.\n\nRuns real Python 3 stdlib HMAC-SHA256 / Base64URL cryptography and SAN matching locally;\nno live TLS 1.3 handshake or production OAuth server is contacted.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport base64\nimport hashlib\nimport hmac\nimport json\n\n\ndef b64url_encode(raw: bytes) -&gt; str:\n    return base64.urlsafe_b64encode(raw).rstrip(b&quot;=&quot;).decode(&quot;ascii&quot;)\n\n\ndef b64url_decode(segment: str) -&gt; bytes:\n    padding = &quot;=&quot; * (-len(segment) % 4)\n    return base64.urlsafe_b64decode(segment + padding)\n\n\ndef build_hs256_jwt(payload: dict[str, object], secret: bytes) -&gt; str:\n    header = {&quot;alg&quot;: &quot;HS256&quot;, &quot;typ&quot;: &quot;JWT&quot;}\n    h_b64 = b64url_encode(json.dumps(header, separators=(&quot;,&quot;, &quot;:&quot;)).encode(&quot;utf-8&quot;))\n    p_b64 = b64url_encode(json.dumps(payload, separators=(&quot;,&quot;, &quot;:&quot;)).encode(&quot;utf-8&quot;))\n    sig = hmac.new(secret, f&quot;{h_b64}.{p_b64}&quot;.encode(&quot;ascii&quot;), hashlib.sha256).digest()\n    return f&quot;{h_b64}.{p_b64}.{b64url_encode(sig)}&quot;\n\n\ndef verify_hs256_jwt(token: str, secret: bytes, now_ts: int = 1764201600) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Decode JWS payload and enforce pinned alg==&#x27;HS256&#x27;, HMAC-SHA256 signature, and exp claim.&quot;&quot;&quot;\n    if not isinstance(token, str) or not isinstance(secret, (bytes, bytearray)):\n        raise ValueError(&quot;token must be str and secret must be bytes&quot;)\n    if isinstance(now_ts, bool) or not isinstance(now_ts, int):\n        raise ValueError(f&quot;now_ts must be an int (not bool), got {now_ts!r}&quot;)\n    parts = token.split(&quot;.&quot;)\n    if len(parts) != 3:\n        return {&quot;valid&quot;: False, &quot;reason&quot;: &quot;malformed_jwt&quot;}\n    h_b64, p_b64, s_b64 = parts\n    try:\n        header = json.loads(b64url_decode(h_b64))\n        payload = json.loads(b64url_decode(p_b64))\n    except (ValueError, UnicodeDecodeError):\n        return {&quot;valid&quot;: False, &quot;reason&quot;: &quot;malformed_jwt&quot;}\n    if not isinstance(header, dict) or not isinstance(payload, dict):\n        return {&quot;valid&quot;: False, &quot;reason&quot;: &quot;malformed_jwt&quot;}\n\n    # RFC 8725: Pin allowed algorithm explicitly to block alg=&quot;none&quot; / algorithm confusion\n    alg_ok = header.get(&quot;alg&quot;) == &quot;HS256&quot;\n    expected_sig = b64url_encode(\n        hmac.new(secret, f&quot;{h_b64}.{p_b64}&quot;.encode(&quot;ascii&quot;), hashlib.sha256).digest()\n    )\n    sig_ok = alg_ok and hmac.compare_digest(s_b64, expected_sig)\n    exp = payload.get(&quot;exp&quot;)\n    not_expired = (not isinstance(exp, bool)) and isinstance(exp, int) and exp &gt; now_ts\n\n    reason = &quot;ok&quot;\n    if not alg_ok:\n        reason = f&quot;disallowed_alg:{header.get(&#x27;alg&#x27;)}&quot;\n    elif not sig_ok:\n        reason = &quot;invalid_signature&quot;\n    elif not not_expired:\n        reason = &quot;token_expired&quot;\n\n    return {\n        &quot;header&quot;: header,\n        &quot;payload&quot;: payload,\n        &quot;alg_pinned_hs256&quot;: alg_ok,\n        &quot;signature_valid&quot;: sig_ok,\n        &quot;not_expired&quot;: not_expired,\n        &quot;valid&quot;: alg_ok and sig_ok and not_expired,\n        &quot;reason&quot;: reason,\n    }\n\n\ndef verify_san_match(target_host: str, cert_sans: list[str]) -&gt; bool:\n    &quot;&quot;&quot;Simplified RFC 6125/9525 SAN match (exact or non-empty single-label left wildcard).&quot;&quot;&quot;\n    if not isinstance(target_host, str) or not isinstance(cert_sans, list) or not all(isinstance(s, str) for s in cert_sans):\n        raise ValueError(&quot;target_host must be str and cert_sans must be list[str]&quot;)\n    host = target_host.lower().strip()\n    if not host or host.startswith(&quot;.&quot;) or host.endswith(&quot;.&quot;):\n        return False\n    for san in cert_sans:\n        pattern = san.lower().strip()\n        if pattern == host:\n            return True\n        if pattern.startswith(&quot;*.&quot;) and host.endswith(pattern[1:]):\n            left_label = host[: -len(pattern[1:])]\n            if left_label and &quot;.&quot; not in left_label:\n                return True\n    return False\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python stdlib JWT/SAN crypto lab — no external HTTPS/OAuth server or router is contacted.&quot;)\n    secret = b&quot;lab-only-not-production-secret&quot;\n    now_ts = 1764201600  # 2025-11-27T00:00:00Z reference timestamp\n\n    valid_tok = build_hs256_jwt({&quot;sub&quot;: &quot;netops-bot&quot;, &quot;scope&quot;: &quot;read:interfaces&quot;, &quot;exp&quot;: 1893456000}, secret)\n    valid_res = verify_hs256_jwt(valid_tok, secret, now_ts=now_ts)\n    assert valid_res[&quot;valid&quot;] is True\n    print(&quot;Valid JWT check:&quot;, valid_res)\n\n    # Negative 1: Tampered payload\n    parts = valid_tok.split(&quot;.&quot;)\n    forged_payload = b64url_encode(json.dumps({&quot;sub&quot;: &quot;netops-bot&quot;, &quot;scope&quot;: &quot;admin:*&quot;, &quot;exp&quot;: 1893456000}).encode(&quot;utf-8&quot;))\n    tampered_res = verify_hs256_jwt(f&quot;{parts[0]}.{forged_payload}.{parts[2]}&quot;, secret, now_ts=now_ts)\n    assert tampered_res[&quot;valid&quot;] is False and tampered_res[&quot;reason&quot;] == &quot;invalid_signature&quot;\n    print(&quot;Tampered JWT rejected:&quot;, tampered_res)\n\n    # Negative 2: alg=&quot;none&quot; attack rejected explicitly\n    none_hdr = b64url_encode(json.dumps({&quot;alg&quot;: &quot;none&quot;, &quot;typ&quot;: &quot;JWT&quot;}).encode(&quot;utf-8&quot;))\n    none_res = verify_hs256_jwt(f&quot;{none_hdr}.{parts[1]}.&quot;, secret, now_ts=now_ts)\n    assert none_res[&quot;valid&quot;] is False and none_res[&quot;alg_pinned_hs256&quot;] is False\n    print(&quot;alg=none attack rejected:&quot;, none_res)\n\n    # Negative 3: Expired token rejected\n    expired_tok = build_hs256_jwt({&quot;sub&quot;: &quot;netops-bot&quot;, &quot;scope&quot;: &quot;read:interfaces&quot;, &quot;exp&quot;: 1700000000}, secret)\n    expired_res = verify_hs256_jwt(expired_tok, secret, now_ts=now_ts)\n    assert expired_res[&quot;valid&quot;] is False and expired_res[&quot;reason&quot;] == &quot;token_expired&quot;\n    print(&quot;Expired JWT rejected:&quot;, expired_res)\n\n    # SAN checks (positive + negative)\n    assert verify_san_match(&quot;api.netops.example&quot;, [&quot;*.netops.example&quot;]) is True\n    assert verify_san_match(&quot;a.b.netops.example&quot;, [&quot;*.netops.example&quot;]) is False\n    assert verify_san_match(&quot;.netops.example&quot;, [&quot;*.netops.example&quot;]) is False\n    print(&quot;SAN checks passed (exact/single-label accepted; multi-label &amp; leading-dot rejected).&quot;)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> توکن اصلی <code>valid: True</code>، رد صریح توکن دستکاری‌شده، رد حمله <code>alg: none</code>، رد توکن منقضی‌شده (<code>exp</code>)، و پذیرش <code>api.netops.example</code> در برابر رد <code>a.b.netops.example</code> و <code>.netops.example</code> در SAN.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>دستور مرجع بررسی گواهینامه و SAN یک سرور آزمایشی با OpenSSL (اجرا نشده روی سرور تولیدی):</strong></p><pre dir=\"ltr\"><code># Reference diagnostic command (NOT executed against live internet hosts)\nopenssl s_client -connect controller.example:443 -servername controller.example &lt;/dev/null 2&gt;/dev/null | openssl x509 -noout -text | grep -A1 \"Subject Alternative Name\"</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس پروتکل HTTP و HTTPS در برنامه‌نویسی شبکه",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "کدام گزاره درباره ساختار JWT امضاشده (JWS در RFC 7519) کاملاً صحیح است؟",
+      "options": [
+        "Payload به‌طور پیش‌فرض رمزنگاری AES-256 است",
+        "JWT جایگزین HTTPS است و روی HTTP پورت ۸۰ کاملاً امن است",
+        "تغییر یک کاراکتر در Payload تأثیری بر امضا ندارد",
+        "Payload فقط با Base64URL کدگذاری شده و خوانا است، اما Signature یکپارچگی و اصالت آن را در برابر دستکاری تضمین می‌کند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>در JWS استاندارد، Payload رمزنگاری نیست (برای محرمانگی بدنه از JWE و برای محرمانگی انتقال از HTTPS استفاده می‌شود)، اما دستکاری آن امضا را باطل می‌کند.</p>"
+    },
+    {
+      "title": "علت اصلی استفاده HTTP/3 از پروتکل QUIC بر بستر UDP چیست؟",
+      "options": [
+        "زیرا UDP هرگز بسته‌ای گم نمی‌کند",
+        "برای حذف رمزنگاری TLS",
+        "برای حذف TCP-level Head-of-Line Blocking تا افت یک بسته فقط همان Stream را معطل کند نه کل اتصال را",
+        "برای استفاده از پورت ۲۳"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>در HTTP/2 روی TCP، گم شدن یک بسته TCP همه Streamهای مالتی‌پلکس‌شده را متوقف می‌کند؛ QUIC جریان‌ها را مستقل مدیریت می‌کند.</p>"
+    },
+    {
+      "title": "در اعتبارسنجی گواهینامه X.509 در HTTPS مدرن، نام میزبان یا IP سرور باید در کدام بخش گواهینامه باشد؟",
+      "options": [
+        "فیلد SAN (Subject Alternative Name)",
+        "فیلد Serial Number",
+        "کلید خصوصی کلاینت",
+        "فقط در کامنت فایل hosts"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مطابق RFC 6125/9525، کلاینت‌های مدرن نام میزبان/IP را با فیلد <code>SAN</code> تطبیق می‌دهند نه صرفاً CN قدیمی.</p>"
+    },
+    {
+      "title": "چرا ارسال عملیات غیرایمن (مانند POST تغییر پیکربندی) درون 0-RTT Early Data در TLS 1.3 خطرناک است؟",
+      "options": [
+        "زیرا 0-RTT از HTTP/1.1 پشتیبانی نمی‌کند",
+        "زیرا داده‌های 0-RTT در برابر حمله بازپخش (Replay Attack) آسیب‌پذیرند",
+        "زیرا 0-RTT کلید خصوصی را حذف می‌کند",
+        "زیرا 0-RTT فقط روی پورت ۲۲ کار می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مهاجم روی مسیر می‌تواند بسته 0-RTT را دوباره ارسال کند؛ لذا 0-RTT تنها برای درخواست‌های ایمن/Idempotent مجاز است.</p>"
+    },
+    {
+      "title": "خاصیت Forward Secrecy در TLS 1.3 (با ECDHE) چه حفاظتی ایجاد می‌کند؟",
+      "options": [
+        "مانع استفاده از گواهینامه X.509 می‌شود",
+        "رمزنگاری را خاموش می‌کند",
+        "حتی اگر کلید خصوصی بلندمدت سرور در آینده افشا شود، ترافیک ضبط‌شده نشست‌های قبلی قابل رمزگشایی نیست",
+        "سرعت DNS را دو برابر می‌کند"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کلیدهای نشست با تبادل موقت ECDHE ساخته و پس از نشست نابود می‌شوند (توجه: حالت PSK-only بدون DHE فاقد FS است).</p>"
+    },
+    {
+      "title": "کدام جمله درباره امنیت HTTP Basic Auth صحیح است؟",
+      "options": [
+        "نام کاربری و رمز با AES-256 رمزنگاری می‌شوند",
+        "بدون HTTPS کاملاً امن است",
+        "فقط با گواهینامه کلاینت کار می‌کند",
+        "صرفاً کدگذاری Base64 است (نه رمزنگاری) و بدون HTTPS معادل ارسال رمز متن‌باز روی شبکه است"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Base64 در کسری از ثانیه بازگشایی می‌شود؛ Basic Auth هرگز نباید روی HTTP بدون TLS ارسال شود.</p>"
+    },
+    {
+      "title": "در ارتباط امن ماشین-به-ماشین (مثلاً سیستم CI/CD با کنترلر شبکه)، تفاوت mTLS با HTTPS معمولی چیست؟",
+      "options": [
+        "در mTLS علاوه بر سرور، کلاینت نیز گواهینامه X.509 خود را ارائه می‌دهد و احراز هویت متقابل انجام می‌شود",
+        "در mTLS رمزنگاری خاموش است",
+        "در mTLS از UDP پورت ۵۳ استفاده می‌شود",
+        "در mTLS نیازی به CA نیست"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Mutual TLS هویت هر دو سمت را با PKI تصدیق می‌کند و برای ارتباط سرویس‌ها بسیار قوی است.</p>"
+    },
+    {
+      "title": "وقتی اسکریپت پایتون به کنترلری با گواهینامه CA داخلی وصل می‌شود و خطای SSLCertVerificationError می‌دهد، راه‌حل امن چیست؟",
+      "options": [
+        "گذاشتن verify=False در محیط تولید",
+        "ارائه مسیر فایل PEM گواهینامه CA داخلی سازمان به پارامتر verify (یا REQUESTS_CA_BUNDLE)",
+        "مهاجرت از HTTPS به HTTP پورت ۸۰",
+        "حذف هدر Authorization"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>خاموش کردن اعتبارسنجی TLS (<code>verify=False</code>) در را برای حمله MitM باز می‌گذارد؛ معرفی CA داخلی راه‌حل صحیح است.</p>"
+    },
+    {
+      "title": "کدام جریان OAuth 2.0 معمولاً برای احراز هویت اسکریپت‌های اتوماسیون بدون تعامل کاربر انسانی (Machine-to-Machine) استفاده می‌شود؟",
+      "options": [
+        "Implicit Flow قدیمی مرورگر",
+        "ارسال رمز در URL",
+        "Client Credentials Grant",
+        "Telnet Login"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>در Client Credentials Grant سرویس با <code>client_id</code> و <code>client_secret</code> (یا assertion) توکن کوتاه‌عمر با Scope محدود می‌گیرد.</p>"
+    },
+    {
+      "title": "برای یک گواهینامه با SAN = *.netops.example، کدام نام میزبان معتبر و کدام رد می‌شود؟",
+      "options": [
+        "هر دو api.netops.example و a.b.netops.example معتبرند",
+        "هر دو رد می‌شوند",
+        "فقط a.b.netops.example معتبر است",
+        "api.netops.example معتبر است اما a.b.netops.example به دلیل چندسطحی بودن رد می‌شود"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Wildcard در SAN فقط یک برچسب (Single-label) سمت چپ را پوشش می‌دهد.</p>"
+    },
+    {
+      "title": "اگر بخواهیم خود محتوای Claims داخل یک توکن JWT برای ناظر بیرونی خوانا نباشد (محرمانگی بدنه)، کدام استاندارد به کار می‌رود؟",
+      "options": [
+        "JWE (JSON Web Encryption)",
+        "فقط تغییر Base64 به Hex",
+        "تنظیم alg روی none",
+        "استفاده از HTTP/1.0"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>JWS فقط امضا (Integrity) می‌دهد؛ برای رمزنگاری خود بدنه توکن از JWE (RFC 7516) استفاده می‌شود.</p>"
+    },
+    {
+      "title": "آزمایشگاه Python این درس چه چیزی را محلی بررسی کرده است؟",
+      "options": [
+        "تست زنده HTTP/3 QUIC روی اینترنت",
+        "ساخت و بررسی JWT (قفل alg=HS256، امضای HMAC-SHA256 و exp)، رد توکن دستکاری‌شده/alg=none/منقضی و منطق تطابق SAN در Python 3 stdlib بدون اتصال به سرور تولیدی",
+        "صدور گواهینامه واقعی از Let's Encrypt",
+        "شنود ترافیک HTTPS سازمان"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>آزمایشگاه محلی در Python 3 stdlib اجرا شده و هیچ سرور OAuth یا TLS تولیدی درگیر نشده است.</p>"
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/auto_07-review-fa.md"
-  },
-  "integration": {
-   "recommendedPath": "fam-automation",
-   "recommendedCourse": "automation-foundations",
-   "blueprint": "/academy-assets/v5/blueprints/auto_07.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_07_lab.py"
-  },
-  "technicalAuditFixes": [
-   "هم‌راستاسازی verify_hs256_jwt در auto_07_lab.py با توصیه‌های امنیتی بخش ۱۰ درس و RFC 8725 (قفل صریح alg=='HS256' برای رد alg='none'، بررسی انقضای exp، و رفع باگ تطبیق برچسب خالی '.netops.example' در verify_san_match) همراه با تست‌های منفی صریح."
-  ]
- }
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "auto_07",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc8446",
+      "https://www.rfc-editor.org/rfc/rfc9113",
+      "https://www.rfc-editor.org/rfc/rfc9114",
+      "https://www.rfc-editor.org/rfc/rfc7519",
+      "https://www.rfc-editor.org/rfc/rfc6749",
+      "https://www.rfc-editor.org/rfc/rfc9525",
+      "https://www.rfc-editor.org/rfc/rfc8725"
+    ],
+    "limitations": [
+      "آزمایشگاه محلی منطق JWT/HMAC و SAN را در Python 3 اجرا و تست کرده است؛ هیچ Handshake زنده TLS 1.3/QUIC یا سرور OAuth واقعی در این محیط اجرا نشده است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش همراه با جزئیات دقیق Forward Secrecy (ECDHE vs PSK-only)، 0-RTT Replay و JWS vs JWE.",
+      "افزودن آزمایشگاه قابل اجرای محلی برای ساخت/تأیید/رد دستکاری JWT و قواعد Wildcard در SAN."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/auto_07-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-automation",
+      "recommendedCourse": "automation-foundations",
+      "blueprint": "/academy-assets/v5/blueprints/auto_07.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/auto_07_lab.py"
+    },
+    "technicalAuditFixes": [
+      "هم‌راستاسازی verify_hs256_jwt در auto_07_lab.py با توصیه‌های امنیتی بخش ۱۰ درس و RFC 8725 (قفل صریح alg=='HS256' برای رد alg='none'، بررسی انقضای exp، و رفع باگ تطبیق برچسب خالی '.netops.example' در verify_san_match) همراه با تست‌های منفی صریح."
+    ]
+  }
 }

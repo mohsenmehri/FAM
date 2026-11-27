@@ -19,7 +19,7 @@ NETWORK_DRIVERS = {
     "macvlan": {"own_ip": True, "own_lan_mac": True, "uses_nat_port_map": False, "host_net_isolation": True},
 }
 
-SECRET_ENV_MARKERS = ("PASSWORD=", "SECRET=", "TOKEN=", "API_KEY=")
+SECRET_ENV_MARKERS = ("PASSWORD", "SECRET", "TOKEN", "API_KEY")
 
 
 def _is_root_user_spec(user_spec: str) -> bool:
@@ -28,9 +28,10 @@ def _is_root_user_spec(user_spec: str) -> bool:
 
 
 def audit_dockerfile(lines: list[str]) -> list[str]:
+    if not isinstance(lines, list) or not all(isinstance(ln, str) for ln in lines):
+        raise ValueError("lines must be a list of Dockerfile instruction strings")
     findings = []
-    joined = "\n".join(lines)
-    if ":latest" in joined:
+    if any(line.strip().upper().startswith("FROM ") and ":latest" in line.lower() for line in lines):
         findings.append("Avoid unpinned :latest base image tag")
 
     user_instructions = [line.strip()[5:].strip() for line in lines if line.strip().upper().startswith("USER ")]
@@ -38,7 +39,8 @@ def audit_dockerfile(lines: list[str]) -> list[str]:
         findings.append("Final effective USER must be non-root (neither root nor UID 0)")
 
     if any(
-        line.strip().upper().startswith("ENV ") and any(marker in line.upper() for marker in SECRET_ENV_MARKERS)
+        line.strip().upper().startswith("ENV ")
+        and any(f"{marker}=" in line.upper() or f"{marker} " in line.upper() for marker in SECRET_ENV_MARKERS)
         for line in lines
     ):
         findings.append("Hardcoded secret in ENV instruction")

@@ -30,12 +30,21 @@ def build_hs256_jwt(payload: dict[str, object], secret: bytes) -> str:
 
 def verify_hs256_jwt(token: str, secret: bytes, now_ts: int = 1764201600) -> dict[str, object]:
     """Decode JWS payload and enforce pinned alg=='HS256', HMAC-SHA256 signature, and exp claim."""
+    if not isinstance(token, str) or not isinstance(secret, (bytes, bytearray)):
+        raise ValueError("token must be str and secret must be bytes")
+    if isinstance(now_ts, bool) or not isinstance(now_ts, int):
+        raise ValueError(f"now_ts must be an int (not bool), got {now_ts!r}")
     parts = token.split(".")
     if len(parts) != 3:
         return {"valid": False, "reason": "malformed_jwt"}
     h_b64, p_b64, s_b64 = parts
-    header = json.loads(b64url_decode(h_b64))
-    payload = json.loads(b64url_decode(p_b64))
+    try:
+        header = json.loads(b64url_decode(h_b64))
+        payload = json.loads(b64url_decode(p_b64))
+    except (ValueError, UnicodeDecodeError):
+        return {"valid": False, "reason": "malformed_jwt"}
+    if not isinstance(header, dict) or not isinstance(payload, dict):
+        return {"valid": False, "reason": "malformed_jwt"}
 
     # RFC 8725: Pin allowed algorithm explicitly to block alg="none" / algorithm confusion
     alg_ok = header.get("alg") == "HS256"
@@ -44,7 +53,7 @@ def verify_hs256_jwt(token: str, secret: bytes, now_ts: int = 1764201600) -> dic
     )
     sig_ok = alg_ok and hmac.compare_digest(s_b64, expected_sig)
     exp = payload.get("exp")
-    not_expired = isinstance(exp, int) and exp > now_ts
+    not_expired = (not isinstance(exp, bool)) and isinstance(exp, int) and exp > now_ts
 
     reason = "ok"
     if not alg_ok:
@@ -67,6 +76,8 @@ def verify_hs256_jwt(token: str, secret: bytes, now_ts: int = 1764201600) -> dic
 
 def verify_san_match(target_host: str, cert_sans: list[str]) -> bool:
     """Simplified RFC 6125/9525 SAN match (exact or non-empty single-label left wildcard)."""
+    if not isinstance(target_host, str) or not isinstance(cert_sans, list) or not all(isinstance(s, str) for s in cert_sans):
+        raise ValueError("target_host must be str and cert_sans must be list[str]")
     host = target_host.lower().strip()
     if not host or host.startswith(".") or host.endswith("."):
         return False

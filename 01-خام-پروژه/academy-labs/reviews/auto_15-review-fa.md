@@ -11,3 +11,7 @@
 - **اصلاح انجام‌شده:** افزودن شرط `nets[i].version == nets[j].version` پیش از `overlaps()` و افزودن نمونه Dual-Stack IPv6 در `auto_15_lab.py`.
 - **تست مرتبط:** `test_phase6_ccde_18_remediation_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** مدل محلی بدون Terraform یا سرور NetBox زنده؛ بازبینی نویسنده (نه مستقل).
+
+## به‌روزرسانی فاز ۱۰E — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن اعتبارسنجی نوع ساختار برای `desired` در `MiniDeclarativeIaC.plan` و `prefixes` در `validate_sot_prefixes` (رد لیست/رشته نامعتبر و host-bits).
+- **وضعیت اجرا:** اجرای محلی Python بدون تجهیز شبکه یا سرویس بیرونی زنده؛ تطابق دقیق بایتی کد HTML با `auto_15_lab.py` تأیید شد.

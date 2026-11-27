@@ -1632,6 +1632,58 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
                     "skips_migration_coexistence": False,
                 })
 
+    def test_phase10e_automation_complete_strict_validation_sweep(self):
+        """Phase 10E: complete 100% unmerged Automation strict validation (auto_06, auto_07, auto_09, auto_15, auto_16, auto_17)."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        bad_bools = ("False", "True", "", 0, 1, None, [], {})
+
+        # 1. auto_07: bool exp rejected (isinstance(True, int) trap!), malformed base64/JSON returns valid=False cleanly
+        a07 = load_module(AGENT3_LAB_DIR / "auto_07_lab.py", "auto_07_p10e")
+        secret = b"test-secret"
+        bool_exp_tok = a07.build_hs256_jwt({"sub": "bot", "exp": True}, secret)
+        res_bool_exp = a07.verify_hs256_jwt(bool_exp_tok, secret, now_ts=0)
+        self.assertFalse(res_bool_exp["valid"])
+        self.assertEqual(res_bool_exp["reason"], "token_expired")
+        self.assertFalse(a07.verify_hs256_jwt("not!b64.not!b64.sig", secret)["valid"])
+        with self.assertRaises(ValueError):
+            a07.verify_hs256_jwt(bool_exp_tok, secret, now_ts=True)
+
+        # 2. auto_15: invalid desired / prefixes types rejected
+        a15 = load_module(AGENT3_LAB_DIR / "auto_15_lab.py", "auto_15_p10e")
+        iac = a15.MiniDeclarativeIaC()
+        with self.assertRaises(ValueError):
+            iac.plan({"bad": "not-a-dict"})
+        with self.assertRaises(ValueError):
+            a15.validate_sot_prefixes(["10.0.0.1/24"])  # host bits set
+        with self.assertRaises(ValueError):
+            a15.validate_sot_prefixes("10.0.0.0/24")
+
+        # 3. auto_16: strict bool on post_verify_ok (no "False" skipping rollback!)
+        a16 = load_module(AGENT3_LAB_DIR / "auto_16_lab.py", "auto_16_p10e")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                a16.run_pipeline({"raw_yaml": "vlan: 30\n", "vlan_id": 30}, post_verify_ok=bv)
+
+        # 4. auto_17: catches space-separated ENV secrets and rejects non-list inputs
+        a17 = load_module(AGENT3_LAB_DIR / "auto_17_lab.py", "auto_17_p10e")
+        self.assertTrue(len(a17.audit_dockerfile(["FROM python:3.11-slim", "USER appuser", "ENV API_PASSWORD supersecret"])) == 1)
+        self.assertEqual(a17.audit_dockerfile(["# note about :latest", "FROM python:3.11-slim", "USER appuser"]), [])
+        with self.assertRaises(ValueError):
+            a17.audit_dockerfile("FROM python:3.11-slim")
+
+        # 5. auto_06 & auto_09: loopback HTTP labs execute cleanly with stricter 400 validation
+        a06 = load_module(AGENT3_LAB_DIR / "auto_06_lab.py", "auto_06_p10e")
+        r06 = a06.run_local_rest_lab()
+        self.assertEqual(r06["bad_post_status"], 400)
+        self.assertEqual(r06["duplicate_post_status"], 409)
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

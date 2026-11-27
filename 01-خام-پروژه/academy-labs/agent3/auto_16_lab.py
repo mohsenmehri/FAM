@@ -17,10 +17,21 @@ SECRET_PATTERNS = [
 ]
 
 
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
 def run_pipeline(change_cfg: dict, post_verify_ok: bool = True) -> dict:
+    if not isinstance(change_cfg, dict):
+        raise ValueError(f"change_cfg must be a dict, got {type(change_cfg).__name__}")
+    verify_ok = _require_bool(post_verify_ok, "post_verify_ok")
+    raw_text = change_cfg.get("raw_yaml", "")
+    if not isinstance(raw_text, str):
+        raise ValueError(f"change_cfg['raw_yaml'] must be str, got {raw_text!r}")
     stages: list[dict] = []
     # Stage 1: Lint (no tabs in raw YAML text)
-    raw_text = change_cfg.get("raw_yaml", "")
     lint_ok = "\t" not in raw_text
     stages.append({"stage": "lint", "passed": lint_ok})
     if not lint_ok:
@@ -44,8 +55,8 @@ def run_pipeline(change_cfg: dict, post_verify_ok: bool = True) -> dict:
     stages.append({"stage": "canary_deploy", "passed": True})
 
     # Stage 5: Post-deploy verification (triggers rollback if failed)
-    stages.append({"stage": "verify", "passed": post_verify_ok})
-    if not post_verify_ok:
+    stages.append({"stage": "verify", "passed": verify_ok})
+    if not verify_ok:
         return {"status": "rolled_back", "deploy_executed": True, "rollback_executed": True, "stages": stages}
     return {"status": "succeeded", "deploy_executed": True, "rollback_executed": False, "stages": stages}
 

@@ -9,3 +9,7 @@
 
 - **اصلاح پاسخ `?content=nonconfig` در `auto_09_lab.py`:** مطابق RFC 8040 §4.8.1 و RFC 8343 (NMDA)، پاسخ فیلتر `nonconfig` زیر همان منبع درخواستی `ietf-interfaces:interfaces` بازگردانده می‌شود (نه کانتینر منسوخ RFC 7223 `interfaces-state`).
 - **وضعیت بازبینی:** خودبازبینی نویسنده (`author-agent-self-review-not-independent`)؛ بازبینی مستقل انجام نشده است.
+
+## به‌روزرسانی فاز ۱۰E — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن پاسخ `400 Bad Request` (`malformed-message` / `invalid-value` مطابق RFC 8040) برای JSON ناقص، فیلد `enabled` غیربولی و مقدار نامعتبر `content=` در سرور RESTCONF Loopback.
+- **وضعیت اجرا:** اجرای محلی Python بدون تجهیز شبکه یا سرویس بیرونی زنده؛ تطابق دقیق بایتی کد HTML با `auto_09_lab.py` تأیید شد.

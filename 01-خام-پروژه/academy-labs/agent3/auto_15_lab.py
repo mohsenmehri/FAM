@@ -20,6 +20,8 @@ class MiniDeclarativeIaC:
         self.live: dict[str, dict] = {}
 
     def plan(self, desired: dict[str, dict]) -> dict[str, list[str]]:
+        if not isinstance(desired, dict) or not all(isinstance(k, str) and isinstance(v, dict) for k, v in desired.items()):
+            raise ValueError("desired must be a dict mapping resource names (str) to resource dicts")
         to_create = [k for k in desired if k not in self.state]
         to_update = [k for k in desired if k in self.state and self.state[k] != desired[k]]
         to_destroy = [k for k in self.state if k not in desired]
@@ -41,6 +43,8 @@ class MiniDeclarativeIaC:
 
 
 def validate_sot_prefixes(prefixes: list[str]) -> list[str]:
+    if not isinstance(prefixes, list) or not all(isinstance(p, str) for p in prefixes):
+        raise ValueError("prefixes must be a list of CIDR strings")
     nets = [ipaddress.ip_network(p, strict=True) for p in prefixes]
     overlaps = []
     for i in range(len(nets)):

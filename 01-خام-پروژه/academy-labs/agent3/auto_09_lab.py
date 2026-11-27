@@ -46,6 +46,9 @@ class RestconfHandler(BaseHTTPRequestHandler):
             return
         qs = urllib.parse.parse_qs(parsed.query)
         content = qs.get("content", ["all"])[0]
+        if content not in ("config", "nonconfig", "all"):
+            self._send(400, {"ietf-restconf:errors": {"error": [{"error-tag": "invalid-value", "error-message": f"unsupported content={content}"}]}})
+            return
         if parsed.path == "/restconf/data/ietf-interfaces:interfaces":
             if content == "config":
                 self._send(200, {"ietf-interfaces:interfaces": {"interface": list(CONFIG_STORE.values())}})
@@ -61,9 +64,24 @@ class RestconfHandler(BaseHTTPRequestHandler):
             return
         self._send(404, {"error": "resource not found"})
 
+    def _read_payload(self) -> dict | None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length).decode("utf-8") if length > 0 else ""
+            obj = json.loads(raw)
+        except (ValueError, UnicodeDecodeError):
+            return None
+        if not isinstance(obj, dict) or not isinstance(obj.get("name"), str) or not obj["name"].strip():
+            return None
+        if "enabled" in obj and not isinstance(obj["enabled"], bool):
+            return None
+        return obj
+
     def do_POST(self) -> None:
-        length = int(self.headers.get("Content-Length", "0"))
-        payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        payload = self._read_payload()
+        if payload is None:
+            self._send(400, {"ietf-restconf:errors": {"error": [{"error-tag": "malformed-message"}]}})
+            return
         name = payload["name"]
         if name in CONFIG_STORE:
             self._send(409, {"ietf-restconf:errors": {"error": [{"error-tag": "data-exists"}]}})
@@ -72,8 +90,10 @@ class RestconfHandler(BaseHTTPRequestHandler):
         self._send(201, payload, {"Location": f"/restconf/data/ietf-interfaces:interfaces/interface={name}"})
 
     def do_PUT(self) -> None:
-        length = int(self.headers.get("Content-Length", "0"))
-        payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        payload = self._read_payload()
+        if payload is None:
+            self._send(400, {"ietf-restconf:errors": {"error": [{"error-tag": "malformed-message"}]}})
+            return
         name = payload["name"]
         existed = name in CONFIG_STORE
         CONFIG_STORE[name] = payload
