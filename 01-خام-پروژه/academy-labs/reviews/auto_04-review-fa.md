@@ -4,3 +4,10 @@
 
 - جمله‌بندی‌های شکسته آزمون نسخه قدیمی اصلاح شدند و درس به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش ارتقا یافت.
 - فایل `01-خام-پروژه/academy-labs/agent3/auto_04_lab.py` با اجرای واقعی باینری محلی `git 2.39.5` درون `TemporaryDirectory` تست شد (بدون تماس با هیچ مخزن Remote یا تجهیز شبکه).
+
+## بازبینی فنی فاز ۴ (2026-11-27 — پاسخ به بازبینی همتای Agent 2 در `agent3-intake-c7351d1-fa.md`)
+- **ایراد:** در بخش ۱ عبارت «تاریخچه رمزنگاری‌شده (SHA)» به کار رفته بود که هش رمزنگاری (Cryptographic Hash برای یکپارچگی محتوا) را با رمزنگاری محرمانگی (Encryption) خلط می‌کرد.
+- **منبع معتبر:** مستندات رسمی Git Internals — Git Objects (`https://git-scm.com/book/en/v2/Git-Internals-Git-Objects`).
+- **اصلاح انجام‌شده:** اصلاح بخش ۱ به «تاریخچه تغییرناپذیر مبتنی بر هش رمزنگاری (Cryptographic Hash / SHA — برای یکپارچگی محتوا، نه رمزنگاری محرمانگی)».
+- **تست مرتبط:** `test_phase4_ccde_18_ccde_19_dynamic_labs_and_regressions` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** آزمایشگاه دستور واقعی `git` را صرفاً درون `tempfile.TemporaryDirectory()` اجرا می‌کند و به مخزن پروژه یا Remote متصل نمی‌شود.

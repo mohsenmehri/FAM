@@ -237,6 +237,12 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
 
         auto05 = load_module(AGENT3_LAB_DIR / "auto_05_lab.py", "auto_05_lab_testmod")
         self.assertEqual(auto05.parse_json_strict('{"ok": true, "n": 42}'), {"ok": True, "n": 42})
+        # Non-object top-level RFC 8259 JSON values must parse cleanly without crashing
+        self.assertEqual(auto05.parse_json_strict("[1, 2, 3]"), [1, 2, 3])
+        self.assertEqual(auto05.parse_json_strict('"ok"'), "ok")
+        self.assertIs(auto05.parse_json_strict("true"), True)
+        self.assertIsNone(auto05.parse_json_strict("null"))
+        self.assertEqual(auto05.parse_json_strict("42"), 42)
         # Non-RFC 8259 constants accepted by plain json.loads MUST be rejected by parse_json_strict
         for bad_const in ('{"x": NaN}', '{"x": Infinity}', '{"x": -Infinity}'):
             with self.subTest(bad_const=bad_const):
@@ -371,11 +377,12 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
 
                 lab_script = AGENT3_LAB_DIR / f"{lesson_id}_lab.py"
                 self.assertTrue(lab_script.exists(), f"Missing lab script {lab_script}")
-                escaped_src = html.escape(lab_script.read_text(encoding="utf-8").strip())
+                # Enforce exact byte-for-byte embedding INCLUDING trailing newline
+                escaped_src = html.escape(lab_script.read_text(encoding="utf-8"))
                 self.assertIn(
                     escaped_src,
                     lab_html,
-                    f"{lesson_id} lab.html does not embed verbatim escaped source of {lab_script.name}",
+                    f"{lesson_id} lab.html does not embed exact byte-for-byte escaped source (including trailing newline) of {lab_script.name}",
                 )
 
                 review_path = REVIEW_DIR / f"{lesson_id}-review-fa.md"
@@ -390,6 +397,111 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
                     meta.get("semanticReview", {}).get("reviewer"),
                     "author-agent-self-review-not-independent",
                 )
+
+    def test_phase4_ccde_18_ccde_19_dynamic_labs_and_regressions(self):
+        """Phase 4 regressions: ccde_18/ccde_19 dynamic pass/fail lab diagnostics, GDPR Chapter V nuance, auto_04 hash vs encryption."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+
+        def student_text(lid: str) -> str:
+            d = json.loads((BLUEPRINT_DIR / f"{lid}.json").read_text(encoding="utf-8"))
+            return json.dumps(
+                {k: d.get(k) for k in ("title", "sections", "glossary", "stages", "interactiveQuiz")},
+                ensure_ascii=False,
+            )
+
+        # 1. ccde_18_lab.py direct unit checks (no hardcoded contradictory notes!)
+        c18_mod = load_module(AGENT3_LAB_DIR / "ccde_18_lab.py", "ccde_18_lab_testmod")
+        base_ok = {
+            "dc_distance_km": 5000,
+            "storage_replication": "asynchronous",
+            "dci_l2_stretched": False,
+            "wan_model": "hybrid_sdwan_regional_hubs_plus_sase",
+            "cloud_hub": "dual_colo_cloud_exchange_direct_connect",
+            "macro_vrfs": 4,
+            "micro_sgt_enabled": True,
+            "eu_residency_policy_enforced": True,
+            "cross_border_transfer_basis": "eu_eea_residency_policy",
+            "encryption_in_transit": True,
+        }
+        res_ok = c18_mod.validate_pars_global_hld(base_ok, "vmware_vmsc_netapp_metrocluster")
+        self.assertTrue(res_ok["all_architectural_checks_passed"])
+        self.assertIn("Chapter V", res_ok["domain_validations"][3]["compliance_scope_note"])
+        self.assertIn("technical controls only", res_ok["domain_validations"][3]["compliance_scope_note"])
+
+        # Metro distance (150 km) where sync IS feasible: note MUST say "within", NEVER "exceeds"!
+        metro_sync_ok = c18_mod.validate_pars_global_hld(
+            {**base_ok, "dc_distance_km": 150, "storage_replication": "synchronous"},
+            "vmware_vsan_stretched",
+        )
+        self.assertTrue(metro_sync_ok["all_architectural_checks_passed"])
+        dci_metro = metro_sync_ok["domain_validations"][0]
+        self.assertTrue(dci_metro["sync_feasible_for_profile"])
+        self.assertTrue(dci_metro["replication_ok"])
+        self.assertTrue(dci_metro["l2_stretch_policy_ok"])
+        self.assertIn("within", dci_metro["note"])
+        self.assertNotIn("exceeds", dci_metro["note"])
+
+        # Metro distance with L2 stretched: replication_ok is True, l2_stretch_policy_ok is False
+        metro_l2_bad = c18_mod.validate_pars_global_hld(
+            {**base_ok, "dc_distance_km": 150, "storage_replication": "synchronous", "dci_l2_stretched": True},
+            "vmware_vsan_stretched",
+        )
+        self.assertFalse(metro_l2_bad["all_architectural_checks_passed"])
+        dci_metro_bad = metro_l2_bad["domain_validations"][0]
+        self.assertTrue(dci_metro_bad["replication_ok"])
+        self.assertFalse(dci_metro_bad["l2_stretch_policy_ok"])
+        self.assertNotIn("exceeds", dci_metro_bad["note"])
+        self.assertIn("policy", dci_metro_bad["note"])
+
+        # Missing encryption or transfer basis must fail compliance technical controls
+        bad_comp = c18_mod.validate_pars_global_hld({**base_ok, "encryption_in_transit": False})
+        self.assertFalse(bad_comp["all_architectural_checks_passed"])
+        self.assertFalse(bad_comp["domain_validations"][3]["pass"])
+
+        # 2. ccde_19_lab.py direct unit checks (dynamic pass/fail notes on all 5 pillars)
+        c19_mod = load_module(AGENT3_LAB_DIR / "ccde_19_lab.py", "ccde_19_lab_testmod")
+        c19_fail = c19_mod.validate_aria_telecom_hld({
+            "max_routers_per_igp_domain": 2050,
+            "inter_domain_stitching": "single_flat_igp",
+            "flex_algo_slices": 1,
+            "tilfa_enabled": True,
+            "rings_two_connected_within_msd": False,
+            "service_plane": "legacy_vpls_plus_bgp_in_core",
+            "migration_mechanism": "overnight_forklift_cutover",
+            "rpki_and_flowspec": False,
+            "ixp_cdn_offload_pct": 15,
+        })
+        self.assertFalse(c19_fail["all_pillars_validated"])
+        for p in c19_fail["pillars"]:
+            self.assertFalse(p["pass"])
+            self.assertTrue(p["note"].startswith("REJECTED:"), f"Failed pillar missing REJECTED note: {p}")
+            self.assertNotIn("Zero-Downtime", p["pillar"])
+
+        # 3. Blueprint semantic regressions (ccde_18, ccde_19, ccde_15, auto_04)
+        c18_txt = student_text("ccde_18")
+        self.assertIn("EDPB", c18_txt)
+        self.assertIn("فصل ۵ GDPR", c18_txt)
+        self.assertNotIn("صفر قطعی", c18_txt)
+        self.assertNotIn("Zero-Downtime", c18_txt)
+        self.assertNotIn("نقض سنگین جریمه GDPR", c18_txt)
+
+        c19_txt = student_text("ccde_19")
+        self.assertNotIn("Zero-Downtime", c19_txt)
+        self.assertNotIn("مهاجرت SRMS رینگ-به-رینگ بدون قطعی", c19_txt)
+
+        a04_txt = student_text("auto_04")
+        self.assertNotIn("تاریخچه رمزنگاری‌شده", a04_txt)
+        self.assertIn("هش رمزنگاری", a04_txt)
+
+        c15_txt = student_text("ccde_15")
+        self.assertNotIn("ممنوعیت خروج داده‌های شهروندان", c15_txt)
+        self.assertIn("EDPB", c15_txt)
+        self.assertIn("فصل ۵", c15_txt)
 
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))

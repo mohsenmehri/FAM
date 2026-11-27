@@ -11,3 +11,12 @@
 - مسئله ۱: ادعای مطلق TI-LFA 100% <50ms بدون قید ۲-همبندی و MSD + ادعای مطلق <5ms برای همه کاربران با CDN محلی. منبع: IETF TI-LFA draft.
 - مسئله ۲: `ccde_19_lab.py` فاقد سناریوی منفی برای مقایسه با ضدالگوی IGP تخت/Forklift بود.
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions` + اجرای زنده `ccde_19_lab.py`).
+
+## بازبینی فنی فاز ۴ (2026-11-27 — ممیزی تکمیلی هم‌راستا با یافته‌های Agent 2)
+- **ایرادها:** (۱) پیام‌های ثابت تاییدآمیز در `ccde_19_lab.py` حتی برای سناریوی مردود `rejected_flat_forklift`؛ (۲) ادعای مطلق «Zero-Downtime / بدون قطعی» در SVG بخش ۴، بخش ۱۲ و نام ستون ۴ آزمایشگاه؛ (۳) حذف `
+` پایانی در HTML آزمایشگاه.
+- **منبع معتبر:** RFC 8661 (SR-MPLS Interworking with LDP)، RFC 9350 (IGP Flex-Algo)، استانداردهای مدیریت تغییر اپراتوری (Maintenance Window / Rollback).
+- **اصلاح انجام‌شده:** پویا کردن پیام‌های pass/fail در تمام ۵ ستون `ccde_19_lab.py` (شروع با `REJECTED:` در حالت شکست)، جایگزینی «Zero-Downtime / بدون قطعی» با «هدف کمینه‌سازی قطعی مشروط به آزمون آزمایشگاهی و پنجره نگهداری» در `ccde_19.json` و `ccde_19_lab.py`، و تطابق دقیق بایت‌به‌بایت HTML با `
+` پایانی.
+- **تست مرتبط:** `test_phase4_ccde_18_ccde_19_dynamic_labs_and_regressions` و `test_blueprints_schema_svg_quiz_lab_and_review_integrity` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** آزمایشگاه مدل محلی بدون اتصال به روترهای مخابراتی یا 5G RAN است و بازبینی مستقل انجام نشده است.

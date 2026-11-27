@@ -11,3 +11,10 @@
 - مسئله: بیان عددی قطعی بدون مبنای آماری واحد («کاهش ۹۵٪ هزینه ممیزی» و «بیش از ۸۰٪ تصمیمات») در بخش‌های ۶، ۹ و پرسش ۶.
 - منبع: راهنمای PCI-DSS Scope Reduction و اصول طراحی CCDE v3.1.
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions`).
+
+## بازبینی فنی فاز ۴ (2026-11-27 — ممیزی متقاطع GDPR در کل ۶۴ درس)
+- **ایراد:** در بخش ۶ و پرسش ۵، GDPR به شکل «ممنوعیت خروج داده‌های شهروندان یک کشور/اتحادیه» بیان شده بود که میان چارچوب انتقال فرامرزی فصل ۵ GDPR و قوانین سخت‌گیرانه ملی بومی‌سازی داده تمایز قائل نمی‌شد.
+- **منبع معتبر:** [EDPB — International Data Transfers (GDPR Chapter V, Arts. 44–49)](https://www.edpb.europa.eu/sme/be-compliant/international-data-transfers_en).
+- **اصلاح انجام‌شده:** تفکیک دقیق فصل ۵ GDPR (اجازه انتقال با Adequacy Decision یا SCC + TIA) از قوانین ملی Data Localization و سیاست‌های شرکتی اقامت داده در بخش ۶ و پرسش ۵، همراه با افزودن لینک مرجع EDPB به `meta.sources`.
+- **تست مرتبط:** `test_phase4_ccde_18_ccde_19_dynamic_labs_and_regressions` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** متن آموزشی جایگزین مشاوره حقوقی DPO/وکیل نیست و بازبینی مستقل انجام نشده است.
