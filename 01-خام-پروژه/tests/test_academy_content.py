@@ -2463,8 +2463,9 @@ class CommandExecutionTests(unittest.TestCase):
                             ("آفلاین", self._load_offline_cli_responses())]:
             for cmd in ["show wireless summary", "show ap summary", "show ip ssh",
                         "terraform plan", "show interfaces Tunnel0"]:
-                self.assertIn(cmd, cli, f"{label} {cmd}: missing from cliResponses")
-                entry = cli[cmd]
+                cmd_low = cmd.lower()
+                self.assertIn(cmd_low, cli, f"{label} {cmd}: missing from cliResponses")
+                entry = cli[cmd_low]
                 self.assertIs(entry["executable"], False,
                               f"{label} {cmd}: should be non-executable reference")
                 self.assertIsInstance(entry["output"], str)
@@ -2501,8 +2502,9 @@ class CommandExecutionTests(unittest.TestCase):
                 if not cmd:
                     continue
                 exe_in_cmd = c.get("executable")
-                if cmd in cli:
-                    exe_in_cli = cli[cmd]["executable"]
+                cmd_low = cmd.lower()
+                if cmd_low in cli:
+                    exe_in_cli = cli[cmd_low]["executable"]
                     if exe_in_cmd != exe_in_cli:
                         mismatches.append(f"{lid} {cmd}: iosCommand={exe_in_cmd} cliResponses={exe_in_cli}")
                 else:
@@ -2529,8 +2531,198 @@ class CommandExecutionTests(unittest.TestCase):
         self.assertIn("cr.output", appjs)
 
 
+class CommandExecutionRealTests(unittest.TestCase):
+    """اجرای واقعی runIosCommand: native، مرجع و پشتیبانی‌نشده — آنلاین و آفلاین."""
+
+    def _load_cli_responses(self):
+        """بارگذاری cliResponses از academy-data.json."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        return data.get("cliResponses", {})
+
+    def _load_offline_cli_responses(self):
+        """استخراج cliResponses از HTML آفلاین (Embedded JSON)."""
+        html = (PACKAGE_ROOT.parent / "FAM-Academy-Offline.html").read_text(encoding="utf-8")
+        start = html.find('"cliResponses": {')
+        self.assertGreater(start, 0, "cliResponses not found in offline HTML")
+        pos = start + len('"cliResponses": ')
+        depth = 0
+        in_string = False
+        escape = False
+        start_obj = pos
+        while pos < len(html):
+            ch = html[pos]
+            if escape:
+                escape = False
+            elif ch == '\\':
+                escape = True
+            elif ch == '"' and not in_string:
+                in_string = True
+            elif ch == '"' and in_string:
+                in_string = False
+            elif not in_string:
+                if ch == '{':
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0:
+                        break
+            pos += 1
+        cli_json = html[start_obj:pos + 1]
+        cli = json.loads(cli_json)
+        return cli
+
+    def _extract_run_ios_command(self, js_path, cli_responses_json):
+        """استخراج runIosCommand و وابستگی‌های آن از app.js."""
+        js = Path(js_path).read_text(encoding="utf-8")
+
+        # Extract the functions we need
+        funcs = {}
+        for name in ["createInitialSim", "resolveIfName", "simPromptText", "runIosCommand"]:
+            pattern = "function " + name + r"\([^)]*\)\s*\{"
+            m = re.search(pattern, js)
+            if not m:
+                raise AssertionError(f"Function {name} not found in {js_path}")
+            start = m.start()
+            depth = 0
+            pos = start
+            in_string = False
+            escape = False
+            while pos < len(js):
+                ch = js[pos]
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"' and not in_string:
+                    in_string = True
+                elif ch == '"' and in_string:
+                    in_string = False
+                elif not in_string:
+                    if ch == "{":
+                        depth += 1
+                    elif ch == "}":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                pos += 1
+            funcs[name] = js[start:pos + 1]
+
+        # Build a standalone Node.js test script with cliResponses injected
+        # Use string concatenation to avoid f-string brace issues
+        academy_line = "const ACADEMY = { cliResponses: " + cli_responses_json + " };\n"
+
+        test_script = (
+            academy_line +
+            funcs["createInitialSim"] + "\n" +
+            funcs["resolveIfName"] + "\n" +
+            funcs["simPromptText"] + "\n" +
+            funcs["runIosCommand"] + "\n" +
+"""
+let sim = createInitialSim();
+let state = { cliMode: 'user' };
+
+function makeMockEl() {
+    return { textContent: '' };
+}
+
+function runTest(cmd) {
+    const outEl = makeMockEl();
+    const prEl = makeMockEl();
+    sim = createInitialSim();
+    state.cliMode = 'user';
+    runIosCommand(cmd, outEl, prEl);
+    return outEl.textContent;
+}
+
+// Process command line argument
+const cmd = process.argv[2] || '';
+console.log(JSON.stringify(runTest(cmd)));
+"""
+        )
+
+        return test_script
+
+    def _run_node_test(self, test_script, cmd):
+        """اجرا تست در Node.js و بازگرداندن خروجی."""
+        import subprocess, tempfile, os
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, encoding='utf-8') as f:
+            f.write(test_script)
+            tmpname = f.name
+        try:
+            result = subprocess.run(
+                ['node', tmpname, cmd],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode != 0:
+                raise AssertionError(f"Node.js error: {result.stderr}")
+            return json.loads(result.stdout.strip())
+        finally:
+            os.unlink(tmpname)
+
+    def test_native_command_execution(self):
+        """دستورات native باید خروجی زنده برگردانند، نه 'پشتیبانی نمی‌شود'."""
+        cli = self._load_cli_responses()
+        app_js = ASSET_ROOT / "app.js"
+        cli_responses_json = json.dumps(cli)
+        test_script = self._extract_run_ios_command(app_js, cli_responses_json)
+
+        native_cmds = ["show ip interface brief", "show vlan brief", "ping 10.10.0.2", "traceroute 10.10.0.2"]
+        for cmd in native_cmds:
+            output = self._run_node_test(test_script, cmd)
+            self.assertNotIn("پشتیبانی نمی‌شود", output,
+                             f"Native command {cmd} should not say 'پشتیبانی نمی‌شود'")
+            self.assertNotIn("[object Object]", output,
+                             f"Native command {cmd} should not have [object Object]")
+            self.assertGreater(len(output.strip()), 0,
+                               f"Native command {cmd} should produce output")
+
+    def test_reference_command_execution(self):
+        """دستورات مرجع باید خروجی ثابت مرجع برگردانند، نه 'پشتیبانی نمی‌شود'."""
+        cli = self._load_cli_responses()
+        app_js = ASSET_ROOT / "app.js"
+        cli_responses_json = json.dumps(cli)
+        test_script = self._extract_run_ios_command(app_js, cli_responses_json)
+
+        ref_cmds = ["show wireless summary", "show ap summary", "show ip ssh",
+                    "terraform plan", "show interfaces tunnel0"]
+        for cmd in ref_cmds:
+            self.assertIn(cmd.lower(), cli,
+                          f"Reference command {cmd} should be in cliResponses")
+            output = self._run_node_test(test_script, cmd)
+            self.assertNotIn("پشتیبانی نمی‌شود", output,
+                             f"Reference command {cmd} should not say 'پشتیبانی نمی‌شود'")
+            self.assertNotIn("[object Object]", output,
+                             f"Reference command {cmd} should not have [object Object]")
+            self.assertGreater(len(output.strip()), 0,
+                               f"Reference command {cmd} should produce reference output")
+
+    def test_unsupported_command_execution(self):
+        """دستور volledig پشتیبانی‌نشده باید 'پشتیبانی نمی‌شود' برگرداند."""
+        cli = self._load_cli_responses()
+        app_js = ASSET_ROOT / "app.js"
+        cli_responses_json = json.dumps(cli)
+        test_script = self._extract_run_ios_command(app_js, cli_responses_json)
+
+        # Commands not in cliResponses at all
+        unsupported_cmds = ["show ip sla", "mpls ldp neighbors"]
+        for cmd in unsupported_cmds:
+            self.assertNotIn(cmd.lower(), cli,
+                             f"Unsupported command {cmd} should not be in cliResponses")
+            output = self._run_node_test(test_script, cmd)
+            self.assertIn("پشتیبانی نمی‌شود", output,
+                          f"Unsupported command {cmd} should say 'پشتیبانی نمی‌شود'")
+
+    def test_offline_html_cli_responses_keys_lowercase(self):
+        """کلیدهای cliResponses در HTML آفلاین باید lowercase باشند."""
+        cli = self._load_offline_cli_responses()
+        bad_keys = [k for k in cli.keys() if k != k.lower()]
+        self.assertEqual(len(bad_keys), 0,
+                         f"Offline HTML cliResponses has uppercase keys: {bad_keys[:10]}")
+
+
 if __name__ == "__main__":
     unittest.main()
-
+if __name__ == "__main__":
+    unittest.main()
 if __name__ == "__main__":
     unittest.main()
