@@ -371,6 +371,28 @@ class FamAppApiTests(unittest.TestCase):
             payload,rev=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
             self.assertEqual(json.loads(payload)['unknown'],'preserve-me'); self.assertEqual(rev,8)
 
+    def test_academy_export_is_owner_scoped_raw_and_read_only(self):
+        url='/api/academy/progress/export'
+        self.assertEqual(self.client.get(url,environ_base=self.https_env).status_code,401)
+        csrf=self._login_admin().get_json()['csrf']
+        self.assertEqual(self.client.get(url,environ_base=self.https_env).status_code,403)
+        self.assertEqual(self.client.get(url,headers={'X-FAM-CSRF':'stale'},environ_base=self.https_env).status_code,403)
+        headers={'X-FAM-CSRF':csrf}
+        blank=self.client.get(url,headers=headers,environ_base=self.https_env)
+        self.assertIsNone(blank.json['payloadRaw']); self.assertEqual(blank.json['revision'],0)
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+            raw='not json: sensitive legacy payload'
+            db.execute('INSERT INTO academy_progress(user_id,payload,updated_at,revision) VALUES(?,?,?,?)',(uid,raw,123,7))
+        response=self.client.get(url,headers=headers,environ_base=self.https_env)
+        self.assertEqual(response.status_code,200); self.assertEqual(response.json['payloadRaw'],raw)
+        self.assertEqual(response.json['revision'],7); self.assertEqual(response.json['updatedAt'],123)
+        self.assertEqual(response.headers['Cache-Control'],'no-store')
+        self.assertIn('attachment',response.headers['Content-Disposition'])
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,7))
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups').fetchone()[0],0)
+
     def test_osi_lesson_is_resolvable_and_auth_gated(self):
         path = "/academy-assets/v5/blueprints/academy-stage-zero-osi-fa.json"
         self.assertEqual(self.client.get(path, environ_base=self.https_env).status_code, 401)

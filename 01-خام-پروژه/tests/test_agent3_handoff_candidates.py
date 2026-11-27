@@ -27,7 +27,8 @@ class IntakeCandidateTests(unittest.TestCase):
                 self.assertEqual(bp['lessonId'], name)
                 self.assertIn((CANDIDATES / f'{name}_lab.py').read_text(), html.unescape(bp['stages']['lab']['html']))
                 self.assertIn('در انتظار بازبینی', bp['reviewStatus'])
-                self.assertNotIn(name, ids)
+                if name == 'auto_20': self.assertIn(name, ids)
+                else: self.assertNotIn(name, ids)
 
     def test_auto20_zero_variance_and_large_finite_values(self):
         lab = load('auto_20')

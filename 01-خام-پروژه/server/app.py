@@ -850,6 +850,25 @@ def create_app(config=None):
             raise RuntimeError('FAM Academy bootstrap marker missing or duplicated.')
         return private_html_response(page.replace(marker, encoded))
 
+    @app.get('/api/academy/progress/export')
+    def export_academy_progress():
+        # The page token is mandatory even for GET: if another tab changes the
+        # shared session cookie, a stale page must not export the new user's data.
+        with connect() as db:
+            user, session = user_and_session(db)
+            supplied = request.headers.get('X-FAM-CSRF', '')
+            if not hmac.compare_digest(supplied, session['csrf']):
+                fail(403, 'توکن نشست برای دریافت پیشرفت لازم است.')
+            row = db.execute('SELECT payload,revision,updated_at FROM academy_progress WHERE user_id=?',
+                             (user['id'],)).fetchone()
+        # Export the stored outer payload as a string, including malformed and
+        # unknown values; do not reinterpret or claim that this is migration.
+        response = jsonify(format='fam-academy-progress-export-v1', revision=row['revision'] if row else 0,
+                           updatedAt=row['updated_at'] if row else None,
+                           payloadRaw=row['payload'] if row else None)
+        response.headers['Content-Disposition'] = 'attachment; filename="fam-academy-progress.json"'
+        return response
+
     @app.get('/api/real/status')
     def real_device_status():
         # The Academy real-device bridge is intentionally disabled in this

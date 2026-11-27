@@ -126,15 +126,15 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     '{bad json', JSON.stringify({}), JSON.stringify(null)
   ];
   for (const value of legacyValues) {
-    const savedStatus = {textContent: ''}; const sent = []; const handlers = {};
+    const savedStatus = {textContent: ''}; const sent = []; const handlers = []; 
     const isolated = {window:{}, document:{documentElement:{dataset:{}},
-      addEventListener(name, cb){handlers[name]=cb;}, getElementById(){return savedStatus;}},
+      addEventListener(name, cb){if(name === "DOMContentLoaded") handlers.push(cb);}, getElementById(id){return id === "academy-save-status" ? savedStatus : null;}},
       localStorage:ctx.localStorage, fetch(...args){sent.push(args);return Promise.resolve({ok:true});}, console};
     vm.createContext(isolated);
     const legacyBoot = {csrf:'token', progress:{'fam4.learn.v1':value}};
     vm.runInContext(bridgeScript.replace('__FAM_ACADEMY_BOOTSTRAP__', JSON.stringify(legacyBoot)), isolated);
     assert.strictEqual(isolated.window.FamAcademyBridge.sharedProgressLocked, true);
-    handlers.DOMContentLoaded();
+    handlers.forEach(cb => cb());
     assert.match(savedStatus.textContent, /ذخیره غیرفعال است/);
     assert.strictEqual(await isolated.window.FamAcademyBridge.saveProgress({completed:['s02'],labs:{}}), false);
     assert.strictEqual(sent.length, 0, 'must not overwrite historical or unknown data');

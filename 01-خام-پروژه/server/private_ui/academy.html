@@ -54,6 +54,28 @@
       }
       const lockedMessage = 'پیشرفت قدیمی یا ناشناخته شناسایی شد؛ برای جلوگیری از بازنویسی، ذخیره غیرفعال است. مهاجرت هنوز انجام نشده است.';
       if (sharedProgressLocked) document.addEventListener('DOMContentLoaded', () => saveStatus(lockedMessage));
+      document.addEventListener('DOMContentLoaded', () => {
+        const button = document.getElementById('academy-export-progress');
+        if (!button || boot.offline === true || !csrf) return;
+        button.hidden = false;
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          try {
+            const response = await fetch('/api/academy/progress/export', {
+              credentials: 'same-origin', headers: {'X-FAM-CSRF': csrf}
+            });
+            if (!response.ok) throw new Error('export failed');
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl; anchor.download = 'fam-academy-progress.json';
+            document.body.appendChild(anchor); anchor.click(); anchor.remove();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          } catch (_) {
+            saveStatus('دریافت نسخه خام ممکن نشد؛ نشست و اتصال را بررسی کنید.');
+          } finally { button.disabled = false; }
+        });
+      });
       window.FamAcademyBridge = {
         user: boot.user || (boot.userName ? { username: boot.userName } : null),
         progress: readProgress(),
@@ -276,6 +298,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 </header>
 
   <div id="academy-save-status" role="status" aria-live="polite" style="padding:0 20px;color:var(--warn)"></div>
+  <div style="padding:0 20px"><button id="academy-export-progress" type="button" hidden>دریافت نسخه خام پیشرفت حساب</button><small> نسخه ممکن است یادداشت و اطلاعات حساس داشته باشد؛ در محل امن نگهداری کنید. این دریافت، مهاجرت یا بازیابی نیست.</small></div>
   <main class="container" id="app-root"></main>
 
   <script src="/academy-assets/lesson-engine.js?v=20261123c"></script>

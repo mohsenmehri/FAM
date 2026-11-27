@@ -17,3 +17,9 @@ class RootIDTests(unittest.TestCase):
         with self.assertRaises(ValueError): m.elect_root([])
         with self.assertRaises(ValueError): m.elect_root([(65536, '02:00:00:00:00:01')])
         with self.assertRaises(ValueError): m.elect_root([(1, 'not-a-mac')])
+
+    def test_strict_priority_and_tie(self):
+        for value in (True, False, 1.0, '1', -1, 65536):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                m.elect_root([(value,'02:00:00:00:00:01')])
+        self.assertEqual(m.elect_root([(0,'ff:ff:ff:ff:ff:ff'),(65535,'00:00:00:00:00:00')]), (0,'ff:ff:ff:ff:ff:ff'))

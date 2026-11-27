@@ -6,7 +6,7 @@ def elect_root(bridges):
     """Compare complete 16-bit priority field then 48-bit MAC for one STP instance."""
     valid = []
     for priority, mac in bridges:
-        if not isinstance(priority, int) or not 0 <= priority <= 65535:
+        if type(priority) is not int or not 0 <= priority <= 65535:
             raise ValueError('priority field must fit 16 bits')
         if not isinstance(mac, str) or not re.fullmatch(r'[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}', mac):
             raise ValueError('MAC must be six colon-separated hexadecimal octets')
