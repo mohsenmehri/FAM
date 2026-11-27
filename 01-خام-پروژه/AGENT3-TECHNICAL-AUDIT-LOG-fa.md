@@ -270,3 +270,20 @@
 - **دامنه اصلاح (۶ درس Automation):** `auto_06`, `auto_07`, `auto_09`, `auto_15`, `auto_16`, `auto_17` (بدون دست‌زدن به ۴ درس ادغام‌شده محلی توسط Agent 2: `auto_02`, `auto_04`, `auto_05`, `auto_10`).
   - با پایان فاز ۱۰E، **۱۰۰٪ هر ۶۰ درس ادغام‌نشده در محدوده Agent 3** (۱۸ Specialist، ۷ CCIE، ۲۰ CCDE و ۱۵ Automation ادغام‌نشده) دارای اعتبارسنجی سخت‌گیرانه ورودی بولی/عددی/بازه/سرریز (`OverflowError -> ValueError`)، مقایسه گردنشده و تست‌های واحد منفی/مرزی هستند.
 - **وضعیت بازبینی و اجرا:** خودبازبینی نویسنده (بدون بازبینی مستقل انسانی)؛ `auto_06` و `auto_09` سرور HTTP محلی Loopback (`127.0.0.1`)، `auto_07` و `auto_15` کد محلی Python stdlib، و `auto_16`/`auto_17` شبیه‌ساز/Mock محلی بدون تجهیز شبکه زنده هستند؛ تطابق بایتی ۶۴/۶۴ HTML تأیید شد.
+
+## ۱۱. رفع کامل یافته‌های `AGENT-HANDOFF-fa.md` @ `f3a809393e` روی `ccde_18` (`reviewed.12`) و `auto_03` (`reviewed.9`)
+
+- **مبنای دریافت:** بررسی شاخه Agent 2 (`arena/ab96c97c-fam` @ `f3a809393e`, شامل `AGENT-HANDOFF-fa.md`، `auto_01-integration-review-fa.md` و `auto_20-integration-review-fa.md`). ثبت به‌روزرسانی ۶ درس ادغام‌شده انتخابی توسط Agent 2 با اصلاحات محلی (`auto_01`, `auto_02`, `auto_04`, `auto_05`, `auto_10`, `auto_20` — بدون بازنویسی نسخه‌های محلی Agent 2).
+- **`ccde_18` (`reviewed.12`):**
+  - بازتعریف Pars-Global به‌عنوان مطالعه موردی **آموزشی و فرضی** (حذف عبارت «سناریوی واقعی / پروژه واقعی بین‌المللی» در بخش ۱، بخش ۱۴ و واژه‌نامه).
+  - حذف درصد بی‌پشتوانه «۹۰ تا ۹۵٪» ممیزی PCI در بخش ۸، واژه‌نامه و Q5 و مشروط‌سازی کیفی کاهش دامنه به جداسازی قابل اثبات و تأیید QSA؛ اصلاح توضیح Q5 و بخش ۸/۱۲ برای تصریح اینکه VRF/SGT به‌تنهایی انطباق PCI-DSS یا Zero Trust را اثبات/تضمین نمی‌کند.
+  - حذف ادعای «آزادسازی میلیون‌ها دلار» / رایگان بودن در Q8 و واژه‌نامه و تصریح مصالحه Single-Router SPOF، تنوع فیزیکی/کانال مسیر WAN در بخش ۶، و هزینه‌های واقعی CPE/لایسنس SD-WAN/SASE/مهاجرت/پشتیبانی.
+  - مشروط‌سازی طرح IPAM و خلاصه‌سازی یک‌خطی (بخش ۹، واژه‌نامه و Q6) به حاکمیت IPAM، تعیین تکلیف هم‌پوشانی‌های موجود/اکتسابی و استثناهای Route-Leaking بین VRFها و سرویس‌های مشترک.
+  - اصلاح `~۹۵–۱۳۰ms` از «واقعی RTT» به بازه فرضی/مدلی (بخش ۱۱، واژه‌نامه) و جایگزینی لینک قدیمی `delltechnologies.com` و تعمیم قدیمی `MetroCluster/vMSC/Metro Node ≤10ms` با اسناد رسمی VMware vSAN (`≤5ms`)، NetApp vMSC with SnapMirror active sync (`<10ms`) و NetApp ONTAP Select MetroCluster SDS (`≤5ms` RTT & jitter) در بخش ۱۳، بخش ۱۴، `meta.sources` و خروجی آزمایشگاه.
+- **`auto_03` (`reviewed.9`):**
+  - تصریح مرز واقعی `dry_run` در Nornir (بخش‌های ۲، ۵، ۶ SVG، ۱۰، ۱۱، ۱۳، واژه‌نامه، Q3 و نمونه مرجع آزمایشگاه): Nornir فقط پرچم `task.is_dry_run()` را منتشر می‌کند و ایمنی/Diff واقعی وابسته به پلاگین یا کد وظیفه است (`nornir_napalm` / `napalm_configure` پشتیبانی بومی دارد، اما `nornir_netmiko` / `netmiko_send_config` پشتیبانی بومی ندارد). بازنویسی `auto_03_lab.py` برای حذف `dry_run` از `MockNetmikoConnection.send_config_set` و اعمال نگهبان صریح `task_honors_dry_run` (رد fail-closed در نبود پشتیبانی).
+  - هم‌راستاسازی `nr.filter(role="pilot")` با کلید `data.role` در `SimpleInventory` (و تفکیک آن از عضویت گروهی `F(groups__contains="pilot")`) در بخش‌های ۸، ۱۰، واژه‌نامه، Q3 و `auto_03_lab.py`.
+  - تعدیل ادعاهای زمانی موازی‌سازی (بخش ۹ و Q7) به عوامل واقعی (`num_workers`, SSH handshake, AAA rate-limit, RTT, CPU) و حذف زمان‌های قطعی («زیر ۱ دقیقه»، «ظرف ۵ ثانیه کل ۵۰۰ دستگاه»).
+  - مشروط‌سازی `save_config()` به پلتفرم/درایور (بخش ۵، واژه‌نامه، Q6 و `auto_03_lab.py`: IOS/IOS-XE/NX-OS در برابر سیستم‌های Commit-based مثل IOS-XR/JunOS که `NotImplementedError` می‌دهند) و تفکیک لایه‌های تایم‌اوت Netmiko (`conn_timeout`, `auth_timeout`, `banner_timeout`, `read_timeout`, `read_timeout_override`) در بخش ۱۲ و Q11.
+- **وضعیت بازبینی و اجرا:** خودبازبینی نویسنده (بدون بازبینی مستقل انسانی)؛ هر دو آزمایشگاه محلی/Mock بدون تجهیز شبکه زنده هستند؛ تطابق بایتی ۶۴/۶۴ HTML و آزمون `test_phase11_handoff_f3a80939_ccde18_and_auto03_remediation` تأیید شد.
+

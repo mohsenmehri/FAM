@@ -1,343 +1,345 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "auto_03",
- "objectiveId": "auto_03",
- "kind": "lesson",
- "track": "Automation",
- "course": "automation-foundations",
- "title": "۷.۷ Automation (درس ۳ از ۲۰): Python پیشرفته (Netmiko، Paramiko، Nornir)",
- "titleEn": "Automation 03: Advanced Python for Networks (Paramiko, Netmiko, TextFSM, Scrapli & Nornir)",
- "domain": "Network Automation",
- "source": "Legacy auto_03 rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [],
- "sections": [
-  {
-   "id": "auto_03-section-1",
-   "title": "مسئله واقعی: چرا اتصال SSH خام با Paramiko روی تجهیزات شبکه شکننده است؟",
-   "html": "<p>در سرورهای لینوکس، <code>Paramiko</code> می‌تواند دستور <code>exec_command</code> را اجرا و خروجی را تمیز برگرداند. اما روترها و سوئیچ‌های شبکه (مانند Cisco IOS/IOS-XE/NX-OS) رفتار متفاوتی دارند: صفحه‌بندی <code>--More--</code>، تغییر Prompt از <code>&gt;</code> به <code>#</code> و <code>(config)#</code>، تأخیرهای متغیر و نیاز به نشست تعاملی <code>invoke_shell()</code>. استفاده از <code>time.sleep(2)</code> در Paramiko خام یکی از رایج‌ترین منابع باگ و خروجی‌های ناقص است؛ اگر روتر کندتر پاسخ دهد، دستور بعدی وسط خروجی قبلی تزریق می‌شود!</p>"
-  },
-  {
-   "id": "auto_03-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر ساختارهای داده، توابع، <code>with</code> و مدیریت خطا در پایتون (درس <code>auto_02</code>).</p><ul><li>مقایسه دقیق <strong>Paramiko</strong>، <strong>Netmiko</strong>، <strong>Scrapli</strong> و فریم‌ورک <strong>Nornir</strong>.</li><li>استفاده ایمن از <code>with ConnectHandler(**device) as conn:</code>، <code>send_command</code>، <code>send_config_set</code> و <code>save_config()</code>.</li><li>تبدیل متن CLI به داده ساخت‌یافته با <strong>TextFSM / ntc-templates</strong> و مدیریت صحیح Fallback رشته خام.</li><li>طراحی اجرای موازی ایمن با <strong>Nornir</strong>: ساختار Inventory، فیلتر پایلوت (<code>nr.filter</code>)، حالت <code>dry_run</code> و تنظیم منطقی <code>num_workers</code>.</li></ul>"
-  },
-  {
-   "id": "auto_03-section-3",
-   "title": "مقایسه مهندسی Paramiko، Netmiko، Scrapli و Nornir",
-   "html": "<table><thead><tr><th>ابزار</th><th>سطح انتزاع</th><th>نقطه قوت و کاربرد اصلی</th></tr></thead><tbody><tr><td><strong>Paramiko</strong></td><td>پروتکل SSH پایه</td><td>اتصال SSH/SFTP به سرورهای لینوکس؛ برای CLI تجهیزات شبکه نیازمند کدنویسی زیاد</td></tr><tr><td><strong>Netmiko</strong></td><td>کتابخانه SSH ویژه شبکه (روی Paramiko)</td><td>پشتیبانی از ده‌ها فروشنده (<code>device_type</code>)، حذف خودکار Paging، تشخیص Prompt و ادغام با TextFSM/Genie</td></tr><tr><td><strong>Scrapli</strong></td><td>کتابخانه سریع SSH/Telnet/NETCONF</td><td>بسیار سریع، پشتیبانی از <code>asyncio</code> و درایور بومی <code>system</code> (OpenSSH) یا Paramiko/SSH2</td></tr><tr><td><strong>Nornir</strong></td><td>فریم‌ورک اتوماسیون تمام-پایتون</td><td>مدیریت Inventory، اجرای موازی (Multi-threaded) و استفاده از پلاگین‌های Netmiko/Scrapli/NAPALM</td></tr></tbody></table>"
-  },
-  {
-   "id": "auto_03-section-4",
-   "title": "الگوی ایمن Netmiko: Context Manager و مدیریت خطا",
-   "html": "<p>در Netmiko، نشست SSH یک منبع محدود روی روتر است (معمولاً تعداد خطوط <code>line vty 0 4</code> یا <code>0 15</code> محدود است). اگر اسکریپت وسط کار دچار خطا شود و <code>disconnect()</code> صدا زده نشود، خطوط VTY اشغال می‌مانند و حتی ادمین هم نمی‌تواند وارد روتر شود! با نوشتن <code>with ConnectHandler(**device) as conn:</code> (Context Manager)، حتی هنگام بروز استثنا، Netmiko نشست SSH را به‌طور خودکار می‌بندد.</p><pre dir=\"ltr\"><code># Reference Netmiko pattern (NOT executed against a live router)\nfrom netmiko import ConnectHandler, NetmikoAuthenticationException, NetmikoTimeoutException\n\ntry:\n    with ConnectHandler(**device) as conn:\n        out = conn.send_command(\"show ip interface brief\", use_textfsm=True)\nexcept (NetmikoTimeoutException, NetmikoAuthenticationException) as exc:\n    print(f\"Connection failed: {exc}\")</code></pre>"
-  },
-  {
-   "id": "auto_03-section-5",
-   "title": "تغییر پیکربندی با send_config_set و مرز save_config()",
-   "html": "<p>در Netmiko برای دستورات خواندنی از <code>send_command()</code> و برای اعمال پیکربندی از <code>send_config_set(commands)</code> استفاده می‌شود که خودکار وارد حالت <code>configure terminal</code> شده، دستورات را می‌فرستد و خارج می‌شود. اما دو نکته ایمنی حیاتی وجود دارد: اول، <code>send_config_set</code> تغییرات را فقط در <code>running-config</code> اعمال می‌کند و تا زمانی که <code>conn.save_config()</code> (معادل <code>write memory</code> / <code>copy run start</code>) اجرا نشود، پس از ریبوت از بین می‌روند؛ دوم، پیش از ذخیره دائمی، ابتدا نتیجه را با یک دستور <code>show</code> (Verify) بررسی کنید و برای تغییرات پرخطر از مکانیسم برگشت (مانند <code>configure replace ... revert timer</code> در IOS-XE) بهره ببرید.</p>"
-  },
-  {
-   "id": "auto_03-section-6",
-   "title": "نمودار معماری: از Nornir Inventory تا Netmiko/TextFSM و استقرار مرحله‌ای",
-   "html": "<p>در نمودار زیر ارتباط لایه Inventory و موازی‌سازی Nornir با لایه اتصال/پارس Netmiko/TextFSM و استراتژی استقرار پایلوت نمایش داده شده است.</p><svg viewBox=\"0 0 760 215\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Paramiko, Netmiko, TextFSM and Nornir Architecture\"><rect x=\"14\" y=\"18\" width=\"215\" height=\"178\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"121\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Nornir Framework</text><text x=\"121\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Inventory: hosts / groups / defaults</text><rect x=\"30\" y=\"84\" width=\"183\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#3b82f6\"/><text x=\"121\" y=\"102\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">nr.filter(role=\"pilot\")</text><text x=\"121\" y=\"117\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1d4ed8\">dry_run=True BEFORE prod!</text><rect x=\"30\" y=\"136\" width=\"183\" height=\"44\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#2563eb\"/><text x=\"121\" y=\"156\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1e40af\">Bounded Thread Pool</text><text x=\"121\" y=\"171\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e3a8a\">num_workers tuned safely</text><rect x=\"262\" y=\"18\" width=\"225\" height=\"178\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"374\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Connection &amp; Parsing Layer</text><text x=\"374\" y=\"72\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">Netmiko / Scrapli (over SSH)</text><text x=\"374\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">with ConnectHandler(...) as c:</text><text x=\"374\" y=\"122\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">TextFSM / ntc-templates</text><text x=\"374\" y=\"148\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9a3412\">Check isinstance(res, list)!</text><text x=\"374\" y=\"170\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Fallback = raw str if no template</text><rect x=\"520\" y=\"34\" width=\"226\" height=\"146\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"633\" y=\"60\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Network Fleet (Lab / Prod)</text><text x=\"633\" y=\"90\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">Pilot Device (Step 1)</text><text x=\"633\" y=\"116\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">Canary Group (Step 2)</text><text x=\"633\" y=\"142\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">Full Rollout + save_config()</text><line x1=\"229\" y1=\"107\" x2=\"262\" y2=\"107\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"487\" y1=\"107\" x2=\"520\" y2=\"107\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
-  },
-  {
-   "id": "auto_03-section-7",
-   "title": "تبدیل خروجی CLI به داده ساخت‌یافته با TextFSM و ntc-templates",
-   "html": "<p>پارس دستی با <code>split()</code> برای دستورات پیچیده‌ای مثل <code>show bgp summary</code> یا <code>show interfaces</code> بسیار شکننده است. کتابخانه <strong>TextFSM</strong> (ساخته گوگل) همراه با مجموعه الگوهای جامع <strong>ntc-templates</strong> متن خروجی CLI را به یک <strong>لیست از دیکشنری‌ها (<code>list[dict]</code>)</strong> تبدیل می‌کند.</p><p><strong>تله مهم عملیاتی (Fallback به رشته خام):</strong> در Netmiko اگر <code>use_textfsm=True</code> بگذارید اما برای آن <code>device_type</code> و دستور خاص الگویی در <code>ntc-templates</code> وجود نداشته باشد (یا متغیر محیطی <code>NET_TEXTFSM</code> تنظیم نباشد)، Netmiko خطا نمی‌دهد بلکه به‌عنوان Fallback <strong>همان رشته خام (<code>str</code>)</strong> را برمی‌گرداند! اگر کد شما بلافاصله روی خروجی حلقه <code>for row in output: row[\"intf\"]</code> بزند، روی کاراکترهای رشته تکرار کرده و با <code>TypeError: string indices must be integers</code> کرش می‌کند. پس همیشه شرط <code>if not isinstance(output, list):</code> را بررسی کنید.</p>"
-  },
-  {
-   "id": "auto_03-section-8",
-   "title": "معماری Inventory در Nornir: hosts، groups و defaults",
-   "html": "<p><strong>Nornir</strong> برخلاف Ansible نیازی به زبان میانی YAML DSL برای منطق برنامه ندارد و کل منطق در پایتون خالص نوشته می‌شود (با قابلیت کامل دیباگ IDE و تایپ‌چکینگ). Inventory استاندارد Nornir از سه فایل تشکیل می‌شود:</p><ul><li><code>hosts.yaml</code>: مشخصات یکتای هر دستگاه (<code>hostname</code>، <code>platform</code>، عضویت در <code>groups</code> و داده‌های اختصاصی).</li><li><code>groups.yaml</code>: تنظیمات مشترک هر گروه (مثلاً <code>campus_iosxe</code> یا <code>dc_nxos</code>).</li><li><code>defaults.yaml</code>: مقادیر پیش‌فرض سراسری (مثل پورت SSH یا تایم‌اوت).</li></ul><p><strong>اصل امنیتی:</strong> هرگز رمز عبور را در <code>hosts.yaml</code> یا <code>defaults.yaml</code> ذخیره و کامیت نکنید؛ آن را هنگام اجرا از متغیر محیطی یا Vault تزریق کنید (مثلاً <code>nr.inventory.defaults.password = os.environ[\"NET_PASS\"]</code>).</p>"
-  },
-  {
-   "id": "auto_03-section-9",
-   "title": "موازی‌سازی هوشمند: چرا num_workers=500 ایده بدی است؟",
-   "html": "<p>اجرای متوالی روی ۲۰۰ سوئیچ (هر کدام ۵ ثانیه) بیش از ۱۶ دقیقه طول می‌کشد، اما Nornir با ThreadPool می‌تواند آن را زیر ۱ دقیقه تمام کند. با این حال، بالا بردن بی‌رویه <code>num_workers</code> به ۵۰۰ چند مشکل واقعی می‌سازد:</p><ul><li>فشار ناگهانی روی سرور <strong>AAA (TACACS+/RADIUS)</strong> که ممکن است باعث Rate-Limit و رد احراز هویت شود.</li><li>مصرف بالای File Descriptor و CPU سرور Jump Host.</li><li><strong>گسترش فوری خطای انسانی (Blast Radius):</strong> اگر دستور اشتباهی بفرستید، ظرف ۵ ثانیه کل ۵۰۰ دستگاه را هم‌زمان قطع می‌کنید!</li></ul><p>معمولاً انتخاب <code>num_workers</code> متعادل (مثلاً ۱۰ تا ۳۰) همراه با اجرای مرحله‌ای (Pilot -> Canary -> Production) استاندارد ایمنی است.</p>"
-  },
-  {
-   "id": "auto_03-section-10",
-   "title": "قاعده پایلوت (nr.filter) و Dry-Run پیش از تغییر سراسری",
-   "html": "<p>پیش از اجرای هر تغییر پیکربندی با Nornir، سه لایه حفاظتی را رعایت کنید:</p><ol><li><strong>فیلتر کردن هدف به یک تجهیز آزمایشی/پایلوت:</strong> <code>pilot = nr.filter(role=\"pilot\")</code>.</li><li><strong>اجرای آزمایشی بدون تغییر (<code>dry_run=True</code>) و بررسی Diff:</strong> مشاهده دقیق دستوراتی که قرار است ارسال شوند پیش از اعمال.</li><li><strong>بررسی ساختار <code>AggregatedResult</code> و <code>failed_hosts</code>:</strong> تنها در صورت موفقیت ۱۰۰٪ پایلوت و راستی‌آزمایی سلامت سرویس (مثلاً باقی ماندن همسایگی OSPF/BGP)، دامنه را به گروه بعدی گسترش دهید.</li></ol>"
-  },
-  {
-   "id": "auto_03-section-11",
-   "title": "کژفهمی‌های رایج در Netmiko و Nornir",
-   "html": "<ul><li><strong>کژفهمی ۱: «اگر use_textfsm=True بگذاریم، خروجی همیشه لیست دیکشنری است.»</strong> واقعیت: نبود الگو برای آن دستور/پلتفرم باعث بازگشت رشته خام <code>str</code> می‌شود و باید با <code>isinstance</code> کنترل شود.</li><li><strong>کژفهمی ۲: «Nornir به خودی خود از طریق SSH به روتر وصل می‌شود.»</strong> واقعیت: Nornir یک فریم‌ورک هماهنگ‌سازی و Inventory است و برای اتصال به تجهیزات از پلاگین‌هایی مانند <code>nornir-netmiko</code>، <code>nornir-scrapli</code> یا <code>nornir-napalm</code> استفاده می‌کند.</li><li><strong>کژفهمی ۳: «برای دستگاه‌های قدیمی سیسکو باید امنیت SSH کل سیستم‌عامل را پایین بیاوریم.»</strong> واقعیت: الگوریتم‌های قدیمی تنها در صورت اجبار و به‌صورت ایزوله و فقط برای همان میزبان‌های مشخص (نه سراسری) فعال می‌شوند و راهکار اصلی ارتقای IOS/الگوریتم‌هاست.</li></ul>"
-  },
-  {
-   "id": "auto_03-section-12",
-   "title": "عیب‌یابی خطاهای رایج Netmiko و Nornir",
-   "html": "<p><strong>خطای ۱ — <code>ReadTimeout</code> در دستورات سنگین (مثل <code>show tech-support</code> یا <code>show bgp</code> بزرگ):</strong> مهلت پیش‌فرض کافی نیست؛ پارامتر <code>read_timeout</code> (در نسخه‌های جدید Netmiko) را فقط برای همان دستور افزایش دهید و در عین حال به یاد داشته باشید اجرای دستورات سنگین روی صدها روتر هم‌زمان می‌تواند CPU کنترل‌پلین را بالا ببرد.</p><p><strong>خطای ۲ — <code>AuthenticationException</code> یا <code>failed_hosts</code> در Nornir:</strong> بررسی کنید رمز عبور از متغیر محیطی درست تزریق شده، <code>secret</code> (رمز enable) در صورت نیاز تنظیم شده و سرور TACACS+ نرخ درخواست‌ها را محدود نکرده است.</p>"
-  },
-  {
-   "id": "auto_03-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> در اسکریپت Netmiko دستور <code>res = conn.send_command(\"show custom telemetry\", use_textfsm=True)</code> اجرا می‌شود و هیچ الگویی برای آن وجود ندارد. اگر بدون بررسی بنویسیم <code>print(res[0][\"value\"])</code> چه خطایی رخ می‌دهد؟ <strong>پاسخ:</strong> چون <code>res</code> از نوع <code>str</code> برمی‌گردد، <code>res[0]</code> اولین کاراکتر رشته است و اندیس‌گذاری رشته‌ای <code>[\"value\"]</code> خطای <code>TypeError: string indices must be integers</code> تولید می‌کند.</p><p><strong>تمرین ۲:</strong> از ۳ دستگاه موجود در Inventory (یک <code>pilot</code> و دو <code>production</code>)، وقتی <code>role_filter=\"pilot\"</code> و <code>dry_run=True</code> اجرا می‌شود، چند دستگاه تغییر واقعی دریافت می‌کنند؟ <strong>پاسخ:</strong> صفر دستگاه؛ ابتدا فقط ۱ دستگاه پایلوت انتخاب می‌شود و چون <code>dry_run=True</code> است هیچ پیکربندی اعمال نمی‌شود و فقط برنامه پیشنهادی گزارش می‌گردد.</p>"
-  },
-  {
-   "id": "auto_03-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://ktbyers.github.io/netmiko/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Netmiko</a>، <a href=\"https://nornir.readthedocs.io/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Nornir</a>، <a href=\"https://github.com/networktocode/ntc-templates\" target=\"_blank\" rel=\"noopener\">مخزن ntc-templates</a> و <a href=\"https://carlmontanari.github.io/scrapli/\" target=\"_blank\" rel=\"noopener\">مستندات Scrapli</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> کتابخانه‌های Netmiko، Paramiko، TextFSM و Nornir و هیچ تجهیز SSH/IOS-XE واقعی در این محیط اجرا نشده‌اند. آزمایشگاه ارائه‌شده یک <strong>Python Mock محلی</strong> است که رفتار Context Manager، Fallback نوع <code>str</code> در TextFSM و الگوی فیلتر پایلوت/Dry-Run موازی را مدل‌سازی و آزمون می‌کند.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "Paramiko",
-   "fa": "کتابخانه Paramiko",
-   "simple": "پیاده‌سازی پایتونی پروتکل SSHv2/SFTP؛ پایه فنی Netmiko."
-  },
-  {
-   "term": "Netmiko",
-   "fa": "کتابخانه Netmiko",
-   "simple": "کتابخانه تخصصی SSH برای تجهیزات شبکه با مدیریت خودکار Prompt، Paging و درایور فروشندگان."
-  },
-  {
-   "term": "ConnectHandler",
-   "fa": "کلاس اتصال Netmiko",
-   "simple": "نقطه ورود ساخت نشست SSH در Netmiko؛ بهترین روش استفاده همراه با بلوک with است."
-  },
-  {
-   "term": "Scrapli",
-   "fa": "کتابخانه Scrapli",
-   "simple": "کتابخانه سریع و مدرن اتصال به تجهیزات شبکه با پشتیبانی asyncio و درایور OpenSSH."
-  },
-  {
-   "term": "TextFSM",
-   "fa": "موتور TextFSM",
-   "simple": "موتور ماشین حالت متنی برای تبدیل خروجی غیرساخت‌یافته CLI به لیست دیکشنری."
-  },
-  {
-   "term": "ntc-templates",
-   "fa": "الگوهای ntc-templates",
-   "simple": "مجموعه متن‌باز الگوهای TextFSM برای دستورات show ده‌ها سیستم‌عامل شبکه."
-  },
-  {
-   "term": "Nornir",
-   "fa": "فریم‌ورک Nornir",
-   "simple": "فریم‌ورک تمام-پایتون برای مدیریت Inventory و اجرای موازی وظایف اتوماسیون."
-  },
-  {
-   "term": "Inventory",
-   "fa": "فهرست دارایی‌ها",
-   "simple": "فایل‌های hosts.yaml، groups.yaml و defaults.yaml برای توصیف تجهیزات هدف."
-  },
-  {
-   "term": "nr.filter",
-   "fa": "فیلتر Inventory",
-   "simple": "محدود کردن دامنه اجرای Nornir به گروه یا دستگاه خاص (مثل پایلوت)."
-  },
-  {
-   "term": "dry_run",
-   "fa": "اجرای آزمایشی بدون اعمال",
-   "simple": "حالت پیش‌نمایش تغییرات برای بازبینی پیش از اعمال واقعی روی شبکه."
-  },
-  {
-   "term": "num_workers",
-   "fa": "تعداد نخ‌های هم‌زمان",
-   "simple": "میزان موازی‌سازی در Nornir که باید با ظرفیت AAA و ایمنی Blast Radius تنظیم شود."
-  },
-  {
-   "term": "send_config_set",
-   "fa": "ارسال دسته پیکربندی",
-   "simple": "متد Netmiko برای ورود به حالت config و ارسال فهرست دستورات پیکربندی."
-  },
-  {
-   "term": "save_config",
-   "fa": "ذخیره پیکربندی",
-   "simple": "متد Netmiko برای ذخیره running-config در startup-config پس از راستی‌آزمایی."
-  },
-  {
-   "term": "AggregatedResult",
-   "fa": "نتیجه تجمیعی Nornir",
-   "simple": "ساختار بازگشتی Nornir شامل نتیجه تک‌تک میزبان‌ها و لیست failed_hosts."
-  },
-  {
-   "term": "VTY Exhaustion",
-   "fa": "اشباع خطوط VTY",
-   "simple": "بسته شدن امکان ورود SSH به روتر در اثر نشست‌های رهاشده و بسته نشده."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه Python Mock محلی Netmiko/TextFSM/Nornir + سناریوی مرجع (SSH و تجهیز واقعی اجرا نشده)",
-   "executionStatus": "Python Mock محلی اجرا و تست شده؛ هیچ نشست SSH، Netmiko، Nornir یا روتر واقعی اجرا نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>Python Mock محلی</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر، سوئیچ، فایروال یا کنترلر واقعی سیسکو اجرا نشده است.</p><p>در این آزمایشگاه با یک Python Mock محلی، بسته شدن تضمین‌شده نشست در بلوک <code>with</code>، تفاوت نوع خروجی TextFSM هنگام وجود الگو (<code>list</code>) در برابر نبود الگو (<code>str</code>) و اجرای موازی محدودشده به گروه <code>pilot</code> با <code>dry_run=True</code> را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_03_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_03_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for auto_03 (Netmiko Context Manager, TextFSM Fallback &amp; Nornir Pilot).\n\nNo real SSH connection, Netmiko session, Nornir inventory target, or Cisco IOS device is run.\nStrict validation rejects non-bool use_textfsm/dry_run flags and non-positive/bool max_workers.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom concurrent.futures import ThreadPoolExecutor\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\nclass MockNetmikoConnection:\n    &quot;&quot;&quot;Simulated ConnectHandler demonstrating disconnect via context manager.&quot;&quot;&quot;\n\n    def __init__(self, host: str) -&gt; None:\n        if not isinstance(host, str) or not host.strip():\n            raise ValueError(f&quot;host must be a non-empty str, got {host!r}&quot;)\n        self.host = host\n        self.connected = False\n        self.closed = False\n        self.sent_configs: list[str] = []\n\n    def __enter__(self) -&gt; &quot;MockNetmikoConnection&quot;:\n        self.connected = True\n        return self\n\n    def __exit__(self, exc_type, exc, tb) -&gt; bool:\n        self.connected = False\n        self.closed = True\n        return False  # Do not swallow exceptions\n\n    def send_command(self, cmd: str, use_textfsm: bool = False) -&gt; object:\n        if not isinstance(cmd, str) or not cmd.strip():\n            raise ValueError(&quot;cmd must be a non-empty str&quot;)\n        want_textfsm = _require_bool(use_textfsm, &quot;use_textfsm&quot;)\n        raw = f&quot;{self.host}: GigabitEthernet0/0 is up, line protocol is up&quot;\n        if want_textfsm and cmd == &quot;show ip interface brief&quot;:\n            return [{&quot;intf&quot;: &quot;GigabitEthernet0/0&quot;, &quot;status&quot;: &quot;up&quot;, &quot;proto&quot;: &quot;up&quot;}]\n        # Mirror real Netmiko fallback: missing template returns raw str!\n        return raw\n\n    def send_config_set(self, commands: list[str], dry_run: bool = True) -&gt; dict[str, object]:\n        is_dry_run = _require_bool(dry_run, &quot;dry_run&quot;)\n        if is_dry_run:\n            return {&quot;host&quot;: self.host, &quot;applied&quot;: False, &quot;planned_commands&quot;: list(commands)}\n        self.sent_configs.extend(commands)\n        return {&quot;host&quot;: self.host, &quot;applied&quot;: True, &quot;commands_count&quot;: len(commands)}\n\n\ndef run_nornir_style_pilot(\n    inventory: list[dict[str, str]],\n    role_filter: str,\n    commands: list[str],\n    dry_run: bool = True,\n    max_workers: int = 4,\n) -&gt; list[dict[str, object]]:\n    &quot;&quot;&quot;Filter inventory to a pilot group first and execute with bounded concurrency.&quot;&quot;&quot;\n    is_dry_run = _require_bool(dry_run, &quot;dry_run&quot;)\n    if isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers &lt;= 0:\n        raise ValueError(f&quot;max_workers must be a positive int (not bool), got {max_workers!r}&quot;)\n    targets = [dev for dev in inventory if dev.get(&quot;role&quot;) == role_filter]\n\n    def task(dev: dict[str, str]) -&gt; dict[str, object]:\n        with MockNetmikoConnection(dev[&quot;host&quot;]) as conn:\n            res = conn.send_config_set(commands, dry_run=is_dry_run)\n        return {**res, &quot;session_closed&quot;: conn.closed}\n\n    with ThreadPoolExecutor(max_workers=min(max_workers, max(1, len(targets)))) as pool:\n        return list(pool.map(task, targets))\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real SSH, Netmiko, Nornir, or IOS-XE router is contacted.&quot;)\n    with MockNetmikoConnection(&quot;192.0.2.11&quot;) as conn:\n        parsed = conn.send_command(&quot;show ip interface brief&quot;, use_textfsm=True)\n        fallback = conn.send_command(&quot;show custom vendor telemetry&quot;, use_textfsm=True)\n    assert isinstance(parsed, list) and isinstance(fallback, str) and conn.closed is True\n    print(&quot;TextFSM matched type:&quot;, type(parsed).__name__, parsed)\n    print(&quot;TextFSM missing-template fallback type:&quot;, type(fallback).__name__, fallback)\n    print(&quot;Session closed safely after with-block:&quot;, conn.closed)\n\n    inv = [\n        {&quot;host&quot;: &quot;192.0.2.11&quot;, &quot;role&quot;: &quot;pilot&quot;},\n        {&quot;host&quot;: &quot;192.0.2.12&quot;, &quot;role&quot;: &quot;production&quot;},\n        {&quot;host&quot;: &quot;192.0.2.13&quot;, &quot;role&quot;: &quot;production&quot;},\n    ]\n    pilot_res = run_nornir_style_pilot(inv, &quot;pilot&quot;, [&quot;ntp server 192.0.2.123&quot;], dry_run=True)\n    assert len(pilot_res) == 1 and pilot_res[0][&quot;applied&quot;] is False and pilot_res[0][&quot;session_closed&quot;] is True\n    print(&quot;Pilot dry-run:&quot;, pilot_res)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> دستور دارای الگو <code>list</code> و دستور فاقد الگو <code>str</code> برمی‌گرداند؛ <code>conn.closed</code> برابر <code>True</code> می‌شود؛ و در اجرای Nornir-style فقط میزبان <code>192.0.2.11</code> (پایلوت) با <code>applied=False</code> پردازش می‌شود.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع Nornir + Netmiko در محیط واقعی/CML (اجرا نشده):</strong></p><pre dir=\"ltr\"><code># Reference Nornir snippet (NOT executed — requires nornir + nornir-netmiko + lab routers)\nimport os\nfrom nornir import InitNornir\nfrom nornir_netmiko.tasks import netmiko_send_command\n\nnr = InitNornir(config_file=\"config.yaml\")\nnr.inventory.defaults.password = os.environ[\"NET_PASS\"]\npilot = nr.filter(role=\"pilot\")\nresult = pilot.run(task=netmiko_send_command, command_string=\"show version\", use_textfsm=True)</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس Python پیشرفته (Netmiko، Paramiko، Nornir)",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "در Netmiko هنگام استفاده از send_command(..., use_textfsm=True)، اگر برای آن دستور الگویی در ntc-templates نباشد چه برمی‌گردد؟",
-   "options": [
-    "به عنوان Fallback همان رشته متنی خام (str) برمی‌گردد و کد باید نوع آن را با isinstance بررسی کند",
-    "روتر به‌صورت خودکار ریبوت می‌شود",
-    "فایل CSV روی دیسک ساخته می‌شود",
-    "همیشه دیکشنری خالی با خطای کرنل برمی‌گردد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>Netmiko در نبود الگوی TextFSM رشته خام برمی‌گرداند؛ بررسی <code>isinstance(out, list)</code> جلوی <code>TypeError</code> را می‌گیرد.</p>"
-  },
-  {
-   "title": "چرا استفاده از with ConnectHandler(**device) as conn در Netmiko بر اتصال بدون with ترجیح دارد؟",
-   "options": [
-    "پهنای باند لینک روتر را دو برابر می‌کند",
-    "موجب می‌شود حتی در صورت بروز خطا وسط اجرا، نشست SSH بسته شود و خطوط VTY روتر اشغال نمانند",
-    "دستور show را به RESTCONF تبدیل می‌کند",
-    "رمز enable را حذف می‌کند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>بستن خودکار نشست در <code>__exit__</code> از اشباع خطوط VTY تجهیزات شبکه جلوگیری می‌کند.</p>"
-  },
-  {
-   "title": "در فریم‌ورک Nornir پیش از اعمال یک تغییر پیکربندی موازی روی صدها سوئیچ، مهم‌ترین اقدام ایمنی چیست؟",
-   "options": [
-    "تنظیم num_workers روی ۵۰۰ تا تغییر فوری روی همه اجرا شود",
-    "حذف کامل try/except و لاگ‌ها",
-    "فیلتر کردن به دستگاه پایلوت (nr.filter)، اجرای dry_run و بررسی Diff/نتیجه پیش از گسترش دامنه",
-    "نوشتن رمز عبور همه سوئیچ‌ها در hosts.yaml و انتشار در Git"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>پایلوت + dry_run + استقرار مرحله‌ای شعاع خطای احتمالی را به حداقل می‌رساند.</p>"
-  },
-  {
-   "title": "چرا استفاده از Paramiko خام با time.sleep برای CLI تجهیزات شبکه شکننده است؟",
-   "options": [
-    "چون Paramiko فقط با ویندوز کار می‌کند",
-    "چون Paramiko رمزنگاری ندارد",
-    "چون Paramiko از IPv4 پشتیبانی نمی‌کند",
-    "چون تجهیزات شبکه دارای Paging (--More--)، تغییر Prompt و تأخیر متغیرند و زمان خواب ثابت باعث خواندن ناقص یا تزریق بی‌موقع دستور می‌شود"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>Netmiko و Scrapli تشخیص هوشمند Prompt و حذف Paging را مدیریت می‌کنند و نیاز به <code>sleep</code> شکننده را از بین می‌برند.</p>"
-  },
-  {
-   "title": "تفاوت نقش Nornir با کتابخانه‌هایی مانند Netmiko یا Scrapli چیست؟",
-   "options": [
-    "Nornir فریم‌ورک مدیریت Inventory و اجرای موازی است و اتصال به دستگاه را از طریق پلاگین‌هایی مثل nornir-netmiko یا nornir-scrapli انجام می‌دهد",
-    "Nornir جایگزین پروتکل SSH است",
-    "Netmiko فقط برای داکر است",
-    "هیچ ارتباطی بین Nornir و Netmiko وجود ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>Nornir هماهنگ‌سازی، Inventory و Multi-threading را بر عهده دارد و اتصال واقعی به درایورهای پلاگین واگذار می‌شود.</p>"
-  },
-  {
-   "title": "پس از اجرای موفق conn.send_config_set(...) روی یک روتر Cisco IOS-XE، وضعیت ذخیره تغییرات چیست؟",
-   "options": [
-    "خودکار در startup-config ذخیره شده‌اند",
-    "تغییرات فقط در running-config اعمال شده‌اند و برای ماندگاری پس از ریبوت باید پس از تأیید، conn.save_config() اجرا شود",
-    "تغییرات روی فایل محلی لینوکس ذخیره شده‌اند",
-    "روتر بلافاصله ریبوت می‌شود"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>همواره ابتدا تغییر را Verify کنید و سپس با <code>save_config()</code> در <code>startup-config</code> ذخیره نمایید.</p>"
-  },
-  {
-   "title": "کدام ریسک در اثر تنظیم بیش‌ازحد بالای num_workers (مثلاً ۵۰۰) در Nornir رخ می‌دهد؟",
-   "options": [
-    "کاهش امنیت رمزنگاری AES",
-    "تبدیل YAML به XML",
-    "فشار شدید هم‌زمان روی سرور AAA (TACACS+/RADIUS)، مصرف منابع و بزرگ شدن ناگهانی Blast Radius در صورت خطا",
-    "خاموش شدن TextFSM"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>موازی‌سازی کنترل‌نشده هم سرورهای احراز هویت را تحت فشار می‌گذارد و هم ریسک قطعی هم‌زمان کل شبکه را بالا می‌برد.</p>"
-  },
-  {
-   "title": "بهترین روش مدیریت رمز عبور تجهیزات در پروژه Nornir چیست؟",
-   "options": [
-    "نوشتن متن ساده رمز در defaults.yaml و push به Git",
-    "نوشتن رمز در نام گروه groups.yaml",
-    "حذف احراز هویت از همه روترها",
-    "تزریق رمز هنگام اجرا از متغیر محیطی (os.environ) یا سیستم مدیریت اسرار (Vault) بدون ذخیره در Git"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>فایل‌های Inventory معمولاً در Git نگهداری می‌شوند و نباید هرگز حاوی رمز عبور باشند.</p>"
-  },
-  {
-   "title": "مهم‌ترین مزیت Scrapli در مقایسه با Netmiko در برخی سناریوهای مقیاس بالا چیست؟",
-   "options": [
-    "پشتیبانی بومی از asyncio و امکان استفاده از درایور سریع OpenSSH/SSH2 با سرعت بالاتر",
-    "حذف کامل نیاز به احراز هویت",
-    "پشتیبانی فقط از یک فروشنده",
-    "تبدیل خودکار CLI به SNMPv1"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>Scrapli معماری مدرن و سریع با پشتیبانی از هر دو حالت همگام و ناهمگام (<code>asyncio</code>) ارائه می‌دهد.</p>"
-  },
-  {
-   "title": "سه فایل استاندارد در SimpleInventory فریم‌ورک Nornir کدام‌اند؟",
-   "options": [
-    "routers.txt، pass.txt، log.txt",
-    "hosts.yaml، groups.yaml و defaults.yaml",
-    "main.tf، state.tf و vars.tf",
-    "index.html، style.css و app.js"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>سلسله‌مراتب ارث‌بری در Nornir SimpleInventory از <code>defaults</code> به <code>groups</code> و سپس <code>hosts</code> است.</p>"
-  },
-  {
-   "title": "هنگام اجرای دستور سنگینی مانند show bgp بزرگ در Netmiko و دریافت ReadTimeout، بهترین واکنش مهندسی چیست؟",
-   "options": [
-    "تکرار نامحدود دستور در حلقه while True بدون وقفه",
-    "خاموش کردن SSH روی روتر",
-    "افزایش کنترل‌شده read_timeout برای همان دستور و بررسی بار CPU کنترل‌پلین یا استفاده از API/Telemetry",
-    "تغییر device_type به linux"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>تنظیم هدفمند <code>read_timeout</code> (و در مقیاس بالا مهاجرت به NETCONF/RESTCONF/Telemetry) راهکار صحیح است.</p>"
-  },
-  {
-   "title": "آزمایشگاه Python این درس چه چیزی را ثابت می‌کند؟",
-   "options": [
-    "اتصال واقعی SSH به روترهای Cisco IOS-XE",
-    "تست سرعت واقعی Scrapli روی ۵۰۰ سوئیچ",
-    "نصب ntc-templates روی روتر",
-    "مدل‌سازی محلی Python Mock از رفتار Context Manager، Fallback رشته در TextFSM و فیلتر پایلوت/Dry-Run بدون اجرای SSH واقعی"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه یک Python Mock محلی است و هیچ نشست SSH یا تجهیز واقعی اجرا نشده است.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.8",
-  "legacyId": "auto_03",
-  "sources": [
-   "https://ktbyers.github.io/netmiko/",
-   "https://nornir.readthedocs.io/",
-   "https://github.com/networktocode/ntc-templates",
-   "https://carlmontanari.github.io/scrapli/"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "auto_03",
+  "objectiveId": "auto_03",
+  "kind": "lesson",
+  "track": "Automation",
+  "course": "automation-foundations",
+  "title": "۷.۷ Automation (درس ۳ از ۲۰): Python پیشرفته (Netmiko، Paramiko، Nornir)",
+  "titleEn": "Automation 03: Advanced Python for Networks (Paramiko, Netmiko, TextFSM, Scrapli & Nornir)",
+  "domain": "Network Automation",
+  "source": "Legacy auto_03 rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [],
+  "sections": [
+    {
+      "id": "auto_03-section-1",
+      "title": "مسئله واقعی: چرا اتصال SSH خام با Paramiko روی تجهیزات شبکه شکننده است؟",
+      "html": "<p>در سرورهای لینوکس، <code>Paramiko</code> می‌تواند دستور <code>exec_command</code> را اجرا و خروجی را تمیز برگرداند. اما روترها و سوئیچ‌های شبکه (مانند Cisco IOS/IOS-XE/NX-OS) رفتار متفاوتی دارند: صفحه‌بندی <code>--More--</code>، تغییر Prompt از <code>&gt;</code> به <code>#</code> و <code>(config)#</code>، تأخیرهای متغیر و نیاز به نشست تعاملی <code>invoke_shell()</code>. استفاده از <code>time.sleep(2)</code> در Paramiko خام یکی از رایج‌ترین منابع باگ و خروجی‌های ناقص است؛ اگر روتر کندتر پاسخ دهد، دستور بعدی وسط خروجی قبلی تزریق می‌شود!</p>"
+    },
+    {
+      "id": "auto_03-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر ساختارهای داده، توابع، <code>with</code> و مدیریت خطا در پایتون (درس <code>auto_02</code>).</p><ul><li>مقایسه دقیق <strong>Paramiko</strong>، <strong>Netmiko</strong>، <strong>Scrapli</strong> و فریم‌ورک <strong>Nornir</strong>.</li><li>استفاده ایمن از <code>with ConnectHandler(**device) as conn:</code>، <code>send_command</code>، <code>send_config_set</code> و مرز وابسته به پلتفرم <code>save_config()</code>.</li><li>تبدیل متن CLI به داده ساخت‌یافته با <strong>TextFSM / ntc-templates</strong> و مدیریت صحیح Fallback رشته خام.</li><li>طراحی اجرای موازی ایمن با <strong>Nornir</strong>: ساختار Inventory (از جمله کلید <code>data.role</code> برای <code>nr.filter</code>)، مرز واقعی <code>dry_run</code> (وابسته به پشتیبانی پلاگین/وظیفه) و تنظیم منطقی <code>num_workers</code>.</li></ul>"
+    },
+    {
+      "id": "auto_03-section-3",
+      "title": "مقایسه مهندسی Paramiko، Netmiko، Scrapli و Nornir",
+      "html": "<table><thead><tr><th>ابزار</th><th>سطح انتزاع</th><th>نقطه قوت و کاربرد اصلی</th></tr></thead><tbody><tr><td><strong>Paramiko</strong></td><td>پروتکل SSH پایه</td><td>اتصال SSH/SFTP به سرورهای لینوکس؛ برای CLI تجهیزات شبکه نیازمند کدنویسی زیاد</td></tr><tr><td><strong>Netmiko</strong></td><td>کتابخانه SSH ویژه شبکه (روی Paramiko)</td><td>پشتیبانی از ده‌ها فروشنده (<code>device_type</code>)، حذف خودکار Paging، تشخیص Prompt و ادغام با TextFSM/Genie</td></tr><tr><td><strong>Scrapli</strong></td><td>کتابخانه سریع SSH/Telnet/NETCONF</td><td>بسیار سریع، پشتیبانی از <code>asyncio</code> و درایور بومی <code>system</code> (OpenSSH) یا Paramiko/SSH2</td></tr><tr><td><strong>Nornir</strong></td><td>فریم‌ورک اتوماسیون تمام-پایتون</td><td>مدیریت Inventory، اجرای موازی (Multi-threaded) و استفاده از پلاگین‌های Netmiko/Scrapli/NAPALM</td></tr></tbody></table>"
+    },
+    {
+      "id": "auto_03-section-4",
+      "title": "الگوی ایمن Netmiko: Context Manager و مدیریت خطا",
+      "html": "<p>در Netmiko، نشست SSH یک منبع محدود روی روتر است (معمولاً تعداد خطوط <code>line vty 0 4</code> یا <code>0 15</code> محدود است). اگر اسکریپت وسط کار دچار خطا شود و <code>disconnect()</code> صدا زده نشود، خطوط VTY اشغال می‌مانند و حتی ادمین هم نمی‌تواند وارد روتر شود! با نوشتن <code>with ConnectHandler(**device) as conn:</code> (Context Manager)، حتی هنگام بروز استثنا، Netmiko نشست SSH را به‌طور خودکار می‌بندد.</p><pre dir=\"ltr\"><code># Reference Netmiko pattern (NOT executed against a live router)\nfrom netmiko import ConnectHandler, NetmikoAuthenticationException, NetmikoTimeoutException\n\ntry:\n    with ConnectHandler(**device) as conn:\n        out = conn.send_command(\"show ip interface brief\", use_textfsm=True)\nexcept (NetmikoTimeoutException, NetmikoAuthenticationException) as exc:\n    print(f\"Connection failed: {exc}\")</code></pre>"
+    },
+    {
+      "id": "auto_03-section-5",
+      "title": "تغییر پیکربندی با send_config_set و مرز save_config()",
+      "html": "<p>در Netmiko برای دستورات خواندنی از <code>send_command()</code> و برای اعمال پیکربندی از <code>send_config_set(commands)</code> استفاده می‌شود که روی اغلب پلتفرم‌های CLI به‌طور خودکار وارد حالت پیکربندی شده، دستورات را می‌فرستد و خارج می‌شود. اما سه نکته ایمنی و پلتفرمی حیاتی وجود دارد:</p><ul><li><strong>وابستگی <code>save_config()</code> به سیستم‌عامل و درایور:</strong> روی پلتفرم‌های دارای مدل <code>running-config</code> / <code>startup-config</code> (مانند Cisco IOS/IOS-XE/NX-OS و Arista EOS)، <code>send_config_set</code> تغییرات را فقط در حافظه جاری اعمال می‌کند و ماندگاری پس از ریبوت نیازمند فراخوانی <code>conn.save_config()</code> است. در مقابل، سیستم‌عامل‌های مبتنی بر <strong>Commit</strong> (مانند Cisco IOS-XR یا Juniper JunOS) از سازوکار <code>commit()</code> / <code>commit confirmed</code> استفاده می‌کنند و برخی درایورهای Netmiko اصلاً <code>save_config()</code> را پیاده‌سازی نکرده‌اند (یا <code>NotImplementedError</code> می‌دهند).</li><li><strong>راستی‌آزمایی پیش از ذخیره:</strong> پیش از ذخیره دائمی، ابتدا وضعیت سرویس و مسیریابی را با دستور <code>show</code> (Verify) بررسی کنید و برای تغییرات پرخطر از مکانیسم برگشت خودکار (مانند <code>configure replace ... revert timer</code> در IOS-XE یا <code>commit confirmed</code> در IOS-XR/JunOS) بهره ببرید.</li><li><strong>نبود <code>dry_run</code> بومی در Netmiko:</strong> متد <code>send_config_set()</code> در Netmiko حالت <code>dry_run</code> داخلی ندارد؛ بنابراین پیش‌نمایش و جلوگیری از اعمال ناخواسته باید در لایه بالاتر (منطق کد یا پلاگین دارای پشتیبانی مانند NAPALM) پیاده‌سازی شود.</li></ul>"
+    },
+    {
+      "id": "auto_03-section-6",
+      "title": "نمودار معماری: از Nornir Inventory تا Netmiko/TextFSM و استقرار مرحله‌ای",
+      "html": "<p>در نمودار زیر ارتباط لایه Inventory و موازی‌سازی Nornir با لایه اتصال/پارس Netmiko/TextFSM و استراتژی استقرار پایلوت نمایش داده شده است.</p><svg viewBox=\"0 0 760 215\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Paramiko, Netmiko, TextFSM and Nornir Architecture\"><rect x=\"14\" y=\"18\" width=\"215\" height=\"178\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"121\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Nornir Framework</text><text x=\"121\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Inventory: hosts / groups / defaults</text><rect x=\"30\" y=\"84\" width=\"183\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#3b82f6\"/><text x=\"121\" y=\"102\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">nr.filter(role=\"pilot\")</text><text x=\"121\" y=\"117\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1d4ed8\">dry_run (if plugin/task supports)</text><rect x=\"30\" y=\"136\" width=\"183\" height=\"44\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#2563eb\"/><text x=\"121\" y=\"156\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1e40af\">Bounded Thread Pool</text><text x=\"121\" y=\"171\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e3a8a\">num_workers tuned safely</text><rect x=\"262\" y=\"18\" width=\"225\" height=\"178\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"374\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Connection &amp; Parsing Layer</text><text x=\"374\" y=\"72\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">Netmiko / Scrapli (over SSH)</text><text x=\"374\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">with ConnectHandler(...) as c:</text><text x=\"374\" y=\"122\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">TextFSM / ntc-templates</text><text x=\"374\" y=\"148\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9a3412\">Check isinstance(res, list)!</text><text x=\"374\" y=\"170\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Fallback = raw str if no template</text><rect x=\"520\" y=\"34\" width=\"226\" height=\"146\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"633\" y=\"60\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Network Fleet (Lab / Prod)</text><text x=\"633\" y=\"90\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">Pilot Device (Step 1)</text><text x=\"633\" y=\"116\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">Canary Group (Step 2)</text><text x=\"633\" y=\"142\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">Full Rollout + save_config()</text><line x1=\"229\" y1=\"107\" x2=\"262\" y2=\"107\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"487\" y1=\"107\" x2=\"520\" y2=\"107\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
+    },
+    {
+      "id": "auto_03-section-7",
+      "title": "تبدیل خروجی CLI به داده ساخت‌یافته با TextFSM و ntc-templates",
+      "html": "<p>پارس دستی با <code>split()</code> برای دستورات پیچیده‌ای مثل <code>show bgp summary</code> یا <code>show interfaces</code> بسیار شکننده است. کتابخانه <strong>TextFSM</strong> (ساخته گوگل) همراه با مجموعه الگوهای جامع <strong>ntc-templates</strong> متن خروجی CLI را به یک <strong>لیست از دیکشنری‌ها (<code>list[dict]</code>)</strong> تبدیل می‌کند.</p><p><strong>تله مهم عملیاتی (Fallback به رشته خام):</strong> در Netmiko اگر <code>use_textfsm=True</code> بگذارید اما برای آن <code>device_type</code> و دستور خاص الگویی در <code>ntc-templates</code> وجود نداشته باشد (یا متغیر محیطی <code>NET_TEXTFSM</code> تنظیم نباشد)، Netmiko خطا نمی‌دهد بلکه به‌عنوان Fallback <strong>همان رشته خام (<code>str</code>)</strong> را برمی‌گرداند! اگر کد شما بلافاصله روی خروجی حلقه <code>for row in output: row[\"intf\"]</code> بزند، روی کاراکترهای رشته تکرار کرده و با <code>TypeError: string indices must be integers</code> کرش می‌کند. پس همیشه شرط <code>if not isinstance(output, list):</code> را بررسی کنید.</p>"
+    },
+    {
+      "id": "auto_03-section-8",
+      "title": "معماری Inventory در Nornir: hosts، groups و defaults",
+      "html": "<p><strong>Nornir</strong> برخلاف Ansible نیازی به زبان میانی YAML DSL برای منطق برنامه ندارد و کل منطق در پایتون خالص نوشته می‌شود (با قابلیت کامل دیباگ IDE و تایپ‌چکینگ). Inventory استاندارد <code>SimpleInventory</code> در Nornir از سه فایل تشکیل می‌شود:</p><ul><li><code>hosts.yaml</code>: مشخصات یکتای هر دستگاه (<code>hostname</code>، <code>platform</code>، فهرست عضویت در <code>groups</code> و دیکشنری <code>data</code> برای کلیدهای سفارشی مانند <code>role: pilot</code>).</li><li><code>groups.yaml</code>: تنظیمات و کلیدهای <code>data</code> مشترک هر گروه (مثلاً <code>campus_iosxe</code> یا <code>dc_nxos</code>).</li><li><code>defaults.yaml</code>: مقادیر پیش‌فرض سراسری (مثل پورت SSH یا پارامترهای اتصال پلاگین مانند تایم‌اوت‌ها در <code>connection_options</code>).</li></ul><p><strong>تطابق فیلتر با ساختار Inventory:</strong> دستور <code>nr.filter(role=\"pilot\")</code> تنها زمانی کار می‌کند که کلید <code>role: pilot</code> واقعاً در بخش <code>data</code> میزبان (در <code>hosts.yaml</code> یا ارث‌بری‌شده از <code>groups.yaml</code>/<code>defaults.yaml</code>) تعریف شده باشد. اگر <code>pilot</code> صرفاً نام یک گروه در <code>groups: [pilot]</code> باشد، باید از <code>from nornir.core.filter import F</code> و <code>nr.filter(F(groups__contains=\"pilot\"))</code> استفاده کنید.</p><p><strong>اصل امنیتی:</strong> هرگز رمز عبور را در <code>hosts.yaml</code> یا <code>defaults.yaml</code> ذخیره و کامیت نکنید؛ آن را هنگام اجرا از متغیر محیطی یا Vault تزریق کنید (مثلاً <code>nr.inventory.defaults.password = os.environ[\"NET_PASS\"]</code>).</p>"
+    },
+    {
+      "id": "auto_03-section-9",
+      "title": "موازی‌سازی هوشمند: چرا num_workers=500 ایده بدی است؟",
+      "html": "<p>برای شهود مقیاس، اگر هر اتصال و دستور روی ۲۰۰ سوئیچ به‌طور فرضی ۵ ثانیه طول بکشد، اجرای کاملاً متوالی حدود ۱۶٫۷ دقیقه (۱٬۰۰۰ ثانیه) زمان می‌برد؛ در حالی که موازی‌سازی با ThreadPool در Nornir می‌تواند زمان کل را به‌طور محسوسی کاهش دهد. با این حال، زمان واقعی اجرا ثابت یا تضمینی نیست و به <code>num_workers</code>، سربار CPU دست‌دهی SSH، تأخیر شبکه (RTT)، سرعت پاسخ‌گویی هر تجهیز و نرخ مجاز سرور AAA بستگی دارد. بالا بردن بی‌رویه <code>num_workers</code> (مثلاً به ۵۰۰) چند مشکل عملیاتی واقعی می‌سازد:</p><ul><li>فشار ناگهانی روی سرور <strong>AAA (TACACS+/RADIUS)</strong> که ممکن است باعث Rate-Limit، تأخیر شدید یا رد احراز هویت شود.</li><li>مصرف بالای File Descriptor، حافظه و CPU سرور Jump Host (به‌ویژه هنگام دست‌دهی رمزنگاری SSH هم‌زمان).</li><li><strong>گسترش سریع شعاع خطای انسانی (Blast Radius):</strong> هرچه هم‌زمانی بالاتر باشد، یک دستور اشتباه در مدت بسیار کوتاه‌تری روی بخش بزرگ‌تری از شبکه اعمال می‌شود و فرصت توقف اضطراری را از بین می‌برد.</li></ul><p>انتخاب <code>num_workers</code> متعادل (متناسب با ظرفیت AAA، Jump Host و پنجره تغییر؛ اغلب در بازه حدود ۱۰ تا ۳۰ پس از آزمون بار) همراه با استقرار مرحله‌ای (Pilot -> Canary -> Production) استاندارد ایمنی است.</p>"
+    },
+    {
+      "id": "auto_03-section-10",
+      "title": "قاعده پایلوت (nr.filter) و Dry-Run پیش از تغییر سراسری",
+      "html": "<p>پیش از اجرای هر تغییر پیکربندی با Nornir، سه لایه حفاظتی را رعایت کنید و به مرز فنی هرکدام دقت داشته باشید:</p><ol><li><strong>فیلتر کردن هدف به تجهیز آزمایشی/پایلوت مطابق ساختار Inventory:</strong> اگر کلید <code>data.role: pilot</code> تعریف شده است از <code>pilot = nr.filter(role=\"pilot\")</code> (و اگر از عضویت گروهی استفاده می‌کنید از <code>F(groups__contains=\"pilot\")</code>) استفاده کنید و تعداد میزبان‌های انتخاب‌شده (<code>len(pilot.inventory.hosts)</code>) را پیش از اجرا چاپ و تأیید نمایید.</li><li><strong>مرز واقعی <code>dry_run=True</code> در Nornir:</strong> Nornir به‌تنهایی با پاس دادن <code>dry_run=True</code> (در <code>InitNornir</code> یا <code>nr.run</code>) فقط پرچم <code>task.is_dry_run()</code> را تنظیم می‌کند؛ <strong>ایمنی واقعی و تولید Diff کاملاً به پشتیبانی پلاگین یا وظیفه وابسته است.</strong> برای نمونه، پلاگین <code>nornir_napalm</code> (وظیفه <code>napalm_configure</code>) به‌طور بومی از <code>dry_run=True</code> و تولید <code>.diff</code> روی پلتفرم‌های پشتیبانی‌شده بهره می‌برد، اما پلاگین <code>nornir_netmiko</code> (وظیفه <code>netmiko_send_config</code>) <strong>پشتیبانی بومی از <code>dry_run</code> ندارد</strong>؛ بنابراین در وظایف سفارشی مبتنی بر Netmiko باید صراحتاً شرط <code>if task.is_dry_run():</code> را بنویسید تا پیش از فراخوانی ارسال پیکربندی متوقف شده و صرفاً فهرست دستورات پیشنهادی را گزارش کند.</li><li><strong>بررسی ساختار <code>AggregatedResult</code> و <code>failed_hosts</code>:</strong> تنها در صورت موفقیت کامل پایلوت و راستی‌آزمایی سلامت سرویس (مثلاً باقی ماندن همسایگی OSPF/BGP)، دامنه را به گروه بعدی گسترش دهید.</li></ol>"
+    },
+    {
+      "id": "auto_03-section-11",
+      "title": "کژفهمی‌های رایج در Netmiko و Nornir",
+      "html": "<ul><li><strong>کژفهمی ۱: «اگر use_textfsm=True بگذاریم، خروجی همیشه لیست دیکشنری است.»</strong> واقعیت: نبود الگو برای آن دستور/پلتفرم باعث بازگشت رشته خام <code>str</code> می‌شود و باید با <code>isinstance</code> کنترل شود.</li><li><strong>کژفهمی ۲: «گذاشتن dry_run=True در Nornir به‌طور خودکار جلوی هر تغییری را روی همه پلاگین‌ها می‌گیرد.»</strong> واقعیت: Nornir فقط پرچم <code>task.is_dry_run()</code> را منتشر می‌کند. پلاگین‌هایی مثل <code>nornir_napalm</code> (<code>napalm_configure</code>) از <code>dry_run</code> و Diff پشتیبانی بومی دارند، اما <code>nornir_netmiko</code> (<code>netmiko_send_config</code>) پشتیبانی بومی ندارد و وظیفه سفارشی شما باید صراحتاً <code>task.is_dry_run()</code> را بررسی کند.</li><li><strong>کژفهمی ۳: «Nornir به خودی خود از طریق SSH به روتر وصل می‌شود.»</strong> واقعیت: Nornir یک فریم‌ورک هماهنگ‌سازی و Inventory است و برای اتصال به تجهیزات از پلاگین‌هایی مانند <code>nornir-netmiko</code>، <code>nornir-scrapli</code> یا <code>nornir-napalm</code> استفاده می‌کند.</li><li><strong>کژفهمی ۴: «برای دستگاه‌های قدیمی سیسکو باید امنیت SSH کل سیستم‌عامل را پایین بیاوریم.»</strong> واقعیت: الگوریتم‌های قدیمی تنها در صورت اجبار و به‌صورت ایزوله و فقط برای همان میزبان‌های مشخص (نه سراسری) فعال می‌شوند و راهکار اصلی ارتقای IOS/الگوریتم‌هاست.</li></ul>"
+    },
+    {
+      "id": "auto_03-section-12",
+      "title": "عیب‌یابی خطاهای رایج Netmiko و Nornir",
+      "html": "<p><strong>خطای ۱ — <code>ReadTimeout</code> در برابر تایم‌اوت‌های اتصال در Netmiko:</strong> تایم‌اوت در Netmiko یک پارامتر واحد نیست و به لایه بروز خطا بستگی دارد: <code>conn_timeout</code> برای برقراری اتصال TCP/SSH، <code>auth_timeout</code> و <code>banner_timeout</code> برای مراحل احراز هویت و بنر SSH (ارسالی به Paramiko)، و <code>read_timeout</code> (در Netmiko 4.x به‌جای پارامترهای منسوخ‌شده <code>delay_factor</code>/<code>max_loops</code>) برای انتظار پاسخ یک دستور خاص (یا <code>read_timeout_override</code> در سطح نشست). برای دستورات سنگین (مثل <code>show tech-support</code> یا جدول <code>show bgp</code> بزرگ)، <code>read_timeout</code> را فقط برای همان دستور افزایش دهید (از قرار دادن <code>read_timeout=0</code> که تایمر مطلق را غیرفعال می‌کند در اسکریپت‌های خودکار بپرهیزید) و مراقب بار CPU کنترل‌پلین روی صدها روتر باشید.</p><p><strong>خطای ۲ — <code>AuthenticationException</code> یا <code>failed_hosts</code> در Nornir:</strong> بررسی کنید رمز عبور از متغیر محیطی درست تزریق شده، <code>secret</code> (رمز enable) در صورت نیاز تنظیم شده، تایم‌اوت‌های <code>auth_timeout</code>/<code>banner_timeout</code> در لینک‌های کند متناسب بوده و سرور TACACS+ نرخ درخواست‌ها را محدود نکرده است.</p>"
+    },
+    {
+      "id": "auto_03-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> در اسکریپت Netmiko دستور <code>res = conn.send_command(\"show custom telemetry\", use_textfsm=True)</code> اجرا می‌شود و هیچ الگویی برای آن وجود ندارد. اگر بدون بررسی بنویسیم <code>print(res[0][\"value\"])</code> چه خطایی رخ می‌دهد؟ <strong>پاسخ:</strong> چون <code>res</code> از نوع <code>str</code> برمی‌گردد، <code>res[0]</code> اولین کاراکتر رشته است و اندیس‌گذاری رشته‌ای <code>[\"value\"]</code> خطای <code>TypeError: string indices must be integers</code> تولید می‌کند.</p><p><strong>تمرین ۲:</strong> از ۳ دستگاه موجود در Inventory (یک <code>pilot</code> و دو <code>production</code>)، وقتی <code>role_filter=\"pilot\"</code> و <code>dry_run=True</code> اجرا می‌شود، چند دستگاه تغییر واقعی دریافت می‌کنند؟ <strong>پاسخ:</strong> صفر دستگاه — مشروط به اینکه کلید <code>data.role</code> در Inventory با <code>pilot</code> هم‌خوان باشد و وظیفه اجراشده صراحتاً <code>task.is_dry_run()</code> را رعایت کند (یا از پلاگین دارای پشتیبانی مانند <code>nornir_napalm</code> استفاده نماید)؛ در این صورت تنها ۱ دستگاه پایلوت انتخاب شده و بدون فراخوانی <code>send_config_set</code> صرفاً فهرست دستورات پیشنهادی گزارش می‌گردد.</p>"
+    },
+    {
+      "id": "auto_03-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://ktbyers.github.io/netmiko/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Netmiko</a> (<a href=\"https://ktbyers.github.io/netmiko/docs/netmiko/base_connection.html\" target=\"_blank\" rel=\"noopener\">مرجع API و تایم‌اوت‌ها</a>)، <a href=\"https://nornir.readthedocs.io/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Nornir</a>، <a href=\"https://github.com/networktocode/ntc-templates\" target=\"_blank\" rel=\"noopener\">مخزن ntc-templates</a> و <a href=\"https://carlmontanari.github.io/scrapli/\" target=\"_blank\" rel=\"noopener\">مستندات Scrapli</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> کتابخانه‌های Netmiko، Paramiko، TextFSM و Nornir و هیچ تجهیز SSH/IOS-XE واقعی در این محیط اجرا نشده‌اند. آزمایشگاه ارائه‌شده یک <strong>Python Mock محلی</strong> است که رفتار Context Manager، Fallback نوع <code>str</code> در TextFSM و الگوی فیلتر پایلوت/Dry-Run موازی را مدل‌سازی و آزمون می‌کند.</p>"
+    }
   ],
-  "limitations": [
-   "کتابخانه‌های Netmiko، Paramiko، TextFSM و Nornir و هیچ تجهیز واقعی SSH در این محیط اجرا نشده‌اند.",
-   "آزمایشگاه یک Python Mock محلی برای آزمون الگوهای ایمنی (Context Manager، TextFSM Fallback، Pilot/Dry-Run) است."
+  "glossary": [
+    {
+      "term": "Paramiko",
+      "fa": "کتابخانه Paramiko",
+      "simple": "پیاده‌سازی پایتونی پروتکل SSHv2/SFTP؛ پایه فنی Netmiko."
+    },
+    {
+      "term": "Netmiko",
+      "fa": "کتابخانه Netmiko",
+      "simple": "کتابخانه تخصصی SSH برای تجهیزات شبکه با مدیریت خودکار Prompt، Paging و درایور فروشندگان."
+    },
+    {
+      "term": "ConnectHandler",
+      "fa": "کلاس اتصال Netmiko",
+      "simple": "نقطه ورود ساخت نشست SSH در Netmiko؛ بهترین روش استفاده همراه با بلوک with است."
+    },
+    {
+      "term": "Scrapli",
+      "fa": "کتابخانه Scrapli",
+      "simple": "کتابخانه سریع و مدرن اتصال به تجهیزات شبکه با پشتیبانی asyncio و درایور OpenSSH."
+    },
+    {
+      "term": "TextFSM",
+      "fa": "موتور TextFSM",
+      "simple": "موتور ماشین حالت متنی برای تبدیل خروجی غیرساخت‌یافته CLI به لیست دیکشنری."
+    },
+    {
+      "term": "ntc-templates",
+      "fa": "الگوهای ntc-templates",
+      "simple": "مجموعه متن‌باز الگوهای TextFSM برای دستورات show ده‌ها سیستم‌عامل شبکه."
+    },
+    {
+      "term": "Nornir",
+      "fa": "فریم‌ورک Nornir",
+      "simple": "فریم‌ورک تمام-پایتون برای مدیریت Inventory و اجرای موازی وظایف اتوماسیون."
+    },
+    {
+      "term": "Inventory",
+      "fa": "فهرست دارایی‌ها",
+      "simple": "فایل‌های hosts.yaml، groups.yaml و defaults.yaml برای توصیف تجهیزات هدف."
+    },
+    {
+      "term": "nr.filter",
+      "fa": "فیلتر Inventory",
+      "simple": "محدود کردن دامنه اجرای Nornir بر اساس کلیدهای تعریف‌شده در data (مثل data.role='pilot') یا عضویت گروهی با F(groups__contains=...)."
+    },
+    {
+      "term": "dry_run",
+      "fa": "اجرای آزمایشی بدون اعمال",
+      "simple": "پرچم اجرای آزمایشی در Nornir (task.is_dry_run()) که ایمنی واقعی و Diff آن به پشتیبانی صریح پلاگین/وظیفه (مثل nornir_napalm یا شرط دستی روی nornir_netmiko) وابسته است."
+    },
+    {
+      "term": "num_workers",
+      "fa": "تعداد نخ‌های هم‌زمان",
+      "simple": "میزان موازی‌سازی در Nornir که باید با ظرفیت AAA و ایمنی Blast Radius تنظیم شود."
+    },
+    {
+      "term": "send_config_set",
+      "fa": "ارسال دسته پیکربندی",
+      "simple": "متد Netmiko برای ورود به حالت config و ارسال فهرست دستورات پیکربندی."
+    },
+    {
+      "term": "save_config",
+      "fa": "ذخیره پیکربندی",
+      "simple": "متد وابسته به پلتفرم در Netmiko برای ذخیره running-config در startup-config روی سیستم‌هایی مثل IOS/IOS-XE/NX-OS (برخلاف سیستم‌های Commit-based مثل IOS-XR/JunOS)."
+    },
+    {
+      "term": "AggregatedResult",
+      "fa": "نتیجه تجمیعی Nornir",
+      "simple": "ساختار بازگشتی Nornir شامل نتیجه تک‌تک میزبان‌ها و لیست failed_hosts."
+    },
+    {
+      "term": "VTY Exhaustion",
+      "fa": "اشباع خطوط VTY",
+      "simple": "بسته شدن امکان ورود SSH به روتر در اثر نشست‌های رهاشده و بسته نشده."
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش با توضیح کامل.",
-   "ارائه Python Mock قابل اجرا و تست‌شده برای نمایش واقعی Fallback نوع str و بسته شدن نشست."
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه Python Mock محلی Netmiko/TextFSM/Nornir + سناریوی مرجع (SSH و تجهیز واقعی اجرا نشده)",
+      "executionStatus": "Python Mock محلی اجرا و تست شده؛ هیچ نشست SSH، Netmiko، Nornir یا روتر واقعی اجرا نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>Python Mock محلی</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر، سوئیچ، فایروال یا کنترلر واقعی سیسکو اجرا نشده است.</p><p>در این آزمایشگاه با یک Python Mock محلی، بسته شدن تضمین‌شده نشست در بلوک <code>with</code>، تفاوت نوع خروجی TextFSM هنگام وجود الگو (<code>list</code>) در برابر نبود الگو (<code>str</code>)، مرز وابسته به پلتفرم <code>save_config()</code> (IOS-XE در برابر IOS-XR) و اجرای موازی محدودشده به میزبان‌های دارای <code>data.role=\"pilot\"</code> همراه با نگهبان صریح <code>task.is_dry_run()</code> را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_03_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_03_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for auto_03 (Netmiko Context Manager, TextFSM Fallback, save_config &amp; Nornir Pilot).\n\nNo real SSH connection, Netmiko session, Nornir inventory target, or network OS device is run.\nModels four real-world safety boundaries:\n1. Context manager (__enter__/__exit__) closes sessions even on exceptions.\n2. TextFSM missing-template fallback returns raw str instead of list[dict].\n3. Netmiko send_config_set has NO native dry_run; Nornir dry_run safety depends on an explicit\n   task.is_dry_run() guard or a dry-run-capable plugin (e.g., nornir_napalm napalm_configure).\n4. save_config() is platform-dependent (IOS/IOS-XE/NX-OS vs commit-based IOS-XR/JunOS).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom concurrent.futures import ThreadPoolExecutor\n\nSAVE_CONFIG_PLATFORMS = frozenset({&quot;cisco_ios&quot;, &quot;cisco_xe&quot;, &quot;cisco_nxos&quot;, &quot;arista_eos&quot;})\nCOMMIT_BASED_PLATFORMS = frozenset({&quot;cisco_xr&quot;, &quot;juniper_junos&quot;})\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _host_role(dev: dict[str, object]) -&gt; str | None:\n    &quot;&quot;&quot;Resolve Nornir SimpleInventory data.role (or legacy top-level role).&quot;&quot;&quot;\n    if not isinstance(dev, dict):\n        raise ValueError(f&quot;inventory entry must be a dict, got {type(dev).__name__}&quot;)\n    data = dev.get(&quot;data&quot;)\n    if isinstance(data, dict) and &quot;role&quot; in data:\n        role = data[&quot;role&quot;]\n        return role if isinstance(role, str) else None\n    role = dev.get(&quot;role&quot;)\n    return role if isinstance(role, str) else None\n\n\nclass MockNetmikoConnection:\n    &quot;&quot;&quot;Simulated ConnectHandler demonstrating disconnect via context manager and platform save_config.&quot;&quot;&quot;\n\n    def __init__(self, host: str, platform: str = &quot;cisco_ios&quot;) -&gt; None:\n        if not isinstance(host, str) or not host.strip():\n            raise ValueError(f&quot;host must be a non-empty str, got {host!r}&quot;)\n        if not isinstance(platform, str) or platform not in (SAVE_CONFIG_PLATFORMS | COMMIT_BASED_PLATFORMS):\n            raise ValueError(f&quot;unsupported mock platform {platform!r}&quot;)\n        self.host = host\n        self.platform = platform\n        self.connected = False\n        self.closed = False\n        self.sent_configs: list[str] = []\n        self.dirty_running_config = False\n        self.saved_to_startup = False\n\n    def __enter__(self) -&gt; &quot;MockNetmikoConnection&quot;:\n        self.connected = True\n        return self\n\n    def __exit__(self, exc_type, exc, tb) -&gt; bool:\n        self.connected = False\n        self.closed = True\n        return False  # Do not swallow exceptions\n\n    def send_command(self, cmd: str, use_textfsm: bool = False) -&gt; object:\n        if not isinstance(cmd, str) or not cmd.strip():\n            raise ValueError(&quot;cmd must be a non-empty str&quot;)\n        want_textfsm = _require_bool(use_textfsm, &quot;use_textfsm&quot;)\n        raw = f&quot;{self.host}: GigabitEthernet0/0 is up, line protocol is up&quot;\n        if want_textfsm and cmd == &quot;show ip interface brief&quot;:\n            return [{&quot;intf&quot;: &quot;GigabitEthernet0/0&quot;, &quot;status&quot;: &quot;up&quot;, &quot;proto&quot;: &quot;up&quot;}]\n        # Mirror real Netmiko fallback: missing template returns raw str!\n        return raw\n\n    def send_config_set(self, commands: list[str]) -&gt; dict[str, object]:\n        &quot;&quot;&quot;Mirror real Netmiko send_config_set: applies directly to running-config (no native dry_run).&quot;&quot;&quot;\n        if not isinstance(commands, list) or not all(isinstance(c, str) and c.strip() for c in commands):\n            raise ValueError(&quot;commands must be a list of non-empty strings&quot;)\n        self.sent_configs.extend(commands)\n        if commands:\n            self.dirty_running_config = True\n            self.saved_to_startup = False\n        return {&quot;host&quot;: self.host, &quot;applied&quot;: True, &quot;commands_count&quot;: len(commands)}\n\n    def save_config(self) -&gt; dict[str, object]:\n        &quot;&quot;&quot;Platform-dependent save_config(): works on running/startup OSes, not commit-based OSes.&quot;&quot;&quot;\n        if self.platform in COMMIT_BASED_PLATFORMS:\n            raise NotImplementedError(\n                f&quot;save_config() is not used on commit-based platform {self.platform!r}; use commit() instead.&quot;\n            )\n        self.dirty_running_config = False\n        self.saved_to_startup = True\n        return {&quot;host&quot;: self.host, &quot;platform&quot;: self.platform, &quot;saved&quot;: True}\n\n\ndef run_nornir_style_pilot(\n    inventory: list[dict[str, object]],\n    role_filter: str,\n    commands: list[str],\n    dry_run: bool = True,\n    max_workers: int = 4,\n    task_honors_dry_run: bool = True,\n) -&gt; list[dict[str, object]]:\n    &quot;&quot;&quot;Filter inventory by SimpleInventory data.role and enforce explicit task-level dry_run gating.&quot;&quot;&quot;\n    is_dry_run = _require_bool(dry_run, &quot;dry_run&quot;)\n    honors_dry_run = _require_bool(task_honors_dry_run, &quot;task_honors_dry_run&quot;)\n    if isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers &lt;= 0:\n        raise ValueError(f&quot;max_workers must be a positive int (not bool), got {max_workers!r}&quot;)\n    if not isinstance(role_filter, str) or not role_filter.strip():\n        raise ValueError(&quot;role_filter must be a non-empty str&quot;)\n    if not isinstance(commands, list) or not all(isinstance(c, str) and c.strip() for c in commands):\n        raise ValueError(&quot;commands must be a list of non-empty strings&quot;)\n\n    targets = [dev for dev in inventory if _host_role(dev) == role_filter]\n\n    def task(dev: dict[str, object]) -&gt; dict[str, object]:\n        host = dev.get(&quot;host&quot;)\n        platform = str(dev.get(&quot;platform&quot;, &quot;cisco_ios&quot;))\n        if is_dry_run and not honors_dry_run:\n            raise RuntimeError(\n                &quot;dry_run=True requested, but task/plugin does not implement task.is_dry_run() &quot;\n                &quot;(e.g., raw nornir_netmiko netmiko_send_config); wrap explicitly or use nornir_napalm.&quot;\n            )\n        with MockNetmikoConnection(str(host), platform=platform) as conn:\n            if is_dry_run:\n                res: dict[str, object] = {\n                    &quot;host&quot;: conn.host,\n                    &quot;applied&quot;: False,\n                    &quot;dry_run_honored&quot;: True,\n                    &quot;planned_commands&quot;: list(commands),\n                }\n            else:\n                res = {**conn.send_config_set(commands), &quot;dry_run_honored&quot;: False}\n        return {**res, &quot;session_closed&quot;: conn.closed}\n\n    with ThreadPoolExecutor(max_workers=min(max_workers, max(1, len(targets)))) as pool:\n        return list(pool.map(task, targets))\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real SSH, Netmiko, Nornir, or IOS-XE router is contacted.&quot;)\n    with MockNetmikoConnection(&quot;192.0.2.11&quot;, platform=&quot;cisco_ios&quot;) as conn:\n        parsed = conn.send_command(&quot;show ip interface brief&quot;, use_textfsm=True)\n        fallback = conn.send_command(&quot;show custom vendor telemetry&quot;, use_textfsm=True)\n    assert isinstance(parsed, list) and isinstance(fallback, str) and conn.closed is True\n    print(&quot;TextFSM matched type:&quot;, type(parsed).__name__, parsed)\n    print(&quot;TextFSM missing-template fallback type:&quot;, type(fallback).__name__, fallback)\n    print(&quot;Session closed safely after with-block:&quot;, conn.closed)\n\n    # Nornir SimpleInventory-style data.role schema\n    inv = [\n        {&quot;host&quot;: &quot;192.0.2.11&quot;, &quot;platform&quot;: &quot;cisco_ios&quot;, &quot;groups&quot;: [&quot;campus_iosxe&quot;], &quot;data&quot;: {&quot;role&quot;: &quot;pilot&quot;}},\n        {&quot;host&quot;: &quot;192.0.2.12&quot;, &quot;platform&quot;: &quot;cisco_ios&quot;, &quot;groups&quot;: [&quot;campus_iosxe&quot;], &quot;data&quot;: {&quot;role&quot;: &quot;production&quot;}},\n        {&quot;host&quot;: &quot;192.0.2.13&quot;, &quot;platform&quot;: &quot;cisco_xr&quot;, &quot;groups&quot;: [&quot;core_iosxr&quot;], &quot;data&quot;: {&quot;role&quot;: &quot;production&quot;}},\n    ]\n    pilot_res = run_nornir_style_pilot(inv, &quot;pilot&quot;, [&quot;ntp server 192.0.2.123&quot;], dry_run=True)\n    assert len(pilot_res) == 1 and pilot_res[0][&quot;applied&quot;] is False and pilot_res[0][&quot;session_closed&quot;] is True\n    print(&quot;Pilot dry-run (explicit task.is_dry_run() guard):&quot;, pilot_res)\n\n    # Demonstrate platform-dependent save_config() boundary (IOS-XE vs commit-based IOS-XR)\n    with MockNetmikoConnection(&quot;192.0.2.13&quot;, platform=&quot;cisco_xr&quot;) as xr_conn:\n        try:\n            xr_conn.save_config()\n            raise AssertionError(&quot;Expected NotImplementedError for cisco_xr save_config()&quot;)\n        except NotImplementedError as exc:\n            print(&quot;Platform save_config() guard:&quot;, exc)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> دستور دارای الگو <code>list</code> و دستور فاقد الگو <code>str</code> برمی‌گرداند؛ <code>conn.closed</code> برابر <code>True</code> می‌شود؛ در اجرای Nornir-style فقط میزبان <code>192.0.2.11</code> (دارای <code>data.role=\"pilot\"</code>) با <code>applied=False</code> و <code>dry_run_honored=True</code> پردازش می‌شود؛ و فراخوانی <code>save_config()</code> روی پلتفرم Commit-based <code>cisco_xr</code> استثنای <code>NotImplementedError</code> می‌دهد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع Nornir + Netmiko در محیط واقعی/CML (اجرا نشده):</strong></p><pre dir=\"ltr\"><code># Reference Nornir snippet (NOT executed — requires nornir + nornir-netmiko + lab routers)\n# Assumes hosts.yaml/groups.yaml defines data: { role: pilot }\nimport os\nfrom nornir import InitNornir\nfrom nornir.core.task import Result, Task\nfrom nornir_netmiko.tasks import netmiko_send_config\n\ndef safe_netmiko_config(task: Task, commands: list[str]) -&gt; Result:\n    # nornir_netmiko does NOT natively support dry_run; guard explicitly!\n    if task.is_dry_run():\n        return Result(host=task.host, result=f&#x27;DRY-RUN planned: {commands}&#x27;, changed=False)\n    return task.run(task=netmiko_send_config, config_commands=commands)\n\nnr = InitNornir(config_file=&quot;config.yaml&quot;, dry_run=True)\nnr.inventory.defaults.password = os.environ[&quot;NET_PASS&quot;]\npilot = nr.filter(role=&quot;pilot&quot;)  # Matches hosts with data.role == &#x27;pilot&#x27;\nresult = pilot.run(task=safe_netmiko_config, commands=[&quot;ntp server 192.0.2.123&quot;])</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس Python پیشرفته (Netmiko، Paramiko، Nornir)",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در Netmiko هنگام استفاده از send_command(..., use_textfsm=True)، اگر برای آن دستور الگویی در ntc-templates نباشد چه برمی‌گردد؟",
+      "options": [
+        "به عنوان Fallback همان رشته متنی خام (str) برمی‌گردد و کد باید نوع آن را با isinstance بررسی کند",
+        "روتر به‌صورت خودکار ریبوت می‌شود",
+        "فایل CSV روی دیسک ساخته می‌شود",
+        "همیشه دیکشنری خالی با خطای کرنل برمی‌گردد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Netmiko در نبود الگوی TextFSM رشته خام برمی‌گرداند؛ بررسی <code>isinstance(out, list)</code> جلوی <code>TypeError</code> را می‌گیرد.</p>"
+    },
+    {
+      "title": "چرا استفاده از with ConnectHandler(**device) as conn در Netmiko بر اتصال بدون with ترجیح دارد؟",
+      "options": [
+        "پهنای باند لینک روتر را دو برابر می‌کند",
+        "موجب می‌شود حتی در صورت بروز خطا وسط اجرا، نشست SSH بسته شود و خطوط VTY روتر اشغال نمانند",
+        "دستور show را به RESTCONF تبدیل می‌کند",
+        "رمز enable را حذف می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بستن خودکار نشست در <code>__exit__</code> از اشباع خطوط VTY تجهیزات شبکه جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "در فریم‌ورک Nornir پیش از اعمال یک تغییر پیکربندی موازی روی صدها سوئیچ، مهم‌ترین اقدام ایمنی چیست؟",
+      "options": [
+        "تنظیم num_workers روی ۵۰۰ تا تغییر فوری روی همه اجرا شود",
+        "حذف کامل try/except و لاگ‌ها",
+        "فیلتر کردن دقیق به پایلوت مطابق ساختار Inventory (مثل data.role='pilot')، اجرای dry_run از طریق پلاگین/وظیفه پشتیبانی‌کننده (مثل nornir_napalm یا شرط صریح task.is_dry_run()) و بررسی Diff/نتیجه پیش از گسترش دامنه",
+        "نوشتن رمز عبور همه سوئیچ‌ها در hosts.yaml و انتشار در Git"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>فیلتر پایلوت هم‌خوان با Inventory + اجرای آزمایشی با پلاگین/وظیفه‌ای که واقعاً <code>task.is_dry_run()</code> را پیاده کرده (چون <code>nornir_netmiko</code> به‌تنهایی <code>dry_run</code> بومی ندارد) + استقرار مرحله‌ای، شعاع خطای احتمالی را مهار می‌کند.</p>"
+    },
+    {
+      "title": "چرا استفاده از Paramiko خام با time.sleep برای CLI تجهیزات شبکه شکننده است؟",
+      "options": [
+        "چون Paramiko فقط با ویندوز کار می‌کند",
+        "چون Paramiko رمزنگاری ندارد",
+        "چون Paramiko از IPv4 پشتیبانی نمی‌کند",
+        "چون تجهیزات شبکه دارای Paging (--More--)، تغییر Prompt و تأخیر متغیرند و زمان خواب ثابت باعث خواندن ناقص یا تزریق بی‌موقع دستور می‌شود"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Netmiko و Scrapli تشخیص هوشمند Prompt و حذف Paging را مدیریت می‌کنند و نیاز به <code>sleep</code> شکننده را از بین می‌برند.</p>"
+    },
+    {
+      "title": "تفاوت نقش Nornir با کتابخانه‌هایی مانند Netmiko یا Scrapli چیست؟",
+      "options": [
+        "Nornir فریم‌ورک مدیریت Inventory و اجرای موازی است و اتصال به دستگاه را از طریق پلاگین‌هایی مثل nornir-netmiko یا nornir-scrapli انجام می‌دهد",
+        "Nornir جایگزین پروتکل SSH است",
+        "Netmiko فقط برای داکر است",
+        "هیچ ارتباطی بین Nornir و Netmiko وجود ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Nornir هماهنگ‌سازی، Inventory و Multi-threading را بر عهده دارد و اتصال واقعی به درایورهای پلاگین واگذار می‌شود.</p>"
+    },
+    {
+      "title": "پس از اجرای موفق conn.send_config_set(...) روی یک روتر Cisco IOS-XE، وضعیت ذخیره تغییرات چیست؟",
+      "options": [
+        "خودکار در startup-config ذخیره شده‌اند",
+        "تغییرات فقط در running-config اعمال شده‌اند و برای ماندگاری پس از ریبوت باید پس از تأیید، conn.save_config() اجرا شود",
+        "تغییرات روی فایل محلی لینوکس ذخیره شده‌اند",
+        "روتر بلافاصله ریبوت می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در پلتفرم‌های دارای مدل running/startup مانند Cisco IOS-XE ابتدا تغییر را Verify کرده و سپس با <code>save_config()</code> ذخیره کنید؛ اما توجه داشته باشید <code>save_config()</code> وابسته به پلتفرم/درایور است و در سیستم‌عامل‌های مبتنی بر Commit (مانند IOS-XR یا JunOS) از <code>commit()</code> استفاده می‌شود.</p>"
+    },
+    {
+      "title": "کدام ریسک در اثر تنظیم بیش‌ازحد بالای num_workers (مثلاً ۵۰۰) در Nornir رخ می‌دهد؟",
+      "options": [
+        "کاهش امنیت رمزنگاری AES",
+        "تبدیل YAML به XML",
+        "فشار شدید هم‌زمان روی سرور AAA (TACACS+/RADIUS)، مصرف منابع و بزرگ شدن ناگهانی Blast Radius در صورت خطا",
+        "خاموش شدن TextFSM"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>سرعت واقعی موازی‌سازی به ظرفیت AAA، سربار SSH، RTT و CPU وابسته است و بالا بردن کنترل‌نشده <code>num_workers</code> هم سرورهای احراز هویت و Jump Host را تحت فشار می‌گذارد و هم در صورت بروز خطا، شعاع اثر (Blast Radius) را به‌سرعت گسترش می‌دهد.</p>"
+    },
+    {
+      "title": "بهترین روش مدیریت رمز عبور تجهیزات در پروژه Nornir چیست؟",
+      "options": [
+        "نوشتن متن ساده رمز در defaults.yaml و push به Git",
+        "نوشتن رمز در نام گروه groups.yaml",
+        "حذف احراز هویت از همه روترها",
+        "تزریق رمز هنگام اجرا از متغیر محیطی (os.environ) یا سیستم مدیریت اسرار (Vault) بدون ذخیره در Git"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>فایل‌های Inventory معمولاً در Git نگهداری می‌شوند و نباید هرگز حاوی رمز عبور باشند.</p>"
+    },
+    {
+      "title": "مهم‌ترین مزیت Scrapli در مقایسه با Netmiko در برخی سناریوهای مقیاس بالا چیست؟",
+      "options": [
+        "پشتیبانی بومی از asyncio و امکان استفاده از درایور سریع OpenSSH/SSH2 با سرعت بالاتر",
+        "حذف کامل نیاز به احراز هویت",
+        "پشتیبانی فقط از یک فروشنده",
+        "تبدیل خودکار CLI به SNMPv1"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Scrapli معماری مدرن و سریع با پشتیبانی از هر دو حالت همگام و ناهمگام (<code>asyncio</code>) ارائه می‌دهد.</p>"
+    },
+    {
+      "title": "سه فایل استاندارد در SimpleInventory فریم‌ورک Nornir کدام‌اند؟",
+      "options": [
+        "routers.txt، pass.txt، log.txt",
+        "hosts.yaml، groups.yaml و defaults.yaml",
+        "main.tf، state.tf و vars.tf",
+        "index.html، style.css و app.js"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>سلسله‌مراتب ارث‌بری در Nornir SimpleInventory از <code>defaults</code> به <code>groups</code> و سپس <code>hosts</code> است.</p>"
+    },
+    {
+      "title": "هنگام اجرای دستور سنگینی مانند show bgp بزرگ در Netmiko و دریافت ReadTimeout، بهترین واکنش مهندسی چیست؟",
+      "options": [
+        "تکرار نامحدود دستور در حلقه while True بدون وقفه",
+        "خاموش کردن SSH روی روتر",
+        "افزایش کنترل‌شده read_timeout (نه read_timeout=0) فقط برای همان دستور، تفکیک آن از conn_timeout/auth_timeout و بررسی بار CPU کنترل‌پلین یا استفاده از API/Telemetry",
+        "تغییر device_type به linux"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>در Netmiko باید بین تایم‌اوت اتصال/احراز هویت (<code>conn_timeout</code>، <code>auth_timeout</code>، <code>banner_timeout</code>) و تایم‌اوت خواندن دستور (<code>read_timeout</code> در Netmiko 4.x) تفکیک قائل شد؛ تنظیم هدفمند <code>read_timeout</code> (و در مقیاس بالا مهاجرت به NETCONF/RESTCONF/Telemetry) راهکار صحیح است.</p>"
+    },
+    {
+      "title": "آزمایشگاه Python این درس چه چیزی را ثابت می‌کند؟",
+      "options": [
+        "اتصال واقعی SSH به روترهای Cisco IOS-XE",
+        "تست سرعت واقعی Scrapli روی ۵۰۰ سوئیچ",
+        "نصب ntc-templates روی روتر",
+        "مدل‌سازی محلی Python Mock از رفتار Context Manager، Fallback رشته در TextFSM و فیلتر پایلوت/Dry-Run بدون اجرای SSH واقعی"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>آزمایشگاه یک Python Mock محلی است و هیچ نشست SSH یا تجهیز واقعی اجرا نشده است.</p>"
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/auto_03-review-fa.md"
-  },
-  "integration": {
-   "recommendedPath": "fam-automation",
-   "recommendedCourse": "automation-foundations",
-   "blueprint": "/academy-assets/v5/blueprints/auto_03.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_03_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۸C-1: اعمال _require_bool روی use_textfsm و dry_run و max_workers مثبت در auto_03_lab.py + تعدیل «تضمین می‌کند» در Q2."
-  ]
- }
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "auto_03",
+    "sources": [
+      "https://ktbyers.github.io/netmiko/",
+      "https://ktbyers.github.io/netmiko/docs/netmiko/base_connection.html",
+      "https://nornir.readthedocs.io/",
+      "https://github.com/networktocode/ntc-templates",
+      "https://carlmontanari.github.io/scrapli/"
+    ],
+    "limitations": [
+      "کتابخانه‌های Netmiko، Paramiko، TextFSM و Nornir و هیچ تجهیز واقعی SSH در این محیط اجرا نشده‌اند.",
+      "آزمایشگاه یک Python Mock محلی برای آزمون الگوهای ایمنی (Context Manager، TextFSM Fallback، Pilot/Dry-Run) است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش با توضیح کامل.",
+      "ارائه Python Mock قابل اجرا و تست‌شده برای نمایش واقعی Fallback نوع str و بسته شدن نشست."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/auto_03-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-automation",
+      "recommendedCourse": "automation-foundations",
+      "blueprint": "/academy-assets/v5/blueprints/auto_03.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/auto_03_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۸C-1: اعمال _require_bool روی use_textfsm و dry_run و max_workers مثبت در auto_03_lab.py + تعدیل «تضمین می‌کند» در Q2.",
+      "اصلاح بازبینی فاز ۱۱ (Handoff f3a809393e): تصریح وابستگی واقعی dry_run در Nornir به پیاده‌سازی پلاگین/وظیفه (پشتیبانی بومی nornir_napalm در برابر نبود پشتیبانی بومی در nornir_netmiko و الزام شرط صریح task.is_dry_run())، هم‌راستاسازی فیلتر role با کلید data.role در SimpleInventory (در برابر گروه‌بندی با F(groups__contains=...))، تعدیل ادعاهای زمانی موازی‌سازی به عوامل واقعی (AAA/SSH/RTT/CPU)، مشروط‌سازی save_config() به پلتفرم (IOS/IOS-XE/NX-OS در برابر سیستم‌های Commit-based مثل IOS-XR/JunOS)، تفکیک لایه‌های تایم‌اوت Netmiko (conn_timeout/auth_timeout/banner_timeout/read_timeout) و همگام‌سازی کامل auto_03_lab.py با HTML."
+    ]
+  }
 }

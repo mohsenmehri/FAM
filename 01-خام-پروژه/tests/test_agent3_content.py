@@ -1684,6 +1684,101 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertEqual(r06["bad_post_status"], 400)
         self.assertEqual(r06["duplicate_post_status"], 409)
 
+    def test_phase11_handoff_f3a80939_ccde18_and_auto03_remediation(self):
+        """Phase 11: full remediation of AGENT-HANDOFF-fa.md @ f3a809393e on ccde_18 and auto_03."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. ccde_18 prose/quiz/sources regressions
+        c18 = json.loads((BLUEPRINT_DIR / "ccde_18.json").read_text(encoding="utf-8"))
+        c18_txt = json.dumps(
+            {k: c18[k] for k in ("title", "sections", "glossary", "stages", "interactiveQuiz")},
+            ensure_ascii=False,
+        )
+        self.assertEqual(c18["meta"]["version"], "reviewed.12")
+        for forbidden in (
+            "۹۰ تا ۹۵",
+            "۹۰–۹۵",
+            "میلیون‌ها دلار",
+            "سناریوی واقعی",
+            "واقعی RTT",
+            "مسیر واقعی",
+            "Dell Metro Node",
+            "delltechnologies.com",
+            "MetroCluster/vMSC",
+        ):
+            self.assertNotIn(forbidden, c18_txt, f"ccde_18 still contains stale phrase: {forbidden}")
+        self.assertIn("https://docs.netapp.com/us-en/netapp-solutions-virtualization/vmware/vmw-vmsc-with-smas.html", c18["meta"]["sources"])
+        self.assertIn("https://docs.netapp.com/us-en/ontap-select/concept_ha_config.html", c18["meta"]["sources"])
+        self.assertIn("Single-Router SPOF", c18_txt)
+        self.assertIn("به‌تنهایی انطباق PCI-DSS یا تحقق کامل Zero Trust را اثبات یا تضمین نمی‌کند", c18["interactiveQuiz"][4]["explanationHtml"])
+        self.assertIn("Route-Leaking", c18["interactiveQuiz"][5]["options"][1])
+        self.assertIn("SPOF", c18["interactiveQuiz"][7]["explanationHtml"])
+
+        # 2. auto_03 prose/quiz/sources regressions
+        a03 = json.loads((BLUEPRINT_DIR / "auto_03.json").read_text(encoding="utf-8"))
+        a03_txt = json.dumps(
+            {k: a03[k] for k in ("title", "sections", "glossary", "stages", "interactiveQuiz")},
+            ensure_ascii=False,
+        )
+        self.assertEqual(a03["meta"]["version"], "reviewed.9")
+        for forbidden in ("زیر ۱ دقیقه", "ظرف ۵ ثانیه", "dry_run=True BEFORE prod!"):
+            self.assertNotIn(forbidden, a03_txt, f"auto_03 still contains stale phrase: {forbidden}")
+        for required in (
+            "task.is_dry_run()",
+            "nornir_napalm",
+            "nornir_netmiko",
+            "data.role",
+            "groups__contains",
+            "conn_timeout",
+            "auth_timeout",
+            "banner_timeout",
+            "read_timeout",
+            "commit",
+        ):
+            self.assertIn(required, a03_txt, f"auto_03 missing required nuance: {required}")
+
+        # 3. auto_03_lab.py unit checks: SimpleInventory data.role, explicit dry_run guard, platform save_config
+        mod = load_module(AGENT3_LAB_DIR / "auto_03_lab.py", "auto_03_p11")
+        inv = [
+            {"host": "192.0.2.11", "platform": "cisco_ios", "groups": ["campus"], "data": {"role": "pilot"}},
+            {"host": "192.0.2.12", "platform": "cisco_xr", "groups": ["core"], "data": {"role": "production"}},
+        ]
+        res = mod.run_nornir_style_pilot(inv, "pilot", ["ntp server 192.0.2.123"], dry_run=True)
+        self.assertEqual(len(res), 1)
+        self.assertFalse(res[0]["applied"])
+        self.assertTrue(res[0]["dry_run_honored"])
+        self.assertTrue(res[0]["session_closed"])
+
+        # Fail-closed when task/plugin does NOT support dry_run (mirroring raw nornir_netmiko)
+        with self.assertRaises(RuntimeError):
+            mod.run_nornir_style_pilot(
+                inv, "pilot", ["ntp server 192.0.2.123"], dry_run=True, task_honors_dry_run=False
+            )
+
+        # Platform-dependent save_config() behavior
+        with mod.MockNetmikoConnection("192.0.2.11", platform="cisco_ios") as ios:
+            ios.send_config_set(["ntp server 192.0.2.123"])
+            self.assertTrue(ios.dirty_running_config)
+            self.assertTrue(ios.save_config()["saved"])
+            self.assertFalse(ios.dirty_running_config)
+        with mod.MockNetmikoConnection("192.0.2.12", platform="cisco_xr") as xr:
+            with self.assertRaises(NotImplementedError):
+                xr.save_config()
+
+        # Invalid task_honors_dry_run, role_filter, or commands rejected
+        with self.assertRaises(ValueError):
+            mod.run_nornir_style_pilot(inv, "pilot", ["cmd"], dry_run=True, task_honors_dry_run="True")
+        with self.assertRaises(ValueError):
+            mod.run_nornir_style_pilot(inv, "", ["cmd"], dry_run=True)
+        with self.assertRaises(ValueError):
+            mod.run_nornir_style_pilot(inv, "pilot", [""], dry_run=True)
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)
