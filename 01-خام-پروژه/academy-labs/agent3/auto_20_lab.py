@@ -5,11 +5,13 @@ Simulated Closed-Loop Remediation Gate with Human-in-the-Loop (500-Branch Capsto
 
 Execution & modeling boundaries:
 - Pure Python 3 stdlib local simulation of 500 branches grouped under 4 regional hubs.
-- Strict input validation: z_score rejects non-finite numbers (NaN/Infinity), huge float-overflow
-  ints (e.g. 10**500), booleans (True/False), and empty or zero-variance baselines with ValueError.
+- Strict input validation: z_score rejects non-finite numbers (NaN/Infinity), IEEE-754 overflow
+  inputs (e.g. 10**500, [1e200, 0], [1e308, -1e308] — always ValueError, never OverflowError),
+  booleans (True/False), and empty or zero-variance constant baselines (ALWAYS ValueError because
+  Z-score is mathematically undefined when sigma == 0, even if value == mean).
 - remediation_decision enforces an explicit action allowlist (rejecting empty, None, or arbitrary
   actions like 'destroy_everything') and strict Python bool for human_approved. Output explicitly
-  marks simulated_only=True so policy-gate output is never mistaken for live network modification.
+  marks simulation_only=True so policy-gate output is never mistaken for live network modification.
 - correlate_root_cause models a topology-parent alert-suppression heuristic ONLY; co-occurring
   branch alarms do NOT prove actual hub root cause without independent underlay/control-plane checks.
 No live WAN controllers, ML cluster, or production routers are connected.
@@ -53,19 +55,42 @@ def _require_finite_num(val: object, name: str) -> float:
 
 
 def z_score(value: float, baseline: list[float]) -> float:
+    """Compute population Z-score with strict finite/overflow checks; rejects constant (sigma=0) baselines."""
     if not isinstance(baseline, (list, tuple)) or len(baseline) < 2:
         raise ValueError("baseline must be a list/tuple with at least 2 finite numeric observations")
     val = _require_finite_num(value, "value")
     clean_base = [_require_finite_num(x, f"baseline[{i}]") for i, x in enumerate(baseline)]
-    mean = sum(clean_base) / len(clean_base)
-    variance = sum((x - mean) ** 2 for x in clean_base) / len(clean_base)
-    if not math.isfinite(variance):
-        raise ValueError("baseline variance overflowed IEEE-754 finite float range")
-    if variance == 0.0:
-        if val == mean:
-            return 0.0
-        raise ValueError("baseline has zero variance; Z-score is undefined for a constant baseline")
-    return (val - mean) / math.sqrt(variance)
+
+    try:
+        total = math.fsum(clean_base)
+        mean = total / len(clean_base)
+        if not math.isfinite(mean):
+            raise ValueError("baseline mean overflowed IEEE-754 finite float range")
+        sq_devs: list[float] = []
+        for x in clean_base:
+            diff = x - mean
+            if not math.isfinite(diff):
+                raise ValueError("baseline deviation overflowed IEEE-754 finite float range")
+            sq = diff * diff
+            if not math.isfinite(sq):
+                raise ValueError("baseline squared deviation overflowed IEEE-754 finite float range")
+            sq_devs.append(sq)
+        variance = math.fsum(sq_devs) / len(clean_base)
+        if not math.isfinite(variance):
+            raise ValueError("baseline variance overflowed IEEE-754 finite float range")
+        if variance == 0.0:
+            raise ValueError(
+                "baseline has zero variance (constant baseline); Z-score is undefined when sigma == 0"
+            )
+        std = math.sqrt(variance)
+        delta = val - mean
+        z = delta / std
+    except OverflowError as exc:
+        raise ValueError("Z-score arithmetic overflowed IEEE-754 finite float range") from exc
+
+    if not math.isfinite(z):
+        raise ValueError("Z-score result overflowed IEEE-754 finite float range")
+    return z
 
 
 def correlate_root_cause(hub_down: set[str], branch_alerts: list[dict]) -> dict:

@@ -49,3 +49,10 @@
 - **اصلاح انجام‌شده:** جایگزینی با سه پروفایل دقیق و مستند (`vmware_vsan_stretched`, `netapp_vmsc_snapmirror_active_sync` با `< 10.0`, `netapp_ontap_select_metrocluster_sds` با `<= 5.0`)، تبدیل `OverflowError` به `ValueError` و هم‌ترازی متن `ccde_18.json` (بخش و Q1).
 - **تست مرتبط:** `test_phase9_agent_handoff_ccde18_and_auto20_fixes` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل) و منتظر بازبینی مستقل Agent 2 روی کل متن و ۱۲ سؤال.
+
+## بازبینی فنی فاز ۱۰A (2026-11-27 — پاسخ به `AGENT-HANDOFF-fa.md` @ `f4e3ab1f`)
+- **ایراد:** پروفایل `netapp_ontap_select_metrocluster_sds` شرط `<= 5 ms jitter` را در متن ذکر می‌کرد بدون آنکه `assumed_jitter_ms` ورودی/اعتبارسنجی شود و تنها با RTT مناسب عبارت انطباق با jitter را گزارش می‌داد.
+- **منبع معتبر:** `AGENT-HANDOFF-fa.md` (@ `f4e3ab1f`) و [NetApp ONTAP Select MetroCluster SDS](https://docs.netapp.com/us-en/ontap-select/concept_ha_config.html).
+- **اصلاح انجام‌شده:** افزودن `max_jitter_ms` در پروفایل‌ها و اعتبارسنجی صریح و **fail-closed** برای `assumed_jitter_ms` (غیاب یا `None` یا `> 5.0 ms` مانع پذیرش sync می‌شود؛ پروفایل‌های بدون مدل jitter صریحاً اعلام می‌کنند jitter مدل نشده است).
+- **تست مرتبط:** `test_phase10a_handoff_f4e3ab1f_ccde18_jitter_and_auto20_zscore` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل) و منتظر بازبینی مستقل Agent 2.

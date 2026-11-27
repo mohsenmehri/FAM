@@ -225,4 +225,15 @@
 | پیگیری Handoff | `ccde_18` | ۱) تعمیم نام و مرز `<= 10ms` به‌جای سند دقیق محصول؛ ۲) پرتاب `OverflowError` روی `10**500` به‌جای `ValueError`. (پیام پویا برای `macro_vrfs` در فاز ۸A رفع شده بود.) | NetApp vMSC with SnapMirror active sync (`< 10ms`) و ONTAP Select MetroCluster SDS (`<= 5ms` RTT/jitter) | تفکیک ۳ پروفایل دقیق محصولی با مقایسه اکید `< 10.0` برای SnapMirror active sync، تبدیل `OverflowError` به `ValueError` و هم‌ترازی متن و Q1. | `test_phase9_agent_handoff_ccde18_and_auto20_fixes` | اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل). |
 | پیگیری Handoff | `auto_20` | ۱) پذیرش `NaN`/`Infinity`/`bool` در `baseline` تابع `z_score`؛ ۲) پذیرش اقدام دلخواه/خالی/`None` مثل `'destroy_everything'` با `executed: true`؛ ۳) شفاف‌سازی شبیه‌سازی و همبستگی در برابر علیت. | `AGENT-HANDOFF-fa.md`، IEEE-754 و AIOps Allowlist | `_require_finite_num` روی کل `baseline`، اعمال `ALLOWED_REMEDIATION_ACTIONS`، خروجی `simulation_only=True`/`simulated_execution_allowed` و افزودن `causal_caveat`. | `test_phase9_agent_handoff_ccde18_and_auto20_fixes` | شبیه‌ساز محلی بدون کنترلر/ML زنده؛ بازبینی نویسنده (نه مستقل). |
 
+---
+
+## بخش ۱۰A: بازبینی فنی فاز ۱۰A (2026-11-27 — پاسخ کامل به `AGENT-HANDOFF-fa.md` @ `f4e3ab1f`)
+
+پس از بررسی آخرین شاخه Agent 2 (`arena/ab96c97c-fam` @ `f4e3ab1fd3555f0ae447f6828d14243a672175ba`، ادغام انتخابی `auto_10` و ثبت دو یافته جدید برای `ccde_18` و `auto_20`)، هر دو یافته به‌طور دقیق برطرف شدند:
+
+| دسته | شناسه درس | ایراد ثبت‌شده در `AGENT-HANDOFF-fa.md` @ `f4e3ab1f` | منبع معتبر | اصلاح انجام‌شده | تست مرتبط | محدودیت |
+|---|---|---|---|---|---|---|
+| پیگیری Handoff | `ccde_18` | پروفایل ONTAP Select بدون دریافت/اعتبارسنجی `jitter` خروجی `satisfies ... plus jitter` می‌داد. | NetApp ONTAP Select MetroCluster SDS | مدل‌سازی صریح و fail-closed ورودی `assumed_jitter_ms` (`<= 5.0ms`)؛ رد sync در غیاب/نامعتبر بودن jitter؛ تفکیک فیلدهای `rtt_feasible_for_profile` و `jitter_feasible_for_profile`. | `test_phase10a_handoff_f4e3ab1f_ccde18_jitter_and_auto20_zscore` | اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل). |
+| پیگیری Handoff | `auto_20` | `OverflowError` روی `z_score(1, [1e200, 0])` و `[1e308, -1e308]`؛ بازگرداندن `0.0` روی baseline ثابت برابر `value` به‌جای تعریف‌نشده بودن Z-score. | IEEE-754 و تعریف ریاضی Z-score | مهار کامل `OverflowError -> ValueError` با `math.fsum`/`isfinite` گام‌به‌گام، رد قطعی baseline ثابت حتی برای `value == mean` و تعدیل Q4/Q6/Q12. | `test_phase10a_handoff_f4e3ab1f_ccde18_jitter_and_auto20_zscore` | شبیه‌ساز محلی بدون کنترلر/ML زنده؛ بازبینی نویسنده (نه مستقل). |
+
 > **یادآوری پایانی:** با وجود این ممیزی فنی و معنایی عمیق و آزمون‌های رگرسیون خودکار، این گزارش همچنان **بازبینی نویسنده** است و پیش از انتشار رسمی عمومی، **بازبینی مستقل توسط متخصص شبکه/امنیت انسانی (Independent Human SME Review)** توصیه می‌شود.

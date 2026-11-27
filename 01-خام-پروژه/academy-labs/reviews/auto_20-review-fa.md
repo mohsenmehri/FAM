@@ -18,3 +18,10 @@
 - **اصلاح انجام‌شده:** اعمال `_require_finite_num` روی `value` و تک‌تک اعضای `baseline` (رد `NaN`/`Inf`/`bool`/`10**500`)، اعمال `ALLOWED_REMEDIATION_ACTIONS`، خروجی صریح `simulation_only=True`/`simulated_execution_allowed` و افزودن `causal_caveat` در `correlate_root_cause`.
 - **تست مرتبط:** `test_phase9_agent_handoff_ccde18_and_auto20_fixes` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** شبیه‌ساز محلی بدون کنترلر SD-WAN یا کلاستر ML زنده؛ بازبینی نویسنده (نه مستقل).
+
+## بازبینی فنی فاز ۱۰A (2026-11-27 — پاسخ به `AGENT-HANDOFF-fa.md` @ `f4e3ab1f`)
+- **ایراد:** ۱) `z_score(1, [1e200, 0])` و `[1e308, -1e308]` هنگام توان دوم قبل از بررسی `isfinite` دچار `OverflowError` می‌شدند؛ ۲) در baseline ثابت هنگام `value == mean` مقدار `0.0` برمی‌گشت در حالی که انحراف معیار صفر و Z-score تعریف‌نشده است؛ ۳) تعدیل عبارات Q4/Q6/Q12.
+- **منبع معتبر:** `AGENT-HANDOFF-fa.md` (@ `f4e3ab1f`)، IEEE-754 و تعریف ریاضی Z-score (`sigma = 0` تعریف‌نشده).
+- **اصلاح انجام‌شده:** محاسبه گام‌به‌گام با `math.fsum` و بررسی `math.isfinite` + مهار `OverflowError -> ValueError`، رد قطعی baseline ثابت حتی هنگام `value == mean` و تعدیل Q4/Q6/Q12.
+- **تست مرتبط:** `test_phase10a_handoff_f4e3ab1f_ccde18_jitter_and_auto20_zscore` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** شبیه‌ساز محلی بدون کنترلر/ML زنده؛ بازبینی نویسنده (نه مستقل).

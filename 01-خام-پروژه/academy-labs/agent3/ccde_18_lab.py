@@ -8,10 +8,13 @@ Key modeling boundaries:
 - Strict input typing: all boolean inputs MUST be strict Python bool (True/False) — strings like "False"/"True"/"",
   integers 0/1, None, lists, and dicts are explicitly rejected with ValueError. Huge integers (e.g. 10**500) that
   overflow IEEE-754 float are caught and rejected with ValueError (never OverflowError).
-- Named product sync RTT profiles (not generalized across different storage products):
-  * vmware_vsan_stretched: <= 5.0 ms RTT (VMware vSAN Stretched Cluster data-site guideline, version dependent)
-  * netapp_vmsc_snapmirror_active_sync: < 10.0 ms RTT strictly (NetApp vMSC with SnapMirror active sync)
-  * netapp_ontap_select_metrocluster_sds: <= 5.0 ms RTT (+ <= 5.0 ms jitter requirement; ONTAP Select MetroCluster SDS)
+- Named product sync profiles (never generalized across different storage products):
+  * vmware_vsan_stretched: <= 5.0 ms RTT (VMware vSAN Stretched Cluster data-site guideline, version dependent;
+    RTT-only model check)
+  * netapp_vmsc_snapmirror_active_sync: < 10.0 ms RTT strictly (NetApp vMSC with SnapMirror active sync;
+    RTT-only model check)
+  * netapp_ontap_select_metrocluster_sds: <= 5.0 ms RTT AND <= 5.0 ms jitter (NetApp ONTAP Select MetroCluster SDS;
+    FAIL-CLOSED if assumed_jitter_ms is omitted or None — never claims jitter compliance without an explicit valid input)
 - Latency figures separate ideal straight-line silica fiber propagation (~0.01 ms/km => ~50 ms at 5,000 km),
   illustrative routed-fiber propagation (default 1.4x => ~70 ms), and optional illustrative equipment/path
   overhead (+35 ms default => ~105 ms inside the ~95-130 ms assumed total RTT range) — all explicitly marked as
@@ -30,13 +33,15 @@ PRODUCT_SYNC_PROFILES = {
     "vmware_vsan_stretched": {
         "max_rtt_ms": 5.0,
         "strict_lt": False,
-        "comparator_text": "<= 5.0 ms",
+        "max_jitter_ms": None,
+        "comparator_text": "<= 5.0 ms RTT",
         "source_note": "VMware vSAN Stretched Cluster data-site RTT ceiling (<= 5 ms; verify exact vSAN release).",
     },
     "netapp_vmsc_snapmirror_active_sync": {
         "max_rtt_ms": 10.0,
         "strict_lt": True,
-        "comparator_text": "< 10.0 ms",
+        "max_jitter_ms": None,
+        "comparator_text": "< 10.0 ms RTT",
         "source_note": (
             "NetApp vMSC with SnapMirror active sync requires strictly < 10 ms RTT "
             "(https://docs.netapp.com/us-en/netapp-solutions-virtualization/vmware/vmw-vmsc-with-smas.html)."
@@ -45,7 +50,8 @@ PRODUCT_SYNC_PROFILES = {
     "netapp_ontap_select_metrocluster_sds": {
         "max_rtt_ms": 5.0,
         "strict_lt": False,
-        "comparator_text": "<= 5.0 ms (plus <= 5.0 ms jitter)",
+        "max_jitter_ms": 5.0,
+        "comparator_text": "<= 5.0 ms RTT AND <= 5.0 ms jitter",
         "source_note": (
             "NetApp ONTAP Select MetroCluster SDS requires <= 5 ms RTT and <= 5 ms jitter "
             "(https://docs.netapp.com/us-en/ontap-select/concept_ha_config.html)."
@@ -123,9 +129,15 @@ def estimate_fiber_rtt_ms(
     )
 
     # Ideal straight-line silica fiber (~200,000 km/s => ~0.01 ms/km propagation-only RTT)
-    propagation_min = round(dist_km * 0.01, 2)
-    routed_propagation = round(propagation_min * stretch, 2)
-    assumed_total_rtt = round(routed_propagation + overhead, 2)
+    try:
+        propagation_min = round(dist_km * 0.01, 2)
+        routed_propagation = round(propagation_min * stretch, 2)
+        assumed_total_rtt = round(routed_propagation + overhead, 2)
+    except OverflowError as exc:
+        raise ValueError("RTT calculation overflowed IEEE-754 finite float range") from exc
+    if not all(math.isfinite(v) for v in (propagation_min, routed_propagation, assumed_total_rtt)):
+        raise ValueError("RTT calculation produced non-finite float value")
+
     return {
         "great_circle_km": dist_km,
         "route_stretch_factor_assumed": stretch,
@@ -181,15 +193,33 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "netapp_v
             f"chapter_v_transfer_safeguard must be None or str, got {safeguard!r} ({type(safeguard).__name__})"
         )
 
+    raw_jitter = design.get("assumed_jitter_ms")
+    assumed_jitter_ms = (
+        None if raw_jitter is None else _require_non_negative_finite(raw_jitter, "assumed_jitter_ms")
+    )
+
     checks = []
     rtt_info = estimate_fiber_rtt_ms(dist_km, assumed_equipment_and_detour_overhead_ms=overhead_ms)
     profile = PRODUCT_SYNC_PROFILES[sync_product_profile]
     max_sync_ms = profile["max_rtt_ms"]
+    max_jitter_ms = profile["max_jitter_ms"]
     assumed_rtt = rtt_info["assumed_total_end_to_end_rtt_ms"]
+
     if profile["strict_lt"]:
-        sync_feasible_for_profile = assumed_rtt < max_sync_ms
+        rtt_feasible = assumed_rtt < max_sync_ms
     else:
-        sync_feasible_for_profile = assumed_rtt <= max_sync_ms
+        rtt_feasible = assumed_rtt <= max_sync_ms
+
+    # Explicit fail-closed jitter modeling when required by the selected product profile
+    if max_jitter_ms is not None:
+        if assumed_jitter_ms is None:
+            jitter_feasible = False
+        else:
+            jitter_feasible = assumed_jitter_ms <= max_jitter_ms
+        sync_feasible_for_profile = rtt_feasible and jitter_feasible
+    else:
+        jitter_feasible = None
+        sync_feasible_for_profile = rtt_feasible
 
     rep_mode_valid = rep_mode in VALID_REPLICATION_MODES
     if not rep_mode_valid:
@@ -212,22 +242,51 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "netapp_v
             f"expected one of {VALID_REPLICATION_MODES}."
         )
     elif sync_feasible_for_profile:
-        dci_reasons.append(
-            f"Assumed total RTT (~{assumed_rtt} ms; propagation min "
-            f"{rtt_info['propagation_only_min_rtt_ms']} ms) satisfies {sync_product_profile} limit "
-            f"({profile['comparator_text']}); selected mode '{rep_mode}' is supported for this profile."
-        )
+        if max_jitter_ms is not None:
+            dci_reasons.append(
+                f"Assumed total RTT (~{assumed_rtt} ms) AND assumed jitter ({assumed_jitter_ms} ms) "
+                f"satisfy {sync_product_profile} limits ({profile['comparator_text']}); "
+                f"selected mode '{rep_mode}' is supported by this model."
+            )
+        else:
+            dci_reasons.append(
+                f"Assumed total RTT (~{assumed_rtt} ms; propagation min {rtt_info['propagation_only_min_rtt_ms']} ms) "
+                f"satisfies {sync_product_profile} RTT limit ({profile['comparator_text']}; jitter not modeled for this profile); "
+                f"selected mode '{rep_mode}' is supported by this RTT model."
+            )
     elif replication_ok:
-        dci_reasons.append(
-            f"Assumed total RTT (~{assumed_rtt} ms; routed propagation "
-            f"~{rtt_info['routed_propagation_only_rtt_ms']} ms) violates {sync_product_profile} limit "
-            f"({profile['comparator_text']}); asynchronous replication appropriately selected."
-        )
+        if max_jitter_ms is not None and rtt_feasible and assumed_jitter_ms is None:
+            dci_reasons.append(
+                f"Assumed jitter was not provided (fail-closed for {sync_product_profile}, which requires <= {max_jitter_ms} ms jitter); "
+                f"asynchronous replication appropriately selected."
+            )
+        elif max_jitter_ms is not None and rtt_feasible and not jitter_feasible:
+            dci_reasons.append(
+                f"Assumed jitter ({assumed_jitter_ms} ms) exceeds {sync_product_profile} jitter limit (<= {max_jitter_ms} ms); "
+                f"asynchronous replication appropriately selected."
+            )
+        else:
+            dci_reasons.append(
+                f"Assumed total RTT (~{assumed_rtt} ms; routed propagation ~{rtt_info['routed_propagation_only_rtt_ms']} ms) "
+                f"violates {sync_product_profile} limit ({profile['comparator_text']}); "
+                f"asynchronous replication appropriately selected."
+            )
     else:
-        dci_reasons.append(
-            f"REJECTED: assumed total RTT (~{assumed_rtt} ms) violates "
-            f"{sync_product_profile} sync limit ({profile['comparator_text']}); switch to asynchronous replication."
-        )
+        if max_jitter_ms is not None and rtt_feasible and assumed_jitter_ms is None:
+            dci_reasons.append(
+                f"REJECTED (fail-closed jitter): {sync_product_profile} requires assumed_jitter_ms <= {max_jitter_ms} ms, "
+                f"but assumed_jitter_ms was omitted/None; cannot approve synchronous replication."
+            )
+        elif max_jitter_ms is not None and rtt_feasible and not jitter_feasible:
+            dci_reasons.append(
+                f"REJECTED (jitter): assumed_jitter_ms ({assumed_jitter_ms} ms) exceeds {sync_product_profile} limit "
+                f"(<= {max_jitter_ms} ms); cannot approve synchronous replication."
+            )
+        else:
+            dci_reasons.append(
+                f"REJECTED: assumed total RTT (~{assumed_rtt} ms) violates "
+                f"{sync_product_profile} sync limit ({profile['comparator_text']}); switch to asynchronous replication."
+            )
 
     if rep_mode_valid:
         if rpo_mode_compatible:
@@ -256,7 +315,12 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "netapp_v
         "product_sync_limit": profile["comparator_text"],
         "product_sync_source_note": profile["source_note"],
         "product_max_sync_rtt_ms": max_sync_ms,
+        "product_max_jitter_ms": max_jitter_ms,
         **rtt_info,
+        "assumed_jitter_ms": assumed_jitter_ms,
+        "rtt_feasible_for_profile": rtt_feasible,
+        "jitter_required_by_profile": max_jitter_ms is not None,
+        "jitter_feasible_for_profile": jitter_feasible,
         "storage_replication": rep_mode,
         "storage_replication_valid": rep_mode_valid,
         "sync_feasible_for_profile": sync_feasible_for_profile,
@@ -392,6 +456,7 @@ def main() -> None:
         **approved_pars_global_hld,
         "dc_distance_km": 150,
         "assumed_equipment_and_detour_overhead_ms": 1.0,
+        "assumed_jitter_ms": 2.0,
         "storage_replication": "synchronous",
         "target_rpo_minutes": 0,
     }
@@ -402,17 +467,24 @@ def main() -> None:
 
     res_rejected = validate_pars_global_hld(rejected_initial_proposal, "vmware_vsan_stretched")
     res_approved = validate_pars_global_hld(approved_pars_global_hld, "netapp_vmsc_snapmirror_active_sync")
-    res_metro = validate_pars_global_hld(metro_sync_feasible_example, "vmware_vsan_stretched")
+    res_metro = validate_pars_global_hld(metro_sync_feasible_example, "netapp_ontap_select_metrocluster_sds")
     res_bad_mode = validate_pars_global_hld(invalid_mode_example, "vmware_vsan_stretched")
 
     assert res_rejected["all_architectural_checks_passed"] is False
     assert res_approved["all_architectural_checks_passed"] is True
     assert res_metro["all_architectural_checks_passed"] is True
     assert res_metro["domain_validations"][0]["sync_feasible_for_profile"] is True
+    assert res_metro["domain_validations"][0]["jitter_feasible_for_profile"] is True
     assert "violates" not in res_metro["domain_validations"][0]["note"]
     assert res_bad_mode["all_architectural_checks_passed"] is False
     assert "unsupported storage_replication mode" in res_bad_mode["domain_validations"][0]["note"]
     assert "is supported" not in res_bad_mode["domain_validations"][0]["note"]
+
+    # Fail-closed jitter check: omitting assumed_jitter_ms on ONTAP Select MetroCluster SDS MUST reject sync!
+    metro_no_jitter = {k: v for k, v in metro_sync_feasible_example.items() if k != "assumed_jitter_ms"}
+    res_no_jitter = validate_pars_global_hld(metro_no_jitter, "netapp_ontap_select_metrocluster_sds")
+    assert res_no_jitter["all_architectural_checks_passed"] is False
+    assert res_no_jitter["domain_validations"][0]["jitter_feasible_for_profile"] is False
 
     # Negative check: non-bool string "False" and huge int 10**500 MUST raise ValueError
     for bad_input in (
@@ -430,6 +502,7 @@ def main() -> None:
         "rejected_sync_l2_proposal": res_rejected,
         "approved_hld_validation": res_approved,
         "metro_sync_feasible_example": res_metro,
+        "metro_missing_jitter_fail_closed_example": res_no_jitter,
         "invalid_mode_rejected_example": res_bad_mode,
     }
     print(json.dumps(report, indent=2, ensure_ascii=False))

@@ -1235,8 +1235,8 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertTrue(r_99["domain_validations"][0]["sync_feasible_for_profile"])
         self.assertTrue(r_99["all_architectural_checks_passed"])
 
-        # ONTAP Select MetroCluster SDS: <= 5.0 ms feasible, > 5.0 ms rejected
-        at_5ms = {**exact_10ms, "dc_distance_km": 200, "assumed_equipment_and_detour_overhead_ms": 2.2}  # 2.8 + 2.2 = 5.0
+        # ONTAP Select MetroCluster SDS: <= 5.0 ms RTT AND <= 5.0 ms jitter (fail-closed if jitter omitted)
+        at_5ms = {**exact_10ms, "dc_distance_km": 200, "assumed_equipment_and_detour_overhead_ms": 2.2, "assumed_jitter_ms": 5.0}
         r_sds_ok = c18.validate_pars_global_hld(at_5ms, "netapp_ontap_select_metrocluster_sds")
         self.assertTrue(r_sds_ok["domain_validations"][0]["sync_feasible_for_profile"])
         over_5ms = {**at_5ms, "assumed_equipment_and_detour_overhead_ms": 2.3}
@@ -1269,6 +1269,73 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
 
         rca = a20.correlate_root_cause({"HUB-WEST"}, [{"branch_id": "BR-1", "hub": "HUB-WEST"}])
         self.assertIn("heuristic", rca["causal_caveat"].lower())
+
+    def test_phase10a_handoff_f4e3ab1f_ccde18_jitter_and_auto20_zscore(self):
+        """Phase 10A: ccde_18 fail-closed ONTAP Select jitter + auto_20 overflow & constant-baseline Z-score."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. ccde_18: fail-closed jitter on netapp_ontap_select_metrocluster_sds
+        c18 = load_module(AGENT3_LAB_DIR / "ccde_18_lab.py", "ccde_18_phase10a_testmod")
+        metro_base = {
+            "dc_distance_km": 150,
+            "assumed_equipment_and_detour_overhead_ms": 1.0,
+            "storage_replication": "synchronous",
+            "target_rpo_minutes": 0,
+            "dci_l2_stretched": False,
+            "gslb_enabled": True,
+            "wan_model": "hybrid_sdwan_regional_hubs_plus_sase",
+            "cloud_hub": "dual_colo_cloud_exchange_direct_connect",
+            "macro_vrfs": 4,
+            "micro_sgt_enabled": True,
+            "eu_residency_policy_enforced": True,
+            "eu_personal_data_transferred_outside_eea": False,
+            "chapter_v_transfer_safeguard": None,
+            "encryption_in_transit_assumed": True,
+        }
+        # Omitted assumed_jitter_ms -> MUST fail closed (never claim jitter compliance!)
+        r_missing = c18.validate_pars_global_hld(metro_base, "netapp_ontap_select_metrocluster_sds")
+        d0 = r_missing["domain_validations"][0]
+        self.assertTrue(d0["rtt_feasible_for_profile"])
+        self.assertTrue(d0["jitter_required_by_profile"])
+        self.assertFalse(d0["jitter_feasible_for_profile"])
+        self.assertFalse(d0["sync_feasible_for_profile"])
+        self.assertFalse(r_missing["all_architectural_checks_passed"])
+        self.assertNotIn("satisfy", d0["note"].lower())
+
+        # Jitter > 5.0 ms -> rejected; Jitter == 5.0 ms -> passes
+        r_high_jitter = c18.validate_pars_global_hld(
+            {**metro_base, "assumed_jitter_ms": 5.1}, "netapp_ontap_select_metrocluster_sds"
+        )
+        self.assertFalse(r_high_jitter["all_architectural_checks_passed"])
+        self.assertFalse(r_high_jitter["domain_validations"][0]["jitter_feasible_for_profile"])
+
+        r_ok_jitter = c18.validate_pars_global_hld(
+            {**metro_base, "assumed_jitter_ms": 5.0}, "netapp_ontap_select_metrocluster_sds"
+        )
+        self.assertTrue(r_ok_jitter["all_architectural_checks_passed"])
+        self.assertTrue(r_ok_jitter["domain_validations"][0]["jitter_feasible_for_profile"])
+
+        # Invalid jitter types/values raise ValueError
+        for bad_j in (-0.1, True, False, "2.0", float("nan"), float("inf"), 10**500):
+            with self.assertRaises(ValueError):
+                c18.validate_pars_global_hld({**metro_base, "assumed_jitter_ms": bad_j}, "netapp_ontap_select_metrocluster_sds")
+
+        # 2. auto_20: overflow inputs -> ValueError (NOT OverflowError); constant baseline == value -> ValueError (NOT 0.0)
+        a20 = load_module(AGENT3_LAB_DIR / "auto_20_lab.py", "auto_20_phase10a_testmod")
+        with self.assertRaises(ValueError):
+            a20.z_score(1, [1e200, 0])
+        with self.assertRaises(ValueError):
+            a20.z_score(1, [1e308, -1e308])
+        with self.assertRaises(ValueError):
+            a20.z_score(5.0, [5.0, 5.0, 5.0])
+        with self.assertRaises(ValueError):
+            a20.z_score(9.0, [5.0, 5.0, 5.0])
 
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
