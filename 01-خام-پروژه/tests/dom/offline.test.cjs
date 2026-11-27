@@ -52,6 +52,16 @@ async function waitFor(fn) {
   await waitFor(()=>w.localStorage.getItem('fam.academy.offline.v2'));
   assert.equal(JSON.parse(w.localStorage.getItem('fam.academy.offline.v2')).labs.quizAttempts.auto_05.correct,1);
   dom.window.close();
+  dom=boot(null, 'auto_04'); w=dom.window;
+  await waitFor(()=>w.document.querySelector('[data-lesson-quiz]'));
+  assert.match(w.document.querySelector('.lesson-review-status').textContent,/Git محلی/);
+  assert.match(w.document.querySelector('.lesson-review-status').textContent,/بازبینی مستقل انسانی انجام نشده/);
+  const gitQuiz=w.document.querySelector('[data-lesson-quiz]');
+  gitQuiz.querySelector('input[name="lesson-question-0"][value="0"]').click();
+  gitQuiz.querySelector('[data-quiz-grade]').click();
+  await waitFor(()=>w.localStorage.getItem('fam.academy.offline.v2'));
+  assert.equal(JSON.parse(w.localStorage.getItem('fam.academy.offline.v2')).labs.quizAttempts.auto_04.correct,1);
+  dom.window.close();
   assert.deepEqual(errors,[]);
   console.log('jsdom offline: bundled lessons, network blocking, quiz local persistence and reload passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
