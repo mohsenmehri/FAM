@@ -255,7 +255,7 @@ class FamAppApiTests(unittest.TestCase):
         res.close()
         state = {"completed": [], "labs": {"quizAttempts": {lesson["id"]: {
             "correct": 6, "incorrect": 2, "unanswered": 4, "total": 12}}}}
-        saved = self.client.post("/api/academy/progress", json={"changes": {"fam4.learn.v1": json.dumps(state)}},
+        saved = self.client.post("/api/academy/progress", json={"changes": {"fam4.learn.v1": json.dumps(state)}, "expectedRevision": 0},
                                  headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf}, environ_base=self.https_env)
         self.assertEqual(saved.status_code, 200)
         page = self.client.get("/academy", environ_base=self.https_env).get_data(as_text=True)
@@ -265,6 +265,78 @@ class FamAppApiTests(unittest.TestCase):
                                environ_base=self.https_env)
         self.assertEqual(out.status_code, 200)
         self.assertEqual(self.client.get(path, environ_base=self.https_env).status_code, 401)
+
+    def test_academy_progress_cas_concurrency_and_atomic_backup(self):
+        clients = []
+        for _ in range(8):
+            c = self.app.test_client()
+            login = c.post('/api/login', json={'username':'admin', 'password':self.ADMIN_PASSWORD},
+                           headers={'Origin':self.ORIGIN}, environ_base=self.https_env)
+            self.assertEqual(login.status_code, 200)
+            clients.append((c, login.get_json()['csrf']))
+        def post(c, csrf, value, revision):
+            return c.post('/api/academy/progress',
+                json={'changes':{'fam4.learn.v1':json.dumps(value)}, 'expectedRevision':revision},
+                headers={'Origin':self.ORIGIN, 'X-FAM-CSRF':csrf}, environ_base=self.https_env)
+        initial={'completed':['initial'], 'labs':{}}
+        first=post(*clients[0], initial, 0)
+        self.assertEqual(first.status_code, 200); self.assertEqual(first.get_json()['revision'], 1)
+        missing=clients[0][0].post('/api/academy/progress', json={'changes':{'fam4.learn.v1':'{}'}},
+                headers={'Origin':self.ORIGIN,'X-FAM-CSRF':clients[0][1]},environ_base=self.https_env)
+        self.assertEqual(missing.status_code,409)
+        barrier=threading.Barrier(9); results=[]; errors=[]; lock=threading.Lock()
+        def worker(index):
+            try:
+                barrier.wait(timeout=10)
+                response=post(*clients[index], {'completed':[f'client-{index}'],'labs':{}}, 1)
+                with lock: results.append((index,response.status_code,response.get_json()))
+            except BaseException as exc:
+                with lock: errors.append(repr(exc))
+        threads=[threading.Thread(target=worker,args=(i,)) for i in range(8)]
+        for thread in threads: thread.start()
+        try: barrier.wait(timeout=10)
+        finally:
+            for thread in threads: thread.join(timeout=20)
+        self.assertFalse(any(t.is_alive() for t in threads)); self.assertEqual(errors,[])
+        self.assertEqual(len(results),8)
+        self.assertEqual(sorted(x[1] for x in results),[200]+[409]*7)
+        winner=next(i for i,status,_ in results if status==200)
+        with sqlite3.connect(self.db_path) as db:
+            row=db.execute('SELECT payload,revision FROM academy_progress').fetchone()
+            backups=db.execute('SELECT revision,payload FROM academy_progress_backups').fetchall()
+        self.assertEqual(row[1],2)
+        self.assertEqual(json.loads(json.loads(row[0])['fam4.learn.v1'])['completed'],[f'client-{winner}'])
+        self.assertEqual(len(backups),1); self.assertEqual(backups[0][0],1)
+        self.assertEqual(json.loads(json.loads(backups[0][1])['fam4.learn.v1']),initial)
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("CREATE TRIGGER fail_progress_update BEFORE UPDATE ON academy_progress BEGIN SELECT RAISE(ABORT, 'simulated disk error'); END")
+        failed=post(*clients[0], {'completed':['fail'],'labs':{}}, 2)
+        self.assertNotEqual(failed.status_code,200)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups').fetchone()[0],1)
+            self.assertEqual(db.execute('SELECT revision FROM academy_progress').fetchone()[0],2)
+
+    def test_academy_progress_legacy_and_unknown_cannot_be_overwritten(self):
+        csrf=self._login_admin().get_json()['csrf']
+        headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+        for raw in (json.dumps({'completedLessons':['s01'],'notes':{'s01':'private'}}),
+                    json.dumps({'completed':[],'completedLessons':['s01']}), '{bad', '{}'):
+            with self.subTest(raw=raw):
+                data=json.dumps({'fam4.learn.v1':raw, 'unknown':'preserve-me'})
+                with sqlite3.connect(self.db_path) as db:
+                    db.execute('INSERT OR REPLACE INTO academy_progress(user_id,payload,updated_at,revision) VALUES(?,?,?,?)',(uid,data,0,7))
+                response=self.client.post('/api/academy/progress',json={'changes':{'fam4.learn.v1':json.dumps({'completed':[]})},'expectedRevision':7},headers=headers,environ_base=self.https_env)
+                self.assertEqual(response.status_code,409)
+                with sqlite3.connect(self.db_path) as db:
+                    self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(data,7))
+        # Old clients may still update other keys without silently erasing unknown data.
+        response=self.client.post('/api/academy/progress',json={'changes':{'fam3.progress.v1':'{}'}},headers=headers,environ_base=self.https_env)
+        self.assertEqual(response.status_code,200)
+        with sqlite3.connect(self.db_path) as db:
+            payload,rev=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
+            self.assertEqual(json.loads(payload)['unknown'],'preserve-me'); self.assertEqual(rev,8)
 
     def test_osi_lesson_is_resolvable_and_auth_gated(self):
         path = "/academy-assets/v5/blueprints/academy-stage-zero-osi-fa.json"

@@ -46,6 +46,8 @@
       // Serialize writes so a slow earlier request cannot overwrite a newer state.
       let saveQueue = Promise.resolve();
       let saveSequence = 0;
+      let progressRevision = Number.isSafeInteger(boot.progressRevision) && boot.progressRevision >= 0 ? boot.progressRevision : null;
+      let revisionConflict = false;
       function saveStatus(message) {
         const node = document.getElementById('academy-save-status');
         if (node) node.textContent = message;
@@ -82,14 +84,26 @@
           saveStatus('در حال ذخیرهٔ پیشرفت…');
           const save = async () => {
             try {
+              if (revisionConflict || progressRevision === null) { revisionConflict = true; return false; }
+              const expectedRevision = progressRevision;
               const response = await fetch('/api/academy/progress', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
-                body: JSON.stringify({ changes: { 'fam4.learn.v1': serialized } })
+                body: JSON.stringify({ changes: { 'fam4.learn.v1': serialized }, expectedRevision })
               });
-              return response.ok;
+              if (response.status === 409) { revisionConflict = true; return false; }
+              if (!response.ok) return false;
+              const result = await response.json();
+              if (!Number.isSafeInteger(result.revision) || result.revision !== expectedRevision + 1) {
+                revisionConflict = true;
+                return false;
+              }
+              progressRevision = result.revision;
+              return true;
             } catch (_) {
+              // The server may have committed before a response was lost;
+              // the next write keeps the old revision and will safely conflict.
               return false;
             }
           };
@@ -97,7 +111,9 @@
           saveQueue = result;
           const ok = await result;
           if (sequence === saveSequence) {
-            saveStatus(ok ? 'پیشرفت ذخیره شد.' : 'ذخیره نشد؛ اتصال را بررسی کنید. برای تلاش دوباره تغییری ثبت کنید.');
+            saveStatus(ok ? 'پیشرفت ذخیره شد.' : revisionConflict
+              ? 'تعارض نسخه پیشرفت؛ ذخیره متوقف شد. تغییرات این نشست ذخیره نشده‌اند؛ پیش از بازخوانی از آنها یادداشت بردارید.'
+              : 'ذخیره نشد؛ اتصال را بررسی کنید. برای تلاش دوباره تغییری ثبت کنید.');
           }
           return ok;
         }

@@ -614,9 +614,20 @@ def create_app(config=None):
         CREATE TABLE IF NOT EXISTS academy_progress(
           user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
           payload TEXT NOT NULL,
-          updated_at INTEGER NOT NULL
+          updated_at INTEGER NOT NULL,
+          revision INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS academy_progress_backups(
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          revision INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          saved_at INTEGER NOT NULL,
+          PRIMARY KEY(user_id, revision)
         );
         ''')
+        progress_columns={r['name'] for r in db.execute('PRAGMA table_info(academy_progress)')}
+        if 'revision' not in progress_columns:
+            db.execute('ALTER TABLE academy_progress ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
         # SQLite only supports additive migrations. NULL deliberately means an
         # untouched legacy role account; custom rows always carry both arrays.
         columns={row['name'] for row in db.execute('PRAGMA table_info(users)')}
@@ -825,11 +836,12 @@ def create_app(config=None):
         # the main app. Progress is looked up by the server-derived user id.
         with connect() as db:
             user, session = user_and_session(db)
-            row = db.execute('SELECT payload FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
+            row = db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
         progress = json.loads(row['payload']) if row else {}
         if not isinstance(progress, dict):
             fail(500, 'وضعیت آکادمی معتبر نیست؛ با مدیر سامانه تماس بگیرید.')
-        bootstrap = {'userName': user['name'], 'csrf': session['csrf'], 'progress': progress}
+        bootstrap = {'userName': user['name'], 'csrf': session['csrf'], 'progress': progress,
+                     'progressRevision': row['revision'] if row else 0}
         encoded = json.dumps(bootstrap, ensure_ascii=True, separators=(',', ':'))
         encoded = encoded.replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
         page = (ROOT/'private_ui'/'academy.html').read_text(encoding='utf-8')
@@ -857,9 +869,14 @@ def create_app(config=None):
     @app.post('/api/academy/progress')
     def save_academy_progress():
         body=data()
-        changes=body.get('changes') if isinstance(body,dict) and set(body)=={'changes'} else None
+        changes=body.get('changes') if isinstance(body,dict) and set(body) <= {'changes','expectedRevision'} else None
         if not isinstance(changes,dict) or not changes or len(changes)>len(ACADEMY_STORAGE_KEYS):
             fail(400,'تغییرات پیشرفت آکادمی معتبر نیست.')
+        expected=body.get('expectedRevision')
+        if 'fam4.learn.v1' in changes and (isinstance(expected,bool) or not isinstance(expected,int) or expected < 0):
+            fail(409,'نسخه پیشرفت لازم است؛ صفحه را بازخوانی کنید.')
+        if expected is not None and (isinstance(expected,bool) or not isinstance(expected,int) or expected < 0):
+            fail(400,'نسخه پیشرفت معتبر نیست.')
         total=0
         for key,value in changes.items():
             if key not in ACADEMY_STORAGE_KEYS or (value is not None and not isinstance(value,str)):
@@ -868,19 +885,37 @@ def create_app(config=None):
         if total>8*1024*1024:fail(413,'حجم پیشرفت آکادمی بیش از حد مجاز است.')
         with transaction() as db:
             user,_=user_and_session(db)
-            row=db.execute('SELECT payload FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
+            row=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
+            revision=row['revision'] if row else 0
+            if expected is not None and expected != revision:
+                fail(409,'پیشرفت در نشست دیگری تغییر کرده است؛ پیش از تلاش دوباره داده‌ها را بررسی کنید.')
             progress=json.loads(row['payload']) if row else {}
             if not isinstance(progress,dict):fail(500,'وضعیت آکادمی معتبر نیست؛ با مدیر سامانه تماس بگیرید.')
-            progress={key:value for key,value in progress.items() if key in ACADEMY_STORAGE_KEYS and isinstance(value,str)}
+            if 'fam4.learn.v1' in changes and 'fam4.learn.v1' in progress:
+                try:
+                    existing=json.loads(progress['fam4.learn.v1'])
+                    legacy={'completedLessons','quizScores','notes','missions','examScore','activeLesson'}
+                    safe=(isinstance(existing,dict) and isinstance(existing.get('completed'),list)
+                          and not (legacy & existing.keys()))
+                except (TypeError,ValueError):
+                    safe=False
+                if not safe:
+                    fail(409,'پیشرفت قدیمی یا ناشناخته قابل بازنویسی نیست؛ مهاجرت هنوز فعال نشده است.')
+            # Persist the entire previous payload in the same transaction before
+            # a shared-key replacement or deletion. Never discard unknown keys.
+            if 'fam4.learn.v1' in changes and row and progress.get('fam4.learn.v1') != changes['fam4.learn.v1']:
+                db.execute('INSERT INTO academy_progress_backups(user_id,revision,payload,saved_at) VALUES(?,?,?,?)',
+                           (user['id'],revision,row['payload'],int(time.time()*1000)))
             for key,value in changes.items():
                 if value is None:progress.pop(key,None)
                 else:progress[key]=value
             payload=packed(progress)
             if len(payload.encode('utf-8'))>8*1024*1024:fail(413,'حجم پیشرفت آکادمی بیش از حد مجاز است.')
-            db.execute('''INSERT INTO academy_progress(user_id,payload,updated_at) VALUES(?,?,?)
-                          ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at''',
-                       (user['id'],payload,int(time.time()*1000)))
-        return jsonify(ok=True)
+            new_revision=revision+1
+            db.execute('''INSERT INTO academy_progress(user_id,payload,updated_at,revision) VALUES(?,?,?,?)
+                          ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at,revision=excluded.revision''',
+                       (user['id'],payload,int(time.time()*1000),new_revision))
+        return jsonify(ok=True,revision=new_revision)
     @app.post('/api/login')
     def login():
         value=data();name=str(value.get('username','')).strip().lower();pw=value.get('password','')

@@ -8,7 +8,7 @@ const page = fs.readFileSync(path.join(root, 'private_ui', 'academy.html'), 'utf
 const bridgeScript = page.match(/<script id="fam-academy-fam-bridge"[^>]*>([\s\S]*?)<\/script>/)[1];
 const engine = fs.readFileSync(path.join(root, 'www', 'academy-assets', 'lesson-engine.js'), 'utf8');
 const catalog = fs.readFileSync(path.join(root, 'www', 'academy-assets', 'academy-catalog.js'), 'utf8');
-const boot = {csrf: 'test-csrf', userName: 'account-b', progress: {
+const boot = {csrf: 'test-csrf', userName: 'account-b', progressRevision: 0, progress: {
   'fam4.learn.v1': JSON.stringify({completed: ['remote'], labs: {sections: {remote: ['a']}}})
 }};
 const storage = new Map([
@@ -49,11 +49,12 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   assert.strictEqual(requests[0].options.headers['X-FAM-CSRF'], 'test-csrf');
   const snapshot = req => JSON.parse(JSON.parse(req.options.body).changes['fam4.learn.v1']);
   assert.deepStrictEqual(snapshot(requests[0]).completed, []);
-  requests[0].resolve({ok: true});
+  requests[0].resolve({ok: true, json: async () => ({revision: 1})});
   await tick();
   assert.strictEqual(requests.length, 2);
   assert.deepStrictEqual(snapshot(requests[1]).completed, ['new']);
-  requests[1].resolve({ok: true});
+  assert.strictEqual(JSON.parse(requests[1].options.body).expectedRevision, 1);
+  requests[1].resolve({ok: true, json: async () => ({revision: 2})});
   await tick();
   assert(lessons.isLessonDone('new'), 'an older response must not overwrite the newer state');
 
@@ -68,7 +69,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   const result = ctx.window.FamAcademyBridge.saveProgress({completed: ['retry'], labs: {}});
   await tick();
   assert.strictEqual(requests.length, 4);
-  requests[3].resolve({ok: true});
+  requests[3].resolve({ok: true, json: async () => ({revision: 3})});
   assert.strictEqual(await result, true);
   assert.deepStrictEqual(snapshot(requests[3]).completed, ['retry']);
   assert(status.textContent.includes('ذخیره شد'));
@@ -78,10 +79,10 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   assert.strictEqual(lessons.toggleSectionDone('retry', 'x'), false);
   await tick();
   assert.deepStrictEqual(snapshot(requests[4]).labs.sections.retry, ['x']);
-  requests[4].resolve({ok: true});
+  requests[4].resolve({ok: true, json: async () => ({revision: 4})});
   await tick();
   assert.deepStrictEqual(snapshot(requests[5]).labs.sections.retry, []);
-  requests[5].resolve({ok: true});
+  requests[5].resolve({ok: true, json: async () => ({revision: 5})});
   await tick();
 
   // The account session did not read, overwrite or clear standalone progress,
