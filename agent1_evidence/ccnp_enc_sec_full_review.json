@@ -1,0 +1,208 @@
+{
+  "id": "ccnp_enc_sec",
+  "faculty": "دانشکده ۳ · CCNP Enterprise",
+  "title": "ENCOR حوزه ۵: امنیت زیرساخت (CoPP با MQC، AAA/ACL و امنیت REST API)",
+  "lead": "فایروال بیرونی سازمان سالم است و ACLهای عادی روی پورت‌های کاربر عبور داده را محدود کرده‌اند؛ اما ناگهان یک سرور آلوده داخل شبکه روزی ده‌ها هزار بستهٔ SSH و ICMP جعلی را مستقیم به آدرس `Loopback0` روتر هسته شلیک می‌کند! چون هدفِ بسته *خودِ روتر* است، تمام این بسته‌ها به پردازنده (`CPU`) ارسال (`Punt`) می‌شوند و با ۱۰۰٪ شدن CPU همسایگی‌های BGP سقوط می‌کنند. چطور ورودی مغز روتر را با `CoPP` کنترل کنیم و امنیت REST API و دسترسی مدیریتی را در ENCOR ببندیم؟",
+  "goal": "پیکربندی حرفه‌ای **CoPP (Control Plane Policing)** با ساختار MQC (`class-map`, `policy-map`, `control-plane`)، تسلط بر مدل امنیتی دسترسی دستگاه (`AAA`، `VTY ACL`، `RBAC`)، شناخت لایه‌های دفاعی شبکه (Cisco ISE، Firepower/FTD، Stealthwatch/Umbrella) و ایمن‌سازی رابط‌های **REST API**.",
+  "prereq": "آشنایی با MQC/QoS، ACL و مبانی AAA (درس‌های `ccna_acl`، `adv_qos` و `ccnp_enc_arch`).",
+  "sections": [
+    {
+      "h": "۱. محافظت از مغز روتر با CoPP (Control Plane Policing)",
+      "p": [
+        "یک ACL ورودی روی اینترفیس (`ip access-group ... in`) می‌تواند هم ترافیک عبوری و هم بسته‌های خطاب به IP خود روتر را روی همان پورت فیلتر کند؛ اما مدیریت مستقل سیاستِ حفاظت از پردازنده روی ده‌ها اینترفیس مختلف و کنترل نرخ استثناهای فورواردینگ (`CEF Punt`، `TTL expired`، `ARP` و پیام‌های کنترلی) با ACL تکی دشوار و غیردقیق است. اگر نرخ بسته‌های ارسالی به **Control Plane (CPU)** محدود نشود، طوفان ترافیک ناخواسته می‌تواند پردازنده را اشباع کند.",
+        "**CoPP** دقیقاً همان موتور آشنای **MQC** را به جای اینترفیس‌های معمولی، روی یک اینترفیس مجازی ویژه به نام **`control-plane`** می‌نشاند تا بسته‌های ارسالی به CPU را به چند طبقه تقسیم و سقف‌گذاری (`police`) کند:"
+      ],
+      "steps": [
+        "گام ۱ (**طبقه‌بندی با `ACL` و `class-map`**): بسته‌های حیاتی را از خطرناک جدا کنید! مثلاً کلاس اول برای **پروتکل‌های روتینگ (`BGP 179`, `OSPF 89`)**، کلاس دوم برای **مدیریت مجاز (`SSH 22`, `SNMP`)** از ساب‌نت ادمین‌ها، کلاس سوم برای **ICMP/ترافیک نامشخص**، و کلاس نهایی **`class-default`**.",
+        "گام ۲ (**تعیین سقف در `policy-map`**): برای ترافیک روتینگ حیاتی نرخ سخاوتمندانه (یا بدون Drop تهاجمی در سطح مجاز) بگذارید؛ برای ICMP نرخ کم (مثلاً `police 64000 conform-action transmit exceed-action drop`)؛ و برای ترافیک مشکوک Drop قرار دهید.",
+        "گام ۳ (**اعمال روی `control-plane`**): زیر بخش **`control-plane`** دستور **`service-policy input <POLICY_NAME>`** را اجرا کنید تا بسته‌های ورودی پیش از رسیدن به CPU غربال شوند (توجه: در پلتفرم‌ها و نسخه‌های پشتیبانی‌شده، CoPP علاوه بر `input` امکان اعمال در جهت **`output`** را نیز برای کنترل نرخ بسته‌های خروجی از Control Plane دارد)."
+      ],
+      "think": {
+        "q": "سناریوی فاجعه: مهندسی در پیکربندی `CoPP` یک `class-map` فقط برای `SSH` می‌سازد و برای تست سریع، زیر **`class class-default`** دستور **`police 8000 conform-action drop exceed-action drop`** (بستن همه‌چیز!) را می‌زند و فراموش می‌کند یک کلاس مجزا برای OSPF و BGP بسازد! بلافاصله چه اتفاقی می‌افتد؟",
+        "a": "تمام بسته‌های `OSPF`، `BGP`، `BFD`، `ARP` و `CDP/LLDP` که به سمت CPU می‌رفتند وارد `class-default` شده و **Drop** می‌شوند! ظرف چند ثانیه تمام همسایگی‌های روتینگ و شبکهٔ مدیریتی قطع می‌شوند (خود-تحریمی / Self-DoS)! در CoPP همیشه قبل از تستِ Drop، ابتدا با `conform-action transmit exceed-action transmit` شمارنده‌ها را رصد کنید و پروتکل‌های حیاتی را در کلاس‌های بالای لیست استثنا و مجاز نمایید."
+      },
+      "bullets": []
+    },
+    {
+      "h": "۲. کنترل دسترسی دستگاه (AAA، VTY ACL و RBAC) در مقیاس ENCOR",
+      "p": [
+        "امنیت دسترسی مدیریتی روی تجهیزات سیسکو از چهار حلقهٔ هم‌پوشان تشکیل می‌شود: ۱) فقط ورود از ساب‌نت مدیریتی (**Out-of-Band / Management VRF**) با اعمال `access-class <ACL> in vrf-also` روی `line vty`؛ ۲) **AAA با TACACS+** (با هدر ثابت `12` بایتی طبق RFC 8907 و رمزنگاری کل بدنه یا همراه TLS/IPsec مدرن؛ تفکیک کامل Authentication، Authorization خط‌به‌خط CLI و Accounting) همراه با پشتیبان **`local`** هنگام قطع سرور مرکزی؛ ۳) **Role-Based CLI Access (RBAC / Parser Views)** تا اپراتور سطح ۱ تنها بتواند دستورات `show` را بزند؛ و ۴) غیرفعال‌سازی کامل سرویس‌های غیرضروری (`no ip http server`, `no cdp run` سمت اینترنت)."
+      ],
+      "think": {
+        "q": "سازمانی برای ورود SSH از طریق پورت اختصاصی مدیریت (`Mgmt-intf` که داخل یک VRF مدیریتی جداگانه است) دستور `access-class 10 in` را زیر `line vty 0 4` نوشته است؛ با اینکه IP ادمین در ACL 10 مجاز است، اتصال SSH رد می‌شود! چرا و با کدام کلمهٔ کلیدی حل می‌شود؟",
+        "a": "در Cisco IOS بدون کلمهٔ کلیدی **`vrf-also`** در انتهای خط (`access-class 10 in vrf-also`)، ترافیک ورودی از VRFهای غیرجهانی مثل `Mgmt-intf` توسط ACL رد می‌شود!"
+      },
+      "bullets": []
+    },
+    {
+      "h": "۳. امنیت اکوسیستم تهدید و ایمن‌سازی REST API",
+      "p": [
+        "در شبکهٔ مدرن ENCOR، مدیریت دیگر تنها از طریق SSH نیست؛ کنترلرهایی مثل Catalyst Center، SD-WAN vManage و فایروال FTD از طریق **REST API** با یکدیگر و با اسکریپت‌های اتوماسیون صحبت می‌کنند. ایمن‌سازی این لایه بر چهار اصل استوار است:"
+      ],
+      "bullets": [
+        "**رمزنگاری و احراز هویت ارتباط (`TLS 1.2/1.3`):** استفادهٔ اجباری از **HTTPS** با گواهی‌نامهٔ معتبر (هرگز HTTP خام، و پرهیز از خاموش کردن `verify=True` در اسکریپت‌های عملیاتی پایتون!).",
+        "**احراز هویت مبتنی بر توکن (`Token / OAuth 2.0 / API Key`):** به جای فرستادن نام کاربری و رمز در تک‌تک درخواست‌ها، دریافت یک **Bearer Token** یا Session Cookie زمان‌دار در هدر `Authorization` (هرگز رمز یا توکن را داخل URL Query String نگذارید چون در لاگ پروکسی‌ها ثبت می‌شود!).",
+        "**محدودیت نرخ و حداقل دسترسی (`Least Privilege & Rate Limiting`):** تعریف حساب‌های اختصاصی API تنها با مجوز دقیق مورد نیاز (مثلاً فقط `Read-Only` برای مانیتورینگ) و محدودسازی تعداد درخواست در ثانیه (`HTTP 429`) برای جلوگیری از کرش کنترلر."
+      ]
+    }
+  ],
+  "analogy": "**CoPP (Control Plane Policing)** مثل نگهبان و گیت ورودیِ «اتاق کنترل مرکزی و مدیریت کارخانه (`CPU`)» است، در حالی که ACLهای عادی روی پورت‌ها نگهبان «جادهٔ ترانزیتی خارج از کارخانه (`Data Plane`)» هستند! اگر صدها کامیون بار فقط بخواهند از بزرگراه کنار کارخانه رد شوند، ربطی به اتاق مدیر ندارند و سریع عبور می‌کنند؛ اما اگر دویست نفر هم‌زمان بریزند جلوی درِ دفتر مدیر با پرسش‌های تکراری و بی‌ربط، نگهبانِ گیت (`CoPP`) درِ دفتر را روی افراد معمولی جیره‌بندی می‌کند (`police 64000`) تا خط تلفن اضطراری آتش‌نشانی (`OSPF/BGP`) همیشه باز بماند! محل شکست تشبیه اینجاست: در برخی سخت‌افزارها اگر فیلتر CoPP نتواند برخی ترافیک‌های لایه ۲ مثل ARP غیرعادی را جدا کند، طوفان لایه ۲ پیش از CoPP هم به حفاظت‌های لایه ۲ (مثل `DAI` و `Storm Control`) نیاز دارد.",
+  "table": {
+    "title": "مقایسهٔ حفاظت Control Plane، Management Plane و Data Plane در ENCOR",
+    "headers": [
+      "صفحهٔ عملیاتی",
+      "تهدید اصلی",
+      "ابزار کلیدی در سیسکو"
+    ],
+    "rows": [
+      [
+        "Data Plane (عبور از پورت)",
+        "دسترسی غیرمجاز شبکه، Spoofing، حملات L2",
+        "Extended ACL، Port Security، DHCP Snooping، DAI، MACsec"
+      ],
+      [
+        "Control Plane (خطاب به CPU)",
+        "طوفان BGP/OSPF/ICMP جعلی و DoS به CPU",
+        "CoPP با MQC (`service-policy input` زیر `control-plane`)"
+      ],
+      [
+        "Management Plane & API",
+        "شنود پسورد، دستورات غیرمجاز CLI، سوءاستفاده از API",
+        "SSHv2، AAA (TACACS+/RADIUS)، VTY `access-class`، HTTPS/OAuth2/Token"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "تفاوت `CoPP` با `CPPr (Control Plane Protection)` در تجهیزات سیسکو چیست؟",
+      "a": "`CoPP` کل ترافیک ورودی به CPU را یکجا بررسی می‌کند؛ ولی نسخهٔ پیشرفته‌تر آن یعنی `CPPr` ترافیک ورودی به کنترل‌پلین را به سه زیرمجموعهٔ مجزا (`host` برای نشست‌های IP خود روتر، `transit` برای استثناهای فورواردینگ مثل TTL expired، و `cef-exception`) تفکیک می‌کند تا حفاظت دقیق‌تر شود."
+    },
+    {
+      "q": "اگر در `line vty 0 4` دستور `access-class 10 in` بزنیم ولی ترافیک از یک **VRF مدیریتی (`Mgmt-intf`)** وارد شود، آیا کار می‌کند؟",
+      "a": "به‌طور پیش‌فرض بدون کلمهٔ کلیدی **`vrf-also`** در انتهای دستور (`access-class 10 in vrf-also`)، ارتباطاتی که از داخل VRFهای غیرجهانی مثل `Mgmt-intf` بیایند مسدود می‌شوند! این یک نکتهٔ بسیار متداول در عیب‌یابی ورود SSH به تجهیزات جدید است."
+    }
+  ],
+  "summary": "امنیت زیرساخت ENCOR تنها به بستن پورت‌های کاربر ختم نمی‌شود: **CoPP** با MQC روی `control-plane` از CPU در برابر DoS محافظت می‌کند (به شرط باز گذاشتن آگاهانهٔ OSPF/BGP و تست بدون Drop ناگهانی در `class-default`)؛ **AAA + TACACS+ + VTY ACL (`vrf-also`)** دسترسی مدیریتی را مهار می‌کنند؛ و در رابط‌های مدرن **REST API** امنیت بر پایهٔ HTTPS/TLS، توکن هدر و حداقل مجوز بنا می‌شود.",
+  "ciscoRef": "Cisco CCNP ENCOR 350-401 Official Cert Guide — Ch 23 (Infrastructure Security: CoPP, AAA, ACL & REST API Security)",
+  "protocolAnalysis": [
+    "در **CoPP**، سیاست نرخ‌بندی ترافیکِ واردشونده به CPU با جهت **`input`** زیر `control-plane` اعمال می‌شود (و در پلتفرم‌ها/نسخه‌های پشتیبانی‌شده جهت **`output`** نیز برای بسته‌های خروجی از CPU قابل استفاده است)؛ با `show policy-map control-plane` شمارندهٔ `conformed` و `exceeded` هر کلاس رصد می‌شود.",
+    "در فراخوانی **REST API** ایمن، کلید یا `Bearer Token` درون HTTP Header (`Authorization: Bearer <token>`) روی بستر رمزنگاری‌شدهٔ **TLS** ارسال می‌شود؛ حتی هدر `Authorization` بدون TLS به‌صورت Base64 کاملاً قابل خواندن است!"
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show policy-map control-plane",
+      "out": "Control Plane\n  Service-policy input: COPP_POLICY\n    Class-map: CM_ROUTING (match-all)\n      Match: access-group name ACL_ROUTING\n      police: cir 512000 bps, bc 16000 bytes\n        conformed 4210 packets, 310200 bytes; actions: transmit\n        exceeded 0 packets, 0 bytes; actions: drop",
+      "note": "بررسی شمارنده‌های CoPP روی کنترل‌پلین. [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تمرین زندهٔ CoPP و TACACS+ نیازمند CML، EVE-NG یا تجهیزات واقعی است.]",
+      "why": "برای راستی‌آزمایی اینکه ترافیک حیاتی در کلاس درست قرار گرفته (`conformed`) و ترافیک اضافی/تهاجمی در کلاس محدودشده Drop می‌شود (`exceeded`) بدون اینکه پروتکل‌ها قطع شوند.",
+      "anatomy": "نام `Service-policy`، لیست هر `class-map`، نرخ `cir` و شمارنده‌های `conformed` در برابر `exceeded` را نمایش می‌دهد.",
+      "lookFor": "صفر بودن `exceeded/dropped` روی کلاس `CM_ROUTING` (OSPF/BGP) و فعال بودن شمارنده‌ها در تست ترافیک.",
+      "ifUnexpected": "اگر در کلاس روتینگ یا `class-default` عدد `exceeded` بالا می‌رود، فوری ظرفیت `cir` را افزایش دهید تا همسایگی‌ها قطع نشوند.",
+      "executable": false
+    },
+    {
+      "cmd": "show running-config",
+      "out": "Building configuration...\nhostname R1\n...",
+      "note": "دستور زنده در شبیه‌ساز داخلی (فقط در حالت R1# یا با do در حالت config) برای ممیزی پیکربندی امنیتی پورت‌ها و بررسی سطح حفاظت دسترسی.",
+      "why": "پایش منظم `running-config` اولین گام برای کشف دسترسی‌های باز، پورت‌های بلااستفادهٔ بدون `shutdown` و خطاهای VTY یا ACL است.",
+      "anatomy": "کل تنظیمات فعال سیستم را از بالا به پایین نمایش می‌دهد.",
+      "lookFor": "ایزوله بودن پورت‌های آزاد، برچسب دقیق نقش هر پورت و نبود تنظیمات ناخواسته.",
+      "ifUnexpected": "در صورت نیاز به تغییر در حالت `config` از `do show running-config` استفاده کرده و تغییرات را اصلاح کنید.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه ممیزی امنیتی اینترفیس‌ها و محدودسازی پورت‌های مدیریتی در شبیه‌ساز",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `control-plane`، `aaa new-model`، `access-list` و `show policy-map control-plane` را اجرا نمی‌کند (برای تمرین زندهٔ CoPP و TACACS+ از CML یا EVE-NG استفاده کنید). اما اجرای ممیزی امنیتی `show running-config`، تفکیک پورت‌های امنیتی/مدیریتی و قفل پورت‌های بلااستفاده کاملاً زنده در دسترس است.",
+      "۲. با `enable` وارد شوید و با `show running-config` و `show interfaces status` وضعیت فعلی تمام پورت‌ها را ممیزی کنید؛ پورت‌های `Gi0/6` و `Gi0/7` در وضعیت پیش‌فرض در `VLAN 1` فعال مانده‌اند!",
+      "۳. پورت مدیریتی اختصاصی برای سرور TACACS+/ISE را در `VLAN 90 (MGMT_SEC)` تعریف کنید، `Gi0/6` را برای آن اختصاص دهید، و پورت اضافی `Gi0/7` را ببندید (`shutdown` در VLAN پارک `999`): `configure terminal` -> `vlan 90` -> `name MGMT_SEC` -> `vlan 999` -> `name PARK_SHUT` -> `exit` -> `interface Gi0/6` -> `description ISE-TACACS-MGMT` -> `switchport mode access` -> `switchport access vlan 90` -> `interface Gi0/7` -> `description UNUSED-SHUT` -> `switchport mode access` -> `switchport access vlan 999` -> `shutdown` -> `interface Gi0/0` -> `description WAN-COPP-PROTECTED` -> `end`.",
+      "۴. با `show running-config`، `show vlan brief` و `show interfaces status` بررسی کنید تغییر وضعیت پورت‌ها در شبیه‌ساز ساده (`Gi0/6` در `VLAN 90` و `Gi0/7` `disabled` در `VLAN 999`) ثبت شده است (اعمال واقعی `CoPP` و `AAA` نیازمند CML یا تجهیز IOS/IOS-XE است).",
+      "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (قطعه‌فرمان آزمایشگاهی CoPP — پلتفرم مرجع: Cisco IOS-XE؛ بدون کپی مستقیم در تولید):** **فرمان‌های نمونه:** برای ترافیک BGP هر دو جهت (مبدأ یا مقصد TCP/179 از همسایهٔ مجاز `198.51.100.0/30`): `ip access-list extended ACL_BGP` -> `permit tcp 198.51.100.0 0.0.0.3 eq bgp any` و `permit tcp 198.51.100.0 0.0.0.3 any eq bgp` -> `class-map match-all CM_BGP` (`match access-group name ACL_BGP`) -> `policy-map PM_COPP` -> `class CM_BGP` (`police rate 1000000 conform-action transmit exceed-action transmit` یا آستانهٔ محافظه‌کارانه؛ همراه سایر کلاس‌های مجاز مثل OSPF/SSH/ARP) و صراحتاً **`class class-default`** (`police 256000 conform-action transmit exceed-action drop`) -> `control-plane` -> `service-policy input PM_COPP`. *(هشدار: این قطعه‌فرمان صرفاً نمونهٔ آزمایشگاهی است و در شبکهٔ تولیدی باید ابتدا با اندازه‌گیری ترافیک واقعی تمام پروتکل‌های حیاتی مانند OSPF، SSH، SNMP، ICMP و ARP در کلاس‌های مجزا محاسبه شوند تا با `class-default` قطع نشوند.)* **خروجی مرجع و نشانهٔ موفقیت:** در `show policy-map control-plane` افزایش `conformed` در کلاس `CM_BGP` برای هر دو جهت نشست BGP و ثبت `exceeded/dropped` روی سیل بسته‌های غیرمجاز در `class-default`. **نشانهٔ شکست:** افت نشست BGP (مثلاً به‌خاطر جا انداختن جهت مبدأ `eq bgp` در ACL) یا قفل شدن VTY/OSPF به دلیل نداشتن کلاس مجزا پیش از `class-default`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط تفکیک VLAN مدیریتی و بستن پورت آزاد را انجام می‌دهد و محافظت واقعی CPU در CML/تجهیز واقعی آزموده می‌شود."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show vlan brief",
+      "show interfaces status",
+      "show running-config"
+    ]
+  },
+  "troubleshooting": {
+    "fault": "پس از اعمال `access-class 50 in` روی `line vty 0 4` برای محدود کردن SSH تنها به ساب‌نت ادمین (`10.90.0.0/24`)، مدیر شبکه دیگر نمی‌تواند از طریق پورت اختصاصی مدیریت `Mgmt-intf` (که در یک VRF مدیریتی است) به روتر SSH بزند، در حالی که IP خودش دقیقاً جزو `10.90.0.0/24` است!",
+    "analysis": "در Cisco IOS دستور `access-class 50 in` به‌صورت پیش‌فرض تمام اتصالاتی را که از طریق VRFهای غیرجهانی (مثل `Mgmt-intf`) می‌آیند رد می‌کند، مگر اینکه کلمهٔ کلیدی `vrf-also` در پایان دستور آمده باشد.",
+    "fix": "تغییر خط VTY از طریق کنسول به **`access-class 50 in vrf-also`** تا ACL روی اتصالات ورودی از داخل VRF مدیریتی نیز ارزیابی و مجاز شود."
+  },
+  "misconceptions": [
+    {
+      "myth": "چون روی پورت ورودی WAN یک ACL نوشته‌ام که SSH را بسته، دیگر هیچ ترافیکی به CPU روتر نمی‌رسد و نیازی به CoPP نیست.",
+      "reality": "روترها برای پروتکل‌های مسیریابی، ARP، ICMP، NTP و پاسخ‌های مدیریتیِ خودِ سیستم هم باید در پورت‌های داخلی و بیرونی بسته بگیرند؛ علاوه بر این، بسته‌های جعلی از سمت شبکهٔ داخلی یا ترافیکِ مجازِ بیش‌ازحد (مثل اسکن یا حملهٔ ICMP/BGP) تنها با **CoPP** در سطح Control Plane مهار می‌شوند.",
+      "howToSpot": "تفاوت `show processes cpu` هنگام طوفان بسته‌های خطاب به IP روتر در برابر ترافیک عبوری عادی از پورت‌ها."
+    },
+    {
+      "myth": "در فراخوانی REST API اگر از `Basic Auth` (نام کاربری و رمز Base64) روی HTTP ساده استفاده کنیم امن است چون رمز تبدیل به رشتهٔ کدشده شده است!",
+      "reality": "**Base64 رمزنگاری نیست** و یک کدگذاری کاملاً برگشت‌پذیر و خوانا در چند میلی‌ثانیه است؛ بدون **TLS (HTTPS)** کل نام کاربری و رمز در سیم لو می‌رود.",
+      "howToSpot": "هرگز آدرس API نباید با `http://` شروع شود؛ همیشه `https://` با تأیید گواهی و توکن هدر لازم است."
+    }
+  ],
+  "exercise": "یک سیاست **CoPP** با ساختار سه‌مرحله‌ای MQC بنویسید به‌طوری که: ۱) ترافیک `OSPF` و `BGP` (`ACL_CRITICAL`) در کلاس `CM_ROUTING` نرخ `512000 bps` مجاز داشته باشد؛ ۲) ترافیک `ICMP` (`ACL_ICMP`) در کلاس `CM_ICMP` به `64000 bps` محدود و مازادش `drop` شود؛ ۳) به صورت امن در `class-default` نرخ بالایی مثل `2000000 bps` بگذارد و ابتدا **بدون Drop** برای پایش آزمایشی تنظیم شود (`exceed-action transmit`)؛ ۴) روی `control-plane` اعمال شود.",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "کدام دستور را باید در انتهای `access-class 25 in` روی `line vty 0 4` اضافه کنیم تا اتصال SSH از داخل VRF مدیریتی (`Mgmt-intf`) نیز اجازهٔ ورود پیدا کند؟",
+      "hint": "کلمهٔ کلیدی دو‌حرفیِ ترکیبی مرتبط با VRF.",
+      "solution": "`access-class 25 in vrf-also`"
+    },
+    {
+      "level": "متوسط",
+      "task": "یک توسعه‌دهنده برای دریافت اطلاعات وضعیت سوئیچ از کنترلر شبکه یک درخواست REST با آدرس `http://10.10.0.5/api/devices?api_key=Secret123` نوشته است. دقیقاً **سه آسیب‌پذیری امنیتی** در همین یک خط را فهرست و اصلاح امن آن را بیان کنید.",
+      "hint": "پروتکل رمزنگاری، محل قرارگیری کلید مخفی، و تأیید گواهی.",
+      "solution": "۱) استفاده از **`http://` بدون رمزنگاری** -> باید `https://` با TLS 1.2/1.3 باشد.\n۲) گذاشتن **`api_key` در Query Stringِ URL** (که در لاگ سرور، مرورگر و پروکسی ذخیره می‌شود) -> باید در هدر `Authorization: Bearer <token>` فرستاده شود.\n۳) نبود چرخهٔ انقضا/توکن موقت و نیاز به تأیید گواهی سمت کلاینت (`verify=True`)."
+    },
+    {
+      "level": "چالشی",
+      "task": "پیکربندی کامل سیاست **CoPP** خواسته‌شده در بخش `exercise` بالا (ACLها، Class-Mapها، Policy-Map و اعمال زیر `control-plane`) را روی Cisco IOS بنویسید.",
+      "hint": "برای OSPF از پروتکل `ospf` و برای BGP از `tcp any any eq bgp` در Extended ACL استفاده می‌کنیم؛ جهت اعمال همیشه `input` است.",
+      "solution": "`ip access-list extended ACL_CRITICAL`\n` permit ospf any any`\n` permit tcp any any eq bgp`\n` permit tcp any eq bgp any`\n`ip access-list extended ACL_ICMP`\n` permit icmp any any`\n`class-map match-all CM_ROUTING`\n` match access-group name ACL_CRITICAL`\n`class-map match-all CM_ICMP`\n` match access-group name ACL_ICMP`\n`policy-map COPP_POLICY`\n` class CM_ROUTING`\n`  police 512000 conform-action transmit exceed-action drop`\n` class CM_ICMP`\n`  police 64000 conform-action transmit exceed-action drop`\n` class class-default`\n`  police 2000000 conform-action transmit exceed-action transmit`\n`control-plane`\n` service-policy input COPP_POLICY`"
+    }
+  ],
+  "quiz": [
+    {
+      "q": "سیاست `CoPP` برای کنترل نرخ ترافیک خطاب به پردازندهٔ روتر در کدام بخش تنظیم می‌شود؟",
+      "opts": [
+        "فقط زیر اینترفیس `Gi0/0` با دستور `ip access-group`",
+        "زیر بخش مجازی `control-plane` با `service-policy input` (و در پلتفرم‌ها/نسخه‌های پشتیبان، در صورت نیاز جهت `output`)",
+        "زیر `router ospf 1` با دستور `passive-interface`",
+        "زیر `line vty 0 4` با دستور `transport input`"
+      ],
+      "ans": 1,
+      "exp": "CoPP ساختار MQC را مستقیماً روی بخش `control-plane` اعمال می‌کند تا ترافیک ورودی به CPU (و در پلتفرم‌های پشتیبان ترافیک خروجی از آن) نرخ‌بندی شود."
+    },
+    {
+      "q": "خطرناک‌ترین اشتباه هنگام تست اولیهٔ `CoPP` روی یک روتر عملیاتی در شبکهٔ زنده چیست؟",
+      "opts": [
+        "نوشتن `description` روی پورت‌ها",
+        "استفاده از `Named ACL` به جای شماره‌دار",
+        "قرار دادن `exceed-action drop` با نرخ بسیار پایین روی `class-default` بدون استثنا کردن پروتکل‌های روتینگ و مدیریت",
+        "بستن پورت Telnet 23"
+      ],
+      "ans": 2,
+      "exp": "اگر بدون پوشش دادن OSPF/BGP/BFD/SSH نرخ سخت‌گیرانه یا Drop روی `class-default` بگذارید، تمام نشست‌های کنترلی روتر سقوط می‌کنند."
+    },
+    {
+      "q": "در امنیت رابط‌های **REST API** شبکه، بهترین روش برای ارسال اعتبارنامه (Credentials/Token) پس از ورود کدام است؟",
+      "opts": [
+        "چسباندن رمز عبور به انتهای URL به عنوان پارامتر `?password=...`",
+        "استفاده از HTTP ساده روی پورت ۸۰",
+        "ذخیرهٔ رمز ساده در فایل متنی عمومی گیت",
+        "ارسال Token در هدر `Authorization` روی ارتباط رمزنگاری‌شدهٔ HTTPS/TLS"
+      ],
+      "ans": 3,
+      "exp": "ارسال Bearer Token در هدر روی بستر HTTPS/TLS مانع افشای رمز در لاگ‌های URL و شنود در شبکه می‌شود."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "CoPP، سخت‌سازی دسترسی مدیریتی و امنیت REST API الزام قطعی تمامی شبکه‌های سازمانی و ممیزی‌های امنیتی در سطح CCNP/CCIE هستند.",
+    "nextQuestion": "حالا که امنیت خودِ روتر و رابط‌های API را بستیم، در **حوزهٔ ۶ ENCOR** می‌بینیم خودِ مهندسان شبکه چطور به جای تغییر دستی روی صدها دستگاه از **Python (`requests` / `ncclient`)**، مدل‌سازی **YANG**، پروتکل‌های **NETCONF/RESTCONF**، **Cisco IOS EEM Applets** و ابزارهای مدیریت پیکربندی (**Ansible/Puppet/Chef**) برای خودکارسازی امن شبکه استفاده می‌کنند!",
+    "nextId": "ccnp_enc_auto"
+  }
+}

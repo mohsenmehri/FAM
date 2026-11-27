@@ -116,3 +116,62 @@ class TestAgent1Rewrites(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestAgent1LabTypeAccuracy(unittest.TestCase):
+    """تست دقت labType بر اساس تحلیل صحت شبیه‌ساز"""
+
+    def setUp(self):
+        self.rewrites = {}
+        for lid in AGENT1_SCOPE:
+            path = os.path.join(REWRITE_DIR, f'{lid}.json')
+            if os.path.exists(path):
+                with open(path, encoding='utf-8') as f:
+                    self.rewrites[lid] = json.load(f)
+
+    def test_labtype_not_executed_without_evidence(self):
+        """هیچ lesson نباید 'Executed' باشد چون اجرا_real_ تأیید نشده."""
+        for lid in AGENT1_SCOPE:
+            lesson = self.rewrites[lid]
+            self.assertIsNotNone(lesson, f"{lid}: فایل غایب")
+            lab_type = lesson.get('lab', {}).get('labType')
+            self.assertNotEqual(lab_type, 'Executed',
+                              f"{lid}: labType='Executed' بدون شوأد اجرا_real_")
+
+    def test_labtype_consistent_with_sim_honesty(self):
+        """labType باید با صحت شبیه‌ساز در خطوات laboratoire همسو باشد."""
+        path = os.path.join(
+            os.path.dirname(__file__), '..', '..',
+            '01-خام-پروژه', 'server', 'www', 'academy-assets', 'academy-data.json'
+        )
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        lessons = data['lessons']
+
+        for lid in AGENT1_SCOPE:
+            lesson = lessons[lid]
+            rewrite = self.rewrites[lid]
+            lab_type = rewrite.get('lab', {}).get('labType')
+
+            all_step_text = ' '.join(lesson.get('lab', {}).get('steps', [])).lower()
+            sim_honest = ('شبیه‌ساز' in all_step_text and
+                         ('اجرا نمی‌کند' in all_step_text or 'پشتیبانی نمی‌کند' in all_step_text))
+
+            if sim_honest:
+                self.assertEqual(lab_type, 'Reference',
+                               f"{lid}: sim صادقانه است اما labType={lab_type}")
+            elif 'mock' in all_step_text:
+                self.assertEqual(lab_type, 'Mock',
+                               f"{lid}: mock است اما labType={lab_type}")
+
+    def test_ccna_v6_verifycmds_count(self):
+        """ccna_v6 باید ۳ verifyCmds داشته باشد (بسته به محتوای laboratoire)."""
+        lesson = self.rewrites.get('ccna_v6')
+        self.assertIsNotNone(lesson, "ccna_v6: فایل غایب")
+        verify_cmds = lesson.get('lab', {}).get('verifyCmds', [])
+        self.assertEqual(len(verify_cmds), 3,
+                        f"ccna_v6 verifyCmds count: {len(verify_cmds)} (باید ۳ باشد)")
+
+
+if __name__ == '__main__':
+    unittest.main()
