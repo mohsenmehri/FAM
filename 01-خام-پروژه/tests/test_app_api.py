@@ -1,4 +1,5 @@
 import json
+import multiprocessing
 import os
 import sqlite3
 import sys
@@ -348,6 +349,56 @@ class FamAppApiTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups').fetchone()[0],1)
             self.assertEqual(db.execute('SELECT revision FROM academy_progress').fetchone()[0],2)
+
+    @unittest.skipUnless('fork' in multiprocessing.get_all_start_methods(), 'requires fork for independent worker processes')
+    def test_academy_progress_cas_across_processes(self):
+        # Separate processes/SQLite connections; not a browser or production WSGI test.
+        clients=[]
+        for _ in range(6):
+            c=self.app.test_client()
+            login=c.post('/api/login',json={'username':'admin','password':self.ADMIN_PASSWORD},
+                         headers={'Origin':self.ORIGIN},environ_base=self.https_env)
+            self.assertEqual(login.status_code,200)
+            clients.append((c,login.json['csrf']))
+        initial=json.dumps({'completed':['initial'],'labs':{}})
+        c,csrf=clients[0]
+        first=c.post('/api/academy/progress',json={'changes':{'fam4.learn.v1':initial},'expectedRevision':0},
+                     headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf},environ_base=self.https_env)
+        self.assertEqual(first.status_code,200)
+        ctx=multiprocessing.get_context('fork'); barrier=ctx.Barrier(7); results=ctx.Queue()
+        def worker(i):
+            try:
+                barrier.wait(timeout=15)
+                c,csrf=clients[i]
+                resp=c.post('/api/academy/progress',json={'changes':{'fam4.learn.v1':json.dumps({'completed':[str(i)],'labs':{}})},'expectedRevision':1},
+                            headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf},environ_base=self.https_env)
+                results.put((i,resp.status_code,None))
+            except BaseException as exc:
+                results.put((i,None,repr(exc)))
+        processes=[ctx.Process(target=worker,args=(i,)) for i in range(6)]
+        for p in processes:p.start()
+        try:
+            barrier.wait(timeout=15)
+            for p in processes:p.join(timeout=25)
+            self.assertFalse(any(p.is_alive() for p in processes))
+            self.assertEqual([p.exitcode for p in processes],[0]*6)
+            records=[results.get(timeout=5) for _ in processes]
+            self.assertEqual(len(records),6)
+            self.assertEqual([r[2] for r in records],[None]*6)
+            self.assertEqual(sorted(r[1] for r in records),[200]+[409]*5)
+            winner=next(i for i,status,_ in records if status==200)
+            with sqlite3.connect(self.db_path) as db:
+                raw,rev=db.execute('SELECT payload,revision FROM academy_progress').fetchone()
+                backups=db.execute('SELECT revision,payload FROM academy_progress_backups').fetchall()
+            self.assertEqual(rev,2)
+            self.assertEqual(json.loads(json.loads(raw)['fam4.learn.v1'])['completed'],[str(winner)])
+            self.assertEqual(len(backups),1);self.assertEqual(backups[0][0],1)
+            self.assertEqual(json.loads(backups[0][1])['fam4.learn.v1'],initial)
+        finally:
+            for p in processes:
+                if p.is_alive():p.terminate()
+                p.join(timeout=5)
+            results.close();results.join_thread()
 
     def test_academy_progress_legacy_and_unknown_cannot_be_overwritten(self):
         csrf=self._login_admin().get_json()['csrf']

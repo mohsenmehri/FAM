@@ -15,3 +15,10 @@ class OpticalBudgetTests(unittest.TestCase):
         self.assertFalse(m.calculate(-3, -15, [4, 1, 1], 7)['meets_margin'])
         with self.assertRaises(ValueError): m.calculate(-3, -15, [], 3)
         with self.assertRaises(ValueError): m.calculate(-3, -15, [-1], 3)
+
+    def test_reject_invalid_and_unrepresentable_budget(self):
+        for args in ((True,-15,[1],0), (-3,float('nan'),[1],0), (-3,-15,[float('inf')],0),
+                     (-3,-15,[1],True), (-3,-15,[1],-1), (10**500,-15,[1],0),
+                     (1e308,-1e308,[1],0), (-3,-15,[1e308,1e308],0), (-3,-15,None,0)):
+            with self.subTest(args=args), self.assertRaises(ValueError):m.calculate(*args)
+        self.assertTrue(m.calculate(-3,-15,[4,1,1],6)['meets_margin'])

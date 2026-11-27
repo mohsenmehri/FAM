@@ -1,0 +1,348 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_01",
+ "objectiveId": "auto_01",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۱ از ۲۰): Linux پیش‌نیاز مهندس شبکه",
+ "titleEn": "Automation 01: Linux Essentials for Network Engineers",
+ "domain": "Network Automation",
+ "source": "Legacy auto_01 rewritten and audited",
+ "evidence": "Python محلی در پوشه موقت اجرا شده؛ tcpdump مرجع است و روی تجهیز اجرا نشده است.",
+ "reviewStatus": "بازبینی فنی توسط یکپارچه‌ساز انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+ "estimatedMinutes": 45,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_01-section-1",
+   "title": "چرا لینوکس زیست‌بوم اصلی مهندس شبکه مدرن است؟",
+   "html": "<p>بسیاری از ابزارهای اتوماسیون و سرورهای مدیریتی شبکه در محیط Linux اجرا می‌شوند، هرچند همه ابزارها و سیستم‌عامل‌های شبکه الزاماً مبتنی بر Linux نیستند. آشنایی با مجوزها و ابزارهای تشخیص برای کار امن مهم است.</p>"
+  },
+  {
+   "id": "auto_01-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> آشنایی پایه با مفهوم IP، پورت TCP/UDP و خط فرمان.</p><ul><li>تسلط بر سلسله‌مراتب فایل‌سیستم لینوکس، مجوزهای عددی (<code>600</code>، <code>644</code>، <code>755</code>) و خطر مجوز نوشتن عمومی در فایل‌های عملیاتی.</li><li>تحلیل سریع لاگ‌های حجیم شبکه با <code>grep</code>، <code>awk</code>، <code>sed</code>، <code>sort</code>، <code>uniq</code> و تفاوت ریدایرکت <code>&gt;</code> و <code>&gt;&gt;</code>.</li><li>جایگزینی ابزارهای قدیمی <code>net-tools</code> با مجموعه مدرن <strong>iproute2</strong> (<code>ip</code>، <code>ss</code>) و استفاده صحیح از <code>tcpdump -nn</code>.</li><li>اصول ایمنی Bash (<code>set -euo pipefail</code>)، مدیریت سرویس با <code>systemd</code>/<code>journalctl</code> و زمان‌بندی امن با <code>cron</code>.</li></ul>"
+  },
+  {
+   "id": "auto_01-section-3",
+   "title": "ساختار فایل‌سیستم لینوکس از دید مهندس شبکه",
+   "html": "<ul><li><code>/etc/</code>: فایل‌های پیکربندی سیستم و سرویس‌ها (مثل <code>/etc/ssh/sshd_config</code>، <code>/etc/hosts</code>، <code>/etc/netplan/</code>).</li><li><code>/var/log/</code>: محل ذخیره لاگ‌های سیستم، احراز هویت و Syslog (مانند <code>auth.log</code> یا <code>secure</code>).</li><li><code>/home/&lt;user&gt;/.ssh/</code>: کلیدهای SSH، فایل <code>config</code> و <code>known_hosts</code> کاربر اتوماسیون.</li><li><code>/usr/local/bin/</code> یا <code>/opt/</code>: محل استاندارد استقرار اسکریپت‌ها و ابزارهای تیمی.</li><li><code>/tmp/</code>: پوشه موقت (هرگز فایل‌های حساس یا کلیدهای دائمی را در <code>/tmp</code> نگذارید).</li></ul>"
+  },
+  {
+   "id": "auto_01-section-4",
+   "title": "مجوزهای فایل (chmod / chown) و چرا chmod 777 در Jump Host خطرناک است؟",
+   "html": "<p>مجوزهای کلاسیک لینوکس سه رقم هشت‌تایی (Octal) برای <strong>مالک (User)</strong>، <strong>گروه (Group)</strong> و <strong>دیگران (Others)</strong> دارند که جمع <code>r=4</code>، <code>w=2</code> و <code>x=1</code> است:</p><ul><li><strong><code>600</code> (<code>rw-------</code>):</strong> یک انتخاب محدودکننده برای <strong>کلید خصوصی SSH</strong> (<code>~/.ssh/id_ed25519</code>) و فایل‌های <code>.env</code> حاوی رمز. در شرایط بررسی مالکیت، OpenSSH معمولاً در صورت دسترسی گروه یا دیگران به کلید خصوصی متعلق به کاربر (مثلاً <code>644</code> یا <code>777</code>) با خطای <code>UNPROTECTED PRIVATE KEY FILE</code> از استفاده از آن سر باز می‌زند؛ 0400 نیز ممکن است مناسب باشد. مالکیت، ACL، پوشه‌ها و سیاست میزبان را هم بررسی کنید!</li><li><strong><code>700</code> (<code>rwx------</code>):</strong> برای پوشه <code>~/.ssh</code>.</li><li><strong><code>755</code> (<code>rwxr-xr-x</code>):</strong> برای اسکریپت‌های اجرایی بدون اطلاعات محرمانه (مالک می‌نویسد، دیگران فقط می‌خوانند/اجرا می‌کنند).</li><li><strong>چرا <code>chmod 777</code> فاجعه است؟</strong> هر کاربر محلی یا سرویس آسیب‌پذیر می‌تواند اسکریپت اتوماسیون شما را ویرایش کند و کد مخرب به عنوان شما روی تمام روترهای شبکه اجرا نماید!</li></ul>"
+  },
+  {
+   "id": "auto_01-section-5",
+   "title": "نمودار خلاصه ابزارهای حیاتی لینوکس برای مهندس شبکه",
+   "html": "<p>سه ستون روزمره کار با لینوکس در عملیات شبکه: پایپ‌لاین تحلیل لاگ، مجموعه شبکه <code>iproute2/tcpdump</code> و انضباط مجوزها و سرویس‌ها.</p><svg viewBox=\"0 0 760 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Linux Pipeline, iproute2 and SSH Permission Architecture\"><rect x=\"12\" y=\"18\" width=\"228\" height=\"174\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"126\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#0f172a\">Log Processing Pipeline</text><text x=\"126\" y=\"72\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1e293b\">grep \"Failed password\"</text><text x=\"126\" y=\"98\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1e293b\">| awk \"{print $(NF-3)}\"</text><text x=\"126\" y=\"124\" text-anchor=\"middle\" font-size=\"11\" fill=\"#1d4ed8\" font-weight=\"bold\">| sort | uniq -c | sort -nr</text><text x=\"126\" y=\"156\" text-anchor=\"middle\" font-size=\"10\" fill=\"#64748b\">sort groups duplicate lines</text><rect x=\"266\" y=\"18\" width=\"228\" height=\"174\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"380\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Modern iproute2 &amp; Capture</text><text x=\"380\" y=\"72\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">ip addr / ip route / ip link</text><text x=\"380\" y=\"98\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">ss -tulnp (replaces netstat)</text><text x=\"380\" y=\"124\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">tcpdump -nn -i eth0</text><text x=\"380\" y=\"156\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">-nn avoids name resolution in display</text><rect x=\"520\" y=\"18\" width=\"228\" height=\"174\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"634\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Permissions &amp; Services</text><text x=\"634\" y=\"72\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">chmod 600 ~/.ssh/id_ed25519</text><text x=\"634\" y=\"98\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">chmod 755 backup.sh</text><text x=\"634\" y=\"124\" text-anchor=\"middle\" font-size=\"11\" fill=\"#b91c1c\">NEVER chmod 777 on prod</text><text x=\"634\" y=\"156\" text-anchor=\"middle\" font-size=\"10\" fill=\"#166534\">systemd (journalctl) &amp; cron</text></svg>"
+  },
+  {
+   "id": "auto_01-section-6",
+   "title": "ریدایرکت‌ها (>، >>، 2>&1) و پایپ‌لاین حرفه‌ای تحلیل لاگ",
+   "html": "<p>تفاوت دو عملگر ریدایرکت در اسکریپت‌های پشتیبان‌گیری بسیار حیاتی است: <code>&gt;</code> فایل مقصد را <strong>کاملاً بازنویسی (Overwrite)</strong> می‌کند، اما <code>&gt;&gt;</code> به انتهای فایل <strong>اضافه (Append)</strong> می‌کند. همچنین <code>2&gt;&amp;1</code> جریان خطا (stderr=2) را به جریان خروجی استاندارد (stdout=1) هدایت می‌کند تا خطاهای cron در فایل لاگ گم نشوند.</p><p><strong>نمونه آموزشی شمارش IP در قالب مشخص لاگ SSH:</strong></p><pre dir=\"ltr\"><code>grep \"Failed password\" /var/log/auth.log | awk '{print $(NF-3)}' | sort | uniq -c | sort -nr | head -n 10</code></pre><p><strong>چرا <code>sort</code> پیش از <code>uniq -c</code> ضروری است؟</strong> زیرا ابزار <code>uniq</code> فقط سطرهای تکراری <em>مجاور هم</em> را می‌شمارد؛ اگر همان IP در سطر ۱ و سطر ۵۰ باشد، بدون <code>sort</code> دو بار جداگانه با شمارش ۱ گزارش می‌شود!</p><p>این پایپ‌لاین فقط برای قالب نمونه است؛ قالب log و کاربران کنترل‌نشده می‌توانند نتیجه را مخدوش کنند. ترتیب ریدایرکت مهم است: <code>command &gt;file 2&gt;&amp;1</code> هر دو را به فایل می‌فرستد، اما برعکس آن چنین نیست. داده لاگ را محرمانه و غیرقابل اعتماد فرض کنید.</p>"
+  },
+  {
+   "id": "auto_01-section-7",
+   "title": "مقایسه ابزارهای مدرن iproute2 در برابر net-tools منسوخ",
+   "html": "<table><thead><tr><th>وظیفه شبکه‌ای</th><th>دستور منسوخ (net-tools)</th><th>جایگزین مدرن استاندارد (iproute2)</th></tr></thead><tbody><tr><td>مشاهده آدرس‌های IP و لینک‌ها</td><td><code>ifconfig -a</code></td><td><code>ip -br addr</code> / <code>ip addr show</code> / <code>ip link</code></td></tr><tr><td>مشاهده جدول مسیریابی</td><td><code>route -n</code></td><td><code>ip route show</code> / <code>ip -6 route</code></td></tr><tr><td>مشاهده جدول ARP / Neighbor</td><td><code>arp -n</code></td><td><code>ip neigh show</code></td></tr><tr><td>مشاهده پورت‌های باز و فرآیندها</td><td><code>netstat -tulnp</code></td><td><code>ss -tulnp</code></td></tr></tbody></table><p>ابزار <code>ss</code> مستقیماً از طریق Netlink کرنل لینوکس اطلاعات سوکت‌ها را می‌خواند و ابزار رایج مشاهده سوکت‌هاست؛ کارایی و پوشش بسته به نسخه و محیط متفاوت است. نمایش فرایند ممکن است به مجوز کافی نیاز داشته باشد. پرچم‌های <code>-tulnp</code> یعنی: TCP (<code>t</code>)، UDP (<code>u</code>)، Listening (<code>l</code>)، عددی بدون DNS (<code>n</code>) و نمایش فرآیند (<code>p</code>).</p>"
+  },
+  {
+   "id": "auto_01-section-8",
+   "title": "تحلیل بسته با tcpdump و اهمیت پرچم -nn",
+   "html": "<p>در عیب‌یابی اتصال API، Syslog، RADIUS یا BGP از روی سرور لینوکس، <code>tcpdump</code> ابزار خط اول است:</p><pre dir=\"ltr\"><code>sudo tcpdump -nn -i eth0 host 192.0.2.10 and port 1812 -w radius_debug.pcap</code></pre><p>پرچم <strong><code>-nn</code></strong> دو کار کلیدی انجام می‌دهد: از ترجمه معکوس DNS برای IPها و از ترجمه شماره پورت به نام سرویس جلوگیری می‌کند. در زمان قطعی شبکه یا کندی DNS، ترجمه نام هنگام نمایش می‌تواند تأخیر یا ترافیک اضافی ایجاد کند؛ از دست رفتن بسته تضمین‌شده نیست. در حالت نوشتن خام <code>-w</code> نمایش بسته انجام نمی‌شود و اثر ترجمه نام نباید به این مثال تعمیم داده شود! همچنین گزینه <code>-w</code> بسته‌ها را خام در فایل <code>.pcap</code> ذخیره می‌کند تا در Wireshark بررسی شوند.</p><p>گرفتن بسته با مجوز و دامنه محدود انجام شود؛ فایل pcap ممکن است حاوی اطلاعات حساس باشد. از <code>-c</code> یا سیاست زمان/اندازه و نگهداری امن استفاده کنید.</p>"
+  },
+  {
+   "id": "auto_01-section-9",
+   "title": "اصول Bash ایمن برای اسکریپت‌های شبکه",
+   "html": "<p>یک اسکریپت Bash بدون محافظت، ممکن است پس از خطا در خط ۳ (مثلاً پر بودن دیسک یا خالی بودن متغیر مسیر) به اجرا ادامه دهد و با دستور <code>rm -rf \"$DIR/\"*</code> فاجعه بسازد. در ابتدای اسکریپت‌های عملیاتی معمولاً این هدر ایمنی قرار می‌گیرد:</p><pre dir=\"ltr\"><code>#!/usr/bin/env bash\nset -euo pipefail</code></pre><ul><li><code>-e</code>: تلاش برای خروج هنگام خطای دستور، با استثناهای مهم Bash مانند شرط if، بخش‌هایی از &&/|| و pipeline.</li><li><code>-u</code>: خطا دادن در صورت استفاده از متغیر تعریف‌نشده (متغیر تعریف‌شده ولی خالی همچنان پذیرفته می‌شود).</li><li><code>-o pipefail</code>: کد خروج pipeline را به آخرین خطای غیرصفر (از راست) تغییر می‌دهد؛ به‌تنهایی خروج در همه contextها را تضمین نمی‌کند.</li></ul><p>این گزینه‌ها جایگزین بررسی صریح خطا، اعتبارسنجی ورودی، نقل‌قول و آزمایش نیستند؛ مثلاً در شرط <code>if</code>، errexit می‌تواند نادیده گرفته شود.</p>"
+  },
+  {
+   "id": "auto_01-section-10",
+   "title": "مدیریت سرویس با systemd و زمان‌بندی ایمن با cron",
+   "html": "<p>سرویس‌های دائمی مانند <code>rsyslog</code>، <code>sshd</code> یا Exporterهای پایش با <strong>systemd</strong> مدیریت می‌شوند: <code>systemctl status &lt;svc&gt;</code>، <code>systemctl reload &lt;svc&gt;</code> (اعمال تغییر بدون قطع نشست‌های فعلی در صورت پشتیبانی سرویس) و بررسی لاگ ساختاری با <code>journalctl -u ssh -n 50 --no-pager</code>.</p><p>برای وظایف دوره‌ای (مثل پشتیبان‌گیری شبانه کانفیگ)، <strong>cron</strong> از ۵ فیلد زمان (دقیقه، ساعت، روز ماه، ماه، روز هفته) استفاده می‌کند. نکته ایمنی در cron: همواره <strong>مسیر کامل باینری‌ها</strong> (مثلاً <code>/usr/bin/python3</code>) را بنویسید، خروجی و خطا را لاگ بگیرید و از <code>flock</code> برای جلوگیری از اجرای هم‌زمان دو نمونه از همان اسکریپت (Overlap) بهره ببرید.</p><p>زمان cron به منطقه زمانی و DST میزبان وابسته است و تکرار/حذف ساعت ممکن است رخ دهد؛ flock زمانی مؤثر است که همه اجراها از قفل مشترک پشتیبانی کنند.</p>"
+  },
+  {
+   "id": "auto_01-section-11",
+   "title": "کژفهمی‌های رایج لینوکس در تیم‌های شبکه",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای رفع خطای Permission Denied سریعاً chmod 777 بزنیم.»</strong> واقعیت: مجوز بسیار باز کلید خصوصی متعلق به کاربر معمولاً توسط OpenSSH رد می‌شود و اسکریپت 777 آسیب‌پذیری ارتقای دسترسی ایجاد می‌کند.</li><li><strong>کژفهمی ۲: «uniq خودش تمام سطرهای تکراری فایل را می‌شمارد.»</strong> واقعیت: <code>uniq</code> فقط سطرهای تکراری <em>متوالی</em> را ادغام می‌کند و تقریباً همیشه به <code>sort</code> پیش از خود نیاز دارد.</li><li><strong>کژفهمی ۳: «برای دیدن پورت‌های باز حتماً باید netstat نصب کنیم.»</strong> واقعیت: <code>ss -tulnp</code> از بسته <code>iproute2</code> در بسته iproute2 قرار دارد و ممکن است نیاز به نصب داشته باشد.</li></ul>"
+  },
+  {
+   "id": "auto_01-section-12",
+   "title": "عیب‌یابی سیستماتیک سرور اتوماسیون لینوکس",
+   "html": "<p><strong>سناریو ۱ — خطای <code>Permissions 0644 for 'id_ed25519' are too open</code> هنگام SSH:</strong> مجوز کلید خصوصی باز است؛ با <code>chmod 600 ~/.ssh/id_ed25519</code> و <code>chmod 700 ~/.ssh</code> اصلاح می‌شود.</p><p><strong>سناریو ۲ — اسکریپت در ترمینال اجرا می‌شود اما در cron کار نمی‌کند:</strong> محیط <code>PATH</code> در cron بسیار محدود است و دایرکتوری کاری (<code>cwd</code>) ممکن است متفاوت باشد؛ با ثبت <code>&gt;&gt; /var/log/job.log 2&gt;&amp;1</code> و استفاده از مسیر کامل فایل‌ها و باینری‌ها به تشخیص کمک می‌کند؛ مجوز، محیط، داده ورودی و وضعیت اجرای job نیز باید بررسی شوند.</p>"
+  },
+  {
+   "id": "auto_01-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> فایل لاگی داریم که IP <code>198.51.100.10</code> در سطرهای ۱، ۲ و ۵ و IP <code>203.0.113.77</code> در سطر ۴ آمده است. خروجی <code>uniq -c</code> بدون <code>sort</code> و با <code>sort</code> چه فرقی دارد؟ <strong>پاسخ:</strong> بدون <code>sort</code>، سطر ۱ و ۲ با هم <code>2</code> می‌شوند اما سطر ۵ جداگانه با شمارش <code>1</code> چاپ می‌شود (نتیجه غلط). با <code>sort | uniq -c</code> هر سه سطر کنار هم قرار گرفته و <code>3 198.51.100.10</code> و <code>1 203.0.113.77</code> دقیق محاسبه می‌شود.</p><p><strong>تمرین ۲:</strong> عبارت cron <code>15 2 * * 1-5</code> چه زمانی اجرا می‌شود؟ <strong>پاسخ:</strong> ساعت ۰۲:۱۵ بامداد در روزهای دوشنبه تا جمعه (روزهای ۱ تا ۵ هفته)، طبق منطقه زمانی و پیاده‌سازی cron میزبان؛ اثر تغییر ساعت را بررسی کنید.</p>"
+  },
+  {
+   "id": "auto_01-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> صفحات راهنمای رسمی <code>man ip</code>، <code>man ss</code>، <code>man tcpdump</code>، <code>man chmod</code>، <code>man systemd</code> و مستندات OpenSSH.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه محلی این درس فقط در یک پوشه موقت (<code>TemporaryDirectory</code>) مجوز <code>0600</code> و الگوریتم پایپ‌لاین لاگ را در Python اجرا و بررسی می‌کند؛ هیچ سرور تولیدی لینوکس، فایل سیستمی <code>/var/log/auth.log</code>، سرویس <code>systemd</code> یا روتر شبکه تغییر داده نمی‌شود.</p><p>اسکریپت فقط قالب محدود نمونه sshd را می‌پذیرد و نه اعتبارسنجی اصالت لاگ و نه parser عمومی production است. تنظیم mode به‌تنهایی امنیت کامل کلید را اثبات نمی‌کند.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "chmod",
+   "fa": "تغییر مجوز فایل",
+   "simple": "دستور تنظیم مجوزهای خواندن/نوشتن/اجرا (مانند 600 برای کلید SSH و 755 برای اسکریپت)."
+  },
+  {
+   "term": "chown",
+   "fa": "تغییر مالکیت فایل",
+   "simple": "تعیین کاربر و گروه مالک یک فایل یا پوشه در لینوکس."
+  },
+  {
+   "term": "iproute2",
+   "fa": "مجموعه iproute2",
+   "simple": "ابزارهای مدرن شبکه لینوکس شامل ip و ss که جایگزین net-tools منسوخ شده‌اند."
+  },
+  {
+   "term": "ss",
+   "fa": "ابزار ss",
+   "simple": "Socket Statistics؛ جایگزین سریع و مدرن netstat برای مشاهده پورت‌های باز و اتصالات."
+  },
+  {
+   "term": "tcpdump",
+   "fa": "شنودگر tcpdump",
+   "simple": "ابزار capture و نمایش بسته؛ ‎-nn ترجمه نام آدرس و سرویس را در نمایش غیرفعال می‌کند."
+  },
+  {
+   "term": "Pipeline (|)",
+   "fa": "پایپ‌لاین لینوکس",
+   "simple": "ارسال خروجی استاندارد یک دستور به ورودی استاندارد دستور بعدی."
+  },
+  {
+   "term": "sort / uniq",
+   "fa": "مرتب‌سازی و شمارش یکتا",
+   "simple": "sort سطرهای تکراری را مجاور هم می‌کند تا uniq -c آن‌ها را دقیق بشمارد."
+  },
+  {
+   "term": "grep / awk / sed",
+   "fa": "ابزارهای پردازش متن",
+   "simple": "جست‌وجوی الگو (grep)، استخراج ستون (awk) و ویرایش جریانی متن (sed)."
+  },
+  {
+   "term": "Redirect (> / >>)",
+   "fa": "تغییر مسیر خروجی",
+   "simple": "عملگر > فایل را بازنویسی می‌کند و >> به انتهای فایل می‌افزاید."
+  },
+  {
+   "term": "stderr (2>&1)",
+   "fa": "ادغام خطا و خروجی",
+   "simple": "هدایت جریان خطای استاندارد به جریان خروجی استاندارد برای ثبت کامل لاگ."
+  },
+  {
+   "term": "set -euo pipefail",
+   "fa": "حالت ایمن Bash",
+   "simple": "گزینه‌های بررسی خطا و متغیر unset و وضعیت pipeline؛ errexit استثنا دارد و مقدار خالی را رد نمی‌کند."
+  },
+  {
+   "term": "systemd",
+   "fa": "مدیر سرویس systemd",
+   "simple": "سامانه مدیریت سرویس‌ها و دیمون‌ها در توزیع‌های مدرن لینوکس."
+  },
+  {
+   "term": "journalctl",
+   "fa": "بازبینی لاگ systemd",
+   "simple": "ابزار خواندن و فیلتر لاگ‌های ساختاریافته سرویس‌های تحت systemd."
+  },
+  {
+   "term": "cron",
+   "fa": "زمان‌بند cron",
+   "simple": "اجرای دوره‌ای اسکریپت‌ها و پشتیبان‌گیری بر اساس الگوی زمانی ۵ فیلدی."
+  },
+  {
+   "term": "flock",
+   "fa": "قفل فایل اجرا",
+   "simple": "جلوگیری از اجرای هم‌زمان و تداخل دو نمونه از یک کار زمان‌بندی‌شده در cron."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه محلی لینوکس (مجوز 0600 و پایپ‌لاین لاگ در پوشه موقت) + مرجع دستورات (سرور تولیدی اجرا نشده)",
+   "executionStatus": "Python محلی در پوشه موقت اجرا شده؛ tcpdump مرجع است و روی تجهیز اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اسکریپت محلی روی پوشه موقت لینوکس</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور تولیدی، سرویس systemd یا روتر واقعی سیسکو تغییر داده نشده است.</p><p>در بخش اول، اسکریپت محلی Python نتیجه مشابه پایپ‌لاین <code>grep | awk | sort | uniq -c</code> را روی نمونه لاگ SSH محاسبه کرده و در یک پوشه موقت واقعی لینوکس مجوز <code>0600</code> کلید SSH آزمایشی را اعمال و راستی‌آزمایی می‌کند.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_01_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_01_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Linux &amp; Log-Processing Lab for auto_01 (runs locally in a temporary directory).\n\nNo production Linux server, root privilege, or real Cisco/network device is modified.\nParses only an illustrative sshd suffix; this is not a trusted production log parser.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom collections import Counter\nimport ipaddress\nimport os\nfrom pathlib import Path\nimport re\nimport stat\nimport tempfile\n\nSAMPLE_AUTH_LOG = &quot;&quot;&quot;Nov 27 02:10:01 bastion sshd[101]: Failed password for invalid user admin from 198.51.100.10 port 51234 ssh2\nNov 27 02:10:03 bastion sshd[102]: Failed password for invalid user admin from 198.51.100.10 port 51235 ssh2\nNov 27 02:10:05 bastion sshd[103]: Accepted publickey for netops from 192.0.2.15 port 52001 ssh2\nNov 27 02:10:07 bastion sshd[104]: Failed password for root from 203.0.113.77 port 49111 ssh2\nNov 27 02:10:09 bastion sshd[105]: Failed password for invalid user test from 198.51.100.10 port 51239 ssh2\n&quot;&quot;&quot;\n\nSSH_FAILED_IP_RE = re.compile(r&quot;Failed password .* from (\\S+) port \\d+ ssh2$&quot;)\n\n\ndef parse_failed_ssh_counts(log_text: str) -&gt; list[tuple[str, int]]:\n    &quot;&quot;&quot;Extract validated source IPs from sshd &#x27;Failed password&#x27; lines, for the limited sample suffix; input is not authenticated.&quot;&quot;&quot;\n    if not isinstance(log_text, str):\n        raise ValueError(f&quot;log_text must be str, got {type(log_text).__name__}&quot;)\n    ips = []\n    for line in log_text.splitlines():\n        if &quot;Failed password&quot; not in line:\n            continue\n        match = SSH_FAILED_IP_RE.search(line)\n        if not match:\n            raise ValueError(f&quot;Malformed &#x27;Failed password&#x27; log line: {line!r}&quot;)\n        candidate = match.group(1)\n        try:\n            normalized = str(ipaddress.ip_address(candidate))\n        except ValueError as exc:\n            raise ValueError(f&quot;Invalid IP address in SSH log line: {candidate!r}&quot;) from exc\n        ips.append(normalized)\n    return sorted(Counter(ips).items(), key=lambda item: (-item[1], item[0]))\n\n\ndef verify_ssh_key_permissions(temp_dir: Path) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Create a dummy key file in temp_dir and verify octal 0600 (owner rw only).&quot;&quot;&quot;\n    key_path = temp_dir / &quot;id_ed25519_dummy&quot;\n    key_path.write_text(&quot;DUMMY-KEY-NOT-REAL\\n&quot;, encoding=&quot;utf-8&quot;)\n    os.chmod(key_path, 0o600)\n    mode = stat.S_IMODE(key_path.stat().st_mode)\n    return {\n        &quot;file&quot;: key_path.name,\n        &quot;octal_mode&quot;: oct(mode),\n        &quot;safe_for_openssh&quot;: mode == 0o600,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local temporary-directory Linux lab only — no production server or router is modified.&quot;)\n    counts = parse_failed_ssh_counts(SAMPLE_AUTH_LOG)\n    assert counts == [(&quot;198.51.100.10&quot;, 3), (&quot;203.0.113.77&quot;, 1)]\n    print(&quot;Top failed SSH source IPs:&quot;, counts)\n    with tempfile.TemporaryDirectory() as tmp:\n        perm = verify_ssh_key_permissions(Path(tmp))\n        assert perm[&quot;safe_for_openssh&quot;] is True\n        print(&quot;SSH key permission check:&quot;, perm)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> شمارش دقیق خطاهای SSH برابر <code>[('198.51.100.10', 3), ('203.0.113.77', 1)]</code> و تأیید مجوز <code>0o600</code> با <code>safe_for_openssh: True</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>دستورات مرجع روی ماشین آزمایشی لینوکس (اجرا نشده روی سرور تولیدی):</strong></p><pre dir=\"ltr\"><code># Read-only diagnostics on a Linux test VM (NOT modifying production)\nip -br addr\nip route show\nss -tulnp\n# With root/sudo on a lab host:\nsudo tcpdump -nn -c 20 -i eth0 port 22</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p><p>این الگو تنها برای قالب نمونه است و اصالت یا سلامت لاگ را تأیید نمی‌کند؛ سنجه mode نیز تضمین همه شرایط امنیت کلید نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس Linux پیش‌نیاز مهندس شبکه",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "چرا پیش از اجرای uniq -c روی خروجی grep و awk تقریباً همیشه دستور sort قرار می‌گیرد؟",
+   "options": [
+    "زیرا uniq فایل لاگ را پاک می‌کند",
+    "زیرا uniq فقط سطرهای تکراری مجاور هم را تشخیص می‌دهد و بدون sort شمارش ناقص می‌ماند",
+    "زیرا sort فایل را رمزنگاری می‌کند",
+    "زیرا uniq فقط روی فایل‌های باینری کار می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p><code>uniq</code> تنها تکرارهای پشت‌سرهم را ترکیب می‌کند؛ مرتب‌سازی قبلی با <code>sort</code> همه مقادیر یکسان را کنار هم می‌آورد.</p>"
+  },
+  {
+   "title": "کدام دستور جایگزین استاندارد و مدرن دستور منسوخ netstat -tulnp در لینوکس امروزی است؟",
+   "options": [
+    "ifconfig -a",
+    "route -n",
+    "chmod 755",
+    "ss -tulnp"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>در Linux، <code>ss -tulnp</code> یکی از جایگزین‌های رایج است؛ نمایش فرایند به مجوز و محیط وابسته است.</p>"
+  },
+  {
+   "title": "پرچم -nn در دستور tcpdump چه کارکرد حیاتی در زمان عیب‌یابی شبکه دارد؟",
+   "options": [
+    "هنگام نمایش بسته، ترجمه نام آدرس و شماره پورت را غیرفعال می‌کند و می‌تواند تأخیر DNS را کاهش دهد",
+    "همه بسته‌های UDP را حذف می‌کند",
+    "کارت شبکه را ریست می‌کند",
+    "فایل pcap را به متن ساده تبدیل می‌کند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>تأثیر روی نمایش است؛ در نوشتن خام با -w نمایش صورت نمی‌گیرد و افت بسته به‌طور قطعی نتیجه نبود -nn نیست.</p>"
+  },
+  {
+   "title": "کدام مجوز عددی برای فایل کلید خصوصی SSH (~/.ssh/id_ed25519) استاندارد و مورد پذیرش OpenSSH است؟",
+   "options": [
+    "777",
+    "600",
+    "666",
+    "755"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>0600 یک انتخاب مناسب است، نه تنها مقدار ممکن؛ مالکیت و ACL و شرایط بررسی OpenSSH نیز اهمیت دارند.</p>"
+  },
+  {
+   "title": "تفاوت اصلی عملگر ریدایرکت > با >> در Bash چیست؟",
+   "options": [
+    "هیچ تفاوتی ندارند",
+    "عملگر > به انتها اضافه می‌کند و >> فایل را پاک می‌کند",
+    "عملگر > محتوای قبلی فایل مقصد را بازنویسی (Overwrite) می‌کند، اما >> به انتهای فایل اضافه (Append) می‌کند",
+    "عملگر >> فقط خطاها را ذخیره می‌کند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>برای حفظ تاریخچه لاگ‌ها باید از <code>&gt;&gt;</code> استفاده کرد؛ استفاده اشتباه از <code>&gt;</code> فایل لاگ قبلی را پاک می‌کند.</p>"
+  },
+  {
+   "title": "هدف از قرار دادن set -euo pipefail در ابتدای اسکریپت‌های Bash چیست؟",
+   "options": [
+    "اجرای اسکریپت با دسترسی root بدون رمز",
+    "نادیده گرفتن تمام خطاها تا پایان اسکریپت",
+    "کاهش مصرف RAM به صفر",
+    "در بسیاری از موارد خطا یا متغیر تعریف‌نشده را آشکار و کد خروج pipeline را تغییر می‌دهد، با استثناهای errexit"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>این گزینه‌ها تضمین توقف در همه contextها یا رد متغیر خالی نیستند؛ خطاها و ورودی‌ها را صریح بررسی کنید.</p>"
+  },
+  {
+   "title": "کدام دستور مدرن از مجموعه iproute2 جایگزین route -n برای مشاهده جدول مسیریابی لینوکس است؟",
+   "options": [
+    "ip route show",
+    "arp -a",
+    "ping -c 1",
+    "ls -la /etc"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>در <code>iproute2</code> دستورات <code>ip addr</code>، <code>ip route</code> و <code>ip neigh</code> جایگزین <code>ifconfig</code>، <code>route</code> و <code>arp</code> شده‌اند.</p>"
+  },
+  {
+   "title": "چرا استفاده از chmod 777 روی اسکریپت‌های اتوماسیون در یک Jump Host خطر امنیتی جدی است؟",
+   "options": [
+    "چون اسکریپت دیگر اجرا نمی‌شود",
+    "چون هر کاربر محلی می‌تواند کد اسکریپت را دستکاری کرده و دستورات مخرب را هنگام اجرای آن روی شبکه تزریق کند",
+    "چون سرعت شبکه را نصف می‌کند",
+    "چون cron فقط فایل 777 را اجرا نمی‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>مجوز نوشتن عمومی (<code>o+w</code>) به هر کاربر یا سرویس دیگر اجازه تغییر کد اسکریپت را می‌دهد.</p>"
+  },
+  {
+   "title": "برای بررسی لاگ‌های یک سرویس تحت systemd (مانند ssh) کدام ابزار استاندارد به کار می‌رود؟",
+   "options": [
+    "ifconfig",
+    "fdisk",
+    "journalctl -u ssh",
+    "chmod +x"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p><code>journalctl</code> ابزار رسمی مطالعه و فیلتر لاگ‌های سرویس‌های مدیریت‌شده توسط <code>systemd</code> است.</p>"
+  },
+  {
+   "title": "چرا اسکریپتی که در ترمینال کاربر درست اجرا می‌شود، ممکن است در cron شکست بخورد؟",
+   "options": [
+    "زیرا cron از فایل‌های متنی پشتیبانی نمی‌کند",
+    "زیرا cron همیشه سرور را ریبوت می‌کند",
+    "زیرا cron فقط در روزهای تعطیل اجرا می‌شود",
+    "زیرا محیط PATH و دایرکتوری کاری در cron محدود و متفاوت است و نیاز به مسیر کامل باینری‌ها و ثبت stderr دارد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>مسیر کامل و ثبت stderr به تشخیص کمک می‌کنند، اما رفع خطا به علت واقعی بستگی دارد.</p>"
+  },
+  {
+   "title": "عبارت 2>&1 در خط فرمان لینوکس چه کاری انجام می‌دهد؟",
+   "options": [
+    "جریان خطای استاندارد (stderr) را به همان مقصد خروجی استاندارد (stdout) هدایت می‌کند",
+    "فایل را دو بار کپی می‌کند",
+    "دو سرور را به هم متصل می‌کند",
+    "مجوز فایل را به 210 تغییر می‌دهد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>۲ به مقصد کنونی ۱ هدایت می‌شود؛ ترتیب عملگرها تعیین می‌کند مقصد نهایی فایل باشد یا ترمینال.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس در چه مرزی اجرا شده است؟",
+   "options": [
+    "تغییر واقعی فایل /etc/ssh/sshd_config سرور تولیدی",
+    "اجرای محلی Python در یک پوشه موقت برای آزمون مجوز 0600 و منطق پایپ‌لاین لاگ، بدون تغییر سرور تولیدی یا روتر",
+    "ضبط ترافیک زنده دیتاسنتر با tcpdump",
+    "نصب سرویس جدید systemd روی روتر سیسکو"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>آزمایشگاه تنها در یک پوشه موقت محلی اجرا شده و هیچ سرور تولیدی یا تجهیز شبکه را لمس نکرده است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "integration-review.1",
+  "legacyId": "auto_01",
+  "sources": [
+   "https://man7.org/linux/man-pages/man8/ip.8.html",
+   "https://man7.org/linux/man-pages/man8/ss.8.html",
+   "https://www.tcpdump.org/manpages/tcpdump.1.html",
+   "https://www.freedesktop.org/software/systemd/man/latest/journalctl.html"
+  ],
+  "limitations": [
+   "آزمایشگاه محلی فقط در پوشه موقت اجرا شده؛ هیچ سرور تولیدی یا تنظیمات سیستمی تغییر نکرده است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش با توضیح کامل.",
+   "افزودن آزمایشگاه محلی قابل اجرا برای راستی‌آزمایی مجوز 0600 و الگوریتم پایپ‌لاین لاگ SSH."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_01-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_01.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_01_lab.py"
+  },
+  "technicalAuditFixes": [
+   "اصلاح بازبینی فاز ۸C-1: استفاده از الگوی regex متصل به port و اعتبارسنجی ipaddress.ip_address در parse_failed_ssh_counts برای دفع تزریق نام کاربری حاوی کلمه from + خطادادن روی سطر خراب."
+  ],
+  "integrationReview": {
+   "date": "2026-11-27",
+   "reviewer": "integrator-agent-not-human",
+   "sourceCommit": "53aa6addf8df5e230384723cf2008be7403e0859",
+   "evidence": "academy-labs/reviews/auto_01-integration-review-fa.md"
+  }
+ }
+}
