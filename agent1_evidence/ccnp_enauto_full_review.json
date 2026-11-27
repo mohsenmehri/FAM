@@ -1,0 +1,219 @@
+{
+  "id": "ccnp_enauto",
+  "faculty": "دانشکده ۳ · CCNP Enterprise",
+  "title": "تخصصی 300-435 ENAUTO: مدل‌های YANG، NETCONF/RESTCONF و API پلتفرم‌های سیسکو",
+  "lead": "شما یک اسکریپت پایتون برای پیاده‌سازی هم‌زمان ۲۰۰ سوئیچ با مدل **YANG** و یک درخواست تغییر SSID به **Catalyst Center API** نوشته‌اید؛ اما روی تجهیزات برند دیگر نام فیلدهای Cisco Native YANG کار نمی‌کند، و Catalyst Center هم به جای نتیجهٔ نهایی فقط کد `202 Accepted` همراه یک `taskId` برمی‌گرداند! چطور بین سه خانوادهٔ **YANG (`OpenConfig`, `IETF`, `Native`)** انتخاب کنیم، چرخهٔ **Async Task** در Catalyst Center و **Pagination / Rate Limiting (`429`)** در Meraki/SD-WAN API را مدیریت کنیم؟",
+  "goal": "مقایسهٔ تخصصی مدل‌های **YANG** (`IETF`، `OpenConfig`، `Cisco Native`)، اجرای عملیات CRUD با **NETCONF (`ncclient`)** و **RESTCONF (`requests`)**، درک الگوی **Asynchronous Task Polling** در Cisco Catalyst Center API، و کار با SD-WAN / Meraki API با مدیریت Pagination و HTTP `429 Retry-After`.",
+  "prereq": "تسلط بر مبانی JSON، REST API، NETCONF/RESTCONF و Python (درس `ccnp_enc_auto`).",
+  "sections": [
+    {
+      "h": "۱. سه‌گانهٔ مدل‌های YANG در ENAUTO: OpenConfig، IETF یا Cisco Native؟",
+      "p": [
+        "وقتی با NETCONF یا RESTCONF به یک روتر IOS-XE وصل می‌شوید، ده‌ها فایل YANG رویش نصب است که به سه خانواده تقسیم می‌شوند. انتخاب مدل درست در ENAUTO تعیین‌کنندهٔ بقای کد شماست:"
+      ],
+      "bullets": [
+        "**IETF Models (مانند `ietf-interfaces`, `ietf-routing`):** مدل‌های استاندارد بین‌المللی (RFC) برای مفاهیم عمومی و پایه مثل IP و وضعیت اینترفیس.",
+        "**OpenConfig Models (مانند `openconfig-interfaces`, `openconfig-bgp`):** مدل‌های بی‌طرفِ میان‌برندی (Vendor-Neutral) ساخته‌شده توسط اپراتورهای بزرگ تا یک کد پایتون بتواند هم به روتر Cisco و هم به Arista یا Juniper دستور دهد؛ با این شرط که امکانات خاص یک برند در آن نیست.",
+        "**Cisco Native Models (مانند `Cisco-IOS-XE-native`):** نسبت به OpenConfig و IETF بخش بسیار گسترده‌تری از امکانات خاص سیستم‌عامل IOS-XE را پوشش می‌دهند، اما گسترهٔ دقیق آن‌ها همواره تابع **نسخهٔ IOS-XE، مدل سخت‌افزاری و ماژول‌های YANG نصب‌شده** است (نه پوشش تضمینی تمام تنظیمات در همهٔ نسخه‌ها)."
+      ]
+    },
+    {
+      "h": "۲. عملیات CRUD در NETCONF (`ncclient`) در برابر RESTCONF (`requests`)",
+      "p": [
+        "در **NETCONF**، عملیات تغییر پیکربندی با تگ XML `<edit-config>` روی دیتاستور هدف (`<target><running/></target>` یا `<candidate/>`) انجام می‌شود و با صفت `operation` روی گره دقیق مشخص می‌کنیم چه رخ دهد: **`merge`** (ادغام بدون حذف بقیه)، **`replace`** (جایگزینی کل آن شاخه)، یا **`delete`/`remove`** (حذف؛ که `remove` در صورت نبودن قبلی خطا نمی‌دهد—عالی برای **Idempotency**!). در **RESTCONF** همین CRUD با فعل‌های HTTP روی URL استاندارد `/restconf/data/...` انجام می‌شود:"
+      ],
+      "steps": [
+        "**`GET` (Read):** خواندن کل شاخه یا یک فیلد بدون هیچ تغییری (Safe و Idempotent).",
+        "**`POST` (Create):** ساخت یک مورد جدید در مسیر والد؛ **غیر-Idempotent** است (اگر روی لیستی تکرار شود ممکن است خطای `409 Conflict` برگرداند).",
+        "**`PUT` (Replace / Create):** جایگزینی *کامل* منبعِ دقیقاً آدرس‌دهی‌شده در URL؛ **Idempotent** است (حواستان باشد فیلدهای غایب پاک می‌شوند!).",
+        "**`PATCH` (Partial Update):** اصلاح جزئی روی بخشی از منبع. توجه مهم طبق **RFC 5789**: متد `HTTP PATCH` **ذاتاً Idempotent نیست** و تکرارپذیری آن به نوع Patch و عملیات بستگی دارد! در **RESTCONF (RFC 8040)** یک Plain Patch ساده با عملگر `merge` روی مقادیر ثابت می‌تواند در سناریوهای مشخص تکرارپذیر باشد، در حالی که **YANG Patch (RFC 8072)** می‌تواند شامل عملیات متوالی غیر-Idempotent (مثل `insert` یا `create`) باشد؛ بنابراین هرگز نباید بدون بررسی schema، هم‌زمانی و نتیجهٔ واقعی فرض کرد `PATCH` همیشه امن و تکرارپذیر است.",
+        "**`DELETE` (Delete):** حذف منبع مشخص در URL."
+      ],
+      "bullets": []
+    },
+    {
+      "h": "۳. الگوهای واقعی API در پلتفرم‌های سیسکو (Catalyst Center، SD-WAN و Meraki)",
+      "p": [
+        "کار با API پلتفرم‌های سازمانی با RESTCONF تکی فرق دارد؛ هر کنترلر قواعد حرفه‌ای خودش را دارد که در آزمون ENAUTO پرسیده می‌شوند:"
+      ],
+      "bullets": [
+        "**Catalyst Center (الگوی رایج Asynchronous Task Polling):** در بسیاری از endpointهای تغییردهنده و ناهمگام Catalyst Center (بسته به **نسخه و endpoint مشخص در مستندات API**)، کنترلر بلافاصله پاسخ **`202 Accepted`** همراه یک **`taskId`** برمی‌گرداند! در چنین endpointهایی کد پایتون باید روی آدرس `/task/{taskId}` با سقف زمان/تلاش (`Timeout`) وضعیت را استعلام کند تا `isError` و `progress` نهایی مشخص شوند.",
+        "**SD-WAN vManage API (Session + X-XSRF-TOKEN):** پس از احراز هویت به `/j_security_check` و گرفتن کوکی `JSESSIONID`، برای درخواست‌های تغییردهنده (`POST/PUT/DELETE`) باید توکن گرفته شده از `/dataservice/client/token` را درون هدر **`X-XSRF-TOKEN`** بفرستید وگرنه خطای `403` می‌گیرید!",
+        "**Meraki Dashboard API (Pagination & Rate Limiting):** از هدر **`X-Cisco-Meraki-API-Key`** (یا Bearer Token جدید) استفاده می‌کند، سقف درخواست در ثانیه دارد (اگر بیشتر بفرستید **`HTTP 429 Too Many Requests`** به همراه هدر **`Retry-After`** برمی‌گرداند که اسکریپت باید به همان اندازه `time.sleep` کند!) و لیست‌های بزرگ را با هدر **`Link`** صفحه‌بندی (Pagination) می‌کند."
+      ],
+      "think": {
+        "q": "سناریوی خطا: اسکریپتی روی Meraki API اجرا شده و پس از واکشی وضعیت ۲۰ شبکه ناگهان با کد خطای **`429`** متوقف می‌شود؛ در همان حال اسکریپت دیگری روی Catalyst Center پس از فرستادن دستور ساخت VLAN به ۲۰ سوئیچ بلافاصله کد **`202`** را دیده و چاپ کرده «کار ۱۰۰٪ با موفقیت تمام شد!»، در حالی که هیچ VLANای ساخته نشده بود! علت هر دو خطا و اصلاح صحیح در کد چیست؟",
+        "a": "۱) در **Meraki**: کد `429` یعنی عبور از نرخ مجاز درخواست در ثانیه؛ کد باید هدر پاسخ **`Retry-After`** را بخواند، به همان تعداد ثانیه صبر کند (`time.sleep(int(resp.headers['Retry-After']))`) و درخواست را دوباره امتحان کند (**Exponential Backoff**).\n۲) در **Catalyst Center**: کد **`202 Accepted`** به معنی *تمام شدن کار نیست*، بلکه یعنی «سفارش ثبت شد و `taskId` گرفت»! اسکریپت باید حتماً روی `/task/{taskId}` حلقهٔ **Polling** بزند تا ببیند نتیجهٔ نهایی واقعی موفق بوده یا با خطا شکست خورده است."
+      }
+    }
+  ],
+  "analogy": "تفاوت **REST API همگام (Synchronous)** با **الگوی `202 + Task Polling` در Catalyst Center** مثل تفاوت «خرید یک نوشیدنی آماده از باجه (`200 OK`)» با «سفارش یک پیتزای سفارشی در رستوران (`202 Accepted`)» است: وقتی سفارش را می‌دهید، صندوقدار در لحظه فقط یک **شمارهٔ فیش (`taskId`)** دست شما می‌دهد تا صندوق شلوغ نشود؛ اینکه شما بلافاصله از در بروید بیرون و فکر کنید غذا آماده و خورده شده خطاست! باید با نگاه کردن به تابلوی شماره فیش (`GET /task/{taskId}`) صبر کنید تا آشپزخانه وضعیت را «آماده شد» یا «مواد تمام شده (isError)» اعلام کند. محل شکست تشبیه اینجاست: در کدهای اتوماسیون اگر روی حلقهٔ `Polling` یک **سقف زمان (`Timeout / Max Retries`)** نگذارید، در صورت گیر کردن کنترلر اسکریپت شما تا ابد در حلقهٔ بی‌نهایت معطل می‌ماند!",
+  "table": {
+    "title": "مقایسهٔ سه خانوادهٔ YANG و API سه کنترلر کلیدی در ENAUTO",
+    "headers": [
+      "مفهوم / پلتفرم",
+      "جزئیات فنی و احراز هویت",
+      "نکتهٔ تخصصی در کدنویسی"
+    ],
+    "rows": [
+      [
+        "YANG: OpenConfig vs Native",
+        "استاندارد چندبرندی vs تمام امکانات IOS-XE",
+        "OpenConfig برای یکپارچگی؛ Native وقتی ویژگی خاص IOS-XE می‌خواهیم"
+      ],
+      [
+        "RESTCONF Verbs (`PUT` vs `PATCH`)",
+        "`PUT` جایگزین کامل / `PATCH` اصلاح جزئی",
+        "`PUT` معمولاً برای جایگزینی کامل Idempotent است؛ `PATCH` طبق RFC 5789 ذاتاً Idempotent نیست (به نوع plain/YANG Patch و عملیات بستگی دارد)"
+      ],
+      [
+        "Catalyst Center API",
+        "Token (`X-Auth-Token`) از `/dna/system/api/v1/auth/token`",
+        "بسیاری از عملیات ناهمگام (وابسته به نسخه/endpoint) `202` + `taskId` می‌دهند و نیازمند Polling با Timeout هستند"
+      ],
+      [
+        "SD-WAN vManage API",
+        "Cookie `JSESSIONID` + هدر `X-XSRF-TOKEN`",
+        "بدون ارسال `X-XSRF-TOKEN` در `POST/PUT` خطای `403` می‌گیرید"
+      ],
+      [
+        "Meraki Dashboard API",
+        "`X-Cisco-Meraki-API-Key` / Bearer",
+        "مدیریت **`429 Retry-After`** و پیمایش صفحات با هدر `Link`"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "در NETCONF برای دستکاری Idempotent یک خط تنظیمات، فرق صفت `operation=\"delete\"` و `operation=\"remove\"` چیست؟",
+      "a": "اگر آن تنظیمات از قبل وجود نداشته باشد، **`delete`** خطای `data-missing` برمی‌گرداند و کل تراکنش شکست می‌خورد؛ اما **`remove`** با آرامش و بدون خطا رد می‌شود که برای اجرای Idempotent بسیار ایمن‌تر است."
+    },
+    {
+      "q": "چرا در NETCONF از ابزارهایی مثل **`yangsuite`** یا **`pyang`** پیش از نوشتن کد استفاده می‌کنیم؟",
+      "a": "فایل‌های YANG گاهی صدها خط تو در تو دارند؛ دستور `pyang -f tree <file.yang>` کل ساختار درختی، نام دقیق گره‌ها، کلیدهای لیست و انواع داده (`uint32`, `string`) را به‌صورت بصری و خوانا چاپ می‌کند تا در نوشتن XML/JSON خطای تایپی ندهید."
+    }
+  ],
+  "summary": "در **300-435 ENAUTO** انتخاب مدل **YANG** (OpenConfig برای چندبرندی، IETF برای پایه، Cisco Native برای امکانات خاص IOS-XE متناسب با مدل/نسخه) پایهٔ کار با **NETCONF (`ncclient`)** و **RESTCONF (`requests`)** است. در کار با RESTCONF شناخت تفاوت جایگزینی کامل (`PUT`) با تغییر جزئی (`PATCH` — که طبق RFC 5789 ذاتاً Idempotent نیست و باید با schema و وضعیت واقعی سنجیده شود)، الگوی `202 + taskId` در بسیاری از endpointهای Catalyst Center، هدر `X-XSRF-TOKEN` در vManage و مدیریت `429 Retry-After` در Meraki کلیدی است.",
+  "ciscoRef": "Cisco Automating and Programming Cisco Enterprise Solutions (300-435 ENAUTO) Official Cert Guide — Ch 2–8 (YANG, NETCONF/RESTCONF, Catalyst Center, SD-WAN & Meraki APIs)",
+  "protocolAnalysis": [
+    "در **Catalyst Center REST API** احراز هویت با `POST /dna/system/api/v1/auth/token` و Basic Auth انجام می‌شود و توکن دریافتی (معتبر به مدت حدود ۶۰ دقیقه) باید در هدر **`X-Auth-Token`** همهٔ درخواست‌های بعدی قرار گیرد.",
+    "در **NETCONF** بستن تراکنش‌های چندمرحله‌ای با `<lock>` -> `<edit-config>` روی `<candidate/>` -> `<validate>` -> `<commit>` جلوی اعمال نیمه‌کاره یا تداخل دو مهندس هم‌زمان را می‌گیرد."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show netconf-yang sessions",
+      "out": "Number of sessions : 1\n\nsession-id  transport    username             source-host\n-------------------------------------------------------------------\n42          netconf-ssh  netops               10.10.0.50",
+      "note": "نمایش نشست‌های فعال NETCONF. [نکتهٔ شبیه‌ساز: دستورات `netconf-yang` و `show netconf-yang sessions` در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شوند و خروجی بالا نمونهٔ مرجع آموزشی است؛ تمرین زندهٔ `ncclient` و `RESTCONF` نیازمند Cisco DevNet Always-On IOS-XE Sandbox یا CML است.]",
+      "why": "تأیید فعال بودن سرویس‌دهندهٔ NETCONF روی دستگاه، بررسی اینکه کدام کاربر/سرور اتوماسیون هم‌اکنون قفل نشست را در دست دارد و خطایابی قطعی نشست‌ها.",
+      "anatomy": "شناسهٔ نشست (`session-id`)، نوع انتقال (`netconf-ssh`)، نام کاربری و IP سرور ارسال‌کننده.",
+      "lookFor": "فعال بودن نشست از سرور اتوماسیون مورد انتظار و نبود نشست‌های معطل‌مانده که `<lock>` را باز نگه داشته‌اند.",
+      "ifUnexpected": "اگر نشست قفل‌کننده گیر کرده باشد می‌توان با `clear netconf-yang session <id>` یا مدیریت تایم‌اوت آن را آزاد کرد.",
+      "executable": false
+    },
+    {
+      "cmd": "show running-config",
+      "out": "Building configuration...\nhostname R1\n...",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای بررسی وضعیت فعلی تنظیمات (معادل خروجی‌ای که در NETCONF `<get-config>` از دیتاستور `running` واکشی می‌کند).",
+      "why": "مقایسهٔ وضعیت واقعی دستگاه (`Running State`) با وضعیت تعریف‌شده در مدل YANG یا کد پایتون.",
+      "anatomy": "فهرست ساختاری اینترفیس‌ها، VLANها و تنظیمات فعال.",
+      "lookFor": "تغییر دقیق فقط همان پارامترهایی که در عملیات `PATCH` یا `<edit-config>` هدف‌گذاری شده بودند.",
+      "ifUnexpected": "پس از هر تغییر با `PUT` یا `PATCH` حتماً وضعیت نهایی واقعی دستگاه را با `GET` (و کنترل هم‌زمانی/قفل) بازبینی کنید تا فیلدی حذف نشده یا تغییر ناخواسته رخ نداده باشد.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه شبیه‌سازی تفاوت `PUT` (جایگزینی کامل) در برابر `PATCH` (اصلاح جزئی) در وضعیت پورت‌ها",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی سرویس‌دهندهٔ واقعی NETCONF/RESTCONF یا کنترلرهای Catalyst Center/Meraki را ندارد (برای کدنویسی زنده از Cisco DevNet Sandbox استفاده کنید). اما اینجا اثر منطقی عملیات CRUD (`PATCH` جزئی روی یک پورت در برابر `PUT` جایگزین‌کنندهٔ کامل لیست ترانک!) را به‌طور زنده روی شبیه‌ساز تجربه می‌کنیم.",
+      "۲. با `enable` وارد شوید و با `show interfaces trunk` و `show running-config` ببینید روی ترانک `Gi0/1` VLANهای `1,10,20` مجاز هستند.",
+      "۳. شبیه‌سازی **`PATCH`** (افزودن جزئی بدون حذف قبلی‌ها): روی `Gi0/1` دستور `configure terminal` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 75` -> `end` و سپس `show interfaces trunk` را ببینید (لیست `1,10,20,75` حفظ شد!). حالا خطر **`PUT`ِ ناقص** را شبیه‌سازی کنید: فرض کنید کدی به اشتباه به جای افزودن جزئی، جایگزینی کامل (`switchport trunk allowed vlan 75`) می‌فرستد! آن را روی `Gi0/1` امتحان و در `show interfaces trunk` ببینید چطور `1,10,20` حذف شدند؛ سپس با `switchport trunk allowed vlan 1,10,20,75` -> `end` اصلاحش کنید.",
+      "۴. با `show interfaces trunk` و `show running-config` بررسی کنید در شبیه‌ساز ساده تفاوت جایگزینی لیست ترانک (شبیه خطرِ `PUT` ناقص) با افزودن افزایشی (`add`) روی `Gi0/1` قابل مشاهده است (پروتکل‌های واقعی RESTCONF/NETCONF و کنترلرهای Catalyst Center/Meraki در این شبیه‌ساز اجرا نمی‌شوند).",
+      "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (Catalyst Center Async `202` Polling و RESTCONF `PATCH` — RFC 8040/8072):** **نمونهٔ کد پایتون:** `r = requests.post(url, headers={'X-Auth-Token': tok}, json=payload, verify=ca_bundle)` -> در endpointهای ناهمگام با دریافت `202 Accepted` و `task_id = r.json()['response']['taskId']` استعلام `GET /dna/intent/api/v1/task/{task_id}` در حلقه با `timeout`؛ و در RESTCONF تست `PATCH` با `Content-Type: application/yang-data+json` روی `ietf-interfaces` و سپس `GET` راستی‌آزمایی. **خروجی مرجع و نشانهٔ موفقیت:** در Catalyst Center دریافت `isError: false` و `endTime` غیرخالی برای تسک، و در RESTCONF دریافت `204 No Content` از `PATCH` و تایید تغییر فیلد هدف در `GET` بعدی بدون حذف فیلدهای دست‌نخورده. **نشانهٔ شکست:** کد `400/409` در schema، دریافت `isError: true` در تسک Catalyst Center یا پاک شدن فیلدهای هم‌تراز هنگام `PUT` ناقص. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی تنها مدل ذهنی `add` در برابر جایگزینی لیست VLAN ترانک را نمایش داد نه رفتار واقعی RFC 5789/8040/8072."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show interfaces trunk",
+      "show running-config",
+      "show vlan brief"
+    ]
+  },
+  "troubleshooting": {
+    "fault": "اسکریپت پایتونی با متد **`PUT`** به RESTCONF برای تغییر فقط `description` روی اینترفیس `Gi0/0` ارسال شده؛ درخواست با کد `204 No Content` موفق می‌شود، اما لحظه‌ای بعد ارتباط مدیریتی با روتر روی `Gi0/0` به کلی قطع می‌گردد!",
+    "analysis": "در RESTCONF، متد **`PUT`** به معنی **جایگزینی کامل منبع (Full Replacement)** است؛ یعنی اگر شما در بدنهٔ JSON تنها `\"name\": \"Gi0/0\"` و `\"description\": \"NEW\"` را فرستاده و آدرس IP اینترفیس را داخل JSON نگذاشته باشید، روتر برای تطابق کامل با JSON شما، آدرس IP را از روی `Gi0/0` پاک می‌کند!",
+    "fix": "در این سناریو برای ویرایش صرفاً `description` بدون بازنویسی IP، استفاده از **`PATCH` (plain RESTCONF merge با بررسی schema و خواندن نتیجه پس از تغییر)** مناسب‌تر از `PUT` ناقص است؛ اگر از `PUT` استفاده می‌کنید باید کل نمایش منبع را ابتدا `GET` کرده و تغییریافته را بفرستید."
+  },
+  "misconceptions": [
+    {
+      "myth": "در Catalyst Center API اگر درخواست `POST` ما کد موفقیت `202 Accepted` برگرداند، یعنی عملیات تغییر روی تمام سوئیچ‌ها با موفقیت کامل پایان یافته است.",
+      "reality": "`202 Accepted` صرفاً یعنی درخواست وارد صف اجرا شده و یک `taskId` گرفته است؛ شکست واقعی (مثل قطع بودن سوئیچ یا خطای CLI) تنها پس از Polling آدرس `/task/{taskId}` در فیلد `isError: true` معلوم می‌شود.",
+      "howToSpot": "همیشه در پاسخ `POST` به دنبال فیلد `response.taskId` بگردید و وضعیتش را تا اتمام (`endTime` و `isError`) پایش کنید."
+    },
+    {
+      "myth": "در پایتون و کار با RESTCONF، فرقی بین `PUT` و `PATCH` وجود ندارد و `PATCH` همیشه به خودی خود Idempotent و امن است.",
+      "reality": "`PUT` منبع هدف را جایگزین کامل می‌کند و فیلدهای نیامده را پاک می‌سازد؛ `PATCH` تغییر جزئی می‌فرستد، ولی طبق **RFC 5789** ذاتاً Idempotent نیست (مثلاً در YANG Patch عملیات `create`/`insert` می‌توانند در تکرار تغییر ایجاد یا خطا بدهند) و جایگزین بررسی schema، کنترل هم‌زمانی و تایید نتیجهٔ واقعی نیست.",
+      "howToSpot": "بررسی دقیق نوع Patch (Plain RESTCONF `merge` vs YANG Patch RFC 8072) و اجرای `GET` راستی‌آزمایی پس از تغییر."
+    }
+  ],
+  "exercise": "یک الگوی کامل حلقهٔ مقاوم پایتون (`requests`) برای کار با **Meraki API** و **Catalyst Center API** بنویسید که: الف) در Meraki هنگام دریافت کد وضعیت `429` دقیقاً بر اساس هدر `Retry-After` صبر و تلاش مجدد کند؛ ب) در Catalyst Center پس از دریافت `202` و `taskId`، تا اتمام تسک Polling انجام دهد (با سقف تلاش مشخص).",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "در مدل‌های YANG، اگر بخواهیم یک اسکریپت واحد بتواند وضعیت اینترفیس و BGP را هم از روتر Cisco IOS-XE و هم از سوئیچ Arista بخواند، از کدام خانواده YANG استفاده می‌کنیم (`IETF`, `OpenConfig`, `Cisco Native`)؟ و اگر بخواهیم تنظیمات خاص `EIGRP` سیسکو را عوض کنیم چطور؟",
+      "hint": "استاندارد چندبرندی اپراتورها در برابر اختصاصیِ برند.",
+      "solution": "برای خواندن مشترک روی چند برند: **`OpenConfig`** (یا `IETF` برای بخش‌های پایه)؛ برای تنظیمات خاص و اختصاصی سیسکو مثل EIGRP: **`Cisco Native`** (`Cisco-IOS-XE-native`)."
+    },
+    {
+      "level": "متوسط",
+      "task": "قطعه کد پایتون با کتابخانهٔ `ncclient` را بنویسید که به پورت `830` روتر `192.0.2.10` وصل شود و تنها بخش `interfaces` را با یک `<filter type=\"subtree\">` از `running` بخواند و در خروجی چاپ کند.",
+      "hint": "استفاده از `manager.connect(host=..., port=830, ..., hostkey_verify=False)` (در محیط تست) و متد `m.get_config(source=\"running\", filter=...)`.",
+      "solution": "`from ncclient import manager`\n`filt = \"\"\"<filter><interfaces xmlns=\"urn:ietf:params:xml:ns:yang:ietf-interfaces\"/></filter>\"\"\"`\n`with manager.connect(host=\"192.0.2.10\", port=830, username=\"netops\", password=\"Pass123\", hostkey_verify=False) as m:`\n`    res = m.get_config(source=\"running\", filter=filt)`\n`    print(res.xml)`"
+    },
+    {
+      "level": "چالشی",
+      "task": "توابع کامل پایتون بخش `exercise` بالا را بنویسید: تابع ۱) `meraki_get(url, api_key)` با مدیریت هوشمند `429 Retry-After`؛ تابع ۲) `wait_dnac_task(base_url, token, task_id)` با Polling ایمن و سقف `max_tries`.",
+      "hint": "برای `429`: `int(r.headers.get(\"Retry-After\", 2))`؛ برای Task: بررسی `\"endTime\" in task_data` و `isError`.",
+      "solution": "`import time, requests`\n`def meraki_get(url, api_key):`\n`    headers = {\"X-Cisco-Meraki-API-Key\": api_key}`\n`    for _ in range(5):`\n`        r = requests.get(url, headers=headers, timeout=10)`\n`        if r.status_code == 429:`\n`            time.sleep(int(r.headers.get(\"Retry-After\", 2)))`\n`            continue`\n`        r.raise_for_status()`\n`        return r.json()`\n`    raise RuntimeError(\"Rate limit persisted\")`\n\n`def wait_dnac_task(base_url, token, task_id, max_tries=15):`\n`    headers = {\"X-Auth-Token\": token}`\n`    for _ in range(max_tries):`\n`        r = requests.get(f\"{base_url}/dna/intent/api/v1/task/{task_id}\", headers=headers, timeout=10)`\n`        r.raise_for_status()`\n`        t = r.json()[\"response\"]`\n`        if \"endTime\" in t:`\n`            if t.get(\"isError\"): raise RuntimeError(t.get(\"failureReason\"))`\n`            return t`\n`        time.sleep(2)`\n`    raise TimeoutError(\"Task polling timed out\")`"
+    }
+  ],
+  "quiz": [
+    {
+      "q": "در کار با **RESTCONF** برای تغییر فقط `description` یک اینترفیس بدون پاک کردن آدرس IP موجود (در برابر `PUT` ناقص)، کدام توضیح دقیق‌تر است؟",
+      "opts": [
+        "استفاده از `PATCH` (با بررسی schema و نتیجهٔ واقعی؛ زیرا طبق RFC 5789 متد `PATCH` ذاتاً Idempotent نیست) یا ارسال کل بدنهٔ کامل در `PUT`",
+        "فرستادن `PUT` تنها با نام و `description`",
+        "استفاده از `GET` با بدنهٔ تغییر",
+        "استفاده از `POST` روی همان URL اینترفیس"
+      ],
+      "ans": 0,
+      "exp": "`PUT` کل منبع را جایگزین می‌کند؛ `PATCH` تغییر جزئی می‌دهد ولی طبق RFC 5789 به نوع عملیات و schema وابسته است و پس از اجرا باید وضعیت واقعی را راستی‌آزمایی کرد."
+    },
+    {
+      "q": "هنگام ارسال درخواست تغییرات به یک endpoint ناهمگام در **Cisco Catalyst Center REST API** که پاسخ **`202 Accepted`** برمی‌گرداند، گام الزامی بعدی چیست؟",
+      "opts": [
+        "بستن اتصال و فرض موفقیت کامل",
+        "استخراج `taskId` و فراخوانی دوره‌ای (Polling) `/dna/intent/api/v1/task/{taskId}` تا رسیدن به `endTime`",
+        "ریستارت کردن کنترلر",
+        "تبدیل متد به `DELETE`"
+      ],
+      "ans": 1,
+      "exp": "عملیات تغییردهنده در Catalyst Center ناهمگام (Asynchronous) هستند و نتیجهٔ واقعی فقط از طریق Polling روی `taskId` مشخص می‌شود."
+    },
+    {
+      "q": "اگر اسکریپت شما هنگام فراخوانی **Meraki Dashboard API** با کد خطای **`HTTP 429`** روبه‌رو شود، علت چیست و پاسخ استاندارد کد باید چه باشد؟",
+      "opts": [
+        "خرابی مدل YANG؛ تغییر فرمت به XML",
+        "نبود مجوز ادمین؛ تعویض پورت به ۸۳۰",
+        "عبور از سقف نرخ مجاز درخواست در ثانیه؛ خواندن هدر `Retry-After` و مکث به همان میزان پیش از ارسال مجدد",
+        "قطع بودن کابل فیبر ابر"
+      ],
+      "ans": 2,
+      "exp": "کد `429 Too Many Requests` نشانهٔ Rate Limiting است و هدر `Retry-After` زمان دقیق انتظار پیش از تلاش بعدی را اعلام می‌کند."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "دانش ENAUTO برای تمام پروژه‌های واقعی برنامه‌پذیری تجهیزات IOS-XE و یکپارچه‌سازی Catalyst Center، SD-WAN و Meraki کاربرد مستقیم دارد.",
+    "nextQuestion": "حالا که کل پردیس و اتوماسیون داخلی را مسلط شدیم، سرورهای سازمان دیگر فقط در دیتاسنتر خودمان نیستند بلکه در **AWS و Azure** قرار دارند! در **تخصص 300-440 ENCC** می‌بینیم چطور شبکهٔ داخلی یا SD-WAN را بدون ایجاد گلوگاه **Hairpinning** و بدون شکستن محدودیت **سقف ۱۰۰ پیشوند BGP** ابر، به شکل امن و افزونه به فضای ابری متصل کنیم.",
+    "nextId": "ccnp_encc"
+  }
+}

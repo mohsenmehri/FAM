@@ -1,0 +1,218 @@
+{
+  "id": "ccnp_enc_arch",
+  "faculty": "دانشکده ۳ · CCNP Enterprise",
+  "title": "ENCOR حوزه ۱: معماری Enterprise، سخت‌افزار CEF/TCAM، SD-Access و SD-WAN",
+  "lead": "در یک دانشگاه با ۱۰ ساختمان و ۵,۰۰۰ کاربر، مدیر شبکه برای حذف کامل خطاهای Spanning Tree پیشنهاد می‌دهد در طبقهٔ دسترسی هم لایه ۳ را تا خودِ سوئیچ دسترسی پایین بیاورند (`Routed Access`)، و هم‌زمان می‌خواهد بدون درگیری با VLANهای پراکنده، امنیت کارمندان و مهمانان با گروه هویتی (SGT) اعمال شود! چرا برخی سوئیچ‌ها زیر بار یک ACL ساده CPUشان ۱۰۰٪ می‌شود (`Punt`) در حالی که سوئیچ‌های دیگر با سرعت خط (`Wire-Speed`) فوروارد می‌کنند، و Cisco SD-Access چطور کل این معماری را تغییر می‌دهد؟",
+  "goal": "مقایسهٔ دقیق معماری‌های طراحی Campus (Two-Tier، Three-Tier و Routed Access)، درک عملکرد سخت‌افزاری سوئیچ/روتر (RIB، FIB، Adjacency Table و TCAM)، تسلط بر اجزا و پروتکل‌های Cisco SD-Access (`Control/Edge/Border Node`، `LISP`، `VXLAN`، `SGT`) و آشنایی معماری با SD-WAN و QoS/Wireless Design.",
+  "prereq": "شناخت VLAN، STP، OSPF و مفاهیم LISP/VXLAN (درس `ccnp_01`).",
+  "sections": [
+    {
+      "h": "۱. معماری طراحی Campus: از Three-Tier کلاسیک تا Routed Access",
+      "p": [
+        "طراحی کلاسیک شبکهٔ پردیس (Campus) برای جلوگیری از تک‌نقطهٔ خرابی از مدل سلسله‌مراتبی استفاده می‌کند: در شبکه‌های متوسط **Two-Tier (Collapsed Core)** لایهٔ Distribution و Core یکی می‌شوند تا هزینه کمتر شود؛ در شبکه‌های بزرگ **Three-Tier (Access -> Distribution -> Core)** لایهٔ Core صرفاً مسئول جابه‌جایی فوق‌سریع بسته‌ها بین ساختمان‌ها و دیتاسنتر بدون اعمال ACL یا فیلترینگ سنگین است.",
+        "اما در حالت سنتی، بین لایهٔ Access و Distribution ارتباط لایه ۲ (Trunk) است و نیمی از لینک‌های افزونه توسط **STP (Spanning Tree)** بلاک می‌شوند! در معماری مدرن **Routed Access**، مرز لایه ۳ را تا خودِ سوئیچ Access پایین می‌آورند:"
+      ],
+      "bullets": [
+        "**مزیت کلیدی Routed Access:** بین سوئیچ‌های دسترسی و توزیع حلقه‌ای در لایه ۲ وجود ندارد؛ لینک‌های Uplink می‌توانند هم‌زمان با **ECMP** کار کنند و با IGP و BFD (در پلتفرم‌های دارای پشتیبانی سخت‌افزاری/نرم‌افزاری مناسب) به همگرایی بسیار سریع برسند.",
+        "**محدودیت مهم:** از آنجا که هر سوئیچ Access یک زیرشبکهٔ IP مجزای خودش را دارد، دیگر نمی‌توان یک VLAN سنتی را بین دو ساختمان پهن کرد—مگر اینکه روی این لایه ۳ پایدار (Underlay) یک **Overlay مثل VXLAN / SD-Access** بسازید!"
+      ]
+    },
+    {
+      "h": "۲. داخل جعبهٔ سخت‌افزار: RIB، FIB، Adjacency Table و نقش حیاتی TCAM",
+      "p": [
+        "چرا یک سوئیچ لایه ۳ میلیون‌ها بسته در ثانیه را بدون فشار به CPU جابه‌جا می‌کند؟ زیرا سیسکو سال‌هاست پردازش بسته را از **Process Switching** (تصمیم‌گیری کند در CPU) به **CEF (Cisco Express Forwarding)** در سخت‌افزار ASIC منتقل کرده است:"
+      ],
+      "steps": [
+        "**Control Plane -> `RIB` و `ARP`:** پروتکل‌های روتینگ جدول **`RIB` (`show ip route`)** و پروتکل ARP جدول لایه ۲ همسایه‌ها را در CPU می‌سازند.",
+        "**Data Plane -> `FIB` و `Adjacency Table`:** CEF به‌طور پیوسته از روی RIB جدول منطقی **`FIB` (`show ip cef`)** (شامل مقصد و خروجی) و از روی ARP جدول **`Adjacency Table` (`show adjacency`)** (شامل هدر آمادهٔ لایه ۲ مثل MAC مبدأ/مقصد!) را می‌سازد؛ در سوئیچ‌ها و روترهای سخت‌افزاری، این جداول سپس درون حافظه‌های سخت‌افزاری **ASIC/TCAM** پلتفرم برنامه‌ریزی می‌شوند تا بسته‌ها بدون نیاز به CPU فوروارد شوند (و روی پلتفرم‌های نرم‌افزاری یا حالت Punt در حافظهٔ سیستم پردازش می‌شوند).",
+        "**`TCAM` (Ternary Content Addressable Memory):** حافظه‌ای سخت‌افزاری که نه فقط مثل RAM با `0` و `1` بلکه با حالت سوم **`X` (Don't Care / Wildcard Mask)** در **یک چرخهٔ ساعت** تطبیق ACL، QoS و مسیریابی را پیدا می‌کند! استثناهایی مثل بسته‌های نیاز به TTL=0، گزینه‌های IP Options، ARP/OSPF مقصد خودِ روتر، یا نبود رکورد Adjacency (`Glean`) به CPU ارسال می‌شوند که به آن **`Punt`** می‌گویند."
+      ],
+      "think": {
+        "q": "در یک سوئیچ سازمانی، به دلیل افزودن ده‌ها هزار خط ACL غیرضروری، ظرفیت `TCAM` پر می‌شود! با این اتفاق، چه بلایی سر ترافیک شبکه و CPU سوئیچ می‌آید؟",
+        "a": "پاسخ دقیق به **معماری پلتفرم و نوع ACL/TCAM** بستگی دارد: در بسیاری از سوئیچ‌ها پر شدن فضای TCAM بسته به پلتفرم باعث می‌شود بسته‌ها برای پردازش نرم‌افزاری به CPU **`Punt`** شوند (که می‌تواند CPU را به شدت بالا ببرد و نشست‌های OSPF/BGP را تهدید کند)، یا در برخی پلتفرم‌های دیگر اصلاً خطای نصب سیاست داده شود یا ترافیک Drop گردد!"
+      },
+      "bullets": []
+    },
+    {
+      "h": "۳. معماری Cisco SD-Access: ترکیب Underlay + Overlay + TrustSec (SGT)",
+      "p": [
+        "پلتفرم **Cisco SD-Access (SDA)** با مدیریت متمرکز **Catalyst Center (DNA Center سابق)** دقیقاً روی یک **Routed Access Underlay** (معمولاً IS-IS خودکار) سه فناوری را یکجا ادغام می‌کند تا کاربر به هر سوئیچی در کل سازمان وصل شود، همان IP/سگمنت و همان سیاست امنیتی را بگیرد:"
+      ],
+      "steps": [
+        "**Edge Node:** سوئیچ دسترسی که کاربران به آن وصل می‌شوند؛ نقش `xTR` در LISP و `VTEP` در VXLAN را هم‌زمان اجرا می‌کند.",
+        "**Control Plane Node:** محل پایگاه‌دادهٔ LISP (`Map-Server / Map-Resolver`) که نگاشتِ تمام `EID`ها (IP/MAC کاربران) به `RLOC`ها (IP سوئیچ‌های Edge) را نگه می‌دارد.",
+        "**Border Node:** دروازهٔ خروجی Fabric به دنیای بیرون (اینترنت، دیتاسنتر، WAN یا شبکه‌های Legacy).",
+        "**کپسوله‌سازی `VXLAN-GPO` و `SGT` (Scalable Group Tag):** به جای اینکه امنیت را به IPهای شکننده گره بزنیم، به کاربر بر اساس هویتش در **Cisco ISE** یک برچسب ۱۶-بیتی به نام **SGT** (مثل `SGT 10: Doctors` یا `SGT 20: IoT-Cameras`) می‌دهیم و این عدد مستقیم داخل هدر VXLAN تا سوئیچ مقصد حمل می‌شود تا سیاست امنیتی مستقل از آدرس IP اعمال شود!"
+      ],
+      "think": {
+        "q": "سناریوی خطا: در یک Fabric از Cisco SD-Access، کاربری از طبقهٔ ۱ به طبقهٔ ۴ جابه‌جا می‌شود؛ اتصالش به اینترنت (از طریق Border Node) برقرار است، اما هیچ دسترسی به سرور داخلی داخل Fabric که پشت یک Edge Node دیگر است ندارد! بر اساس اجزای سه‌گانهٔ SDA کدام گره را باید اول بررسی کنیم؟",
+        "a": "ابتدا باید **Control Plane Node** (`show lisp site` / `show lisp session` روی Edge و Control Plane) را بررسی کنیم: اگر کاربر به عنوان `EID` در پایگاه‌دادهٔ LISP ثبت نشده یا نگاشت `EID-to-RLOC` روی Edge Node اول به‌روزرسانی نشده باشد، Edgeهای داخلی راه رسیدن به هم را پیدا نمی‌کنند (در حالی که ترافیک ناشناخته به سمت `Border Node` به‌عنوان Proxy Default ETR ارسال و به اینترنت می‌رود!)."
+      },
+      "bullets": []
+    }
+  ],
+  "analogy": "تفاوت `RIB` و `FIB/TCAM` مثل تفاوت «دفترچهٔ حسابداری و برنامه‌ریزی مدیر (`Control Plane / RIB`)» با «بستهٔ برچسب‌خورده و شابلون آماده روی خط تسمهٔ کارخانه (`Data Plane / FIB + Adjacency + TCAM`)» است: مدیر با قوانین و نقشه‌کشی مسیرها را می‌سنجد و در نهایت کد مقصد و لیبلِ آماده را به دستگاه خودکار تسمه نقاله می‌دهد تا روزی میلیون‌ها جعبه را در چشم‌به‌هم‌زدنی جدا کند؛ اگر جعبه‌ای برچسب ناخوانا داشته باشد یا شابلون (`TCAM`) پر شده باشد، تسمه نقاله آن جعبه را کنار می‌گذارد و به دفتر خود مدیر (`Punt to CPU`) می‌فرستد! محل شکست تشبیه اینجاست: در شبکهٔ واقعی اگر `Punt` بیش از حد اتفاق بیفتد، تنها بسته‌های خراب کند نمی‌شوند، بلکه کل مغزِ مدیر (`CPU`) قفل می‌کند و پروتکل‌های مسیر‌یابی هم از کار می‌افتند.",
+  "table": {
+    "title": "معماری اجزای Cisco SD-Access در برابر شبکهٔ سنتی",
+    "headers": [
+      "جزئیات معماری",
+      "شبکهٔ سنتی Campus",
+      "Cisco SD-Access (SDA)"
+    ],
+    "rows": [
+      [
+        "بستر زیرین (Underlay)",
+        "Trunkهای لایه ۲ بین Access-Dist + STP",
+        "Routed Access تماماً لایه ۳ (IS-IS + ECMP؛ بدون STP بین سوئیچ‌ها)"
+      ],
+      [
+        "پیدا کردن مکان کاربر",
+        "Flooding ARP و یادگیری MAC در VLAN",
+        "Control Plane مبتنی بر LISP (`EID -> RLOC`) بدون Flood گسترده"
+      ],
+      [
+        "حمل ترافیک (Data Plane)",
+        "تگ 802.1Q (سقف ۴۰۹۴ VLAN)",
+        "کپسوله‌سازی VXLAN (`VNID` + حمل تگ امنیتی `SGT`)"
+      ],
+      [
+        "اعمال امنیت سگمنت‌ها",
+        "ACL بر پایهٔ IP و Subnet روی VLANهای پراکنده",
+        "TrustSec با `SGT` (سیاست مبتنی بر هویت کاربر از Cisco ISE)"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "آیا در Cisco SD-Access همچنان داخل خود یک اتاق یا زیر یک تک‌سوئیچ `Edge Node` پروتکل STP وجود دارد؟",
+      "a": "روی پورت‌های کاربرِ خود `Edge Node` از PortFast و BPDU Guard برای محافظت در برابر وصل شدن اشتباهی یک مینی‌سوئیچ یا حلقهٔ کابل استفاده می‌شود، اما در کل ساختار بین سوئیچ‌های Access/Distribution/Core هیچ STP بین‌سوئیچی وجود ندارد."
+    },
+    {
+      "q": "تفاوت `Virtual Network (VN)` با `SGT` در SD-Access چیست؟",
+      "a": "**VN** جداسازی درشت‌دانه در سطح لایه ۳ (معادل **VRF**؛ مثلاً `VN_Corporate` کاملاً از `VN_Guest` جدول روتینگ جدا دارد؛ جداسازی کلان/Macro)، اما **SGT** جداسازی ظریف داخل همان VRF است (مثلاً داخل `VN_Corporate`، گروه `HR` نتواند به پورت‌های مدیریتی `DevOps` وصل شود؛ جداسازی خرد/Micro-segmentation)."
+    }
+  ],
+  "summary": "در طراحی ENCOR، انتقال از Two/Three-Tier لایه ۲ به **Routed Access** باعث حذف STP و بهره‌گیری از ECMP می‌شود؛ درون تجهیزات، **CEF** از `RIB/ARP` جداول منطقی `FIB/Adjacency` را می‌سازد که در پلتفرم‌های سخت‌افزاری در ASIC/TCAM برنامه‌ریزی می‌شوند تا بسته‌ها بدون `Punt` به CPU عبور کنند؛ و **Cisco SD-Access** با ترکیب **IS-IS Underlay**، **LISP Control Plane**، **VXLAN-GPO Data Plane** و **SGT**، مدیریت متمرکز Campus را میسر می‌کند.",
+  "ciscoRef": "Cisco CCNP ENCOR 350-401 Official Cert Guide — Ch 1 (Enterprise Network Architecture), Ch 2 (Packet Forwarding / CEF) & Ch 17 (SD-Access)",
+  "protocolAnalysis": [
+    "جدول منطقی **`FIB`** آینهٔ `RIB` برای جستجوی طولانی‌ترین پیشوند (Longest Prefix Match) و **`Adjacency Table`** شامل هدر آمادهٔ لایه ۲ برای هر Next-Hop است؛ این جداول در سوئیچ‌های سخت‌افزاری به جداول **ASIC/TCAM** کامپایل می‌شوند (و با دستورات پلتفرم‌محور مثل `show platform ...` وضعیت برنامه‌ریزی سخت‌افزاری آن‌ها بررسی می‌شود).",
+    "در **SD-Access** بخش **`VXLAN-GPO`** از فیلدهای رزروشدهٔ هدر استاندارد `8` بایتی VXLAN استفاده می‌کند تا هم **`VNID`** (بخش Macro/VRF) و هم **`SGT`** ۱۶ بیتی (بخش Micro-segmentation) را در یک بسته حمل کند."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show ip cef",
+      "out": "Prefix               Next Hop             Interface\n0.0.0.0/0            drop                 Null0 (default route handler)\n10.10.0.0/24         attached             GigabitEthernet0/0\n10.255.0.2/32        10.10.0.2            GigabitEthernet0/0",
+      "note": "نمایش جدول `FIB` منطقی CEF (که در پلتفرم‌های سخت‌افزاری در ASIC برنامه‌ریزی می‌شود؛ وضعیت سخت‌افزار در دستگاه واقعی با دستوراتی مانند `show platform ...` نیز راستی‌آزمایی می‌شود). [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تمرین زندهٔ CEF، TCAM و LISP نیازمند CML، EVE-NG یا تجهیزات واقعی است.]",
+      "why": "تأیید اینکه پیشوندهای جدول مسیریابی واقعاً در Data Plane کامپایل شده‌اند و دارای Next-Hop یا وضعیت مشخص (`attached`, `receive`, `drop`, `glean`) هستند.",
+      "anatomy": "هر پیشوند به یک Next-Hop و اینترفیس خروجی متصل شده است؛ وضعیت `glean` یعنی ساب‌نت مستقیم است ولی هنوز ARP یک میزبان خاص آن حل نشده است.",
+      "lookFor": "حضور مسیر مورد نظر با Next-Hop معتبر و نبود وضعیت‌های معیوب `drop` ناخواسته.",
+      "ifUnexpected": "اگر در `show ip route` مسیر هست ولی در `show ip cef` متفاوت است (CEF Inconsistency)، باید علت همگام‌سازی جدول یا `Punt` بودن را بررسی کرد.",
+      "executable": false
+    },
+    {
+      "cmd": "show ip interface brief",
+      "out": "Interface              IP-Address      OK? Method Status                Protocol\nGigabitEthernet0/0     10.10.0.1       YES manual up                    up\nLoopback0              10.255.0.1      YES manual up                    up",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای تأیید لینک لایه ۳ `Gi0/0` (الگوی Routed Access Uplink) و `Loopback0` (شناسهٔ RLOC/VTEP).",
+      "why": "در طراحی Routed Access و SD-Access Underlay، پورت‌های بالادستی سوئیچ با `no switchport` به لینک‌های نقطه-به-نقطهٔ لایه ۳ تبدیل می‌شوند و Loopback0 مرجع پایدار VTEP/LISP است.",
+      "anatomy": "فهرست اینترفیس‌های روت‌شده در برابر پورت‌های سوئیچی و وضعیت `up/up`.",
+      "lookFor": "آدرس‌دهی سالم روی لینک‌های روت‌شده و پایداری همیشگی `Loopback0`.",
+      "ifUnexpected": "خاموشی Uplink لایه ۳ در Routed Access بلافاصله مسیرهای ECMP را به‌طور آنی به لینک موازی منتقل می‌کند.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "leafspine",
+  "lab": {
+    "title": "آزمایشگاه آماده‌سازی نقش‌های Underlay (Routed Uplink) و پاک‌سازی پورت‌های Edge برای معماری Campus",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `show ip cef`، `show platform tcam` و `show lisp` را اجرا نمی‌کند (برای تمرین زندهٔ CEF و SD-Access از CML یا Cisco DevNet استفاده کنید). اما بررسی تفکیک پورت‌های لایه ۳ (`Gi0/0`, `Lo0`) از پورت‌های Access (`Gi0/2..7`) در شبیه‌ساز کاملاً زنده اجرا می‌شود.",
+      "۲. با `enable` وارد شوید و `show ip interface brief` و `show interfaces status` را ببینید؛ تفکیک ستون `Vlan` بین `routed` (`Gi0/0`)، `trunk` (`Gi0/1`) و `access` (`10, 20`) را مشاهده کنید.",
+      "۳. فرض کنید سوئیچ را برای یک Campus مدرن مستند و آماده می‌کنیم: `configure terminal` -> `interface Gi0/0` -> `description ROUTED-UPLINK-ECMP` -> `interface Loopback0` -> `description SDA-RLOC-VTEP` -> `vlan 55` -> `name SDA_USER_VN` -> `exit` -> `interface Gi0/7` -> `description EDGE-PORT-SDA` -> `switchport mode access` -> `switchport access vlan 55` -> `end`.",
+      "۴. با `show running-config`، `show interfaces status` و `ping 10.255.0.2` بررسی کنید تنظیمات نمونه (برچسب‌گذاری `Gi0/0`/`Lo0` و ایجاد `VLAN 55` برای `Gi0/7`) در شبیه‌ساز ساده ثبت شده و پایهٔ ارتباط با `10.255.0.2` پاسخ می‌دهد (ساختار واقعی CEF، TCAM و Fabric SD-Access در این شبیه‌ساز اجرا نمی‌شوند).",
+      "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (CEF/TCAM — تفکیک دستور میان پلتفرم‌ها):** **پیش‌نیاز و فرمان‌های بررسی:** پس از اعمال ACLهای امنیتی روی SVI، دستور **`show ip cef 10.20.0.0/16`** و سپس دستور پلتفرم‌محور متناسب با مدل را اجرا کنید: روی **Catalyst 9300 (یا مدل‌های Stackable / StackWise Virtual)** دستور `show platform hardware fed switch active fwd-asic resource tcam utilization` و `show platform software fed switch active punt cause summary`؛ و روی **Catalyst 9500 Standalone** (که کلمهٔ `switch` در ساختار دستور آن وجود ندارد) دستور **`show platform hardware fed fwd-asic resource tcam utilization`** و `show platform software fed punt cause summary` (مطابق Command Reference نسخهٔ IOS-XE آن مدل) همراه با `show processes cpu sorted`. **خروجی مرجع و نشانهٔ موفقیت:** در `show ip cef` وجود Next-Hop معتبر (نه `drop`/`glean` ناخواسته)، در خروجی `tcam utilization` پایین ماندن مصرف سطرهای `Security ACL` از آستانهٔ فرضی این سناریو (مثلاً `< 80%`)، نبود جهش غیرعادی در `punt cause summary` و CPU عادی در `show processes cpu sorted`. **نشانهٔ شکست:** پر شدن ظرفیت TCAM، خطای نصب ACL یا افزایش نرخ `Punt` همراه با بالا رفتن پردازش `FED`/`IOSd`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط تفکیک پورت‌ها را ثبت می‌کند؛ نحو دقیق دستورات `fed` و رفتار سرریز TCAM به مدل، حالت Standalone/Stack و نسخهٔ IOS-XE وابسته است."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show ip interface brief",
+      "show interfaces status",
+      "show running-config"
+    ]
+  },
+  "troubleshooting": {
+    "fault": "روی یک سوئیچ Core که ۱۰۰ هزار مسیر و ۴۰ خط ACL ساده داشت، پس از اضافه شدن یک ACL طولانیِ جدید برای کنترل ترافیک VoIP، پینگ مدیریتی تا خود سوئیچ دچار قطع‌ووصل شده و مصرف پردازنده در `show processes cpu` از ۱۵٪ به ۹۲٪ جهش پیدا کرده است!",
+    "analysis": "ظرفیت سخت‌افزاری **TCAM** برای ذخیرهٔ ACL/QoS (مثلاً به دلیل بسط رنج پورت‌های باز یا تکرار روی چندین SVI) پر شده و در این پلتفرم بسته‌های جاافتاده از TCAM به CPU **`Punt`** می‌شوند که بار پردازنده را به ۹۲٪ رسانده و نشست‌های کنترلی را دچار ناپایداری کرده است (در پلتفرم‌های دیگر ممکن است به جای Punt، خطای نصب یا Drop رخ دهد).",
+    "fix": "بررسی مصرف واقعی با `show platform hardware capacity` / `show tcam counts`، تجمیع قوانین ACL با خلاصه‌سازی ساب‌نت‌ها و حذف رنج‌های باز غیرضروری (یا انتقال فیلترینگ حجیم به فایروال تخصصی)."
+  },
+  "misconceptions": [
+    {
+      "myth": "در `Routed Access` دیگر اصلاً به هیچ VLANای روی سوئیچ دسترسی نیاز نیست.",
+      "reality": "خود لینک‌های *بین سوئیچ‌ها* لایه ۳ (Routed) هستند، اما کامپیوترها و تلفن‌های IP روی خود سوئیچ دسترسی همچنان به VLANهای محلی (`VLAN 10 Data`, `VLAN 50 Voice`) وصل می‌شوند که SVI آن‌ها روی همان سوئیچ Access قرار دارد؛ تنها چیزی که حذف شده کشیده شدن VLAN روی Trunkهای بین‌سوئیچی است.",
+      "howToSpot": "در پیکربندی Routed Access همچنان `vlan 10` و `interface Vlan10` روی هر سوئیچ Access وجود دارد، اما دیگر آن `VLAN 10` به سوئیچ همسایه کشیده نمی‌شود."
+    },
+    {
+      "myth": "چون `Control Plane Node` در SD-Access مسیرها را نگه می‌دارد، تمام ترافیک دادهٔ کاربران هم از داخل آن عبور می‌کند!",
+      "reality": "Control Plane Node صرفاً مثل دفتر راهنما (LISP Map-Server) پاسخِ «این EID کجاست» را می‌دهد؛ خود داده‌های سنگین کاربران (Data Plane) مستقیم در تونل **VXLAN** بین دو `Edge Node` (یا به `Border Node`) حرکت می‌کنند.",
+      "howToSpot": "در نمودار ترافیک SD-Access، اگر ارتباطات عادی درون‌ساختمانی است، هیچ بار دیتای کاربری روی لینک‌های مدیریتِ Control Plane Node نمی‌افتد."
+    }
+  ],
+  "exercise": "یک سازمان در دو ساختمان، در ساختمان اول ۴۸ کاربر در یک سوئیچ Access دارد که همه روی `VLAN 10` (`10.10.10.0/24`) هستند و در ساختمان دوم ۶۰ کاربر روی `VLAN 20` (`10.10.20.0/24`). تفاوت اصلی ارتباط بین این دو سوئیچ و جدول مسیریابی آن‌ها را در مدل **Three-Tier سنتی** در برابر **Routed Access** مقایسه کنید و نقش ۳ گره اصلی (`Edge`, `Control Plane`, `Border`) را در تبدیل این شبکه به SD-Access توضیح دهید.",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "اجزای زیر را به درستی به **Control Plane** یا **Data Plane** متصل کنید:\n۱) جدول `RIB`، ۲) جدول `FIB`، ۳) جدول `Adjacency Table`، ۴) پیام‌های `LISP Map-Register`، ۵) بسته‌بندی `VXLAN`، ۶) حافظهٔ `TCAM`.",
+      "hint": "کدام‌ها تصمیم‌گیری/پروتکل‌اند و کدام‌ها فوروارد/تطبیقِ خطیِ بسته؟",
+      "solution": "**Control Plane:** ۱) `RIB`، ۴) `LISP Map-Register`.\n**Data Plane (سخت‌افزار فورواردینگ):** ۲) `FIB`، ۳) `Adjacency Table`، ۵) بسته‌بندی `VXLAN`، ۶) حافظهٔ `TCAM`."
+    },
+    {
+      "level": "متوسط",
+      "task": "در مدل `Two-Tier (Collapsed Core)` و `Three-Tier` و `Routed Access`، کدام معماری برای شرایط زیر بهترین انتخاب است و چرا؟\nالف) یک مجتمع با ۲۰ ساختمان و ترافیک عظیم شرق-به-غرب بین ساختمان‌ها؛ ب) یک ساختمان تک با ۳۰۰ کاربر که به دنبال هزینهٔ پایین است؛ ج) یک شبکه با نیاز به همگرایی زیرثانیه‌ای و حذف کامل بلاک شدن لینک‌های آپ‌لینک توسط STP.",
+      "hint": "Core جدا برای مقیاس بزرگ، Collapsed Core برای ادغام هزینه، و L3 تا لایه دسترسی برای حذف STP.",
+      "solution": "الف) **Three-Tier** (جداسازی Core پرسرعت از Distribution)؛ ب) **Two-Tier / Collapsed Core** (کاهش هزینه و تاخیر اضافه در مقیاس تک‌ساختمانی)؛ ج) **Routed Access** (فعال بودن تمام آپ‌لینک‌ها با ECMP و همگرایی سریع L3 بدون بلاک STP)."
+    },
+    {
+      "level": "چالشی",
+      "task": "در یک شبکهٔ Cisco SD-Access که از `VN_CORP` برای کاربران شرکتی استفاده می‌کند، می‌خواهیم کارکنان بخش مالی (`SGT 15`) فقط مجاز به دسترسی پورت `TCP 443` به سرورهای مالی (`SGT 25`) باشند، اما همین کاربران اگر از طبقهٔ اول به طبقهٔ سوم بروند و IP دیگری (یا حتی در ساب‌نت دیگر در همین VN) بگیرند همچنان سیاست امنیتی بدون تغییر ACL برقرار بماند! توضیح دهید این تگ چطور در بسته سفر می‌کند و در کجا اعمال (`Enforce`) می‌شود.",
+      "hint": "نقطهٔ اول **Classification** در Edge مبدأ با ISE، حمل درون **VXLAN-GPO**، و **Enforcement** با ماتریس SGACL در Edge مقصد!",
+      "solution": "۱) هنگام احراز هویت با 802.1X در ورود به Edge Node مبدأ، سرور **Cisco ISE** بر اساس هویت کاربر تگ **`SGT = 15`** را اختصاص می‌دهد (Classification).\n۲) هنگام ارسال ترافیک به Edge Node مقصد، تگ `15` داخل هدر **`VXLAN-GPO`** قرار می‌گیرد (Propagation).\n۳) در **Edge Node مقصد** (جایی که سرورهای `SGT = 25` متصلند)، بر اساس **ماتریس سیاست TrustSec (`SGACL`)** بررسی می‌شود: `Source SGT 15 -> Dest SGT 25 : Permit TCP 443, Deny Any`! تمام این چرخه کاملاً مستقل از IP کلاینت و بدون تغییر ACLهای سنتی انجام می‌شود."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "در معماری داخلی یک روتر یا سوئیچ لایه ۳ سیسکو، جدول **`FIB`** و **`Adjacency Table`** توسط چه بخشی ساخته می‌شوند و چه تفاوتی دارند؟",
+      "opts": [
+        "جایگزین پروتکل BGP در اینترنت هستند",
+        "توسط STP ساخته می‌شوند و فقط در حالت Trunk فعالند",
+        "فقط هنگام قطع برق در NVRAM ذخیره می‌شوند",
+        "توسط CEF از روی RIB و ARP ساخته می‌شوند (و در پلتفرم‌های سخت‌افزاری در ASIC برنامه‌ریزی می‌گردند)؛ FIB مسیر/خروجی و Adjacency Table هدر آمادهٔ لایه ۲ را نگه می‌دارد"
+      ],
+      "ans": 3,
+      "exp": "CEF جداول کنترلی RIB و ARP را به جداول منطقی FIB و Adjacency تبدیل می‌کند که در تجهیزات سخت‌افزاری در ASIC برای فورواردینگ سریع برنامه‌ریزی می‌شوند."
+    },
+    {
+      "q": "مزیت اصلی انتخاب طراحی **Routed Access** به جای لایهٔ دسترسیِ کلاسیک مبتنی بر VLAN Trunking تا Distribution چیست؟",
+      "opts": [
+        "حذف حلقه‌های لایه ۲ بین سوئیچ‌ها و حذف بلاک شدن لینک‌ها توسط STP (استفادهٔ هم‌زمان با ECMP)",
+        "حذف کامل آدرس‌های IP از شبکه",
+        "نیاز نداشتن به سوئیچ‌های لایه ۳ در کل شبکه",
+        "کاهش پهنای باند آپ‌لینک‌ها به ۱۰۰ مگابیت"
+      ],
+      "ans": 0,
+      "exp": "وقتی مرز لایه ۳ به سوئیچ Access می‌آید، دیگر STP لینک‌های افزونهٔ بالادست را مسدود نمی‌کند و تمام لینک‌ها با ECMP فعال می‌شوند."
+    },
+    {
+      "q": "در **Cisco SD-Access**، کدام گره وظیفهٔ اتصال Fabric به شبکه‌های بیرونی (اینترنت، دیتاسنتر و WAN سنتی) را بر عهده دارد؟",
+      "opts": [
+        "Edge Node",
+        "Border Node",
+        "Intermediate Underlay Node",
+        "Control Plane Node"
+      ],
+      "ans": 1,
+      "exp": "Border Node نقطهٔ ورود و خروج بین دامنهٔ LISP/VXLAN در SD-Access و شبکه‌های بیرونی است؛ Edge میزبان کاربران است و Control Plane نگاشت EID-to-RLOC را نگه می‌دارد."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "این معماری پایهٔ کل طراحی‌های جدید شبکه‌های سازمانی سیسکو (Catalyst Center + SD-Access + Catalyst 9000) است.",
+    "nextQuestion": "زیربنای معماری و سخت‌افزار CEF را چیدیم؛ حالا در **حوزهٔ ۳ ENCOR** باید ببینیم چطور روی زیرساخت L2/L3 جزئیات حساسی مثل **تنظیم نوع شبکهٔ OSPF (`Point-to-Point` در برابر `Broadcast`)**، **فیلترینگ و دستکاری مسیر در eBGP** و **مکانیسم جابه‌جایی بی‌سیم (`L2 vs L3 Wireless Roaming`)** در شبکه‌های زنده کار می‌کنند!",
+    "nextId": "ccnp_enc_inf"
+  }
+}
