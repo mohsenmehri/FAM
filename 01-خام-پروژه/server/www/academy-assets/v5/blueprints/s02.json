@@ -1,0 +1,317 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "s02",
+ "objectiveId": "s02",
+ "kind": "lesson",
+ "track": "FAM Curriculum 5.0",
+ "course": "c5-stage-zero",
+ "title": "Ethernet و ARP: از IP تا فریم روی یک پیوند",
+ "titleEn": "Ethernet frames and ARP",
+ "domain": "Network fundamentals",
+ "source": "Legacy s02 rewritten",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 45,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "s02-section-1",
+   "title": "سناریو",
+   "html": "<p>میزبان 192.0.2.10/24 به سرور 198.51.100.80 درخواست دارد و gateway آن 192.0.2.1 است. اگر جدول همسایه خالی باشد، برای ساخت فریم اول کدام نشانی پیوند لازم است؟ تا آخر درس دو مقصد IP و MAC را جدا دنبال می‌کنیم.</p>"
+  },
+  {
+   "id": "s02-section-2",
+   "title": "هدف",
+   "html": "<p>فریم Ethernet II، MAC، EtherType و ARP را توضیح دهید، مقصد محلی و دوردست را تفکیک و نشانه‌های متداول خرابی را با شواهد تحلیل کنید. این مثال IPv4 روی Ethernet است، نه IPv6 یا همه رسانه‌ها.</p>"
+  },
+  {
+   "id": "s02-section-3",
+   "title": "مرز IP و Ethernet",
+   "html": "<p>IP مقصد منطقی را برای مسیریابی نشان می‌دهد؛ در Ethernet آدرس مقصد فریم گیرنده همان پیوند است. سرور دوردست IP مقصد باقی می‌ماند، اما فریم اول معمولاً به MAC gateway محلی ارسال می‌شود.</p>"
+  },
+  {
+   "id": "s02-section-4",
+   "title": "فریم Ethernet II",
+   "html": "<p>فریم نمونه آدرس مقصد و مبدأ MAC، EtherType، payload و FCS دارد. میدان FCS تشخیص برخی خطاهای انتقال را امکان‌پذیر می‌کند؛ مشاهده فریم در یک capture لزوماً حاوی FCS نیست و به کارت و ابزار وابسته است.</p>"
+  },
+  {
+   "id": "s02-section-5",
+   "title": "MAC و بیت‌های کنترل",
+   "html": "<p>MAC معمولاً در قالب شش octet نوشته می‌شود. بیت I/G نخستین octet فردی یا گروهی بودن را نشان می‌دهد و U/L به مدیریت محلی اشاره دارد؛ نشانی ممکن است مجازی یا تنظیم‌شده باشد و الزاماً هویت پایدار کارخانه نیست.</p>"
+  },
+  {
+   "id": "s02-section-6",
+   "title": "EtherType و VLAN",
+   "html": "<p>در Ethernet II مقدار 0x0800 معمولاً IPv4 و 0x0806 ARP را مشخص می‌کند. 802.1Q یک tag در فریم دارد و نمایش آن در capture به سخت‌افزار و offload بستگی دارد. tag، VLAN و IP را با یکدیگر یکی نگیرید.</p>"
+  },
+  {
+   "id": "s02-section-7",
+   "title": "انتخاب next hop",
+   "html": "<p>برای یک مقصد on-link، هدف ARP معمولاً خود مقصد است؛ برای مقصد بیرون از subnet، میزبان معمولاً gateway منتخب را resolve می‌کند. routeهای اختصاصی و پیکربندی میزبان می‌توانند انتخاب next hop را تغییر دهند.</p>"
+  },
+  {
+   "id": "s02-section-8",
+   "title": "ARP request",
+   "html": "<p>در صورت نیاز به resolve IPv4 روی لینک، درخواست ARP معمولاً به MAC broadcast ارسال و IP مورد جست‌وجو را اعلام می‌کند. broadcast در همان broadcast domain مربوط است، نه تمام اینترنت.</p>"
+  },
+  {
+   "id": "s02-section-9",
+   "title": "ARP reply و cache",
+   "html": "<p>پاسخ ARP عادی معمولاً unicast به درخواست‌کننده است. سامانه نگاشت IP به MAC را در neighbor/ARP cache نگه می‌دارد و انقضای دقیق به سیستم بستگی دارد. پاسخ‌های غیرعادی مثل gratuitous ARP را نباید با همه replyها یکسان فرض کرد.</p>"
+  },
+  {
+   "id": "s02-section-10",
+   "title": "مثال حل‌شده",
+   "html": "<p>با subnet /24، آدرس 192.0.2.20 محلی و 198.51.100.80 بیرونی است. در مثال بدون route خاص، ARP برای اولی به IP خودش و برای دومی به 192.0.2.1 انجام می‌شود. پیش از اجرا، اعتبار gateway و route را چک کنید.</p>"
+  },
+  {
+   "id": "s02-section-11",
+   "title": "ARP در برابر جدول سوئیچ",
+   "html": "<p>ARP cache میزبان نگاشت IPv4 به MAC است. جدول MAC سوئیچ نگاشت MAC به پورت در VLAN را نگه می‌دارد. داشتن یکی الزاماً وجود دیگری یا سلامت همه مسیر را اثبات نمی‌کند.</p>"
+  },
+  {
+   "id": "s02-section-12",
+   "title": "شواهد و محدودیت",
+   "html": "<p>در سیستم واقعی با مجوز از ابزارهای جدول neighbor و packet capture استفاده کنید؛ نام دستور و نمایش با سیستم‌عامل فرق می‌کند. دیدن request بدون reply می‌تواند از خرابی پورت، VLAN، نشانی اشتباه، فیلتر یا نبود مقصد ناشی شود و تشخیص قطعی نیست.</p>"
+  },
+  {
+   "id": "s02-section-13",
+   "title": "امنیت",
+   "html": "<p>ARP عادی احراز هویت داخلی ندارد و پاسخ جعلی ممکن است cache را تغییر دهد؛ تغییر MAC همیشه حمله نیست و HA یا تعویض تجهیز هم علت است. کنترل‌های سوئیچ مانند Dynamic ARP Inspection به طراحی و قابلیت پلتفرم وابسته‌اند.</p>"
+  },
+  {
+   "id": "s02-section-14",
+   "title": "جمع‌بندی",
+   "html": "<p>ابتدا route و on-link بودن، سپس هدف ARP، جدول neighbor، VLAN و در آخر IP و سرویس بالاتر را بررسی کنید. کد آزمایشگاه زیر فقط مدل انتخاب هدف است؛ خروجی آن شاهد ترافیک واقعی نیست.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Ethernet",
+   "fa": "Ethernet",
+   "simple": "فناوری متداول شبکه محلی لایه پیوند."
+  },
+  {
+   "term": "Frame",
+   "fa": "Frame",
+   "simple": "واحد داده پیوند در Ethernet."
+  },
+  {
+   "term": "MAC",
+   "fa": "MAC",
+   "simple": "نشانی پیوند در Ethernet."
+  },
+  {
+   "term": "IPv4",
+   "fa": "IPv4",
+   "simple": "پروتکل نشانی‌دهی و مسیریابی نسخه چهار."
+  },
+  {
+   "term": "ARP",
+   "fa": "ARP",
+   "simple": "پروتکل یافتن نشانی پیوند برای IPv4 محلی."
+  },
+  {
+   "term": "EtherType",
+   "fa": "EtherType",
+   "simple": "شناسه نوع payload در Ethernet II."
+  },
+  {
+   "term": "FCS",
+   "fa": "FCS",
+   "simple": "میدان کنترل خطا در فریم."
+  },
+  {
+   "term": "Broadcast",
+   "fa": "Broadcast",
+   "simple": "ارسال به همه اعضای دامنه پخش مرتبط."
+  },
+  {
+   "term": "Unicast",
+   "fa": "Unicast",
+   "simple": "ارسال به یک گیرنده مشخص."
+  },
+  {
+   "term": "VLAN",
+   "fa": "VLAN",
+   "simple": "بخش‌بندی منطقی دامنه لایه ۲."
+  },
+  {
+   "term": "Gateway",
+   "fa": "Gateway",
+   "simple": "next hop برای مسیرهای بیرونی در مثال."
+  },
+  {
+   "term": "Next hop",
+   "fa": "Next hop",
+   "simple": "گره بعدی انتخاب‌شده توسط route."
+  },
+  {
+   "term": "Cache",
+   "fa": "Cache",
+   "simple": "نگهداری موقت اطلاعات resolve شده."
+  },
+  {
+   "term": "Capture",
+   "fa": "Capture",
+   "simple": "ثبت ترافیک مشاهده‌شده توسط ابزار."
+  },
+  {
+   "term": "Offload",
+   "fa": "Offload",
+   "simple": "واگذاری بخشی از کار شبکه به سخت‌افزار."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ Python Mock — تجهیز واقعی اجرا نشده",
+   "executionStatus": "Designed — Not Run — تجهیز واقعی اجرا نشده است.",
+   "html": "<p><strong>Python Mock / محاسبه محلی:</strong> دستگاه واقعی یا IOS اجرا نشده است. Python Mock فقط هدف ARP را با یک subnet و gateway فرضی محاسبه می‌کند؛ هیچ ARP یا ترافیکی ارسال نمی‌شود. انتظار: مقصد محلی 192.0.2.20 و مقصد بیرونی 198.51.100.80 به‌ترتیب به 192.0.2.20 و 192.0.2.1 نگاشت شوند.</p><p>Python 3 لازم است؛ کد را در پوشه آزمایشی به نام <code>ethernet_arp_mock.py</code> ذخیره و با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 ethernet_arp_mock.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;A routing/ARP thought experiment; does not access a real network.&quot;&quot;&quot;\nfrom ipaddress import IPv4Address, IPv4Interface\n\n\ndef arp_target(local, destination, gateway):\n    iface = IPv4Interface(local)\n    dst, gw = IPv4Address(destination), IPv4Address(gateway)\n    if gw not in iface.network:\n        raise ValueError(&#x27;gateway must be on the local subnet&#x27;)\n    return dst if dst in iface.network else gw\n\n\nif __name__ == &#x27;__main__&#x27;:\n    local, gateway = &#x27;192.0.2.10/24&#x27;, &#x27;192.0.2.1&#x27;\n    print(&#x27;Python Mock: no ARP request sent&#x27;)\n    for target in (&#x27;192.0.2.20&#x27;, &#x27;198.51.100.80&#x27;):\n        print(f&#x27;destination {target} -&gt; ARP target {arp_target(local, target, gateway)}&#x27;)\n</code></pre><p>در صورت تفاوت خروجی، ورودی‌ها و نسخه Python را بررسی کنید. این خروجی از تجهیز یا packet capture واقعی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس",
+   "instructions": "پاسخ‌ها و توضیحات را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "برای مقصد خارج از subnet در مثال بدون route خاص، هدف ARP کدام است؟",
+   "options": [
+    "gateway محلی",
+    "IP سرور دوردست",
+    "DNS عمومی",
+    "MAC همه روترها"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>فریم نخست به next hop محلی ارسال می‌شود.</p>"
+  },
+  {
+   "title": "ARP cache چه نگاشتی را نگه می‌دارد؟",
+   "options": [
+    "MAC به پورت سوئیچ",
+    "IPv4 به MAC همسایه",
+    "نام DNS به URL",
+    "TCP port به VLAN"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>ARP cache در این سناریو نشانی IPv4 همسایه را به MAC مرتبط می‌کند.</p>"
+  },
+  {
+   "title": "در Ethernet II، EtherType 0x0806 کدام payload را نشان می‌دهد؟",
+   "options": [
+    "IPv6",
+    "TCP",
+    "ARP",
+    "HTTP"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>0x0806 شناسه ARP در Ethernet II است.</p>"
+  },
+  {
+   "title": "درخواست معمول ARP روی Ethernet به چه MAC مقصدی فرستاده می‌شود؟",
+   "options": [
+    "MAC مقصد دوردست",
+    "MAC DNS",
+    "یک MAC تصادفی",
+    "broadcast"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>درخواست معمول روی broadcast domain ارسال می‌شود.</p>"
+  },
+  {
+   "title": "پاسخ عادی به درخواست ARP معمولاً چگونه ارسال می‌شود؟",
+   "options": [
+    "unicast به درخواست‌کننده",
+    "broadcast به همه اینترنت",
+    "فقط از طریق TCP",
+    "بدون MAC مقصد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>پاسخ عادی اغلب مستقیماً به درخواست‌کننده ارسال می‌شود.</p>"
+  },
+  {
+   "title": "جدول MAC یک سوئیچ معمولاً چه نگاشتی دارد؟",
+   "options": [
+    "IPv4 به نام DNS",
+    "MAC و VLAN به پورت",
+    "پورت TCP به gateway",
+    "IP به certificate"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>سوئیچ MAC مبدأ را در VLAN و پورت ورودی یاد می‌گیرد.</p>"
+  },
+  {
+   "title": "آیا نشانی MAC لزوماً ثابت و معرف قطعی کارخانه است؟",
+   "options": [
+    "بله همیشه",
+    "فقط در IPv6",
+    "خیر؛ مجازی یا محلی نیز می‌تواند باشد",
+    "فقط پس از DNS"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>نشانی MAC می‌تواند تغییر کند و هویت قطعی نیست.</p>"
+  },
+  {
+   "title": "در capture نبود FCS چه نتیجه‌ای دارد؟",
+   "options": [
+    "حتماً شبکه دچار حمله است",
+    "حتماً بسته خراب است",
+    "Ethernet وجود ندارد",
+    "ممکن است کارت یا ابزار FCS را نمایش ندهد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>قابلیت capture و offload بر نمایش FCS اثر دارد.</p>"
+  },
+  {
+   "title": "هدف FCS چیست؟",
+   "options": [
+    "تشخیص برخی خطاهای فریم",
+    "رمزگذاری frame",
+    "انتخاب default route",
+    "حل DNS"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>FCS برای تشخیص برخی خطاها استفاده می‌شود.</p>"
+  },
+  {
+   "title": "برای مقصد محلی در مثال ساده، هدف ARP چیست؟",
+   "options": [
+    "IP سرور بیرونی",
+    "IP همان مقصد محلی",
+    "همیشه DNS",
+    "IP روتر بعدی در اینترنت"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در حالت on-link معمولاً نشانی همان میزبان محلی resolve می‌شود.</p>"
+  },
+  {
+   "title": "تغییر MAC یک IP چه معنایی دارد؟",
+   "options": [
+    "همیشه حمله قطعی",
+    "اثبات خرابی کابل",
+    "ممکن است HA یا تغییر تجهیز یا حمله باشد",
+    "همیشه ناشی از DNS"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>نیاز به بررسی زمینه، زمان و شواهد دیگر وجود دارد.</p>"
+  },
+  {
+   "title": "کد آزمایشگاه این درس چه می‌کند؟",
+   "options": [
+    "ARP واقعی می‌فرستد",
+    "روی سوئیچ VLAN می‌سازد",
+    "جدول IOS را می‌خواند",
+    "فقط در حافظه هدف فرضی را محاسبه می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>مدل هیچ شبکه یا تجهیزی را به کار نمی‌گیرد.</p>"
+  }
+ ],
+ "meta": {
+  "version": "draft.1",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc826",
+   "https://www.rfc-editor.org/rfc/rfc894"
+  ]
+ }
+}
