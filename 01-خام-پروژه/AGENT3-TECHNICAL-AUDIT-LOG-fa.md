@@ -237,3 +237,18 @@
 | پیگیری Handoff | `auto_20` | `OverflowError` روی `z_score(1, [1e200, 0])` و `[1e308, -1e308]`؛ بازگرداندن `0.0` روی baseline ثابت برابر `value` به‌جای تعریف‌نشده بودن Z-score. | IEEE-754 و تعریف ریاضی Z-score | مهار کامل `OverflowError -> ValueError` با `math.fsum`/`isfinite` گام‌به‌گام، رد قطعی baseline ثابت حتی برای `value == mean` و تعدیل Q4/Q6/Q12. | `test_phase10a_handoff_f4e3ab1f_ccde18_jitter_and_auto20_zscore` | شبیه‌ساز محلی بدون کنترلر/ML زنده؛ بازبینی نویسنده (نه مستقل). |
 
 > **یادآوری پایانی:** با وجود این ممیزی فنی و معنایی عمیق و آزمون‌های رگرسیون خودکار، این گزارش همچنان **بازبینی نویسنده** است و پیش از انتشار رسمی عمومی، **بازبینی مستقل توسط متخصص شبکه/امنیت انسانی (Independent Human SME Review)** توصیه می‌شود.
+
+## ۱۰B. هم‌راستایی نامزد `89fcfd1d` روی `ccde_18`/`auto_20` + پاک‌سازی سراسری `OverflowError -> ValueError` در ۷ آزمایشگاه دیگر
+
+- **مبنای دریافت:** بررسی شاخه Agent 2 (`arena/ab96c97c-fam` @ `89fcfd1dd9baed4c32ab7f79328d8f396f149145` و فایل `tests/test_agent3_handoff_candidates.py`) و اسکن AST/ایستای هر ۶۴ آزمایشگاه Agent 3 برای سرریز `math.isfinite(10**500)`، سرریز توان و خروجی‌های غیرمتناهی.
+- **`ccde_18` (`reviewed.11`):**
+  - مقایسه مرزهای سخت‌گیرانه RTT (`< 10.0 ms` برای `netapp_vmsc_snapmirror_active_sync` و `<= 5.0 ms` برای `netapp_ontap_select_metrocluster_sds`) اکنون از مقدار دقیق گردنشده (`assumed_total_end_to_end_rtt_ms_exact`) استفاده می‌کند (`100 km + 8.599 ms = 9.999 ms < 10.0` عبور می‌کند و `100 km + 8.6 ms = 10.0` رد می‌شود؛ مقدار گرد صرفاً نمایشی است).
+  - سیاست fail-closed jitter روی ONTAP Select حفظ شده (حالت `synchronous` بدون jitter رد می‌شود و `asynchronous` با `target_rpo_minutes > 0` عبور می‌کند) و متن پیام‌ها صریحاً محدوده مدل محلی را بیان می‌کند، نه تایید محصول یا اندازه‌گیری زنده.
+- **`auto_20` (`reviewed.11`):**
+  - `z_score` به محاسبه مقیاس‌گذاری‌شده (`max_abs` و `diff_scale`) ارتقا یافت تا روی baselineهای متناهی بزرگ سرریز کاذب مجذور رخ ندهد (`z_score(1e200, [1e200, 0]) == 1.0` و `z_score(1e308, [-1e308, 1e308]) == 1.0`) و هم‌زمان خروجی غیرمتناهی ناهم‌مقیاس (`z_score(1e308, [1e-308, 2e-308])`)، عدد خارج از بازه IEEE-754 (`10**500`) و baseline ثابت (`sigma == 0`) با `ValueError` رد شوند.
+- **پاک‌سازی پیشگیرانه ۷ آزمایشگاه دیگر (`reviewed.9`):**
+  - `auto_19`, `ccde_11`, `ccde_14`, `ccde_17`: محافظت `_require_finite_num` / `_require_non_negative_cost` در برابر `OverflowError` (`10**500 -> ValueError`).
+  - `spec_cyber`: محافظت `OverflowError -> ValueError` در `_require_finite_num` و `detect_c2_beaconing` + بازگرداندن `cv: None` به‌جای `float('inf')` غیرسازگار با JSON وقتی فاصله زمانی صفر است.
+  - `spec_wl`: محافظت `OverflowError -> ValueError` در `_require_finite_num` و `dbm_to_mw` (مانند `dbm=10000` و `10**500`).
+  - `ccie_sec`: افزودن `_require_finite_num` به `audit_ntp_dns_preflight` برای رد `NaN`/`Inf`/`10**500`/`bool` در `clock_skew_sec` و آستانه‌ها.
+- **وضعیت بازبینی و اجرا:** خودبازبینی نویسنده (بدون بازبینی مستقل انسانی)؛ هر ۹ آزمایشگاه محلی/Mock بدون تجهیز شبکه زنده هستند و تطابق بایتی ۶۴/۶۴ HTML تأیید شد.

@@ -5,10 +5,12 @@ Simulated Closed-Loop Remediation Gate with Human-in-the-Loop (500-Branch Capsto
 
 Execution & modeling boundaries:
 - Pure Python 3 stdlib local simulation of 500 branches grouped under 4 regional hubs.
-- Strict input validation: z_score rejects non-finite numbers (NaN/Infinity), IEEE-754 overflow
-  inputs (e.g. 10**500, [1e200, 0], [1e308, -1e308] — always ValueError, never OverflowError),
-  booleans (True/False), and empty or zero-variance constant baselines (ALWAYS ValueError because
-  Z-score is mathematically undefined when sigma == 0, even if value == mean).
+- Strict input validation: z_score uses scale-normalized arithmetic to avoid spurious squaring
+  overflow on large finite baselines (e.g. [1e200, 0], [-1e308, 1e308]), rejects non-finite numbers
+  (NaN/Infinity), out-of-range integers (10**500), non-finite scaled results (e.g. 1e308 against
+  [1e-308, 2e-308]) with ValueError (never OverflowError), booleans (True/False), and empty or
+  zero-variance constant baselines (ALWAYS ValueError because Z-score is mathematically undefined
+  when sigma == 0, even if value == mean).
 - remediation_decision enforces an explicit action allowlist (rejecting empty, None, or arbitrary
   actions like 'destroy_everything') and strict Python bool for human_approved. Output explicitly
   marks simulation_only=True so policy-gate output is never mistaken for live network modification.
@@ -55,36 +57,35 @@ def _require_finite_num(val: object, name: str) -> float:
 
 
 def z_score(value: float, baseline: list[float]) -> float:
-    """Compute population Z-score with strict finite/overflow checks; rejects constant (sigma=0) baselines."""
+    """Compute population Z-score using scale-normalized arithmetic; rejects constant (sigma=0) & non-finite results."""
     if not isinstance(baseline, (list, tuple)) or len(baseline) < 2:
         raise ValueError("baseline must be a list/tuple with at least 2 finite numeric observations")
     val = _require_finite_num(value, "value")
     clean_base = [_require_finite_num(x, f"baseline[{i}]") for i, x in enumerate(baseline)]
 
+    max_abs = max(abs(x) for x in clean_base)
+    if max_abs == 0.0:
+        raise ValueError(
+            "baseline has zero variance (all zeros / constant baseline); Z-score is undefined when sigma == 0"
+        )
+
     try:
-        total = math.fsum(clean_base)
-        mean = total / len(clean_base)
-        if not math.isfinite(mean):
-            raise ValueError("baseline mean overflowed IEEE-754 finite float range")
-        sq_devs: list[float] = []
-        for x in clean_base:
-            diff = x - mean
-            if not math.isfinite(diff):
-                raise ValueError("baseline deviation overflowed IEEE-754 finite float range")
-            sq = diff * diff
-            if not math.isfinite(sq):
-                raise ValueError("baseline squared deviation overflowed IEEE-754 finite float range")
-            sq_devs.append(sq)
-        variance = math.fsum(sq_devs) / len(clean_base)
-        if not math.isfinite(variance):
-            raise ValueError("baseline variance overflowed IEEE-754 finite float range")
-        if variance == 0.0:
+        scaled = [x / max_abs for x in clean_base]
+        scaled_mean = math.fsum(scaled) / len(scaled)
+        diffs = [s - scaled_mean for s in scaled]
+        diff_scale = max(abs(d) for d in diffs)
+        if diff_scale == 0.0:
             raise ValueError(
                 "baseline has zero variance (constant baseline); Z-score is undefined when sigma == 0"
             )
-        std = math.sqrt(variance)
-        delta = val - mean
-        z = delta / std
+        norm_sq = math.fsum((d / diff_scale) ** 2 for d in diffs) / len(diffs)
+        scaled_std = diff_scale * math.sqrt(norm_sq)
+        if scaled_std == 0.0 or not math.isfinite(scaled_std):
+            raise ValueError("baseline standard deviation is zero or non-finite")
+        scaled_val = val / max_abs
+        if not math.isfinite(scaled_val):
+            raise ValueError("value/baseline scale ratio overflowed IEEE-754 finite float range")
+        z = (scaled_val - scaled_mean) / scaled_std
     except OverflowError as exc:
         raise ValueError("Z-score arithmetic overflowed IEEE-754 finite float range") from exc
 

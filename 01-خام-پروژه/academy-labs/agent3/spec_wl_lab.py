@@ -15,14 +15,26 @@ def _require_bool(val: object, name: str) -> bool:
 
 
 def _require_finite_num(val: object, name: str) -> float:
-    if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(val):
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
         raise ValueError(f"{name} must be a finite number (not bool), got {val!r}")
-    return float(val)
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval):
+        raise ValueError(f"{name} must be a finite number (not bool), got {val!r}")
+    return fval
 
 
 def dbm_to_mw(dbm: float) -> float:
     val = _require_finite_num(dbm, "dbm")
-    return 10 ** (val / 10.0)
+    try:
+        res = 10.0 ** (val / 10.0)
+    except OverflowError as exc:
+        raise ValueError(f"dbm={val!r} overflows IEEE-754 mW conversion") from exc
+    if not math.isfinite(res):
+        raise ValueError(f"dbm={val!r} produced non-finite mW value")
+    return res
 
 
 def mw_to_dbm(mw: float) -> float:

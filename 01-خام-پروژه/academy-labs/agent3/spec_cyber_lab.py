@@ -18,9 +18,15 @@ def _require_int(val: object, name: str) -> int:
 
 
 def _require_finite_num(val: object, name: str) -> float:
-    if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(val):
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
         raise ValueError(f"{name} must be a finite number (not bool), got {val!r}")
-    return float(val)
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval):
+        raise ValueError(f"{name} must be a finite number (not bool), got {val!r}")
+    return fval
 
 
 def detect_ssh_bruteforce(
@@ -75,14 +81,21 @@ def detect_c2_beaconing(timestamps: list[float], max_cv: float = 0.25) -> dict[s
         return {"beaconing_suspected": False, "reason": "need at least 4 observations"}
     ordered = sorted(clean_ts)
     deltas = [ordered[i + 1] - ordered[i] for i in range(len(ordered) - 1)]
-    mean_d = statistics.mean(deltas)
-    stdev_d = statistics.pstdev(deltas)
-    cv = stdev_d / mean_d if mean_d > 0 else float("inf")
+    if not all(math.isfinite(d) for d in deltas):
+        raise ValueError("inter-arrival timestamp deltas overflowed IEEE-754 finite float range")
+    try:
+        mean_d = statistics.mean(deltas)
+        stdev_d = statistics.pstdev(deltas)
+    except OverflowError as exc:
+        raise ValueError("inter-arrival statistics overflowed IEEE-754 finite float range") from exc
+    if not (math.isfinite(mean_d) and math.isfinite(stdev_d)):
+        raise ValueError("inter-arrival statistics produced non-finite float value")
+    cv = (stdev_d / mean_d) if mean_d > 0 else None
     return {
         "mean_interval_sec": round(mean_d, 2),
         "stdev_sec": round(stdev_d, 2),
-        "cv": round(cv, 4) if math.isfinite(cv) else float("inf"),
-        "beaconing_suspected": cv <= cv_limit and mean_d > 0,
+        "cv": round(cv, 4) if (cv is not None and math.isfinite(cv)) else None,
+        "beaconing_suspected": cv is not None and math.isfinite(cv) and cv <= cv_limit and mean_d > 0,
         "mitre_attack": "T1071.001",
     }
 

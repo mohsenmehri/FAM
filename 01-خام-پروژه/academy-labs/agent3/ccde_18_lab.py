@@ -129,13 +129,27 @@ def estimate_fiber_rtt_ms(
     )
 
     # Ideal straight-line silica fiber (~200,000 km/s => ~0.01 ms/km propagation-only RTT)
+    # Exact unrounded values are preserved for strict boundary comparisons; rounded values are for display only.
     try:
-        propagation_min = round(dist_km * 0.01, 2)
-        routed_propagation = round(propagation_min * stretch, 2)
-        assumed_total_rtt = round(routed_propagation + overhead, 2)
+        propagation_min_exact = dist_km * 0.01
+        routed_propagation_exact = propagation_min_exact * stretch
+        assumed_total_rtt_exact = routed_propagation_exact + overhead
+        propagation_min = round(propagation_min_exact, 2)
+        routed_propagation = round(routed_propagation_exact, 2)
+        assumed_total_rtt = round(assumed_total_rtt_exact, 2)
     except OverflowError as exc:
         raise ValueError("RTT calculation overflowed IEEE-754 finite float range") from exc
-    if not all(math.isfinite(v) for v in (propagation_min, routed_propagation, assumed_total_rtt)):
+    if not all(
+        math.isfinite(v)
+        for v in (
+            propagation_min_exact,
+            routed_propagation_exact,
+            assumed_total_rtt_exact,
+            propagation_min,
+            routed_propagation,
+            assumed_total_rtt,
+        )
+    ):
         raise ValueError("RTT calculation produced non-finite float value")
 
     return {
@@ -145,9 +159,10 @@ def estimate_fiber_rtt_ms(
         "routed_propagation_only_rtt_ms": routed_propagation,
         "assumed_equipment_and_detour_overhead_ms": overhead,
         "assumed_total_end_to_end_rtt_ms": assumed_total_rtt,
+        "assumed_total_end_to_end_rtt_ms_exact": assumed_total_rtt_exact,
         "latency_assumption_note": (
-            "Illustrative model estimate only (not measured carrier RTT); real RTT depends on actual "
-            "submarine/terrestrial cable path, DWDM optics, and intermediate routing hops."
+            "Illustrative model estimate only (not measured carrier RTT); boundary checks use the "
+            "unrounded assumed_total_end_to_end_rtt_ms_exact value, while rounded fields are for display only."
         ),
     }
 
@@ -204,11 +219,13 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "netapp_v
     max_sync_ms = profile["max_rtt_ms"]
     max_jitter_ms = profile["max_jitter_ms"]
     assumed_rtt = rtt_info["assumed_total_end_to_end_rtt_ms"]
+    assumed_rtt_exact = rtt_info["assumed_total_end_to_end_rtt_ms_exact"]
 
+    # Boundary comparison uses exact unrounded RTT (display uses rounded value)
     if profile["strict_lt"]:
-        rtt_feasible = assumed_rtt < max_sync_ms
+        rtt_feasible = assumed_rtt_exact < max_sync_ms
     else:
-        rtt_feasible = assumed_rtt <= max_sync_ms
+        rtt_feasible = assumed_rtt_exact <= max_sync_ms
 
     # Explicit fail-closed jitter modeling when required by the selected product profile
     if max_jitter_ms is not None:
@@ -244,15 +261,15 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "netapp_v
     elif sync_feasible_for_profile:
         if max_jitter_ms is not None:
             dci_reasons.append(
-                f"Assumed total RTT (~{assumed_rtt} ms) AND assumed jitter ({assumed_jitter_ms} ms) "
-                f"satisfy {sync_product_profile} limits ({profile['comparator_text']}); "
-                f"selected mode '{rep_mode}' is supported by this model."
+                f"Modeled RTT (~{assumed_rtt} ms, exact {assumed_rtt_exact:.4g} ms) AND modeled jitter "
+                f"({assumed_jitter_ms} ms) are within {sync_product_profile} assumption bounds ({profile['comparator_text']}); "
+                f"selected mode '{rep_mode}' passes this local model check (not a live measurement or vendor qualification)."
             )
         else:
             dci_reasons.append(
-                f"Assumed total RTT (~{assumed_rtt} ms; propagation min {rtt_info['propagation_only_min_rtt_ms']} ms) "
-                f"satisfies {sync_product_profile} RTT limit ({profile['comparator_text']}; jitter not modeled for this profile); "
-                f"selected mode '{rep_mode}' is supported by this RTT model."
+                f"Modeled RTT (~{assumed_rtt} ms, exact {assumed_rtt_exact:.4g} ms; propagation min {rtt_info['propagation_only_min_rtt_ms']} ms) "
+                f"is within {sync_product_profile} RTT assumption bound ({profile['comparator_text']}; jitter not modeled for this profile); "
+                f"selected mode '{rep_mode}' passes this local RTT model check (not a live measurement or vendor qualification)."
             )
     elif replication_ok:
         if max_jitter_ms is not None and rtt_feasible and assumed_jitter_ms is None:

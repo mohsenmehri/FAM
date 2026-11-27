@@ -18,3 +18,7 @@
 - **اصلاح انجام‌شده:** اعمال `_require_bool` سخت‌گیرانه روی `tls_decrypted`، `route_exists`، `contains_exploit_sig` و `dns_forward_reverse_ok` در `ccie_sec_lab.py`.
 - **تست مرتبط:** `test_phase7_strict_boolean_typing_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** مدل محلی بدون ISE/FMC/FTD واقعی؛ بازبینی نویسنده (نه مستقل).
+
+## به‌روزرسانی فاز ۱۰B — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن `_require_finite_num` به `audit_ntp_dns_preflight` برای رد `NaN`/`Inf`/`10**500` و `bool` در `clock_skew_sec` و آستانه‌های زمانی.
+- **وضعیت اجرا:** آزمایشگاه محلی/Mock Python بدون تجهیز شبکه یا سرویس زنده؛ تطابق دقیق بایتی کد HTML با `ccie_sec_lab.py` تأیید شد.

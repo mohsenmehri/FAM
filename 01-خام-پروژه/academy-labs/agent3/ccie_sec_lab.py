@@ -9,6 +9,7 @@ No real Cisco ISE, FMC/FTD, ASA, or Active Directory server is connected.
 """
 
 import json
+import math
 
 
 def _require_bool(val: object, name: str) -> bool:
@@ -17,26 +18,40 @@ def _require_bool(val: object, name: str) -> bool:
     return val
 
 
+def _require_finite_num(val: object, name: str) -> float:
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise ValueError(f"{name} must be a finite number (not bool), got {val!r}")
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval):
+        raise ValueError(f"{name} must be a finite number (no NaN/Infinity), got {val!r}")
+    return fval
+
+
 def audit_ntp_dns_preflight(
     nodes: list[dict],
     ops_warning_skew_sec: int = 30,
     kerberos_max_skew_sec: int = 300,
 ) -> dict:
+    ops_warn = _require_finite_num(ops_warning_skew_sec, "ops_warning_skew_sec")
+    krb_max = _require_finite_num(kerberos_max_skew_sec, "kerberos_max_skew_sec")
+    if ops_warn < 0 or krb_max <= 0:
+        raise ValueError("ops_warning_skew_sec must be >= 0 and kerberos_max_skew_sec must be > 0")
     failures = []
     warnings = []
     for n in nodes:
-        skew_raw = n["clock_skew_sec"]
-        if isinstance(skew_raw, bool) or not isinstance(skew_raw, (int, float)):
-            raise ValueError(f"{n['name']}: clock_skew_sec must be numeric, got {skew_raw!r}")
+        skew_raw = _require_finite_num(n.get("clock_skew_sec"), f"{n['name']}.clock_skew_sec")
         skew = abs(skew_raw)
         dns_ok = _require_bool(n.get("dns_forward_reverse_ok"), f"{n['name']}.dns_forward_reverse_ok")
-        if skew > kerberos_max_skew_sec:
+        if skew > krb_max:
             failures.append(
-                f"{n['name']}: skew {skew_raw}s exceeds RFC 4120 / AD Kerberos default 300s (5-min) tolerance (KRB_AP_ERR_SKEW)"
+                f"{n['name']}: skew {skew_raw}s exceeds RFC 4120 / AD Kerberos default {int(krb_max)}s (5-min) tolerance (KRB_AP_ERR_SKEW)"
             )
-        elif skew > ops_warning_skew_sec:
+        elif skew > ops_warn:
             warnings.append(
-                f"{n['name']}: skew {skew_raw}s exceeds {ops_warning_skew_sec}s operational NTP target (within 300s Kerberos default, fix NTP)"
+                f"{n['name']}: skew {skew_raw}s exceeds {ops_warn:g}s operational NTP target (within {int(krb_max)}s Kerberos default, fix NTP)"
             )
         if not dns_ok:
             failures.append(f"{n['name']}: DNS A/PTR mismatch breaks ISE AD join & EST/SCEP certs")

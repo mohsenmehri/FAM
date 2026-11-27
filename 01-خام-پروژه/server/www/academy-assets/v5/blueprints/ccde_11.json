@@ -1,342 +1,342 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "ccde_11",
- "objectiveId": "ccde_11",
- "kind": "lesson",
- "track": "CCDE",
- "course": "ccde-design",
- "title": "۹.۱۱ CCDE — برنامه‌ریزی ظرفیت (Capacity Planning): ۵ بُعد پنهان فراتر از Gbps و فرمول رشد مرکب ۵ساله",
- "titleEn": "CCDE Topic 11: Capacity Planning — 5 Hidden Dimensions Beyond Gbps, Compound Growth & Failover Headroom",
- "domain": "Capacity Planning & Forecasting",
- "source": "Legacy ccde_11 rewritten and expanded",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 50,
- "prerequisites": [
-  "ccde_01",
-  "ccde_10"
- ],
- "sections": [
-  {
-   "id": "ccde_11-section-1",
-   "title": "مسئله واقعی: چرا فایروال «۴۰ گیگابیتی» در کاتالوگ، وقتی ترافیک واقعی سازمان تازه به ۷ گیگابیت می‌رسد ناگهان قفل می‌کند؟",
-   "html": "<p>یکی از پرهزینه‌ترین خطاهای خرید تجهیزات سازمانی، تکیه ساده به عدد تبلیغاتی <strong>Gbps</strong> روی برگه مشخصات (Datasheet) است! یک فایروال ۴۰Gbps در تست آزمایشگاهی با بسته‌های بزرگ ۱۵۰۰بایتی بدون رمزگشایی تست شده؛ اما در دنیای واقعی با فعال شدن <strong>TLS 1.3 Inspection، IPS، بسته‌های کوچک صوتی/DNS (PPS بالا) و هزاران نشست جدید در ثانیه (CPS)</strong>، ظرفیت واقعی آن گاهی به <strong>۷ گیگابیت</strong> سقوط می‌کند! معمار CCDE ظرفیت را در <strong>۵ بُعد پنهان</strong>، با <strong>فرمول رشد مرکب ۵ساله</strong> و <strong>حاشیه Failover</strong> محاسبه می‌کند.</p>"
-  },
-  {
-   "id": "ccde_11-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code> و <code>ccde_10</code>.</p><ul><li>ممیزی <strong>۵ بُعد پنهان ظرفیت</strong> فراتر از Gbps: <strong>PPS (بسته‌های کوچک)</strong>، <strong>جداول سخت‌افزاری TCAM/FIB/NAT</strong>، <strong>توان واقعی NGFW TLS/IPS/CPS</strong>، <strong>بافر سوئیچ (Microburst)</strong> و <strong>برق/سرمایش/فضای رک</strong>.</li><li>محاسبه دقیق رشد ترافیک در افق ۵ساله با <strong>فرمول رشد مرکب <code>C_5 = C_0 × (1 + r)^5</code></strong> و اعمال <strong>سقف ۵۰٪ برای Failover</strong>.</li><li>تبیین تفاوت <strong>میانگین ۵دقیقه‌ای SNMP</strong> با <strong>اوج لحظه‌ای (95th Percentile و Microburstهای میلی‌ثانیه‌ای)</strong>.</li><li>طراحی آستانه‌های عملیاتی (<strong>آستانه هشدار ۷۰٪ و بازه تحویل سخت‌افزار Lead-Time</strong>) برای ارتقای پیش‌فعال بدون بحران.</li></ul>"
-  },
-  {
-   "id": "ccde_11-section-3",
-   "title": "پنج بُعد پنهان ظرفیت (فراتر از عدد تبلیغاتی Gbps!)",
-   "html": "<ol><li><strong>نرخ بسته در ثانیه (PPS / Mpps — IMIX):</strong> بسته‌های کوچک ۶۴ تا ۱۲۸بایتی (VoIP، DNS، BGP، حملات SYN) CPU و ASIC را خیلی زودتر از رسیدن به سقف Gbps اشباع می‌کنند!</li><li><strong>سقف جداول سخت‌افزاری (TCAM / FIB / MAC / ARP / NAT / ACL):</strong> روتر مرزی اینترنت با جدول IPv4 نزدیک به ۱ میلیون مسیر + IPv6 به سرعت از سقف TCAM/FIB یک سوئیچ لایه ۳ عادی سرریز می‌شود!</li><li><strong>ظرفیت واقعی فایروال و VPN (NGFW TLS Inspection &amp; CPS):</strong> روشن کردن IPS + Decrypt TLS می‌تواند بسته به مدل سخت‌افزار، شتاب‌دهنده رمزنگاری و Cipher Suite توان اسمی فایروال را به‌شدت (در بسیاری از پلتفرم‌ها حدود ۵۰ تا ۸۰٪) کاهش دهد!</li><li><strong>عمق بافر سوئیچ (Deep Buffer در برابر Shallow Buffer):</strong> هنگام تغییر سرعت (مثلاً ورود ترافیک ۴۰G به پورت خروجی ۱۰G) یا Microburst، سوئیچ‌های کم‌بافر بدون اشباع میانگین لینک، بسته‌ها را Drop می‌کنند!</li><li><strong>محدودیت‌های فیزیکی دیتاسنتر (برق kW، سرمایش BTU و فضای Rack Unit):</strong> هیچ معماری بدون هماهنگی با ظرفیت برق و کولینگ اتاق سرور در عمل اجرا نمی‌شود.</li></ol>"
-  },
-  {
-   "id": "ccde_11-section-4",
-   "title": "نمودار ۵ بُعد پنهان Capacity Planning و فرمول رشد مرکب ۵ساله",
-   "html": "<p>نمودار زیر ۵ بُعد واقعی ظرفیت و اثر مرکب رشد ۳۵٪ سالانه همراه با حاشیه ۵۰٪ Failover را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Capacity Planning: 5 Hidden Dimensions Beyond Gbps and 5-Year Compound Growth Formula\"><rect x=\"14\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"190\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">5 Hidden Dimensions Beyond Gbps</text><text x=\"190\" y=\"56\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">1. PPS (Small-Packet Rate Mpps)</text><text x=\"190\" y=\"72\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">2. TCAM / FIB / MAC / ARP / NAT Scale</text><text x=\"190\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">3. NGFW TLS Decrypt &amp; CPS Throughput!</text><text x=\"190\" y=\"104\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">4. Switch Buffer (Microburst) &amp; 5. Power/Cooling</text><rect x=\"394\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"570\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">5-Year Compound Growth + Failover Cap</text><text x=\"570\" y=\"58\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#14532d\">C_5 = C_0 x (1 + r)^5</text><text x=\"570\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">12 Gbps @ 35%/yr =&gt; 53.81 Gbps in Yr 5!</text><text x=\"570\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">With 50% 2N Failover Cap =&gt; Need 107.6 Gbps!</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">CCDE Capacity Law: Datasheet Headline Gbps Lies! Always Size for Small-Packet PPS, TLS Inspect, 5yr Growth &amp; N-1 Failover!</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Monitor 95th Percentile + Microburst Counters Continuously to Trigger Upgrades BEFORE Reaching 70% Saturation</text></svg>"
-  },
-  {
-   "id": "ccde_11-section-5",
-   "title": "ریاضی رشد ۵ساله (Compound Growth) + تله فراموشی Failover Headroom",
-   "html": "<p>اشتباه کلاسیک مدیران: «امسال ۱۲ گیگابیت مصرف داریم و رشد سالانه ۳۵٪ است، پس در ۵ سال می‌شود <code>12 + 5×35%</code>!» <strong>غلط!</strong> رشد شبکه <strong>مرکب (Compound)</strong> است: <code>C_5 = 12 × (1.35)^5 = 53.81 Gbps</code> (نزدیک به ۴٫۵ برابر امروز!). و فراموش نکنید: اگر دو لینک 2N دارید و می‌خواهید هنگام قطع یکی، لینک دوم بدون اشباع کل ۵۳٫۸۱ گیگابیت را بکشد (سقف ۵۰٪ بار در حالت عادی)، باید ظرفیت کل را برای <strong><code>107.62 Gbps</code></strong> (مثلاً دو لینک ۱۰۰G) برنامه‌ریزی کنید!</p>"
-  },
-  {
-   "id": "ccde_11-section-6",
-   "title": "چرا نمودار ۵دقیقه‌ای SNMP دروغ می‌گوید؟ (معضل Microburst و 95th Percentile)",
-   "html": "<p>وقتی SNMP هر ۵ دقیقه یک‌بار میانگین مصرف لینک ۱۰G را ۳۵٪ نشان می‌دهد، ممکن است کاربران همچنان از افت بسته شکایت کنند! چرا؟ زیرا یک انفجار ترافیک ۱۰میلی‌ثانیه‌ای (<strong>Microburst</strong>) بافر پورت را پر کرده و صدها بسته را انداخته، اما در میانگین ۳۰۰ثانیه‌ای گم شده است! معمار CCDE علاوه بر <strong>صدک ۹۵ام (95th Percentile)</strong>، شمارنده‌های <strong>Output Queue Drops</strong> و تله‌متری زیرثانیه‌ای (Streaming Telemetry) را در طرح پایش ظرفیت الزامی می‌کند.</p>"
-  },
-  {
-   "id": "ccde_11-section-7",
-   "title": "برنامه‌ریزی ظرفیت بر اساس رویدادهای غیرخطی (Peak Events، ادغام M&amp;A و مهاجرت ابری)",
-   "html": "<p>ترافیک کسب‌وکارها خطی نیست: بلک‌فرایدی فروشگاه اینترنتی، روز ثبت‌نام دانشگاه، گزارش مالی آخر سال، خرید یک شرکت جدید (M&amp;A) یا شروع بکاپ شبانه دیتاسنتر به ابر می‌تواند ترافیک را در یک شب ۵ برابر کند! معمار CCDE علاوه بر روند تاریخی، حتماً <strong>نقشه راه ۳ تا ۵ساله تجاری (Business Roadmap)</strong> را از مدیران کسب‌وکار می‌گیرد تا جهش‌های غیرخطی را در ظرفیت بگنجاند.</p>"
-  },
-  {
-   "id": "ccde_11-section-8",
-   "title": "آستانه ۷۰٪ و زمان تامین سخت‌افزار (Procurement Lead-Time)",
-   "html": "<p>اگر منتظر بمانید تا لینک WAN یا CPU فایروال به ۹۵٪ برسد و تازه درخواست خرید بدهید، با زمان تامین ۳ تا ۶ماهه سخت‌افزار و مدار مخابراتی، سازمان شما ماه‌ها در بحران می‌سوزد! استاندارد عملیاتی CCDE: <strong>آستانه هشدار اولیه ۶۰–۷۰٪ (برای N+1) و ۴۰–۴۵٪ (برای جفت 2N)</strong> تا پیش از اشباع واقعی، خرید و ارتقا بدون فشار انجام شود.</p>"
-  },
-  {
-   "id": "ccde_11-section-9",
-   "title": "تخمین واقعی ترافیک با پروفایل IMIX (Internet Mix) به جای بسته‌های ۱۵۰۰بایتی",
-   "html": "<p>در تست‌های بازاریابی فروشندگان، بسته ۱۵۰۰بایتی کمترین تعداد بسته در ثانیه را دارد و بالاترین عدد Gbps را نمایش می‌دهد. معمار CCDE هنگام مقایسه تجهیزات در RFP حتماً عدد <strong>IMIX (ترکیب واقعی بسته‌های کوچک ۶۴B، متوسط ۵۷۶B و بزرگ ۱۵۰۰B)</strong> همراه با همه سرویس‌های امنیتی روشن (IPS/TLS/Logging) را مطالبه می‌کند!</p>"
-  },
-  {
-   "id": "ccde_11-section-10",
-   "title": "موازنه CapEx در Capacity Planning: خرید ظرفیت ۵ساله در روز اول یا معماری Pay-as-You-Grow؟",
-   "html": "<p>خرید سخت‌افزار ۱۰۰٪ ظرفیت سال پنجم در روز اول، سرمایه نقدی شرکت را می‌سوزاند و باعث استهلاک سخت‌افزار بیکار می‌شود. بهترین راهبرد CCDE: خرید <strong>شاسی/فابریک آماده رشد (Pay-as-You-Grow / Modular Spine-Leaf)</strong> با ظرفیت لازم برای ۲ تا ۳ سال اول و امکان افزودن آسان Line-Card، ماژول 100G/400G یا سوئیچ Leaf/Spine جدید بدون تعویض کل معماری!</p>"
-  },
-  {
-   "id": "ccde_11-section-11",
-   "title": "کژفهمی‌های رایج درباره Capacity Planning",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای خرید فایروال کافی است عدد Gbps ترافیک را با عدد تیتر کاتالوگ (Datasheet Firewall Throughput) مقایسه کنیم.»</strong> واقعیت: عدد تیتر بدون TLS Decrypt، IPS و IMIX محاسبه شده و می‌تواند تا ۵ برابر خوش‌بینانه‌تر از توان واقعی تولید باشد!</li><li><strong>کژفهمی ۲: «اگر میانگین مصرف ۵دقیقه‌ای لینک زیر ۴۰٪ است، هیچ افت بسته‌ای از ازدحام نداریم.»</strong> واقعیت: Microburstهای میلی‌ثانیه‌ای می‌توانند روی لینک ۳۰٪ اشغال‌شده، بافرهای کم‌عمق را پر کرده و افت بسته جدی بسازند.</li><li><strong>کژفهمی ۳: «ظرفیت‌سنجی فقط برای پهنای باند لینک‌هاست و ربطی به جدول مسیر FIB و برق اتاق سرور ندارد.»</strong> واقعیت: سرریز TCAM/FIB روتر یا کمبود برق/سرمایش رک دقیقاً به اندازه کمبود پهنای باند پروژه را متوقف می‌کند!</li></ul>"
-  },
-  {
-   "id": "ccde_11-section-12",
-   "title": "چک‌لیست پنج‌پرسشی Capacity Planning در CCDE",
-   "html": "<ol><li>آیا هر ۵ بُعد (PPS/IMIX، TCAM/FIB، TLS/CPS فایروال، Buffer و برق/سرمایش) جداگانه ممیزی شده‌اند؟</li><li>آیا رشد ۵ساله با <strong>فرمول مرکب <code>(1+r)^5</code></strong> و نه رشد خطی محاسبه شده است؟</li><li>آیا سقف <strong>۵۰٪ Failover Headroom</strong> برای جفت‌های 2N لحاظ شده است؟</li><li>آیا رویدادهای غیرخطی تجاری (M&amp;A، فصلی، بکاپ ابری) در مدل گنجانده شده‌اند؟</li><li>آیا مدل مالی <strong>Pay-as-You-Grow</strong> همراه با آستانه هشدار ۷۰٪ و Lead-Time تامین تعریف شده است؟</li></ol>"
-  },
-  {
-   "id": "ccde_11-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> ترافیک اوج هسته WAN امروز ۱۲ گیگابیت است و هر سال ۳۵٪ رشد مرکب دارد. ترافیک سال پنجم چقدر است و برای حفظ قانون ۵۰٪ Failover روی جفت 2N به چه ظرفیت کل نیاز داریم؟ <strong>پاسخ:</strong> <code>12 × (1.35)^5 = 53.81 Gbps</code>؛ با تقسیم بر ۰٫۵۰ به <strong>۱۰۷٫۶۲ Gbps</strong> (دو لینک ۱۰۰G) نیاز است.</p><p><strong>تمرین ۲:</strong> یک فایروال با توان اسمی ۴۰Gbps اما توان TLS Inspection برابر ۷Gbps و نرخ ۵Mpps، روی تقاضای ۸Gbps، ۴٫۵Mpps و ۶٫۵Gbps ترافیک TLS قرار می‌گیرد. آیا از آزمون ۵ بُعد سربلند بیرون می‌آید؟ <strong>پاسخ:</strong> <strong>خیر!</strong> گرچه مصرف Gbps فقط ۲۰٪ است، اما <strong>Small-Packet PPS در ۹۰٪</strong> و <strong>TLS Inspection در ۹۲٫۹٪</strong> (بسیار فراتر از آستانه ایمنی ۷۰٪) دچار گلوگاه بحرانی هستند!</p>"
-  },
-  {
-   "id": "ccde_11-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc6985\" target=\"_blank\" rel=\"noopener\">RFC 6985 (IMIX Genome: Specification of Variable Packet Sizes for Benchmarking)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای محاسبه رشد مرکب ۵ساله و ممیزی ۵ بُعد ظرفیت است و به هیچ تجهیز زنده متصل نیست.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "Compound Growth Formula",
-   "fa": "فرمول رشد مرکب چندساله",
-   "simple": "C_n = C_0 × (1 + r)^n؛ مدل‌سازی دقیق رشد نمایی ترافیک شبکه در افق ۳ تا ۵ساله."
-  },
-  {
-   "term": "PPS / Mpps (Small Packets)",
-   "fa": "نرخ بسته در ثانیه",
-   "simple": "تعداد میلیون بسته در ثانیه؛ بسته‌های کوچک صوت/DNS خیلی زودتر از Gbps پردازنده را پر می‌کنند."
-  },
-  {
-   "term": "IMIX (RFC 6985)",
-   "fa": "ترکیب واقعی اندازه بسته‌های اینترنتی",
-   "simple": "الگوی استاندارد ترکیبی از بسته‌های ۶۴B، ۵۷۶B و ۱۵۰۰B برای ارزیابی صادقانه توان تجهیزات."
-  },
-  {
-   "term": "TCAM / FIB Table Scale",
-   "fa": "سقف حافظه سخت‌افزاری جدول مسیر و ACL",
-   "simple": "محدودیت سخت‌افزاری تعداد مسیرهای BGP، جدول MAC/ARP و قوانین امنیتی روی ASIC."
-  },
-  {
-   "term": "NGFW TLS Inspection & CPS",
-   "fa": "توان واقعی رمزگشایی TLS و نشست بر ثانیه",
-   "simple": "بُعد بحرانی ظرفیت فایروال که می‌تواند تا ۸۰٪ کمتر از عدد تبلیغاتی Gbps کاتالوگ باشد."
-  },
-  {
-   "term": "Microburst",
-   "fa": "انفجار ترافیکی میلی‌ثانیه‌ای",
-   "simple": "جهش کوتاه اما شدید ترافیک که در میانگین ۵دقیقه‌ای SNMP پنهان می‌ماند اما بافر را سرریز می‌کند."
-  },
-  {
-   "term": "95th Percentile Billing/Sizing",
-   "fa": "معیار صدک ۹۵ام اوج ترافیک",
-   "simple": "حذف ۵٪ قله‌های لحظه‌ای بسیار نادر برای تخمین واقع‌بینانه اوج مصرف پایدار لینک‌ها."
-  },
-  {
-   "term": "Deep Buffer vs Shallow Buffer",
-   "fa": "بافر عمیق در برابر بافر کم‌عمق",
-   "simple": "لزوم بافر عمیق در لبه‌های WAN/تغییر سرعت برای جذب Microburst بدون Drop بسته."
-  },
-  {
-   "term": "Pay-as-You-Grow",
-   "fa": "توسعه تدریجی متناسب با رشد",
-   "simple": "طراحی شاسی/فابریک ماژولار جهت افزودن تدریجی ظرفیت به جای قفل کردن کل CapEx در روز اول."
-  },
-  {
-   "term": "Procurement Lead-Time",
-   "fa": "زمان تحویل سخت‌افزار و مدار",
-   "simple": "فاصله چندماهه بین سفارش تا نصب که تعیین می‌کند ارتقا باید در آستانه ۶۰–۷۰٪ کلید بخورد."
-  },
-  {
-   "term": "Failover Headroom Cap",
-   "fa": "حاشیه ظرفیت برای زمان خرابی",
-   "simple": "نگه داشتن مصرف زیر ۵۰٪ در 2N تا پس از قطع یک عضو، عضو زنده دچار اشباع نشود."
-  },
-  {
-   "term": "Output Queue Drops",
-   "fa": "شمارنده افت بسته صف خروجی",
-   "simple": "مهم‌ترین نشانه واقعی کمبود بافر یا ازدحام لحظه‌ای حتی وقتی میانگین مصرف لینک پایین است."
-  },
-  {
-   "term": "Power & Cooling Budget (kW/BTU)",
-   "fa": "ظرفیت برق و سرمایش اتاق سرور",
-   "simple": "بُعد فیزیکی اجباری در Capacity Planning که سقف استقرار رک‌های پرچگالی و GPU را تعیین می‌کند."
-  },
-  {
-   "term": "Non-Linear Demand Shock",
-   "fa": "جهش غیرخطی تقاضا",
-   "simple": "رویدادهایی مانند ادغام شرکت جدید (M&A)، کمپین فروش یا مهاجرت ابری که رشد خطی را می‌شکنند."
-  },
-  {
-   "term": "Streaming Telemetry",
-   "fa": "تله‌متری لحظه‌ای جایگزین SNMP",
-   "simple": "ارسال مداوم و ثانیه‌ای شاخص‌های صف و بافر از تجهیزات برای کشف دقیق گلوگاه‌ها."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (محاسبه‌گر رشد مرکب ۵ساله با حاشیه ۵۰٪ Failover و ممیز ۵ بُعد پنهان NGFW) — بدون تجهیز واقعی",
-   "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ تجهیز یا تله‌متری تولیدی زنده متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ تجهیز شبکه یا سامانه تله‌متری تولیدی در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو خطای رایج Capacity Planning را افشا می‌کند: (۱) رشد مرکب ۵ساله ۱۲Gbps با نرخ ۳۵٪ سالانه (<code>53.81 Gbps</code>) که با سقف ۵۰٪ Failover نیازمند <strong>۱۰۷٫۶۲ Gbps</strong> است، و (۲) ممیزی ۵ بُعد فایروال «۴۰ گیگابیتی» که در حالی که مصرف Gbps آن فقط ۲۰٪ است، در <strong>PPS (90%)، FIB (85%) و TLS Inspection (92.9%)</strong> قرمز می‌شود!</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_11_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_11_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_11 (CCDE Capacity Planning: 5-Year Compound Growth, Failover Headroom &amp; 5 Hidden Dimensions)\nComputes 5-year compound traffic growth C_5 = C_0 * (1 + r)^5 with configurable N/2N failover headroom\n(default 50% cap), and audits 5 hidden CCDE capacity dimensions (Gbps, PPS small-packet rate,\nTCAM/FIB, NGFW TLS inspection, Power kW).\nStrict validation rejects zero/negative capacities, invalid utilization caps, bools, and NaN/Inf.\nNo real production telemetry or hardware chassis is connected.\n&quot;&quot;&quot;\n\nimport json\nimport math\n\n\ndef _require_finite_num(val: object, name: str) -&gt; float:\n    if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(val):\n        raise ValueError(f&quot;{name} must be a finite number (not bool), got {val!r}&quot;)\n    return float(val)\n\n\ndef forecast_5yr_capacity(\n    current_gbps: float,\n    annual_growth_rate: float,\n    failover_utilization_cap: float = 0.50,\n) -&gt; dict:\n    cur = _require_finite_num(current_gbps, &quot;current_gbps&quot;)\n    rate = _require_finite_num(annual_growth_rate, &quot;annual_growth_rate&quot;)\n    cap = _require_finite_num(failover_utilization_cap, &quot;failover_utilization_cap&quot;)\n    if cur &lt;= 0:\n        raise ValueError(f&quot;current_gbps must be positive, got {cur}&quot;)\n    if rate &lt; -1.0:\n        raise ValueError(f&quot;annual_growth_rate cannot be &lt; -1.0, got {rate}&quot;)\n    if not (0.0 &lt; cap &lt;= 1.0):\n        raise ValueError(f&quot;failover_utilization_cap must be in (0.0, 1.0], got {cap}&quot;)\n\n    year5_peak = round(cur * ((1.0 + rate) ** 5), 2)\n    required_link_capacity = round(year5_peak / cap, 2)\n    return {\n        &quot;year0_peak_gbps&quot;: cur,\n        &quot;annual_growth_pct&quot;: round(rate * 100, 1),\n        &quot;failover_utilization_cap_pct&quot;: round(cap * 100, 1),\n        &quot;year5_peak_gbps&quot;: year5_peak,\n        &quot;required_capacity_with_failover_cap_gbps&quot;: required_link_capacity,\n    }\n\n\ndef audit_five_dimensions(demand: dict, hardware_spec: dict) -&gt; dict:\n    if not isinstance(demand, dict) or not isinstance(hardware_spec, dict) or not demand:\n        raise ValueError(&quot;demand and hardware_spec must be non-empty dicts&quot;)\n    bottlenecks = []\n    for dim, raw_req in demand.items():\n        if dim not in hardware_spec:\n            raise ValueError(f&quot;Missing hardware_spec capacity for dimension &#x27;{dim}&#x27;&quot;)\n        req = _require_finite_num(raw_req, f&quot;demand.{dim}&quot;)\n        cap = _require_finite_num(hardware_spec[dim], f&quot;hardware_spec.{dim}&quot;)\n        if req &lt; 0 or cap &lt;= 0:\n            raise ValueError(f&quot;Invalid capacity/demand for &#x27;{dim}&#x27;: demand={req}, capacity={cap}&quot;)\n        util_pct = round((req / cap) * 100.0, 1)\n        if util_pct &gt; 70.0:\n            bottlenecks.append({&quot;dimension&quot;: dim, &quot;demand&quot;: req, &quot;capacity&quot;: cap, &quot;utilization_pct&quot;: util_pct})\n    return {&quot;passed_all_5_dimensions&quot;: len(bottlenecks) == 0, &quot;bottlenecks&quot;: bottlenecks}\n\n\ndef main() -&gt; None:\n    forecast = forecast_5yr_capacity(current_gbps=12.0, annual_growth_rate=0.35)\n    audit = audit_five_dimensions(\n        demand={&quot;throughput_gbps&quot;: 8.0, &quot;small_packet_mpps&quot;: 4.5, &quot;fib_routes_k&quot;: 850, &quot;tls_inspection_gbps&quot;: 6.5, &quot;rack_power_kw&quot;: 14.0},\n        hardware_spec={&quot;throughput_gbps&quot;: 40.0, &quot;small_packet_mpps&quot;: 5.0, &quot;fib_routes_k&quot;: 1000, &quot;tls_inspection_gbps&quot;: 7.0, &quot;rack_power_kw&quot;: 20.0},\n    )\n    assert forecast[&quot;year5_peak_gbps&quot;] == 53.81\n    assert forecast[&quot;required_capacity_with_failover_cap_gbps&quot;] == 107.62\n    assert audit[&quot;passed_all_5_dimensions&quot;] is False and len(audit[&quot;bottlenecks&quot;]) == 3\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_CAPACITY_PLANNER&quot;,\n        &quot;five_year_wan_core_forecast&quot;: forecast,\n        &quot;five_dimension_ngfw_audit&quot;: audit,\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>required_capacity_with_50pct_failover_cap_gbps: 107.62</code> و <code>passed_all_5_dimensions: False</code> با ۳ گلوگاه پنهان کشف‌شده.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع درخواست مشخصات صادقانه در RFP تجهیزات (اجرا نشده روی سامانه زنده):</strong></p><pre dir=\"ltr\"><code># Reference CCDE RFP Capacity Verification Clause\n# Require vendor sizing under: IMIX (RFC 6985) + IPS + TLS 1.3 Decrypt + Full Logging\n# Max steady-state utilization at Year 3: &lt;= 45% (2N) or &lt;= 70% (N+1)</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس برنامه‌ریزی ظرفیت (Capacity Planning) در CCDE",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "چرا در Capacity Planning سطح CCDE، تکیه صرف بر عدد تبلیغاتی «Firewall Throughput (Gbps)» کاتالوگ یک خطای بزرگ است؟",
-   "options": [
-    "زیرا عدد تیتر معمولاً با بسته‌های بزرگ ۱۵۰۰B بدون IPS/TLS تست شده و در تولید با IMIX، بسته‌های کوچک (PPS)، CPS و رمزگشایی TLS 1.3 توان واقعی می‌تواند تا ۷۰–۸۰٪ کمتر باشد",
-    "زیرا فایروال‌ها اصلاً Gbps ندارند",
-    "زیرا بسته‌های کوچک سریع‌تر پردازش می‌شوند",
-    "کاتالوگ همیشه بدبینانه‌تر از واقعیت است"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>ارزیابی ۵ بُعد واقعی (PPS/IMIX، TCAM/FIB، TLS/CPS، Buffer و برق/سرمایش) از شکست فاجعه‌بار خریدهای میلیون‌دلاری جلوگیری می‌کند.</p>"
-  },
-  {
-   "title": "اگر اوج ترافیک فعلی ۱۲ گیگابیت و رشد سالانه مرکب ۳۵٪ باشد، ترافیک سال پنجم و ظرفیت مورد نیاز با قانون ۵۰٪ Failover (برای 2N) چقدر است؟",
-   "options": [
-    "ترافیک سال پنجم ۲۴ گیگابیت و ظرفیت ۴۸ گیگابیت",
-    "ترافیک سال پنجم ۵۳٫۸۱ گیگابیت و ظرفیت مورد نیاز حدود ۱۰۷٫۶۲ گیگابیت (نیازمند لینک‌های ۱۰۰G)",
-    "ترافیک سال پنجم ۱۶ گیگابیت",
-    "ترافیک تغییر نمی‌کند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p><code>12 × (1.35)^5 = 53.81 Gbps</code> و با تقسیم بر سقف ۰٫۵۰ برای Failover برابر <code>107.62 Gbps</code> می‌شود.</p>"
-  },
-  {
-   "title": "چگونه ممکن است نمودار ۵دقیقه‌ای SNMP مصرف یک لینک ۱۰G را ۳۵٪ نشان دهد، اما کاربران همچنان افت بسته ناشی از ازدحام تجربه کنند؟",
-   "options": [
-    "به علت Microburstهای چندمیلی‌ثانیه‌ای که بافر کم‌عمق پورت را سرریز کرده و Output Queue Drops می‌سازند اما در میانگین ۵دقیقه‌ای پنهان می‌مانند",
-    "زیرا SNMP فقط IPv6 می‌شمارد",
-    "امکان ندارد زیر ۵۰٪ افت بسته رخ دهد",
-    "فقط به دلیل قطعی برق"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>پایش شمارنده‌های Microburst/Buffer Drops و Streaming Telemetry زیرثانیه‌ای (در کنار ابزارهای تکمیلی مانند Packet Capture سخت‌افزاری یا Buffer Watermark) روش کلیدی شکار واقعی Microburst است.</p>"
-  },
-  {
-   "title": "منظور از الگوی تست IMIX (RFC 6985) در ارزیابی ظرفیت روترها و فایروال‌ها چیست؟",
-   "options": [
-    "ارسال صرفاً بسته‌های ۱۵۰۰بایتی",
-    "ترکیبی واقع‌گرایانه از بسته‌های کوچک (۶۴B)، متوسط (۵۷۶B) و بزرگ (۱۵۰۰B) مطابق ترافیک واقعی اینترنت/سازمان برای سنجش صادقانه PPS و Gbps",
-    "حذف هدر IP از بسته‌ها",
-    "تست بدون کابل"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>در RFPهای حرفه‌ای همیشه توان تجهیزات بر مبنای IMIX با تمام قابلیت‌های امنیتی فعال مقایسه می‌شود.</p>"
-  },
-  {
-   "title": "در ممیزی ۵ بُعد آزمایشگاه، فایروال ۴۰Gbps روی تقاضای ۸Gbps (فقط ۲۰٪) چرا مردود شد؟",
-   "options": [
-    "زیرا رنگ آن مناسب نبود",
-    "زیرا سه بُعد پنهان دیگر یعنی PPS (90%)، FIB (85%) و TLS Inspection (92.9%) به شدت از آستانه ایمنی ۷۰٪ عبور کرده بودند!",
-    "زیرا ۸Gbps از ۴۰Gbps بزرگ‌تر است",
-    "مردود نشد"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>ظرفیت کل یک تجهیز توسط ضعیف‌ترین بُعد گلوگاه آن (نه بزرگ‌ترین عدد کاتالوگ) تعیین می‌شود.</p>"
-  },
-  {
-   "title": "چرا باید سفارش ارتقای ظرفیت در آستانه ۶۰–۷۰٪ (یا ۴۵٪ در 2N) آغاز شود نه در ۹۵٪؟",
-   "options": [
-    "به دلیل زمان تامین سخت‌افزار و تحویل مدار مخابراتی (Procurement Lead-Time 3 تا ۶ماهه) و جلوگیری از سوختن سرویس پیش از رسیدن تجهیزات جدید",
-    "زیرا لینک‌ها در ۸۰٪ ذوب می‌شوند",
-    "برای هدر دادن بودجه",
-    "فرقی ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>هم‌راستایی آستانه هشدار ظرفیت با Lead-Time خرید و نصب، رکن مدیریت پیش‌فعال ظرفیت است.</p>"
-  },
-  {
-   "title": "راهبرد مالی «Pay-as-You-Grow» در برنامه‌ریزی ظرفیت ۵ساله به چه معناست؟",
-   "options": [
-    "خرید ۱۰۰٪ سخت‌افزار سال پنجم در روز اول و بیکار نگه داشتن آن",
-    "انتخاب معماری ماژولار آماده رشد (مانند شاسی/Spine-Leaf) با خرید ظرفیت ۲–۳ سال اول و افزودن تدریجی کارت/پورت/سوئیچ همگام با رشد واقعی",
-    "هرگز ارتقا ندادن شبکه",
-    "اجاره روزانه همه روترها"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>Pay-as-You-Grow سرمایه روز اول (CapEx) را بهینه می‌کند بدون آنکه معماری را در سال سوم به بن‌بست برساند.</p>"
-  },
-  {
-   "title": "کدام بُعد پنهان هنگام تغییر سرعت پورت (مثلاً ۴۰G ورودی به ۱۰G خروجی در لبه WAN) اهمیت حیاتی پیدا می‌کند؟",
-   "options": [
-    "عمق بافر سوئیچ (Deep Buffer) برای جذب لحظه‌ای بسته‌ها در سرعت‌های نامتجانس بدون افت بسته",
-    "تعداد پورت کنسول",
-    "طول نام دستگاه",
-    "تعداد VLANها"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>Speed Mismatch بدون بافر عمیق باعث Tail-Drop شدید و کاهش شدید توان TCP می‌شود.</p>"
-  },
-  {
-   "title": "چرا معمار CCDE در برنامه‌ریزی ظرفیت باید علاوه بر نمودارهای تاریخی، با مدیران کسب‌وکار درباره نقشه راه آینده صحبت کند؟",
-   "options": [
-    "برای کشف جهش‌های غیرخطی (Non-Linear Shocks) مانند خرید شرکت جدید (M&A)، کمپین‌های فروش، مهاجرت ابری یا استقرار AI که در نمودارهای گذشته دیده نمی‌شوند",
-    "برای نوشتن کد وب‌سایت",
-    "نمودار گذشته همیشه ۱۰۰٪ کافی است",
-    "فقط جهت آشنایی"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>تاریخچه گذشته هرگز خرید ناگهانی یک شرکت جدید یا راه‌اندازی سرویس ویدیویی جدید را پیش‌بینی نمی‌کند.</p>"
-  },
-  {
-   "title": "در بررسی بُعد TCAM/FIB یک روتر مرزی اینترنت (ASBR)، چرا دانستن رشد جدول BGP جهانی IPv4 و IPv6 حیاتی است؟",
-   "options": [
-    "زیرا سرریز جدول FIB سخت‌افزاری باعث قطع مسیریابی، افت شدید کارایی (Software Punt) یا Crash روتر مرزی در میانه عمر ۵ساله آن می‌شود",
-    "زیرا جدول BGP اینترنت ثابت است",
-    "زیرا FIB فقط برای لایه ۲ است",
-    "اهمیتی ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>جدول کامل اینترنت (DFZ) دائماً در حال رشد است و سخت‌افزار ASBR باید حداقل حاشیه رشد ۵ساله در FIB/RIB داشته باشد.</p>"
-  },
-  {
-   "title": "معیار «صدک ۹۵ام (95th Percentile)» چه مزیتی نسبت به میانگین ساده (Average) در ظرفیت‌سنجی لینک‌ها دارد؟",
-   "options": [
-    "میانگین ساده ساعات خلوت نیمه‌شب را با ساعات شلوغ کاری قاطی کرده و اوج واقعی را پنهان می‌کند، اما صدک ۹۵ام اوج مصرف واقعی پایدار را بدون اثرپذیری از چند ثانیه نویز نادر نشان می‌دهد",
-    "همیشه از میانگین کمتر است",
-    "فقط برای برق کاربرد دارد",
-    "هیچ مزیتی ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>استفاده از میانگین ۲۴ساعته یکی از تله‌های رایج کم‌برآورد کردن ظرفیت واقعی در ساعات اوج کاری است.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "مدل‌سازی محلی (Local Mock) در Python 3 برای محاسبه رشد مرکب ۵ساله با سقف ۵۰٪ Failover و ممیزی ۵ بُعد پنهان NGFW",
-    "تست بار زنده با ژنراتور IXIA روی فایروال تولیدی",
-    "جمع‌آوری SNMP از شبکه بانکی واقعی",
-    "فقط متن نظری بدون کد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ تجهیز تولیدی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.8",
-  "legacyId": "ccde_11",
-  "sources": [
-   "https://www.rfc-editor.org/rfc/rfc6985"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccde_11",
+  "objectiveId": "ccde_11",
+  "kind": "lesson",
+  "track": "CCDE",
+  "course": "ccde-design",
+  "title": "۹.۱۱ CCDE — برنامه‌ریزی ظرفیت (Capacity Planning): ۵ بُعد پنهان فراتر از Gbps و فرمول رشد مرکب ۵ساله",
+  "titleEn": "CCDE Topic 11: Capacity Planning — 5 Hidden Dimensions Beyond Gbps, Compound Growth & Failover Headroom",
+  "domain": "Capacity Planning & Forecasting",
+  "source": "Legacy ccde_11 rewritten and expanded",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 50,
+  "prerequisites": [
+    "ccde_01",
+    "ccde_10"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ تجهیز یا سامانه تله‌متری تولیدی متصل نیست."
+  "sections": [
+    {
+      "id": "ccde_11-section-1",
+      "title": "مسئله واقعی: چرا فایروال «۴۰ گیگابیتی» در کاتالوگ، وقتی ترافیک واقعی سازمان تازه به ۷ گیگابیت می‌رسد ناگهان قفل می‌کند؟",
+      "html": "<p>یکی از پرهزینه‌ترین خطاهای خرید تجهیزات سازمانی، تکیه ساده به عدد تبلیغاتی <strong>Gbps</strong> روی برگه مشخصات (Datasheet) است! یک فایروال ۴۰Gbps در تست آزمایشگاهی با بسته‌های بزرگ ۱۵۰۰بایتی بدون رمزگشایی تست شده؛ اما در دنیای واقعی با فعال شدن <strong>TLS 1.3 Inspection، IPS، بسته‌های کوچک صوتی/DNS (PPS بالا) و هزاران نشست جدید در ثانیه (CPS)</strong>، ظرفیت واقعی آن گاهی به <strong>۷ گیگابیت</strong> سقوط می‌کند! معمار CCDE ظرفیت را در <strong>۵ بُعد پنهان</strong>، با <strong>فرمول رشد مرکب ۵ساله</strong> و <strong>حاشیه Failover</strong> محاسبه می‌کند.</p>"
+    },
+    {
+      "id": "ccde_11-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code> و <code>ccde_10</code>.</p><ul><li>ممیزی <strong>۵ بُعد پنهان ظرفیت</strong> فراتر از Gbps: <strong>PPS (بسته‌های کوچک)</strong>، <strong>جداول سخت‌افزاری TCAM/FIB/NAT</strong>، <strong>توان واقعی NGFW TLS/IPS/CPS</strong>، <strong>بافر سوئیچ (Microburst)</strong> و <strong>برق/سرمایش/فضای رک</strong>.</li><li>محاسبه دقیق رشد ترافیک در افق ۵ساله با <strong>فرمول رشد مرکب <code>C_5 = C_0 × (1 + r)^5</code></strong> و اعمال <strong>سقف ۵۰٪ برای Failover</strong>.</li><li>تبیین تفاوت <strong>میانگین ۵دقیقه‌ای SNMP</strong> با <strong>اوج لحظه‌ای (95th Percentile و Microburstهای میلی‌ثانیه‌ای)</strong>.</li><li>طراحی آستانه‌های عملیاتی (<strong>آستانه هشدار ۷۰٪ و بازه تحویل سخت‌افزار Lead-Time</strong>) برای ارتقای پیش‌فعال بدون بحران.</li></ul>"
+    },
+    {
+      "id": "ccde_11-section-3",
+      "title": "پنج بُعد پنهان ظرفیت (فراتر از عدد تبلیغاتی Gbps!)",
+      "html": "<ol><li><strong>نرخ بسته در ثانیه (PPS / Mpps — IMIX):</strong> بسته‌های کوچک ۶۴ تا ۱۲۸بایتی (VoIP، DNS، BGP، حملات SYN) CPU و ASIC را خیلی زودتر از رسیدن به سقف Gbps اشباع می‌کنند!</li><li><strong>سقف جداول سخت‌افزاری (TCAM / FIB / MAC / ARP / NAT / ACL):</strong> روتر مرزی اینترنت با جدول IPv4 نزدیک به ۱ میلیون مسیر + IPv6 به سرعت از سقف TCAM/FIB یک سوئیچ لایه ۳ عادی سرریز می‌شود!</li><li><strong>ظرفیت واقعی فایروال و VPN (NGFW TLS Inspection &amp; CPS):</strong> روشن کردن IPS + Decrypt TLS می‌تواند بسته به مدل سخت‌افزار، شتاب‌دهنده رمزنگاری و Cipher Suite توان اسمی فایروال را به‌شدت (در بسیاری از پلتفرم‌ها حدود ۵۰ تا ۸۰٪) کاهش دهد!</li><li><strong>عمق بافر سوئیچ (Deep Buffer در برابر Shallow Buffer):</strong> هنگام تغییر سرعت (مثلاً ورود ترافیک ۴۰G به پورت خروجی ۱۰G) یا Microburst، سوئیچ‌های کم‌بافر بدون اشباع میانگین لینک، بسته‌ها را Drop می‌کنند!</li><li><strong>محدودیت‌های فیزیکی دیتاسنتر (برق kW، سرمایش BTU و فضای Rack Unit):</strong> هیچ معماری بدون هماهنگی با ظرفیت برق و کولینگ اتاق سرور در عمل اجرا نمی‌شود.</li></ol>"
+    },
+    {
+      "id": "ccde_11-section-4",
+      "title": "نمودار ۵ بُعد پنهان Capacity Planning و فرمول رشد مرکب ۵ساله",
+      "html": "<p>نمودار زیر ۵ بُعد واقعی ظرفیت و اثر مرکب رشد ۳۵٪ سالانه همراه با حاشیه ۵۰٪ Failover را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Capacity Planning: 5 Hidden Dimensions Beyond Gbps and 5-Year Compound Growth Formula\"><rect x=\"14\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"190\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">5 Hidden Dimensions Beyond Gbps</text><text x=\"190\" y=\"56\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">1. PPS (Small-Packet Rate Mpps)</text><text x=\"190\" y=\"72\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">2. TCAM / FIB / MAC / ARP / NAT Scale</text><text x=\"190\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">3. NGFW TLS Decrypt &amp; CPS Throughput!</text><text x=\"190\" y=\"104\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">4. Switch Buffer (Microburst) &amp; 5. Power/Cooling</text><rect x=\"394\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"570\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">5-Year Compound Growth + Failover Cap</text><text x=\"570\" y=\"58\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#14532d\">C_5 = C_0 x (1 + r)^5</text><text x=\"570\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">12 Gbps @ 35%/yr =&gt; 53.81 Gbps in Yr 5!</text><text x=\"570\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">With 50% 2N Failover Cap =&gt; Need 107.6 Gbps!</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">CCDE Capacity Law: Datasheet Headline Gbps Lies! Always Size for Small-Packet PPS, TLS Inspect, 5yr Growth &amp; N-1 Failover!</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Monitor 95th Percentile + Microburst Counters Continuously to Trigger Upgrades BEFORE Reaching 70% Saturation</text></svg>"
+    },
+    {
+      "id": "ccde_11-section-5",
+      "title": "ریاضی رشد ۵ساله (Compound Growth) + تله فراموشی Failover Headroom",
+      "html": "<p>اشتباه کلاسیک مدیران: «امسال ۱۲ گیگابیت مصرف داریم و رشد سالانه ۳۵٪ است، پس در ۵ سال می‌شود <code>12 + 5×35%</code>!» <strong>غلط!</strong> رشد شبکه <strong>مرکب (Compound)</strong> است: <code>C_5 = 12 × (1.35)^5 = 53.81 Gbps</code> (نزدیک به ۴٫۵ برابر امروز!). و فراموش نکنید: اگر دو لینک 2N دارید و می‌خواهید هنگام قطع یکی، لینک دوم بدون اشباع کل ۵۳٫۸۱ گیگابیت را بکشد (سقف ۵۰٪ بار در حالت عادی)، باید ظرفیت کل را برای <strong><code>107.62 Gbps</code></strong> (مثلاً دو لینک ۱۰۰G) برنامه‌ریزی کنید!</p>"
+    },
+    {
+      "id": "ccde_11-section-6",
+      "title": "چرا نمودار ۵دقیقه‌ای SNMP دروغ می‌گوید؟ (معضل Microburst و 95th Percentile)",
+      "html": "<p>وقتی SNMP هر ۵ دقیقه یک‌بار میانگین مصرف لینک ۱۰G را ۳۵٪ نشان می‌دهد، ممکن است کاربران همچنان از افت بسته شکایت کنند! چرا؟ زیرا یک انفجار ترافیک ۱۰میلی‌ثانیه‌ای (<strong>Microburst</strong>) بافر پورت را پر کرده و صدها بسته را انداخته، اما در میانگین ۳۰۰ثانیه‌ای گم شده است! معمار CCDE علاوه بر <strong>صدک ۹۵ام (95th Percentile)</strong>، شمارنده‌های <strong>Output Queue Drops</strong> و تله‌متری زیرثانیه‌ای (Streaming Telemetry) را در طرح پایش ظرفیت الزامی می‌کند.</p>"
+    },
+    {
+      "id": "ccde_11-section-7",
+      "title": "برنامه‌ریزی ظرفیت بر اساس رویدادهای غیرخطی (Peak Events، ادغام M&amp;A و مهاجرت ابری)",
+      "html": "<p>ترافیک کسب‌وکارها خطی نیست: بلک‌فرایدی فروشگاه اینترنتی، روز ثبت‌نام دانشگاه، گزارش مالی آخر سال، خرید یک شرکت جدید (M&amp;A) یا شروع بکاپ شبانه دیتاسنتر به ابر می‌تواند ترافیک را در یک شب ۵ برابر کند! معمار CCDE علاوه بر روند تاریخی، حتماً <strong>نقشه راه ۳ تا ۵ساله تجاری (Business Roadmap)</strong> را از مدیران کسب‌وکار می‌گیرد تا جهش‌های غیرخطی را در ظرفیت بگنجاند.</p>"
+    },
+    {
+      "id": "ccde_11-section-8",
+      "title": "آستانه ۷۰٪ و زمان تامین سخت‌افزار (Procurement Lead-Time)",
+      "html": "<p>اگر منتظر بمانید تا لینک WAN یا CPU فایروال به ۹۵٪ برسد و تازه درخواست خرید بدهید، با زمان تامین ۳ تا ۶ماهه سخت‌افزار و مدار مخابراتی، سازمان شما ماه‌ها در بحران می‌سوزد! استاندارد عملیاتی CCDE: <strong>آستانه هشدار اولیه ۶۰–۷۰٪ (برای N+1) و ۴۰–۴۵٪ (برای جفت 2N)</strong> تا پیش از اشباع واقعی، خرید و ارتقا بدون فشار انجام شود.</p>"
+    },
+    {
+      "id": "ccde_11-section-9",
+      "title": "تخمین واقعی ترافیک با پروفایل IMIX (Internet Mix) به جای بسته‌های ۱۵۰۰بایتی",
+      "html": "<p>در تست‌های بازاریابی فروشندگان، بسته ۱۵۰۰بایتی کمترین تعداد بسته در ثانیه را دارد و بالاترین عدد Gbps را نمایش می‌دهد. معمار CCDE هنگام مقایسه تجهیزات در RFP حتماً عدد <strong>IMIX (ترکیب واقعی بسته‌های کوچک ۶۴B، متوسط ۵۷۶B و بزرگ ۱۵۰۰B)</strong> همراه با همه سرویس‌های امنیتی روشن (IPS/TLS/Logging) را مطالبه می‌کند!</p>"
+    },
+    {
+      "id": "ccde_11-section-10",
+      "title": "موازنه CapEx در Capacity Planning: خرید ظرفیت ۵ساله در روز اول یا معماری Pay-as-You-Grow؟",
+      "html": "<p>خرید سخت‌افزار ۱۰۰٪ ظرفیت سال پنجم در روز اول، سرمایه نقدی شرکت را می‌سوزاند و باعث استهلاک سخت‌افزار بیکار می‌شود. بهترین راهبرد CCDE: خرید <strong>شاسی/فابریک آماده رشد (Pay-as-You-Grow / Modular Spine-Leaf)</strong> با ظرفیت لازم برای ۲ تا ۳ سال اول و امکان افزودن آسان Line-Card، ماژول 100G/400G یا سوئیچ Leaf/Spine جدید بدون تعویض کل معماری!</p>"
+    },
+    {
+      "id": "ccde_11-section-11",
+      "title": "کژفهمی‌های رایج درباره Capacity Planning",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای خرید فایروال کافی است عدد Gbps ترافیک را با عدد تیتر کاتالوگ (Datasheet Firewall Throughput) مقایسه کنیم.»</strong> واقعیت: عدد تیتر بدون TLS Decrypt، IPS و IMIX محاسبه شده و می‌تواند تا ۵ برابر خوش‌بینانه‌تر از توان واقعی تولید باشد!</li><li><strong>کژفهمی ۲: «اگر میانگین مصرف ۵دقیقه‌ای لینک زیر ۴۰٪ است، هیچ افت بسته‌ای از ازدحام نداریم.»</strong> واقعیت: Microburstهای میلی‌ثانیه‌ای می‌توانند روی لینک ۳۰٪ اشغال‌شده، بافرهای کم‌عمق را پر کرده و افت بسته جدی بسازند.</li><li><strong>کژفهمی ۳: «ظرفیت‌سنجی فقط برای پهنای باند لینک‌هاست و ربطی به جدول مسیر FIB و برق اتاق سرور ندارد.»</strong> واقعیت: سرریز TCAM/FIB روتر یا کمبود برق/سرمایش رک دقیقاً به اندازه کمبود پهنای باند پروژه را متوقف می‌کند!</li></ul>"
+    },
+    {
+      "id": "ccde_11-section-12",
+      "title": "چک‌لیست پنج‌پرسشی Capacity Planning در CCDE",
+      "html": "<ol><li>آیا هر ۵ بُعد (PPS/IMIX، TCAM/FIB، TLS/CPS فایروال، Buffer و برق/سرمایش) جداگانه ممیزی شده‌اند؟</li><li>آیا رشد ۵ساله با <strong>فرمول مرکب <code>(1+r)^5</code></strong> و نه رشد خطی محاسبه شده است؟</li><li>آیا سقف <strong>۵۰٪ Failover Headroom</strong> برای جفت‌های 2N لحاظ شده است؟</li><li>آیا رویدادهای غیرخطی تجاری (M&amp;A، فصلی، بکاپ ابری) در مدل گنجانده شده‌اند؟</li><li>آیا مدل مالی <strong>Pay-as-You-Grow</strong> همراه با آستانه هشدار ۷۰٪ و Lead-Time تامین تعریف شده است؟</li></ol>"
+    },
+    {
+      "id": "ccde_11-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> ترافیک اوج هسته WAN امروز ۱۲ گیگابیت است و هر سال ۳۵٪ رشد مرکب دارد. ترافیک سال پنجم چقدر است و برای حفظ قانون ۵۰٪ Failover روی جفت 2N به چه ظرفیت کل نیاز داریم؟ <strong>پاسخ:</strong> <code>12 × (1.35)^5 = 53.81 Gbps</code>؛ با تقسیم بر ۰٫۵۰ به <strong>۱۰۷٫۶۲ Gbps</strong> (دو لینک ۱۰۰G) نیاز است.</p><p><strong>تمرین ۲:</strong> یک فایروال با توان اسمی ۴۰Gbps اما توان TLS Inspection برابر ۷Gbps و نرخ ۵Mpps، روی تقاضای ۸Gbps، ۴٫۵Mpps و ۶٫۵Gbps ترافیک TLS قرار می‌گیرد. آیا از آزمون ۵ بُعد سربلند بیرون می‌آید؟ <strong>پاسخ:</strong> <strong>خیر!</strong> گرچه مصرف Gbps فقط ۲۰٪ است، اما <strong>Small-Packet PPS در ۹۰٪</strong> و <strong>TLS Inspection در ۹۲٫۹٪</strong> (بسیار فراتر از آستانه ایمنی ۷۰٪) دچار گلوگاه بحرانی هستند!</p>"
+    },
+    {
+      "id": "ccde_11-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc6985\" target=\"_blank\" rel=\"noopener\">RFC 6985 (IMIX Genome: Specification of Variable Packet Sizes for Benchmarking)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای محاسبه رشد مرکب ۵ساله و ممیزی ۵ بُعد ظرفیت است و به هیچ تجهیز زنده متصل نیست.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش نسخه قدیمی (۱ پرسش) به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، IMIX RFC 6985، Microburst، Pay-as-You-Grow و مدل‌ساز ۵-بُعد/رشد مرکب."
+  "glossary": [
+    {
+      "term": "Compound Growth Formula",
+      "fa": "فرمول رشد مرکب چندساله",
+      "simple": "C_n = C_0 × (1 + r)^n؛ مدل‌سازی دقیق رشد نمایی ترافیک شبکه در افق ۳ تا ۵ساله."
+    },
+    {
+      "term": "PPS / Mpps (Small Packets)",
+      "fa": "نرخ بسته در ثانیه",
+      "simple": "تعداد میلیون بسته در ثانیه؛ بسته‌های کوچک صوت/DNS خیلی زودتر از Gbps پردازنده را پر می‌کنند."
+    },
+    {
+      "term": "IMIX (RFC 6985)",
+      "fa": "ترکیب واقعی اندازه بسته‌های اینترنتی",
+      "simple": "الگوی استاندارد ترکیبی از بسته‌های ۶۴B، ۵۷۶B و ۱۵۰۰B برای ارزیابی صادقانه توان تجهیزات."
+    },
+    {
+      "term": "TCAM / FIB Table Scale",
+      "fa": "سقف حافظه سخت‌افزاری جدول مسیر و ACL",
+      "simple": "محدودیت سخت‌افزاری تعداد مسیرهای BGP، جدول MAC/ARP و قوانین امنیتی روی ASIC."
+    },
+    {
+      "term": "NGFW TLS Inspection & CPS",
+      "fa": "توان واقعی رمزگشایی TLS و نشست بر ثانیه",
+      "simple": "بُعد بحرانی ظرفیت فایروال که می‌تواند تا ۸۰٪ کمتر از عدد تبلیغاتی Gbps کاتالوگ باشد."
+    },
+    {
+      "term": "Microburst",
+      "fa": "انفجار ترافیکی میلی‌ثانیه‌ای",
+      "simple": "جهش کوتاه اما شدید ترافیک که در میانگین ۵دقیقه‌ای SNMP پنهان می‌ماند اما بافر را سرریز می‌کند."
+    },
+    {
+      "term": "95th Percentile Billing/Sizing",
+      "fa": "معیار صدک ۹۵ام اوج ترافیک",
+      "simple": "حذف ۵٪ قله‌های لحظه‌ای بسیار نادر برای تخمین واقع‌بینانه اوج مصرف پایدار لینک‌ها."
+    },
+    {
+      "term": "Deep Buffer vs Shallow Buffer",
+      "fa": "بافر عمیق در برابر بافر کم‌عمق",
+      "simple": "لزوم بافر عمیق در لبه‌های WAN/تغییر سرعت برای جذب Microburst بدون Drop بسته."
+    },
+    {
+      "term": "Pay-as-You-Grow",
+      "fa": "توسعه تدریجی متناسب با رشد",
+      "simple": "طراحی شاسی/فابریک ماژولار جهت افزودن تدریجی ظرفیت به جای قفل کردن کل CapEx در روز اول."
+    },
+    {
+      "term": "Procurement Lead-Time",
+      "fa": "زمان تحویل سخت‌افزار و مدار",
+      "simple": "فاصله چندماهه بین سفارش تا نصب که تعیین می‌کند ارتقا باید در آستانه ۶۰–۷۰٪ کلید بخورد."
+    },
+    {
+      "term": "Failover Headroom Cap",
+      "fa": "حاشیه ظرفیت برای زمان خرابی",
+      "simple": "نگه داشتن مصرف زیر ۵۰٪ در 2N تا پس از قطع یک عضو، عضو زنده دچار اشباع نشود."
+    },
+    {
+      "term": "Output Queue Drops",
+      "fa": "شمارنده افت بسته صف خروجی",
+      "simple": "مهم‌ترین نشانه واقعی کمبود بافر یا ازدحام لحظه‌ای حتی وقتی میانگین مصرف لینک پایین است."
+    },
+    {
+      "term": "Power & Cooling Budget (kW/BTU)",
+      "fa": "ظرفیت برق و سرمایش اتاق سرور",
+      "simple": "بُعد فیزیکی اجباری در Capacity Planning که سقف استقرار رک‌های پرچگالی و GPU را تعیین می‌کند."
+    },
+    {
+      "term": "Non-Linear Demand Shock",
+      "fa": "جهش غیرخطی تقاضا",
+      "simple": "رویدادهایی مانند ادغام شرکت جدید (M&A)، کمپین فروش یا مهاجرت ابری که رشد خطی را می‌شکنند."
+    },
+    {
+      "term": "Streaming Telemetry",
+      "fa": "تله‌متری لحظه‌ای جایگزین SNMP",
+      "simple": "ارسال مداوم و ثانیه‌ای شاخص‌های صف و بافر از تجهیزات برای کشف دقیق گلوگاه‌ها."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/ccde_11-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (محاسبه‌گر رشد مرکب ۵ساله با حاشیه ۵۰٪ Failover و ممیز ۵ بُعد پنهان NGFW) — بدون تجهیز واقعی",
+      "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ تجهیز یا تله‌متری تولیدی زنده متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ تجهیز شبکه یا سامانه تله‌متری تولیدی در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو خطای رایج Capacity Planning را افشا می‌کند: (۱) رشد مرکب ۵ساله ۱۲Gbps با نرخ ۳۵٪ سالانه (<code>53.81 Gbps</code>) که با سقف ۵۰٪ Failover نیازمند <strong>۱۰۷٫۶۲ Gbps</strong> است، و (۲) ممیزی ۵ بُعد فایروال «۴۰ گیگابیتی» که در حالی که مصرف Gbps آن فقط ۲۰٪ است، در <strong>PPS (90%)، FIB (85%) و TLS Inspection (92.9%)</strong> قرمز می‌شود!</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_11_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_11_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_11 (CCDE Capacity Planning: 5-Year Compound Growth, Failover Headroom &amp; 5 Hidden Dimensions)\nComputes 5-year compound traffic growth C_5 = C_0 * (1 + r)^5 with configurable N/2N failover headroom\n(default 50% cap), and audits 5 hidden CCDE capacity dimensions (Gbps, PPS small-packet rate,\nTCAM/FIB, NGFW TLS inspection, Power kW).\nStrict validation rejects zero/negative capacities, invalid utilization caps, bools, and NaN/Inf.\nNo real production telemetry or hardware chassis is connected.\n&quot;&quot;&quot;\n\nimport json\nimport math\n\n\ndef _require_finite_num(val: object, name: str) -&gt; float:\n    if isinstance(val, bool) or not isinstance(val, (int, float)):\n        raise ValueError(f&quot;{name} must be a finite number (not bool), got {val!r}&quot;)\n    try:\n        fval = float(val)\n    except OverflowError as exc:\n        raise ValueError(f&quot;{name} exceeds IEEE-754 finite float range: {val!r}&quot;) from exc\n    if not math.isfinite(fval):\n        raise ValueError(f&quot;{name} must be a finite number (not bool), got {val!r}&quot;)\n    return fval\n\n\ndef forecast_5yr_capacity(\n    current_gbps: float,\n    annual_growth_rate: float,\n    failover_utilization_cap: float = 0.50,\n) -&gt; dict:\n    cur = _require_finite_num(current_gbps, &quot;current_gbps&quot;)\n    rate = _require_finite_num(annual_growth_rate, &quot;annual_growth_rate&quot;)\n    cap = _require_finite_num(failover_utilization_cap, &quot;failover_utilization_cap&quot;)\n    if cur &lt;= 0:\n        raise ValueError(f&quot;current_gbps must be positive, got {cur}&quot;)\n    if rate &lt; -1.0:\n        raise ValueError(f&quot;annual_growth_rate cannot be &lt; -1.0, got {rate}&quot;)\n    if not (0.0 &lt; cap &lt;= 1.0):\n        raise ValueError(f&quot;failover_utilization_cap must be in (0.0, 1.0], got {cap}&quot;)\n\n    year5_peak = round(cur * ((1.0 + rate) ** 5), 2)\n    required_link_capacity = round(year5_peak / cap, 2)\n    return {\n        &quot;year0_peak_gbps&quot;: cur,\n        &quot;annual_growth_pct&quot;: round(rate * 100, 1),\n        &quot;failover_utilization_cap_pct&quot;: round(cap * 100, 1),\n        &quot;year5_peak_gbps&quot;: year5_peak,\n        &quot;required_capacity_with_failover_cap_gbps&quot;: required_link_capacity,\n    }\n\n\ndef audit_five_dimensions(demand: dict, hardware_spec: dict) -&gt; dict:\n    if not isinstance(demand, dict) or not isinstance(hardware_spec, dict) or not demand:\n        raise ValueError(&quot;demand and hardware_spec must be non-empty dicts&quot;)\n    bottlenecks = []\n    for dim, raw_req in demand.items():\n        if dim not in hardware_spec:\n            raise ValueError(f&quot;Missing hardware_spec capacity for dimension &#x27;{dim}&#x27;&quot;)\n        req = _require_finite_num(raw_req, f&quot;demand.{dim}&quot;)\n        cap = _require_finite_num(hardware_spec[dim], f&quot;hardware_spec.{dim}&quot;)\n        if req &lt; 0 or cap &lt;= 0:\n            raise ValueError(f&quot;Invalid capacity/demand for &#x27;{dim}&#x27;: demand={req}, capacity={cap}&quot;)\n        util_pct = round((req / cap) * 100.0, 1)\n        if util_pct &gt; 70.0:\n            bottlenecks.append({&quot;dimension&quot;: dim, &quot;demand&quot;: req, &quot;capacity&quot;: cap, &quot;utilization_pct&quot;: util_pct})\n    return {&quot;passed_all_5_dimensions&quot;: len(bottlenecks) == 0, &quot;bottlenecks&quot;: bottlenecks}\n\n\ndef main() -&gt; None:\n    forecast = forecast_5yr_capacity(current_gbps=12.0, annual_growth_rate=0.35)\n    audit = audit_five_dimensions(\n        demand={&quot;throughput_gbps&quot;: 8.0, &quot;small_packet_mpps&quot;: 4.5, &quot;fib_routes_k&quot;: 850, &quot;tls_inspection_gbps&quot;: 6.5, &quot;rack_power_kw&quot;: 14.0},\n        hardware_spec={&quot;throughput_gbps&quot;: 40.0, &quot;small_packet_mpps&quot;: 5.0, &quot;fib_routes_k&quot;: 1000, &quot;tls_inspection_gbps&quot;: 7.0, &quot;rack_power_kw&quot;: 20.0},\n    )\n    assert forecast[&quot;year5_peak_gbps&quot;] == 53.81\n    assert forecast[&quot;required_capacity_with_failover_cap_gbps&quot;] == 107.62\n    assert audit[&quot;passed_all_5_dimensions&quot;] is False and len(audit[&quot;bottlenecks&quot;]) == 3\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_CAPACITY_PLANNER&quot;,\n        &quot;five_year_wan_core_forecast&quot;: forecast,\n        &quot;five_dimension_ngfw_audit&quot;: audit,\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>required_capacity_with_50pct_failover_cap_gbps: 107.62</code> و <code>passed_all_5_dimensions: False</code> با ۳ گلوگاه پنهان کشف‌شده.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع درخواست مشخصات صادقانه در RFP تجهیزات (اجرا نشده روی سامانه زنده):</strong></p><pre dir=\"ltr\"><code># Reference CCDE RFP Capacity Verification Clause\n# Require vendor sizing under: IMIX (RFC 6985) + IPS + TLS 1.3 Decrypt + Full Logging\n# Max steady-state utilization at Year 3: &lt;= 45% (2N) or &lt;= 70% (N+1)</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس برنامه‌ریزی ظرفیت (Capacity Planning) در CCDE",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-ccde",
-   "recommendedCourse": "ccde-design",
-   "blueprint": "/academy-assets/v5/blueprints/ccde_11.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_11_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح عبارت مطلق «تنها راه شکار واقعی Microburst» در توضیح پرسش ۳ و شرط‌دار کردن افت توان TLS Decryption به مدل سخت‌افزار/شتاب‌دهنده رمزنگاری در بخش ۳.",
-   "اصلاح بازبینی فاز ۸D: جلوگیری از ZeroDivisionError روی failover_utilization_cap<=0 و ظرفیت<=0، پویاسازی نام کلید خروجی failover cap و رد مقادیر منفی/bool/NaN در ccde_11_lab.py."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "چرا در Capacity Planning سطح CCDE، تکیه صرف بر عدد تبلیغاتی «Firewall Throughput (Gbps)» کاتالوگ یک خطای بزرگ است؟",
+      "options": [
+        "زیرا عدد تیتر معمولاً با بسته‌های بزرگ ۱۵۰۰B بدون IPS/TLS تست شده و در تولید با IMIX، بسته‌های کوچک (PPS)، CPS و رمزگشایی TLS 1.3 توان واقعی می‌تواند تا ۷۰–۸۰٪ کمتر باشد",
+        "زیرا فایروال‌ها اصلاً Gbps ندارند",
+        "زیرا بسته‌های کوچک سریع‌تر پردازش می‌شوند",
+        "کاتالوگ همیشه بدبینانه‌تر از واقعیت است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ارزیابی ۵ بُعد واقعی (PPS/IMIX، TCAM/FIB، TLS/CPS، Buffer و برق/سرمایش) از شکست فاجعه‌بار خریدهای میلیون‌دلاری جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "اگر اوج ترافیک فعلی ۱۲ گیگابیت و رشد سالانه مرکب ۳۵٪ باشد، ترافیک سال پنجم و ظرفیت مورد نیاز با قانون ۵۰٪ Failover (برای 2N) چقدر است؟",
+      "options": [
+        "ترافیک سال پنجم ۲۴ گیگابیت و ظرفیت ۴۸ گیگابیت",
+        "ترافیک سال پنجم ۵۳٫۸۱ گیگابیت و ظرفیت مورد نیاز حدود ۱۰۷٫۶۲ گیگابیت (نیازمند لینک‌های ۱۰۰G)",
+        "ترافیک سال پنجم ۱۶ گیگابیت",
+        "ترافیک تغییر نمی‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>12 × (1.35)^5 = 53.81 Gbps</code> و با تقسیم بر سقف ۰٫۵۰ برای Failover برابر <code>107.62 Gbps</code> می‌شود.</p>"
+    },
+    {
+      "title": "چگونه ممکن است نمودار ۵دقیقه‌ای SNMP مصرف یک لینک ۱۰G را ۳۵٪ نشان دهد، اما کاربران همچنان افت بسته ناشی از ازدحام تجربه کنند؟",
+      "options": [
+        "به علت Microburstهای چندمیلی‌ثانیه‌ای که بافر کم‌عمق پورت را سرریز کرده و Output Queue Drops می‌سازند اما در میانگین ۵دقیقه‌ای پنهان می‌مانند",
+        "زیرا SNMP فقط IPv6 می‌شمارد",
+        "امکان ندارد زیر ۵۰٪ افت بسته رخ دهد",
+        "فقط به دلیل قطعی برق"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>پایش شمارنده‌های Microburst/Buffer Drops و Streaming Telemetry زیرثانیه‌ای (در کنار ابزارهای تکمیلی مانند Packet Capture سخت‌افزاری یا Buffer Watermark) روش کلیدی شکار واقعی Microburst است.</p>"
+    },
+    {
+      "title": "منظور از الگوی تست IMIX (RFC 6985) در ارزیابی ظرفیت روترها و فایروال‌ها چیست؟",
+      "options": [
+        "ارسال صرفاً بسته‌های ۱۵۰۰بایتی",
+        "ترکیبی واقع‌گرایانه از بسته‌های کوچک (۶۴B)، متوسط (۵۷۶B) و بزرگ (۱۵۰۰B) مطابق ترافیک واقعی اینترنت/سازمان برای سنجش صادقانه PPS و Gbps",
+        "حذف هدر IP از بسته‌ها",
+        "تست بدون کابل"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در RFPهای حرفه‌ای همیشه توان تجهیزات بر مبنای IMIX با تمام قابلیت‌های امنیتی فعال مقایسه می‌شود.</p>"
+    },
+    {
+      "title": "در ممیزی ۵ بُعد آزمایشگاه، فایروال ۴۰Gbps روی تقاضای ۸Gbps (فقط ۲۰٪) چرا مردود شد؟",
+      "options": [
+        "زیرا رنگ آن مناسب نبود",
+        "زیرا سه بُعد پنهان دیگر یعنی PPS (90%)، FIB (85%) و TLS Inspection (92.9%) به شدت از آستانه ایمنی ۷۰٪ عبور کرده بودند!",
+        "زیرا ۸Gbps از ۴۰Gbps بزرگ‌تر است",
+        "مردود نشد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ظرفیت کل یک تجهیز توسط ضعیف‌ترین بُعد گلوگاه آن (نه بزرگ‌ترین عدد کاتالوگ) تعیین می‌شود.</p>"
+    },
+    {
+      "title": "چرا باید سفارش ارتقای ظرفیت در آستانه ۶۰–۷۰٪ (یا ۴۵٪ در 2N) آغاز شود نه در ۹۵٪؟",
+      "options": [
+        "به دلیل زمان تامین سخت‌افزار و تحویل مدار مخابراتی (Procurement Lead-Time 3 تا ۶ماهه) و جلوگیری از سوختن سرویس پیش از رسیدن تجهیزات جدید",
+        "زیرا لینک‌ها در ۸۰٪ ذوب می‌شوند",
+        "برای هدر دادن بودجه",
+        "فرقی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هم‌راستایی آستانه هشدار ظرفیت با Lead-Time خرید و نصب، رکن مدیریت پیش‌فعال ظرفیت است.</p>"
+    },
+    {
+      "title": "راهبرد مالی «Pay-as-You-Grow» در برنامه‌ریزی ظرفیت ۵ساله به چه معناست؟",
+      "options": [
+        "خرید ۱۰۰٪ سخت‌افزار سال پنجم در روز اول و بیکار نگه داشتن آن",
+        "انتخاب معماری ماژولار آماده رشد (مانند شاسی/Spine-Leaf) با خرید ظرفیت ۲–۳ سال اول و افزودن تدریجی کارت/پورت/سوئیچ همگام با رشد واقعی",
+        "هرگز ارتقا ندادن شبکه",
+        "اجاره روزانه همه روترها"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Pay-as-You-Grow سرمایه روز اول (CapEx) را بهینه می‌کند بدون آنکه معماری را در سال سوم به بن‌بست برساند.</p>"
+    },
+    {
+      "title": "کدام بُعد پنهان هنگام تغییر سرعت پورت (مثلاً ۴۰G ورودی به ۱۰G خروجی در لبه WAN) اهمیت حیاتی پیدا می‌کند؟",
+      "options": [
+        "عمق بافر سوئیچ (Deep Buffer) برای جذب لحظه‌ای بسته‌ها در سرعت‌های نامتجانس بدون افت بسته",
+        "تعداد پورت کنسول",
+        "طول نام دستگاه",
+        "تعداد VLANها"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Speed Mismatch بدون بافر عمیق باعث Tail-Drop شدید و کاهش شدید توان TCP می‌شود.</p>"
+    },
+    {
+      "title": "چرا معمار CCDE در برنامه‌ریزی ظرفیت باید علاوه بر نمودارهای تاریخی، با مدیران کسب‌وکار درباره نقشه راه آینده صحبت کند؟",
+      "options": [
+        "برای کشف جهش‌های غیرخطی (Non-Linear Shocks) مانند خرید شرکت جدید (M&A)، کمپین‌های فروش، مهاجرت ابری یا استقرار AI که در نمودارهای گذشته دیده نمی‌شوند",
+        "برای نوشتن کد وب‌سایت",
+        "نمودار گذشته همیشه ۱۰۰٪ کافی است",
+        "فقط جهت آشنایی"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تاریخچه گذشته هرگز خرید ناگهانی یک شرکت جدید یا راه‌اندازی سرویس ویدیویی جدید را پیش‌بینی نمی‌کند.</p>"
+    },
+    {
+      "title": "در بررسی بُعد TCAM/FIB یک روتر مرزی اینترنت (ASBR)، چرا دانستن رشد جدول BGP جهانی IPv4 و IPv6 حیاتی است؟",
+      "options": [
+        "زیرا سرریز جدول FIB سخت‌افزاری باعث قطع مسیریابی، افت شدید کارایی (Software Punt) یا Crash روتر مرزی در میانه عمر ۵ساله آن می‌شود",
+        "زیرا جدول BGP اینترنت ثابت است",
+        "زیرا FIB فقط برای لایه ۲ است",
+        "اهمیتی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>جدول کامل اینترنت (DFZ) دائماً در حال رشد است و سخت‌افزار ASBR باید حداقل حاشیه رشد ۵ساله در FIB/RIB داشته باشد.</p>"
+    },
+    {
+      "title": "معیار «صدک ۹۵ام (95th Percentile)» چه مزیتی نسبت به میانگین ساده (Average) در ظرفیت‌سنجی لینک‌ها دارد؟",
+      "options": [
+        "میانگین ساده ساعات خلوت نیمه‌شب را با ساعات شلوغ کاری قاطی کرده و اوج واقعی را پنهان می‌کند، اما صدک ۹۵ام اوج مصرف واقعی پایدار را بدون اثرپذیری از چند ثانیه نویز نادر نشان می‌دهد",
+        "همیشه از میانگین کمتر است",
+        "فقط برای برق کاربرد دارد",
+        "هیچ مزیتی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>استفاده از میانگین ۲۴ساعته یکی از تله‌های رایج کم‌برآورد کردن ظرفیت واقعی در ساعات اوج کاری است.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "مدل‌سازی محلی (Local Mock) در Python 3 برای محاسبه رشد مرکب ۵ساله با سقف ۵۰٪ Failover و ممیزی ۵ بُعد پنهان NGFW",
+        "تست بار زنده با ژنراتور IXIA روی فایروال تولیدی",
+        "جمع‌آوری SNMP از شبکه بانکی واقعی",
+        "فقط متن نظری بدون کد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ تجهیز تولیدی متصل نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "ccde_11",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc6985"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ تجهیز یا سامانه تله‌متری تولیدی متصل نیست."
+    ],
+    "legacyAuditFixes": [
+      "گسترش نسخه قدیمی (۱ پرسش) به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، IMIX RFC 6985، Microburst، Pay-as-You-Grow و مدل‌ساز ۵-بُعد/رشد مرکب."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccde_11-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-ccde",
+      "recommendedCourse": "ccde-design",
+      "blueprint": "/academy-assets/v5/blueprints/ccde_11.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_11_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح عبارت مطلق «تنها راه شکار واقعی Microburst» در توضیح پرسش ۳ و شرط‌دار کردن افت توان TLS Decryption به مدل سخت‌افزار/شتاب‌دهنده رمزنگاری در بخش ۳.",
+      "اصلاح بازبینی فاز ۸D: جلوگیری از ZeroDivisionError روی failover_utilization_cap<=0 و ظرفیت<=0، پویاسازی نام کلید خروجی failover cap و رد مقادیر منفی/bool/NaN در ccde_11_lab.py."
+    ]
+  }
 }

@@ -13,9 +13,15 @@ import math
 
 
 def _require_finite_num(val: object, name: str) -> float:
-    if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(val):
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
         raise ValueError(f"{name} must be a finite number (not bool), got {val!r}")
-    return float(val)
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval):
+        raise ValueError(f"{name} must be a finite number (not bool), got {val!r}")
+    return fval
 
 
 def forecast_5yr_capacity(

@@ -12,9 +12,15 @@ import math
 
 
 def _require_non_negative_cost(val: object, name: str) -> float:
-    if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(val) or val < 0:
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
         raise ValueError(f"{name} must be a non-negative finite number, got {val!r}")
-    return float(val)
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval) or fval < 0:
+        raise ValueError(f"{name} must be a non-negative finite number, got {val!r}")
+    return fval
 
 
 def compute_5yr_tco(

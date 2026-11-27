@@ -446,7 +446,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertTrue(dci_metro["sync_feasible_for_profile"])
         self.assertTrue(dci_metro["replication_ok"])
         self.assertTrue(dci_metro["l2_stretch_policy_ok"])
-        self.assertIn("satisfies", dci_metro["note"])
+        self.assertIn("within", dci_metro["note"])
         self.assertNotIn("violates", dci_metro["note"])
         self.assertNotIn("exceeds", dci_metro["note"])
 
@@ -1326,16 +1326,101 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 c18.validate_pars_global_hld({**metro_base, "assumed_jitter_ms": bad_j}, "netapp_ontap_select_metrocluster_sds")
 
-        # 2. auto_20: overflow inputs -> ValueError (NOT OverflowError); constant baseline == value -> ValueError (NOT 0.0)
+        # 2. auto_20: scale-normalized Z-score + non-finite/overflow -> ValueError; constant baseline -> ValueError
         a20 = load_module(AGENT3_LAB_DIR / "auto_20_lab.py", "auto_20_phase10a_testmod")
+        self.assertAlmostEqual(a20.z_score(1, [1e200, 0]), -1.0)
+        self.assertAlmostEqual(a20.z_score(1e200, [1e200, 0]), 1.0)
+        self.assertAlmostEqual(a20.z_score(1e308, [-1e308, 1e308]), 1.0)
         with self.assertRaises(ValueError):
-            a20.z_score(1, [1e200, 0])
+            a20.z_score(1e308, [1e-308, 2e-308])
         with self.assertRaises(ValueError):
-            a20.z_score(1, [1e308, -1e308])
+            a20.z_score(10**500, [1, 2])
         with self.assertRaises(ValueError):
             a20.z_score(5.0, [5.0, 5.0, 5.0])
         with self.assertRaises(ValueError):
             a20.z_score(9.0, [5.0, 5.0, 5.0])
+
+    def test_phase10b_unrounded_rtt_scaled_zscore_and_overflow_sweep(self):
+        """Phase 10B: ccde_18 unrounded RTT + async w/o jitter, auto_20 scaled Z-score, & 7-lab OverflowError->ValueError sweep."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. ccde_18 unrounded strict RTT boundary (< 10.0 ms) & async pass without jitter on ONTAP Select
+        c18 = load_module(AGENT3_LAB_DIR / "ccde_18_lab.py", "ccde_18_phase10b_testmod")
+        base = {
+            "dc_distance_km": 100,
+            "assumed_equipment_and_detour_overhead_ms": 8.599,
+            "storage_replication": "synchronous",
+            "target_rpo_minutes": 0,
+            "dci_l2_stretched": False,
+            "gslb_enabled": True,
+            "wan_model": "hybrid_sdwan_regional_hubs_plus_sase",
+            "cloud_hub": "dual_colo_cloud_exchange_direct_connect",
+            "macro_vrfs": 3,
+            "micro_sgt_enabled": True,
+            "eu_residency_policy_enforced": True,
+            "eu_personal_data_transferred_outside_eea": False,
+            "chapter_v_transfer_safeguard": None,
+            "encryption_in_transit_assumed": True,
+        }
+        # 100*0.014 + 8.599 = 9.999 < 10.0 -> MUST PASS (would falsely fail if rounded to 10.00!)
+        self.assertTrue(
+            c18.validate_pars_global_hld(base, "netapp_vmsc_snapmirror_active_sync")["domain_validations"][0]["pass"]
+        )
+        # 100*0.014 + 8.6 = 10.0 -> MUST FAIL strict < 10.0
+        self.assertFalse(
+            c18.validate_pars_global_hld(
+                {**base, "assumed_equipment_and_detour_overhead_ms": 8.6},
+                "netapp_vmsc_snapmirror_active_sync",
+            )["domain_validations"][0]["pass"]
+        )
+        # ONTAP Select async with target_rpo_minutes=15 passes even if assumed_jitter_ms is omitted
+        self.assertTrue(
+            c18.validate_pars_global_hld(
+                {**base, "storage_replication": "asynchronous", "target_rpo_minutes": 15},
+                "netapp_ontap_select_metrocluster_sds",
+            )["domain_validations"][0]["pass"]
+        )
+
+        # 2. auto_19, ccde_11, ccde_14, ccde_17, spec_cyber, spec_wl, ccie_sec: 10**500 -> ValueError (never OverflowError)
+        a19 = load_module(AGENT3_LAB_DIR / "auto_19_lab.py", "auto_19_phase10b_testmod")
+        with self.assertRaises(ValueError):
+            a19.evaluate_alert_hysteresis([10**500])
+
+        c11 = load_module(AGENT3_LAB_DIR / "ccde_11_lab.py", "ccde_11_phase10b_testmod")
+        with self.assertRaises(ValueError):
+            c11.forecast_5yr_capacity(10**500, 0.2, 100.0)
+
+        c14 = load_module(AGENT3_LAB_DIR / "ccde_14_lab.py", "ccde_14_phase10b_testmod")
+        with self.assertRaises(ValueError):
+            c14.model_east_west_firewall_bottleneck(10**500, 10.0, 0.5)
+
+        c17 = load_module(AGENT3_LAB_DIR / "ccde_17_lab.py", "ccde_17_phase10b_testmod")
+        with self.assertRaises(ValueError):
+            c17.compute_5yr_tco("X", 10**500, 0, 0, 0)
+
+        scy = load_module(AGENT3_LAB_DIR / "spec_cyber_lab.py", "spec_cyber_phase10b_testmod")
+        with self.assertRaises(ValueError):
+            scy.detect_c2_beaconing([0, 1, 2, 10**500])
+        res_zero = scy.detect_c2_beaconing([5, 5, 5, 5])
+        self.assertIsNone(res_zero["cv"])
+        self.assertFalse(res_zero["beaconing_suspected"])
+
+        swl = load_module(AGENT3_LAB_DIR / "spec_wl_lab.py", "spec_wl_phase10b_testmod")
+        with self.assertRaises(ValueError):
+            swl.dbm_to_mw(10**500)
+        with self.assertRaises(ValueError):
+            swl.dbm_to_mw(10000)
+
+        csec = load_module(AGENT3_LAB_DIR / "ccie_sec_lab.py", "ccie_sec_phase10b_testmod")
+        for bad_skew in (float("nan"), float("inf"), 10**500, True):
+            with self.assertRaises(ValueError):
+                csec.audit_ntp_dns_preflight([{"name": "ISE-1", "clock_skew_sec": bad_skew, "dns_forward_reverse_ok": True}])
 
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))

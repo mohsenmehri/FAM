@@ -16,3 +16,7 @@
 - **اصلاح انجام‌شده:** اعمال `_require_bool` روی ۵ پرچم C9800، `_require_finite_num` و `cable_loss_db >= 0` + assertها.
 - **تست مرتبط:** `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** مدل محلی بدون WLC 9800 یا رادیو واقعی؛ بازبینی نویسنده (نه مستقل).
+
+## به‌روزرسانی فاز ۱۰B — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** محافظت `_require_finite_num` و `dbm_to_mw` در برابر `OverflowError` (`10**500` و `dbm=10000`) و تبدیل به `ValueError`.
+- **وضعیت اجرا:** آزمایشگاه محلی/Mock Python بدون تجهیز شبکه یا سرویس زنده؛ تطابق دقیق بایتی کد HTML با `spec_wl_lab.py` تأیید شد.

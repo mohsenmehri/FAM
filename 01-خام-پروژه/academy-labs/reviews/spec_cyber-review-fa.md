@@ -16,3 +16,7 @@
 - **اصلاح انجام‌شده:** افزودن نگهبان‌های نوع و بازه روی همه توابع SIEM/Beaconing/DNS + assertها.
 - **تست مرتبط:** `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** داده‌های مصنوعی محلی بدون SIEM/EDR زنده؛ بازبینی نویسنده (نه مستقل).
+
+## به‌روزرسانی فاز ۱۰B — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** محافظت `_require_finite_num` و `detect_c2_beaconing` در برابر `OverflowError`/`NaN`/`Inf` و `10**500`؛ حذف بازگرداندن `float('inf')` غیرسازگار با JSON وقتی `mean_d == 0` (`cv: None`).
+- **وضعیت اجرا:** آزمایشگاه محلی/Mock Python بدون تجهیز شبکه یا سرویس زنده؛ تطابق دقیق بایتی کد HTML با `spec_cyber_lab.py` تأیید شد.
