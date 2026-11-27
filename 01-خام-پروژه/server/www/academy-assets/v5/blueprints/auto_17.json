@@ -1,0 +1,337 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_17",
+ "objectiveId": "auto_17",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۱۷ از ۲۰): کانتینرها و Docker در سرویس‌های شبکه",
+ "titleEn": "Automation 17: Containers, Docker Networking (Bridge/Host/Macvlan), Volumes, Compose & Security",
+ "domain": "Network Automation",
+ "source": "Legacy auto_17 rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_17-section-1",
+   "title": "مسئله واقعی: چرا استقرار پشته NetBox، Grafana، Prometheus و ابزارهای اتوماسیون با کانتینر ده برابر سریع‌تر و تمیزتر است؟",
+   "html": "<p>در شبکه‌های مدرن، یک مهندس شبکه علاوه بر روترها باید ده‌ها سرویس کمکی (NetBox، Grafana، InfluxDB، Telegraf، Syslog، Ansible Execution Environment و حتی آزمایشگاه‌های Containerlab) را مستقر و به‌روزرسانی کند. نصب مستقیم همه این‌ها روی یک سرور لینوکسی باعث تعارض نسخه کتابخانه‌ها («روی سیستم من کار می‌کرد!») می‌شود. <strong>کانتینرها (Docker / Podman)</strong> با ایزوله‌سازی فرآیندها از طریق <strong>Linux Namespaces و cgroups</strong>، محیطی سبک، یکسان و قابل تکرار فراهم می‌کنند.</p>"
+  },
+  {
+   "id": "auto_17-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> مبانی لینوکس (درس <code>auto_01</code>) و شبکه‌سازی TCP/IP و VLAN.</p><ul><li>تبیین تفاوت <strong>کانتینر با ماشین مجازی (VM)</strong> (کرنل مشترک لینوکس در برابر سیستم‌عامل کامل) و تفاوت <strong>Image</strong> (فقط-خواندنی) با <strong>Container</strong> (نمونه اجرایی موقت).</li><li>مدیریت ذخیره‌سازی پایدار با <strong>Named Volumes</strong> و <strong>Bind Mounts</strong>.</li><li>مقایسه دقیق درایورهای شبکه Docker: <strong>Bridge</strong>، <strong>Host</strong>، <strong>Macvlan</strong> (و IPvlan) و کاربرد هرکدام در سرویس‌های شبکه.</li><li>هماهنگ‌سازی چند سرویس با <strong>Docker Compose</strong> و اصول سخت‌سازی امنیتی کانتینر (کاربر غیر-root، قفل تگ، منع <code>--privileged</code> و ممنوعیت اسرار در <code>ENV</code>).</li></ul>"
+  },
+  {
+   "id": "auto_17-section-3",
+   "title": "تفاوت کانتینر با VM و رابطه دقیق Image، Container و Dockerfile",
+   "html": "<p>برخلاف ماشین مجازی (VM) که هر کدام یک کرنل و سیستم‌عامل کامل روی Hypervisor دارند، کانتینرها <strong>کرنل لینوکس میزبان</strong> را به اشتراک می‌گذارند و با <code>Namespaces</code> (جداسازی PID، شبکه، Mount) و <code>cgroups</code> (محدودسازی CPU/RAM) ایزوله می‌شوند؛ بنابراین در میلی‌ثانیه بالا می‌آیند.</p><ul><li><strong>Dockerfile:</strong> دستورالعمل متنی ساخت Image (مبنی بر لایه‌ها: <code>FROM</code>، <code>RUN</code>، <code>COPY</code>، <code>USER</code>، <code>CMD</code>).</li><li><strong>Image:</strong> قالب <strong>فقط-خواندنی (Read-Only)</strong> و تغییرناپذیر شامل کد و وابستگی‌ها.</li><li><strong>Container:</strong> نمونه در حال اجرا از Image همراه با یک لایه نوشتنی موقت (Ephemeral) که با حذف کانتینر از بین می‌رود.</li></ul>"
+  },
+  {
+   "id": "auto_17-section-4",
+   "title": "نمودار یکپارچه Image/Volume، درایورهای شبکه و امنیت کانتینر",
+   "html": "<p>نمودار زیر لایه‌های ذخیره‌سازی، سه حالت شبکه Docker و الزامات کلیدی امنیتی را کنار هم نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Docker Image vs Container vs Volume and Bridge/Host/Macvlan Network Drivers\"><rect x=\"12\" y=\"16\" width=\"234\" height=\"186\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"129\" y=\"38\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Image, Container &amp; Volume</text><rect x=\"28\" y=\"52\" width=\"202\" height=\"36\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#2563eb\"/><text x=\"129\" y=\"74\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Image: Read-Only Layered Template</text><rect x=\"28\" y=\"98\" width=\"202\" height=\"36\" rx=\"6\" fill=\"#fef3c7\" stroke=\"#d97706\"/><text x=\"129\" y=\"120\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Container: Ephemeral RW Instance</text><rect x=\"28\" y=\"144\" width=\"202\" height=\"44\" rx=\"6\" fill=\"#dcfce7\" stroke=\"#15803d\"/><text x=\"129\" y=\"164\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Named Volume (Persistent)</text><text x=\"129\" y=\"180\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Survives container rm/recreate</text><rect x=\"264\" y=\"16\" width=\"246\" height=\"186\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"387\" y=\"38\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#0f172a\">Docker Network Drivers</text><text x=\"387\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1d4ed8\" font-weight=\"bold\">Bridge (Default)</text><text x=\"387\" y=\"84\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Private subnet + NAT (-p 8080:80)</text><text x=\"387\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#d97706\" font-weight=\"bold\">Host</text><text x=\"387\" y=\"130\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Shares Host NIC/ports directly (No NAT)</text><text x=\"387\" y=\"160\" text-anchor=\"middle\" font-size=\"10\" fill=\"#15803d\" font-weight=\"bold\">Macvlan</text><text x=\"387\" y=\"176\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Dedicated L2 MAC + LAN IP on physical VLAN</text><rect x=\"528\" y=\"16\" width=\"220\" height=\"186\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"638\" y=\"38\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#991b1b\">Container Hardening</text><text x=\"638\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">Pin Image Tag (NO :latest)</text><text x=\"638\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">Non-Root USER in Dockerfile</text><text x=\"638\" y=\"122\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">Avoid --privileged &amp; root sock</text><text x=\"638\" y=\"148\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">NO Secrets in ENV / Image!</text><text x=\"638\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">Shared Linux Kernel (cgroups/ns)</text></svg>"
+  },
+  {
+   "id": "auto_17-section-5",
+   "title": "ذخیره‌سازی پایدار (Persistence): چرا دیتابیس و لاگ شبکه حتماً باید روی Volume باشد؟",
+   "html": "<p>از آنجا که لایه نوشتنی کانتینر موقت است، اگر دیتابیس NetBox (PostgreSQL) یا سری زمانی InfluxDB را درون لایه داخلی کانتینر ذخیره کنید، با اولین ارتقا یا <code>docker rm</code> کل داده‌ها نابود می‌شوند! <strong>Named Volume</strong> (تحت مدیریت Docker روی دیسک میزبان) و <strong>Bind Mount</strong> (اتصال مستقیم یک پوشه میزبان به کانتینر) تضمین می‌کنند که داده‌ها پس از حذف و بازسازی کانتینر کاملاً پایدار بمانند.</p>"
+  },
+  {
+   "id": "auto_17-section-6",
+   "title": "شبکه‌سازی Docker برای مهندسان شبکه: Bridge، Host و Macvlan",
+   "html": "<table><thead><tr><th>درایور شبکه</th><th>مکانیسم لایه ۲ و ۳</th><th>کاربرد اصلی در شبکه</th><th>نکته / محدودیت</th></tr></thead><tbody><tr><td><strong>Bridge (پیش‌فرض / User-defined)</strong></td><td>ساخت سوئیچ مجازی داخلی + ساب‌نت خصوصی + NAT و Port Mapping (<code>-p 3000:3000</code>)</td><td>اکثر سرویس‌های وب، API و پشته Compose (با DNS داخلی بر اساس نام سرویس)</td><td>دسترسی بیرونی نیازمند انتشار پورت است</td></tr><tr><td><strong>Host</strong></td><td>حذف ایزوله‌سازی شبکه؛ کانتینر مستقیماً از کارت شبکه و پورت‌های میزبان استفاده می‌کند</td><td>کالکتورهای پرترافیک NetFlow/Telemetry/Syslog که سربار NAT را نمی‌خواهند</td><td>تضاد پورت با میزبان؛ کاهش ایزوله‌سازی</td></tr><tr><td><strong>Macvlan</strong></td><td>اختصاص <strong>آدرس MAC و IP اختصاصی لایه ۲</strong> مستقیم روی شبکه/VLAN فیزیکی؛ کانتینر شبیه یک تجهیز فیزیکی مستقل در LAN ظاهر می‌شود</td><td>سرویس‌های نیازمند IP مستقیم روی VLAN (مانند DHCP/Syslog/سنسور شبکه/تجهیزات شبیه‌سازی)</td><td>میزبان به دلیل محدودیت کرنل مستقیماً نمی‌تواند با کانتینر Macvlan خود صحبت کند (مگر با sub-interface کمکی) و پورت سوئیچ نیازمند مجوز چند MAC است</td></tr></tbody></table>"
+  },
+  {
+   "id": "auto_17-section-7",
+   "title": "هماهنگ‌سازی پشته چندسرویسه با Docker Compose",
+   "html": "<p>یک سرویس واقعی (مانند پشته مانیتورینگ TIG شامل Telegraf + InfluxDB + Grafana یا NetBox شامل Django + PostgreSQL + Redis) از چند کانتینر تشکیل شده است. <strong>Docker Compose (<code>compose.yml</code>)</strong> تمام سرویس‌ها، شبکه‌های Bridge اختصاصی (که در آن کانتینرها یکدیگر را با نام سرویس مثلاً <code>http://influxdb:8086</code> پیدا می‌کنند)، Volumeها و Healthcheckها را در یک فایل YAML نسخه‌بندی‌شده تعریف می‌کند تا با یک دستور <code>docker compose up -d</code> بالا بیایند.</p>"
+  },
+  {
+   "id": "auto_17-section-8",
+   "title": "کاربرد ویژه کانتینر در شبکه: Cisco App Hosting (IOx) و Containerlab",
+   "html": "<p>علاوه بر سرورهای مرکزی، برخی سوئیچ‌ها و روترهای مدرن سیسکو (مانند Catalyst 9000 با قابلیت <strong>App Hosting / IOx</strong>) اجازه اجرای مستقیم کانتینرهای سبک (مانند سنسور ThousandEyes یا ابزار عیب‌یابی محلی) را روی خود تجهیز شبکه می‌دهند. همچنین ابزار <strong>Containerlab</strong> به مهندسان امکان می‌دهد توپولوژی‌های کامل روترهای کانتینری را در چند ثانیه روی لپ‌تاپ یا پایپ‌لاین CI اجرا کنند.</p>"
+  },
+  {
+   "id": "auto_17-section-9",
+   "title": "امنیت کانتینر (Container Hardening): پنج قانون حیاتی تولیدی",
+   "html": "<ol><li><strong>عدم اجرا با کاربر <code>root</code>:</strong> در Dockerfile کاربر غیر-root بسازید و با <code>USER appuser</code> اجرا کنید.</li><li><strong>پرهیز از تگ <code>:latest</code>:</strong> همیشه نسخه دقیق (مثل <code>python:3.11-slim</code> یا Digest) را قفل کنید و از ایمیج‌های سبک و کم‌حجم (Multi-stage build) استفاده نمایید.</li><li><strong>ممنوعیت <code>--privileged</code> و Mount نکردن <code>/var/run/docker.sock</code>:</strong> این دو عملاً دسترسی کامل root روی سرور میزبان می‌دهند!</li><li><strong>ممنوعیت قرار دادن اسرار در Dockerfile (<code>ENV</code>/<code>ARG</code>):</strong> اسرار داخل لایه‌های Image می‌مانند؛ آن‌ها را هنگام اجرا با Docker Secrets یا Vault تزریق کنید.</li><li><strong>محدودسازی منابع و اسکن آسیب‌پذیری:</strong> تنظیم <code>memory/cpus</code> و اسکن Image با ابزارهایی مانند Trivy در CI.</li></ol>"
+  },
+  {
+   "id": "auto_17-section-10",
+   "title": "محدودیت‌های عملی و زمان انتخاب Kubernetes (یا Podman)",
+   "html": "<p>برای یک یا دو سرور سرویس شبکه، <code>Docker Compose</code> ساده و عالی است. اما اگر نیازمند دسترس‌پذیری بالای چندسروره (HA)، Self-Healing خودکار نودها و مقیاس‌پذیری افقی صدها سرویس باشید، ارکستراتورهایی مثل <strong>Kubernetes</strong> مطرح می‌شوند. همچنین <strong>Podman</strong> جایگزینی بدون دیمون root (Rootless) و سازگار با CLI داکر است.</p>"
+  },
+  {
+   "id": "auto_17-section-11",
+   "title": "کژفهمی‌های رایج درباره کانتینرها و Docker",
+   "html": "<ul><li><strong>کژفهمی ۱: «کانتینر همان ماشین مجازی سبک است که کرنل جداگانه دارد.»</strong> واقعیت: کانتینر کرنل میزبان را به اشتراک می‌گذارد؛ به همین دلیل فرار از کانتینر (Container Escape) در صورت اجرای <code>--privileged</code> یا <code>root</code> کل میزبان را به خطر می‌اندازد.</li><li><strong>کژفهمی ۲: «وقتی کانتینر را پاک می‌کنیم، داده‌های درون Named Volume هم پاک می‌شوند.»</strong> واقعیت: Named Volume مستقل از چرخه عمر کانتینر است و با <code>docker rm</code> پاک نمی‌شود (مگر با دستور صریح <code>docker volume rm</code>).</li><li><strong>کژفهمی ۳: «در حالت Macvlan کانتینر به‌راحتی می‌تواند IP سرور میزبان خودش را پینگ کند.»</strong> واقعیت: به دلیل طراحی کرنل لینوکس، ارتباط مستقیم میان میزبان و کانتینر Macvlan روی همان کارت شبکه به‌طور پیش‌فرض مسدود است و نیازمند یک sub-interface کمکی روی میزبان است.</li></ul>"
+  },
+  {
+   "id": "auto_17-section-12",
+   "title": "عیب‌یابی خطاهای پرتکرار Docker در سرویس‌های شبکه",
+   "html": "<p><strong>خطای ۱ — عدم دسترسی کانتینر A به کانتینر B با نام سرویس:</strong> هر دو روی شبکه پیش‌فرض قدیمی <code>bridge</code> اجرا شده‌اند که DNS داخلی نام‌محور ندارد؛ یک <strong>User-defined Bridge Network</strong> (یا شبکه پیش‌فرض Docker Compose) بسازید.</p><p><strong>خطای ۲ — شکست ارتباط Macvlan روی پورت سوئیچ سیسکو:</strong> پورت سوئیچ دارای <code>switchport port-security maximum 1</code> است و MAC جدید کانتینر را مسدود می‌کند یا محیط مجازی‌ساز نیاز به فعال‌سازی Promiscuous/Forged Transmits دارد.</p>"
+  },
+  {
+   "id": "auto_17-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> در یک Dockerfile سه‌خطی داریم: <code>FROM python:latest</code>، <code>ENV API_PASSWORD=admin123</code> و <code>COPY . /app</code>. سه ایراد امنیتی آن چیست؟ <strong>پاسخ:</strong> (۱) استفاده از تگ قفل‌نشده <code>:latest</code>، (۲) قرار دادن رمز عبور به‌صورت متن‌باز در <code>ENV</code> داخل لایه Image، و (۳) نبود دستور <code>USER</code> غیر-root.</p><p><strong>تمرین ۲:</strong> کانتینر InfluxDB فایل موقتی در <code>/tmp/ephemeral.log</code> و داده‌های متریک را در Named Volume <code>/var/lib/tsdb</code> نوشته است. پس از حذف و بازسازی کانتینر کدام باقی می‌ماند؟ <strong>پاسخ:</strong> <code>/tmp/ephemeral.log</code> پاک می‌شود اما داده‌های درون Named Volume <code>/var/lib/tsdb</code> کاملاً حفظ می‌شوند.</p>"
+  },
+  {
+   "id": "auto_17-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://docs.docker.com/network/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی شبکه‌سازی Docker (Bridge/Host/Macvlan)</a> و <a href=\"https://docs.docker.com/storage/volumes/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Docker Volumes</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ دیمون واقعی Docker (<code>dockerd</code>) یا سوئیچ Catalyst IOx در این محیط اجرا نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Container",
+   "fa": "کانتینر",
+   "simple": "نمونه اجرایی سبک و ایزوله‌شده از یک Image بر بستر کرنل مشترک لینوکس."
+  },
+  {
+   "term": "Docker Image",
+   "fa": "ایمیج داکر",
+   "simple": "قالب لایه‌ای و فقط-خواندنی (Read-Only) شامل کد، کتابخانه‌ها و فایل‌سیستم پایه."
+  },
+  {
+   "term": "Dockerfile",
+   "fa": "فایل ساخت ایمیج",
+   "simple": "فایل متنی شامل دستورالعمل‌های لایه‌به‌لایه برای ساخت خودکار Docker Image."
+  },
+  {
+   "term": "Named Volume",
+   "fa": "حجم ذخیره‌سازی پایدار",
+   "simple": "فضای ذخیره‌سازی تحت مدیریت Docker که با حذف و بازسازی کانتینر از بین نمی‌رود."
+  },
+  {
+   "term": "Bind Mount",
+   "fa": "اتصال مستقیم پوشه میزبان",
+   "simple": "نگاشت یک مسیر مشخص روی سیستم فایل میزبان به درون کانتینر."
+  },
+  {
+   "term": "Bridge Driver",
+   "fa": "شبکه پل (پیش‌فرض)",
+   "simple": "شبکه خصوصی داخلی با NAT و Port Mapping (نوع user-defined دارای DNS داخلی است)."
+  },
+  {
+   "term": "Host Driver",
+   "fa": "شبکه میزبان",
+   "simple": "اشتراک مستقیم کارت شبکه و پورت‌های میزبان با کانتینر بدون NAT."
+  },
+  {
+   "term": "Macvlan Driver",
+   "fa": "شبکه Macvlan",
+   "simple": "اختصاص آدرس MAC و IP اختصاصی لایه ۲ به کانتینر روی VLAN فیزیکی شبیه تجهیز مستقل."
+  },
+  {
+   "term": "Docker Compose",
+   "fa": "ابزار Docker Compose",
+   "simple": "تعریف و اجرای هماهنگ چند کانتینر، شبکه و Volume مرتبط با یک فایل YAML."
+  },
+  {
+   "term": "Namespaces & cgroups",
+   "fa": "فضاهای نام و گروه‌های کنترل",
+   "simple": "قابلیت‌های کرنل لینوکس برای ایزوله‌سازی فرآیند/شبکه و محدودسازی CPU/RAM کانتینر."
+  },
+  {
+   "term": "Non-Root USER",
+   "fa": "اجرای غیر-root",
+   "simple": "اصل امنیتی اجرای فرآیند کانتینر با کاربر کم‌امتیاز به جای root."
+  },
+  {
+   "term": "Multi-Stage Build",
+   "fa": "ساخت چندمرحله‌ای",
+   "simple": "حذف ابزارهای کامپایل در لایه نهایی Image برای کاهش حجم و سطح حمله."
+  },
+  {
+   "term": "Cisco App Hosting (IOx)",
+   "fa": "میزبانی کانتینر روی تجهیز سیسکو",
+   "simple": "اجرای کانتینرهای سبک کمکی مستقیماً روی پلتفرم‌هایی مثل Catalyst 9000."
+  },
+  {
+   "term": "Containerlab",
+   "fa": "آزمایشگاه کانتینری شبکه",
+   "simple": "ابزار ساخت سریع توپولوژی‌های شبکه کانتینری برای تمرین و تست CI/CD."
+  },
+  {
+   "term": "Ephemeral Layer",
+   "fa": "لایه نوشتنی موقت",
+   "simple": "لایه قابل نوشتن روی کانتینر که هنگام حذف کانتینر پاک می‌شود."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (پایداری Volume در برابر لایه موقت، Macvlan و ممیزی امنیت Dockerfile) — دیمون Docker اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ دیمون واقعی Docker یا کانتینر زنده در این محیط اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ دیمون Docker (dockerd) یا کانتینر واقعی در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی سه مفهوم کلیدی را آزمون می‌کند: (۱) پاک شدن فایل لایه موقت در برابر ماندگاری داده درون Named Volume هنگام بازسازی کانتینر، (۲) ویژگی‌های درایورهای <code>bridge/host/macvlan</code>، و (۳) ممیزی خودکار امنیت Dockerfile برای کشف <code>:latest</code>، رمز در <code>ENV</code> و نبود <code>USER</code> غیر-root.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_17_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_17_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_17: Containers, Docker Networking &amp; Hardening Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of read-only Image vs\nephemeral Container layer vs persistent Volume, Docker network drivers\n(bridge/host/macvlan), and Dockerfile security linter. No Docker daemon run.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport copy\nimport json\n\nNETWORK_DRIVERS = {\n    &quot;bridge&quot;: {&quot;own_ip&quot;: True, &quot;own_lan_mac&quot;: False, &quot;uses_nat_port_map&quot;: True, &quot;host_net_isolation&quot;: True},\n    &quot;host&quot;: {&quot;own_ip&quot;: False, &quot;own_lan_mac&quot;: False, &quot;uses_nat_port_map&quot;: False, &quot;host_net_isolation&quot;: False},\n    &quot;macvlan&quot;: {&quot;own_ip&quot;: True, &quot;own_lan_mac&quot;: True, &quot;uses_nat_port_map&quot;: False, &quot;host_net_isolation&quot;: True},\n}\n\n\ndef audit_dockerfile(lines: list[str]) -&gt; list[str]:\n    findings = []\n    joined = &quot;\\n&quot;.join(lines)\n    if &quot;:latest&quot; in joined:\n        findings.append(&quot;Avoid unpinned :latest base image tag&quot;)\n    if not any(line.strip().startswith(&quot;USER &quot;) and &quot;root&quot; not in line.lower() for line in lines):\n        findings.append(&quot;Missing non-root USER instruction&quot;)\n    if any(&quot;ENV &quot; in line and (&quot;PASSWORD=&quot; in line.upper() or &quot;SECRET=&quot; in line.upper()) for line in lines):\n        findings.append(&quot;Hardcoded secret in ENV instruction&quot;)\n    return findings\n\n\ndef main() -&gt; None:\n    image_fs = {&quot;/app/collector.py&quot;: &quot;v1.0&quot;}  # read-only template\n    named_volume = {&quot;/var/lib/tsdb&quot;: [&quot;metric_day1&quot;]}  # persistent host-managed storage\n\n    # Container 1 starts from image, writes to ephemeral layer AND named volume\n    c1_layer = copy.deepcopy(image_fs)\n    c1_layer[&quot;/tmp/ephemeral.log&quot;] = &quot;temp&quot;\n    named_volume[&quot;/var/lib/tsdb&quot;].append(&quot;metric_day2&quot;)\n\n    # Container 1 is removed; Container 2 recreated from same image + same volume\n    del c1_layer\n    c2_layer = copy.deepcopy(image_fs)\n    ephemeral_lost = &quot;/tmp/ephemeral.log&quot; not in c2_layer\n    volume_persisted = &quot;metric_day2&quot; in named_volume[&quot;/var/lib/tsdb&quot;]\n    assert ephemeral_lost and volume_persisted\n\n    insecure_df = [&quot;FROM python:latest&quot;, &quot;ENV API_PASSWORD=admin123&quot;, &quot;COPY . /app&quot;]\n    secure_df = [&quot;FROM python:3.11-slim&quot;, &quot;RUN useradd -m appuser&quot;, &quot;USER appuser&quot;, &quot;COPY . /app&quot;]\n    assert len(audit_dockerfile(insecure_df)) == 3\n    assert audit_dockerfile(secure_df) == []\n    assert NETWORK_DRIVERS[&quot;macvlan&quot;][&quot;own_lan_mac&quot;] is True\n\n    print(&quot;=== auto_17 Docker Image/Volume, Networking &amp; Security Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;ephemeral_layer_cleared_on_recreate&quot;: ephemeral_lost,\n        &quot;named_volume_persisted&quot;: volume_persisted,\n        &quot;macvlan_properties&quot;: NETWORK_DRIVERS[&quot;macvlan&quot;],\n        &quot;insecure_dockerfile_findings&quot;: audit_dockerfile(insecure_df),\n        &quot;secure_dockerfile_findings&quot;: audit_dockerfile(secure_df),\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>ephemeral_layer_cleared_on_recreate: True</code>، <code>named_volume_persisted: True</code>، سه هشدار امنیتی روی Dockerfile ناامن و صفر هشدار روی Dockerfile ایمن.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع اجرای شبکه Macvlan و Volume در محیط دارای Docker Engine (اجرا نشده در این مخزن):</strong></p><pre dir=\"ltr\"><code># Reference Docker commands (NOT executed; no Docker daemon in sandbox)\ndocker volume create netops_tsdb\ndocker network create -d macvlan --subnet=192.0.2.0/24 --gateway=192.0.2.1 -o parent=eth0.20 vlan20_macvlan</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس کانتینرها و Docker در سرویس‌های شبکه",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "تفاوت دقیق Image و Container در Docker چیست؟",
+   "options": [
+    "Image نمونه در حال اجرا و Container فایل متنی است",
+    "Image یک قالب لایه‌ای و فقط-خواندنی (Read-Only) است و Container نمونه اجرایی (دارای لایه نوشتنی موقت) از آن Image",
+    "هر دو دقیقاً یکسان‌اند",
+    "Container فقط روی ویندوز کار می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>از یک Image فقط-خواندنی می‌توان هم‌زمان ده‌ها Container مستقل اجرا کرد.</p>"
+  },
+  {
+   "title": "کدام درایور شبکه Docker به کانتینر یک آدرس MAC و IP اختصاصی لایه ۲ روی شبکه/VLAN فیزیکی می‌دهد تا شبیه یک تجهیز فیزیکی مستقل ظاهر شود؟",
+   "options": [
+    "Bridge",
+    "Host",
+    "Macvlan",
+    "None"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>در حالت <code>macvlan</code> کانتینر مستقیماً روی VLAN فیزیکی با MAC و IP مجزا دیده می‌شود و نیازی به NAT ندارد.</p>"
+  },
+  {
+   "title": "چرا برای نگهداری دیتابیس‌های سرویس‌های شبکه (مثل PostgreSQL در NetBox یا InfluxDB) استفاده از Docker Volume ضروری است؟",
+   "options": [
+    "برای افزایش سرعت حذف داده‌ها",
+    "برای جایگزینی شبکه Bridge",
+    "زیرا کانتینر بدون Volume هیچ فایلی نمی‌تواند بنویسد",
+    "برای ذخیره‌سازی پایدار (Persistent) داده‌ها روی میزبان تا با حذف یا ارتقای کانتینر، اطلاعات از بین نروند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>لایه داخلی کانتینر موقت (Ephemeral) است؛ Named Volume پایداری داده‌ها را مستقل از چرخه عمر کانتینر حفظ می‌کند.</p>"
+  },
+  {
+   "title": "تفاوت معماری اصلی میان Container و ماشین مجازی (VM) چیست؟",
+   "options": [
+    "کانتینرها کرنل سیستم‌عامل میزبان را با ایزوله‌سازی Namespaces و cgroups به اشتراک می‌گذارند، اما هر VM سیستم‌عامل و کرنل کامل خود را دارد",
+    "کانتینر همیشه از VM کندتر است",
+    "VM نیازی به CPU ندارد",
+    "کانتینر روی Hypervisor سخت‌افزاری جدا اجرا می‌شود"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>اشتراک کرنل باعث سرعت راه‌اندازی میلی‌ثانیه‌ای و مصرف حافظه بسیار کمتر کانتینر نسبت به VM می‌شود.</p>"
+  },
+  {
+   "title": "کدام ویژگی درباره درایور شبکه Host در Docker صحیح است؟",
+   "options": [
+    "به کانتینر MAC جدید روی VLAN می‌دهد",
+    "ایزوله‌سازی شبکه را حذف می‌کند و کانتینر مستقیماً از کارت شبکه و پورت‌های میزبان بدون سربار NAT استفاده می‌نماید",
+    "فقط روی پورت ۸۰ کار می‌کند",
+    "DNS داخلی Docker Compose را اجباری می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>حالت <code>host</code> برای کالکتورهای پرترافیک که سربار NAT نمی‌خواهند مفید است ولی ریسک تداخل پورت دارد.</p>"
+  },
+  {
+   "title": "چرا نوشتن رمز عبور یا API Key با دستور ENV داخل Dockerfile یک اشتباه امنیتی جدی است؟",
+   "options": [
+    "زیرا Docker متغیر محیطی پشتیبانی نمی‌کند",
+    "زیرا فایل Compose خراب می‌شود",
+    "زیرا مقدار آن در لایه‌های Image و خروجی docker inspect/history باقی می‌ماند و با انتشار Image افشا می‌شود",
+    "زیرا باعث قطع شدن شبکه Bridge می‌شود"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>اسرار باید هنگام اجرا (Runtime) از طریق Secrets/Vault تزریق شوند، نه در زمان ساخت Image.</p>"
+  },
+  {
+   "title": "چرا در سخت‌سازی Dockerfile باید از تگ قفل‌شده (مثلاً python:3.11-slim) به جای :latest و از دستور USER غیر-root استفاده کرد؟",
+   "options": [
+    "برای بزرگ‌تر کردن حجم Image",
+    "برای غیرفعال کردن شبکه",
+    "زیرا :latest روی لینوکس اجرا نمی‌شود",
+    "برای تضمین تکرارپذیری محیط (عدم تغییر ناگهانی پایه) و کاهش شدید ریسک در صورت نفوذ به فرآیند داخل کانتینر"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>قفل نسخه از شکست غیرمنتظره Buildها جلوگیری کرده و اجرای غیر-root اصل حداقل دسترسی را رعایت می‌کند.</p>"
+  },
+  {
+   "title": "نقش Docker Compose در استقرار پشته‌های مانیتورینگ و اتوماسیون (مانند TIG یا NetBox) چیست؟",
+   "options": [
+    "تعریف و هماهنگ‌سازی چند سرویس مرتبط، شبکه‌های Bridge اختصاصی (با DNS نام‌محور)، Volumeها و Healthcheckها در یک فایل YAML واحد",
+    "جایگزینی کرنل لینوکس",
+    "تبدیل کانتینر به فایروال فیزیکی",
+    "حذف نیاز به Dockerfile"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Docker Compose مدیریت چرخه عمر پشته‌های چندکانتینری را به یک فرمان ساده و نسخه‌بندی‌شده تبدیل می‌کند.</p>"
+  },
+  {
+   "title": "چرا اجرای کانتینر با پرچم --privileged یا اتصال /var/run/docker.sock به درون کانتینر خطرناک است؟",
+   "options": [
+    "چون فقط ۵ مگابایت رم اضافه مصرف می‌کند",
+    "چون عملاً ایزوله‌سازی را می‌شکند و به فرآیند داخل کانتینر کنترل کامل root روی سرور میزبان می‌دهد",
+    "چون DNS را خاموش می‌کند",
+    "چون Volume را فقط-خواندنی می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>دسترسی به Docker socket یا حالت <code>--privileged</code> در محیط تولیدی یکی از بدترین ریسک‌های امنیتی کانتینر است.</p>"
+  },
+  {
+   "title": "هنگام استفاده از شبکه Macvlan روی یک سرور متصل به سوئیچ سیسکو، کدام تنظیم روی پورت سوئیچ می‌تواند باعث مسدود شدن ترافیک کانتینرها شود؟",
+   "options": [
+    "فعال بودن GigabitEthernet",
+    "فعال بودن NTP",
+    "تنظیم switchport port-security maximum 1 (محدود کردن پورت به تنها یک آدرس MAC)",
+    "تنظیم description روی پورت"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>چون هر کانتینر Macvlan یک MAC مجزا دارد، Port Security با سقف ۱ آدرس MAC ترافیک کانتینر را Drop یا err-disable می‌کند.</p>"
+  },
+  {
+   "title": "چرا بهتر است دو کانتینر در Docker را به یک User-defined Bridge Network وصل کنیم به جای شبکه پیش‌فرض bridge؟",
+   "options": [
+    "زیرا شبکه پیش‌فرض TCP ندارد",
+    "زیرا User-defined Bridge بدون IP کار می‌کند",
+    "زیرا شبکه پیش‌فرض رمزنگاری ندارد",
+    "زیرا User-defined Bridge دارای DNS داخلی خودکار است و کانتینرها یکدیگر را با نام سرویس (به جای IP متغیر) پیدا می‌کنند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>کشف سرویس با نام (Service Discovery) از طریق DNS داخلی، کلید پایداری ارتباط کانتینرهاست.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای پایداری Volume، درایور Macvlan و ممیزی امنیتی Dockerfile بدون اجرای دیمون واقعی Docker",
+    "اجرای کانتینر واقعی روی Catalyst 9300",
+    "ساخت کلاستر تولیدی Kubernetes",
+    "فقط متن بدون کد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ دیمون Docker واقعی درگیر نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "auto_17",
+  "sources": [
+   "https://docs.docker.com/network/",
+   "https://docs.docker.com/storage/volumes/"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ دیمون واقعی Docker یا تجهیز شبکه در این محیط اجرا نشده است."
+  ],
+  "legacyAuditFixes": [
+   "رفع غلط‌های تایپی نسخه قدیمی («قالب_READ_ONLY»، «پوییدار» -> «پایدار») و توضیح دقیق محدودیت‌های فنی Macvlan (ارتباط میزبان و Port Security).",
+   "گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، سخت‌سازی امنیتی کانتینر و شبیه‌ساز محلی Volume + Dockerfile Linter."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_17-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_17.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_17_lab.py"
+  }
+ }
+}

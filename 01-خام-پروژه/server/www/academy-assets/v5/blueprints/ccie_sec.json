@@ -1,0 +1,339 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccie_sec",
+ "objectiveId": "ccie_sec",
+ "kind": "lesson",
+ "track": "CCIE",
+ "course": "ccie-security",
+ "title": "۸.۲ CCIE Security: معماری دفاع لایه‌دار (v6.1)، هم‌افزایی ISE/FTD/PKI و روش دیباگ لب ۸ساعته",
+ "titleEn": "CCIE Security (350-701 SCOR + 8-Hour Lab v6.1): Defense-in-Depth, ISE/pxGrid, FTD/FMC & Pre-Flight Debugging",
+ "domain": "Network Security Expert",
+ "source": "Legacy ccie_sec rewritten, typo-cleaned, and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 60,
+ "prerequisites": [
+  "spec_sec",
+  "spec_sec_vpn",
+  "spec_sec_ise"
+ ],
+ "sections": [
+  {
+   "id": "ccie_sec-section-1",
+   "title": "مسئله واقعی: چرا یک اختلاف ساعت ساده ۵ دقیقه‌ای می‌تواند کل آزمایشگاه ۸ساعته CCIE Security را قفل کند؟",
+   "html": "<p>در آزمون عملی <strong>CCIE Security (v6.1)</strong> (پس از قبولی در <code>350-701 SCOR</code>)، برخلاف روتینگ کلاسیک، ده‌ها سیستم امنیتی — از <strong>ISE</strong>، <strong>FMC/FTD</strong>، <strong>ASA</strong>، <strong>Active Directory / CA</strong> تا <strong>WSA/ESA</strong> و <strong>VPN</strong> — با رشته‌های باریک رمزنگاری، توکن و گواهینامه به هم گره خورده‌اند! کافی است ساعت NTP یکی از ماشین‌ها ۵ دقیقه عقب باشد یا رکورد PTR در DNS ناقص باشد تا Kerberos، گواهینامه‌های PKI، pxGrid و SAML هم‌زمان با خطاهای مرموز سقوط کنند!</p>"
+  },
+  {
+   "id": "ccie_sec-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر SCOR، VPNها و Cisco ISE در درس‌های <code>spec_sec</code>، <code>spec_sec_vpn</code> و <code>spec_sec_ise</code>.</p><ul><li>کالبدشکافی معماری دفاع لایه‌دار (<strong>Defense in Depth</strong>) و ساختار ۸ساعته لب <strong>CCIE Security v6.1</strong> (۳ ساعت Design + ۵ ساعت DOO).</li><li>اجرای چک‌لیست پیش‌پرواز <strong>NTP + DNS (A/PTR) + PKI (Root/Sub CA)</strong> پیش از لمس سیاست‌های ISE و FTD.</li><li>تسلط بر زنجیره هم‌افزایی <strong>ISE + TrustSec SGT + pxGrid -&gt; FMC/FTD</strong> و دیباگ دقیق خط‌به‌خط با <strong><code>packet-tracer</code></strong>، <strong><code>system support trace</code></strong> و <strong>ISE Live Logs</strong>.</li><li>طراحی لایه‌های مکمل: <strong>VPNهای IKEv2/FlexVPN/Secure Client (SAML/MFA)</strong>، <strong>WSA/ESA</strong>، <strong>Snort IPS / TLS Decryption</strong> و اتوماسیون API امنیتی.</li></ul>"
+  },
+  {
+   "id": "ccie_sec-section-3",
+   "title": "چک‌لیست پیش‌پرواز ۱۰ دقیقه اول لب CCIE Security: NTP، DNS و PKI",
+   "html": "<ol><li><strong>هم‌زمانی دقیق ساعت (NTP):</strong> بررسی <code>show ntp associations</code> و ساعت دقیق روی AD، ISE، FMC، FTD و روترها (اختلاف زیر چند ثانیه برای سلامت Kerberos، SAML Assertions و اعتبار زمانی گواهینامه‌ها).</li><li><strong>DNS رفت و برگشت (Forward A و Reverse PTR):</strong> ISE برای Join شدن به Active Directory و تبادل pxGrid به تطابق دقیق نام دامنه و رکوردهای A/PTR وابسته است.</li><li><strong>زنجیره اعتماد PKI (Root/Intermediate CA):</strong> پیش از راه‌اندازی pxGrid، EAP-TLS یا IKEv2 با گواهینامه، مطمئن شوید گواهینامه Root CA روی همه گره‌ها در بخش Trusted Certificates نصب و کلیدهای SAN (Subject Alternative Name) کامل‌اند!</li></ol>"
+  },
+  {
+   "id": "ccie_sec-section-4",
+   "title": "نمودار اکوسیستم دفاع لایه‌دار CCIE Security v6.1 و جریان دیباگ",
+   "html": "<p>نمودار زیر لایه بنیادین NTP/DNS/PKI و سه ستون کلیدی لب CCIE Security را همراه ابزارهای دیباگ هر ستون نمایش می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCIE Security v6.1 Defense-in-Depth Lab Ecosystem: NTP/PKI Foundation, ISE/pxGrid, FTD/FMC and VPN\"><rect x=\"14\" y=\"14\" width=\"732\" height=\"50\" rx=\"8\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Pre-Flight Foundation: NTP Clock Sync + DNS (A/PTR) + Enterprise PKI (CA / EST / SCEP)</text><text x=\"380\" y=\"54\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Any 5-min Skew or DNS Error Breaks Kerberos AD, pxGrid, SAML &amp; TLS Certs!</text><rect x=\"14\" y=\"82\" width=\"232\" height=\"126\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"130\" y=\"106\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Identity &amp; Zero Trust</text><text x=\"130\" y=\"128\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Cisco ISE (802.1X / MAB / Posture)</text><text x=\"130\" y=\"146\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">TrustSec SGT + TACACS+ CLI</text><text x=\"130\" y=\"164\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">pxGrid Context -&gt; FMC/FTD</text><text x=\"130\" y=\"186\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1e3a8a\">Debug: ISE Live Logs!</text><rect x=\"264\" y=\"82\" width=\"232\" height=\"126\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"106\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Perimeter &amp; Threat Defense</text><text x=\"380\" y=\"128\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Secure Firewall FTD / FMC &amp; ASA</text><text x=\"380\" y=\"146\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Route -&gt; NAT -&gt; ACP/SGT -&gt; Snort IPS</text><text x=\"380\" y=\"164\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">TLS Decryption + Malware/AMP</text><text x=\"380\" y=\"186\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#166534\">Debug: packet-tracer &amp; trace!</text><rect x=\"514\" y=\"82\" width=\"232\" height=\"126\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"630\" y=\"106\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">VPN, Content &amp; Automation</text><text x=\"630\" y=\"128\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">IKEv2 FlexVPN / DMVPN / AnyConnect</text><text x=\"630\" y=\"146\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">WSA / ESA / Umbrella / Duo MFA</text><text x=\"630\" y=\"164\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Stealthwatch (SNA) + FMC/ISE API</text><text x=\"630\" y=\"186\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#312e81\">Defense in Depth (Layered)</text></svg>"
+  },
+  {
+   "id": "ccie_sec-section-5",
+   "title": "دیباگ جراحی فایروال FTD/FMC: کالبدشکافی خطوط packet-tracer و system support trace",
+   "html": "<p>وقتی ترافیکی از فایروال <strong>Cisco Secure Firewall (FTD)</strong> رد نمی‌شود، تغییر تصادفی سیاست در FMC و صبر کردن برای Deploy چنددقیقه‌ای قاتل وقت در روز آزمون است! همیشه ابتدا روی کنسول FTD دو ابزار طلایی را اجرا کنید:</p><ul><li><strong><code>packet-tracer input inside tcp 10.10.20.15 54321 10.20.50.10 443 detailed</code>:</strong> بسته مجازی را از تک‌تک فازهای موتور LINA عبور می‌دهد (<code>ROUTE-LOOKUP -&gt; UN-NAT -&gt; ACCESS-LIST/SGT -&gt; NAT -&gt; SNORT</code>) و دقیقاً نام قانون یا فاز Dropکننده را چاپ می‌کند!</li><li><strong><code>system support firewall-engine-debug</code> و <code>system support trace</code>:</strong> برای دیدن تصمیم دقیق موتور <strong>Snort IPS / AppID / Decryption</strong> روی بسته‌های زنده واقعی (چون <code>packet-tracer</code> تنها فاز LINA را شبیه‌سازی می‌کند و برخی قوانین لایه ۷ Snort را باید با <code>firewall-engine-debug</code> دید!).</li></ul>"
+  },
+  {
+   "id": "ccie_sec-section-6",
+   "title": "تسلط بر ISE، TrustSec SGT و pxGrid بدون اتلاف وقت در Deploy",
+   "html": "<p>در بخش ISE و Zero Trust (بیش از ۲۵٪ لب)، هرگز خطای 802.1X یا MAB را حدس نزنید: بلافاصله پنجره <strong>Operations -&gt; RADIUS -&gt; Live Logs</strong> را باز کنید! Live Logs با آیکون ذره‌بین دقیقاً می‌گوید: کدام <code>Policy Set</code> تطبیق یافت، کدام شرط <code>Authentication</code> یا <code>Authorization</code> شکست خورد و چه کد خطایی (مثلاً <code>22056 Subject not found in identity store</code> یا خطای EAP-TLS cert) رخ داده است. سپس در سمت FMC تأیید کنید نگاشت <strong><code>User/IP -&gt; SGT</code></strong> از طریق pxGrid واقعاً به FTD رسیده است (با <code>show user-identity</code> / <code>show cts role-based sgt-map</code>).</p>"
+  },
+  {
+   "id": "ccie_sec-section-7",
+   "title": "فناوری‌های VPN سازمانی در CCIE Security: IKEv2 FlexVPN، GETVPN و AnyConnect با SAML/MFA",
+   "html": "<p>در آزمون عملی علاوه بر Site-to-Site IPsec روی FTD/ASA، باید بر <strong>IOS-XE IKEv2 FlexVPN</strong> (مبتنی بر <code>Virtual-Template / DVTI</code>)، <strong>DMVPN + IPsec</strong> و <strong>Cisco Secure Client (AnyConnect)</strong> با احراز هویت گواهینامه یا <strong>SAML 2.0 / Duo MFA</strong> و <strong>Split-Tunneling / Dynamic Access Policies (DAP)</strong> مسلط باشید. نکته کلیدی دیباگ IKEv2: <code>debug crypto ikev2 error</code> و تطابق دقیق <code>Proposal / Policy / Keyring / Profile</code>.</p>"
+  },
+  {
+   "id": "ccie_sec-section-8",
+   "title": "امنیت محتوا و ابر: WSA، ESA، TLS Decryption، Malware Defense و SNA (Stealthwatch)",
+   "html": "<p>دفاع لایه‌دار واقعی در لب CCIE Security به فایروال ختم نمی‌شود: (۱) <strong>WSA (Web Security Appliance)</strong> در حالت Explicit یا Transparent (WCCP/PBR) با TLS Decryption و فیلتر URL/Malware؛ (۲) <strong>ESA (Email Security Appliance)</strong> با سیاست‌های Anti-Spam، <strong>SPF/DKIM/DMARC</strong> و DLP برای جلوگیری از خروج فایل‌های محرمانه؛ و (۳) <strong>Cisco Secure Network Analytics (Stealthwatch)</strong> برای کشف ناهنجاری‌های NetFlow و ارسال فرمان قرنطینه ANC به ISE.</p>"
+  },
+  {
+   "id": "ccie_sec-section-9",
+   "title": "اتوماسیون امنیتی در CCIE Security (FMC REST API، ISE ERS/OpenAPI و SOAR)",
+   "html": "<p>در نسخه v6.1، بخشی از امتیازها به خودکارسازی عملیات امنیتی اختصاص دارد: ساخت گروه آبجکت یا قانون دسترسی روی <strong>FMC REST API</strong> (دریافت <code>X-auth-access-token</code> از مسیر <code>/api/fmc_platform/v1/auth/generatetoken</code>)، قرنطینه خودکار MAC آلوده با <strong>ISE ANC API</strong>، و تحلیل خودکار هش فایل با APIهای Threat Intelligence (مانند SecureX / Threat Response).</p>"
+  },
+  {
+   "id": "ccie_sec-section-10",
+   "title": "مدیریت زمان طلایی Deploy در FMC (تله ۵ تا ۸ دقیقه‌ای!)",
+   "html": "<p>یک واقعیت عملیاتی بسیار مهم در روز لب CCIE Security: هر بار زدن دکمه <strong>Deploy</strong> در FMC به سمت FTDها می‌تواند چند دقیقه طول بکشد! پس به جای Deploy کردن بعد از هر تک‌تغییر کوچک، تغییرات مرتبط یک سناریو (مثلاً اشیاء شبکه + NAT + Access Policy + Intrusion Policy) را به‌صورت منظم دسته‌بندی (Batch) کنید، یک بار بازبینی و Deploy بزنید و در حین انتظار Deploy، روی تسک‌های مستقل دیگر (مثل روتر FlexVPN یا اسکریپت API) کار کنید!</p>"
+  },
+  {
+   "id": "ccie_sec-section-11",
+   "title": "کژفهمی‌های رایج درباره آزمون CCIE Security",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای امنیت کامل در لب کافی است فقط یک فایروال FTD قوی در لبه بگذاریم.»</strong> واقعیت: کل فلسفه CCIE Security <strong>دفاع لایه‌دار (Defense in Depth)</strong> است: ترکیب کنترل دسترسی هویت‌محور (ISE/802.1X/SGT)، فایروال/IPS/Decryption (FTD)، امنیت وب/ایمیل (WSA/ESA)، رمزنگاری VPN و تحلیل رفتار (SNA).</li><li><strong>کژفهمی ۲: «اگر packet-tracer خروجی ALLOW داد، پس ترافیک حتماً از موتور Snort IPS هم عبور می‌کند.»</strong> واقعیت: <code>packet-tracer</code> مسیر LINA (Route/NAT/ACL) را می‌سنجد؛ برای دیدن Dropهای لایه ۷ (Snort IPS / AppID / URL / File Policy) باید <code>system support firewall-engine-debug</code> یا Connection Events در FMC را چک کنید!</li><li><strong>کژفهمی ۳: «زمان سیستم فقط برای زیبایی لاگ‌ها مهم است.»</strong> واقعیت: اختلاف ساعت باعث شکست مستقیم Kerberos، ابطال توکن‌های SAML و نامعتبر شدن گواهینامه‌های X.509/pxGrid می‌شود.</li></ul>"
+  },
+  {
+   "id": "ccie_sec-section-12",
+   "title": "اصلاح خطای نسخه قدیمی و چک‌لیست تست نهایی لب CCIE Security",
+   "html": "<p><strong>یادداشت ممیزی:</strong> غلط تایپی «لیب ۸ ساعته» و تکرار پرسش‌های مشابه نسخه قدیمی در این نسخه اصلاح و به ۱۲ پرسش تخصصی منحصربه‌فرد ارتقا یافت.</p><p><strong>چک‌لیست ۳۰ دقیقه پایانی:</strong> (۱) بررسی نبود تغییرات Undeployed در FMC، (۲) تأیید سبز بودن اتصال pxGrid بین ISE و FMC، (۳) تست واقعی یک کلاینت 802.1X، یک تونل VPN و یک ایمیل/صفحه وب فیلترشده، (۴) ذخیره پیکربندی تمام تجهیزات IOS-XE/ASA.</p>"
+  },
+  {
+   "id": "ccie_sec-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> در تست پیش‌پرواز، ساعت <code>FTD-EDGE-01</code> نسبت به NTP برابر <code>+420</code> ثانیه اختلاف دارد و رکورد PTR آن در DNS ثبت نشده است. چه سرویس‌هایی در خطر شکست‌اند؟ <strong>پاسخ:</strong> احراز هویت Kerberos/AD، همگام‌سازی pxGrid، اعتبار گواهینامه‌های PKI (EST/SCEP) و نشست‌های SAML؛ باید پیش از ادامه کار NTP و DNS A/PTR اصلاح شوند.</p><p><strong>تمرین ۲:</strong> کارمندی با <code>SGT=10</code> به سرور وب وصل می‌شود اما بسته حاوی امضای اکسپلویت CVE است؛ در کدام فاز FTD بسته Drop می‌شود؟ <strong>پاسخ:</strong> از فازهای <code>ROUTE-LOOKUP</code>، <code>NAT</code> و <code>ACCESS-POLICY-SGT</code> عبور می‌کند و در فاز چهارم <strong><code>SNORT-IPS</code></strong> به صورت Inline Drop می‌گردد.</p>"
+  },
+  {
+   "id": "ccie_sec-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://learningnetwork.cisco.com/s/ccie-security-exam-topics\" target=\"_blank\" rel=\"noopener\">سرفصل‌های رسمی آزمون عملی CCIE Security v6.1 (Cisco Learning Network)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ دستگاه واقعی Cisco ISE، FMC/FTD، ASA یا سرور AD در این محیط متصل نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "CCIE Security v6.1",
+   "fa": "گواهینامه خبره امنیت شبکه سیسکو",
+   "simple": "بالاترین سطح اجرایی امنیت سیسکو شامل SCOR (350-701) و آزمون عملی ۸ساعته."
+  },
+  {
+   "term": "Defense in Depth",
+   "fa": "دفاع در عمق / لایه‌دار",
+   "simple": "هم‌افزایی چند لایه امنیتی مستقل (هویت، فایروال، IPS، ایمیل/وب، VPN و تحلیل رفتار)."
+  },
+  {
+   "term": "Pre-Flight NTP/DNS/PKI",
+   "fa": "ممیزی پیش‌پرواز زمان، نام و گواهی",
+   "simple": "تأیید هم‌زمانی ساعت، رکورد A/PTR و زنجیره CA پیش از شروع پیکربندی سرویس‌های امنیتی."
+  },
+  {
+   "term": "FTD packet-tracer",
+   "fa": "شبیه‌ساز مسیر بسته در LINA",
+   "simple": "ابزار CLI برای ردیابی گام‌به‌گام Route، NAT و ACL/SGT روی فایروال FTD/ASA."
+  },
+  {
+   "term": "firewall-engine-debug",
+   "fa": "دیباگ موتور لایه ۷ Snort",
+   "simple": "دستور کنسول FTD جهت مشاهده تصمیم دقیق IPS، AppID و Access Control روی بسته‌های زنده."
+  },
+  {
+   "term": "ISE Live Logs",
+   "fa": "لاگ‌های زنده احراز هویت ISE",
+   "simple": "نقطه شروع طلایی دیباگ 802.1X/MAB/Posture با نمایش دقیق Policy Set و کد خطا."
+  },
+  {
+   "term": "TrustSec SGT + pxGrid",
+   "fa": "انتشار برچسب امنیتی به فایروال",
+   "simple": "انتقال نگاشت زنده User/IP/SGT از ISE به FMC/FTD جهت اجرای سیاست بدون وابستگی به IP."
+  },
+  {
+   "term": "Snort Inline IPS",
+   "fa": "موتور جلوگیری از نفوذ Snort",
+   "simple": "تحلیل عمیق بار مفید بسته و Drop آنی امضاهای اکسپلویت و بدافزار روی FTD."
+  },
+  {
+   "term": "TLS Decryption",
+   "fa": "رمزگشایی کنترل‌شده ترافیک HTTPS",
+   "simple": "باز کردن موقت TLS روی FTD/WSA با گواهینامه سازمانی جهت کشف بدافزار در ترافیک رمزنگاری‌شده."
+  },
+  {
+   "term": "FlexVPN (IKEv2 DVTI)",
+   "fa": "معماری VPN مدرن IOS-XE",
+   "simple": "چارچوب یکپارچه IKEv2 سیسکو بر پایه Virtual-Template برای Site-to-Site، Hub-Spoke و Remote Access."
+  },
+  {
+   "term": "WSA / ESA",
+   "fa": "تجهیزات امنیت وب و ایمیل سیسکو",
+   "simple": "پروکسی فیلتر وب (WSA) و دروازه امنیت ایمیل با SPF/DKIM/DMARC و DLP (ESA)."
+  },
+  {
+   "term": "SNA (Stealthwatch)",
+   "fa": "تحلیل رفتاری ترافیک شبکه",
+   "simple": "پایش NetFlow/Telemetry جهت کشف حرکت جانبی و خروج داده و صدور قرنطینه ANC."
+  },
+  {
+   "term": "FMC Batch Deploy",
+   "fa": "استقرار دسته‌ای سیاست در FMC",
+   "simple": "تجمیع تغییرات مرتبط پیش از Deploy به FTD برای صرفه‌جویی حیاتی در زمان ۵ساعته لب."
+  },
+  {
+   "term": "SAML 2.0 + MFA",
+   "fa": "ورود یکپارچه و احراز چندعاملی",
+   "simple": "یکپارچه‌سازی VPN/پورتال‌ها با ارائه‌دهنده هویت (IdP) و عامل دوم مانند Cisco Duo."
+  },
+  {
+   "term": "DAP (Dynamic Access Policy)",
+   "fa": "سیاست دسترسی پویا در VPN",
+   "simple": "اعمال محدودیت دسترسی لحظه‌ای روی کاربر AnyConnect بر اساس وضعیت آنتی‌ویروس و گروه AD."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (ممیزی پیش‌پرواز NTP/DNS و خط لوله FTD packet-tracer با pxGrid SGT و Snort IPS) — تجهیزات واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ دستگاه واقعی Cisco ISE، FMC/FTD یا AD متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ دستگاه واقعی Cisco ISE، FMC/FTD، ASA یا سرور AD در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی دو ابزار طلایی روز لب CCIE Security را مدل‌سازی می‌کند: (۱) ممیزی پیش‌پرواز <strong>NTP Skew &amp; DNS A/PTR</strong> (کشف اختلاف ۴۲۰ ثانیه‌ای کشنده)، و (۲) خط لوله ۴مرحله‌ای <strong>FTD packet-tracer + Snort</strong> برای سه جریان: کاربر سالم <code>SGT 10</code> (ALLOW)، دستگاه قرنطینه <code>SGT 99</code> (DROP در ACP) و کاربر سالم با بار اکسپلویت (DROP در Snort IPS).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccie_sec_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccie_sec_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccie_sec (CCIE Security v6.1: NTP/PKI/pxGrid Pre-Flight Audit &amp; FTD Packet-Tracer Pipeline)\nSimulates (1) Pre-flight NTP clock-skew and DNS/PKI verification across ISE, FMC, FTD, and AD,\nand (2) Multi-phase Cisco Secure Firewall (FTD) packet-tracer evaluation (Route -&gt; NAT -&gt; ACP/SGT -&gt; IPS/Decrypt).\nNo real Cisco ISE, FMC/FTD, ASA, or Active Directory server is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef audit_ntp_dns_preflight(nodes: list[dict], max_skew_sec: int = 30) -&gt; dict:\n    failures = []\n    for n in nodes:\n        if abs(n[&quot;clock_skew_sec&quot;]) &gt; max_skew_sec:\n            failures.append(f&quot;{n[&#x27;name&#x27;]}: skew {n[&#x27;clock_skew_sec&#x27;]}s breaks Kerberos/PKI/pxGrid/SAML&quot;)\n        if not n[&quot;dns_forward_reverse_ok&quot;]:\n            failures.append(f&quot;{n[&#x27;name&#x27;]}: DNS A/PTR mismatch breaks ISE AD join &amp; EST/SCEP certs&quot;)\n    return {&quot;preflight_passed&quot;: len(failures) == 0, &quot;failures&quot;: failures}\n\n\ndef ftd_packet_tracer(flow: dict, sgt_table: dict[str, int]) -&gt; dict:\n    phases = []\n    # Phase 1: Route lookup\n    if not flow.get(&quot;route_exists&quot;, True):\n        return {&quot;flow&quot;: flow, &quot;result&quot;: &quot;DROP&quot;, &quot;drop_phase&quot;: &quot;ROUTE-LOOKUP&quot;}\n    phases.append({&quot;phase&quot;: &quot;ROUTE-LOOKUP&quot;, &quot;action&quot;: &quot;ALLOW&quot;, &quot;egress_zone&quot;: flow[&quot;dst_zone&quot;]})\n\n    # Phase 2: NAT\n    nat_ip = flow.get(&quot;nat_translated_src&quot;, flow[&quot;src_ip&quot;])\n    phases.append({&quot;phase&quot;: &quot;NAT&quot;, &quot;action&quot;: &quot;ALLOW&quot;, &quot;translated_src&quot;: nat_ip})\n\n    # Phase 3: Access Control Policy (ACP) + pxGrid SGT\n    src_sgt = sgt_table.get(flow[&quot;src_ip&quot;], 0)\n    if src_sgt == 99:\n        phases.append({&quot;phase&quot;: &quot;ACCESS-POLICY-SGT&quot;, &quot;action&quot;: &quot;DROP&quot;, &quot;reason&quot;: &quot;SGT 99 (Quarantine via ISE pxGrid ANC)&quot;})\n        return {&quot;flow&quot;: flow, &quot;src_sgt&quot;: src_sgt, &quot;result&quot;: &quot;DROP&quot;, &quot;phases&quot;: phases}\n    phases.append({&quot;phase&quot;: &quot;ACCESS-POLICY-SGT&quot;, &quot;action&quot;: &quot;ALLOW&quot;, &quot;src_sgt&quot;: src_sgt})\n\n    # Phase 4: Snort IPS Inspection\n    if flow.get(&quot;contains_exploit_sig&quot;):\n        phases.append({&quot;phase&quot;: &quot;SNORT-IPS&quot;, &quot;action&quot;: &quot;DROP&quot;, &quot;reason&quot;: &quot;Snort Inline Drop (CVE signature matched)&quot;})\n        return {&quot;flow&quot;: flow, &quot;src_sgt&quot;: src_sgt, &quot;result&quot;: &quot;DROP&quot;, &quot;phases&quot;: phases}\n    phases.append({&quot;phase&quot;: &quot;SNORT-IPS&quot;, &quot;action&quot;: &quot;ALLOW&quot;})\n    return {&quot;flow&quot;: flow, &quot;src_sgt&quot;: src_sgt, &quot;result&quot;: &quot;ALLOW&quot;, &quot;phases&quot;: phases}\n\n\ndef main() -&gt; None:\n    nodes_bad = [\n        {&quot;name&quot;: &quot;ISE-PAN-01&quot;, &quot;clock_skew_sec&quot;: 0, &quot;dns_forward_reverse_ok&quot;: True},\n        {&quot;name&quot;: &quot;FTD-EDGE-01&quot;, &quot;clock_skew_sec&quot;: 420, &quot;dns_forward_reverse_ok&quot;: False},\n    ]\n    nodes_good = [\n        {&quot;name&quot;: &quot;ISE-PAN-01&quot;, &quot;clock_skew_sec&quot;: 1, &quot;dns_forward_reverse_ok&quot;: True},\n        {&quot;name&quot;: &quot;FTD-EDGE-01&quot;, &quot;clock_skew_sec&quot;: -2, &quot;dns_forward_reverse_ok&quot;: True},\n    ]\n    sgt_map = {&quot;10.10.20.15&quot;: 10, &quot;10.10.20.99&quot;: 99}\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_ISE_FMC_OR_FTD_HARDWARE&quot;,\n        &quot;preflight_before_fix&quot;: audit_ntp_dns_preflight(nodes_bad),\n        &quot;preflight_after_fix&quot;: audit_ntp_dns_preflight(nodes_good),\n        &quot;packet_tracer_runs&quot;: {\n            &quot;clean_employee_https&quot;: ftd_packet_tracer(\n                {&quot;src_ip&quot;: &quot;10.10.20.15&quot;, &quot;dst_ip&quot;: &quot;10.20.50.10&quot;, &quot;dst_port&quot;: 443, &quot;dst_zone&quot;: &quot;DC_APP&quot;, &quot;contains_exploit_sig&quot;: False},\n                sgt_map,\n            ),\n            &quot;quarantined_endpoint_sgt99&quot;: ftd_packet_tracer(\n                {&quot;src_ip&quot;: &quot;10.10.20.99&quot;, &quot;dst_ip&quot;: &quot;10.20.50.10&quot;, &quot;dst_port&quot;: 443, &quot;dst_zone&quot;: &quot;DC_APP&quot;, &quot;contains_exploit_sig&quot;: False},\n                sgt_map,\n            ),\n            &quot;employee_with_exploit_payload&quot;: ftd_packet_tracer(\n                {&quot;src_ip&quot;: &quot;10.10.20.15&quot;, &quot;dst_ip&quot;: &quot;10.20.50.10&quot;, &quot;dst_port&quot;: 443, &quot;dst_zone&quot;: &quot;DC_APP&quot;, &quot;contains_exploit_sig&quot;: True},\n                sgt_map,\n            ),\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف ۲ خطای پیش‌پرواز پیش از اصلاح، عبور کامل جریان تمیز، Drop در فاز <code>ACCESS-POLICY-SGT</code> برای <code>SGT 99</code> و Drop در فاز <code>SNORT-IPS</code> برای بسته آلوده.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع دستورات دیباگ روی FTD CLI (اجرا نشده روی فایروال زنده):</strong></p><pre dir=\"ltr\"><code># Reference Cisco FTD troubleshooting CLI (NOT executed on live FTD)\npacket-tracer input inside tcp 10.10.20.15 54321 10.20.50.10 443 detailed\nsystem support firewall-engine-debug\nshow cts role-based sgt-map all</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس CCIE Security v6.1 (دفاع لایه‌دار، ISE/FTD و دیباگ لب)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در آزمایشگاه ۸ساعته CCIE Security v6.1، فلسفه «دفاع لایه‌دار (Defense in Depth)» به چه معناست؟",
+   "options": [
+    "اتکا به یک فایروال ساده در لبه شبکه",
+    "حذف رمزنگاری برای سرعت بیشتر",
+    "هم‌افزایی چند لایه امنیتی مستقل شامل کنترل هویت/Zero Trust (ISE/SGT)، فایروال/IPS/Decryption (FTD)، امنیت محتوا (WSA/ESA)، VPN و تحلیل رفتار (SNA)",
+    "استفاده صرف از ACL لایه ۲"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>در دفاع لایه‌دار، عبور مهاجم از یک لایه توسط لایه‌های بعدی (هویت، IPS، DLP، تحلیل رفتار) کشف و متوقف می‌شود.</p>"
+  },
+  {
+   "title": "چرا بررسی هم‌زمانی ساعت (NTP) و صحت DNS (رکوردهای A و PTR) در ۱۰ دقیقه اول لب CCIE Security حیاتی است؟",
+   "options": [
+    "صرفاً برای زیباتر شدن تاریخ گزارش‌ها",
+    "برای افزایش سرعت لینک اینترنت",
+    "زیرا حتی چند دقیقه اختلاف ساعت یا خطای DNS باعث شکست زنجیره‌ای Kerberos AD، توکن‌های SAML، گواهینامه‌های PKI و ارتباط pxGrid می‌شود",
+    "برای کاهش مصرف برق سرورها"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>بسیاری از خطاهای به ظاهر عجیب ISE و pxGrid در واقع ریشه در اختلاف ساعت NTP یا نقص DNS دارند.</p>"
+  },
+  {
+   "title": "هنگام عیب‌یابی بسته Dropشده روی Cisco Secure Firewall (FTD)، ابزار packet-tracer چه مزیت و چه محدودیتی دارد؟",
+   "options": [
+    "فازهای LINA (Route، NAT، ACL/SGT) را دقیق و فوری نشان می‌دهد، اما برای بررسی جزئیات قوانین لایه ۷ Snort IPS/AppID باید از system support firewall-engine-debug یا Connection Events نیز استفاده کرد",
+    "کل ترافیک Snort را از روی PCAP می‌خواند",
+    "فقط روی سوئیچ لایه ۲ کار می‌کند",
+    "باعث ریست فایروال می‌شود"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>ترکیب <code>packet-tracer</code> (فاز LINA) و <code>system support firewall-engine-debug</code> (فاز Snort) سریع‌ترین روش دیباگ FTD است.</p>"
+  },
+  {
+   "title": "در لب CCIE Security، وقتی احراز هویت 802.1X یک کلاینت شکست می‌خورد، سریع‌ترین نقطه شروع عیب‌یابی کدام است؟",
+   "options": [
+    "پاک کردن کل Policy Set و ساخت مجدد",
+    "بررسی ISE Live Logs (بخش Operations -> RADIUS) جهت مشاهده دقیق Policy Set تطبیق‌یافته و کد علت رد شدن",
+    "خاموش کردن فایروال FTD",
+    "تغییر آدرس IP سوئیچ"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>جزئیات ذره‌بین ISE Live Logs دقیقاً مرحله خطا (هویت، گواهینامه، AD یا Authorization) را مشخص می‌کند.</p>"
+  },
+  {
+   "title": "اگر یک کارمند سالم (SGT 10) به سرور وب مجاز متصل شود اما بسته او حاوی امضای اکسپلویت CVE باشد، در کدام مرحله FTD بسته مسدود می‌شود؟",
+   "options": [
+    "فاز ROUTE-LOOKUP",
+    "فاز NAT",
+    "فاز SNORT-IPS (پس از عبور از Route، NAT و Access Policy)",
+    "فاز DHCP"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>حتی کاربران احرازهویت‌شده و مجاز در سطح L4 نیز توسط موتور بازرسی عمیق Snort IPS پالایش می‌شوند.</p>"
+  },
+  {
+   "title": "چرا مدیریت دسته‌ای تغییرات پیش از زدن دکمه Deploy در Cisco FMC در روز آزمون اهمیت بالایی دارد؟",
+   "options": [
+    "زیرا FMC تنها یک بار در روز اجازه Deploy می‌دهد",
+    "زیرا هر Deploy به سمت FTDها چند دقیقه طول می‌کشد و تجمیع منطقی تغییرات (Batch Deploy) از هدر رفتن ۳۰ تا ۴۵ دقیقه زمان آزمون جلوگیری می‌کند",
+    "زیرا Deploy باعث حذف لاگ‌های ISE می‌شود",
+    "زیرا بدون Batch فایروال خاموش می‌شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در ۵ ساعت بخش DOO، انجام هم‌زمان تسک‌های غیرمرتبط حین انتظار Deploy یک مهارت کلیدی مدیریت زمان است.</p>"
+  },
+  {
+   "title": "برای بازرسی ترافیک HTTPS و کشف بدافزارهای پنهان‌شده درون کانال رمزنگاری‌شده روی FTD یا WSA چه قابلیتی لازم است؟",
+   "options": [
+    "خاموش کردن پورت ۴۴۳ برای کل شرکت",
+    "تبدیل HTTPS به Telnet",
+    "TLS Decryption (Decrypt - Resign با نصب گواهینامه سازمانی معتبر روی کلاینت‌ها)",
+    "حذف DNS"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>بدون TLS Decryption، موتور IPS و Anti-Malware قادر به دیدن محتوای رمزنگاری‌شده درون بسیاری از نشست‌های وب نیستند.</p>"
+  },
+  {
+   "title": "چگونه فایروال FTD می‌تواند بدون وابستگی به تغییر مداوم آدرس IP کاربران، ترافیک یک لپ‌تاپ قرنطینه‌شده توسط ISE (SGT 99) را فوری مسدود کند؟",
+   "options": [
+    "از طریق دریافت زنده نگاشت User/IP -> SGT از Cisco ISE روی گذرگاه pxGrid و اعمال قانون Access Control مبتنی بر SGT",
+    "با نوشتن دستی هر آدرس IP در فایل متنی",
+    "با خاموش کردن پورت مدیریت FMC",
+    "با تغییر مسیر BGP اینترنت"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>هم‌افزایی ISE + pxGrid + FTD پایه اجرای سیاست‌های هویت‌محور و قرنطینه آنی در شبکه سازمانی است.</p>"
+  },
+  {
+   "title": "در Cisco ESA (Email Security Appliance)، کدام سه استاندارد احراز هویت ایمیل برای مقابله با جعل دامنه فرستنده (Email Spoofing / Phishing) به کار می‌روند؟",
+   "options": [
+    "OSPF، BGP و EIGRP",
+    "SPF، DKIM و DMARC",
+    "STP، VTP و LACP",
+    "FTP، TFTP و Telnet"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>SPF، DKIM و DMARC زنجیره استاندارد تایید اصالت دامنه فرستنده ایمیل در دروازه‌های امنیتی هستند.</p>"
+  },
+  {
+   "title": "به‌منظور خودکارسازی تغییرات روی Cisco FMC از طریق REST API، نخستین گام احراز هویت چیست؟",
+   "options": [
+    "اتصال با Telnet روی پورت ۲۳",
+    "ارسال درخواست POST به مسیر /api/fmc_platform/v1/auth/generatetoken برای دریافت توکن X-auth-access-token و DOMAIN_UUID",
+    "ویرایش مستقیم دیتابیس فایل‌های لینوکس",
+    "ارسال پیام SNMPv1"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>توکن احراز هویت FMC و شناسه Domain UUID در هدر تمام درخواست‌های بعدی REST API ارسال می‌شوند.</p>"
+  },
+  {
+   "title": "نقش Cisco FlexVPN در معماری VPN مدرن IOS-XE چیست؟",
+   "options": [
+    "جایگزینی سوئیچ‌های لایه ۲",
+    "فریم‌ورک یکپارچه مبتنی بر IKEv2 و Virtual-Template (DVTI) که Site-to-Site، Hub-and-Spoke و Remote Access را با یک معماری مدرن و تمیز پیاده‌سازی می‌کند",
+    "خاموش کردن رمزنگاری AES",
+    "فقط اجرای پروتکل PPTP"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>FlexVPN جایگزین مدرن و IKEv2محور روش‌های پراکنده قدیمی Crypto Map و EzVPN در IOS-XE است.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "حمله واقعی به فایروال تولیدی سازمان",
+    "اتصال زنده به FMC/FTD و ISE واقعی",
+    "فقط متن نظری بدون کد",
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای ممیزی پیش‌پرواز NTP/DNS و خط لوله FTD packet-tracer با SGT و Snort IPS"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ دستگاه ISE یا FTD واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccie_sec",
+  "sources": [
+   "https://learningnetwork.cisco.com/s/ccie-security-exam-topics"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ دستگاه واقعی Cisco ISE، FMC/FTD، ASA یا AD متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "اصلاح غلط تایپی «لیب ۸ ساعته» و حذف پرسش تکراری Defense in Depth در نسخه قدیمی؛ بازنویسی جامع به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG، تفکیک packet-tracer/firewall-engine-debug، FMC Batch Deploy و شبیه‌ساز Pre-Flight + FTD Pipeline."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccie_sec-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccie",
+   "recommendedCourse": "ccie-security",
+   "blueprint": "/academy-assets/v5/blueprints/ccie_sec.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccie_sec_lab.py"
+  }
+ }
+}

@@ -1,0 +1,339 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccde_09",
+ "objectiveId": "ccde_09",
+ "kind": "lesson",
+ "track": "CCDE",
+ "course": "ccde-design",
+ "title": "۹.۹ CCDE — معماری تاب‌آوری (Resiliency): ۵ لایه آسیب‌پذیری، شعاع انفجار و موازنه همگرایی سریع در برابر پایداری",
+ "titleEn": "CCDE Topic 9: Resiliency Architecture — 5 Vulnerability Layers, Blast Radius & Convergence vs Dampening",
+ "domain": "Resiliency & Stability Architecture",
+ "source": "Legacy ccde_09 rewritten and expanded",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 50,
+ "prerequisites": [
+  "ccde_01",
+  "ccde_02"
+ ],
+ "sections": [
+  {
+   "id": "ccde_09-section-1",
+   "title": "مسئله واقعی: چرا شبکه‌ای که روی کاغذ دو روتر و دو لینک دارد، همچنان به خاطر یک ماژول نوری خراب یا یک اشتباه تایپی کاملاً می‌خوابد؟",
+   "html": "<p><strong>تاب‌آوری (Resiliency)</strong> فقط خرید سخت‌افزار دوم نیست؛ بلکه توانایی کل سامانه برای <em>جذب ضربه، مهار شعاع خرابی و حفظ سرویس پایدار در برابر ۵ لایه متفاوت خطا</em> است! یک ماژول SFP نیم‌سوز که در دقیقه ۲۰ بار Up/Down می‌شود، روی شبکه‌ای با همگرایی بیش‌ازحد حساس و بدون <strong>IP Event Dampening</strong> می‌تواند طوفان بی‌پایان SPF و BGP بسازد و کل سازمان را مختل کند؛ و آمارهای جهانی نشان می‌دهد بزرگ‌ترین عامل قطعی‌های بزرگ نه سوختن روتر، بلکه <strong>خطای انسانی پیکربندی</strong> است!</p>"
+  },
+  {
+   "id": "ccde_09-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code> و <code>ccde_02</code>.</p><ul><li>ممیزی ۵ لایه آسیب‌پذیری تاب‌آوری CCDE: <strong>فیزیکی/لایه ۱</strong>، <strong>لایه ۲/۳ داده</strong>، <strong>صفحه کنترل (Control Plane)</strong>، <strong>مدیریت/کنترلر</strong> و <strong>عامل انسانی/عملیاتی</strong>.</li><li>تحلیل موازنه حساس <strong>همگرایی سریع (Fast Convergence: BFD/TI-LFA)</strong> در برابر <strong>پایداری (Stability: IP Event Dampening / Exponential Backoff)</strong>.</li><li>طراحی <strong>مدیریت خارج از باند (Out-of-Band Management)</strong> و <strong>بقای بدون کنترلر (Headless Survival)</strong> برای SDN/SD-WAN/SD-Access.</li><li>مهار <strong>تک‌نقطه‌های خرابی نرم‌افزاری (Bug Shared Fate)</strong> و کاهش خطای انسانی از طریق اتوماسیون و استقرار تدریجی (Canary).</li></ul>"
+  },
+  {
+   "id": "ccde_09-section-3",
+   "title": "پنج لایه آسیب‌پذیری در معماری تاب‌آوری (Resiliency 5-Layer Model)",
+   "html": "<ol><li><strong>لایه ۱ — فیزیکی (Physical/Power/Cooling):</strong> عبور دو فیبر از یک داکت مشترک، تغذیه هر دو منبع برق از یک UPS واحد یا نبود مسیر فیزیکی متنوع (Path Diversity).</li><li><strong>لایه ۲/۳ — صفحه داده (Data Plane):</strong> دامنه‌های تخت STP، نبود ECMP یا نبود Fast Reroute (LFA/TI-LFA).</li><li><strong>لایه ۳ — صفحه کنترل (Control Plane):</strong> نبود CoPP، نبود <code>BGP maximum-prefix</code>، نبود خلاصه‌سازی مسیر و طوفان Flapping بدون Dampening.</li><li><strong>لایه ۴ — صفحه مدیریت و کنترلر (Management/SDN):</strong> مدیریت صرفاً In-Band (وقتی شبکه قطع شود نمی‌توانید به روتر وصل شوید!) یا تک‌کنترلر بدون HA.</li><li><strong>لایه ۵ — عامل انسانی و فرآیند (Human Ops — رتبه ۱ قطعی‌های بزرگ!):</strong> اعمال دستی هم‌زمان یک اشتباه روی کل شبکه بدون تست آزمایشگاهی، Peer Review یا Canary Rollout.</li></ol>"
+  },
+  {
+   "id": "ccde_09-section-4",
+   "title": "نمودار ۵ لایه تاب‌آوری CCDE و پارادوکس همگرایی سریع در برابر Dampening",
+   "html": "<p>نمودار زیر ۵ لایه آسیب‌پذیری شبکه و توازن میان همگرایی سریع BFD/FRR و پایداری Dampening را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Resiliency Architecture: 5 Vulnerability Layers and Fast Convergence vs Flap Dampening Stability\"><rect x=\"14\" y=\"14\" width=\"136\" height=\"114\" rx=\"8\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"82\" y=\"38\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1e3a8a\">1. Physical (L1)</text><text x=\"82\" y=\"60\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#0f172a\">Diverse Fiber Ducts</text><text x=\"82\" y=\"78\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#1e40af\">Dual Power A+B</text><text x=\"82\" y=\"96\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#15803d\">No Shared Fate!</text><rect x=\"163\" y=\"14\" width=\"136\" height=\"114\" rx=\"8\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"231\" y=\"38\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">2. L2 / L3 Data</text><text x=\"231\" y=\"60\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#14532d\">Zero Flat STP</text><text x=\"231\" y=\"78\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#166534\">ECMP + BFD/FRR</text><text x=\"231\" y=\"96\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#14532d\">Small Failure Dom</text><rect x=\"312\" y=\"14\" width=\"136\" height=\"114\" rx=\"8\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"38\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#92400e\">3. Control Plane</text><text x=\"380\" y=\"60\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#78350f\">CoPP + Max-Prefix</text><text x=\"380\" y=\"78\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#b45309\">Summarization</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#78350f\">Event Dampening!</text><rect x=\"461\" y=\"14\" width=\"136\" height=\"114\" rx=\"8\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"529\" y=\"38\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#312e81\">4. Mgmt / Ctrl</text><text x=\"529\" y=\"60\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#3730a3\">Out-of-Band (OOB)</text><text x=\"529\" y=\"78\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#3730a3\">HA Controllers</text><text x=\"529\" y=\"96\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#312e81\">Headless Survive</text><rect x=\"610\" y=\"14\" width=\"136\" height=\"114\" rx=\"8\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"678\" y=\"38\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#991b1b\">5. Human Ops</text><text x=\"678\" y=\"60\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#7f1d1d\">#1 Outage Cause!</text><text x=\"678\" y=\"78\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#991b1b\">CI/CD + Canary</text><text x=\"678\" y=\"96\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#7f1d1d\">Auto-Rollback MoP</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f172a\">CCDE Resiliency Paradox: Fast Convergence (&lt;50ms BFD/TI-LFA) MUST Be Paired with Stability (IP Event Dampening)!</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Chasing a Bad Flapping SFP Optic at 50ms Triggers Endless SPF Storms Across the Entire Core!</text></svg>"
+  },
+  {
+   "id": "ccde_09-section-5",
+   "title": "پارادوکس CCDE: همگرایی فوق‌سریع (Fast Convergence) در برابر پایداری (Stability &amp; Dampening)",
+   "html": "<p>همه مدیران همگرایی زیر ۵۰ میلی‌ثانیه (BFD + TI-LFA/FRR) می‌خواهند؛ اما اگر یک لینک فیبر آسیب‌دیده یا SFP خراب هر ۲ ثانیه یک‌بار قطع و وصل (Flap) شود چه؟ اگر شبکه بدون ترمز بلافاصله به هر نوسان واکنش نشان دهد، روترها دائماً SPF و BGP را بازمحاسبه کرده و بسته‌ها در حلقه گذرا (Micro-Loop) گم می‌شوند! <strong>راه‌حل مهندسی CCDE:</strong> (۱) روی اولین خرابی تمیز، <strong>همگرایی فوری زیرثانیه (BFD/FRR)</strong>؛ (۲) روی لینک دچار نوسان مکرر، <strong>IP Event Dampening</strong> (جریمه و سرکوب موقت اینترفیس تا پایدار شدن کامل) همراه با <strong>SPF/LSA Exponential Backoff</strong> تا پایداری هسته حفظ شود!</p>"
+  },
+  {
+   "id": "ccde_09-section-6",
+   "title": "تاب‌آوری صفحه کنترل (Control Plane Protection): CoPP، BGP Max-Prefix و Graceful Restart",
+   "html": "<p>اگر یک شریک تجاری به اشتباه ۱ میلیون مسیر BGP را به روتر لبه شما تزریق کند، حافظه روتر پر شده و ریست می‌شود! سه محافظ الزامی در معماری تاب‌آور: (۱) <strong>CoPP (Control Plane Policing)</strong> برای محدودسازی نرخ ترافیک عازم CPU روتر، (۲) <strong><code>BGP maximum-prefix</code></strong> روی تمام نشست‌های خارجی و داخلی برای پیشگیری از سرریز حافظه، و (۳) <strong>Prefix-Suppression / Summarization</strong> برای کوچک نگه داشتن پایگاه داده IGP.</p>"
+  },
+  {
+   "id": "ccde_09-section-7",
+   "title": "بقای بدون کنترلر (Headless Survival) و مدیریت خارج از باند (OOB)",
+   "html": "<p>در معماری‌های مدرن کنترلرمحور (SD-WAN vManage، Catalyst Center، APIC)، یک پرسش طلایی CCDE این است: <strong>«اگر تمام کنترلرها همین الان خاموش شوند چه بلایی سر ترافیک کاربران می‌آید؟»</strong> پاسخ صحیح: صفحه داده (Data Plane) باید کاملاً زنده و پایدار به کار خود ادامه دهد (<strong>Headless Survival</strong>) و تنها اعمال تغییرات جدید تا بازگشت کلاستر HA کنترلرها به تعویق بیفتد! همچنین شبکه <strong>Out-of-Band (OOB)</strong> با کنسول سریال و مودم LTE مستقل تضمین می‌کند مهندسان در شدیدترین قطعی نیز به تجهیزات دسترسی داشته باشند.</p>"
+  },
+  {
+   "id": "ccde_09-section-8",
+   "title": "تنوع نرم‌افزاری و سخت‌افزاری (Bug Shared Fate) در برابر سادگی عملیاتی",
+   "html": "<p>اگر دو روتر Core هر دو دقیقاً یک نسخه نرم‌افزار جدید داشته باشند، یک باگ مشترک (Software Shared Fate — مثلاً یک بسته BGP خاص) می‌تواند <strong>هر دو روتر را هم‌زمان Crash کند</strong>! معمار CCDE این ریسک را با دو راهکار مهار می‌کند: (۱) ارتقای مرحله‌ای (N-1 / Canary: یک روتر همیشه روی نسخه پایدار قبلی می‌ماند تا نسخه جدید چند هفته در تولید امتحان پس دهد)، و (۲) در زیرساخت‌های فوق‌حساس (اپراتورهای Tier-1)، گاهی تنوع دو فروشنده/دو سیستم‌عامل در لایه‌های کلیدی — البته با سنجش دقیق هزینه پیچیدگی عملیاتی!</p>"
+  },
+  {
+   "id": "ccde_09-section-9",
+   "title": "مهار عامل شماره ۱ قطعی‌ها: تاب‌آوری عملیاتی (Operational Resiliency &amp; Chaos Testing)",
+   "html": "<p>بهترین معماری سخت‌افزاری با یک <code>no router bgp</code> یا پوشاندن اشتباهی یک سیاست روی ۱۰۰ روتر از کار می‌افتد! تاب‌آوری مدرن یعنی: (۱) تغییر از طریق <strong>GitOps + CI/CD با تست خودکار (pyATS/Batfish)</strong>، (۲) اعمال تدریجی <strong>Canary Deployment</strong> (ابتدا ۱ سایت، سپس ۵ سایت، سپس کل ناوگان) + <code>commit confirmed</code> (بازگشت خودکار)، و (۳) اجرای برنامه‌ریزی‌شده <strong>تست‌های خرابی کنترل‌شده (Failover / Chaos Drills)</strong> — زیرا افزونگی‌ای که هرگز تست نشده باشد، در روز بحران اغلب کار نمی‌کند!</p>"
+  },
+  {
+   "id": "ccde_09-section-10",
+   "title": "مقایسه تاب‌آوری در برابر شکست «خاموش» (Silent Failure / Gray Failure)",
+   "html": "<p>خطرناک‌ترین نوع خرابی، قطع کامل لینک نیست؛ بلکه <strong>خرابی خاکستری (Gray / Silent Failure)</strong> است: لینک Up است و BFD شاید هنوز قطع نشده، اما یک خط کارت معیوب ۳۰٪ بسته‌های داده را در سکوت می‌اندازد! راه‌حل CCDE: پایش پیوسته سرتاسری با کاوشگرهای فعال (<strong>Synthetic Probes / TWAMP / IPSLA / SD-WAN AAR</strong>) و Telemetry شمارنده‌های خطای سخت‌افزاری (CRC/Drop) جهت خارج کردن خودکار مسیر معیوب.</p>"
+  },
+  {
+   "id": "ccde_09-section-11",
+   "title": "کژفهمی‌های رایج درباره Resiliency Architecture",
+   "html": "<ul><li><strong>کژفهمی ۱: «همیشه باید تایمرهای IGP و BGP را تا حد صفر سفت کنیم تا سریع‌ترین همگرایی را داشته باشیم.»</strong> واقعیت: سفت کردن افراطی تایمرها بدون BFD و بدون Dampening باعث False Positive هنگام بار بالای CPU و طوفان Flapping در کل شبکه می‌شود!</li><li><strong>کژفهمی ۲: «داشتن دو روتر مشابه در یک رک تمام نیازهای تاب‌آوری را پوشش می‌دهد.»</strong> واقعیت: اگر برق، فیبر، نسخه باگ‌دار سیستم‌عامل یا خطای انسانی هر دو را هم‌زمان بزند، هیچ تاب‌آوری واقعی وجود ندارد.</li><li><strong>کژفهمی ۳: «وقتی Failover را در روز راه‌اندازی پیکربندی کردیم، دیگر تا ۵ سال نیازی به تست ندارد.»</strong> واقعیت: تغییرات بعدی ACL، مسیرها و فایروال به‌تدریج باعث از کار افتادن مسیر پشتیبان می‌شوند؛ تست دوره‌ای Failover الزامی است.</li></ul>"
+  },
+  {
+   "id": "ccde_09-section-12",
+   "title": "چک‌لیست پنج‌پرسشی ممیزی تاب‌آوری CCDE",
+   "html": "<ol><li>آیا تنوع فیزیکی لایه ۱ (داکت فیبر و برق A/B مجزا) بررسی شده است؟</li><li>آیا BFD/FRR همراه با <strong>IP Event Dampening</strong> و Backoff تنظیم شده است؟</li><li>آیا صفحه کنترل با CoPP، Max-Prefix و Summarization محافظت شده است؟</li><li>آیا دسترسی <strong>Out-of-Band (OOB)</strong> و بقای بدون کنترلر (Headless) تایید شده‌اند؟</li><li>آیا فرآیند تغییرات شامل CI/CD، Canary Rollout و تست دوره‌ای Failover است؟</li></ol>"
+  },
+  {
+   "id": "ccde_09-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> یک ماژول SFP روی لینک هسته در عرض ۶۰ ثانیه ۱۲ بار قطع و وصل (Flap) شده است. سیستم باید هر بار دوباره همگرایی سریع کند یا لینک را سرکوب (Dampen) نماید؟ <strong>پاسخ:</strong> باید با <strong>IP Event Dampening</strong> اینترفیس خراب را موقتاً <strong>Suppress</strong> کند تا هسته آرام بماند؛ روی یک قطع تمیز منفرد همگرایی زیرثانیه عالی است اما دنبال کردن یک SFP خراب کل شبکه را بی‌ثبات می‌کند!</p><p><strong>تمرین ۲:</strong> چرا در یک شبکه SDN، «بقای صفحه داده در زمان خاموشی کامل کنترلر» یک الزام معماری است؟ <strong>پاسخ:</strong> تا کنترلر (صفحه مدیریت/کنترل) به یک Single Point of Failure برای ترافیک جاری کاربران تبدیل نشود.</p>"
+  },
+  {
+   "id": "ccde_09-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc5880\" target=\"_blank\" rel=\"noopener\">RFC 5880 (Bidirectional Forwarding Detection — BFD)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8405\" target=\"_blank\" rel=\"noopener\">RFC 8405 (Shortest Path First Back-Off Delay Algorithm for Link-State IGPs)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای ممیزی ۵ لایه تاب‌آوری و شبیه‌سازی Flap Dampening است و به هیچ تجهیز زنده متصل نیست.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Resiliency (5 Layers)",
+   "fa": "تاب‌آوری پنج‌لایه شبکه",
+   "simple": "توانایی حفظ سرویس در برابر خطاهای فیزیکی، داده، کنترل‌پلین، مدیریت/کنترلر و عامل انسانی."
+  },
+  {
+   "term": "IP Event Dampening",
+   "fa": "میراسازی نوسان لینک",
+   "simple": "جریمه و سرکوب موقت اینترفیس‌های دچار Flapping مکرر برای حفظ پایداری IGP/BGP در کل شبکه."
+  },
+  {
+   "term": "SPF Exponential Backoff",
+   "fa": "تاخیر نمایی بازمحاسبه SPF",
+   "simple": "واکنش فوری روی اولین رویداد اما افزایش نمایی فاصله محاسبات بعدی هنگام طوفان نوسانات (RFC 8405)."
+  },
+  {
+   "term": "Gray / Silent Failure",
+   "fa": "خرابی خاکستری یا خاموش",
+   "simple": "اختلال جزئی (مثل ۳۰٪ افت بسته روی لینک Up) که پروتکل‌های عادی آن را نمی‌بینند و نیاز به Probe دارد."
+  },
+  {
+   "term": "Headless Survival",
+   "fa": "بقای بدون کنترلر در SDN",
+   "simple": "ادامه کامل عبور ترافیک کاربران روی صفحه داده حتی در صورت خاموشی موقت کل کلاستر کنترلر."
+  },
+  {
+   "term": "Out-of-Band (OOB) Management",
+   "fa": "شبکه مدیریت خارج از باند",
+   "simple": "مسیر دسترسی مستقل (کنسول سریال + LTE/شبکه مجزا) برای بازیابی تجهیزات هنگام قطعی شبکه اصلی."
+  },
+  {
+   "term": "Software Bug Shared Fate",
+   "fa": "سرنوشت مشترک باگ نرم‌افزاری",
+   "simple": "خطر Crash هم‌زمان تجهیزات افزونه دارای نسخه سیستم‌عامل یکسان؛ قابل مهار با ارتقای Canary / N-1."
+  },
+  {
+   "term": "CoPP (Control Plane Policing)",
+   "fa": "محدودسازی نرخ ترافیک CPU روتر",
+   "simple": "حفاظت از پردازنده صفحه کنترل روتر در برابر طوفان بسته‌ها و حملات DoS."
+  },
+  {
+   "term": "BGP Maximum-Prefix",
+   "fa": "سقف حداکثر پیشوند BGP",
+   "simple": "محافظ صفحه کنترل جهت پیشگیری از سرریز حافظه روتر هنگام نشت تصادفی صدها هزار مسیر."
+  },
+  {
+   "term": "Canary Rollout",
+   "fa": "استقرار مرحله‌ای آزمایشی",
+   "simple": "اعمال تغییر ابتدا روی یک گره کوچک و بررسی سلامت آن پیش از تعمیم به کل ناوگان."
+  },
+  {
+   "term": "Failover / Chaos Drills",
+   "fa": "مانور دوره‌ای آزمون خرابی",
+   "simple": "قطع کنترل‌شده مسیر اصلی در پنجره نگهداری برای اطمینان از کارکرد واقعی مسیر پشتیبان."
+  },
+  {
+   "term": "Micro-Loop Avoidance",
+   "fa": "پیشگیری از حلقه‌های گذرا",
+   "simple": "جلوگیری از حلقه‌های چندمیلی‌ثانیه‌ای هنگام همگرایی ناهم‌زمان روترهای همسایه پس از تغییر توپولوژی."
+  },
+  {
+   "term": "Synthetic Probing (TWAMP/IPSLA)",
+   "fa": "کاوشگر فعال سنجش کیفیت مسیر",
+   "simple": "ارسال بسته‌های سنجش مستمر برای کشف افت کیفیت (Brownout/Gray Failure) پیش از شکایت کاربر."
+  },
+  {
+   "term": "Path Diversity (L1)",
+   "fa": "تنوع واقعی مسیر فیزیکی",
+   "simple": "عبور کابل‌های اصلی و پشتیبان از دو مسیر حفاری، دو ورودی ساختمان و دو مدار برق کاملاً مجزا."
+  },
+  {
+   "term": "Commit Confirmed",
+   "fa": "اعمال تغییر با بازگشت خودکار",
+   "simple": "مکانیزم ایمنی برگشت خودکار پیکربندی در صورت قطع دسترسی مهندس پس از تغییر."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (ممیز ۵ لایه تاب‌آوری CCDE و شبیه‌ساز موازنه Fast Convergence در برابر Flap Dampening) — بدون تجهیزات زنده",
+   "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر تولیدی یا فیبر فیزیکی متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر تولیدی یا فیبر فیزیکی در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو ممیزی اصلی Resiliency در CCDE را اجرا می‌کند: (۱) بررسی هم‌زمان هر ۵ لایه آسیب‌پذیری روی طرح قدیمی تک‌داکت در برابر طرح سخت‌سازی‌شده CCDE، و (۲) تصمیم‌گیری میان <code>FAST_CONVERGE_SUBSECOND_BFD_FRR</code> (روی ۱ قطع تمیز) و <code>DAMPEN_SUPPRESS_INTERFACE</code> (روی SFP خراب با ۱۲ Flap در دقیقه).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_09_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_09_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_09 (CCDE Resiliency Architecture: 5-Layer Risk Audit &amp; Fast Convergence vs Dampening)\nAudits a network design across all 5 CCDE resiliency layers (Physical/L1, L2/L3, Control Plane,\nManagement/Controller, Human Ops) and simulates IP Event Dampening vs Fast Convergence under link flapping.\nNo real production routers or physical fiber plants are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef audit_five_resiliency_layers(design: dict) -&gt; dict:\n    findings = []\n    if not design[&quot;diverse_fiber_ducts&quot;]:\n        findings.append(&quot;L1_PHYSICAL_SHARED_FATE: Dual circuits share same conduit/entry duct.&quot;)\n    if not design[&quot;loop_free_l3_ecmp&quot;]:\n        findings.append(&quot;L2_L3_RISK: Flat STP domain creates wide broadcast/loop blast radius.&quot;)\n    if not design[&quot;graceful_control_plane_limits&quot;]:\n        findings.append(&quot;CONTROL_PLANE_RISK: Missing BGP max-prefix, CoPP, or route summarization.&quot;)\n    if not design[&quot;out_of_band_mgmt_and_ha_controller&quot;]:\n        findings.append(&quot;MGMT_RISK: In-band-only management or single controller SPOF.&quot;)\n    if not design[&quot;automated_validated_changes&quot;]:\n        findings.append(&quot;HUMAN_OPS_RISK: Unreviewed manual CLI changes are top cause of outages.&quot;)\n    return {&quot;design_name&quot;: design[&quot;name&quot;], &quot;layers_passing&quot;: 5 - len(findings), &quot;risks&quot;: findings}\n\n\ndef simulate_flap_dampening(flaps_in_60s: int, suppress_threshold: int = 4) -&gt; dict:\n    if flaps_in_60s &gt;= suppress_threshold:\n        return {\n            &quot;flaps_in_60s&quot;: flaps_in_60s,\n            &quot;action&quot;: &quot;DAMPEN_SUPPRESS_INTERFACE&quot;,\n            &quot;reason&quot;: &quot;Prevents endless SPF/BGP churn across core; stability beats chasing a broken flapping optic!&quot;,\n        }\n    return {\n        &quot;flaps_in_60s&quot;: flaps_in_60s,\n        &quot;action&quot;: &quot;FAST_CONVERGE_SUBSECOND_BFD_FRR&quot;,\n        &quot;reason&quot;: &quot;Clean single fault -&gt; trigger sub-second BFD + LFA/TI-LFA recovery immediately.&quot;,\n    }\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_RESILIENCY_MODELER&quot;,\n        &quot;five_layer_audits&quot;: [\n            audit_five_resiliency_layers({\n                &quot;name&quot;: &quot;Legacy_Single_Duct_Campus&quot;,\n                &quot;diverse_fiber_ducts&quot;: False,\n                &quot;loop_free_l3_ecmp&quot;: False,\n                &quot;graceful_control_plane_limits&quot;: False,\n                &quot;out_of_band_mgmt_and_ha_controller&quot;: True,\n                &quot;automated_validated_changes&quot;: False,\n            }),\n            audit_five_resiliency_layers({\n                &quot;name&quot;: &quot;CCDE_Hardened_Architecture&quot;,\n                &quot;diverse_fiber_ducts&quot;: True,\n                &quot;loop_free_l3_ecmp&quot;: True,\n                &quot;graceful_control_plane_limits&quot;: True,\n                &quot;out_of_band_mgmt_and_ha_controller&quot;: True,\n                &quot;automated_validated_changes&quot;: True,\n            }),\n        ],\n        &quot;convergence_vs_stability&quot;: {\n            &quot;single_clean_fiber_cut&quot;: simulate_flap_dampening(1),\n            &quot;failing_sfp_flapping_12x&quot;: simulate_flap_dampening(12),\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف ۴ ریسک در <code>Legacy_Single_Duct_Campus</code>، قبولی کامل <code>5/5</code> در <code>CCDE_Hardened_Architecture</code> و سرکوب هوشمند SFP نوسان‌دار.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع تنظیم IP Event Dampening و SPF Backoff (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference Stability Controls (CCDE LLD)\ninterface TenGigabitEthernet0/0/0\n dampening 1 750 2000 4\nrouter ospf 1\n timers throttle spf 50 200 5000</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس معماری تاب‌آوری (Resiliency) در CCDE (۵ لایه و Dampening)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "چرا در معماری تاب‌آور CCDE، همگرایی فوق‌سریع (BFD/TI-LFA) باید حتماً با مکانیزم پایداری مانند IP Event Dampening و SPF Backoff همراه شود؟",
+   "options": [
+    "زیرا بدون Dampening، یک لینک یا SFP نیم‌سوز با نوسانات مکرر (Flapping) کل هسته شبکه را دچار طوفان بی‌پایان SPF و بی‌ثباتی می‌کند",
+    "زیرا Dampening همگرایی را برای همیشه خاموش می‌کند",
+    "زیرا BFD فقط روی کابل مسی کار می‌کند",
+    "برای افزایش تعداد Flapها"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>همگرایی سریع برای قطع تمیز اول عالی است، اما در برابر نوسان مکرر یک قطعه خراب، پایداری هسته با Dampening اولویت مطلق دارد!</p>"
+  },
+  {
+   "title": "بر اساس مطالعات عملیاتی در شبکه‌های بزرگ سازمانی و ابری، رتبه اول علت قطعی‌های گسترده کدام لایه آسیب‌پذیری است؟",
+   "options": [
+    "سوختن هم‌زمان هر دو منبع تغذیه",
+    "خطای انسانی در پیکربندی و تغییرات بدون تست (Human Ops — قابل مهار با CI/CD، Canary و Commit Confirmed)",
+    "قطع شدن پروتکل DNS در کل دنیا",
+    "فرسودگی رنگ بدنه رک"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>تاب‌آوری واقعی بدون مهار ریسک انسانی (اتوماسیون، تست خودکار و استقرار تدریجی Canary) ناقص است.</p>"
+  },
+  {
+   "title": "مفهوم «Headless Survival» در معماری‌های کنترلرمحور (SD-WAN، SD-Access، ACI) به چه معناست؟",
+   "options": [
+    "خاموش شدن فوری همه سوئیچ‌ها هنگام قطع کنترلر",
+    "ادامه بدون وقفه عبور ترافیک روی صفحه داده (Data Plane) حتی در زمان خاموشی موقت کل کلاستر کنترلر",
+    "نیاز نداشتن به هیچ کابل شبکه‌ای",
+    "حذف کامل امنیت در زمان قطعی"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>جدایی صفحه کنترل/مدیریت از صفحه داده تضمین می‌کند کنترلر به تک‌نقطه خرابی ترافیک زنده تبدیل نشود.</p>"
+  },
+  {
+   "title": "خرابی خاکستری یا خاموش (Gray / Silent Failure) چرا از قطع کامل لینک (Hard Down) خطرناک‌تر است؟",
+   "options": [
+    "زیرا لینک همچنان Up گزارش می‌شود اما بخشی از بسته‌ها (مثلاً ۳۰٪) را در سکوت می‌اندازد و پروتکل‌های معمولی Failover انجام نمی‌دهند؛ نیازمند Probe فعال است",
+    "زیرا چراغ پورت قرمز می‌شود",
+    "زیرا فقط نیمه‌شب رخ می‌دهد",
+    "خطرناک‌تر نیست"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>پایش پیوسته Synthetic Probing (TWAMP/IPSLA/AAR) و شمارنده‌های سخت‌افزاری کلید کشف Gray Failure است.</p>"
+  },
+  {
+   "title": "چگونه می‌توان ریسک «سرنوشت مشترک باگ نرم‌افزاری (Software Bug Shared Fate)» را میان دو روتر Core افزونه کاهش داد؟",
+   "options": [
+    "با نصب یک نسخه آزمایشی جدید به‌طور هم‌زمان روی هر دو روتر",
+    "با سیاست ارتقای مرحله‌ای (N-1 / Canary: نگه داشتن نسخه پایدار روی روتر دوم تا اثبات پایداری نسخه جدید) یا در موارد فوق‌حساس تنوع سیستم‌عامل",
+    "با هرگز آپدیت نکردن نرم‌افزار تا ۱۰ سال",
+    "با خاموش کردن روتر دوم"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>پرهیز از ارتقای هم‌زمان جفت افزونه و اجرای Canary Rollout جلوی سقوط هم‌زمان ناشی از یک باگ مشترک را می‌گیرد.</p>"
+  },
+  {
+   "title": "نقش شبکه Out-of-Band (OOB) Management در معماری تاب‌آور CCDE چیست؟",
+   "options": [
+    "ارسال ترافیک ویدیویی کاربران",
+    "فراهم کردن مسیر دسترسی مستقل (کنسول سریال + شبکه/LTE مجزا) جهت ورود به تجهیزات و بازیابی آن‌ها دقیقاً زمانی که شبکه اصلی (In-Band) قطع شده است",
+    "جایگزینی لینک‌های ۱۰۰G هسته",
+    "افزایش ترافیک Broadcast"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>اگر تنها راه مدیریت روتر از درون خود شبکه تولیدی باشد، در اولین بحران بزرگ عملاً کور و بی‌دسترس می‌شوید.</p>"
+  },
+  {
+   "title": "کدام سه مکانیزم به‌طور مستقیم از صفحه کنترل (Control Plane) روتر در برابر طوفان مسیرها و بسته‌ها محافظت می‌کنند؟",
+   "options": [
+    "Telnet، Hub و VLAN 1",
+    "CoPP (Control Plane Policing)، BGP maximum-prefix و Route Summarization",
+    "فقط تغییر نام روتر",
+    "خاموش کردن BFD"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>محافظت از CPU و حافظه صفحه کنترل شرط بقای روتر در برابر خطای همسایگان و حملات است.</p>"
+  },
+  {
+   "title": "الگوریتم SPF Exponential Backoff (RFC 8405) چگونه هم‌زمان همگرایی سریع و پایداری را تامین می‌کند؟",
+   "options": [
+    "روی اولین رویداد خرابی با کمترین تاخیر (مثلاً ۵۰ms) اجرا می‌شود، اما در صورت ادامه طوفان تغییرات، فاصله محاسبات بعدی را به‌صورت نمایی افزایش می‌دهد تا CPU نسوزد",
+    "همیشه ۱۰ دقیقه صبر می‌کند",
+    "SPF را برای همیشه خاموش می‌کند",
+    "فقط برای مسیر استاتیک است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>این الگوریتم استاندارد به زیبایی بین واکنش سریع به خرابی واقعی و آرامش شبکه هنگام طوفان تعادل می‌سازد.</p>"
+  },
+  {
+   "title": "چرا اجرای دوره‌ای مانورهای آزمون خرابی (Failover / Chaos Drills) بخشی جدایی‌ناپذیر از معماری Resiliency است؟",
+   "options": [
+    "برای ایجاد قطعی بی‌دلیل وسط روز کاری",
+    "زیرا تغییرات تدریجی شبکه (ACL، مسیرها، لایسنس‌ها) ممکن است مسیر پشتیبان را بی‌سروصدا از کار بیندازد و افزونگیِ تست‌نشده در روز بحران قابل اعتماد نیست",
+    "برای فرسوده کردن فیبرها",
+    "نیازی به تست نیست"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>اصل مشهور مهندسی قابلیت اطمینان: افزونگی‌ای که در آزمایش کنترل‌شده تست نشده باشد، عملاً وجود ندارد.</p>"
+  },
+  {
+   "title": "در ممیزی لایه ۱ فیزیکی، دو لینک متصل به دو روتر مجزا اما با برق گرفته از یک UPS واحد و فیبر عبوری از یک داکت مشترک چه ایرادی دارند؟",
+   "options": [
+    "هیچ ایرادی ندارند",
+    "دارای Shared Fate (سرنوشت مشترک) در لایه ۱ برق و فیبر هستند و یک خرابی واحد هر دو را هم‌زمان قطع می‌کند",
+    "سرعت آن‌ها دو برابر می‌شود",
+    "بهترین طراحی ۵-نه هستند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>حذف تک‌نقطه‌های خرابی فیزیکی (برق A/B مجزا و داکت فیبر متنوع) پایه تمام لایه‌های بالایی است.</p>"
+  },
+  {
+   "title": "در صورت نیاز به اعمال تغییر بزرگ روی ۲۰۰ روتر سازمانی، کدام رویکرد بیشترین تاب‌آوری عملیاتی را دارد؟",
+   "options": [
+    "کپی-پیست دستی روی همه ۲۰۰ روتر هم‌زمان",
+    "تست در لابراتوار/Batfish، سپس استقرار تدریجی Canary (ابتدا ۱، سپس ۵، سپس کل ناوگان) با مکانیزم Rollback خودکار (Commit Confirmed)",
+    "اعمال بدون بررسی در اوج ترافیک",
+    "حذف بکاپ کانفیگ‌ها"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Canary Rollout شعاع انفجار هر خطای احتمالی تغییر را به یک تجهیز آزمایشی محدود می‌کند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "قطع واقعی فیبر دیتاسنتر تولیدی",
+    "ایجاد عمدی طوفان BGP در اینترنت",
+    "فقط متن نظری بدون کد",
+    "مدل‌سازی محلی (Local Mock) در Python 3 برای ممیزی ۵ لایه تاب‌آوری و شبیه‌سازی موازنه همگرایی سریع BFD/FRR در برابر IP Event Dampening"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ تجهیز تولیدی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccde_09",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc5880",
+   "https://www.rfc-editor.org/rfc/rfc8405"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ تجهیز تولیدی یا فیبر فیزیکی متصل نیست."
+  ],
+  "legacyAuditFixes": [
+   "گسترش نسخه قدیمی (۱ پرسش) به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Gray Failure، Headless Survival، Software Shared Fate و مدل‌ساز ۵-لایه/Dampening."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccde_09-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccde",
+   "recommendedCourse": "ccde-design",
+   "blueprint": "/academy-assets/v5/blueprints/ccde_09.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_09_lab.py"
+  }
+ }
+}

@@ -1,0 +1,339 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "spec_sp_sr",
+ "objectiveId": "spec_sp_sr",
+ "kind": "lesson",
+ "track": "Specialist",
+ "course": "spec-sp",
+ "title": "۷.۴ Service Provider: معماری Segment Routing (SR-MPLS / SRv6)، SR-TE و TI-LFA",
+ "titleEn": "Service Provider Deep Dive: Segment Routing (SR-MPLS & SRv6), Prefix/Adj-SID, SR-TE & TI-LFA",
+ "domain": "Service Provider Routing",
+ "source": "Legacy spec_sp_sr rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [
+  "spec_sp",
+  "spec_sp_xr"
+ ],
+ "sections": [
+  {
+   "id": "spec_sp_sr-section-1",
+   "title": "مسئله واقعی: چرا اپراتورهای بزرگ جهان در حال حذف LDP و RSVP-TE و مهاجرت به Segment Routing هستند؟",
+   "html": "<p>در MPLS سنتی برای مهندسی ترافیک و بازیابی زیر ۵۰ میلی‌ثانیه باید هم IGP (IS-IS/OSPF)، هم <strong>LDP</strong> و هم <strong>RSVP-TE</strong> را هم‌زمان نگه دارید؛ و بدتر آنکه در RSVP-TE تمام روترهای میانی Core مجبورند وضعیت (State) هزاران تونل را در حافظه نگه دارند و پیوسته پیام‌های Refresh مبادله کنند! <strong>Segment Routing (SR — استاندارد IETF RFC 8402)</strong> با الگوی <strong>Source Routing</strong> کل این پیچیدگی را حذف می‌کند: نه LDP لازم است و نه RSVP-TE؛ تنها روتر سرخط (Headend) فهرستی از دستورالعمل‌ها (<strong>SID Stack</strong>) را روی بسته می‌گذارد و روترهای میانی Core دقیقاً <strong>صفر State به ازای هر جریان</strong> نگه می‌دارند!</p>"
+  },
+  {
+   "id": "spec_sp_sr-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر MPLS L3VPN، IS-IS/OSPF و درس‌های <code>spec_sp</code> و <code>spec_sp_xr</code>.</p><ul><li>تبیین اصل <strong>Source Routing بدون State در Core</strong> در Segment Routing (حذف کامل LDP و RSVP-TE).</li><li>محاسبه دقیق لیبل‌ها با <strong>SRGB</strong>، تفکیک <strong>Prefix-SID (سراسری)</strong> از <strong>Adj-SID (محلی لینک)</strong> و ساخت پشته لیبل.</li><li>کاربرد <strong>SR-TE (Segment Routing Traffic Engineering)</strong> همراه با <strong>PCE/SR-PCE</strong> و <strong>Flex-Algo</strong> (مثلاً مسیر کم‌تاخیر برای ۵G).</li><li>درک مکانیسم <strong>TI-LFA (Topology-Independent Loop-Free Alternate)</strong> برای Failover تضمین‌شده زیر ۵۰ میلی‌ثانیه در هر توپولوژی و مقایسه <strong>SR-MPLS</strong> با <strong>SRv6</strong>.</li></ul>"
+  },
+  {
+   "id": "spec_sp_sr-section-3",
+   "title": "اصل Source Routing در SR: چطور IGP به تنهایی جای LDP و RSVP-TE را می‌گیرد؟",
+   "html": "<p>در Segment Routing هیچ پروتکل جداگانه‌ای برای توزیع لیبل وجود ندارد! همان پروتکل IGP موجود (<strong>IS-IS</strong> یا <strong>OSPF</strong>) از طریق پسوندهای جدید TLV/Opaque LSA، شناسه‌های سگمنت (<strong>SID</strong>) را درون شبکه پخش می‌کند. در نتیجه همگامی IGP و MPLS (مشکل کلاسیک LDP-IGP Sync) برای همیشه حل می‌شود و هر روتر کل نقشه سگمنت‌های شبکه را می‌داند.</p>"
+  },
+  {
+   "id": "spec_sp_sr-section-4",
+   "title": "نمودار معماری SR-MPLS: پشته SID در Headend، SR-TE بدون State در Core و TI-LFA",
+   "html": "<p>نمودار زیر نحوه هدایت بسته با پشته Prefix-SID / Adj-SID از PE1، نبود Per-Flow State در P1 و مسیر پشتیبان TI-LFA زیر ۵۰ میلی‌ثانیه را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Segment Routing (SR-MPLS): Source Routing Label Stack, Prefix-SID, Adj-SID, SR-TE and TI-LFA Sub-50ms\"><rect x=\"16\" y=\"68\" width=\"128\" height=\"82\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"80\" y=\"92\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">PE1 (Headend)</text><text x=\"80\" y=\"112\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Pushes SID Stack</text><text x=\"80\" y=\"130\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">[16011, 24013, 16002]</text><rect x=\"192\" y=\"68\" width=\"120\" height=\"82\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"252\" y=\"92\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">P1 (Core)</text><text x=\"252\" y=\"112\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">SRGB 16000-23999</text><text x=\"252\" y=\"130\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">0 Per-Flow State!</text><rect x=\"372\" y=\"18\" width=\"136\" height=\"72\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"440\" y=\"42\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">P2 (Primary Path)</text><text x=\"440\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Cut =&gt; TI-LFA &lt;50ms!</text><rect x=\"372\" y=\"132\" width=\"136\" height=\"72\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"440\" y=\"156\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">P3 (SR-TE / Backup)</text><text x=\"440\" y=\"178\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Adj-SID 24013 Steer</text><rect x=\"576\" y=\"68\" width=\"168\" height=\"82\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"660\" y=\"92\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">PE2 (Tailend)</text><text x=\"660\" y=\"112\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Prefix-SID Index 2 =&gt; 16002</text><text x=\"660\" y=\"130\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">No LDP / No RSVP-TE!</text><line x1=\"144\" y1=\"108\" x2=\"192\" y2=\"108\" stroke=\"#1d4ed8\" stroke-width=\"3\"/><line x1=\"312\" y1=\"90\" x2=\"372\" y2=\"54\" stroke=\"#b91c1c\" stroke-width=\"2\" stroke-dasharray=\"5,3\"/><line x1=\"312\" y1=\"126\" x2=\"372\" y2=\"168\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"508\" y1=\"54\" x2=\"576\" y2=\"92\" stroke=\"#b91c1c\" stroke-width=\"2\" stroke-dasharray=\"5,3\"/><line x1=\"508\" y1=\"168\" x2=\"576\" y2=\"124\" stroke=\"#15803d\" stroke-width=\"3\"/></svg>"
+  },
+  {
+   "id": "spec_sp_sr-section-5",
+   "title": "کالبدشکافی دو سگمنت بنیادی: Prefix-SID (سراسری با SRGB) در برابر Adj-SID (محلی)",
+   "html": "<ul><li><strong>SRGB (Segment Routing Global Block):</strong> بازه لیبل سراسری مشترک در کل دامنه (معمولاً در سیسکو <strong><code>16000–23999</code></strong>).</li><li><strong>Prefix-SID / Node-SID (سراسری — ECMP-aware):</strong> به Loopback هر روتر یک اندیس یکتا داده می‌شود (مثلاً برای PE2 اندیس <code>2</code> -> لیبل <code>16000 + 2 = 16002</code>). هر روتر با دیدن لیبل <code>16002</code> بسته را روی کوتاه‌ترین مسیر IGP (همراه با ECMP!) به سمت PE2 می‌فرستد.</li><li><strong>Adj-SID (Adjacency SID — محلی لینک):</strong> یک لیبل محلی (خارج از SRGB، مثلاً <code>24013</code>) که توسط یک روتر برای یک لینک خروجی مشخص (مثلاً دقیقاً لینک <code>P1 -> P3</code>) تولید می‌شود و اجازه می‌دهد بسته حتی خلاف کوتاه‌ترین مسیر IGP از آن لینک خاص عبور کند!</li></ul>"
+  },
+  {
+   "id": "spec_sp_sr-section-6",
+   "title": "مهندسی ترافیک SR-TE، کنترلر SR-PCE و Flex-Algo (برش شبکه ۵G)",
+   "html": "<p>در <strong>SR-TE</strong>، روتر سرخط (یا کنترلر متمرکز <strong>SR-PCE</strong> با پروتکل PCEP) برای یک سرویس حساس (مثل ترافیک صوت/۵G که مسیر کم‌تاخیر می‌خواهد، نه مسیر پرظرفیت)، یک پشته فشرده از SIDها (مثلاً <code>[16011 (P1), 24013 (P1->P3), 16002 (PE2)]</code>) روی بسته می‌گذارد. جالب‌تر آنکه با <strong>Flex-Algo (Flexible Algorithm — RFC 9350)</strong> می‌توان برای یک مقصد دو Prefix-SID متفاوت تعریف کرد: یکی بر اساس متریک IGP عادی (Algo 0) و دیگری بر اساس کمترین تاخیر واقعی لینک (Algo 128) — یعنی مهندسی ترافیک با تنها <strong>یک لیبل</strong>!</p>"
+  },
+  {
+   "id": "spec_sp_sr-section-7",
+   "title": "TI-LFA: بازیابی تضمین‌شده زیر ۵۰ میلی‌ثانیه بدون محدودیت توپولوژی",
+   "html": "<p>در روش قدیمی LFA/Remote-LFA برای Fast Reroute، بسته به شکل فیزیکی شبکه گاهی تنها ۷۰–۸۰٪ لینک‌ها پوشش Fast Reroute داشتند. اما <strong>TI-LFA (Topology-Independent Loop-Free Alternate)</strong> با محاسبه از پیشِ دقیقِ مسیر پس از همگرایی (Post-Convergence Path) و ساخت یک Repair List کوچک از SIDها (معمولاً ۱ تا ۲ لیبل)، <strong>۱۰۰٪ پوشش Fast Reroute زیر ۵۰ میلی‌ثانیه در هر توپولوژی دلخواه</strong> را تضمین می‌کند و حتی در حین همگرایی IGP از تشکیل <strong>Micro-Loop</strong> جلوگیری می‌نماید!</p>"
+  },
+  {
+   "id": "spec_sp_sr-section-8",
+   "title": "مقایسه SR-MPLS در برابر SRv6 (Segment Routing over IPv6)",
+   "html": "<table><thead><tr><th>ویژگی</th><th>SR-MPLS</th><th>SRv6 (RFC 8986)</th></tr></thead><tbody><tr><td>Data Plane</td><td>پشته لیبل‌های ۲۰بیتی MPLS (روی سخت‌افزار MPLS موجود)</td><td><strong>آدرس‌های ۱۲۸بیتی IPv6</strong> + هدر <strong>SRH</strong> (حذف کامل MPLS!)</td></tr><tr><td>مهاجرت از MPLS سنتی</td><td>بسیار آسان (همزیستی با LDP از طریق Mapping Server)</td><td>نیازمند زیرساخت IPv6 و ASICهای پشتیبانی‌کننده SRv6 / uSID</td></tr><tr><td>قابلیت برنامه‌ریزی (Network Programming)</td><td>متوسط (لیبل‌های ساده)</td><td><strong>فوق‌العاده بالا</strong> (Locator + Function + Arguments در آدرس IPv6)</td></tr><tr><td>مقیاس‌پذیری هدر</td><td>فشرده (۴ بایت به ازای هر SID)</td><td>با فناوری <strong>SRv6 uSID (Micro-SID)</strong> تا ۶ سگمنت در یک آدرس ۱۲۸بیتی!</td></tr></tbody></table>"
+  },
+  {
+   "id": "spec_sp_sr-section-9",
+   "title": "مهاجرت تدریجی بدون قطعی از LDP به SR-MPLS با SRMS (Mapping Server)",
+   "html": "<p>هیچ اپراتوری نمی‌تواند هزار روتر را در یک شب از LDP به SR تبدیل کند! با ویژگی <strong>SRMS (Segment Routing Mapping Server)</strong> و تنظیم ترجیح <code>segment-routing mpls sr-prefer</code>، روترهای مدرن SR و روترهای قدیمی LDP در یک شبکه هم‌زیستی مسالمت‌آمیز دارند و به‌تدریج پس از مهاجرت آخرین گره، پروتکل LDP برای همیشه خاموش می‌شود.</p>"
+  },
+  {
+   "id": "spec_sp_sr-section-10",
+   "title": "محدودیت سخت‌افزاری MSD (Maximum SID Depth) در طراحی SR-TE",
+   "html": "<p>یک واقعیت مهم سخت‌افزاری که هر طراح SR باید بداند: ASIC هر روتر Headend حداکثر تعداد مشخصی لیبل (<strong>MSD — مثلاً ۵ تا ۱۰ لیبل</strong>) می‌تواند روی بسته Push کند. بنابراین در SR-TE و SR-PCE به جای نوشتن تمام هاپ‌ها با Adj-SID، از ترکیب هوشمند <strong>Prefix-SID + حداقل Adj-SID</strong> (یا Flex-Algo) استفاده می‌شود تا عمق پشته هرگز از MSD سخت‌افزار فراتر نرود!</p>"
+  },
+  {
+   "id": "spec_sp_sr-section-11",
+   "title": "کژفهمی‌های رایج درباره Segment Routing",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای اجرای SR-MPLS هنوز به LDP نیاز داریم تا لیبل‌ها را پخش کند.»</strong> واقعیت: خیر! هدف اصلی SR حذف LDP است؛ خود IS-IS یا OSPF لیبل‌های Prefix-SID و Adj-SID را مستقیماً توزیع می‌کنند.</li><li><strong>کژفهمی ۲: «در SR-TE هر روتر میانی Core باید یک جدول تونل برای هر مسیر SR-TE نگه دارد.»</strong> واقعیت: دقیقاً برعکس RSVP-TE! روترهای میانی Core هیچ State به ازای هر تونل SR-TE ندارند و تنها برچسب بالای پشته بسته را می‌خوانند.</li><li><strong>کژفهمی ۳: «SRGB روی روترها می‌تواند کاملاً تصادفی و متفاوت باشد و مشکلی پیش نیاید.»</strong> واقعیت: اگرچه از نظر پروتکل ممکن است، اما در عمل استفاده از یک <strong>SRGB یکسان (مثلاً 16000–23999)</strong> در کل شبکه طراحی، عیب‌یابی و TI-LFA را بی‌نهایت ساده‌تر و ایمن‌تر می‌کند.</li></ul>"
+  },
+  {
+   "id": "spec_sp_sr-section-12",
+   "title": "عیب‌یابی پرتکرار در SR-MPLS و SR-TE",
+   "html": "<p><strong>تله ۱ — عدم تطابق SRGB یا تداخل اندیس Prefix-SID:</strong> اگر دو روتر به اشتباه اندیس یکسان (مثلاً Index 2) بگیرند، خطای <strong>SID Collision</strong> رخ می‌دهد (قابل بررسی با <code>show isis segment-routing label table</code>).</p><p><strong>تله ۲ — فعال نبودن MPLS / SR در یک لینک میانی یا تجاوز از MSD:</strong> در صورت قطع مسیر SR-TE، بررسی وضعیت کاندیدهای سیاست با <code>show segment-routing traffic-eng policy</code> و تطابق <code>MSD</code> کلیدی است.</p>"
+  },
+  {
+   "id": "spec_sp_sr-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> اگر بازه SRGB برابر <code>16000–23999</code> باشد و Prefix-SID Index روتر PE2 برابر <code>2</code> تنظیم شود، لیبل MPLS مربوط به PE2 چیست و چند State روی روتر میانی P1 برای ۱۰٬۰۰۰ تونل SR-TE به سمت PE2 ذخیره می‌شود؟ <strong>پاسخ:</strong> لیبل PE2 برابر <strong><code>16002</code></strong> است و تعداد Per-Flow State روی P1 دقیقاً <strong>صفر</strong> می‌باشد!</p><p><strong>تمرین ۲:</strong> لینک اصلی <code>P1 -> P2</code> ناگهان قطع می‌شود. TI-LFA روی P1 چگونه بسته را در کمتر از ۵۰ میلی‌ثانیه بدون Micro-Loop به PE2 می‌رساند؟ <strong>پاسخ:</strong> P1 پشته پشتیبان از پیش محاسبه‌شده <code>[Adj-SID 24013 (P1->P3), Prefix-SID 16002 (PE2)]</code> را که از قبل در سخت‌افزار FIB نصب شده است روی بسته می‌گذارد.</p>"
+  },
+  {
+   "id": "spec_sp_sr-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8402\" target=\"_blank\" rel=\"noopener\">RFC 8402 (Segment Routing Architecture)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8986\" target=\"_blank\" rel=\"noopener\">RFC 8986 (SRv6 Network Programming)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی SR-MPLS / SRv6 یا کنترلر SR-PCE در این محیط اجرا نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Segment Routing (SR)",
+   "fa": "مسیریابی مبتنی بر سگمنت",
+   "simple": "معماری Source Routing استاندارد (RFC 8402) که مسیر را به شکل پشته SID در Headend کدگذاری کرده و LDP/RSVP-TE را حذف می‌کند."
+  },
+  {
+   "term": "SRGB",
+   "fa": "بازه سراسری لیبل SR",
+   "simple": "Segment Routing Global Block؛ بازه رزرو لیبل سراسری (معمولاً 16000-23999 در سیسکو)."
+  },
+  {
+   "term": "Prefix-SID / Node-SID",
+   "fa": "شناسه سگمنت سراسری گره",
+   "simple": "اندیس سراسری یکتا که با SRGB جمع شده و کوتاه‌ترین مسیر IGP (همراه ECMP) به یک روتر را مشخص می‌کند."
+  },
+  {
+   "term": "Adj-SID",
+   "fa": "شناسه سگمنت محلی لینک",
+   "simple": "لیبل محلی یک لینک همسایگی خاص که بسته را دقیقاً از آن لینک (حتی خلاف مسیر IGP) عبور می‌دهد."
+  },
+  {
+   "term": "SR-TE",
+   "fa": "مهندسی ترافیک با SR",
+   "simple": "هدایت ترافیک از مسیرهای کم‌تاخیر یا ایزوله با پشته SID در Headend بدون ذخیره State در روترهای Core."
+  },
+  {
+   "term": "TI-LFA",
+   "fa": "بازیابی سریع مستقل از توپولوژی",
+   "simple": "Topology-Independent Loop-Free Alternate؛ تضمین ۱۰۰٪ Failover زیر ۵۰ میلی‌ثانیه بدون Micro-Loop."
+  },
+  {
+   "term": "SR-PCE",
+   "fa": "موتور محاسبه مسیر مرکزی SR",
+   "simple": "کنترلر مرکزی که مسیرهای بهینه SR-TE را برای کل شبکه و چند دامنه محاسبه و به Headend تزریق می‌کند."
+  },
+  {
+   "term": "Flex-Algo (RFC 9350)",
+   "fa": "الگوریتم انعطاف‌پذیر IGP",
+   "simple": "تعریف چند متریک مستقل (مثل کمترین تاخیر برای ۵G) با Prefix-SID مجزا و تنها یک لیبل."
+  },
+  {
+   "term": "SRv6 (RFC 8986)",
+   "fa": "سگمنت روتینگ روی IPv6",
+   "simple": "اجرای Segment Routing بومی روی Data Plane IPv6 (با SRH / uSID) و حذف کامل هدر MPLS."
+  },
+  {
+   "term": "SRv6 uSID",
+   "fa": "میکرو‌سگمنت SRv6",
+   "simple": "فشرده‌سازی چندین دستورالعمل سگمنت درون یک آدرس ۱۲۸بیتی IPv6 برای کاهش سربار هدر."
+  },
+  {
+   "term": "MSD",
+   "fa": "حداکثر عمق پشته SID",
+   "simple": "Maximum SID Depth؛ سقف تعداد لیبل‌هایی که سخت‌افزار ASIC روتر Headend می‌تواند روی بسته Push کند."
+  },
+  {
+   "term": "SRMS",
+   "fa": "سرور نگاشت مهاجرت LDP-SR",
+   "simple": "Segment Routing Mapping Server؛ ابزار هم‌زیستی و مهاجرت تدریجی روترهای LDP قدیمی به SR-MPLS."
+  },
+  {
+   "term": "Source Routing",
+   "fa": "مسیریابی هدایت‌شده از مبدأ",
+   "simple": "تعیین کل مسیر در گره ورودی (Headend) تا گره‌های میانی کاملاً Stateless و ساده بمانند."
+  },
+  {
+   "term": "Micro-Loop Avoidance",
+   "fa": "جلوگیری از حلقه‌های لحظه‌ای",
+   "simple": "پیشگیری از حلقه‌های کوتاه‌مدت در حین همگرایی IGP پس از قطع لینک با پشته SID موقت."
+  },
+  {
+   "term": "SID Collision",
+   "fa": "تداخل شناسه سگمنت",
+   "simple": "اختصاص اشتباه یک اندیس Prefix-SID یکسان به دو روتر متفاوت در یک دامنه SR."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (محاسبه SRGB/Prefix-SID/Adj-SID، پشته فشرده SR-TE و پشتیبان TI-LFA Sub-50ms) — روتر SR-MPLS واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر واقعی SR-MPLS/IOS-XR یا SR-PCE متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر واقعی Cisco IOS-XR SR-MPLS/SRv6 یا کنترلر SR-PCE در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی چهار محاسبه کلیدی SR-MPLS را انجام می‌دهد: (۱) تبدیل Prefix-SID به لیبل با <code>SRGB 16000–23999</code>، (۲) مقایسه پشته کوتاه‌ترین مسیر IGP (۱ لیبل) با پشته صریح SR-TE و پشته فشرده ترکیبی، و (۳) تولید Repair List پشتیبان <code>TI-LFA</code> هنگام قطع <code>P1->P2</code> با <code>core_per_flow_state_required: 0</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_sp_sr_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_sp_sr_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — spec_sp_sr (Service Provider Segment Routing: SR-MPLS, Prefix/Adj-SID, SR-TE &amp; TI-LFA)\nComputes SR-MPLS label stacks from SRGB + Prefix-SID / Local Adj-SID, builds an explicit SR-TE\nlow-latency path without RSVP-TE per-flow state in the core, and computes a TI-LFA &lt;50ms backup stack.\nNo real SR-MPLS / IOS-XR router is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\nSRGB_START = 16000\nSRGB_END = 23999\n\nPREFIX_SIDS = {\n    &quot;PE1&quot;: 1,\n    &quot;P1&quot;: 11,\n    &quot;P2&quot;: 12,\n    &quot;P3&quot;: 13,\n    &quot;PE2&quot;: 2,\n}\n\nADJ_SIDS = {\n    (&quot;PE1&quot;, &quot;P1&quot;): 24001,\n    (&quot;P1&quot;, &quot;P2&quot;): 24012,\n    (&quot;P2&quot;, &quot;PE2&quot;): 24022,\n    (&quot;P1&quot;, &quot;P3&quot;): 24013,\n    (&quot;P3&quot;, &quot;PE2&quot;): 24032,\n}\n\n\ndef prefix_label(node: str) -&gt; int:\n    sid = SRGB_START + PREFIX_SIDS[node]\n    assert SRGB_START &lt;= sid &lt;= SRGB_END\n    return sid\n\n\ndef build_sr_te_stack(nodes: list[str], mode: str = &quot;hybrid&quot;) -&gt; list[dict]:\n    stack = []\n    if mode == &quot;loose_prefix_sid&quot;:\n        # Headend only pushes destination Prefix-SID; core follows IGP shortest path\n        dest = nodes[-1]\n        stack.append({&quot;type&quot;: &quot;Prefix-SID&quot;, &quot;target&quot;: dest, &quot;label&quot;: prefix_label(dest)})\n    elif mode == &quot;strict_sr_te&quot;:\n        # Headend enforces explicit low-latency hops using Adj-SIDs (zero RSVP state in core!)\n        for src, dst in zip(nodes, nodes[1:]):\n            stack.append({&quot;type&quot;: &quot;Adj-SID&quot;, &quot;hop&quot;: f&quot;{src}-&gt;{dst}&quot;, &quot;label&quot;: ADJ_SIDS[(src, dst)]})\n    else:\n        # Hybrid: steer via P1-&gt;P3 Adj-SID, then IGP shortest path to PE2 Prefix-SID\n        stack.append({&quot;type&quot;: &quot;Prefix-SID&quot;, &quot;target&quot;: &quot;P1&quot;, &quot;label&quot;: prefix_label(&quot;P1&quot;)})\n        stack.append({&quot;type&quot;: &quot;Adj-SID&quot;, &quot;hop&quot;: &quot;P1-&gt;P3&quot;, &quot;label&quot;: ADJ_SIDS[(&quot;P1&quot;, &quot;P3&quot;)]})\n        stack.append({&quot;type&quot;: &quot;Prefix-SID&quot;, &quot;target&quot;: &quot;PE2&quot;, &quot;label&quot;: prefix_label(&quot;PE2&quot;)})\n    return stack\n\n\ndef compute_ti_lfa_backup(failed_link: tuple[str, str], destination: str) -&gt; dict:\n    # Pre-computed post-convergence backup stack on P1 if P1-&gt;P2 fails\n    return {\n        &quot;failed_link&quot;: f&quot;{failed_link[0]}-&gt;{failed_link[1]}&quot;,\n        &quot;destination&quot;: destination,\n        &quot;repair_list_pushed_by_p1&quot;: [\n            {&quot;type&quot;: &quot;Adj-SID (Q-Space/PQ)&quot;, &quot;hop&quot;: &quot;P1-&gt;P3&quot;, &quot;label&quot;: ADJ_SIDS[(&quot;P1&quot;, &quot;P3&quot;)]},\n            {&quot;type&quot;: &quot;Prefix-SID&quot;, &quot;target&quot;: destination, &quot;label&quot;: prefix_label(destination)},\n        ],\n        &quot;expected_switchover_ms&quot;: &quot;&lt;50ms (pre-installed in FIB, topology-independent)&quot;,\n        &quot;core_per_flow_state_required&quot;: 0,\n    }\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_SR_MPLS_HARDWARE&quot;,\n        &quot;srgb_range&quot;: f&quot;{SRGB_START}-{SRGB_END}&quot;,\n        &quot;igp_shortest_path_stack_pe1_to_pe2&quot;: build_sr_te_stack([&quot;PE1&quot;, &quot;P1&quot;, &quot;P2&quot;, &quot;PE2&quot;], mode=&quot;loose_prefix_sid&quot;),\n        &quot;sr_te_low_latency_strict_stack&quot;: build_sr_te_stack([&quot;PE1&quot;, &quot;P1&quot;, &quot;P3&quot;, &quot;PE2&quot;], mode=&quot;strict_sr_te&quot;),\n        &quot;sr_te_hybrid_compressed_stack&quot;: build_sr_te_stack([&quot;PE1&quot;, &quot;P1&quot;, &quot;P3&quot;, &quot;PE2&quot;], mode=&quot;hybrid&quot;),\n        &quot;ti_lfa_backup_on_p1_p2_cut&quot;: compute_ti_lfa_backup((&quot;P1&quot;, &quot;P2&quot;), &quot;PE2&quot;),\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> لیبل <code>16002</code> برای PE2، پشته ترکیبی <code>[16011, 24013, 16002]</code> و Repair List دو‌لیبلی TI-LFA با سوئیچ زیر ۵۰ میلی‌ثانیه.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع فعال‌سازی SR-MPLS و TI-LFA روی IS-IS در IOS-XR (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XR IS-IS SR-MPLS + TI-LFA snippet (NOT executed on live router)\nrouter isis CORE\n address-family ipv4 unicast\n  segment-routing mpls\n interface Loopback0\n  address-family ipv4 unicast\n   prefix-sid index 2\n interface GigabitEthernet0/0/0/1\n  address-family ipv4 unicast\n   fast-reroute per-prefix\n   fast-reroute per-prefix ti-lfa</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس Segment Routing (SR-MPLS / SRv6)، SR-TE و TI-LFA",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در Segment Routing (SR-MPLS)، کدام دو پروتکل قدیمی MPLS به‌طور کامل حذف می‌شوند و چه چیزی جایگزین توزیع لیبل آن‌ها می‌شود؟",
+   "options": [
+    "BGP و DNS حذف می‌شوند",
+    "LDP و RSVP-TE حذف می‌شوند و خود IGP (IS-IS یا OSPF) شناسه‌های Prefix-SID و Adj-SID را مستقیماً توزیع می‌کند",
+    "OSPF و IS-IS حذف می‌شوند",
+    "ARP و ICMP حذف می‌شوند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>یکپارچه‌سازی توزیع لیبل در IGP هم پیچیدگی کنترل‌پلین را کم می‌کند و هم مشکل هماهنگی LDP-IGP را ریشه‌کن می‌سازد.</p>"
+  },
+  {
+   "title": "چرا SR-TE نسبت به RSVP-TE در هسته شبکه (Core) مقیاس‌پذیری بسیار بالاتری دارد؟",
+   "options": [
+    "زیرا SR-TE از کابل‌های پهن‌تر استفاده می‌کند",
+    "زیرا SR-TE رمزنگاری ندارد",
+    "زیرا با الگوی Source Routing، کل مسیر به صورت پشته SID در روتر Headend روی بسته گذاشته می‌شود و روترهای Core هیچ Per-Flow State برای تونل‌ها نگه نمی‌دارند",
+    "زیرا SR-TE فقط برای دو روتر کار می‌کند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>حذف Per-Flow State و پیام‌های Refresh RSVP از روترهای P بزرگ‌ترین انقلاب مقیاس‌پذیری Segment Routing است.</p>"
+  },
+  {
+   "title": "اگر SRGB در شبکه برابر 16000 تا 23999 باشد و اندیس Prefix-SID روتر PE2 برابر 2 تنظیم شود، لیبل MPLS آن در شبکه چیست؟",
+   "options": [
+    "24002",
+    "2",
+    "15998",
+    "16002"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>فرمول استاندارد: <code>Label = SRGB_Start + Prefix_SID_Index = 16000 + 2 = 16002</code>.</p>"
+  },
+  {
+   "title": "تفاوت اساسی Prefix-SID (سراسری) با Adj-SID (محلی) چیست؟",
+   "options": [
+    "Prefix-SID در کل شبکه معنادار است و بسته را روی کوتاه‌ترین مسیر IGP (با ECMP) به مقصد می‌برد؛ Adj-SID محلی یک روتر است و بسته را دقیقاً از یک لینک همسایگی مشخص عبور می‌دهد",
+    "Adj-SID در کل جهان یکتاست",
+    "Prefix-SID فقط برای IPv6 است",
+    "هیچ تفاوتی ندارند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>ترکیب Prefix-SID و Adj-SID به SR-TE اجازه می‌دهد با حداقل تعداد لیبل، هر مسیر دلخواهی را در شبکه مهندسی کند.</p>"
+  },
+  {
+   "title": "مزیت کلیدی TI-LFA نسبت به روش‌های قدیمی LFA/Remote-LFA برای Fast Reroute چیست؟",
+   "options": [
+    "نیازمند RSVP-TE در کل شبکه است",
+    "پوشش ۱۰۰٪ Fast Reroute زیر ۵۰ میلی‌ثانیه در هر توپولوژی دلخواه (مستقل از شکل شبکه) همراه با مسیر دقیق پس از همگرایی و بدون Micro-Loop",
+    "زمان بازیابی ۵ ثانیه‌ای دارد",
+    "فقط در توپولوژی حلقوی کار می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>TI-LFA با استفاده از پشته کوتاه SIDهای از پیش محاسبه‌شده در FIB، بازیابی زیر ۵۰ میلی‌ثانیه را مستقل از توپولوژی تضمین می‌کند.</p>"
+  },
+  {
+   "title": "قابلیت Flex-Algo (RFC 9350) در Segment Routing چگونه مهندسی ترافیک کم‌تاخیر (مثلاً برای شبکه ۵G) را ساده می‌کند؟",
+   "options": [
+    "با نصب ۱۰ لیبل Adj-SID روی هر بسته",
+    "با خاموش کردن لینک‌های پرظرفیت",
+    "با تعریف یک الگوریتم جداگانه مبتنی بر تاخیر (مثلاً Algo 128) و اختصاص یک Prefix-SID مجزا تا بسته تنها با یک لیبل از مسیر کم‌تاخیر عبور کند",
+    "با تغییر سرعت نور در فیبر"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>Flex-Algo نیاز به پشته‌های عمیق لیبل را کاهش می‌دهد و برش شبکه (Network Slicing) بسیار تمیزی ارائه می‌دهد.</p>"
+  },
+  {
+   "title": "تفاوت بنیادی Data Plane در SRv6 نسبت به SR-MPLS چیست؟",
+   "options": [
+    "SRv6 همچنان لیبل ۲۰بیتی MPLS دارد",
+    "SRv6 فقط روی IPv4 کار می‌کند",
+    "SRv6 از LDP استفاده می‌کند",
+    "SRv6 هدر MPLS را کاملاً حذف کرده و سگمنت‌ها را به شکل آدرس‌های ۱۲۸بیتی IPv6 (با هدر SRH یا uSID فشرده) کدگذاری می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>SRv6 کل شبکه را به یک Data Plane یکپارچه و قابل برنامه‌ریزی مبتنی بر IPv6 تبدیل می‌کند.</p>"
+  },
+  {
+   "title": "چرا محدودیت سخت‌افزاری MSD (Maximum SID Depth) در طراحی سیاست‌های SR-TE اهمیت حیاتی دارد؟",
+   "options": [
+    "زیرا ASIC روتر Headend سقف مشخصی برای تعداد لیبل‌هایی که می‌تواند روی بسته Push کند دارد و پشته SR-TE نباید از MSD آن بیشتر شود",
+    "زیرا MSD سرعت فن روتر را تعیین می‌کند",
+    "زیرا MSD نام یک پروتکل مسیریابی است",
+    "زیرا MSD فقط روی سوئیچ لایه ۲ مطرح است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>کنترلر SR-PCE هنگام محاسبه مسیر همیشه MSD روتر سرخط را رعایت می‌کند تا پشته فشرده و قابل اجرا باشد.</p>"
+  },
+  {
+   "title": "ابزار SRMS (Segment Routing Mapping Server) برای چه هدفی به کار می‌رود؟",
+   "options": [
+    "پخش آدرس DHCP به مشترکان",
+    "هم‌زیستی و مهاجرت تدریجی بدون قطعی میان روترهای قدیمی LDP و روترهای جدید SR-MPLS در یک دامنه واحد",
+    "حذف IS-IS از شبکه",
+    "تولید گواهینامه TLS"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>SRMS برای روترهایی که هنوز فقط LDP دارند نگاشت Prefix-SID تبلیغ می‌کند تا مهاجرت مرحله‌ای بدون قطعی میسر شود.</p>"
+  },
+  {
+   "title": "نقش کنترلر SR-PCE در شبکه‌های بزرگ چنددامنه‌ای چیست؟",
+   "options": [
+    "جایگزینی کابل‌های فیبر",
+    "مدیریت اکانت ایمیل کارمندان",
+    "داشتن دید سراسری از توپولوژی و تاخیر کل شبکه (چند Area/AS) و محاسبه و تزریق مسیرهای بهینه SR-TE به روترهای Headend",
+    "خاموش کردن BGP"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>SR-PCE به ویژه برای مسیرهای دوپاره (Disjoint Paths) و مهندسی ترافیک بین چندین ناحیه IGP/AS ضروری است.</p>"
+  },
+  {
+   "title": "خطای SID Collision زمانی رخ می‌دهد که:",
+   "options": [
+    "پهنای باند لینک ۱۰۰٪ پر شود",
+    "دو لینک به یک سوئیچ وصل شوند",
+    "یک روتر ریبوت شود",
+    "یک اندیس Prefix-SID یکسان به اشتباه به دو پیشوند/روتر متفاوت در یک دامنه اختصاص داده شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>اندیس‌های Prefix-SID در یک دامنه SR باید دقیقاً مانند آدرس Loopback کاملاً یکتا مدیریت و خودکارسازی شوند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای محاسبه لیبل‌های SRGB/Prefix-SID/Adj-SID، پشته SR-TE و Repair List پشتیبان TI-LFA",
+    "اتصال زنده به شبکه Core ۵G اپراتور",
+    "تست قطع فیبر روی NCS 5500 واقعی",
+    "فقط متن نظری بدون کد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ روتر SR-MPLS یا SR-PCE واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "spec_sp_sr",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc8402",
+   "https://www.rfc-editor.org/rfc/rfc8986"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی SR-MPLS/SRv6 یا کنترلر SR-PCE متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Flex-Algo، MSD، SRMS، SRv6 uSID و شبیه‌ساز SR-MPLS/SR-TE/TI-LFA."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/spec_sp_sr-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-specializations",
+   "recommendedCourse": "spec-sp",
+   "blueprint": "/academy-assets/v5/blueprints/spec_sp_sr.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_sp_sr_lab.py"
+  }
+ }
+}

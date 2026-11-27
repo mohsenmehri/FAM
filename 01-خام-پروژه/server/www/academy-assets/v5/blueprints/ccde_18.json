@@ -1,0 +1,342 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccde_18",
+ "objectiveId": "ccde_18",
+ "kind": "lesson",
+ "track": "CCDE",
+ "course": "ccde-design",
+ "title": "۹.۱۸ CCDE — مطالعه موردی جامع ۱: معماری سازمان جهانی چندسایتی (شرکت Pars-Global)",
+ "titleEn": "CCDE Topic 18: Capstone Case Study 1 — Pars-Global Multi-Site Global Enterprise Architecture",
+ "domain": "Enterprise Architecture Capstone",
+ "source": "Legacy ccde_18 rewritten and expanded",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [
+  "ccde_02",
+  "ccde_05",
+  "ccde_06",
+  "ccde_07",
+  "ccde_08",
+  "ccde_16"
+ ],
+ "sections": [
+  {
+   "id": "ccde_18-section-1",
+   "title": "معرفی پرونده جامع ۱ (Pars-Global): یک سناریوی واقعی به سبک آزمون عملی ۸ساعته CCDE",
+   "html": "<p>در این مطالعه موردی جامع، تمام مهارت‌های درس‌های ۱ تا ۱۷ را یکجا روی یک پروژه واقعی بین‌المللی به کار می‌بریم: <strong>شرکت جهانی Pars-Global</strong> در <strong>۳ قاره</strong> (اروپا، خاورمیانه، آسیا) فعالیت دارد، دارای <strong>۲ دیتاسنتر اصلی در فرانکفورت و دبی با فاصله ۵٬۰۰۰ کیلومتر</strong>، <strong>۱۰۰ شعبه</strong> (کوچک، متوسط و هاب منطقه‌ای)، اپلیکیشن‌های ابری در <strong>AWS Frankfurt و Azure UAE</strong> و الزامات سخت‌گیرانه <strong>GDPR اروپا و PCI-DSS</strong> است؛ با بودجه کنترل‌شده و هدف کاهش ۳۰٪ OpEx فعلی!</p>"
+  },
+  {
+   "id": "ccde_18-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر درس‌های <code>ccde_01</code> تا <code>ccde_17</code>.</p><ul><li>استخراج نیازمندی‌ها، محدودیت‌ها (GDPR، PCI-DSS، فاصله ۵٬۰۰۰km) و فرضیات پرونده <strong>Pars-Global</strong>.</li><li>اتخاذ تصمیم قطعی و مبتنی بر فیزیک برای <strong>DCI میان فرانکفورت و دبی (L3-Only + GSLB + Async Replication)</strong>.</li><li>طراحی <strong>WAN جهانی ۱۰۰شعبه‌ای (Regional Hybrid SD-WAN + SASE Local Breakout)</strong> و <strong>هاب‌های Colocation ابری</strong>.</li><li>یکپارچه‌سازی <strong>سگمنتاسیون سرتاسری (۴ Macro VRF + Micro SGT)</strong> و <strong>نقشه مهاجرت موج‌بندی‌شده بدون قطعی</strong>.</li></ul>"
+  },
+  {
+   "id": "ccde_18-section-3",
+   "title": "گام ۱ — استخراج نیازمندی‌ها، قیدها و تله‌های پنهان پرونده Pars-Global",
+   "html": "<ul><li><strong>اهداف تجاری:</strong> کاهش ۳۰٪ هزینه ۵ساله WAN (خروج از Dual-MPLS گران)، بهبود کیفیت Microsoft 365 و CRM در شعب، و آمادگی افزودن ۳۰ شعبه جدید.</li><li><strong>قیدهای غیرقابل مذاکره (Constraints):</strong> (۱) فاصله فیزیکی <strong>۵٬۰۰۰ کیلومتر</strong> بین فرانکفورت و دبی (حداقل ۵۰ms RTT!)، (۲) قانون <strong>GDPR</strong> (داده‌های شهروندان اروپایی باید داخل اتحادیه اروپا/فرانکفورت بمانند!)، (۳) استاندارد <strong>PCI-DSS</strong> برای پایانه‌های فروش شعب، و (۴) تیم شبکه مرکزی تنها ۸ نفر است (پس معماری باید ساده، استاندارد و خودکار باشد!).</li></ul>"
+  },
+  {
+   "id": "ccde_18-section-4",
+   "title": "نمودار معماری سرتاسری Pars-Global: فرانکفورت، دبی، ۱۰۰ شعبه و اتصال چندابری",
+   "html": "<p>نمودار زیر طرح کلان HLD شرکت جهانی Pars-Global را در سه قاره نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Capstone 1 Pars-Global Enterprise: Frankfurt and Dubai DCs 5,000km Apart, 100 Branches, Colo Multi-Cloud and 4 VRFs\"><rect x=\"14\" y=\"14\" width=\"222\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"125\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">EU Hub: Frankfurt DC1</text><text x=\"125\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Spine-Leaf EVPN + GDPR Local</text><text x=\"125\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Equinix FR -&gt; AWS EU DX</text><text x=\"125\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">EU Branches (Regional Hub)</text><rect x=\"260\" y=\"14\" width=\"240\" height=\"114\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">5,000 km Intercontinental DCI</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">Physics RTT &gt;= 50 ms!</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Async Replication + L3-Only DCI</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">GSLB / Anycast (Zero L2 Stretch!)</text><rect x=\"524\" y=\"14\" width=\"222\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"635\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">MEA Hub: Dubai DC2</text><text x=\"635\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Spine-Leaf EVPN + Regional DR</text><text x=\"635\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Equinix DXB -&gt; Azure UAE ER</text><text x=\"635\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">MEA/Asia Branches (SD-WAN)</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">Pars-Global (100 Branches | 3 Continents): Hybrid SD-WAN + SASE Local Breakout + 4 Macro VRFs + Micro SGT</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Zero-Downtime Wave Migration: Pilot Branches -&gt; Regional Hubs -&gt; Global Decommission of Legacy MPLS Backhaul</text></svg>"
+  },
+  {
+   "id": "ccde_18-section-5",
+   "title": "گام ۲ — تصمیم دیتاسنتر و DCI (فرانکفورت &lt;-&gt; دبی با فاصله ۵٬۰۰۰ کیلومتر)",
+   "html": "<p>مدیر اجرایی inicialmente خواسته بود هر دو دیتاسنتر با همگام‌سازی Synchronous (RPO=0) و VLAN مشترک کار کنند! معمار CCDE با استناد به فیزیک و تاب‌آوری این تله را خنثی می‌کند:</p><ul><li><strong>رد کردن Sync Replication:</strong> فاصله ۵٬۰۰۰km حداقل <strong>۵۰ میلی‌ثانیه RTT</strong> می‌سازد (۱۰ برابر سقف ۵ms!) -> انتخاب قطعی <strong>Asynchronous Replication</strong> بین فرانکفورت و دبی (همراه با <strong>جدایی داده GDPR</strong> در دیتابیس اروپایی فرانکفورت!).</li><li><strong>رد کردن کشش خام لایه ۲:</strong> انتخاب <strong>L3-Only DCI + DNS GSLB</strong> با فابریک مستقل <strong>Spine-Leaf VXLAN EVPN</strong> در هر DC تا هیچ طوفان L2 بین دو قاره منتقل نشود.</li><li><strong>رمزنگاری DCI:</strong> رمزنگاری خطی IPsec/DWDM روی مدارهای خصوصی بین‌قاره‌ای.</li></ul>"
+  },
+  {
+   "id": "ccde_18-section-6",
+   "title": "گام ۳ — تصمیم WAN جهانی ۱۰۰ شعبه (پروفایل‌بندی S/M/L + Hybrid SD-WAN + SASE)",
+   "html": "<p>ساخت Full-Mesh روی ۱۰۰ شعبه سه قاره و بازگرداندن ترافیک اینترنت به فرانکفورت (Tromboning) فاجعه است! طرح نهایی:</p><ul><li><strong>سه پروفایل تیپ شعبه:</strong> ۶۰ شعبه کوچک (۱ روتر SD-WAN + Broadband + 5G LTE)، ۳۰ شعبه متوسط (۲ روتر + Dual DIA + SRST) و ۱۰ هاب بزرگ (۲ روتر + MPLS + DIA + HA CUBE).</li><li><strong>توپولوژی Regional Hub-and-Spoke:</strong> شعب اروپا به هاب فرانکفورت و شعب خاورمیانه/آسیا به هاب دبی وصل می‌شوند (حذف انفجار تونل‌ها و کاهش تاخیر بین‌قاره‌ای!).</li><li><strong>خروج محلی ابری (Local DIA Breakout + SASE):</strong> ترافیک Microsoft 365 و وب هر شعبه از طریق نزدیک‌ترین SSE PoP امن (با رعایت PoP اروپایی برای شعب EU جهت GDPR) خارج می‌شود!</li></ul>"
+  },
+  {
+   "id": "ccde_18-section-7",
+   "title": "گام ۴ — تصمیم اتصال چندابری (AWS Frankfurt + Azure UAE بدون Hairpinning)",
+   "html": "<p>به جای کشیدن ترافیک AWS اروپا به دیتاسنتر دبی یا استفاده صرف از IPsec VPN گران از نظر Egress، در <strong>دو مرکز Colocation خنثی (Equinix Frankfurt و Equinix Dubai)</strong> روترهای مرزی و SD-WAN Cloud OnRamp با <strong>مدارهای خصوصی Dual-Diverse Direct Connect / ExpressRoute</strong> (با IPsec روی مدار خصوصی برای PCI/GDPR و IPsec اینترنتی به عنوان پشتیبان سوم) مستقر می‌شوند — هم Egress را ۷۵٪ می‌کاهند و هم تاخیر شعب به ابر را زیر ۱۰ms نگه می‌دارند!</p>"
+  },
+  {
+   "id": "ccde_18-section-8",
+   "title": "گام ۵ — تصمیم سگمنتاسیون و امنیت سرتاسری (۴ Macro VRF + Micro SGT)",
+   "html": "<p>برای رعایت هم‌زمان PCI-DSS و حفظ سادگی برای تیم ۸نفره (پرهیز از Over-Segmentation)، دقیقاً <strong>۴ Macro VRF سرتاسری</strong> از Campus تا SD-WAN و DC تعریف می‌شود: <code>VRF_Corp</code>، <code>VRF_PCI_CDE</code> (خارج کردن ۹۵٪ شبکه از دامنه ممیزی PCI!)، <code>VRF_IoT</code> و <code>VRF_Guest</code>. ارتباط بین VRFها تنها از طریق <strong>Fusion NGFW</strong> عبور می‌کند، و درون هر VRF، <strong>Micro-Segmentation با SGT / Distributed FW</strong> جلوی حرکت افقی باج‌افزار را می‌گیرد؛ به‌علاوه <strong>NDR + SIEM + ZTNA</strong> برای کارمندان دورکار!</p>"
+  },
+  {
+   "id": "ccde_18-section-9",
+   "title": "گام ۶ — طرح آدرس‌دهی سلسله‌مراتبی پیوسته جهانی (Global IPAM Plan)",
+   "html": "<p>برای جلوگیری از هم‌پوشانی RFC 1918 و تضمین خلاصه‌سازی تمیز بین قاره‌ها و ابرها، فضای <code>10.0.0.0/8</code> از روز اول بلوک‌بندی می‌شود: <code>10.0.0.0/11</code> برای اروپا (DC فرانکفورت + AWS EU + شعب EU)، <code>10.32.0.0/11</code> برای خاورمیانه/آسیا (DC دبی + Azure UAE + شعب MEA)، و هر شعبه یک بلوک پیوسته <code>/22</code> دارد که تنها با ۱ مسیر به هاب منطقه‌ای معرفی می‌گردد!</p>"
+  },
+  {
+   "id": "ccde_18-section-10",
+   "title": "گام ۷ — نقشه مهاجرت بدون قطعی Pars-Global (۴ موج اجرایی + Rollback)",
+   "html": "<ol><li><strong>موج ۱ (زیرساخت پایه موازی):</strong> ساخت هاب‌های Equinix/SD-WAN در فرانکفورت و دبی و برقراری Coexistence امن (BGP با Route-Tagging) کنار MPLS فعلی — <em>صفر قطعی!</em></li><li><strong>موج ۲ (سایت‌های Pilot):</strong> مهاجرت ۲ شعبه کوچک (۱ در اروپا، ۱ در دبی) با ZTP، تست کامل PCI/VoIP/M365 و نهایی‌سازی MoP.</li><li><strong>موج ۳ (موج‌های منطقه‌ای ۱۰۰ شعبه):</strong> مهاجرت هفتگی ۱۰ شعبه در هر موج (ابتدا لینک DIA جدید، سپس جابه‌جایی MPLS به روتر SD-WAN با ساعت Go/No-Go Rollback).</li><li><strong>موج ۴ (Decommission):</strong> لغو مدارهای اضافی Dual-MPLS (آغاز صرفه‌جویی ۳۰٪+ OpEx) و پاکسازی پل‌های موقت Coexistence!</li></ol>"
+  },
+  {
+   "id": "ccde_18-section-11",
+   "title": "تله‌های کلاسیکی که در پرونده Pars-Global از آن‌ها جان سالم به در بردیم!",
+   "html": "<ul><li><strong>تله ۱:</strong> پذیرفتن درخواست Synchronous RPO=0 بین فرانکفورت و دبی (شکست فیزیکی ۵۰ms RTT!).</li><li><strong>تله ۲:</strong> ارسال ترافیک کاربران اروپایی به PoP امنیتی خارج از اتحادیه اروپا (نقض سنگین جریمه GDPR!).</li><li><strong>تله ۳:</strong> ساخت ۳۰ VRF برای ۳۰ بخش سازمانی با تیم ۸نفره (تله Over-Segmentation!).</li><li><strong>تله ۴:</strong> خرید سخت‌افزار دو‌روتری گران یکسان برای همه ۱۰۰ شعبه کوچک و بزرگ (اتلاف بودجه!).</li></ul>"
+  },
+  {
+   "id": "ccde_18-section-12",
+   "title": "چک‌لیست هم‌راستایی نهایی Pars-Global با اهداف هیئت‌مدیره",
+   "html": "<p>طرح نهایی هم‌زمان خواسته <strong>CEO</strong> (چابکی باز کردن ۳۰ شعبه جدید با ZTP/5G)، <strong>CFO</strong> (کاهش بالای ۳۰٪ OpEx ۵ساله WAN و کاهش دامنه ممیزی PCI)، <strong>CISO</strong> (Zero Trust، ۴ VRF + SGT + رمزنگاری DX + GDPR) و <strong>تیم عملیات ۸نفره</strong> (۳ پروفایل استاندارد + خلاصه‌سازی + اتوماسیون) را محقق می‌کند!</p>"
+  },
+  {
+   "id": "ccde_18-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> چرا در پرونده Pars-Global، اگرچه هر دو دیتاسنتر فرانکفورت و دبی فعال‌اند، همگام‌سازی ذخیره‌ساز بین آن‌ها باید Asynchronous و DCI تماماً لایه ۳ باشد؟ <strong>پاسخ:</strong> زیرا فاصله ۵٬۰۰۰km حداقل ۵۰ms RTT فیزیکی ایجاد می‌کند (۱۰ برابر سقف ۵ms همگام‌سازی Synchronous)، و DCI لایه ۳ + GSLB از سقوط هم‌زمان هر دو قاره بر اثر طوفان لایه ۲ جلوگیری می‌کند.</p><p><strong>تمرین ۲:</strong> چگونه شعب اروپایی Pars-Global از خروج محلی اینترنت (Local Breakout) بهره می‌برند بدون اینکه قانون GDPR را نقض کنند؟ <strong>پاسخ:</strong> با هدایت ترافیک شعب اروپا صرفاً به <strong>SSE/SASE PoPهای مستقر درون اتحادیه اروپا</strong> و نگه‌داری داده‌های مشتریان اروپایی در دیتاسنتر/AWS فرانکفورت.</p>"
+  },
+  {
+   "id": "ccde_18-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/solutions/enterprise/design-zone-networking/index.html\" target=\"_blank\" rel=\"noopener\">مجموعه راهنماهای جامع Cisco Validated Designs (Enterprise Multi-Site &amp; Cloud)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> پرونده Pars-Global یک مطالعه موردی آموزشی جامع در سبک آزمون عملی CCDE است و آزمایشگاه آن یک اعتبارسنج محلی Python 3 بدون اتصال به زیرساخت بین‌المللی واقعی می‌باشد.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Pars-Global Capstone",
+   "fa": "مطالعه موردی جامع سازمانی جهانی",
+   "simple": "سناریوی ترکیبی ۳ قاره، ۲ DC (فرانکفورت-دبی ۵٬۰۰۰km)، ۱۰۰ شعبه، Multi-Cloud و PCI/GDPR."
+  },
+  {
+   "term": "Intercontinental Async DCI",
+   "fa": "تکرار ناهم‌زمان بین‌قاره‌ای",
+   "simple": "انتخاب اجباری برای فاصله ۵٬۰۰۰km (۵۰ms RTT) جهت پرهیز از کندی مرگبار Sync Storage."
+  },
+  {
+   "term": "Regional SD-WAN Hubs",
+   "fa": "هاب‌های منطقه‌ای SD-WAN",
+   "simple": "تجمیع شعب اروپا در فرانکفورت و خاورمیانه/آسیا در دبی برای کاهش تاخیر و جلوگیری از Full-Mesh."
+  },
+  {
+   "term": "GDPR Data Residency",
+   "fa": "اقامت جغرافیایی داده در اتحادیه اروپا",
+   "simple": "نگه‌داری پردازش و لاگ داده‌های شهروندان اروپایی درون دیتاسنتر و PoPهای اروپایی."
+  },
+  {
+   "term": "Global Hierarchical IPAM",
+   "fa": "طرح آدرس‌دهی سلسله‌مراتبی جهانی",
+   "simple": "تخصیص بلوک‌های پیوسته /11 به هر قاره و /22 به هر شعبه جهت خلاصه‌سازی تمیز و عدم تداخل با ابر."
+  },
+  {
+   "term": "Equinix Dual-Region Colo",
+   "fa": "هاب‌های کولوکیشن دوگانه منطقه‌ای",
+   "simple": "اتصال کم‌تاخیر و کم‌هزینه Egress به AWS فرانکفورت و Azure دبی با Direct Connect/ExpressRoute."
+  },
+  {
+   "term": "End-to-End 4-VRF Model",
+   "fa": "مدل ۴-VRF سرتاسری متوازن",
+   "simple": "جداسازی Corp، PCI، IoT و Guest در کل جهان بدون افتادن در تله Over-Segmentation برای تیم ۸نفره."
+  },
+  {
+   "term": "L3-Only Active/Active + GSLB",
+   "fa": "دو دیتاسنتر فعال لایه ۳ با GSLB",
+   "simple": "توزیع کاربران هر قاره به نزدیک‌ترین DC سالم بدون کشش لایه ۲ بین فرانکفورت و دبی."
+  },
+  {
+   "term": "4-Wave Global Migration",
+   "fa": "مهاجرت ۴موجی جهانی بدون قطعی",
+   "simple": "ساخت هاب موازی -> ۲ سایت Pilot -> موج‌های ۱۰شعبه‌ای -> برچیدن MPLSهای اضافی."
+  },
+  {
+   "term": "Branch Right-Sizing (60/30/10)",
+   "fa": "تیپ‌بندی اقتصادی ۱۰۰ شعبه",
+   "simple": "تفکیک ۶۰ شعبه کوچک، ۳۰ متوسط و ۱۰ هاب بزرگ برای جلوگیری از هدررفت میلیون‌ها دلار سخت‌افزار."
+  },
+  {
+   "term": "EU-Pinned SASE PoP",
+   "fa": "نقطه امنیتی SASE مقید به اروپا",
+   "simple": "اطمینان از خروج امن ترافیک SaaS شعب اروپایی از PoPهای درون اروپا مطابق قوانین GDPR."
+  },
+  {
+   "term": "Cross-Domain Synthesis",
+   "fa": "هم‌افزایی کلان میان حوزه‌ها",
+   "simple": "توانایی اتصال هم‌زمان تصمیمات DC، WAN، Cloud، Security، IPAM و Migration در یک HLD منسجم."
+  },
+  {
+   "term": "Brownfield Coexistence Hub",
+   "fa": "هاب هم‌زیستی شبکه قدیم و جدید",
+   "simple": "گره مرزی موقت دارای Route-Tagging که شعب مهاجرت‌کرده SD-WAN را به شعب MPLS متصل نگه می‌دارد."
+  },
+  {
+   "term": "OpEx 30% Reduction Target",
+   "fa": "هدف تجاری کاهش ۳۰٪ هزینه جاری",
+   "simple": "محرک مالی اصلی مهاجرت از Dual-MPLS به Hybrid SD-WAN و Direct Connect در Pars-Global."
+  },
+  {
+   "term": "PCI-DSS CDE Isolation",
+   "fa": "ایزوله‌سازی محیط کارت بانکی در ۱۰۰ شعبه",
+   "simple": "جدا نگه داشتن پایانه‌های فروش در VRF_PCI سرتاسری تا ۹۵٪ شبکه از ممیزی PCI خارج بماند."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (اعتبارسنج جامع HLD پروژه جهانی Pars-Global در ۴ حوزه فیزیک DCI، WAN، ابر و سگمنتاسیون) — بدون زیرساخت واقعی",
+   "executionStatus": "اسکریپت اعتبارسنجی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ مدار بین‌المللی یا دیتاسنتر واقعی متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اعتبارسنجی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ دیتاسنتر یا مدار بین‌المللی واقعی در این محیط متصل نشده است.</p><p>این اسکریپت اعتبارسنج محلی، کل سند HLD پروژه جهانی <strong>Pars-Global</strong> را روی ۴ ستون حیاتی ممیزی می‌کند: (۱) فیزیک ۵٬۰۰۰km فرانکفورت-دبی (<code>50.0 ms RTT -&gt; Async + L3-Only</code>)، (۲) WAN منطقه‌ای ۱۰۰ شعبه، (۳) هاب‌های Colocation چندابری، و (۴) مدل ۴ Macro VRF + SGT + انطباق GDPR.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_18_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_18_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_18 (CCDE Capstone Case Study 1: Pars-Global Multi-Site Enterprise Architecture)\nValidates the complete end-to-end HLD architecture for Pars-Global (3 continents, Frankfurt &amp; Dubai DCs\n5,000 km apart, 100 branches, Multi-Cloud AWS/Azure, PCI-DSS compliance) across physics, WAN, DCI &amp; segmentation.\nNo real international circuits or enterprise sites are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef validate_pars_global_hld(design: dict) -&gt; dict:\n    checks = []\n    # 1. Frankfurt &lt;-&gt; Dubai = 5,000 km -&gt; ~50ms fiber RTT -&gt; Async replication mandatory!\n    rtt_ms = design[&quot;dc_distance_km&quot;] * 0.01\n    checks.append({\n        &quot;domain&quot;: &quot;DCI &amp; Storage Physics (Frankfurt &lt;-&gt; Dubai 5,000km)&quot;,\n        &quot;measured_min_rtt_ms&quot;: rtt_ms,\n        &quot;pass&quot;: (design[&quot;storage_replication&quot;] == &quot;asynchronous&quot;) and (design[&quot;dci_l2_stretched&quot;] is False),\n        &quot;note&quot;: &quot;50ms RTT forbids Sync RPO=0; L3-Only DCI + GSLB eliminates cross-continental L2 broadcast fate!&quot;,\n    })\n    # 2. WAN Architecture for 100 global branches\n    checks.append({\n        &quot;domain&quot;: &quot;Global WAN (100 Branches across 3 Continents)&quot;,\n        &quot;pass&quot;: design[&quot;wan_model&quot;] == &quot;hybrid_sdwan_regional_hubs_plus_sase&quot;,\n        &quot;note&quot;: &quot;Regional SD-WAN hubs + Local DIA/SASE breakout eliminates intercontinental tromboning &amp; cuts MPLS OpEx&quot;,\n    })\n    # 3. Multi-Cloud Connectivity (AWS Frankfurt + Azure UAE)\n    checks.append({\n        &quot;domain&quot;: &quot;Multi-Cloud Connectivity&quot;,\n        &quot;pass&quot;: design[&quot;cloud_hub&quot;] == &quot;dual_colo_cloud_exchange_direct_connect&quot;,\n        &quot;note&quot;: &quot;Carrier-neutral Colo Exchanges in Frankfurt &amp; Dubai give low-latency private DX/ER + low Egress&quot;,\n    })\n    # 4. Segmentation &amp; Compliance (PCI-DSS + GDPR)\n    checks.append({\n        &quot;domain&quot;: &quot;End-to-End Segmentation &amp; Compliance&quot;,\n        &quot;pass&quot;: (3 &lt;= design[&quot;macro_vrfs&quot;] &lt;= 6) and design[&quot;micro_sgt_enabled&quot;] and design[&quot;gdpr_eu_data_local&quot;],\n        &quot;note&quot;: &quot;Compact 4 Macro VRFs (Corp/PCI/IoT/Guest) + Micro SGT + EU data stays in Frankfurt for GDPR!&quot;,\n    })\n    return {\n        &quot;case_study&quot;: &quot;Pars-Global Enterprise (3 Continents | 2 DCs | 100 Branches)&quot;,\n        &quot;all_architectural_checks_passed&quot;: all(c[&quot;pass&quot;] for c in checks),\n        &quot;domain_validations&quot;: checks,\n    }\n\n\ndef main() -&gt; None:\n    pars_global_hld = {\n        &quot;dc_distance_km&quot;: 5000,\n        &quot;storage_replication&quot;: &quot;asynchronous&quot;,\n        &quot;dci_l2_stretched&quot;: False,\n        &quot;wan_model&quot;: &quot;hybrid_sdwan_regional_hubs_plus_sase&quot;,\n        &quot;cloud_hub&quot;: &quot;dual_colo_cloud_exchange_direct_connect&quot;,\n        &quot;macro_vrfs&quot;: 4,\n        &quot;micro_sgt_enabled&quot;: True,\n        &quot;gdpr_eu_data_local&quot;: True,\n    }\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_CAPSTONE_PARS_GLOBAL&quot;,\n        &quot;validation_result&quot;: validate_pars_global_hld(pars_global_hld),\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> قبولی کامل <code>all_architectural_checks_passed: True</code> در تمام ۴ دامنه معماری پروژه Pars-Global.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>خلاصه اجرایی معماری تاییدشده Pars-Global (الگوی مرجع HLD):</strong></p><pre dir=\"ltr\"><code># Pars-Global Approved HLD Summary (3 Continents | 2 DCs | 100 Branches)\nDCI (5,000km) : L3-Only + GSLB + Async Replication (50ms RTT) + Line-Rate Crypto\nGlobal WAN    : 3 Branch Profiles (60S/30M/10L) + Regional Hybrid SD-WAN + SASE\nMulti-Cloud   : Dual Colo Exchanges (Frankfurt AWS DX / Dubai Azure ER) + IPsec\nSecurity/Comp : 4 Macro VRFs (Corp/PCI/IoT/Guest) + Micro SGT + EU GDPR Pinning</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون مطالعه موردی جامع ۱ CCDE (معماری سازمان جهانی Pars-Global)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در پرونده Pars-Global با دو دیتاسنتر در فرانکفورت و دبی (فاصله ۵٬۰۰۰ کیلومتر)، چرا درخواست اولیه «Synchronous Replication (RPO=0) روی VLAN کشیده‌شده» رد می‌شود؟",
+   "options": [
+    "زیرا فاصله ۵٬۰۰۰km حداقل ۵۰ms RTT فیزیکی می‌سازد (بسیار فراتر از سقف ~۵ms تکرار هم‌زمان) و کشش L2 دو قاره را به یک دامنه خرابی واحد تبدیل می‌کند؛ راه‌حل Async + L3-Only DCI + GSLB است",
+    "زیرا بین اروپا و خاورمیانه فیبر وجود ندارد",
+    "زیرا VLAN فقط تا ۱۰ کیلومتر کار می‌کند",
+    "درخواست کاملاً عملی است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>احترام به فیزیک سرعت نور و ایزوله‌سازی دامنه خرابی دو اصل بنیادین طراحی DCI بین‌قاره‌ای هستند.</p>"
+  },
+  {
+   "title": "برای کاهش ۳۰٪ هزینه ۵ساله WAN در ۱۰۰ شعبه سه‌قاره‌ای Pars-Global و بهبود کیفیت Microsoft 365، کدام معماری WAN انتخاب شد؟",
+   "options": [
+    "حفظ Dual-MPLS و بازگرداندن کل اینترنت ۱۰۰ شعبه به فرانکفورت",
+    "تیپ‌بندی ۳گانه شعب (60S/30M/10L) + Hybrid SD-WAN با هاب‌های منطقه‌ای (فرانکفورت و دبی) + Local DIA Breakout از طریق SASE",
+    "تونل‌های IPsec Full-Mesh ایستا بین همه ۱۰۰ شعبه",
+    "حذف کامل اینترنت در شعب"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>این ترکیب هم هزینه‌های OpEx را به شدت کاهش می‌دهد، هم Tromboning را حذف می‌کند و هم مقیاس‌پذیری تونل‌ها را تضمین می‌نماید.</p>"
+  },
+  {
+   "title": "چگونه معماری Pars-Global الزام قانونی GDPR اتحادیه اروپا را در کنار خروج محلی اینترنت (Local Breakout) رعایت می‌کند؟",
+   "options": [
+    "با ارسال تمام ترافیک شعب اروپا به دبی",
+    "با نگه‌داری داده‌های مشتریان اروپایی در دیتاسنتر و AWS فرانکفورت و هدایت خروج SASE شعب اروپایی صرفاً از طریق PoPهای مستقر درون اتحادیه اروپا",
+    "با خاموش کردن رمزنگاری",
+    "GDPR ربطی به شبکه ندارد"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>تضمین Data Residency در سطح دیتاسنتر، ابر و PoP امنیتی SASE از جریمه‌های سنگین GDPR پیشگیری می‌کند.</p>"
+  },
+  {
+   "title": "برای اتصال پرسرعت و کم‌هزینه Egress به AWS فرانکفورت و Azure دبی بدون Cloud Hairpinning، چه الگویی در Pars-Global طراحی شد؟",
+   "options": [
+    "فقط یک تونل IPsec VPN واحد از دبی به هر دو ابر",
+    "استقرار هاب‌های Colocation خنثی (Equinix Frankfurt & Dubai) با مدارهای خصوصی Dual-Diverse Direct Connect/ExpressRoute + IPsec Encryption",
+    "ارسال داده‌های دیتابیس روی اینترنت عمومی بدون رمزنگاری",
+    "حذف کامل ابر عمومی"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>دو هاب کولوکیشن منطقه‌ای هم تاخیر شعب به ابر را کمینه می‌کنند و هم قبض Egress را تا ۷۵٪ پایین می‌آورند.</p>"
+  },
+  {
+   "title": "با توجه به تیم مرکزی ۸نفره و الزام PCI-DSS، چرا دقیقاً ۴ Macro VRF (Corp، PCI، IoT، Guest) + Micro SGT انتخاب شد نه ۳۰ VRF؟",
+   "options": [
+    "برای کاهش ۹۵٪ دامنه ممیزی PCI با VRF_PCI و هم‌زمان پرهیز از تله Over-Segmentation که تیم ۸نفره را زیر بار Route-Leaking فلج می‌کرد",
+    "زیرا روترها بیشتر از ۴ VRF پشتیبانی نمی‌کنند",
+    "برای باز گذاشتن دسترسی IoT به پایانه‌های POS",
+    "فقط به صورت تصادفی"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>توازن Macro (۴ VRF) + Micro (SGT) هم‌زمان انطباق PCI-DSS، Zero Trust و سادگی نگهداری را برای تیم ۸نفره تامین می‌کند.</p>"
+  },
+  {
+   "title": "چگونه طرح IPAM جهانی Pars-Global از تداخل RFC 1918 با AWS/Azure و انفجار جدول مسیر هسته جلوگیری می‌کند؟",
+   "options": [
+    "تخصیص تصادفی هر ساب‌نت توسط تیم‌های محلی",
+    "بلوک‌بندی سلسله‌مراتبی پیوسته (10.0.0.0/11 برای اروپا، 10.32.0.0/11 برای خاورمیانه/آسیا و یک /22 پیوسته برای هر شعبه) جهت خلاصه‌سازی ۱خطی در مرزها",
+    "استفاده از رنج یکسان 10.0.0.0/16 در همه قاره‌ها",
+    "استفاده از NAT در کل هسته"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>IPAM سلسله‌مراتبی پیوسته، ستون فقرات مقیاس‌پذیری و اتصال بدون دردسر Multi-Cloud است.</p>"
+  },
+  {
+   "title": "چرا در نقشه مهاجرت ۴موجی Pars-Global، نخست هاب‌های موازی و سپس ۲ شعبه کوچک غیرحیاتی (Pilot) مهاجرت می‌شوند؟",
+   "options": [
+    "برای تست کامل ZTP، سیاست‌های PCI/AAR و برنامه Rollback با کمترین ریسک پیش از مهاجرت موج‌های بزرگ و هاب‌های حیاتی",
+    "زیرا هاب‌های اصلی نیازی به مهاجرت ندارند",
+    "برای ایجاد قطعی در اروپا",
+    "فرقی نداشت از HQ شروع کنیم"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>موج‌بندی از Pilot به Bulk استاندارد طلایی مهاجرت‌های چندشعبه‌ای بدون قطعی است.</p>"
+  },
+  {
+   "title": "چرا در ۶۰ شعبه کوچک Pars-Global به جای ۲ روتر گران‌قیمت و دو لینک MPLS، یک روتر SD-WAN با Broadband + 5G LTE انتخاب شد؟",
+   "options": [
+    "اصل Right-Sizing (پروفایل‌بندی شعبه): حفظ پایداری مناسب (فیبر + 5G مستقل از حفاری) با کسری از CapEx و OpEx برای شعب کوچک غیرحیاتی",
+    "زیرا ۵G از فیبر سریع‌تر است",
+    "زیرا شعب کوچک اصلاً مهم نیستند",
+    "برای حذف رمزنگاری"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Right-Sizing میلیون‌ها دلار بودجه را آزاد می‌کند تا در لایه‌های واقعاً حیاتی (DCها و هاب‌های بزرگ) سرمایه‌گذاری شود.</p>"
+  },
+  {
+   "title": "چرا در Pars-Global حتی روی مدارهای خصوصی Direct Connect و ExpressRoute همچنان رمزنگاری IPsec/MACsec اضافه شد؟",
+   "options": [
+    "زیرا مدارهای خصوصی ابر به‌طور پیش‌فرض رمزنگاری نشده‌اند و الزامات محرمانگی PCI-DSS و GDPR رمزنگاری در حال عبور را الزامی می‌کنند",
+    "زیرا بدون IPsec لینک Up نمی‌شود",
+    "برای افزایش تاخیر",
+    "هیچ دلیلی نداشت"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>خصوصی بودن لایه ۱/۲ هرگز جایگزین الزام رمزنگاری Compliance برای داده‌های کارت بانکی و GDPR نیست.</p>"
+  },
+  {
+   "title": "نقش پل Coexistence موقت با Route-Tagging میان شبکه SD-WAN جدید و شبکه MPLS قدیمی در حین مهاجرت ۱۰۰ شعبه چیست؟",
+   "options": [
+    "امکان ارتباط بی‌وقفه میان شعبی که هنوز روی MPLS قدیمی هستند و شعبی که به SD-WAN مهاجرت کرده‌اند بدون ایجاد Routing Loop، تا پایان موج ۴ و Decommission",
+    "نگه داشتن همیشگی هر دو شبکه تا ۱۰ سال آینده",
+    "قطع ارتباط بین شعب قدیم و جدید",
+    "حذف BGP"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>هم‌زیستی تمیز و بدون حلقه شرط اصلی مهاجرت مرحله‌ای ۱۰۰ شعبه در طول چند ماه است.</p>"
+  },
+  {
+   "title": "اگر در آینده Pars-Global ناگهان ۳۰ شعبه جدید در آسیا افتتاح کند، این معماری چگونه پاسخ می‌دهد؟",
+   "options": [
+    "نیازمند بازطراحی کامل دو دیتاسنتر و هسته",
+    "افزودن فوری هر شعبه با یکی از ۳ پروفایل آماده (ZTP + DIA/5G)، تخصیص یک بلوک /22 از رنج آسیا و اتصال خودکار به هاب منطقه‌ای دبی بدون هیچ تغییر در هسته!",
+    "توقف پروژه به مدت ۶ ماه",
+    "ساخت یک VRF جدید برای هر شعبه"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>تکرارپذیری (Cookie-Cutter Scalability) و چابکی تجاری نتیجه مستقیم طراحی ماژولار CCDE است.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "اتصال زنده به دو دیتاسنتر در فرانکفورت و دبی",
+    "اجرای واقعی روی ۱۰۰ شعبه بین‌المللی",
+    "فقط متن نظری بدون کد",
+    "اعتبارسنجی محلی (Local Mock) در Python 3 برای ممیزی جامع ۴ حوزه HLD مطالعه موردی Pars-Global"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ دیتاسنتر یا مدار واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccde_18",
+  "sources": [
+   "https://www.cisco.com/c/en/us/solutions/enterprise/design-zone-networking/index.html"
+  ],
+  "limitations": [
+   "پرونده Pars-Global یک مطالعه موردی آموزشی در سبک CCDE است و آزمایشگاه آن یک اعتبارسنج محلی Python 3 بدون اتصال به زیرساخت واقعی است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش مطالعه موردی Pars-Global نسخه قدیمی به ۱۴ بخش جامع سرتاسری، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، طرح IPAM/مهاجرت ۴موجی و اعتبارسنج Python."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccde_18-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccde",
+   "recommendedCourse": "ccde-design",
+   "blueprint": "/academy-assets/v5/blueprints/ccde_18.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_18_lab.py"
+  }
+ }
+}

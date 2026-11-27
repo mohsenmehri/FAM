@@ -1,0 +1,339 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccde_03",
+ "objectiveId": "ccde_03",
+ "kind": "lesson",
+ "track": "CCDE",
+ "course": "ccde-design",
+ "title": "۹.۳ CCDE — معماری شبکه‌های اپراتوری (Service Provider): اقتصاد Peering/Transit و هسته مقیاس‌پذیر",
+ "titleEn": "CCDE Topic 3: Service Provider Architecture — BGP-Free Core, IXP Peering Economics & SR/MPLS/EVPN",
+ "domain": "Service Provider Architecture",
+ "source": "Legacy ccde_03 rewritten and expanded",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [
+  "ccde_01",
+  "ccie_sp"
+ ],
+ "sections": [
+  {
+   "id": "ccde_03-section-1",
+   "title": "مسئله واقعی: چرا در شبکه اپراتوری، شبکه یک «مرکز هزینه» نیست بلکه «خودِ محصول درآمدزا» است؟",
+   "html": "<p>در شرکت سازمانی (Enterprise)، شبکه صرفاً زیرساخت پشتیبانی کارمندان است؛ اما در یک <strong>اپراتور مخابراتی / ISP (Service Provider)</strong>، شبکه <em>خودِ محصولی است که به میلیون‌ها مشترک و هزاران سازمان فروخته می‌شود</em>! یک تصمیم اشتباه معمار در انتخاب بین <strong>Transit</strong> و <strong>IXP Peering</strong> می‌تواند سالانه میلیون‌ها دلار سود اپراتور را بسوزاند، و نبود جداسازی <strong>BGP-Free Core + VRF/MPLS</strong> می‌تواند هسته را زیر بار یک میلیون مسیر BGP و میلیون‌ها مشترک از پای درآورد.</p>"
+  },
+  {
+   "id": "ccde_03-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code>، <code>spec_sp</code>، <code>spec_sp_sr</code> و <code>ccie_sp</code>.</p><ul><li>تبیین سه قانون بنیادین معماری Service Provider: <strong>BGP-Free Core</strong>، <strong>ایزوله‌سازی مشتریان با VRF/MPLS/EVPN</strong> و <strong>مقیاس‌پذیری چندمیلیونی (Unified MPLS / RR Hierarchy)</strong>.</li><li>تحلیل اقتصادی و فنی اتصال به اینترنت جهانی: موازنه <strong>Paid IP Transit</strong> در برابر <strong>Settlement-Free IXP Peering</strong> و <strong>کش‌های محلی CDN (GGC/Netflix/Meta)</strong>.</li><li>انتخاب معماری حمل‌ونقل (Transport) متناسب با سخت‌افزار و SLA: <strong>LDP کلاسیک</strong>، <strong>مهاجرت تدریجی SRMS</strong> یا <strong>SR-MPLS/SRv6 + Flex-Algo + TI-LFA</strong>.</li><li>تلفیق سیاست‌های مسیریابی اقتصادی (<strong>Hot-Potato در برابر Cold-Potato</strong>) و امنیت مرزی اپراتور (<strong>RPKI / FlowSpec / RTBH</strong>).</li></ul>"
+  },
+  {
+   "id": "ccde_03-section-3",
+   "title": "سه قانون سرنوشت‌ساز معماری Service Provider",
+   "html": "<ol><li><strong>BGP-Free Core:</strong> روترهای P در هسته تنها پیشوندهای <code>/32</code> روترهای PE (مثلاً ۱٬۲۰۰ مسیر IGP) را دارند و هرگز زیر بار ۱٬۰۰۰٬۰۰۰+ مسیر جدول اینترنت و VRFهای مشتریان نمی‌روند!</li><li><strong>جداسازی و تجمیع مقیاس‌پذیر:</strong> تفکیک کامل مشتریان روی روترهای لبه PE با <strong>VRF / MPLS L3VPN / EVPN</strong>، خلاصه‌سازی ساب‌نت‌های مشترکان (BNG/CGNAT) و استفاده از سلسله‌مراتب <strong>BGP Route Reflector</strong> (خارج از مسیر داده، ترجیحاً به تفکیک خانواده آدرس VPNv4 و Internet).</li><li><strong>استقلال سرویس از زیرساخت (Transport/Service Decoupling):</strong> تغییر زیرساخت حمل‌ونقل (مثلاً مهاجرت از LDP به SR-MPLS) نباید باعث بازطراحی سرویس‌های مشتریان L3VPN/EVPN شود.</li></ol>"
+  },
+  {
+   "id": "ccde_03-section-4",
+   "title": "نمودار معماری Service Provider: BGP-Free Core و بهینه‌سازی اقتصادی Peering/Transit",
+   "html": "<p>نمودار زیر تفکیک PE، هسته BGP-Free و لبه اینترنت با Offload اقتصادی روی IXP/CDN را نمایش می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Service Provider Architecture: BGP-Free Core, Peering vs Transit Economics and SR-MPLS/EVPN Transport\"><rect x=\"14\" y=\"16\" width=\"222\" height=\"112\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"125\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Access &amp; Edge (PE)</text><text x=\"125\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Millions of Subscribers</text><text x=\"125\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">VRF L3VPN + EVPN Services</text><text x=\"125\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Summarize + RPKI / FlowSpec</text><rect x=\"258\" y=\"16\" width=\"244\" height=\"112\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">BGP-Free Core (P-Routers)</text><text x=\"380\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Only ~1,200 IGP /32 Loopbacks!</text><text x=\"380\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Zero Customer VRFs / Full BGP</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">SR-MPLS + TI-LFA &lt;50ms + Flex-Algo</text><rect x=\"524\" y=\"16\" width=\"222\" height=\"112\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"635\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Internet Edge (ASBR)</text><text x=\"635\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Paid Tier-1 Transit (All Internet)</text><text x=\"635\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">IXP Peering + Local CDN Cache</text><text x=\"635\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">65% Offload =&gt; Massive OpEx Save!</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f172a\">SP Architect Rule: Network IS the Revenue Product — Every Millisecond &amp; Every $/Mbps Directly Hits Profit!</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Scale Out via Unified MPLS (BGP-LU) + Route Reflector Hierarchy + Phased LDP-to-SR Migration (SRMS)</text></svg>"
+  },
+  {
+   "id": "ccde_03-section-5",
+   "title": "اقتصاد اتصال به اینترنت: Paid Transit در برابر IXP Peering و کش‌های محلی CDN",
+   "html": "<p>اپراتور برای اتصال به کل اینترنت دو ابزار مکمل دارد: (۱) <strong>IP Transit (پولی — به ازای هر مگابیت/ثانیه به Tier-1/Tier-2):</strong> دسترسی تضمینی به ۱۰۰٪ اینترنت جهانی اما با OpEx ماهانه بسیار سنگین؛ و (۲) <strong>Peering (معمولاً رایگان / Settlement-Free در نقاط تبادل IXP یا PNI مستقیم + استقرار سرورهای CDN محلی داخل شبکه اپراتور):</strong> بیش از ۶۰ تا ۷۰ درصد ترافیک مصرفی مشترکان (ویدیو، شبکه اجتماعی، بازی) با یک هزینه ثابت کوچک پورت IXP از دوش لینک گران Transit برداشته می‌شود و هم‌زمان <strong>تاخیر (Latency) کاربران نیز به نصف کاهش می‌یابد!</strong></p>"
+  },
+  {
+   "id": "ccde_03-section-6",
+   "title": "تصمیم معماری Transport: چه زمانی LDP، چه زمانی SRMS و چه زمانی SR-MPLS/SRv6؟",
+   "html": "<ul><li><strong>LDP کلاسیک + LFA:</strong> اگر اپراتور سخت‌افزارهای قدیمی دارد، صرفاً L3VPN ساده می‌فروشد و نیازی به Traffic Engineering یا برش شبکه ۵G ندارد (کمترین هزینه تغییر).</li><li><strong>مهاجرت تدریجی با SRMS (Mapping Server):</strong> در شبکه Brownfield که باید بدون قطعی و به تدریج از LDP به Segment Routing ارتقا یابد.</li><li><strong>SR-MPLS (یا SRv6) + Flex-Algo + TI-LFA + EVPN:</strong> انتخاب قطعی برای اپراتورهای مدرن، ۵G Backhaul و SLA زیر ۵۰ میلی‌ثانیه بدون ذخیره State در روترهای Core.</li></ul>"
+  },
+  {
+   "id": "ccde_03-section-7",
+   "title": "موازنه Hot-Potato در برابر Cold-Potato Routing در سیاست BGP اپراتورها",
+   "html": "<p>در <strong>Hot-Potato Routing</strong> (پیش‌فرض اینترنت — با متریک نزدیک‌ترین IGP)، اپراتور ترافیک خروجی را از <em>نزدیک‌ترین نقطه Peering</em> از شبکه خود بیرون می‌اندازد تا پهنای باند هسته خودش مصرف نشود؛ اما در <strong>Cold-Potato Routing</strong> (با تنظیم <code>MED</code> یا <code>Local-Preference</code>)، اپراتور یا ارائه‌دهنده محتوا ترافیک را تا نزدیک‌ترین شهر به مقصد روی شبکه باکیفیت خودش حمل می‌کند تا کنترل کامل بر Latency و تجربه کاربر (QoE) داشته باشد!</p>"
+  },
+  {
+   "id": "ccde_03-section-8",
+   "title": "مقیاس‌پذیری ده‌ها هزار روتر دسترسی: Unified MPLS (Seamless MPLS با BGP-LU)",
+   "html": "<p>وقتی تعداد روترهای تجمیع و دکل‌های موبایل به ۵٬۰۰۰ یا ۲۰٬۰۰۰ عدد می‌رسد، هیچ IGP واحدی (نه OSPF و نه IS-IS) نمی‌تواند همه آن‌ها را در یک دامنه نگه دارد! معمار CCDE شبکه را به دامنه‌های کوچک IGP (Access، Aggregation، Core) می‌شکند و با <strong>BGP Labeled Unicast (BGP-LU)</strong> در مرز ABRها، LSP سرتاسری می‌سازد تا IGP هر ناحیه کوچک، سریع و ایزوله باقی بماند.</p>"
+  },
+  {
+   "id": "ccde_03-section-9",
+   "title": "طراحی امنیتی و حفظ حاکمیت مسیریابی اپراتور (MANRS: RPKI، Filtering و Anti-DDoS)",
+   "html": "<p>یک اپراتور حرفه‌ای باید اصول جهانی <strong>MANRS</strong> را در معماری خود ببیند: (۱) <strong>Prefix Filtering</strong> سخت‌گیرانه روی مشتریان (با IRR/RPKI) برای جلوگیری از BGP Route Leak؛ (۲) <strong>RPKI ROV</strong> در لبه‌های Peering/Transit؛ (۳) <strong>uRPF</strong> در دسترسی علیه IP Spoofing؛ و (۴) ترکیب <strong>BGP FlowSpec</strong> و مراکز پاک‌سازی (<strong>Scrubbing Centers</strong>) به جای تکیه صرف به RTBH برای مهار DDoS بدون قطع کامل سرویس مشتری!</p>"
+  },
+  {
+   "id": "ccde_03-section-10",
+   "title": "طراحی IPv6 و CGNAT برای میلیون‌ها مشترک خانگی و موبایل",
+   "html": "<p>با اتمام آدرس‌های IPv4 عمومی، هیچ اپراتوری نمی‌تواند به هر گوشی موبایل یک IPv4 عمومی اختصاص دهد! معماری مدرن اپراتور ترکیبی از <strong>Dual-Stack (IPv6 بومی برای ترافیک رو به رشد + IPv4 خصوصی پشت CGNAT / NAT444 یا MAP-T / 464XLAT)</strong> همراه با ثبت لاگ ترجمه پورت (Port-Block Allocation) جهت کاهش ۹۹٪ حجم لاگ قانونی است.</p>"
+  },
+  {
+   "id": "ccde_03-section-11",
+   "title": "کژفهمی‌های رایج درباره معماری Service Provider",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای اتصال میلیون‌ها مشترک بهتر است همه را با IPv4 عمومی و بدون VRF در یک جدول مسیریابی قرار دهیم.»</strong> واقعیت: هم آدرس IPv4 کافی وجود ندارد و هم بدون VRF/MPLS جداسازی مشتریان سازمانی و مقیاس‌پذیری هسته ممکن نیست.</li><li><strong>کژفهمی ۲: «Peering در IXP می‌تواند جایگزین ۱۰۰٪ لینک‌های Transit شود.»</strong> واقعیت: خیر! در IXP تنها به شبکه‌های حاضر در همان نقطه دسترسی دارید؛ برای رسیدن به بقیه اینترنت جهانی همچنان به حداقل دو ارائه‌دهنده Transit افزونه نیاز است.</li><li><strong>کژفهمی ۳: «برای سادگی باید روی تمام روترهای P هسته نیز تمام مسیرهای BGP اینترنت را بریزیم.»</strong> واقعیت: این کار معماری <strong>BGP-Free Core</strong> را می‌شکند، حافظه روترهای P را هدر می‌دهد و زمان همگرایی را کند می‌کند.</li></ul>"
+  },
+  {
+   "id": "ccde_03-section-12",
+   "title": "چک‌لیست پنج‌پرسشی معمار در طراحی شبکه Service Provider",
+   "html": "<ol><li>آیا هسته ۱۰۰٪ <strong>BGP-Free</strong> و عاری از VRF مشتریان است؟</li><li>آیا سیاست <strong>IXP Peering + CDN Offload</strong> حداقل ۵۰–۷۰٪ هزینه Transit را کاهش داده است؟</li><li>آیا سقف اندازه هر دامنه IGP (یا Unified MPLS) برای رشد ۵ساله کنترل شده است؟</li><li>آیا <strong>RPKI ROV، Prefix Filtering و FlowSpec/Scrubbing</strong> در لبه طراحی شده‌اند؟</li><li>آیا طرح مهاجرت بدون قطعی (مثلاً با SRMS) برای سخت‌افزارهای فعلی دیده شده است؟</li></ol>"
+  },
+  {
+   "id": "ccde_03-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> اپراتوری ۴۰۰ گیگابیت اوج ترافیک با هزینه Transit برابر <code>$0.65/Mbps</code> دارد (ماهانه ۲۶۰٬۰۰۰ دلار). با صرف ۱۸٬۰۰۰ دلار در ماه برای پورت IXP و CDN محلی، ۶۵٪ ترافیک (۲۶۰ گیگابیت) Offload می‌شود. صرفه‌جویی ماهانه چقدر است؟ <strong>پاسخ:</strong> هزینه جدید برابر <code>140,000 × 0.65 + 18,000 = $109,000</code> است؛ یعنی <strong>۱۵۱٬۰۰۰ دلار صرفه‌جویی خالص ماهانه</strong> همراه با کاهش چشمگیر Latency مشترکان!</p><p><strong>تمرین ۲:</strong> اپراتوری شبکه قدیمی LDP دارد اما می‌خواهد طی ۱۸ ماه بدون قطعی به SR-MPLS برای سرویس ۵G مهاجرت کند. چه راهکاری پیشنهاد می‌دهید؟ <strong>پاسخ:</strong> مهاجرت مرحله‌ای با هم‌زیستی LDP و SR-MPLS از طریق <strong>SRMS (Segment Routing Mapping Server)</strong> به جای تعویض پرریسک یک‌شبه (Forklift).</p>"
+  },
+  {
+   "id": "ccde_03-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.manrs.org/\" target=\"_blank\" rel=\"noopener\">استاندارد جهانی MANRS (Mutually Agreed Norms for Routing Security)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8277\" target=\"_blank\" rel=\"noopener\">RFC 8277 (Using BGP to Bind MPLS Labels to Address Prefixes / BGP-LU)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز اقتصادی و معماری محلی در Python 3 است و به هیچ روتر مخابراتی یا IXP زنده متصل نیست.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "BGP-Free Core",
+   "fa": "هسته مخابراتی بدون BGP",
+   "simple": "نگه داشتن صرفاً Loopbackهای PE در IGP روترهای P و حذف میلیون‌ها مسیر اینترنت/VRF از هسته."
+  },
+  {
+   "term": "IP Transit",
+   "fa": "خرید ترانزیت اینترنت",
+   "simple": "سرویس پولی از اپراتور بالادست (Tier-1/2) جهت دسترسی تضمینی به کل جدول مسیریابی اینترنت."
+  },
+  {
+   "term": "IXP Settlement-Free Peering",
+   "fa": "تبادل ترافیک رایگان در IXP",
+   "simple": "اتصال مستقیم اپراتورها و CDNها در نقطه تبادل جهت کاهش شدید هزینه Transit و Latency."
+  },
+  {
+   "term": "PNI (Private Network Interconnect)",
+   "fa": "اتصال فیزیکی مستقیم دو شبکه",
+   "simple": "لینک اختصاصی نقطه‌به‌نقطه بین اپراتور و یک ارائه‌دهنده محتوای بزرگ (مثل CDN ویدیو)."
+  },
+  {
+   "term": "CDN Local Cache",
+   "fa": "سرور کش محلی محتوا",
+   "simple": "استقرار سرورهای کش (مثل Google/Netflix) داخل شبکه اپراتور برای پاسخ محلی به ترافیک پرتکرار."
+  },
+  {
+   "term": "Hot-Potato Routing",
+   "fa": "مسیریابی سیب‌زمینی داغ",
+   "simple": "خارج کردن سریع ترافیک از نزدیک‌ترین نقطه Peering به مبدأ جهت صرفه‌جویی در ظرفیت Backbone."
+  },
+  {
+   "term": "Cold-Potato Routing",
+   "fa": "مسیریابی سیب‌زمینی سرد",
+   "simple": "حمل ترافیک روی Backbone خود اپراتور تا نزدیک‌ترین شهر به مقصد جهت کنترل کامل کیفیت و Latency."
+  },
+  {
+   "term": "Unified MPLS (BGP-LU)",
+   "fa": "MPLS یکپارچه چندناحیه‌ای",
+   "simple": "تقسیم شبکه عظیم به دامنه‌های کوچک IGP و اتصال لیبل‌های End-to-End با BGP Labeled Unicast."
+  },
+  {
+   "term": "MANRS",
+   "fa": "اصول جهانی امنیت مسیریابی",
+   "simple": "مجموعه قواعد عملیاتی اپراتورها شامل Prefix Filtering، RPKI، Anti-Spoofing و هماهنگی رخداد."
+  },
+  {
+   "term": "CGNAT (NAT444 / PBA)",
+   "fa": "NAT در مقیاس مخابراتی",
+   "simple": "اشتراک‌گذاری آدرس‌های IPv4 عمومی بین هزاران مشترک با تخصیص بلوک پورت (PBA) و همراهی IPv6."
+  },
+  {
+   "term": "BNG (Broadband Network Gateway)",
+   "fa": "دروازه تجمیع مشترکان",
+   "simple": "روتر خاتمه نشست‌های PPPoE/IPoE، احراز هویت RADIUS، اعمال QoS و تخصیص IP مشترکان."
+  },
+  {
+   "term": "Scrubbing Center",
+   "fa": "مرکز پاک‌سازی حملات DDoS",
+   "simple": "هدایت ترافیک تحت حمله با BGP به تجهیزات پاک‌سازی و بازگرداندن ترافیک سالم به مشتری."
+  },
+  {
+   "term": "Route Reflector Hierarchy",
+   "fa": "سلسله‌مراتب بازتاب‌دهنده مسیر",
+   "simple": "تفکیک Out-of-Band Route Reflectorها (مثلاً جدا برای VPNv4 و Internet) جهت مقیاس‌پذیری."
+  },
+  {
+   "term": "Transport/Service Decoupling",
+   "fa": "جدایی لایه انتقال از سرویس",
+   "simple": "امکان ارتقای لایه انتقال (LDP به SR) بدون تغییر ساختار سرویس‌های VRF/EVPN مشتریان."
+  },
+  {
+   "term": "464XLAT / MAP-T",
+   "fa": "فناوری‌های گذار به هسته IPv6-Only",
+   "simple": "حمل ترافیک باقی‌مانده IPv4 روی شبکه دسترسی تماماً IPv6 اپراتورهای موبایل و ثابت."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (مدل اقتصاد Transit در برابر IXP/CDN Offload و انتخابگر Transport مخابراتی) — بدون روتر مخابراتی واقعی",
+   "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر مخابراتی یا نقطه تبادل IXP زنده متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر مخابراتی، BNG یا نقطه تبادل IXP زنده در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو تصمیم کلان Service Provider در CCDE را محاسبه می‌کند: (۱) مدل اقتصادی مقایسه <code>All-Transit</code> با <strong>Hybrid Transit + IXP/CDN Offload 65%</strong> (صرفه‌جویی ۱۵۱٬۰۰۰ دلار ماهانه روی ۴۰۰Gbps)، و (۲) ماتریس انتخاب Transport میان <code>Classic LDP</code>، <code>Phased SRMS</code> و <code>SR-MPLS/SRv6 + Flex-Algo</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_03_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_03_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_03 (CCDE Service Provider Architecture: Transit vs IXP Peering Economics &amp; SR/MPLS Choice)\nModels Service Provider internet economics (Tier-1 Transit vs IXP Settlement-Free Peering + CDN Cache),\nverifies BGP-Free Core P-router scaling, and recommends LDP vs SR-MPLS/EVPN based on hardware &amp; 5G SLA.\nNo real carrier core routers or IXP fabrics are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef model_sp_peering_economics(total_gbps: float, transit_usd_per_mbps: float, ixp_port_usd_month: float, offload_ratio: float) -&gt; dict:\n    all_transit_cost = round(total_gbps * 1000 * transit_usd_per_mbps, 2)\n    offloaded_gbps = round(total_gbps * offload_ratio, 2)\n    remaining_transit_gbps = round(total_gbps - offloaded_gbps, 2)\n    hybrid_cost = round(remaining_transit_gbps * 1000 * transit_usd_per_mbps + ixp_port_usd_month, 2)\n    monthly_savings = round(all_transit_cost - hybrid_cost, 2)\n    return {\n        &quot;total_peak_gbps&quot;: total_gbps,\n        &quot;all_transit_monthly_usd&quot;: all_transit_cost,\n        &quot;ixp_and_cdn_offload_gbps&quot;: offloaded_gbps,\n        &quot;hybrid_monthly_usd&quot;: hybrid_cost,\n        &quot;monthly_opex_savings_usd&quot;: monthly_savings,\n        &quot;roi_positive&quot;: monthly_savings &gt; 0,\n    }\n\n\ndef select_sp_transport(legacy_ldp_only: bool, needs_5g_slicing_and_tilfa: bool) -&gt; dict:\n    if needs_5g_slicing_and_tilfa and not legacy_ldp_only:\n        return {\n            &quot;recommended&quot;: &quot;SR-MPLS (or SRv6) + Flex-Algo + TI-LFA + EVPN&quot;,\n            &quot;reason&quot;: &quot;Eliminates LDP/RSVP state in Core, gives 100% &lt;50ms TI-LFA and latency-based Flex-Algo slices&quot;,\n        }\n    if needs_5g_slicing_and_tilfa and legacy_ldp_only:\n        return {\n            &quot;recommended&quot;: &quot;Phased SR-MPLS migration using SRMS (Mapping Server) alongside LDP&quot;,\n            &quot;reason&quot;: &quot;Allows gradual brownfield upgrade without forklift outage&quot;,\n        }\n    return {\n        &quot;recommended&quot;: &quot;Classic MPLS LDP + LFA/rLFA (BGP-Free Core)&quot;,\n        &quot;reason&quot;: &quot;Simplest stable fit for basic L3VPN on legacy hardware without TE slicing needs&quot;,\n    }\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_SP_MODELER&quot;,\n        &quot;transit_vs_ixp_economics&quot;: model_sp_peering_economics(\n            total_gbps=400.0,\n            transit_usd_per_mbps=0.65,\n            ixp_port_usd_month=18000.0,\n            offload_ratio=0.65,\n        ),\n        &quot;transport_architecture_choices&quot;: {\n            &quot;greenfield_5g_carrier&quot;: select_sp_transport(False, True),\n            &quot;brownfield_upgrade_to_5g&quot;: select_sp_transport(True, True),\n            &quot;legacy_l3vpn_only&quot;: select_sp_transport(True, False),\n        },\n        &quot;bgp_free_core_p_router_rib_routes&quot;: {&quot;igp_loopbacks_only&quot;: 1200, &quot;full_internet_plus_vpn_avoided&quot;: 1_800_000},\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کاهش هزینه ماهانه از <code>$260,000</code> به <code>$109,000</code> (<code>roi_positive: True</code>) و مقایسه جدول هسته BGP-Free (۱٬۲۰۰ مسیر IGP در برابر ۱٫۸ میلیون مسیر اجتناب‌شده).</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع سیاست اولویت اقتصادی BGP در لبه اینترنت اپراتور (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference SP BGP Local-Preference Economic Hierarchy (HLD)\n# Customer Routes (Revenue!) : Local-Pref 300\n# IXP / PNI Peering (Free!)  : Local-Pref 200\n# Paid IP Transit (Cost!)    : Local-Pref 100</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس معماری شبکه‌های اپراتوری CCDE (BGP-Free Core، Peering و SR/MPLS)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در معماری Service Provider در CCDE، کدام ترکیب برای اتصال میلیون‌ها مشترک و هزاران مشتری سازمانی حیاتی‌ترین نقش را دارد؟",
+   "options": [
+    "اختصاص IPv4 عمومی به همه دستگاه‌ها بدون جداسازی",
+    "خلاصه‌سازی مسیرها و جداسازی کامل جدول مسیریابی مشتریان با VRF/MPLS/EVPN روی هسته BGP-Free",
+    "حذف تمام فایروال‌ها و فیلترها",
+    "استفاده از RIPv2 در کل کشور"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>ترکیب BGP-Free Core، جداسازی VRF/MPLS/EVPN و خلاصه‌سازی، کلید مقیاس‌پذیری شبکه‌های مخابراتی است.</p>"
+  },
+  {
+   "title": "سلسله‌مراتب استاندارد اقتصادی BGP Local-Preference در لبه یک اپراتور (ISP) از بالاترین به پایین‌ترین اولویت کدام است؟",
+   "options": [
+    "Transit > Peering > Customer",
+    "Customer (درآمدزا — بالاترین) > IXP/PNI Peering (رایگان — میانی) > Paid Transit (پولی — پایین‌ترین)",
+    "Peering > Customer > Transit",
+    "همه با اولویت یکسان"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>اپراتور همیشه ترافیک را نخست از لینک مشتری (درآمد)، سپس Peering رایگان و در نهایت از Transit پولی عبور می‌دهد.</p>"
+  },
+  {
+   "title": "چرا استقرار سرورهای کش محلی CDN و اتصال به IXP برای یک اپراتور ۴۰۰ گیگابیتی معمولاً بازگشت سرمایه (ROI) بسیار سریع دارد؟",
+   "options": [
+    "زیرا نیاز به Transit را به صفر مطلق می‌رساند",
+    "زیرا ۶۰ تا ۷۰ درصد ترافیک پرتکرار (ویدیو/محتوا) را با هزینه ثابت کوچک از روی لینک گران Transit برمی‌دارد و هم‌زمان تاخیر کاربران را کاهش می‌دهد",
+    "زیرا جایگزین روترهای PE می‌شود",
+    "زیرا IPv6 را حذف می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Offload ترافیک روی IXP و CDN محلی هم OpEx ماهانه Transit را به شدت کاهش می‌دهد و هم تجربه کاربری (QoE) را بهتر می‌کند.</p>"
+  },
+  {
+   "title": "تفاوت اصلی Hot-Potato Routing با Cold-Potato Routing در تصمیم معمار SP چیست؟",
+   "options": [
+    "در Hot-Potato ترافیک از نزدیک‌ترین نقطه Peering خارج می‌شود تا ظرفیت Backbone حفظ شود؛ در Cold-Potato ترافیک تا نزدیک‌ترین نقطه به مقصد روی شبکه خود اپراتور حمل می‌شود تا کیفیت و Latency کنترل گردد",
+    "Hot-Potato فقط برای IPv6 است",
+    "Cold-Potato از RIP استفاده می‌کند",
+    "هیچ تفاوتی ندارند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>انتخاب Hot-Potato در برابر Cold-Potato یک موازنه کلاسیک بین هزینه حمل داخلی (Backbone) و کنترل کیفیت سرتاسری (SLA) است.</p>"
+  },
+  {
+   "title": "چرا یک اپراتور با سخت‌افزارهای قدیمی LDP که قصد ارتقا به ۵G و Segment Routing را دارد، باید از SRMS (Mapping Server) استفاده کند؟",
+   "options": [
+    "برای تخریب یک‌شبه کل شبکه",
+    "برای امکان مهاجرت تدریجی و هم‌زیستی مسالمت‌آمیز LDP و SR-MPLS بدون قطعی سرویس مشترکان",
+    "برای حذف IS-IS",
+    "برای خاموش کردن BGP"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در شبکه‌های مخابراتی Brownfield، مهاجرت مرحله‌ای بدون قطعی همیشه بر تعویض پرریسک Forklift اولویت دارد.</p>"
+  },
+  {
+   "title": "در شبکه‌ای با ۱۰٬۰۰۰ روتر تجمیع موبایل (5G Backhaul)، چگونه از انفجار جدول IGP جلوگیری می‌شود؟",
+   "options": [
+    "قرار دادن همه ۱۰٬۰۰۰ روتر در OSPF Area 0",
+    "حذف MPLS و استفاده از Static Route",
+    "شکستن شبکه به چند دامنه کوچک IGP و اتصال لیبل‌شده آن‌ها با Unified MPLS (BGP-LU / RFC 8277)",
+    "خاموش کردن Loopbackها"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>Unified MPLS اندازه هر دامنه IGP را کوچک و سریع نگه می‌دارد در حالی که LSP سرتاسری بین لبه‌ها برقرار می‌ماند.</p>"
+  },
+  {
+   "title": "مزیت اصلی هدایت ترافیک حمله DDoS به Scrubbing Center (همراه با BGP FlowSpec) در مقایسه با RTBH ساده چیست؟",
+   "options": [
+    "RTBH گران‌تر است",
+    "RTBH ترافیک سالم و مخرب مقصد را هم‌زمان سیاه‌چاله (قطع کامل) می‌کند، اما Scrubbing Center و FlowSpec ترافیک حمله را فیلتر کرده و سرویس مشروع مشتری را زنده نگه می‌دارند",
+    "Scrubbing Center بدون BGP کار می‌کند",
+    "تفاوتی ندارند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>برای مشتریان حیاتی دارای SLA، پاک‌سازی دقیق ترافیک حمله در Scrubbing Center جایگزین سیاه‌چاله کردن کامل می‌شود.</p>"
+  },
+  {
+   "title": "مجموعه اصول جهانی MANRS از اپراتورهای مخابراتی کدام اقدامات کلیدی امنیت مسیریابی را می‌طلبد؟",
+   "options": [
+    "باز گذاشتن همه پورت‌های مدیریتی",
+    "فیلتر دقیق پیشوندهای مشتریان (جلوگیری از Route Leak)، اعتبارسنجی RPKI ROV، مقابله با IP Spoofing (uRPF) و هماهنگی رخدادها",
+    "حذف BGP و استفاده از RIP",
+    "انتشار مسیرهای خصوصی RFC 1918 در اینترنت"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>رعایت MANRS از بروز فجایع جهانی BGP Hijack و Route Leak جلوگیری می‌کند.</p>"
+  },
+  {
+   "title": "نقش معماری BGP-Free Core در کاهش مصرف حافظه و افزایش سرعت روترهای P چیست؟",
+   "options": [
+    "روترهای P به جای ذخیره ۱٫۸ میلیون مسیر اینترنت و VRF مشتریان، تنها حدود چند صد تا چند هزار مسیر IGP Loopback را نگه داشته و صرفاً برچسب MPLS/SR را Swap می‌کنند",
+    "روترهای P تمام ترافیک را رمزگشایی می‌کنند",
+    "روترهای P به اینترنت وصل نیستند",
+    "روترهای P از سوئیچ لایه ۲ استفاده می‌کنند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>BGP-Free Core پایه طراحی مقیاس‌پذیر و کم‌هزینه در هسته تمام اپراتورهای بزرگ جهان است.</p>"
+  },
+  {
+   "title": "چرا در شبکه‌های موبایل و خانگی مدرن، استفاده از CGNAT همراه با Port-Block Allocation (PBA) و Dual-Stack IPv6 استاندارد شده است؟",
+   "options": [
+    "زیرا IPv4 عمومی کافی برای میلیون‌ها مشترک وجود ندارد و PBA با تخصیص بلوک پورت ثابت به هر مشترک، حجم لاگ‌های قانونی NAT را تا ۹۹٪ کاهش می‌دهد",
+    "زیرا IPv6 دیگر استفاده نمی‌شود",
+    "برای مسدود کردن وب‌سایت‌ها",
+    "برای حذف نیاز به DNS"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>PBA در CGNAT و مهاجرت تدریجی ترافیک روی IPv6 راه‌حل استاندارد اتمام IPv4 در مقیاس اپراتوری است.</p>"
+  },
+  {
+   "title": "چرا در معماری Route Reflector اپراتوری، جداسازی RRها به صورت Out-of-Band (خارج از مسیر Data Plane) و تفکیک خانواده آدرس (VPNv4 در برابر Internet) توصیه می‌شود؟",
+   "options": [
+    "برای افزایش تعداد هاپ بسته",
+    "برای جلوگیری از فشار CPU/RAM مسیرهای یک سرویس بر سرویس دیگر و حذف گلوگاه Forwarding روی RRها",
+    "برای حذف نیاز به IGP",
+    "برای تبدیل RR به فایروال"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>RRهای تخصصی و خارج از مسیر داده، پایداری صفحه کنترل اپراتور را هنگام نوسانات جدول اینترنت تضمین می‌کنند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "مدل‌سازی محلی (Local Mock) در Python 3 برای تحلیل اقتصادی Transit در برابر IXP/CDN Offload و انتخاب معماری Transport مخابراتی",
+    "اتصال زنده به IXP فرانکفورت",
+    "پیکربندی واقعی روی BNG اپراتور",
+    "فقط متن نظری بدون کد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و به هیچ شبکه مخابراتی زنده متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccde_03",
+  "sources": [
+   "https://www.manrs.org/",
+   "https://www.rfc-editor.org/rfc/rfc8277"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ روتر مخابراتی یا نقطه تبادل IXP زنده متصل نیست."
+  ],
+  "legacyAuditFixes": [
+   "گسترش نسخه قدیمی (۱ پرسش) به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Hot/Cold Potato، MANRS، CGNAT PBA و مدل‌ساز اقتصادی Peering/Transit."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccde_03-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccde",
+   "recommendedCourse": "ccde-design",
+   "blueprint": "/academy-assets/v5/blueprints/ccde_03.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_03_lab.py"
+  }
+ }
+}

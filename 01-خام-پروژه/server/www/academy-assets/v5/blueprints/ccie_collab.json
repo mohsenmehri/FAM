@@ -1,0 +1,339 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccie_collab",
+ "objectiveId": "ccie_collab",
+ "kind": "lesson",
+ "track": "CCIE",
+ "course": "ccie-collab",
+ "title": "۸.۶ CCIE Collaboration: معماری یکپارچه CUCM/CUBE/Expressway (v3.1) و جراحی پیام‌های SIP",
+ "titleEn": "CCIE Collaboration (350-801 CLCOR + 8-Hour Lab v3.1): CUCM CSS/CAC, CUBE SIP Debugging & Expressway MRA",
+ "domain": "Collaboration Expert",
+ "source": "Legacy ccie_collab rewritten, typo-cleaned, and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 60,
+ "prerequisites": [
+  "spec_collab",
+  "spec_collab_gw"
+ ],
+ "sections": [
+  {
+   "id": "ccie_collab-section-1",
+   "title": "مسئله واقعی: چرا تماس‌های صوتی/ویدیویی در لب CCIE Collaboration دقیقاً پس از ۳۰ ثانیه قطع می‌شوند یا بدون صدا وصل می‌گردند؟",
+   "html": "<p>در آزمون عملی ۸ساعته <strong>CCIE Collaboration (v3.1)</strong> (پس از <code>350-801 CLCOR</code>)، داوطلب روی خوشه‌های زنده <strong>CUCM</strong>، <strong>Unity Connection (CUC)</strong>، <strong>IM&amp;P</strong>، <strong>Expressway-C/E</strong>، روترهای <strong>CUBE/SRST</strong> (با منابع DSP/Transcoding) و اتصال <strong>Webex Hybrid</strong> کار می‌کند. در این جهان، حدس زدن علت بوق اشغال یا قطع ۳۰ثانیه‌ای سم است؛ تنها خواندن دقیق پیام‌های <strong>SIP/SDP</strong> با <strong>TranslatorX</strong> و <strong><code>debug ccsip messages</code></strong> شما را به جواب می‌رساند!</p>"
+  },
+  {
+   "id": "ccie_collab-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر SIP/RTP/SDP، CUCM، CUBE و SRST در درس‌های <code>spec_collab</code> و <code>spec_collab_gw</code>.</p><ul><li>تسلط بر زنجیره مسیریابی و دسترسی در <strong>CUCM</strong>: <code>CSS -&gt; Partition</code>، <code>Translation Pattern -&gt; Route Pattern -&gt; Route List -&gt; Route Group -&gt; SIP Trunk</code> و <strong>Globalized Call Routing (+E.164)</strong>.</li><li>طراحی و عیب‌یابی <strong>Regions (مذاکره کدک صوت/ویدیو)</strong>، <strong>Locations (کنترل پذیرش تماس CAC)</strong> و منابع رسانه (<strong>MTP / Hardware Transcoder</strong>).</li><li>جراحی دقیق سه علامت کلاسیک شکست SIP در <strong>TranslatorX / <code>debug ccsip messages</code></strong>: خطای <code>404</code>، قطع تماس پس از <strong>۳۰ ثانیه (نبود ACK)</strong> و <strong>One-Way Audio (IP خصوصی در SDP)</strong>.</li><li>یکپارچه‌سازی <strong>Cisco Expressway-C/E (MRA و B2B Video)</strong> با <strong>DNS SRV + Mutual TLS</strong>، <strong>ILS/URI Dialing</strong> و اتوماسیون <strong>CUCM AXL SOAP API</strong>.</li></ul>"
+  },
+  {
+   "id": "ccie_collab-section-3",
+   "title": "زنجیره طلایی مسیریابی و مجوزدهی تماس در CUCM (CSS/Partition و Globalized +E.164)",
+   "html": "<p>در CUCM، هیچ شماره یا مسیری بدون عبور از دو سازه امنیتی کار نمی‌کند: <strong>Partition</strong> (برچسب قرارگرفته روی DNها و Route Patternها) و <strong>CSS (Calling Search Space)</strong> (فهرست مرتب Partitionهایی که یک گوشی یا Trunk اجازه دیدن آن‌ها را دارد). در معماری مدرن لب CCIE Collaboration، از <strong>Globalized Call Routing (+E.164)</strong> استفاده می‌شود: تمام شماره‌ها در ورود به فرمت یکپارچه <code>+9821...</code> تبدیل می‌شوند، روی Route Patternهای ساده مسیریابی می‌گردند و در لحظه خروج (Called/Calling Party Transformation در سطح Route List یا Gateway) به فرمت مورد انتظار اپراتور محلی بازنویسی (Localized) می‌شوند!</p>"
+  },
+  {
+   "id": "ccie_collab-section-4",
+   "title": "نمودار اکوسیستم CCIE Collaboration v3.1 و امضاهای شکست SIP",
+   "html": "<p>نمودار زیر سه ستون اصلی CUCM، CUBE و Expressway-C/E و سه علامت طلایی دیباگ SIP را خلاصه می‌کند.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCIE Collaboration v3.1 End-to-End Call Routing: CUCM CSS/Partition, Regions/Locations CAC, CUBE and Expressway\"><rect x=\"14\" y=\"14\" width=\"234\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"131\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">CUCM Call Control Chain</text><text x=\"131\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">CSS -&gt; Partition (Authorization)</text><text x=\"131\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">TP -&gt; Route Pattern -&gt; RL -&gt; RG</text><text x=\"131\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Regions (Codec) + Locations (CAC)</text><text x=\"131\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e3a8a\">CUC Voicemail + IM&amp;P + ILS</text><rect x=\"264\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Cisco CUBE / IOS-XE DSP</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">SIP Trunk B2BUA + Transcoding</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">SRST Branch Survivability</text><text x=\"380\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">SIP Profiles + DTMF rtp-nte</text><text x=\"380\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#166534\">Debug: TranslatorX / ccsip!</text><rect x=\"512\" y=\"14\" width=\"234\" height=\"114\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"629\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Expressway C/E &amp; Webex</text><text x=\"629\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">MRA (Mobile &amp; Remote Access)</text><text x=\"629\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">B2B SIP Video + Traversal Zone</text><text x=\"629\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Hybrid Webex Calling + AXL API</text><text x=\"629\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">TLS Mutual Auth + DNS SRV!</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"64\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">Classic CCIE Collaboration SIP Failure Signatures</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">404 =&gt; CSS/Partition or Dial-Peer | 30s Drop =&gt; Missing ACK (NAT/Contact) | No Audio =&gt; SDP c=IN IP4 / RTP Port</text></svg>"
+  },
+  {
+   "id": "ccie_collab-section-5",
+   "title": "کنترل کدک و پهنای باند بین شعب: Regions، Locations (CAC) و منابع DSP Transcoding",
+   "html": "<ul><li><strong>Regions:</strong> حداکثر پهنای باند کدک مجاز بین دو سایت را تعیین می‌کند (مثلاً درون دفتر مرکزی <code>G.711 — 64 kbps</code>، اما روی لینک WAN بین HQ و شعبه <code>G.729 — 8 kbps</code> با حدود <code>24 kbps</code> همراه هدر IP/UDP/RTP).</li><li><strong>Locations (Call Admission Control — CAC):</strong> سقف کل پهنای باند صوتی و ویدیویی قابل مصرف روی لینک WAN هر سایت را کنترل می‌کند تا تماس جدید کیفیت تماس‌های زنده قبلی را خراب نکند (در صورت کمبود پهنای باند، تماس با خطای CAC رد یا از طریق AAR به PSTN سوییچ می‌شود!).</li><li><strong>MRGL (Media Resource Group List) و Transcoder:</strong> اگر یک سمت فقط G.711 و سمت دیگر فقط G.729 بخواهد (یا در برخی سناریوهای DTMF/Early Offer)، بدون ثبت صحیح <strong>IOS-XE Hardware Transcoder / MTP</strong> در MRGL گوشی/Trunk تماس فوراً با <code>488 Not Acceptable Here</code> رد می‌شود!</li></ul>"
+  },
+  {
+   "id": "ccie_collab-section-6",
+   "title": "جراحی سه علامت کلاسیک شکست SIP در TranslatorX و debug ccsip messages",
+   "html": "<ol><li><strong>پاسخ <code>404 Not Found</code> بلافاصله پس از <code>INVITE</code>:</strong> شماره گرفته‌شده در هیچ Partition عضو CSS تماس‌گیرنده نیست یا با هیچ Dial-Peer خروجی در CUBE تطبیق نیافته است.</li><li><strong>تماس وصل می‌شود، صدا هم هست، اما دقیقاً پس از ~۳۰ ثانیه قطع می‌شود!</strong> علت کلاسیک: پیام <code>200 OK</code> رسیده اما پیام <strong><code>ACK</code></strong> نهایی به مبدأ <code>200 OK</code> نرسیده است (تایمر SIP منقضی شده و <code>BYE</code> می‌فرستد)! علت معمولاً نادرست بودن آدرس IP در هدر <code>Contact</code> پشت NAT یا فایروال بین CUBE و CUCM/ITSP است.</li><li><strong>تماس وصل است و قطع هم نمی‌شود اما صدای یک‌طرفه یا سکوت کامل (One-Way / No-Way Audio):</strong> بررسی خط <strong><code>c=IN IP4 &lt;ip&gt;</code></strong> و <code>m=audio &lt;port&gt;</code> در بدنه <strong>SDP</strong>؛ اغلب یک IP خصوصی داخل SDP به اپراتور ارسال شده یا پورت‌های UDP رسانه RTP روی فایروال مسدود است (یا <code>media flow-around</code> به اشتباه فعال شده است).</li></ol>"
+  },
+  {
+   "id": "ccie_collab-section-7",
+   "title": "Cisco Expressway-C و Expressway-E: معماری MRA، B2B Video و تله DNS SRV / Mutual TLS",
+   "html": "<p>جفت <strong>Expressway-C (داخل شبکه)</strong> و <strong>Expressway-E (در DMZ)</strong> بدون نیاز به VPN اجازه می‌دهد کاربران دورکار با Cisco Jabber / Webex App از اینترنت به CUCM وصل شوند (<strong>MRA — Mobile and Remote Access</strong>) و تماس‌های ویدیویی B2B با شرکت‌های دیگر برقرار کنند. دو عامل شماره ۱ شکست Expressway در روز آزمون: (۱) نبود رکوردهای دقیق <strong>DNS SRV</strong> (<code>_collab-edge._tls.&lt;domain&gt;</code> در DNS عمومی برای MRA و <code>_cisco-uds._tcp.&lt;domain&gt;</code> در DNS داخلی!) و (۲) ناقص بودن زنجیره گواهینامه‌های <strong>Mutual TLS</strong> و نام‌های <strong>SAN</strong> در <strong>Traversal Zone</strong> بین Exp-C و Exp-E!</p>"
+  },
+  {
+   "id": "ccie_collab-section-8",
+   "title": "پست صوتی Cisco Unity Connection (CUC)، ILS و تماس مبتنی بر URI",
+   "html": "<p>در لب CCIE Collaboration، یکپارچه‌سازی <strong>Unity Connection</strong> از طریق <strong>SIP Trunk</strong> (به جای SCCP قدیمی) همراه با تطابق هدر <strong>Redirecting Number / Diversion</strong> برای پخش پیام صندوق صوتی دقیق کارمند تماس‌گرفته‌شده حیاتی است. همچنین برای اتصال چند خوشه CUCM مستقل از <strong>ILS (Intercluster Lookup Service)</strong> و <strong>URI Dialing (مثل <code>ali@corp.ir</code>)</strong> همراه با <strong>GDPR (Global Dial Plan Replication)</strong> استفاده می‌شود.</p>"
+  },
+  {
+   "id": "ccie_collab-section-9",
+   "title": "اتوماسیون همکاری در CCIE Collaboration (CUCM AXL SOAP API و Webex REST API)",
+   "html": "<p>در بخش Automation نسخه v3.1، دو API کلیدی آزمون می‌شوند: (۱) <strong>CUCM AXL (Administrative XML — مبتنی بر SOAP/XML)</strong> با Python (<code>zeep</code> یا <code>requests</code>) برای ساخت/ویرایش انبوه کاربران، DNها، گوشی‌ها و CSSها؛ و (۲) <strong>Webex REST API (JSON با Bearer Token)</strong> برای مدیریت خودکار فضاها، ربات‌ها و Webhookهای Webex.</p>"
+  },
+  {
+   "id": "ccie_collab-section-10",
+   "title": "مدیریت زمان و جمع‌آوری سریع لاگ با RTMT + TranslatorX در روز لب",
+   "html": "<p>ابزار <strong>Cisco RTMT (Real-Time Monitoring Tool)</strong> برای دانلود لاگ‌های <code>Cisco CallManager SDI/SDL Traces</code> از CUCM و باز کردن آن‌ها درون <strong>TranslatorX</strong> (تولیدکننده خودکار نمودار گرافیکی Ladder Diagram پیام‌های SIP!) می‌تواند یک عیب‌یابی ۱ساعته را به ۵ دقیقه کاهش دهد.</p>"
+  },
+  {
+   "id": "ccie_collab-section-11",
+   "title": "کژفهمی‌های رایج درباره CCIE Collaboration",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای صدا و ویدیو روی IP فقط پروتکل SIP کافی است.»</strong> واقعیت: SIP صرفاً سیگنالینگ (زنگ خوردن و قطع) است؛ مذاکره کدک/پورت با <strong>SDP</strong> و انتقال واقعی جریان صدا/تصویر با <strong>RTP/RTCP (یا SRTP رمزنگاری‌شده)</strong> انجام می‌شود.</li><li><strong>کژفهمی ۲: «اگر تماس بعد از ۳۰ ثانیه قطع شود، یعنی پهنای باند کم است.»</strong> واقعیت: قطع منظم دقیقاً در حدود ۳۰–۳۲ ثانیه امضای کلاسیک <strong>نرسیدن پیام SIP ACK</strong> پس از <code>200 OK</code> است (مسئله NAT/Contact/Routing سیگنالینگ)!</li><li><strong>کژفهمی ۳: «پیکربندی Expressway MRA بدون DNS SRV با آدرس IP مستقیم هم کار می‌کند.»</strong> واقعیت: MRA به صورت بنیادی برای کشف سرویس به رکوردهای DNS SRV (<code>_collab-edge._tls</code> و <code>_cisco-uds._tcp</code>) و گواهینامه TLS با SAN دقیق متکی است.</li></ul>"
+  },
+  {
+   "id": "ccie_collab-section-12",
+   "title": "اصلاح خطاهای نسخه قدیمی و چک‌لیست تست نهایی لب CCIE Collaboration",
+   "html": "<p><strong>یادداشت ممیزی:</strong> عبارات معیوب نسخه قدیمی («Purposeی از CUBE»، «ترمینال‌سازی و نرمافزار SIP trunk») به‌طور کامل با نثر فنی دقیق بازنویسی شدند.</p><p><strong>چک‌لیست پایانی لب CCIE Collaboration:</strong> (۱) تست تماس صوتی دوطرفه بیشتر از ۴۰ ثانیه (جهت رد تله قطع ۳۰ثانیه‌ای ACK!)، (۲) تست DTMF روی Unity Connection Voicemail، (۳) تست ورود کاربر MRA از شبکه بیرونی، (۴) ذخیره پیکربندی تمام روترهای CUBE/SRST.</p>"
+  },
+  {
+   "id": "ccie_collab-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> پهنای باند باقیمانده Location یک شعبه برابر <code>40 kbps</code> است؛ تماس با کدک <code>G.711 (80 kbps)</code> رد می‌شود اما پس از تغییر Region به <code>G.729 (24 kbps)</code> پذیرفته می‌شود. چرا؟ <strong>پاسخ:</strong> Location CAC در CUCM پیش از برقراری تماس بررسی می‌کند آیا پهنای باند کافی برای کدک انتخاب‌شده توسط Region موجود است یا خیر؛ <code>80 &gt; 40</code> رد می‌شود ولی <code>24 &lt;= 40</code> مجاز است.</p><p><strong>تمرین ۲:</strong> در ردگیری SIP با TranslatorX، پیام‌های <code>INVITE</code>، <code>180 Ringing</code> و <code>200 OK</code> دیده می‌شوند ولی هیچ پیام <code>ACK</code> وجود ندارد و تماس در ثانیه ۳۲ قطع می‌شود. اولین بررسی شما چیست؟ <strong>پاسخ:</strong> بررسی آدرس IP درون هدر <code>Contact</code> و <code>Record-Route</code> در پیام <code>200 OK</code> و اطمینان از مسیریابی برگشت سیگنالینگ SIP بدون تخریب NAT/فایروال.</p>"
+  },
+  {
+   "id": "ccie_collab-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://learningnetwork.cisco.com/s/ccie-collaboration-exam-topics\" target=\"_blank\" rel=\"noopener\">سرفصل‌های رسمی آزمون عملی CCIE Collaboration v3.1 (Cisco Learning Network)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc3261\" target=\"_blank\" rel=\"noopener\">RFC 3261 (SIP: Session Initiation Protocol)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ خوشه واقعی CUCM، Expressway-C/E یا روتر CUBE در این محیط متصل نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "CCIE Collaboration v3.1",
+   "fa": "گواهینامه خبره ارتباطات یکپارچه سیسکو",
+   "simple": "بالاترین سطح اجرایی VoIP و ویدیوی سیسکو شامل CLCOR (350-801) و لب ۸ساعته."
+  },
+  {
+   "term": "CSS & Partition (CUCM)",
+   "fa": "فضای جست‌وجوی تماس و پارتیشن",
+   "simple": "مکانیسم کنترل دسترسی و مسیریابی تماس در CUCM (فهرست مجاز Partitionهای قابل مشاهده توسط گوشی)."
+  },
+  {
+   "term": "Globalized Call Routing (+E.164)",
+   "fa": "مسیریابی یکپارچه با فرمت E.164",
+   "simple": "تبدیل ورودی شماره‌ها به +E.164، مسیریابی ساده مرکزی و محلی‌سازی در خروجی Gateway."
+  },
+  {
+   "term": "Regions (CUCM)",
+   "fa": "ناحیه کنترل کدک در CUCM",
+   "simple": "تعیین سقف پهنای باند کدک (مثلاً G.711 محلی و G.729 روی WAN) بین گروه‌های دستگاه."
+  },
+  {
+   "term": "Locations CAC",
+   "fa": "کنترل پذیرش تماس مبتنی بر پهنای باند",
+   "simple": "محدود کردن مجموع پهنای باند تماس‌های هم‌زمان WAN برای حفظ کیفیت تماس‌های فعال."
+  },
+  {
+   "term": "MRGL & Transcoder",
+   "fa": "فهرست منابع رسانه و تبدیل کدک",
+   "simple": "اختصاص منابع DSP سخت‌افزاری/نرم‌افزاری برای تبدیل بین G.711 و G.729 یا MTP."
+  },
+  {
+   "term": "TranslatorX",
+   "fa": "تحلیلگر گرافیکی لاگ SIP/CUCM",
+   "simple": "ابزار کلیدی تولید Ladder Diagram پیام‌های SIP از لاگ‌های RTMT و CUBE."
+  },
+  {
+   "term": "SIP 30-Second Drop (Missing ACK)",
+   "fa": "قطع تماس در ثانیه ۳۰ به دلیل نبود ACK",
+   "simple": "امضای کلاسیک خطای Contact/NAT که مانع رسیدن ACK نهایی به 200 OK می‌شود."
+  },
+  {
+   "term": "Cisco Expressway-C/E (MRA)",
+   "fa": "دسترسی دورکار بدون VPN",
+   "simple": "جفت سرور داخلی و DMZ جهت ثبت امن کلاینت‌های Jabber/Webex و تماس‌های ویدیویی B2B."
+  },
+  {
+   "term": "DNS SRV (_collab-edge._tls)",
+   "fa": "رکورد کشف سرویس MRA",
+   "simple": "رکورد DNS حیاتی برای یافتن Expressway-E توسط کاربران دورکار خارج از شرکت."
+  },
+  {
+   "term": "ILS & URI Dialing",
+   "fa": "سرویس کشف بین‌خوشه‌ای",
+   "simple": "همگام‌سازی خودکار طرح شماره‌گذاری و تماس با آدرس ایمیل‌شکل میان چند خوشه CUCM."
+  },
+  {
+   "term": "Unity Connection (CUC)",
+   "fa": "سرور پست صوتی و تلفن گویا",
+   "simple": "پلتفرم Voicemail و Auto-Attendant متصل به CUCM از طریق SIP Trunk."
+  },
+  {
+   "term": "CUCM AXL API",
+   "fa": "رابط برنامه‌نویسی SOAP مدیریت CUCM",
+   "simple": "Administrative XML API جهت خودکارسازی ساخت کاربران، گوشی‌ها و مسیرها در CUCM."
+  },
+  {
+   "term": "AAR (Automated Alternate Routing)",
+   "fa": "مسیریابی جایگزین خودکار در CAC",
+   "simple": "هدایت خودکار تماس به شبکه PSTN هنگام پر شدن ظرفیت پهنای باند Location WAN."
+  },
+  {
+   "term": "Mutual TLS (mTLS)",
+   "fa": "احراز هویت دوطرفه گواهینامه TLS",
+   "simple": "الزام تایید گواهینامه هر دو سمت (مثلاً بین Expressway-C و Expressway-E) در Traversal Zone."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (ارزیابی CSS/Partition و CAC در CUCM + تحلیلگر امضای قطع ۳۰ثانیه‌ای ACK و One-Way Audio در SIP) — تجهیزات واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ خوشه واقعی CUCM، Expressway یا CUBE متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ خوشه واقعی CUCM، Unity Connection، Expressway یا روتر CUBE در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی دو منطق حیاتی لب CCIE Collaboration را مدل‌سازی می‌کند: (۱) ارزیابی دسترسی <code>CSS -&gt; Partition</code> و ظرفیت <strong>Location CAC</strong> در CUCM (رد <code>G.711</code> و پذیرش <code>G.729</code> روی لینک ۴۰ کیلوبیتی)، و (۲) تشخیص خودکار علت ریشه‌ای قطع ۳۰ثانیه‌ای (نبود <code>ACK</code>) و صدای یک‌طرفه (نشت IP خصوصی در <code>SDP c=IN IP4</code>).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccie_collab_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccie_collab_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccie_collab (CCIE Collaboration v3.1: CUCM CSS/Partition, Region/Location CAC &amp; SIP 30s ACK Debug)\nSimulates (1) CUCM Calling Search Space (CSS) -&gt; Partition authorization + Region codec &amp; Location CAC check,\nand (2) CUBE SIP call-flow diagnosis for 404 Not Found, One-Way Audio (SDP private IP), and 30-second ACK drop.\nNo real Cisco CUCM, Expressway, or CUBE hardware is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef evaluate_cucm_call(css_partitions: list[str], target_partition: str, inter_region_codec: str, location_avail_kbps: int) -&gt; dict:\n    if target_partition not in css_partitions:\n        return {&quot;admitted&quot;: False, &quot;sip_code&quot;: &quot;404 Not Found&quot;, &quot;reason&quot;: f&quot;CSS lacks access to Partition &#x27;{target_partition}&#x27;&quot;}\n    needed_kbps = 80 if inter_region_codec == &quot;G.711&quot; else 24\n    if location_avail_kbps &lt; needed_kbps:\n        return {\n            &quot;admitted&quot;: False,\n            &quot;sip_code&quot;: &quot;488 / Location CAC Reject&quot;,\n            &quot;reason&quot;: f&quot;Need {needed_kbps} kbps for {inter_region_codec}, only {location_avail_kbps} kbps available&quot;,\n        }\n    return {&quot;admitted&quot;: True, &quot;sip_code&quot;: &quot;200 OK&quot;, &quot;codec&quot;: inter_region_codec, &quot;bandwidth_reserved_kbps&quot;: needed_kbps}\n\n\ndef diagnose_sip_trace(events: list[str], sdp_ip: str) -&gt; dict:\n    if &quot;ACK&quot; not in events and &quot;200 OK&quot; in events:\n        return {\n            &quot;symptom&quot;: &quot;Call drops cleanly after ~30 seconds (SIP Timer B/H)&quot;,\n            &quot;root_cause&quot;: &quot;Missing ACK for 200 OK — check Contact header NAT/Route or firewall blocking return SIP signaling&quot;,\n        }\n    if sdp_ip.startswith(&quot;10.&quot;) or sdp_ip.startswith(&quot;192.168.&quot;):\n        return {\n            &quot;symptom&quot;: &quot;Call connects but One-Way / No-Way Audio&quot;,\n            &quot;root_cause&quot;: f&quot;Private IP {sdp_ip} leaked in SDP c=IN IP4 toward ITSP — fix CUBE bind/SIP Profile NAT&quot;,\n        }\n    return {&quot;symptom&quot;: &quot;Healthy Two-Way Audio&quot;, &quot;root_cause&quot;: None}\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_CUCM_OR_CUBE_HARDWARE&quot;,\n        &quot;cucm_call_admission&quot;: {\n            &quot;css_missing_intl_partition&quot;: evaluate_cucm_call([&quot;PT_INTERNAL&quot;, &quot;PT_LOCAL&quot;], &quot;PT_INTL&quot;, &quot;G.711&quot;, 512),\n            &quot;wan_cac_exhausted_g711&quot;: evaluate_cucm_call([&quot;PT_INTERNAL&quot;, &quot;PT_WAN&quot;], &quot;PT_WAN&quot;, &quot;G.711&quot;, 40),\n            &quot;wan_admitted_with_g729&quot;: evaluate_cucm_call([&quot;PT_INTERNAL&quot;, &quot;PT_WAN&quot;], &quot;PT_WAN&quot;, &quot;G.729&quot;, 40),\n        },\n        &quot;sip_trace_diagnostics&quot;: {\n            &quot;thirty_second_drop&quot;: diagnose_sip_trace([&quot;INVITE&quot;, &quot;180 Ringing&quot;, &quot;200 OK&quot;], &quot;203.0.113.5&quot;),\n            &quot;one_way_audio_private_sdp&quot;: diagnose_sip_trace([&quot;INVITE&quot;, &quot;180 Ringing&quot;, &quot;200 OK&quot;, &quot;ACK&quot;], &quot;10.10.50.12&quot;),\n            &quot;healthy_call&quot;: diagnose_sip_trace([&quot;INVITE&quot;, &quot;180 Ringing&quot;, &quot;200 OK&quot;, &quot;ACK&quot;], &quot;203.0.113.5&quot;),\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> خطای <code>404 Not Found</code> برای کمبود Partition، خطای <code>Location CAC Reject</code> برای G.711 و قبولی G.729، و تشخیص دقیق دو امضای شکست SIP.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع کلیدهای بررسی SIP در CUBE و DNS SRV برای MRA (اجرا نشده روی سرور زنده):</strong></p><pre dir=\"ltr\"><code># Reference CUBE SIP debug &amp; MRA DNS SRV checks (NOT executed on live infra)\n# CUBE CLI: debug ccsip messages\n# External DNS SRV for MRA: _collab-edge._tls.corp.example -&gt; exp-e.corp.example:8443\n# Internal DNS SRV for UDS: _cisco-uds._tcp.corp.example -&gt; cucm-pub.corp.example:8443</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس CCIE Collaboration v3.1 (CUCM، CUBE، Expressway و دیباگ SIP)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "برای برقراری کامل یک تماس صوتی و ویدیویی IP در CCIE Collaboration، کدام سه گروه پروتکل به‌صورت مکمل عمل می‌کنند؟",
+   "options": [
+    "فقط HTTP و FTP",
+    "SIP (سیگنالینگ تماس)، SDP (مذاکره کدک، IP و پورت رسانه) و RTP/RTCP یا SRTP (انتقال واقعی جریان صدا و تصویر)",
+    "فقط DNS و DHCP",
+    "فقط SNMP و Syslog"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>تفکیک سیگنالینگ (SIP)، توصیف نشست (SDP) و انتقال رسانه (RTP/SRTP) پایه کل عیب‌یابی VoIP است.</p>"
+  },
+  {
+   "title": "در آزمایشگاه CCIE Collaboration، تماسی با موفقیت وصل می‌شود و صدا هم برقرار است، اما دقیقاً پس از حدود ۳۰ ثانیه قطع می‌شود. علت کلاسیک و ابزار بررسی چیست؟",
+   "options": [
+    "باید روتر را فوری ریست فکتوری کرد",
+    "نرسیدن پیام SIP ACK پس از 200 OK (معمولاً به دلیل NAT یا هدر Contact نادرست)؛ تحلیل با TranslatorX یا debug ccsip messages",
+    "کمبود حافظه هارد CUCM",
+    "خراب بودن گوشی رومیزی"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>قطع منظم در ثانیه ~۳۰–۳۲ دقیقاً ناشی از انقضای تایمر انتظار SIP برای پیام ACK است.</p>"
+  },
+  {
+   "title": "نقش دقیق Cisco CUBE در معماری CCIE Collaboration چیست؟",
+   "options": [
+    "ذخیره فایل‌های متنی کاربران",
+    "یک دروازه مرزی سازمانی (Enterprise SBC / B2BUA) برای خاتمه، نرمال‌سازی (SIP Profiles)، امنیت و ترنسکدینگ SIP Trunk میان شبکه‌های داخلی CUCM و اپراتور/خارج",
+    "سوئیچ لایه ۲ پورت‌های PoE",
+    "اکسس‌پوینت بی‌سیم"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>CUBE مرز امن و استاندارد B2BUA میان CUCM و شبکه‌های SIP بیرونی است.</p>"
+  },
+  {
+   "title": "در سیستم تماس CUCM، رابطه میان CSS (Calling Search Space) و Partition چگونه کنترل دسترسی تماس را اعمال می‌کند؟",
+   "options": [
+    "Partition فهرست تلفن‌های خراب است",
+    "یک دستگاه یا خط (دارای CSS) تنها قادر به شماره‌گیری و رسیدن به DNها و Route Patternهایی است که Partition آن‌ها درون فهرست مرتب CSS آن قرار دارد",
+    "CSS فقط برای رنگ صفحه تلفن است",
+    "همه دستگاه‌ها همیشه به همه Partitionها دسترسی دارند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>مدل <code>CSS -&gt; Partition</code> هسته کلاس‌های مجوز تماس (داخلی، شهری، بین‌المللی) و جلوگیری از Toll Fraud در CUCM است.</p>"
+  },
+  {
+   "title": "تفاوت نقش Regions و Locations در CUCM برای مدیریت تماس‌های بین دفتر مرکزی و شعب چیست؟",
+   "options": [
+    "Regions کدک و سقف پهنای باند تک‌تماس (مثلاً G.711 در برابر G.729) را تعیین می‌کند، و Locations کل پهنای باند مجاز مجموع تماس‌های هم‌زمان WAN (CAC) را کنترل می‌کند",
+    "هر دو دقیقاً یک کار انجام می‌دهند",
+    "Locations فقط آدرس پستی شعبه است",
+    "Regions مربوط به وای‌فای است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>تنظیم دقیق Regions (مثلاً G.729 با ~24 kbps روی WAN) در کنار Locations CAC مانع از تخریب کیفیت تماس‌ها روی لینک‌های کم‌ظرفیت می‌شود.</p>"
+  },
+  {
+   "title": "اگر تماس SIP برقرار شود اما صدای یک‌طرفه (One-Way Audio) یا سکوت کامل داشته باشد، در تحلیل TranslatorX / debug ccsip messages کدام بخش پیام SIP را فوری بررسی می‌کنید؟",
+   "options": [
+    "خط User-Agent",
+    "بدنه SDP (خطوط c=IN IP4 برای کشف نشت IP خصوصی و m=audio برای بررسی پورت‌های UDP رسانه RTP روی فایروال)",
+    "تاریخ ساعت NTP",
+    "فقط طول رمز عبور"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>بخش SDP دقیقاً می‌گوید هر سمت منتظر دریافت بسته‌های RTP روی کدام IP و پورت UDP است.</p>"
+  },
+  {
+   "title": "برای عملکرد صحیح Cisco Expressway MRA (دسترسی کاربران دورکار Jabber/Webex به CUCM بدون VPN)، کدام دو پیش‌نیاز زیرساختی بیشترین علت شکست در روز آزمون هستند؟",
+   "options": [
+    "داشتن کابل فیبر ۱۰۰ گیگابیت",
+    "نصب آنتی‌ویروس روی تلفن",
+    "رکوردهای دقیق DNS SRV (_collab-edge._tls در بیرون و _cisco-uds._tcp در داخل) و گواهینامه‌های Mutual TLS با نام‌های SAN کامل بین Exp-C و Exp-E",
+    "تنظیم VLAN 1 روی کل شرکت"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>نبود یا غلط تایپی در رکوردهای DNS SRV و گواهینامه‌های TLS علت شماره ۱ خطای ورود MRA است.</p>"
+  },
+  {
+   "title": "فلسفه طراحی Globalized Call Routing (+E.164) در CUCM چیست؟",
+   "options": [
+    "حذف کد کشور از تمام شماره‌ها",
+    "استفاده از شماره‌گیری آنالوگ",
+    "تغییر شماره داخلی کارمندان هر هفته",
+    "تبدیل تمام شماره‌ها در ورود به فرمت یکپارچه +E.164 جهت مسیریابی ساده و واحد در هسته، و محلی‌سازی (Localization) آن‌ها در خروجی هر Gateway"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>+E.164 پیچیدگی طرح شماره‌گذاری سازمان‌های چندکشوری را به‌شدت کاهش می‌دهد و امکان برقراری مجدد تماس از Missed Calls را ساده‌سازی می‌کند.</p>"
+  },
+  {
+   "title": "اگر در یک تماس بین دو دستگاه، یک سمت فقط کدک G.711 و سمت دیگر فقط G.729 را بپذیرد و هیچ Hardware Transcoder در MRGL موجود نباشد، چه اتفاقی می‌افتد؟",
+   "options": [
+    "تماس به دلیل شکست مذاکره کدک (معمولاً 488 Not Acceptable Here یا Media Failure) برقرار نمی‌شود",
+    "CUCM خودکار کدک را به MP3 تبدیل می‌کند",
+    "تماس با کیفیت دو برابر وصل می‌شود",
+    "تلفن‌ها ریبوت می‌شوند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>ثبت صحیح منابع Transcoder روی IOS-XE DSP و افزودن آن‌ها به MRG/MRGL دستگاه‌ها در لب بسیار کلیدی است.</p>"
+  },
+  {
+   "title": "در بخش اتوماسیون CCIE Collaboration، کدام رابط برنامه‌نویسی برای مدیریت و پیکربندی انبوه کاربران، DNها و گوشی‌های CUCM به کار می‌رود؟",
+   "options": [
+    "SNMPv1 Set",
+    "CUCM AXL (Administrative XML — مبتنی بر SOAP/XML)",
+    "FTP Passive",
+    "Telnet Script"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>AXL API رابط رسمی و کامل CUCM برای اتوماسیون پیکربندی در مقیاس سازمانی است.</p>"
+  },
+  {
+   "title": "قابلیت AAR (Automated Alternate Routing) در کنار Location CAC چه کمکی به کاربران شعب می‌کند؟",
+   "options": [
+    "پاک کردن تاریخچه تماس‌ها",
+    "خاموش کردن گوشی‌ها در شب",
+    "در صورت پر شدن سقف پهنای باند صوتی WAN یک شعبه (رد توسط CAC)، تماس جدید را به‌طور خودکار از طریق شبکه محلی PSTN مسیریابی می‌کند تا تماس از دست نرود",
+    "افزایش سرعت لینک اینترنت"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>AAR تداوم سرویس تماس کاربران را حتی در لحظه اشباع ظرفیت WAN تضمین می‌کند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای ارزیابی CSS/Partition و CAC در CUCM و تحلیلگر امضای قطع ۳۰ثانیه‌ای ACK و One-Way Audio در SIP",
+    "اتصال زنده به خوشه CUCM و Expressway سازمان",
+    "تماس واقعی بین‌المللی از CUBE",
+    "فقط متن نظری بدون کد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سرور CUCM، Expressway یا CUBE واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccie_collab",
+  "sources": [
+   "https://learningnetwork.cisco.com/s/ccie-collaboration-exam-topics",
+   "https://www.rfc-editor.org/rfc/rfc3261"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ خوشه واقعی CUCM، Unity Connection، Expressway یا روتر CUBE متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "اصلاح عبارات معیوب نسخه قدیمی («Purposeی از CUBE»، «ترمینال‌سازی و نرمافزار SIP trunk») و بازنویسی جامع به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG، +E.164، Expressway MRA/DNS SRV، CUCM AXL API و شبیه‌ساز CSS/CAC/SIP."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccie_collab-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccie",
+   "recommendedCourse": "ccie-collab",
+   "blueprint": "/academy-assets/v5/blueprints/ccie_collab.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccie_collab_lab.py"
+  }
+ }
+}

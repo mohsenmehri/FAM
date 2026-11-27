@@ -1,0 +1,338 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_09",
+ "objectiveId": "auto_09",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۹ از ۲۰): پروتکل RESTCONF",
+ "titleEn": "Automation 09: RESTCONF Protocol (RFC 8040)",
+ "domain": "Network Automation",
+ "source": "Legacy auto_09 rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 50,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_09-section-1",
+   "title": "مسئله واقعی: چگونه از مدل‌های دقیق YANG روی همان HTTPS و JSON آشنای توسعه‌دهندگان استفاده کنیم؟",
+   "html": "<p>NETCONF قدرت تراکنشی فوق‌العاده‌ای دارد اما کار با SSH پورت ۸۳۰ و XML پیچیده برای بسیاری از تیم‌های DevOps و وب دشوار است. <strong>RESTCONF (RFC 8040)</strong> پل میان دو دنیاست: همان داده‌های مدل‌سازی‌شده با <strong>YANG</strong> را روی <strong>HTTPS (پورت ۴۴۳)</strong> با متدهای استاندارد HTTP و قالب <strong>JSON یا XML</strong> در دسترس قرار می‌دهد — البته با قواعد دقیق Media Type، URI و محدودیت‌های تراکنشی که باید به‌خوبی بشناسید.</p>"
+  },
+  {
+   "id": "auto_09-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> REST API (درس <code>auto_06</code>)، HTTPS/TLS (درس <code>auto_07</code>) و NETCONF (درس <code>auto_08</code>).</p><ul><li>تسلط بر ساختار URI استاندارد RFC 8040 (<code>/.well-known/host-meta</code>، <code>{+restconf}/data</code>، <code>/operations</code> و <code>interface=GigabitEthernet1</code>).</li><li>تنظیم صحیح هدرهای <code>Accept</code> و <code>Content-Type</code> روی <code>application/yang-data+json</code> (یا <code>+xml</code>).</li><li>استفاده دقیق از پارامتر <code>content=config</code> و <code>content=nonconfig</code> و تفکیک سمانتیک <code>POST</code>، <code>PUT</code>، <code>PATCH</code> و <code>DELETE</code>.</li><li>شناخت تفاوت‌های بنیادی RESTCONF با NETCONF (نداشتن <code>candidate</code> و <code>&lt;lock&gt;</code> استاندارد) و پیشگیری از افشای هدر <code>Authorization</code> در Redirectها.</li></ul>"
+  },
+  {
+   "id": "auto_09-section-3",
+   "title": "کشف ریشه و آناتومی URI در RESTCONF (RFC 8040)",
+   "html": "<p>کلاینت می‌تواند مسیر پایه <code>{+restconf}</code> (معمولاً <code>/restconf</code>) را از طریق <code>GET /.well-known/host-meta</code> کشف کند. زیر ریشه سه منبع اصلی وجود دارد: <code>/restconf/data</code> (دسترسی به درخت پیکربندی و وضعیت عملیاتی YANG)، <code>/restconf/operations</code> (اجرای RPCهای YANG با <code>POST</code>) و <code>/restconf/yang-library-version</code>.</p><p><strong>نکته کلیدی کلید لیست در URI:</strong> برای اشاره به یک عضو لیست YANG از علامت مساوی (<code>=</code>) استفاده می‌شود، مثل <code>/restconf/data/ietf-interfaces:interfaces/interface=GigabitEthernet1</code> (و اگر نام اینترفیس شامل <code>/</code> باشد مثل <code>GigabitEthernet0/0/1</code>، باید با Percent-Encoding به <code>GigabitEthernet0%2F0%2F1</code> کدگذاری شود!).</p>"
+  },
+  {
+   "id": "auto_09-section-4",
+   "title": "نمودار ساختار URI، هدرهای YANG و نگاشت متدها در RESTCONF",
+   "html": "<p>نمودار زیر خلاصه استاندارد RFC 8040 و نقاط حساس امنیتی و معماری آن را نشان می‌دهد.</p><svg viewBox=\"0 0 760 215\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"RESTCONF RFC 8040 URI Structure, Media Types and Method Mapping\"><rect x=\"14\" y=\"18\" width=\"732\" height=\"62\" rx=\"8\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"380\" y=\"40\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">RESTCONF URI Anatomy (RFC 8040)</text><text x=\"380\" y=\"62\" text-anchor=\"middle\" font-size=\"11\" font-family=\"monospace\" fill=\"#0f172a\">https://router/restconf/data/ietf-interfaces:interfaces/interface=GigabitEthernet1?content=config</text><rect x=\"14\" y=\"96\" width=\"234\" height=\"104\" rx=\"8\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"131\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Media Types (Headers)</text><text x=\"131\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">application/yang-data+json</text><text x=\"131\" y=\"164\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">application/yang-data+xml</text><text x=\"131\" y=\"186\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">NOT plain application/json!</text><rect x=\"263\" y=\"96\" width=\"234\" height=\"104\" rx=\"8\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">CRUD Mapping</text><text x=\"380\" y=\"140\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">GET: Read (?content=config|nonconfig)</text><text x=\"380\" y=\"158\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">POST: Create child (201 / 409 dup)</text><text x=\"380\" y=\"176\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">PUT: Replace/Create | PATCH: Merge</text><rect x=\"512\" y=\"96\" width=\"234\" height=\"104\" rx=\"8\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"629\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">Security &amp; Trade-offs</text><text x=\"629\" y=\"140\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">HTTPS Mandatory (TLS verify)</text><text x=\"629\" y=\"158\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">Block unsafe 3xx Redirects</text><text x=\"629\" y=\"176\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">No native candidate/lock!</text></svg>"
+  },
+  {
+   "id": "auto_09-section-5",
+   "title": "هدرهای اجباری Media Type: چرا application/json معمولی خطای 415 می‌دهد؟",
+   "html": "<p>در RESTCONF ارسال هدر معمولی <code>application/json</code> اغلب با خطای <strong><code>415 Unsupported Media Type</code></strong> یا <strong><code>406 Not Acceptable</code></strong> رد می‌شود! RFC 8040 صریحاً دو Media Type اختصاصی تعریف کرده است:</p><ul><li><code>application/yang-data+json</code> برای JSON منطبق بر RFC 7951.</li><li><code>application/yang-data+xml</code> برای XML.</li></ul><p>همیشه هر دو هدر <code>Accept</code> و (برای POST/PUT/PATCH) <code>Content-Type</code> را دقیقاً روی یکی از این دو تنظیم کنید.</p>"
+  },
+  {
+   "id": "auto_09-section-6",
+   "title": "تفکیک Config از State با پارامتر query: content=config و content=nonconfig",
+   "html": "<p>یکی از قابلیت‌های بسیار کاربردی RFC 8040 پارامتر <code>content</code> روی درخواست <code>GET</code> است:</p><ul><li><code>?content=config</code>: فقط گره‌های پیکربندی (معادل <code>&lt;get-config&gt;</code> در NETCONF).</li><li><code>?content=nonconfig</code>: فقط <strong>داده‌های عملیاتی زنده (State)</strong> مانند <code>oper-status</code> و شمارنده‌ها.</li><li><code>?content=all</code> (پیش‌فرض): هر دو با هم.</li></ul>"
+  },
+  {
+   "id": "auto_09-section-7",
+   "title": "نگاشت دقیق متدهای HTTP در RESTCONF: تفاوت POST، PUT و PATCH",
+   "html": "<table><thead><tr><th>متد HTTP</th><th>سمانتیک در RFC 8040</th><th>معادل NETCONF</th><th>کد پاسخ رایج</th></tr></thead><tbody><tr><td><code>GET</code></td><td>خواندن Config/State</td><td><code>&lt;get&gt;</code> / <code>&lt;get-config&gt;</code></td><td><code>200 OK</code></td></tr><tr><td><code>POST</code></td><td><strong>ایجاد فرزند جدید</strong> زیر منبع والد (یا اجرای RPC زیر <code>/operations</code>)؛ اگر وجود داشته باشد <strong><code>409 Conflict</code></strong></td><td><code>edit-config (create)</code> / RPC</td><td><code>201 Created</code> یا <code>409</code></td></tr><tr><td><code>PUT</code></td><td><strong>جایگزینی کامل یا ایجاد (Replace-or-Create)</strong> خود منبع هدف</td><td><code>edit-config (replace)</code></td><td><code>201</code> (ایجاد) یا <code>204</code> (جایگزینی)</td></tr><tr><td><code>PATCH</code></td><td><strong>ادغام جزئی (Plain Patch = Merge)</strong> یا YANG Patch (RFC 8072)</td><td><code>edit-config (merge)</code></td><td><code>200</code> / <code>204</code></td></tr><tr><td><code>DELETE</code></td><td>حذف منبع پیکربندی</td><td><code>edit-config (delete)</code></td><td><code>204 No Content</code></td></tr></tbody></table>"
+  },
+  {
+   "id": "auto_09-section-8",
+   "title": "مقایسه مهندسی NETCONF در برابر RESTCONF: کدام را انتخاب کنیم؟",
+   "html": "<p>اگرچه RESTCONF ساده‌تر و دوستدار JSON/HTTPS است، یک تفاوت معماری بزرگ دارد: <strong>RESTCONF در استاندارد پایه RFC 8040 فاقد Datastore <code>candidate</code>، قفل‌گذاری <code>&lt;lock&gt;</code> و <code>confirmed-commit</code> است!</strong> هر درخواست <code>PUT/PATCH/POST</code> موفق بلافاصله روی <code>running</code> اعمال می‌شود. بنابراین برای تغییرات تراکنشی پیچیده چندمرحله‌ای با نیاز به Rollback ایمن، <strong>NETCONF</strong> برتر است؛ اما برای یکپارچه‌سازی سریع با سرویس‌های وب، خواندن وضعیت، داشبوردها و تغییرات تک‌منبعی، <strong>RESTCONF</strong> بسیار کارآمدتر است.</p>"
+  },
+  {
+   "id": "auto_09-section-9",
+   "title": "امنیت حمل‌ونقل RESTCONF: TLS الزامی و خطر Redirectها (نشت Authorization)",
+   "html": "<p>RFC 8040 الزام می‌کند RESTCONF روی <strong>HTTPS (TLS)</strong> اجرا شود. یک آسیب‌پذیری ظریف در کلاینت‌های HTTP: اگر سرور یا یک Proxy میانی پاسخ <code>301/302</code> به یک آدرس غیر HTTPS یا دامنه بیرونی بدهد، برخی کلاینت‌ها در صورت دنبال کردن خودکار Redirect ممکن است هدر <strong><code>Authorization</code></strong> (شامل Basic یا Bearer Token) را به مقصد نامعتبر نشت دهند! بنابراین در کلاینت‌های RESTCONF (مثل <code>urllib</code> یا <code>requests</code> با <code>allow_redirects=False</code>) باید دنبال کردن خودکار Redirect به مقاصد نامعتبر مسدود شود.</p>"
+  },
+  {
+   "id": "auto_09-section-10",
+   "title": "آشکارسازی خطاها با ساختار استاندارد ietf-restconf:errors",
+   "html": "<p>در صورت بروز خطا (4xx/5xx)، سرور RESTCONF بدنه‌ای ساختاریافته مطابق <code>ietf-restconf:errors</code> برمی‌گرداند که شامل <code>error-type</code> (مثل <code>protocol</code> یا <code>application</code>)، <code>error-tag</code> (مثل <code>data-exists</code>، <code>invalid-value</code>، <code>access-denied</code>) و <code>error-message</code> است. لاگ کردن دقیق این فیلدها عیب‌یابی را بسیار سریع می‌کند.</p>"
+  },
+  {
+   "id": "auto_09-section-11",
+   "title": "کژفهمی‌های رایج درباره RESTCONF",
+   "html": "<ul><li><strong>کژفهمی ۱: «RESTCONF دقیقاً همه قابلیت‌های تراکنشی NETCONF مثل candidate و confirmed-commit را دارد.»</strong> واقعیت: خیر؛ RFC 8040 این قابلیت‌ها را به شکل استاندارد ندارد و تغییرات مستقیماً روی <code>running</code> اعمال می‌شوند.</li><li><strong>کژفهمی ۲: «برای تغییر نام اینترفیس GigabitEthernet0/0/1 کافی است آن را خام در URL بگذاریم.»</strong> واقعیت: کاراکتر <code>/</code> درون کلید لیست URI را می‌شکند؛ باید به <code>%2F</code> کدگذاری شود (<code>interface=GigabitEthernet0%2F0%2F1</code>).</li><li><strong>کژفهمی ۳: «POST روی منبع موجود آن را به‌روزرسانی می‌کند.»</strong> واقعیت: در RESTCONF، متد <code>POST</code> صرفاً برای ایجاد فرزند جدید است و روی داده موجود <code>409 Conflict</code> برمی‌گرداند؛ برای Replace-or-Create از <code>PUT</code> و برای Merge جزئی از <code>PATCH</code> استفاده کنید.</li></ul>"
+  },
+  {
+   "id": "auto_09-section-12",
+   "title": "عیب‌یابی خطاهای ۴xx پرتکرار در RESTCONF",
+   "html": "<p><strong>خطای <code>406 Not Acceptable</code> / <code>415 Unsupported Media Type</code>:</strong> فراموش کردن <code>application/yang-data+json</code> در هدرهای <code>Accept</code> یا <code>Content-Type</code>.</p><p><strong>خطای <code>400 Bad Request</code> با <code>invalid-value</code>:</strong> نبود پیشوند نام ماژول YANG در کلید ریشه JSON (مثلاً باید <code>\"ietf-interfaces:interface\"</code> باشد نه صرفاً <code>\"interface\"</code>) یا نقض قید YANG.</p>"
+  },
+  {
+   "id": "auto_09-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> می‌خواهیم فقط وضعیت عملیاتی (<code>oper-status</code> و شمارنده بسته‌ها) اینترفیس‌ها را بدون دریافت پیکربندی استاتیک از RESTCONF بخوانیم. کدام URI و Query Parameter صحیح است؟ <strong>پاسخ:</strong> <code>GET /restconf/data/ietf-interfaces:interfaces?content=nonconfig</code> همراه هدر <code>Accept: application/yang-data+json</code>.</p><p><strong>تمرین ۲:</strong> هنگام ارسال <code>POST</code> برای ساخت <code>Loopback0</code> که از قبل وجود دارد چه کدی دریافت می‌کنیم و برای جایگزینی آن چه متدی باید به کار رود؟ <strong>پاسخ:</strong> <code>POST</code> کد <code>409 Conflict</code> (<code>data-exists</code>) می‌دهد؛ برای جایگزینی کامل باید <code>PUT</code> (یا برای ادغام جزئی <code>PATCH</code>) روی مسیر دقیق <code>.../interface=Loopback0</code> ارسال شود.</p>"
+  },
+  {
+   "id": "auto_09-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8040\" target=\"_blank\" rel=\"noopener\">RFC 8040 (RESTCONF Protocol)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc7951\" target=\"_blank\" rel=\"noopener\">RFC 7951 (JSON Encoding of YANG Data)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8072\" target=\"_blank\" rel=\"noopener\">RFC 8072 (YANG Patch)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک سرور HTTP محلی شبیه‌ساز RESTCONF روی <code>127.0.0.1</code> اجرا کرده است؛ هیچ روتر IOS-XE واقعی یا گواهینامه HTTPS تولیدی در این محیط متصل نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "RESTCONF (RFC 8040)",
+   "fa": "پروتکل RESTCONF",
+   "simple": "پروتکل HTTP/HTTPS برای دسترسی به داده‌های YANG با فرمت JSON یا XML."
+  },
+  {
+   "term": "application/yang-data+json",
+   "fa": "نوع رسانه YANG JSON",
+   "simple": "مقدار استاندارد هدرهای Accept و Content-Type در RESTCONF برای قالب JSON."
+  },
+  {
+   "term": "{+restconf}/data",
+   "fa": "مسیر ریشه داده‌ها",
+   "simple": "نقطه دسترسی درخت پیکربندی و وضعیت عملیاتی مدل‌های YANG در RESTCONF."
+  },
+  {
+   "term": "{+restconf}/operations",
+   "fa": "مسیر عملیات RPC",
+   "simple": "مسیر فراخوانی RPCهای سفارشی YANG از طریق متد HTTP POST."
+  },
+  {
+   "term": "content=nonconfig",
+   "fa": "فیلتر داده‌های عملیاتی",
+   "simple": "پارامتر Query در GET برای خواندن صرفاً وضعیت عملیاتی زنده (State)."
+  },
+  {
+   "term": "content=config",
+   "fa": "فیلتر داده‌های پیکربندی",
+   "simple": "پارامتر Query در GET برای خواندن صرفاً پیکربندی (Config)."
+  },
+  {
+   "term": "List Key (=)",
+   "fa": "کلید لیست در URI",
+   "simple": "نحوه آدرس‌دهی یک عضو لیست YANG در URI مانند interface=Loopback0."
+  },
+  {
+   "term": "Percent-Encoding (%2F)",
+   "fa": "کدگذاری اسلش در URI",
+   "simple": "جایگزینی کاراکتر / در نام اینترفیس (مثل 0/0/1 -> 0%2F0%2F1) در URI."
+  },
+  {
+   "term": "409 Conflict (data-exists)",
+   "fa": "خطای ۴۰۹ تداخل",
+   "simple": "پاسخ استاندارد RESTCONF وقتی POST قصد ایجاد منبعی را دارد که از قبل وجود دارد."
+  },
+  {
+   "term": "415 Unsupported Media Type",
+   "fa": "خطای ۴۱۵ فرمت نامعتبر",
+   "simple": "خطای رایج هنگام ارسال application/json معمولی به جای application/yang-data+json."
+  },
+  {
+   "term": "Plain Patch",
+   "fa": "پچ ساده (Merge)",
+   "simple": "متد PATCH پایه RFC 8040 که تغییرات جزئی را در منبع هدف ادغام می‌کند."
+  },
+  {
+   "term": "YANG Patch (RFC 8072)",
+   "fa": "پچ پیشرفته YANG",
+   "simple": "افزونه‌ای برای انجام چند ویرایش ترتیبی (create/delete/merge) در یک PATCH."
+  },
+  {
+   "term": "ietf-restconf:errors",
+   "fa": "قالب استاندارد خطا",
+   "simple": "ساختار JSON/XML پاسخ خطا شامل error-type، error-tag و error-message."
+  },
+  {
+   "term": "No-Redirect Policy",
+   "fa": "منع تغییرمسیر ناامن",
+   "simple": "جلوگیری از دنبال کردن خودکار 3xx برای پیشگیری از نشت هدر Authorization."
+  },
+  {
+   "term": "RFC 7951",
+   "fa": "استاندارد JSON برای YANG",
+   "simple": "قواعد نگاشت نام ماژول و انواع داده YANG به JSON در RESTCONF."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه واقعی Loopback محلی RESTCONF روی 127.0.0.1 — روتر IOS-XE واقعی اجرا نشده",
+   "executionStatus": "سرور HTTP محلی شبیه‌ساز RESTCONF روی 127.0.0.1 در Python اجرا و تست شده؛ روی روتر واقعی IOS-XE اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اجرای واقعی سرور HTTP Loopback محلی (127.0.0.1)</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر واقعی IOS-XE یا سرور تولیدی RESTCONF HTTPS در این آزمایشگاه متصل نشده است.</p><p>این آزمایشگاه یک سرور HTTP محلی شبیه‌ساز RFC 8040 روی <code>127.0.0.1</code> اجرا کرده و <code>content=nonconfig</code>، ایجاد <code>POST (201)</code>، خطای تکراری <code>409</code>، جایگزینی <code>PUT (204)</code> و مسدودسازی Redirect ناامن (<code>NoRedirectHandler</code>) را عملاً آزمون می‌کند.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_09_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_09_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_09: RESTCONF (RFC 8040) Local Loopback Lab.\nExecution boundary: Spins up an ephemeral local HTTP server on 127.0.0.1\nimplementing RFC 8040 content=config/nonconfig, POST vs PUT semantics,\napplication/yang-data+json headers, and a strict NoRedirectHandler so\nAuthorization headers are never leaked across redirects. No live IOS-XE device.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\nimport threading\nimport urllib.error\nimport urllib.parse\nimport urllib.request\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\n\nYANG_JSON = &quot;application/yang-data+json&quot;\nCONFIG_STORE = {\n    &quot;GigabitEthernet1&quot;: {&quot;name&quot;: &quot;GigabitEthernet1&quot;, &quot;description&quot;: &quot;WAN&quot;, &quot;enabled&quot;: True}\n}\nSTATE_STORE = {\n    &quot;GigabitEthernet1&quot;: {&quot;name&quot;: &quot;GigabitEthernet1&quot;, &quot;oper-status&quot;: &quot;up&quot;, &quot;in-octets&quot;: 982340}\n}\n\n\nclass RestconfHandler(BaseHTTPRequestHandler):\n    def log_message(self, fmt: str, *args) -&gt; None:\n        pass\n\n    def _send(self, code: int, body: dict | None = None, extra_headers: dict | None = None) -&gt; None:\n        self.send_response(code)\n        self.send_header(&quot;Content-Type&quot;, YANG_JSON)\n        if extra_headers:\n            for k, v in extra_headers.items():\n                self.send_header(k, v)\n        self.end_headers()\n        if body is not None:\n            self.wfile.write(json.dumps(body).encode(&quot;utf-8&quot;))\n\n    def do_GET(self) -&gt; None:\n        parsed = urllib.parse.urlparse(self.path)\n        if parsed.path == &quot;/restconf/redirect-trap&quot;:\n            self._send(302, None, {&quot;Location&quot;: &quot;http://untrusted.example/steal&quot;})\n            return\n        qs = urllib.parse.parse_qs(parsed.query)\n        content = qs.get(&quot;content&quot;, [&quot;all&quot;])[0]\n        if parsed.path == &quot;/restconf/data/ietf-interfaces:interfaces&quot;:\n            if content == &quot;config&quot;:\n                self._send(200, {&quot;ietf-interfaces:interfaces&quot;: {&quot;interface&quot;: list(CONFIG_STORE.values())}})\n            elif content == &quot;nonconfig&quot;:\n                self._send(200, {&quot;ietf-interfaces:interfaces-state&quot;: {&quot;interface&quot;: list(STATE_STORE.values())}})\n            else:\n                self._send(200, {&quot;config&quot;: list(CONFIG_STORE.values()), &quot;nonconfig&quot;: list(STATE_STORE.values())})\n            return\n        self._send(404, {&quot;error&quot;: &quot;resource not found&quot;})\n\n    def do_POST(self) -&gt; None:\n        length = int(self.headers.get(&quot;Content-Length&quot;, &quot;0&quot;))\n        payload = json.loads(self.rfile.read(length).decode(&quot;utf-8&quot;))\n        name = payload[&quot;name&quot;]\n        if name in CONFIG_STORE:\n            self._send(409, {&quot;ietf-restconf:errors&quot;: {&quot;error&quot;: [{&quot;error-tag&quot;: &quot;data-exists&quot;}]}})\n            return\n        CONFIG_STORE[name] = payload\n        self._send(201, payload, {&quot;Location&quot;: f&quot;/restconf/data/ietf-interfaces:interfaces/interface={name}&quot;})\n\n    def do_PUT(self) -&gt; None:\n        length = int(self.headers.get(&quot;Content-Length&quot;, &quot;0&quot;))\n        payload = json.loads(self.rfile.read(length).decode(&quot;utf-8&quot;))\n        name = payload[&quot;name&quot;]\n        existed = name in CONFIG_STORE\n        CONFIG_STORE[name] = payload\n        self._send(204 if existed else 201, None)\n\n\nclass NoRedirectHandler(urllib.request.HTTPRedirectHandler):\n    def redirect_request(self, req, fp, code, msg, headers, newurl):\n        raise urllib.error.HTTPError(req.full_url, code, f&quot;Blocked redirect to {newurl}&quot;, headers, fp)\n\n\ndef main() -&gt; None:\n    server = HTTPServer((&quot;127.0.0.1&quot;, 0), RestconfHandler)\n    port = server.server_address[1]\n    thread = threading.Thread(target=server.serve_forever, daemon=True)\n    thread.start()\n    opener = urllib.request.build_opener(NoRedirectHandler())\n    base = f&quot;http://127.0.0.1:{port}&quot;\n    headers = {&quot;Accept&quot;: YANG_JSON, &quot;Content-Type&quot;: YANG_JSON, &quot;Authorization&quot;: &quot;Bearer lab-token&quot;}\n\n    try:\n        # 1. content=nonconfig returns operational state only\n        req_state = urllib.request.Request(f&quot;{base}/restconf/data/ietf-interfaces:interfaces?content=nonconfig&quot;, headers=headers)\n        with opener.open(req_state, timeout=5) as resp:\n            nonconfig_body = json.loads(resp.read().decode(&quot;utf-8&quot;))\n        assert &quot;ietf-interfaces:interfaces-state&quot; in nonconfig_body\n\n        # 2. POST creates child (201); duplicate POST returns 409 Conflict\n        lo0 = json.dumps({&quot;name&quot;: &quot;Loopback0&quot;, &quot;description&quot;: &quot;Router-ID&quot;, &quot;enabled&quot;: True}).encode(&quot;utf-8&quot;)\n        with opener.open(urllib.request.Request(f&quot;{base}/restconf/data/ietf-interfaces:interfaces&quot;, data=lo0, headers=headers, method=&quot;POST&quot;), timeout=5) as r:\n            post_create_code = r.status\n        assert post_create_code == 201\n        try:\n            opener.open(urllib.request.Request(f&quot;{base}/restconf/data/ietf-interfaces:interfaces&quot;, data=lo0, headers=headers, method=&quot;POST&quot;), timeout=5)\n            post_dup_code = 200\n        except urllib.error.HTTPError as exc:\n            post_dup_code = exc.code\n        assert post_dup_code == 409\n\n        # 3. PUT replaces existing resource (204)\n        lo0_new = json.dumps({&quot;name&quot;: &quot;Loopback0&quot;, &quot;description&quot;: &quot;Updated-RID&quot;, &quot;enabled&quot;: True}).encode(&quot;utf-8&quot;)\n        with opener.open(urllib.request.Request(f&quot;{base}/restconf/data/ietf-interfaces:interfaces/interface=Loopback0&quot;, data=lo0_new, headers=headers, method=&quot;PUT&quot;), timeout=5) as r:\n            put_replace_code = r.status\n        assert put_replace_code == 204\n\n        # 4. Redirect trap blocked to prevent Authorization header leakage\n        try:\n            opener.open(urllib.request.Request(f&quot;{base}/restconf/redirect-trap&quot;, headers=headers), timeout=5)\n            redirect_blocked = False\n        except urllib.error.HTTPError as exc:\n            redirect_blocked = exc.code == 302\n        assert redirect_blocked\n    finally:\n        server.shutdown()\n        server.server_close()\n\n    print(&quot;=== auto_09 RESTCONF RFC 8040 Loopback Lab ===&quot;)\n    print(json.dumps({\n        &quot;nonconfig_oper_status&quot;: nonconfig_body[&quot;ietf-interfaces:interfaces-state&quot;][&quot;interface&quot;][0][&quot;oper-status&quot;],\n        &quot;post_create_status&quot;: post_create_code,\n        &quot;post_duplicate_status&quot;: post_dup_code,\n        &quot;put_replace_status&quot;: put_replace_code,\n        &quot;unsafe_redirect_blocked&quot;: redirect_blocked,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>nonconfig_oper_status: 'up'</code>، <code>post_create_status: 201</code>، <code>post_duplicate_status: 409</code>، <code>put_replace_status: 204</code> و <code>unsafe_redirect_blocked: True</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع فراخوانی RESTCONF روی IOS-XE واقعی (اجرا نشده روی تجهیز زنده):</strong></p><pre dir=\"ltr\"><code># Reference curl command (NOT executed against live router)\ncurl -X GET \"https://router.example/restconf/data/ietf-interfaces:interfaces/interface=GigabitEthernet0%2F0%2F1?content=config\" \\\n  -H \"Accept: application/yang-data+json\" -u netops --cacert /etc/ssl/certs/corp-ca.pem</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس پروتکل RESTCONF",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در پروتکل RESTCONF (RFC 8040) برای خواندن صرفاً داده‌های عملیاتی (غیرپیکربندی) از مسیر /restconf/data، چه پارامتر query به کار می‌رود؟",
+   "options": [
+    "content=nonconfig",
+    "content=config",
+    "data=operational",
+    "type=state"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>پارامتر <code>content=nonconfig</code> صرفاً داده‌های وضعیت عملیاتی (State) را برمی‌گرداند.</p>"
+  },
+  {
+   "title": "در RESTCONF، تفاوت دقیق سمانتیک متدهای POST و PUT روی یک منبع چیست؟",
+   "options": [
+    "هر دو دقیقاً یک رفتار دارند",
+    "POST برای ایجاد فرزند جدید زیر منبع والد است (و در صورت وجود قبلی 409 می‌دهد)، اما PUT برای جایگزینی کامل یا ایجاد (Replace-or-Create) منبع هدف است",
+    "POST حذف و PUT خواندن است",
+    "PUT فقط برای اجرای RPC است"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در RFC 8040، <code>POST</code> ایجاد فرزند (Create) و <code>PUT</code> جایگزینی یا ایجاد (Replace-or-Create) است.</p>"
+  },
+  {
+   "title": "چرا یک کلاینت RESTCONF باید از دنبال کردن خودکار Redirectهای ناامن (3xx) جلوگیری کند؟",
+   "options": [
+    "زیرا HTTP کد ۳۰۰ ندارد",
+    "زیرا JSON با Redirect کار نمی‌کند",
+    "زیرا Redirect ناامن ممکن است کلاینت را به مقصد غیر HTTPS یا نامعتبر هدایت کرده و هدر Authorization (توکن/رمز) را افشا کند",
+    "زیرا TLS روی پورت ۸۳۰ است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>مسدودسازی Redirect به مقاصد نامطمئن مانع نشت هدر حساس <code>Authorization</code> می‌شود.</p>"
+  },
+  {
+   "title": "مقدار صحیح هدرهای Accept و Content-Type در RESTCONF برای قالب JSON کدام است؟",
+   "options": [
+    "text/plain",
+    "application/json",
+    "application/netconf+json",
+    "application/yang-data+json"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>RFC 8040 هدر استاندارد <code>application/yang-data+json</code> (یا <code>+xml</code>) را الزامی می‌داند؛ ارسال <code>application/json</code> معمولی اغلب خطای 415/406 می‌دهد.</p>"
+  },
+  {
+   "title": "کدام محدودیت معماری مهم RESTCONF را از NETCONF متمایز می‌کند؟",
+   "options": [
+    "RESTCONF در استاندارد پایه RFC 8040 فاقد Datastore candidate، قفل‌گذاری <lock> و confirmed-commit است",
+    "RESTCONF نمی‌تواند از مدل‌های YANG استفاده کند",
+    "RESTCONF فقط روی UDP کار می‌کند",
+    "RESTCONF از JSON پشتیبانی نمی‌کند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>تراکنش‌های پیچیده نیازمند Candidate و Confirmed-Commit همچنان نقطه قوت اصلی NETCONF هستند.</p>"
+  },
+  {
+   "title": "نحوه صحیح نوشتن نام اینترفیس GigabitEthernet0/0/1 به عنوان کلید لیست در URI پروتکل RESTCONF چیست؟",
+   "options": [
+    "interface/GigabitEthernet0/0/1",
+    "interface=GigabitEthernet0%2F0%2F1",
+    "interface:GigabitEthernet0/0/1",
+    "interface?name=0/0/1"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>کلید لیست با <code>=</code> جدا شده و کاراکتر <code>/</code> درون کلید باید به <code>%2F</code> کدگذاری شود تا با جداکننده مسیر URI اشتباه نشود.</p>"
+  },
+  {
+   "title": "مسیر استاندارد اجرای RPCهای سفارشی تعریف‌شده در YANG در RESTCONF کدام است؟",
+   "options": [
+    "GET /restconf/data",
+    "DELETE /restconf/yang",
+    "POST /restconf/operations/<module>:<rpc-name>",
+    "PUT /.well-known/host-meta"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>فراخوانی RPCها در RESTCONF از طریق <code>POST</code> به زیرشاخه <code>{+restconf}/operations</code> انجام می‌شود.</p>"
+  },
+  {
+   "title": "کدام پاسخ HTTP هنگام ارسال POST تکراری برای ساخت اینترفیسی که از قبل وجود دارد مطابق RFC 8040 برمی‌گردد؟",
+   "options": [
+    "200 OK",
+    "204 No Content",
+    "301 Moved Permanently",
+    "409 Conflict همراه error-tag برابر data-exists"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>در RESTCONF متد POST فقط برای ایجاد جدید است و در صورت وجود قبلی <code>409 Conflict</code> برمی‌گرداند.</p>"
+  },
+  {
+   "title": "متد PATCH پایه (Plain Patch) در RFC 8040 معادل کدام عملیات NETCONF است؟",
+   "options": [
+    "edit-config با عملیات merge",
+    "discard-changes",
+    "kill-session",
+    "lock"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Plain Patch فیلدهای ارسالی را بدون پاک کردن سایر فیلدهای موجود با منبع هدف ادغام (Merge) می‌کند.</p>"
+  },
+  {
+   "title": "در صورت دریافت خطای 415 Unsupported Media Type از سرور RESTCONF، اولین چیزی که باید بررسی کنید چیست؟",
+   "options": [
+    "کابل فیبر نوری",
+    "مقدار هدر Content-Type (اطمینان از application/yang-data+json یا +xml)",
+    "شماره VLAN",
+    "مقدار MTU"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>کد ۴۱۵ یعنی فرمت اعلام‌شده در هدر <code>Content-Type</code> توسط سرور RESTCONF پشتیبانی نمی‌شود.</p>"
+  },
+  {
+   "title": "نقش استاندارد RFC 7951 در ارتباط با RESTCONF چیست؟",
+   "options": [
+    "تعریف پورت TCP 830",
+    "تعریف SSH Chunked Framing",
+    "تعیین قواعد استاندارد نگاشت داده‌های مدل‌سازی‌شده با YANG به قالب JSON (از جمله پیشوند نام ماژول)",
+    "تعریف پروتکل BGP"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>RFC 7951 نحوه دقیق سریال‌سازی گره‌ها و انواع YANG در JSON را مشخص می‌کند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چه چیزی را عملاً اجرا و آزمون کرده است؟",
+   "options": [
+    "تغییر پیکربندی روتر تولیدی سیسکو روی اینترنت",
+    "نصب گواهینامه TLS روی سوئیچ Nexus",
+    "فقط متن نظری بدون کد",
+    "اجرای سرور HTTP محلی شبیه‌ساز RESTCONF روی 127.0.0.1 و تست content=nonconfig، POST 201/409، PUT 204 و مسدودسازی Redirect"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌طور محلی روی loopback <code>127.0.0.1</code> اجرا و تست شده و هیچ تجهیز شبکه‌ای متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "auto_09",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc8040",
+   "https://www.rfc-editor.org/rfc/rfc7951",
+   "https://www.rfc-editor.org/rfc/rfc8072"
+  ],
+  "limitations": [
+   "آزمایشگاه روی سرور HTTP محلی 127.0.0.1 اجرا شده و هیچ تجهیز IOS-XE واقعی متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "رفع غلط تایپی نسخه قدیمی («عمولاتی» -> «عملیاتی») و عبارت نامأنوس «لكن»، و گسترش کامل به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش.",
+   "افزودن آزمایشگاه واقعی HTTP Loopback محلی شبیه‌ساز RESTCONF شامل content=nonconfig، POST 201/409، PUT 204 و NoRedirectHandler."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_09-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_09.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_09_lab.py"
+  }
+ }
+}

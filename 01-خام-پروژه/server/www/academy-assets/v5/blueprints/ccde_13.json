@@ -1,0 +1,340 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccde_13",
+  "objectiveId": "ccde_13",
+  "kind": "lesson",
+  "track": "CCDE",
+  "course": "ccde-design",
+  "title": "۹.۱۳ CCDE — مهندسی ترافیک (Traffic Engineering): ۴ سطح TE، SR-TE/Flex-Algo و تله ناپایداری پس از خرابی",
+  "titleEn": "CCDE Topic 13: Traffic Engineering Architecture — 4 TE Levels, SR-TE/PCE & Post-Failure Capacity Trap",
+  "domain": "Traffic Engineering & Path Control",
+  "source": "Legacy ccde_13 rewritten, typo-cleaned, and expanded",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 50,
+  "prerequisites": [
+    "ccde_03",
+    "spec_sp_sr",
+    "ccde_11"
+  ],
+  "sections": [
+    {
+      "id": "ccde_13-section-1",
+      "title": "مسئله واقعی: چرا مهندسی ترافیک بدون مدل‌سازی ظرفیت پس از خرابی (Post-Failure) گاهی اوضاع را از مسیریابی عادی هم بدتر می‌کند؟",
+      "html": "<p><strong>مهندسی ترافیک (Traffic Engineering — TE)</strong> یعنی هدایت هوشمند جریان‌ها روی مسیرهایی غیر از کوتاه‌ترین مسیر پیش‌فرض IGP (SPF) تا پهنای باند لینک‌های کم‌مصرف به کار گرفته شود یا ترافیک حیاتی از مسیر کم‌تاخیر (Low-Latency) عبور کند. اما در آزمون CCDE دو قانون طلایی درباره TE وجود دارد: (۱) <strong>از ساده‌ترین سطح TE شروع کن</strong> (اگر IGP Metric/ECMP کافی است، سراغ پیچیدگی RSVP-TE/PBR نرو!)، و (۲) <strong>هرگز از TE برای پنهان کردن کمبود ظرفیت واقعی استفاده نکن</strong> وگرنه در لحظه قطع یک لینک، سرریز ترافیک روی لینک دوم باعث فروپاشی پس از خرابی (<strong>Post-Failure Meltdown</strong>) می‌شود!</p>"
+    },
+    {
+      "id": "ccde_13-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_03</code>، <code>spec_sp_sr</code> و <code>ccde_11</code>.</p><ul><li>طبقه‌بندی و انتخاب مهندسی میان <strong>۴ سطح Traffic Engineering</strong>: <strong>IGP/ECMP</strong>، <strong>BGP Attributes/Communities</strong>، <strong>RSVP-TE</strong> و <strong>SR-TE + Flex-Algo + PCE</strong>.</li><li>تشخیص و مهار <strong>تله ناپایداری ظرفیت پس از خرابی (Post-Failure Congestion Trap)</strong> در طراحی مسیرهای TE.</li><li>تبیین ریسک <strong>عدم تقارن مسیر (Asymmetric Routing)</strong> ناشی از TE هنگام عبور ترافیک از فایروال‌ها و تجهیزات Stateful.</li><li>نقد فنی <strong>مسیریابی مبتنی بر سیاست (PBR — Policy-Based Routing)</strong> و چرایی پرهیز از آن در هسته‌های مقیاس‌پذیر به نفع TEهای مقیاس‌پذیر.</li></ul>"
+    },
+    {
+      "id": "ccde_13-section-3",
+      "title": "چهار سطح مهندسی ترافیک (4 Levels of TE) — از ساده به فوق‌پیشرفته",
+      "html": "<ol><li><strong>سطح ۱ — IGP Metric Tuning &amp; ECMP/UCMP:</strong> ساده‌ترین و پایدارترین TE؛ تنظیم متریک OSPF/IS-IS (یا نسبت پهنای باند در EIGRP/DMZ-Link-BW) برای توازن بار بدون هیچ پروتکل اضافه‌ای.</li><li><strong>سطح ۲ — BGP Policy &amp; Communities:</strong> کنترل خروجی (<code>Local-Preference</code>) و نفوذ بر ورودی (<code>MED</code>، <code>AS-Path Prepend</code> و <strong>BGP Communities</strong> ارائه‌شده توسط ISPها) در لبه اینترنت و WAN.</li><li><strong>سطح ۳ — MPLS RSVP-TE:</strong> رزرو صریح پهنای باند (Bandwidth Reservation) و مسیرهای Explicit در MPLS کلاسیک؛ قدرتمند اما نیازمند ذخیره State هر تونل در تمام روترهای میانی P (سخت در مقیاس N²).</li><li><strong>سطح ۴ — SR-TE + Flex-Algo + PCE (استاندارد مدرن):</strong> برش‌های شبکه مبتنی بر تاخیر (Low-Latency Flex-Algo)، مسیرهای کاملاً مجزا (Disjoint Paths) محاسبه‌شده توسط <strong>PCE مرکزی</strong> با <strong>صفر State در روترهای میانی Core!</strong></li></ol>"
+    },
+    {
+      "id": "ccde_13-section-4",
+      "title": "نمودار ۴ سطح Traffic Engineering و تله فروپاشی ظرفیت پس از خرابی",
+      "html": "<p>نمودار زیر سلسله‌مراتب انتخاب سطح TE و تله سرریز ۱۳۰ گیگابیت روی لینک ۱۰۰ گیگابیتی هنگام قطع مسیر اصلی را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Traffic Engineering: 4 TE Levels (IGP/BGP/RSVP/SR-TE) and Post-Failure Capacity Instability Trap\"><rect x=\"14\" y=\"14\" width=\"170\" height=\"114\" rx=\"8\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"99\" y=\"36\" text-anchor=\"middle\" font-size=\"10.5\" font-weight=\"bold\" fill=\"#1e3a8a\">Level 1: IGP + ECMP</text><text x=\"99\" y=\"58\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#0f172a\">Simplest &amp; Most Stable</text><text x=\"99\" y=\"76\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#1e40af\">Metric Tuning / UCMP</text><text x=\"99\" y=\"94\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#15803d\">Use First If Sufficient!</text><rect x=\"200\" y=\"14\" width=\"172\" height=\"114\" rx=\"8\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"286\" y=\"36\" text-anchor=\"middle\" font-size=\"10.5\" font-weight=\"bold\" fill=\"#166534\">Level 2: BGP Policy</text><text x=\"286\" y=\"58\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#14532d\">Local-Pref (Egress)</text><text x=\"286\" y=\"76\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#166534\">MED / AS-Prepend (In)</text><text x=\"286\" y=\"94\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#14532d\">BGP Communities (ISP)</text><rect x=\"388\" y=\"14\" width=\"172\" height=\"114\" rx=\"8\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"474\" y=\"36\" text-anchor=\"middle\" font-size=\"10.5\" font-weight=\"bold\" fill=\"#92400e\">Level 3: RSVP-TE</text><text x=\"474\" y=\"58\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#78350f\">Explicit BW Reservation</text><text x=\"474\" y=\"76\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#b45309\">Midpoint Per-LSP State</text><text x=\"474\" y=\"94\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#b91c1c\">Hard to Scale N^2 Tunnels</text><rect x=\"576\" y=\"14\" width=\"170\" height=\"114\" rx=\"8\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"661\" y=\"36\" text-anchor=\"middle\" font-size=\"10.5\" font-weight=\"bold\" fill=\"#312e81\">Level 4: SR-TE + PCE</text><text x=\"661\" y=\"58\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#3730a3\">Zero Midpoint State!</text><text x=\"661\" y=\"76\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#3730a3\">Flex-Algo Low-Latency</text><text x=\"661\" y=\"94\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#15803d\">Disjoint Paths + TI-LFA</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">CCDE TE Trap: Post-Failure Capacity Meltdown! (70G Primary + 60G Backup = 130G Crashes 100G Backup Link!)</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Never Use TE to Mask Chronic Under-Capacity — Always Model Post-Failure Loads + Watch Out for Stateful Asymmetry</text></svg>"
+    },
+    {
+      "id": "ccde_13-section-5",
+      "title": "تله شماره ۱: فروپاشی ظرفیت پس از خرابی (Post-Failure Capacity Meltdown)",
+      "html": "<p>فرض کنید با TE هوشمند، ۷۰ گیگابیت ترافیک را روی لینک A (۱۰۰G کم‌تاخیر) و ۶۰ گیگابیت را روی لینک B (۱۰۰G پرپهنای‌باند) گذاشته‌اید. در روز عادی همه خوشحال‌اند (۷۰٪ و ۶۰٪)! اما به محض قطع فیبر لینک A، تمام ۷۰ گیگابیت روی لینک B سرریز می‌شود: <strong><code>70 + 60 = 130 Gbps</code> روی یک لینک ۱۰۰ گیگابیتی!</strong> نتیجه: ۳۰٪ افت بسته روی همه سرویس‌ها از جمله ترافیک حیاتی! <strong>قانون طلایی CCDE:</strong> TE جایگزین خرید پهنای باند نیست؛ همیشه مدل <strong>Worst-Case Post-Failure Load</strong> را شبیه‌سازی کنید و QoS/Preemption ترافیک حیاتی را تضمین نمایید.</p>"
+    },
+    {
+      "id": "ccde_13-section-6",
+      "title": "تله شماره ۲: عدم تقارن مسیر (Asymmetry) و شکست تجهیزات Stateful",
+      "html": "<p>بسیاری از سیاست‌های TE (به‌ویژه در BGP لبه اینترنت یا PBR) <strong>یک‌طرفه</strong> هستند: مثلاً با <code>Local-Pref</code> ترافیک خروجی را از ISP-1 می‌فرستید اما ترافیک برگشت از ISP-2 وارد می‌شود! در مسیریابی خالص لایه ۳ این مشکل چندانی ندارد (گرچه عیب‌یابی و سنجش RTT را دشوار می‌کند)، اما اگر روی دو مسیر دو <strong>فایروال Stateful جداگانه یا NAT مستقل</strong> قرار گرفته باشد، عدم تقارن باعث <strong>Drop فوری ۱۰۰٪ نشست‌ها</strong> می‌شود!</p>"
+    },
+    {
+      "id": "ccde_13-section-7",
+      "title": "چرا PBR (Policy-Based Routing) در مقیاس بزرگ یک ضدالگوی خطرناک است؟",
+      "html": "<p>استفاده از PBR (<code>route-map</code> با <code>set ip next-hop</code> روی تک‌تک اینترفیس‌ها) در یک روتر لبه کوچک برای یک استثنا شاید قابل قبول باشد، اما در یک شبکه چندهاپه بزرگ یک کابوس واقعی است: (۱) پیکربندی <strong>هاپ‌به‌‌هاپ دستی</strong> و ناهماهنگ، (۲) خطر شدید ایجاد <strong>حلقه‌های مسیریابی (Routing Loops)</strong> که IGP از آن بی‌خبر است، و (۳) عدم مقیاس و دشواری دیباگ ساعت ۳ بامداد! در معماری CCDE، برای تفکیک مسیرها بر اساس سرویس از <strong>VRF / SD-WAN AAR / SR-TE On-Demand Next-Hop (ODN)</strong> استفاده می‌شود نه PBR!</p>"
+    },
+    {
+      "id": "ccde_13-section-8",
+      "title": "تفاوت کنترل ترافیک خروجی (Egress) با ورودی (Ingress) در BGP لبه اینترنت",
+      "html": "<p>کنترل <strong>ترافیک خروجی (Outbound/Egress)</strong> کاملاً در اختیار خود شماست (<code>Local-Preference</code> و <code>Weight</code>). اما کنترل <strong>ترافیک ورودی (Inbound/Ingress)</strong> از اینترنت بسیار ظریف‌تر است زیرا شما بر روترهای اینترنت کنترل مستقیم ندارید! ابزارهای استاندارد Ingress TE در CCDE به ترتیب ترجیح: (۱) <strong>BGP Communities</strong> (درخواست مستقیم از ISP برای تغییر Local-Pref سمت خودش)، (۲) <strong>تنظیم MED</strong> (وقتی دو لینک به یک ISP واحد متصل‌اند)، (۳) <strong>AS-Path Prepending</strong> (محتاطانه؛ اغلب بیش از ۲–۳ بار اثر معکوس دارد یا نادیده گرفته می‌شود)، و (۴) <strong>تبلیغ پیشوندهای دقیق‌تر (More-Specific /24)</strong> فقط به عنوان آخرین چاره (زیرا جدول اینترنت را بزرگ می‌کند).</p>"
+    },
+    {
+      "id": "ccde_13-section-9",
+      "title": "مسیرهای کاملاً مجزا (Disjoint Paths) با PCE و Flex-Algo در سرویس‌های حیاتی",
+      "html": "<p>بورس‌ها و اپراتورهای ۵G گاهی دو مسیر کاملاً جداگانه (<strong>Link-Disjoint / Node-Disjoint / SRLG-Disjoint</strong>) برای دو جریان Live-Live می‌خواهند تا قطع هیچ فیبر یا روتری هر دو جریان را نزند! در <strong>SR-TE + Stateful PCE</strong>، کنترلر با دید سراسری به توپولوژی و برچسب‌های <strong>SRLG (Shared Risk Link Group)</strong>، دو پشته لیبل کاملاً غیرمتقاطع (Disjoint SID Lists) را به روترهای Headend تحویل می‌دهد.</p>"
+    },
+    {
+      "id": "ccde_13-section-10",
+      "title": "تکمیل‌کننده TE در شرایط بحران: هم‌افزایی Traffic Engineering و QoS",
+      "html": "<p>TE تصمیم می‌گیرد ترافیک از <em>کدام مسیر</em> برود، و <strong>QoS (DiffServ: LLQ/CBWFQ/WRED)</strong> تصمیم می‌گیرد اگر در شرایط بحران یا پس از Failover لینک پر شد، <em>کدام ترافیک زنده بماند و کدام بسته Drop شود</em>! این دو جایگزین هم نیستند؛ در بهترین معماری‌های CCDE، SR-TE/AAR ترافیک حیاتی را در حالت عادی روی مسیر کم‌تاخیر می‌گذارد و QoS در حالت Failover بقای آن را تضمین می‌کند.</p>"
+    },
+    {
+      "id": "ccde_13-section-11",
+      "title": "کژفهمی‌های رایج درباره Traffic Engineering",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای هر سازمان معمولی باید فوراً RSVP-TE یا PBR سنگین پیاده‌سازی کنیم تا شبکه حرفه‌ای به نظر برسد.»</strong> واقعیت: قانون CCDE این است که تا وقتی <strong>IGP Metric/ECMP</strong> یا <strong>BGP Policy</strong> ساده پاسخ‌گوست، هرگز پیچیدگی غیرضروری TE اضافه نکنید!</li><li><strong>کژفهمی ۲: «TE می‌تواند مشکل کمبود پهنای باند مزمن در کل شبکه را بدون خرید لینک حل کند.»</strong> واقعیت: TE فقط بار نامتوازن را پخش می‌کند؛ اگر مجموع تقاضا بیش از ظرفیت پس از خرابی باشد، TE فقط فاجعه Failover را پنهان و سپس شدیدتر می‌کند!</li><li><strong>کژفهمی ۳: «AS-Path Prepending ۱۰بار تضمینی ۱۰۰٪ ترافیک ورودی اینترنت را متوقف می‌کند.»</strong> واقعیت: اگر ISP مقابل روی مسیر مشتریان خود <code>Local-Pref</code> بالاتری تنظیم کرده باشد، AS-Path Prepend را کلاً نادیده می‌گیرد؛ <strong>BGP Communities</strong> بسیار دقیق‌تر و موثرتر است!</li></ul>"
+    },
+    {
+      "id": "ccde_13-section-12",
+      "title": "اصلاح خطای نگارشی نسخه قدیمی و چک‌لیست طراحی TE",
+      "html": "<p><strong>یادداشت ممیزی:</strong> غلط تایپی نسخه قدیمی به عبارت صحیح فنی «مسیریابی مبتنی بر سیاست (Policy-Based Routing / PBR)» اصلاح شد.</p><p><strong>چک‌لیست TE در CCDE:</strong> (۱) شروع از ساده‌ترین سطح (IGP/ECMP -> BGP -> SR-TE)، (۲) شبیه‌سازی بار پس از خرابی (Post-Failure)، (۳) بررسی اثر Asymmetry روی فایروال‌ها، (۴) پرهیز از PBR در هسته، (۵) همراهی QoS با TE.</p>"
+    },
+    {
+      "id": "ccde_13-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> دو لینک ۱۰۰ گیگابیتی به ترتیب ۷۰G و ۶۰G ترافیک دارند. پس از قطع لینک اول چه رخ می‌دهد و راه‌حل چیست؟ <strong>پاسخ:</strong> سرریز <code>130 Gbps</code> روی لینک ۱۰۰G دوم باعث <strong>Post-Failure Congestion Meltdown</strong> می‌شود؛ راه‌حل: افزایش ظرفیت به سقف ایمن (۴۵G+۴۰G=۸۵G &lt; ۱۰۰G) یا تفکیک ترافیک حیاتی با QoS/Flex-Algo و Drop کنترل‌شده Best-Effort.</p><p><strong>تمرین ۲:</strong> برای یک اپراتور ۵G با نیاز به مسیر کم‌تاخیر اختصاصی و صفر State در روترهای Core کدام سطح TE را انتخاب می‌کنید؟ <strong>پاسخ:</strong> <strong>سطح ۴: SR-TE + Flex-Algo + PCE</strong>.</p>"
+    },
+    {
+      "id": "ccde_13-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc9256\" target=\"_blank\" rel=\"noopener\">RFC 9256 (Segment Routing Policy Architecture — SR-TE)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc9350\" target=\"_blank\" rel=\"noopener\">RFC 9350 (IGP Flexible Algorithm — Flex-Algo)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای انتخاب سطح TE و شبیه‌سازی Post-Failure Load است و به هیچ روتر یا PCE زنده متصل نیست.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Traffic Engineering (TE)",
+      "fa": "مهندسی و هدایت هوشمند ترافیک",
+      "simple": "هدایت جریان‌ها روی مسیرهای بهینه (تاخیر/پهنای باند/مجزا) فراتر از کوتاه‌ترین مسیر پیش‌فرض SPF."
+    },
+    {
+      "term": "Post-Failure Capacity Trap",
+      "fa": "تله فروپاشی ظرفیت پس از خرابی",
+      "simple": "اشباع شدن لینک پشتیبان هنگام سرریز ترافیک مسیر TE اصلی به دلیل نادیده گرفتن حاشیه Failover."
+    },
+    {
+      "term": "SR-TE (RFC 9256)",
+      "fa": "مهندسی ترافیک با Segment Routing",
+      "simple": "کدگذاری مسیر صریح در پشته لیبل در لبه (Headend) با صفر وضعیت (Stateless) در روترهای Core."
+    },
+    {
+      "term": "Flex-Algo (RFC 9350)",
+      "fa": "الگوریتم انعطاف‌پذیر برش مسیر",
+      "simple": "ایجاد توپولوژی‌های منطقی جداگانه در IGP (مثلاً کمترین تاخیر واقعی لینک برای ۵G و صوت)."
+    },
+    {
+      "term": "Stateful PCE",
+      "fa": "موتور مرکزی محاسبه مسیر",
+      "simple": "کنترلر سراسری با دید کامل به تاخیر، پهنای باند و SRLG جهت محاسبه مسیرهای Disjoint در SR-TE."
+    },
+    {
+      "term": "SRLG (Shared Risk Link Group)",
+      "fa": "گروه لینک‌های دارای ریسک مشترک",
+      "simple": "برچسب‌گذاری فیبرهایی که از یک داکت/پل مشترک می‌گذرند تا PCE مسیر پشتیبان را از همان داکت عبور ندهد."
+    },
+    {
+      "term": "RSVP-TE",
+      "fa": "مهندسی ترافیک MPLS مبتنی بر رزرو",
+      "simple": "پروتکل کلاسیک رزرو پهنای باند MPLS که به دلیل نگهداری وضعیت per-LSP در میانه هسته، مقیاس سختی دارد."
+    },
+    {
+      "term": "BGP Communities (TE)",
+      "fa": "برچسب‌های سیاستی BGP نزد اپراتور",
+      "simple": "دقیق‌ترین ابزار کنترل ترافیک ورودی (Ingress) از طریق درخواست تغییر Local-Pref از ISP بالادست."
+    },
+    {
+      "term": "PBR (Policy-Based Routing)",
+      "fa": "مسیریابی مبتنی بر سیاست دستی",
+      "simple": "تغییر Next-Hop با route-map روی هر روتر؛ در مقیاس بزرگ مستعد حلقه و ضدالگوی CCDE است."
+    },
+    {
+      "term": "Asymmetric Routing Trap",
+      "fa": "تله عدم تقارن رفت‌وبرگشت",
+      "simple": "عبور رفت و برگشت بسته از دو فایروال Stateful مجزا در اثر TE یک‌طرفه که منجر به Drop نشست می‌شود."
+    },
+    {
+      "term": "Disjoint Paths",
+      "fa": "مسیرهای کاملاً غیرمتقاطع",
+      "simple": "دو مسیر بدون هیچ لینک، گره یا داکت فیزیکی مشترک برای ترافیک‌های فوق‌حیاتی Live-Live."
+    },
+    {
+      "term": "IGP Metric Tuning / ECMP",
+      "fa": "سطح اول TE (تنظیم متریک و ECMP)",
+      "simple": "ساده‌ترین و پایدارترین شکل مهندسی ترافیک که همواره باید پیش از فناوری‌های پیچیده‌تر بررسی شود."
+    },
+    {
+      "term": "AS-Path Prepending",
+      "fa": "افزودن تکراری ASN در BGP",
+      "simple": "ابزار کمکی کنترل Ingress که در برابر Local-Pref بالاتر ISP مقابل می‌تواند بی‌اثر شود."
+    },
+    {
+      "term": "UCMP (Unequal-Cost Multi-Path)",
+      "fa": "توزیع بار نامتوازن چندمسیره",
+      "simple": "تقسیم ترافیک متناسب با ظرفیت لینک‌های نابرابر (مثلاً ۸۰٪ روی ۱۰۰G و ۲۰٪ روی ۲۵G)."
+    },
+    {
+      "term": "TE + QoS Synergy",
+      "fa": "هم‌افزایی TE و کیفیت سرویس",
+      "simple": "هدایت مسیر بهینه با TE و تضمین بقای ترافیک حیاتی در زمان ازدحام پس از خرابی با QoS."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (انتخابگر ۴ سطح Traffic Engineering و شبیه‌ساز تله Post-Failure Congestion) — بدون PCE واقعی",
+      "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر مخابراتی یا PCE زنده متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر مخابراتی یا کنترلر PCE زنده در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو آزمون کلیدی TE در CCDE را اجرا می‌کند: (۱) انتخاب متناسب‌ترین سطح از میان <code>IGP/ECMP</code>، <code>BGP Communities</code> و <code>SR-TE + Flex-Algo + PCE</code>، و (۲) شبیه‌سازی تله <strong>Post-Failure Congestion Meltdown</strong> روی لینک ۱۰۰G هنگام سرریز <code>70G + 60G = 130G</code> در برابر طرح دارای Headroom ایمن (<code>45G + 40G = 85G</code>).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_13_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_13_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_13 (CCDE Traffic Engineering: 4 TE Levels, SR-TE Flex-Algo &amp; Post-Failure Capacity Trap)\nModels the 4 CCDE Traffic Engineering levels (IGP/ECMP, BGP Communities, RSVP-TE, SR-TE/Flex-Algo)\nand simulates the classic Post-Failure Capacity Instability Trap when an optimal TE primary path fails.\nNo real carrier routers or PCE controllers are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef simulate_post_failure_te(links: dict[str, dict], primary_flow_gbps: float, backup_existing_gbps: float, failed_link: str) -&gt; dict:\n    surviving = {k: v for k, v in links.items() if k != failed_link}\n    backup_name, backup = next(iter(surviving.items()))\n    post_fail_load = backup_existing_gbps + primary_flow_gbps\n    congested = post_fail_load &gt; backup[&quot;capacity_gbps&quot;]\n    return {\n        &quot;failed_link&quot;: failed_link,\n        &quot;rerouted_onto&quot;: backup_name,\n        &quot;backup_capacity_gbps&quot;: backup[&quot;capacity_gbps&quot;],\n        &quot;post_failure_total_load_gbps&quot;: post_fail_load,\n        &quot;post_failure_congestion_meltdown&quot;: congested,\n        &quot;remediation&quot;: &quot;Pre-reserve TE headroom or split critical vs best-effort classes (QoS + Flex-Algo)&quot; if congested else &quot;Clean failover within capacity&quot;,\n    }\n\n\ndef select_te_level(needs_explicit_latency_slice: bool, large_scale_stateless: bool, multi_homed_internet: bool) -&gt; dict:\n    if needs_explicit_latency_slice and large_scale_stateless:\n        return {&quot;level&quot;: &quot;Level 4: SR-TE + Flex-Algo + PCE&quot;, &quot;reason&quot;: &quot;Explicit low-latency/disjoint paths with zero midpoint per-flow state&quot;}\n    if multi_homed_internet:\n        return {&quot;level&quot;: &quot;Level 2: BGP Attributes &amp; Communities (Local-Pref / MED / Prepend)&quot;, &quot;reason&quot;: &quot;Clean egress/ingress steering at internet ASBR edges&quot;}\n    return {&quot;level&quot;: &quot;Level 1: IGP Metric Tuning + ECMP&quot;, &quot;reason&quot;: &quot;Simplest stable TE — never over-engineer TE when IGP ECMP suffices!&quot;}\n\n\ndef main() -&gt; None:\n    links = {\n        &quot;Link_A_LowLatency_100G&quot;: {&quot;capacity_gbps&quot;: 100.0, &quot;delay_ms&quot;: 8},\n        &quot;Link_B_HighBW_100G&quot;: {&quot;capacity_gbps&quot;: 100.0, &quot;delay_ms&quot;: 22},\n    }\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_TRAFFIC_ENGINEERING_MODELER&quot;,\n        &quot;te_level_recommendations&quot;: {\n            &quot;5g_ultra_low_latency_carrier&quot;: select_te_level(True, True, False),\n            &quot;enterprise_dual_isp_edge&quot;: select_te_level(False, False, True),\n            &quot;balanced_campus_core&quot;: select_te_level(False, False, False),\n        },\n        &quot;post_failure_trap_check&quot;: {\n            &quot;overloaded_backup_trap&quot;: simulate_post_failure_te(links, primary_flow_gbps=70.0, backup_existing_gbps=60.0, failed_link=&quot;Link_A_LowLatency_100G&quot;),\n            &quot;properly_headroomed_backup&quot;: simulate_post_failure_te(links, primary_flow_gbps=45.0, backup_existing_gbps=40.0, failed_link=&quot;Link_A_LowLatency_100G&quot;),\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>post_failure_congestion_meltdown: True</code> برای سناریوی اشباع‌شده (۱۳۰G) و <code>False</code> برای سناریوی دارای Headroom (۸۵G).</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع سلسله‌مراتب انتخاب سطح TE در سند HLD (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference CCDE Traffic Engineering Escalation Ladder\n# 1. Start with IGP Metric / ECMP (Zero extra protocol)\n# 2. Internet Edge? Use BGP Local-Pref (Egress) + ISP Communities (Ingress)\n# 3. Need Low-Latency Slices / Disjoint Paths at Scale? Use SR-TE + Flex-Algo + PCE\n# AVOID: Hop-by-hop manual PBR in core networks!</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس مهندسی ترافیک (Traffic Engineering) در CCDE",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "کدام گزینه یکی از روش‌های استاندارد و غیرپیشنهادی (در مقیاس هسته) را در کنار کاربرد صحیح Traffic Engineering درست تفکیک می‌کند؟",
+      "options": [
+        "مسیریابی مبتنی بر سیاست دستی (PBR) در مقیاس هسته مستعد حلقه و سخت‌نگهداری است؛ برای TE مقیاس‌پذیر باید از IGP/ECMP، BGP Policy یا SR-TE/Flex-Algo استفاده کرد",
+        "PBR بهترین و تنها روش TE در هسته ۵G است",
+        "TE جایگزین کامل خرید پهنای باند است",
+        "IGP ECMP نوعی TE نیست"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>شناخت سلسله‌مراتب ۴ سطح TE و پرهیز از PBR در هسته، نشانه بلوغ معمار CCDE است.</p>"
+    },
+    {
+      "title": "تله «ناپایداری ظرفیت پس از خرابی (Post-Failure Capacity Meltdown)» در Traffic Engineering چگونه رخ می‌دهد؟",
+      "options": [
+        "وقتی دو لینک ۱۰۰G به ترتیب ۷۰G و ۶۰G ترافیک دارند و با قطع لینک اول، کل ۱۳۰G روی لینک ۱۰۰G دوم سرریز شده و همه سرویس‌ها دچار افت شدید بسته می‌شوند",
+        "وقتی هر دو لینک زیر ۴۰٪ پر هستند",
+        "وقتی از SR-TE استفاده می‌کنیم",
+        "فقط هنگام خاموشی برق"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مدل‌سازی ظرفیت در شرایط Worst-Case Failure (N-1) یک الزام غیرقابل مذاکره در طراحی TE است.</p>"
+    },
+    {
+      "title": "مزیت کلیدی SR-TE (سطح ۴) نسبت به MPLS RSVP-TE (سطح ۳) در مقیاس هزاران تونل اپراتوری چیست؟",
+      "options": [
+        "SR-TE هیچ وضعیتی (Per-Flow State) در روترهای میانی Core ذخیره نمی‌کند و کل مسیر در پشته لیبل در لبه (Headend) کدگذاری می‌شود",
+        "SR-TE هیچ نیازی به IGP ندارد",
+        "RSVP-TE از MPLS پشتیبانی نمی‌کند",
+        "SR-TE فقط لایه ۲ است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>حذف وضعیت پرهزینه Midpoint RSVP-TE، مقیاس‌پذیری و چابکی TE را در شبکه‌های مدرن متحول کرده است.</p>"
+    },
+    {
+      "title": "در لبه اینترنت چنداپراتوری (Dual-ISP)، کدام ابزار معمولاً دقیق‌ترین و موثرترین روش کنترل ترافیک ورودی (Inbound/Ingress) است؟",
+      "options": [
+        "تنظیم Weight روی روتر خودمان",
+        "ارسال BGP Communities استاندارد به ISP بالادست تا Local-Preference را در شبکه خودش تغییر دهد",
+        "خاموش کردن BGP",
+        "تغییر شماره VLAN داخلی"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>BGP Communities مستقیماً بر تصمیم Local-Pref درون شبکه ISP اثر می‌گذارد و از محدودیت‌های AS-Path Prepending عبور می‌کند.</p>"
+    },
+    {
+      "title": "چرا عدم تقارن مسیر (Asymmetric Routing) ایجادشده توسط یک سیاست TE می‌تواند باعث قطع کامل نشست‌های TCP کاربران شود؟",
+      "options": [
+        "زیرا اگر مسیر رفت از یک فایروال Stateful و مسیر برگشت از فایروال Stateful مستقل دوم عبور کند، فایروال دوم بسته برگشت را بدون دیدن SYN فوری Drop می‌کند",
+        "زیرا TCP اصلاً مسیر نامتقارن را قبول نمی‌کند",
+        "زیرا روترهای لایه ۳ بسته‌های نامتقارن را می‌اندازند",
+        "هرگز مشکلی نمی‌سازد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>روترهای Stateless لایه ۳ با عدم تقارن مشکلی ندارند، اما تجهیزات Stateful (فایروال/NAT/IPS) به شدت به آن حساس‌اند!</p>"
+    },
+    {
+      "title": "نقش برچسب‌های SRLG (Shared Risk Link Group) همراه با Stateful PCE در محاسبه مسیرهای Disjoint چیست؟",
+      "options": [
+        "جلوگیری از انتخاب مسیر پشتیبان از روی فیبر دومی که از همان داکت، پل یا لوله مشترک فیزیکی مسیر اصلی عبور می‌کند",
+        "افزایش اندازه MTU",
+        "تخصیص آدرس IP به کاربران",
+        "حذف BFD"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>SRLG تضمین می‌کند دو مسیر ظاهراً مجزا در لایه ۳، در لایه ۱ سرنوشت خرابی مشترک (Shared Fate) نداشته باشند.</p>"
+    },
+    {
+      "title": "در یک شبکه Campus/Core متوازن که تنها نیاز به پخش ترافیک روی لینک‌های هم‌ظرفیت دارد، کدام سطح TE از دید CCDE بهترین انتخاب است؟",
+      "options": [
+        "سطح ۱: تنظیم ساده متریک IGP و ECMP (بدون اضافه کردن پیچیدگی RSVP-TE یا PCE!)",
+        "سطح ۳: RSVP-TE Full-Mesh روی همه سوئیچ‌ها",
+        "PBR دستی روی همه پورت‌ها",
+        "حذف ECMP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>اصل سادگی CCDE: هیچ‌گاه برای مسأله‌ای که IGP ECMP آن را حل می‌کند، سراغ پروتکل‌های سنگین TE نروید.</p>"
+    },
+    {
+      "title": "چرا Traffic Engineering و QoS مکمل هم هستند و هیچ‌کدام جای دیگری را نمی‌گیرد؟",
+      "options": [
+        "TE مسیر عبور ترافیک را در شبکه هدایت می‌کند و QoS تضمین می‌نماید در صورت بروز ازدحام (مثلاً پس از خرابی لینک)، ترافیک حیاتی در اولویت باقی بماند و ترافیک غیرحیاتی Drop شود",
+        "QoS مسیرها را تغییر می‌دهد",
+        "TE جایگزین صف‌بندی LLQ می‌شود",
+        "هیچ ارتباطی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ترکیب TE (انتخاب مسیر) + QoS (محافظت هنگام ازدحام) سپر دوجداره SLA در شبکه‌های حساس است.</p>"
+    },
+    {
+      "title": "چگونه Flex-Algo (RFC 9350) بدون نیاز به تعریف هزاران تونل دستی، ترافیک ۵G/صوت را به مسیر کمترین تاخیر هدایت می‌کند؟",
+      "options": [
+        "با ایجاد یک برش الگوریتمی در IGP (مثلاً Algo 128 با متریک Delay واقعی لینک) تا تمام روترها خودکار کوتاه‌ترین مسیر کم‌تاخیر را با یک Prefix-SID واحد محاسبه کنند",
+        "با خاموش کردن لینک‌های کند",
+        "با استفاده از RIP",
+        "با حذف MPLS"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Flex-Algo به دلیل سادگی عملیاتی و مقیاس‌پذیری فوق‌العاده، محبوب‌ترین ابزار TE در شبکه‌های مدرن ۵G است.</p>"
+    },
+    {
+      "title": "چرا تبلیغ پیشوندهای دقیق‌تر (More-Specific /24) در اینترنت برای کنترل ترافیک ورودی (Ingress TE) باید به عنوان آخرین چاره به کار رود؟",
+      "options": [
+        "زیرا باعث بزرگ شدن غیرضروری جدول BGP جهانی اینترنت (Deaggregation) می‌شود و اگر زیر /24 باشد توسط اپراتورها فیلتر می‌گردد",
+        "زیرا BGP از Longest Match پشتیبانی نمی‌کند",
+        "زیرا رایگان نیست",
+        "هیچ محدودیتی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>احترام به اندازه جدول DFZ اینترنت و پرهیز از Deaggregation غیرضروری از اصول مهندسی اینترنت است.</p>"
+    },
+    {
+      "title": "کاربرد UCMP (Unequal-Cost Multi-Path) در Traffic Engineering چیست؟",
+      "options": [
+        "ارسال ترافیک متناسب با نسبت واقعی ظرفیت لینک‌های نابرابر (مثلاً تقسیم ۸۰/۲۰ بین لینک ۱۰۰G و ۲۵G) به جای بیکار گذاشتن لینک کوچک‌تر",
+        "مسدود کردن لینک‌های سریع‌تر",
+        "حذف مسیرهای مساوی",
+        "فقط برای لینک‌های ۱۰ مگابیتی"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>UCMP بهره‌برداری از زیرساخت‌های دارای لینک‌های نامتجانس را بدون پیچیدگی تونل‌های دستی افزایش می‌دهد.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "مدل‌سازی محلی (Local Mock) در Python 3 برای انتخاب سطح متناسب TE و شبیه‌سازی تله Post-Failure Congestion روی لینک ۱۰۰G",
+        "پیکربندی زنده SR-TE روی بک‌بون اپراتور",
+        "قطع واقعی یک لینک ۱۰۰G تولیدی",
+        "فقط متن نظری بدون کد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ روتر یا PCE زنده متصل نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccde_13",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc9256",
+      "https://www.rfc-editor.org/rfc/rfc9350"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ روتر مخابراتی یا PCE زنده متصل نیست."
+    ],
+    "legacyAuditFixes": [
+      "اصلاح غلط تایپی نسخه قدیمی («مسیریابی مبتنی بر یتیک») به «مسیریابی مبتنی بر سیاست (PBR)» و گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، SRLG/PCE، BGP Communities و مدل‌ساز Post-Failure Trap."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccde_13-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-ccde",
+      "recommendedCourse": "ccde-design",
+      "blueprint": "/academy-assets/v5/blueprints/ccde_13.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_13_lab.py"
+    }
+  }
+}

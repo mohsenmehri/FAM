@@ -1,0 +1,338 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_05",
+ "objectiveId": "auto_05",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۵ از ۲۰): ساختارهای داده JSON و YAML",
+ "titleEn": "Automation 05: Data Serialization Formats — JSON, YAML & XML in Network Automation",
+ "domain": "Network Automation",
+ "source": "Legacy auto_05 rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 45,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_05-section-1",
+   "title": "مسئله واقعی: چرا یک کد کشور NO در فایل YAML پیکربندی شبکه را خراب کرد؟",
+   "html": "<p>تیمی فهرست شعب اروپایی را در یک فایل <code>YAML</code> ذخیره می‌کند: <code>country: DE</code>، <code>country: FR</code> و <code>country: NO</code> (نروژ). هنگام اجرای اسکریپت با پارسر <strong>YAML 1.1</strong> (مانند PyYAML پیش‌فرض)، مقدار <code>NO</code> بدون کوتیشن به عنوان رشته خوانده نمی‌شود بلکه به مقدار بولی <code>False</code> تبدیل می‌شود (موسوم به <strong>Norway Problem</strong>) و کل پیکربندی BGP آن شعبه با خطا مواجه می‌گردد! شناخت دقیق قواعد <strong>JSON</strong>، <strong>YAML</strong> و <strong>XML</strong> شرط لازم کار ایمن با کنترلرها، Ansible، Nornir، RESTCONF و NETCONF است.</p>"
+  },
+  {
+   "id": "auto_05-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با <code>dict</code> و <code>list</code> در پایتون (درس <code>auto_02</code>).</p><ul><li>تسلط بر قواعد سخت‌گیرانه <strong>JSON (RFC 8259)</strong> و تبدیل دوطرفه با <code>json.loads / json.dumps</code>.</li><li>تشخیص تفاوت <strong>YAML 1.1 و YAML 1.2</strong>، ممنوعیت کاراکتر <code>Tab</code>، تله‌های نوع داده (<code>NO/yes/on</code> و اعداد شبیه <code>0123</code>) و چرایی اجبار استفاده از <code>yaml.safe_load()</code>.</li><li>خواندن صحیح <strong>XML</strong> در <strong>NETCONF</strong> با <strong>Namespaces (<code>xmlns</code>)</strong> و شناخت ریسک امنیتی <strong>XXE</strong>.</li></ul>"
+  },
+  {
+   "id": "auto_05-section-3",
+   "title": "JSON (RFC 8259): زبان مشترک REST APIها و RESTCONF",
+   "html": "<p><strong>JSON (JavaScript Object Notation، استاندارد RFC 8259)</strong> سبک‌ترین و پرکاربردترین قالب تبادل داده در APIهای مدرن شبکه (Catalyst Center، Meraki، SD-WAN Manager، RESTCONF) است. چهار قاعده نحوی سخت‌گیرانه که بیشترین خطای <code>JSONDecodeError</code> را می‌سازند:</p><ul><li>همه کلیدها و رشته‌ها <strong>فقط با کوتیشن دوتایی (<code>\"...\"</code>)</strong> مجازند؛ کوتیشن تکی خطاست.</li><li><strong>کاما در انتهای آخرین عنصر (Trailing Comma)</strong> در آرایه یا آبجکت غیرمجاز است.</li><li><strong>کامنت (Comment)</strong> در JSON استاندارد (RFC 8259) وجود ندارد.</li><li>مقادیر بولی و تهی دقیقاً با حروف کوچک <code>true</code>، <code>false</code> و <code>null</code> نوشته می‌شوند (برخلاف <code>True/False/None</code> در پایتون).</li></ul>"
+  },
+  {
+   "id": "auto_05-section-4",
+   "title": "YAML: قالب انسان‌خوان برای Ansible و Nornir و تله‌های پنهان آن",
+   "html": "<p><strong>YAML</strong> (که YAML 1.2 ابرمجموعه JSON است) برای فایل‌هایی که مهندسان می‌خوانند و ویرایش می‌کنند (Ansible Playbookها، Nornir Inventory، Docker Compose، CI/CD) محبوب است زیرا از <strong>کامنت با <code>#</code></strong> پشتیبانی می‌کند و ساختار سلسله‌مراتبی را با تورفتگی (Indentation) نشان می‌دهد.</p><p><strong>سه تله پرتکرار YAML در شبکه:</strong></p><ol><li><strong>ممنوعیت مطلق <code>Tab</code> برای تورفتگی:</strong> فقط فاصله (Space، معمولاً ۲ فاصله) مجاز است؛ وجود حتی یک Tab فایل را نامعتبر می‌کند.</li><li><strong>تله YAML 1.1 (Norway Problem):</strong> در پارسرهای مبتنی بر YAML 1.1 (از جمله <code>PyYAML</code>)، مقادیر بدون کوتیشن مانند <code>yes</code>، <code>no</code>، <code>on</code>، <code>off</code> به <code>True/False</code> تبدیل می‌شوند (در YAML 1.2 فقط <code>true/false</code> بولی هستند). راه‌حل قطعی: رشته‌هایی مثل کد کشور (<code>\"NO\"</code>)، شماره نسخه (<code>\"1.10\"</code>) یا شماره پورت/کد دارای صفر پیشرو را همیشه درون کوتیشن قرار دهید.</li><li><strong>تبدیل ناخواسته نسخه یا MAC/زمان:</strong> عباراتی مثل <code>1.10</code> ممکن است عدد اعشاری <code>1.1</code> خوانده شوند اگر در کوتیشن نباشند.</li></ol>"
+  },
+  {
+   "id": "auto_05-section-5",
+   "title": "امنیت پارس YAML: چرا همیشه yaml.safe_load و هرگز yaml.load ناامن؟",
+   "html": "<p>در کتابخانه PyYAML، تابع قدیمی <code>yaml.load(data, Loader=yaml.UnsafeLoader)</code> (یا <code>yaml.load</code> در نسخه‌های قدیمی‌تر بدون Loader) اجازه می‌داد تگ‌های اختصاصی پایتون مانند <code>!!python/object/apply:os.system</code> داخل فایل YAML اجرا شوند؛ یعنی خواندن یک فایل YAML آلوده می‌توانست به <strong>اجرای کد دلخواه (Arbitrary Code Execution)</strong> روی سرور اتوماسیون منجر شود! استفاده از <strong><code>yaml.safe_load()</code></strong> فقط انواع داده استاندارد YAML (رشته، عدد، لیست، دیکشنری، بولی، null) را می‌سازد و از اجرای کد جلوگیری می‌کند.</p>"
+  },
+  {
+   "id": "auto_05-section-6",
+   "title": "نمودار مقایسه سه‌گانه JSON، YAML و XML در اتوماسیون شبکه",
+   "html": "<p>در نمودار زیر جایگاه هر سه قالب داده و مهم‌ترین قواعد نحوی و امنیتی آن‌ها در ابزارهای شبکه مقایسه شده است.</p><svg viewBox=\"0 0 760 215\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"JSON, YAML and XML Data Serialization in Network Automation\"><rect x=\"12\" y=\"18\" width=\"228\" height=\"178\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"126\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">JSON (RFC 8259)</text><text x=\"126\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">REST APIs &amp; RESTCONF</text><text x=\"126\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Double quotes ONLY (\"key\")</text><text x=\"126\" y=\"120\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">No comments / No trailing comma</text><text x=\"126\" y=\"144\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">json.loads() / json.dumps()</text><rect x=\"266\" y=\"18\" width=\"228\" height=\"178\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">YAML (1.1 vs 1.2)</text><text x=\"380\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Ansible / Nornir / CI Pipelines</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Spaces only (NEVER Tabs) + #</text><text x=\"380\" y=\"120\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">YAML 1.1 Trap: NO / on -&gt; bool!</text><text x=\"380\" y=\"144\" text-anchor=\"middle\" font-size=\"10\" fill=\"#92400e\" font-weight=\"bold\">ALWAYS yaml.safe_load()</text><rect x=\"520\" y=\"18\" width=\"228\" height=\"178\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"634\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">XML (W3C / NETCONF)</text><text x=\"634\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">NETCONF RPCs &amp; YANG</text><text x=\"634\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Explicit Namespaces (xmlns)</text><text x=\"634\" y=\"120\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">Security: Guard against XXE!</text><text x=\"634\" y=\"144\" text-anchor=\"middle\" font-size=\"10\" fill=\"#166534\">defusedxml for untrusted XML</text></svg>"
+  },
+  {
+   "id": "auto_05-section-7",
+   "title": "XML در NETCONF: چرا Namespace (xmlns) باعث می‌شود جست‌وجوی ساده شکست بخورد؟",
+   "html": "<p>پروتکل <strong>NETCONF (RFC 6241)</strong> پیام‌های خود را در قالب <strong>XML</strong> مبادله می‌کند. هر مدل YANG فضای نام (<strong>Namespace</strong>) یکتای خود را در ویژگی <code>xmlns</code> تعریف می‌کند، مثلاً <code>xmlns=\"urn:ietf:params:xml:ns:yang:ietf-interfaces\"</code>. اگر در پایتون با <code>root.findall(\"interface\")</code> بدون ذکر Namespace جست‌وجو کنید، لیست خالی <code>[]</code> برمی‌گردد؛ زیرا نام واقعی گره در XML دارای Namespace برابر <code>{urn:ietf:params:xml:ns:yang:ietf-interfaces}interface</code> است! بنابراین در <code>xml.etree.ElementTree</code> باید دیکشنری Namespace (<code>ns = {\"if\": \"...\"}</code>) را صریحاً به <code>findall</code> و <code>find</code> پاس دهید.</p>"
+  },
+  {
+   "id": "auto_05-section-8",
+   "title": "هشدار امنیتی XML: حمله XXE (XML External Entity) و defusedxml",
+   "html": "<p>ساختار DTD و Entity در XML اگر روی ورودی نامطمئن مهار نشود، می‌تواند منجر به حملات <strong>XXE (خواندن فایل‌های محلی سرور یا SSRF)</strong> یا <strong>Billion Laughs (انفجار حافظه/DoS)</strong> شود. اگرچه برخی پارسرهای جدید پایتون در نسخه stdlib بخشی از موجودیت‌های بیرونی را بارگذاری نمی‌کنند، مستندات رسمی پایتون صریحاً هشدار می‌دهد که برای پارس XML دریافت‌شده از منابع غیرمعتمد، از کتابخانه امن <strong><code>defusedxml</code></strong> استفاده شود.</p>"
+  },
+  {
+   "id": "auto_05-section-9",
+   "title": "مقایسه جامع مهندسی JSON، YAML و XML",
+   "html": "<table><thead><tr><th>ویژگی</th><th>JSON (RFC 8259)</th><th>YAML (1.1 / 1.2)</th><th>XML (W3C)</th></tr></thead><tbody><tr><td>خوانایی انسانی و کامنت</td><td>متوسط؛ بدون کامنت</td><td>بسیار بالا؛ کامنت با <code>#</code></td><td>پرطول (Verbose)؛ کامنت با <code>&lt;!-- --&gt;</code></td></tr><tr><td>کاربرد اصلی در شبکه</td><td>REST API، RESTCONF، Telemetry</td><td>Ansible، Nornir، CI/CD، K8s</td><td>NETCONF RPC، SOAP، برخی مدل‌های قدیمی</td></tr><tr><td>پشتیبانی Namespace</td><td>ندارد (مگر پیشوند ماژول در RESTCONF)</td><td>ندارد</td><td>بومی با <code>xmlns</code></td></tr><tr><td>ریسک امنیتی اصلی پارس</td><td>کد اجرایی ندارد (توجه به عمق تو در تو)</td><td>اجرای کد در <code>yaml.load</code> ناامن (راه‌حل: <code>safe_load</code>)</td><td>XXE و Billion Laughs (راه‌حل: <code>defusedxml</code>)</td></tr></tbody></table>"
+  },
+  {
+   "id": "auto_05-section-10",
+   "title": "اعتبارسنجی خودکار (Linting و Schema Validation) پیش از استقرار",
+   "html": "<p>در تیم‌های حرفه‌ای، فایل‌های YAML و JSON هرگز «چشمی» تأیید نمی‌شوند. در پایپ‌لاین CI/CD از ابزارهایی مثل <code>yamllint</code> (تشخیص Tab، کلیدهای تکراری و خطای تورفتگی) و <strong>JSON Schema</strong> (تأیید نوع دقیق فیلدها مانند معتبر بودن شماره VLAN بین ۱ تا ۴۰۹۴ یا قالب IPv4) استفاده می‌شود تا فایل خراب اصلاً وارد شاخه اصلی نشود.</p>"
+  },
+  {
+   "id": "auto_05-section-11",
+   "title": "کژفهمی‌های رایج درباره JSON، YAML و XML",
+   "html": "<ul><li><strong>کژفهمی ۱: «در JSON هم مثل پایتون می‌توانیم کوتیشن تکی و کامنت بگذاریم.»</strong> واقعیت: RFC 8259 هر دو را غیرمجاز می‌داند و کنترلرهای شبکه آن را با خطای <code>400 Bad Request</code> رد می‌کنند.</li><li><strong>کژفهمی ۲: «YAML و JSON دو دنیای کاملاً جدا هستند.»</strong> واقعیت: YAML 1.2 ابرمجموعه JSON است؛ یعنی هر سند JSON معتبر در یک پارسر YAML 1.2 معتبر است، اما برعکس آن برقرار نیست.</li><li><strong>کژفهمی ۳: «اگر در فایل YAML کلید تکراری بنویسیم، پارسر همیشه خطا می‌دهد.»</strong> واقعیت: بسیاری از پارسرها (از جمله PyYAML پیش‌فرض) بی‌صدا مقدار دوم را جایگزین مقدار اول می‌کنند! ابزار <code>yamllint</code> برای کشف کلیدهای تکراری ضروری است.</li></ul>"
+  },
+  {
+   "id": "auto_05-section-12",
+   "title": "عیب‌یابی خطاهای پرتکرار Serialization در اسکریپت‌های شبکه",
+   "html": "<p><strong>خطای ۱ — <code>json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes</code>:</strong> یا از کوتیشن تکی استفاده شده یا یک کامای اضافه در انتهای آخرین عضو آبجکت/لیست مانده است.</p><p><strong>خطای ۲ — لیست خالی هنگام پارس خروجی NETCONF XML:</strong> تقریباً همیشه فراموشی تعریف دیکشنری <code>xmlns</code> در <code>findall</code> است؛ ابتدا تگ ریشه (<code>root.tag</code>) را چاپ کنید تا Namespace دقیق آن را ببینید.</p>"
+  },
+  {
+   "id": "auto_05-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> کدام بخش از متن JSON زیر نامعتبر است؟ <code>{'vlan': 10, 'active': True,}</code> <strong>پاسخ:</strong> سه خطای RFC 8259 دارد: (۱) کوتیشن تکی به جای دوتایی، (۲) <code>True</code> با حرف بزرگ به جای <code>true</code>، و (۳) کامای انتهایی (Trailing Comma). شکل معتبر: <code>{\"vlan\": 10, \"active\": true}</code>.</p><p><strong>تمرین ۲:</strong> در فایل Inventory مبتنی بر YAML 1.1 نوشته‌ایم <code>country: NO</code> و <code>port_state: on</code>. پارسر این دو را به چه نوع داده‌ای تبدیل می‌کند و راه‌حل چیست؟ <strong>پاسخ:</strong> به ترتیب به بولی <code>False</code> و <code>True</code> تبدیل می‌شوند؛ برای حفظ آن‌ها به‌عنوان رشته باید <code>country: \"NO\"</code> و <code>port_state: \"on\"</code> نوشت.</p>"
+  },
+  {
+   "id": "auto_05-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8259\" target=\"_blank\" rel=\"noopener\">RFC 8259 (JSON)</a>، <a href=\"https://yaml.org/spec/1.2.2/\" target=\"_blank\" rel=\"noopener\">YAML 1.2.2 Specification</a> و <a href=\"https://docs.python.org/3/library/xml.html#xml-vulnerabilities\" target=\"_blank\" rel=\"noopener\">مستندات امنیتی XML در Python</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه محلی با کتابخانه استاندارد Python 3 (<code>json</code> و <code>xml.etree.ElementTree</code>) اجرا و تست شده است؛ هیچ سرور NETCONF/RESTCONF واقعی یا PyYAML خارجی در این اسکریپت فراخوانی نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Serialization",
+   "fa": "سریال‌سازی داده",
+   "simple": "تبدیل ساختارهای حافظه (مثل dict/list) به متن استاندارد قابل انتقال (JSON/YAML/XML)."
+  },
+  {
+   "term": "JSON (RFC 8259)",
+   "fa": "فرمت JSON",
+   "simple": "فرمت سبک کلید-مقدار و آرایه با کوتیشن دوتایی، بدون کامنت و زبان اصلی REST APIها."
+  },
+  {
+   "term": "Trailing Comma",
+   "fa": "کامای انتهایی",
+   "simple": "کامای اضافه پس از آخرین عضو در JSON که باعث خطای نحوی JSONDecodeError می‌شود."
+  },
+  {
+   "term": "YAML 1.1 vs 1.2",
+   "fa": "تفاوت YAML 1.1 و 1.2",
+   "simple": "در YAML 1.1 عبارات yes/no/on/off بولی می‌شوند؛ در YAML 1.2 فقط true/false بولی‌اند."
+  },
+  {
+   "term": "Norway Problem",
+   "fa": "تله نروژ در YAML 1.1",
+   "simple": "تبدیل ناخواسته کد کشور بدون کوتیشن NO به مقدار بولی False در پارسرهای YAML 1.1."
+  },
+  {
+   "term": "yaml.safe_load",
+   "fa": "بارگذاری امن YAML",
+   "simple": "روش امن خواندن YAML که مانع اجرای کد پایتون مخرب از طریق تگ‌های YAML می‌شود."
+  },
+  {
+   "term": "Indentation",
+   "fa": "تورفتگی ساختاری",
+   "simple": "تعیین سلسله‌مراتب در YAML منحصراً با Space (استفاده از Tab غیرمجاز است)."
+  },
+  {
+   "term": "XML",
+   "fa": "فرمت XML",
+   "simple": "زبان نشانه‌گذاری برچسب‌محور (تگ باز و بسته) مورد استفاده در پروتکل NETCONF."
+  },
+  {
+   "term": "XML Namespace (xmlns)",
+   "fa": "فضای نام XML",
+   "simple": "شناسه یکتای ماژول در XML (مثل urn:ietf:...) برای جلوگیری از تداخل نام تگ‌ها."
+  },
+  {
+   "term": "XXE",
+   "fa": "آسیب‌پذیری XXE",
+   "simple": "XML External Entity؛ حمله امنیتی به پارسرهای XML ناامن برای خواندن فایل یا SSRF."
+  },
+  {
+   "term": "defusedxml",
+   "fa": "کتابخانه defusedxml",
+   "simple": "پوشش امنیتی پیشنهادی پایتون برای پارس ایمن اسناد XML از منابع نامطمئن."
+  },
+  {
+   "term": "JSON Schema",
+   "fa": "اسکیمای JSON",
+   "simple": "قرارداد توصیف ساختار، نوع و محدوده مجاز داده‌های JSON برای اعتبارسنجی خودکار."
+  },
+  {
+   "term": "yamllint",
+   "fa": "ابزار yamllint",
+   "simple": "ابزار بررسی خودکار خطاهای تورفتگی، Tab و کلیدهای تکراری در فایل‌های YAML."
+  },
+  {
+   "term": "json.loads / dumps",
+   "fa": "پارس و تبدیل JSON در پایتون",
+   "simple": "loads رشته JSON را به شیء پایتون و dumps شیء پایتون را به رشته JSON تبدیل می‌کند."
+  },
+  {
+   "term": "Scalar",
+   "fa": "مقدار اسکالر",
+   "simple": "مقدار تکی غیرمجموعه‌ای (رشته، عدد، بولی یا null) در JSON و YAML."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه محلی Python 3 (پارس JSON سخت‌گیرانه، تله YAML 1.1 و XML با Namespace) — تجهیز واقعی اجرا نشده",
+   "executionStatus": "اسکریپت محلی Python 3 اجرا و تست شده؛ هیچ سرور NETCONF/RESTCONF یا روتر واقعی متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اسکریپت محلی واقعی Python 3 (stdlib)</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ تجهیز NETCONF یا RESTCONF واقعی در این آزمایشگاه متصل نشده است.</p><p>در این آزمایشگاه با کتابخانه استاندارد Python 3، پارس JSON مطابق RFC 8259، تشخیص تله <code>NO</code> در YAML 1.1 و پارس XML با Namespace واقعی IETF YANG را اجرا می‌کنید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_05_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_05_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Data-Serialization Lab for auto_05 (JSON RFC 8259, YAML 1.1/1.2 Traps &amp; XML Namespaces).\n\nRuns locally in Python 3 standard library; no external network device or NETCONF server is run.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport json\nimport xml.etree.ElementTree as ET\n\nSAMPLE_JSON = &#x27;{&quot;hostname&quot;: &quot;edge-01&quot;, &quot;vlans&quot;: [10, 20], &quot;active&quot;: true}&#x27;\n\nSAMPLE_NETCONF_XML = &quot;&quot;&quot;\n&lt;interfaces xmlns=&quot;urn:ietf:params:xml:ns:yang:ietf-interfaces&quot;&gt;\n  &lt;interface&gt;\n    &lt;name&gt;GigabitEthernet1&lt;/name&gt;\n    &lt;enabled&gt;true&lt;/enabled&gt;\n  &lt;/interface&gt;\n&lt;/interfaces&gt;\n&quot;&quot;&quot;.strip()\n\nYAML_11_BOOL_LITERALS = frozenset({&quot;yes&quot;, &quot;no&quot;, &quot;on&quot;, &quot;off&quot;, &quot;true&quot;, &quot;false&quot;, &quot;y&quot;, &quot;n&quot;})\n\n\ndef parse_json_strict(raw_json: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Parse strict RFC 8259 JSON (double quotes, lowercase true/false, no trailing commas).&quot;&quot;&quot;\n    return json.loads(raw_json)\n\n\ndef detect_yaml_11_norway_trap(unquoted_scalar: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Demonstrate why unquoted country code &#x27;NO&#x27; or port state &#x27;on&#x27; becomes boolean in YAML 1.1.&quot;&quot;&quot;\n    lowered = unquoted_scalar.strip().lower()\n    trapped = lowered in YAML_11_BOOL_LITERALS\n    return {\n        &quot;raw_value&quot;: unquoted_scalar,\n        &quot;yaml_1_1_coerced_to_bool&quot;: trapped,\n        &quot;safe_representation&quot;: f&#x27;&quot;{unquoted_scalar}&quot;&#x27;,\n    }\n\n\ndef parse_xml_with_namespace(xml_text: str) -&gt; list[dict[str, str]]:\n    &quot;&quot;&quot;Parse IETF YANG XML using explicit Clark-notation namespace (not raw tag name).&quot;&quot;&quot;\n    ns = {&quot;if&quot;: &quot;urn:ietf:params:xml:ns:yang:ietf-interfaces&quot;}\n    root = ET.fromstring(xml_text)\n    rows = []\n    for iface in root.findall(&quot;if:interface&quot;, ns):\n        name_el = iface.find(&quot;if:name&quot;, ns)\n        en_el = iface.find(&quot;if:enabled&quot;, ns)\n        rows.append({\n            &quot;name&quot;: name_el.text if name_el is not None and name_el.text else &quot;&quot;,\n            &quot;enabled&quot;: en_el.text if en_el is not None and en_el.text else &quot;&quot;,\n        })\n    return rows\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python serialization lab only — no real RESTCONF/NETCONF device is contacted.&quot;)\n    print(&quot;Parsed JSON:&quot;, parse_json_strict(SAMPLE_JSON))\n    print(&quot;YAML 1.1 Norway trap (&#x27;NO&#x27;):&quot;, detect_yaml_11_norway_trap(&quot;NO&quot;))\n    print(&quot;YAML 1.1 safe string (&#x27;IR&#x27;):&quot;, detect_yaml_11_norway_trap(&quot;IR&quot;))\n    print(&quot;Parsed XML with Namespace:&quot;, parse_xml_with_namespace(SAMPLE_NETCONF_XML))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> پارس موفق JSON، گزارش <code>yaml_1_1_coerced_to_bool: True</code> برای <code>'NO'</code> در برابر <code>False</code> برای <code>'IR'</code>، و استخراج صحیح <code>GigabitEthernet1</code> از XML با Namespace <code>ietf-interfaces</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>نکته مرجع برای محیط‌های دارای PyYAML (اجرا نشده در این اسکریپت stdlib):</strong> همواره از <code>yaml.safe_load(stream)</code> استفاده کنید و پیش از ادغام PRها ابزار <code>yamllint</code> را در CI اجرا نمایید.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس ساختارهای داده JSON و YAML",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "کدام تفاوت میان JSON و YAML در پروژه‌های اتوماسیون شبکه دقیق است؟",
+   "options": [
+    "JSON از کامنت پشتیبانی می‌کند اما YAML نه",
+    "YAML انسان‌خوان‌تر است و از کامنت با # پشتیبانی می‌کند (مناسب Ansible/Inventory)، در حالی که JSON سخت‌گیرانه‌تر و استاندارد اصلی REST APIهاست",
+    "در YAML استفاده از Tab الزامی است",
+    "JSON فقط برای فایل‌های باینری است"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>YAML به دلیل خوانایی و پشتیبانی از کامنت برای پیکربندی‌های نوشته‌شده توسط انسان محبوب است و JSON زبان استاندارد تبادل داده در REST APIهاست.</p>"
+  },
+  {
+   "title": "چرا هنگام خواندن فایل YAML با PyYAML باید از yaml.safe_load به جای yaml.load ناامن استفاده کرد؟",
+   "options": [
+    "چون safe_load فایل را فشرده می‌کند",
+    "چون safe_load فقط برای JSON است",
+    "چون safe_load از اجرای کد دلخواه پایتون از طریق تگ‌های مخرب YAML جلوگیری می‌کند",
+    "چون safe_load کاراکتر Tab را مجاز می‌کند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>لودر ناامن YAML می‌تواند اشیاء و توابع دلخواه پایتون را اجرا کند؛ <code>safe_load</code> فقط انواع استاندارد داده را می‌سازد.</p>"
+  },
+  {
+   "title": "در مشخصات YAML 1.1 (مانند PyYAML)، مقدار بدون کوتیشن NO یا on چه رفتاری دارد؟",
+   "options": [
+    "همواره به عنوان رشته متنی باقی می‌ماند",
+    "باعث خطای سینتکس می‌شود",
+    "فقط در XML رخ می‌دهد",
+    "به‌صورت خودکار به مقدار بولی (False / True) تبدیل می‌شود و برای حفظ رشته باید در کوتیشن نوشته شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>این همان Norway Problem در YAML 1.1 است؛ قرار دادن در کوتیشن (<code>\"NO\"</code>) نوع رشته را تضمین می‌کند.</p>"
+  },
+  {
+   "title": "کدام رشته زیر یک JSON کاملاً معتبر مطابق RFC 8259 است؟",
+   "options": [
+    "{\"vlan\": 10, \"enabled\": true}",
+    "{'vlan': 10, 'enabled': true}",
+    "{\"vlan\": 10, \"enabled\": True,}",
+    "{\"vlan\": 10} // comment"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>RFC 8259 فقط کوتیشن دوتایی، <code>true/false/null</code> با حروف کوچک، نبود کامای انتهایی و نبود کامنت را می‌پذیرد.</p>"
+  },
+  {
+   "title": "در نوشتن فایل‌های YAML (مانند Ansible Playbook)، کدام کاراکتر برای تورفتگی (Indentation) کاملاً غیرمجاز است؟",
+   "options": [
+    "دو فضای خالی (Space)",
+    "کاراکتر Tab",
+    "چهار فضای خالی (Space)",
+    "علامت خط تیره برای آیتم لیست"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>مشخصات YAML استفاده از <code>Tab</code> را برای تورفتگی ممنوع کرده است؛ فقط Space مجاز است.</p>"
+  },
+  {
+   "title": "هنگام پارس خروجی NETCONF XML در پایتون با ElementTree، چرا root.findall('interface') اغلب لیست خالی برمی‌گرداند؟",
+   "options": [
+    "زیرا NETCONF از JSON استفاده می‌کند",
+    "زیرا ElementTree لیست برنمی‌گرداند",
+    "زیرا گره‌های XML در NETCONF دارای Namespace (xmlns) هستند و باید Namespace در جست‌وجو ذکر شود",
+    "زیرا باید حتماً فایل را به YAML تبدیل کرد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>در XML دارای <code>xmlns</code>، نام کامل گره شامل URI فضای نام است و باید از طریق دیکشنری Namespace به <code>findall</code> داده شود.</p>"
+  },
+  {
+   "title": "تهدید امنیتی XXE (XML External Entity) به چه دلیلی در پارس XML نامطمئن مهم است و راه‌حل پیشنهادی پایتون چیست؟",
+   "options": [
+    "XXE سرعت شبکه را کم می‌کند و راه‌حلش افزایش MTU است",
+    "XXE فقط در JSON رخ می‌دهد",
+    "XXE باعث حذف کلید SSH می‌شود",
+    "می‌تواند به خواندن فایل محلی سرور یا SSRF منجر شود و استفاده از defusedxml برای ورودی‌های نامطمئن توصیه می‌شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>پارس XML غیرمعتمد باید با کتابخانه‌های ایمن‌شده مانند <code>defusedxml</code> انجام شود تا موجودیت‌های بیرونی و حملات DoS مهار شوند.</p>"
+  },
+  {
+   "title": "کدام عبارت درباره رابطه YAML 1.2 و JSON صحیح است؟",
+   "options": [
+    "YAML 1.2 ابرمجموعه JSON است؛ بنابراین هر JSON معتبر یک YAML 1.2 معتبر نیز هست",
+    "JSON ابرمجموعه YAML است",
+    "هیچ اشتراکی بین JSON و YAML وجود ندارد",
+    "در YAML 1.2 همچنان yes و no بولی محسوب می‌شوند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>در YAML 1.2 سازگاری کامل با JSON برقرار شده و مقادیر بولی به <code>true/false</code> محدود شده‌اند.</p>"
+  },
+  {
+   "title": "در پایتون، تفاوت json.loads() و json.dumps() چیست؟",
+   "options": [
+    "هر دو فایل را از دیسک پاک می‌کنند",
+    "json.loads رشته JSON را به شیء پایتون (dict/list) تبدیل می‌کند و json.dumps شیء پایتون را به رشته JSON تبدیل می‌نماید",
+    "json.dumps فقط برای XML است",
+    "json.loads رشته را رمزنگاری می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>حرف <code>s</code> در انتهای <code>loads/dumps</code> به معنای <code>string</code> است (در برابر <code>load/dump</code> برای فایل).</p>"
+  },
+  {
+   "title": "اگر در یک فایل YAML کلیدی را دو بار تکرار کنیم، خطر رایج در بسیاری از پارسرهای پیش‌فرض چیست؟",
+   "options": [
+    "فایل به PDF تبدیل می‌شود",
+    "تجهیز شبکه ریبوت می‌شود",
+    "ممکن است بدون خطا، مقدار دومی بی‌صدا جایگزین اولی شود؛ لذا استفاده از yamllint در CI ضروری است",
+    "کل سیستم‌عامل متوقف می‌شود"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>بازنویسی بی‌صدای کلیدهای تکراری یکی از باگ‌های پنهان فایل‌های Inventory بزرگ است که با <code>yamllint</code> کشف می‌شود.</p>"
+  },
+  {
+   "title": "کاربرد JSON Schema در پایپ‌لاین اتوماسیون شبکه چیست؟",
+   "options": [
+    "جایگزینی پروتکل BGP",
+    "افزایش سرعت DNS",
+    "تبدیل YAML به XML",
+    "اعتبارسنجی خودکار ساختار، نوع داده و محدوده مقادیر (مثلاً VLAN 1..4094) پیش از اعمال روی شبکه"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>JSON Schema قرارداد دقیق داده‌های ورودی را پیش از رسیدن به مرحله استقرار روی تجهیزات کنترل می‌کند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چه چیزی را محلی اجرا و اثبات کرده است؟",
+   "options": [
+    "پارس محلی JSON، تشخیص تله YAML 1.1 (NO) و پارس XML با Namespace IETF در Python 3 stdlib بدون اتصال به تجهیز واقعی",
+    "تغییر پیکربندی روتر با NETCONF واقعی",
+    "نصب PyYAML روی سوئیچ Nexus",
+    "ارسال پیام به Catalyst Center زنده"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه به‌طور محلی در Python 3 stdlib اجرا و تست شده و هیچ تجهیز شبکه‌ای متصل نشده است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "auto_05",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc8259",
+   "https://yaml.org/spec/1.2.2/",
+   "https://docs.python.org/3/library/xml.html#xml-vulnerabilities"
+  ],
+  "limitations": [
+   "اسکریپت آزمایشگاه در Python 3 stdlib اجرا شده و هیچ سرور NETCONF/RESTCONF واقعی متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "اصلاح کامل پرسش‌های شکسته نسخه قدیمی (مانند «چه معتبری است در YAML 1.1؟» و «safe_load Execute کد Python را در YAML نمی‌کند»).",
+   "گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش و آزمایشگاه قابل اجرای JSON / YAML 1.1 trap / XML Namespace."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_05-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_05.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_05_lab.py"
+  }
+ }
+}

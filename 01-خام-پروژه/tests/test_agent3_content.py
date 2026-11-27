@@ -1,0 +1,197 @@
+import html
+import json
+import re
+import subprocess
+import sys
+import unittest
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+BLUEPRINT_DIR = ROOT / "server" / "www" / "academy-assets" / "v5" / "blueprints"
+AGENT3_LAB_DIR = ROOT / "academy-labs" / "agent3"
+REVIEW_DIR = ROOT / "academy-labs" / "reviews"
+
+AGENT3_ALLOWED_IDS = {
+    # Core Specialist (6)
+    "spec_ent", "spec_sec", "spec_sp", "spec_wl", "spec_collab", "spec_cyber",
+    # Deep Specialist (12)
+    "spec_ent_campus", "spec_ent_sd", "spec_sec_vpn", "spec_sec_ise",
+    "spec_dc_nx", "spec_dc_aci", "spec_dc_stor", "spec_sp_xr", "spec_sp_sr",
+    "spec_wl_survey", "spec_collab_gw", "spec_cyber_hunt",
+    # Automation except auto_12 (19)
+    "auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_07",
+    "auto_08", "auto_09", "auto_10", "auto_11", "auto_13", "auto_14", "auto_15",
+    "auto_16", "auto_17", "auto_18", "auto_19", "auto_20",
+    # CCIE (7)
+    "ccie_01", "ccie_sec", "ccie_dc", "ccie_sp", "ccie_wl", "ccie_collab", "ccie_auto",
+    # CCDE (20)
+    *[f"ccde_{i:02d}" for i in range(1, 21)],
+}
+
+FORBIDDEN_LEGACY_TYPOS = (
+    "تلgern",
+    "شوائع",
+    "politicaها",
+    "استخراجدرس",
+    "چهخروجیی",
+    "عمولاتی",
+    "مرزهای camino",
+    "فیبرpath",
+    "سبین-لیف",
+    "سه تاقا",
+    "یک الشيء",
+    "مبتنی بر یتیک",
+    "n preservation",
+)
+
+UNEXECUTED_MARKERS = (
+    "اجرا نشده",
+    "متصل نشده",
+    "بدون اتصال",
+    "تجهیز واقعی",
+    "شبیه‌سازی",
+    "Mock",
+)
+
+
+def discover_agent3_blueprints() -> list[tuple[str, Path]]:
+    found = []
+    for lab_file in sorted(AGENT3_LAB_DIR.glob("*_lab.py")):
+        lesson_id = lab_file.name.removesuffix("_lab.py")
+        bp_path = BLUEPRINT_DIR / f"{lesson_id}.json"
+        if bp_path.exists():
+            found.append((lesson_id, bp_path))
+    return found
+
+
+class Agent3ContentIntegrityTests(unittest.TestCase):
+    def test_discovered_lessons_are_strictly_within_agent3_scope(self):
+        discovered = discover_agent3_blueprints()
+        discovered_ids = {lesson_id for lesson_id, _ in discovered}
+        self.assertEqual(len(AGENT3_ALLOWED_IDS), 64)
+        self.assertEqual(
+            discovered_ids,
+            AGENT3_ALLOWED_IDS,
+            f"Missing: {sorted(AGENT3_ALLOWED_IDS - discovered_ids)} | Extra: {sorted(discovered_ids - AGENT3_ALLOWED_IDS)}",
+        )
+        self.assertNotIn("auto_12", discovered_ids, "auto_12 belongs to Agent 2")
+
+    def test_integration_guide_lists_all_64_lessons(self):
+        guide_path = ROOT / "AGENT3-INTEGRATION-GUIDE-fa.md"
+        self.assertTrue(guide_path.exists(), "Missing AGENT3-INTEGRATION-GUIDE-fa.md")
+        guide_text = guide_path.read_text(encoding="utf-8")
+        for lesson_id in sorted(AGENT3_ALLOWED_IDS):
+            self.assertIn(f"`{lesson_id}`", guide_text, f"{lesson_id} missing from AGENT3-INTEGRATION-GUIDE-fa.md")
+
+    def test_blueprints_schema_svg_quiz_lab_and_review_integrity(self):
+        discovered = discover_agent3_blueprints()
+        for lesson_id, bp_path in discovered:
+            with self.subTest(lesson_id=lesson_id):
+                raw_text = bp_path.read_text(encoding="utf-8")
+                data = json.loads(raw_text)
+                student_facing_text = json.dumps(
+                    {
+                        "title": data.get("title"),
+                        "sections": data.get("sections"),
+                        "glossary": data.get("glossary"),
+                        "stages": data.get("stages"),
+                        "interactiveQuiz": data.get("interactiveQuiz"),
+                    },
+                    ensure_ascii=False,
+                )
+                for bad in FORBIDDEN_LEGACY_TYPOS:
+                    self.assertNotIn(
+                        bad,
+                        student_facing_text,
+                        f"Legacy typo {bad!r} leaked into student-facing content of {lesson_id}",
+                    )
+                self.assertEqual(data.get("schema"), "fam-app-blueprint-v1")
+                self.assertEqual(data.get("lessonId"), lesson_id)
+                self.assertEqual(data.get("objectiveId"), lesson_id)
+                self.assertEqual(data.get("kind"), "lesson")
+                self.assertEqual(data.get("evidence"), "Designed — Not Run")
+                self.assertIn("بازبینی مستقل انجام نشده", data.get("reviewStatus", ""))
+
+                sections = data.get("sections", [])
+                self.assertGreaterEqual(len(sections), 14)
+                sec_ids = set()
+                svg_count = 0
+                for sec in sections:
+                    self.assertTrue(sec.get("id"))
+                    self.assertNotIn(sec["id"], sec_ids)
+                    sec_ids.add(sec["id"])
+                    self.assertTrue(sec.get("title", "").strip())
+                    sec_html = sec.get("html", "")
+                    self.assertTrue(sec_html.strip())
+                    for match in re.findall(r"<svg\b[^>]*>.*?</svg>", sec_html, flags=re.DOTALL):
+                        svg_count += 1
+                        root = ET.fromstring(match)
+                        self.assertTrue(root.attrib.get("viewBox"), f"SVG missing viewBox in {lesson_id}")
+                self.assertGreaterEqual(svg_count, 1, f"{lesson_id} must contain at least one valid inline SVG")
+
+                glossary = data.get("glossary", [])
+                self.assertGreaterEqual(len(glossary), 15)
+                for item in glossary:
+                    self.assertTrue(item.get("term", "").strip())
+                    self.assertTrue(item.get("fa", "").strip())
+                    self.assertTrue(item.get("simple", "").strip())
+
+                quiz = data.get("interactiveQuiz", [])
+                self.assertEqual(len(quiz), 12)
+                for q_idx, q in enumerate(quiz):
+                    self.assertTrue(q.get("title", "").strip(), f"{lesson_id} Q{q_idx} empty title")
+                    opts = q.get("options", [])
+                    self.assertEqual(len(opts), 4, f"{lesson_id} Q{q_idx} must have 4 options")
+                    self.assertEqual(len(set(opts)), 4, f"{lesson_id} Q{q_idx} has duplicate options")
+                    self.assertIn(q.get("correctIndex"), (0, 1, 2, 3))
+                    self.assertTrue(q.get("explanationHtml", "").strip())
+
+                lab = data.get("stages", {}).get("lab", {})
+                lab_html = lab.get("html", "")
+                self.assertTrue(any(m in lab_html for m in UNEXECUTED_MARKERS))
+                self.assertTrue(any(m in lab.get("executionStatus", "") for m in UNEXECUTED_MARKERS))
+
+                lab_script = AGENT3_LAB_DIR / f"{lesson_id}_lab.py"
+                self.assertTrue(lab_script.exists(), f"Missing lab script {lab_script}")
+                escaped_src = html.escape(lab_script.read_text(encoding="utf-8").strip())
+                self.assertIn(
+                    escaped_src,
+                    lab_html,
+                    f"{lesson_id} lab.html does not embed verbatim escaped source of {lab_script.name}",
+                )
+
+                review_path = REVIEW_DIR / f"{lesson_id}-review-fa.md"
+                self.assertTrue(review_path.exists(), f"Missing review log {review_path}")
+                review_text = review_path.read_text(encoding="utf-8")
+                self.assertIn("بازبینی مستقل", review_text)
+
+                meta = data.get("meta", {})
+                self.assertGreaterEqual(len(meta.get("sources", [])), 1)
+                self.assertGreaterEqual(len(meta.get("limitations", [])), 1)
+                self.assertEqual(
+                    meta.get("semanticReview", {}).get("reviewer"),
+                    "author-agent-self-review-not-independent",
+                )
+
+    def test_all_agent3_lab_scripts_execute_cleanly(self):
+        scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
+        self.assertEqual(len(scripts), 64)
+        for script in scripts:
+            with self.subTest(script=script.name):
+                proc = subprocess.run(
+                    [sys.executable, str(script)],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                self.assertEqual(
+                    proc.returncode,
+                    0,
+                    f"{script.name} failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}",
+                )
+                self.assertTrue(proc.stdout.strip(), f"{script.name} produced empty stdout")
+
+
+if __name__ == "__main__":
+    unittest.main()

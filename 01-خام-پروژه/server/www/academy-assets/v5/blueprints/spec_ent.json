@@ -1,0 +1,347 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "spec_ent",
+ "objectiveId": "spec_ent",
+ "kind": "lesson",
+ "track": "FAM Specializations",
+ "course": "spec-enterprise",
+ "title": "تخصص Enterprise: IS-IS، اتصال Campus (SD-Access) به SD-WAN و معماری ۱۰۰ شعبه‌ای",
+ "titleEn": "Enterprise Specialization: IS-IS Underlay, SD-Access to SD-WAN Integration & 100-Branch Architecture",
+ "domain": "Enterprise Networking",
+ "source": "Legacy spec_ent rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "spec_ent-section-1",
+   "title": "مسئله واقعی: چرا معماری ۱۰۰ شعبه‌ای بدون Underlay یکپارچه و انتقال سیاست فرو می‌پاشد؟",
+   "html": "<p>سازمانی را در نظر بگیرید که از یک ساختمان مرکزی به ۱۰۰ شعبه پراکنده و دو دیتاسنتر رشد کرده است. در ساختمان مرکزی، کارمند واحد مالی درون <strong>SD-Access</strong> به شبکه مجازی <code>VN_FINANCE</code> متصل است و برچسب امنیتی <code>SGT 15</code> دریافت کرده است. اکنون این کاربر باید به سامانه حسابداری در شعبه شماره ۸۷ روی <strong>SD-WAN</strong> متصل شود. اگر در مرز خروج از Campus فقط بسته‌های IP عادی بدون نگاشت دقیق VRF به VPN و بدون سازوکار انتقال <code>SGT</code> تحویل داده شوند، دو شکست هم‌زمان رخ می‌دهد: اول، انزوای کلان (Macro-Segmentation) بین بخش مالی و شبکه مهمان در خطر نشت قرار می‌گیرد؛ دوم، هویت ریزدانه کاربر (Micro-Segmentation) در مرز Border گم می‌شود و در شعبه مقصد دیگر نمی‌توان سیاست مبتنی بر نقش اعمال کرد.</p><p>در کنار این چالش مرزی، خود زیرساخت حمل (Underlay) در Campusهای بزرگ نیز تحت فشار است: وقتی قرار است صدها سوئیچ Access/Distribution/Border هم IPv4 و هم IPv6 و همچنین قابلیت‌های توسعه‌پذیر Fabric را حمل کنند، انتخاب پروتکل IGP زیرین (به‌ویژه <strong>IS-IS</strong>) به تصمیمی تعیین‌کننده تبدیل می‌شود.</p>"
+  },
+  {
+   "id": "spec_ent-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازهای مفهومی:</strong> آشنایی با OSPF، BGP، مفاهیم پایه VRF، LISP/VXLAN در SD-Access و معماری کنترل‌پلین/دیتاپلین SD-WAN (در کاتالوگ قدیمی معادل درس‌های <code>ccnp_01</code>، <code>ccnp_enc_arch</code> و <code>ccnp_ensdwi</code>).</p><ul><li>تحلیل معماری <strong>IS-IS</strong> (کپسوله‌سازی لایه ۲ روی CLNS، ساختار TLV، آدرس <code>NET</code>، سطوح L1/L2 و نقش DIS) و مقایسه دقیق آن با OSPF.</li><li>تبدیل نشانی IPv4 Loopback به <code>System ID</code> شش‌بایتی و بررسی پیش‌نیازهای تشکیل همسایگی IS-IS (Area ID، MTU Padding، Circuit Type و یکتایی System ID).</li><li>طراحی مرز اتصال <strong>SD-Access به SD-WAN</strong> با حفظ هم‌زمان Macro-Segmentation (VRF/VN به Service VPN) و Micro-Segmentation (انتقال SGT با Inline Tagging/CMD، VXLAN-GPO یا SXP).</li><li>تصمیم‌گیری مهندسی برای مقیاس ۱۰۰ شعبه و پرهیز از Over-Engineering در شعب کوچک.</li></ul>"
+  },
+  {
+   "id": "spec_ent-section-3",
+   "title": "چرا IS-IS ستون Underlay در Fabricهای مدرن شد؟",
+   "html": "<p>پروتکل <strong>IS-IS (Intermediate System to Intermediate System)</strong> ابتدا در استاندارد ISO 10589 برای شبکه CLNS طراحی و سپس در <strong>RFC 1195</strong> و <strong>RFC 5308</strong> برای حمل IPv4 و IPv6 توسعه یافت. برخلاف OSPF که مستقیماً داخل IP (پروتکل ۸۹) حمل می‌شود، IS-IS مستقیماً روی <strong>لایه ۲ (CLNS / LLC SAP 0xFE)</strong> حرکت می‌کند. همین ویژگی باعث می‌شود کنترل‌پلین Underlay به تغییر یا اختلال نشانی‌دهی IP لینک‌ها وابستگی کمتری داشته باشد و از برخی حملات مبتنی بر بسته‌های IP مسیریابی‌شده از بیرون مصون بماند.</p><p>مزیت کلیدی دوم، ساختار کاملاً ماژولار <strong>TLV (Type-Length-Value)</strong> در پیام‌های LSP است. برای افزودن پشتیبانی IPv6 (RFC 5308)، Segment Routing یا Multi-Topology، نیازی به تعریف یک پروتکل جدید مثل مهاجرت OSPFv2 به OSPFv3 نیست؛ صرفاً TLVهای جدید داخل همان فرایند واحد IS-IS افزوده می‌شوند. <strong>نکته دقت فنی:</strong> در منابع آموزشی گاهی <code>AD = 115</code> به‌عنوان خاصیت ذاتی IS-IS ذکر می‌شود؛ اما Administrative Distance یک عدد وابسته به پیاده‌سازی فروشنده است (در Cisco IOS/IOS-XE/IOS-XR برابر ۱۱۵ و در Junos پیش‌فرض ۱۵/۱۸ برای L1/L2 داخلی است) و جزو استاندارد ISO/RFC نیست.</p>"
+  },
+  {
+   "id": "spec_ent-section-4",
+   "title": "کالبدشکافی آدرس NET در IS-IS و تبدیل Loopback به System ID",
+   "html": "<p>هر روتر IS-IS باید حداقل یک <strong>NET (Network Entity Title)</strong> داشته باشد که بین ۸ تا ۲۰ بایت طول دارد و از سه بخش تشکیل می‌شود:</p><ul><li><strong>Area ID (۱ تا ۱۳ بایت):</strong> معمولاً با AFI خصوصی <code>49</code> شروع می‌شود (معادل مفهومی فضای خصوصی در ISO NSAP)، مثلاً <code>49.0001</code>.</li><li><strong>System ID (دقیقاً ۶ بایت = ۱۲ رقم هگز):</strong> باید در کل دامنه مسیریابی یکتا باشد.</li><li><strong>NSEL (دقیقاً ۱ بایت):</strong> برای معرفی خود روتر (نه یک سرویس لایه بالا) همواره برابر <code>00</code> است.</li></ul><p><strong>مثال عددی تبدیل IPv4 Loopback به System ID به روش رایج سیسکو (BCD):</strong> فرض کنید <code>Loopback0 = 10.255.0.1</code> است. ابتدا هر اکتت را به صورت ۳ رقمی با صفرهای پیشرو می‌نویسیم: <code>010.255.000.001</code>. سپس ۱۲ رقم حاصل را در سه گروه ۴ رقمی دسته‌بندی می‌کنیم: <code>0102.5500.0001</code>. با افزودن Area ID <code>49.0001</code> و NSEL <code>00</code>، آدرس نهایی می‌شود: <code>49.0001.0102.5500.0001.00</code>. برای روتر دوم با <code>10.255.0.2</code>، آدرس می‌شود <code>49.0001.0102.5500.0002.00</code>. این روش خوانایی عملیاتی را در خروجی <code>show isis neighbors</code> به شدت ساده می‌کند.</p>"
+  },
+  {
+   "id": "spec_ent-section-5",
+   "title": "سطوح L1، L2، مرز Area و تفاوت DIS با DR در OSPF",
+   "html": "<p>در OSPF، مرز Area <em>داخل</em> روتر ABR قرار می‌گیرد و همه Areaها (به‌جز استثنای Virtual Link) باید به <code>Area 0</code> متصل باشند. در مقابل، در IS-IS <strong>کل روتر متعلق به یک Area است</strong> و مرز Area روی <em>لینک بین دو روتر</em> شکل می‌گیرد. هیچ <code>Area 0</code> اجباری وجود ندارد؛ ستون فقرات شبکه از زنجیره‌ای پیوسته از روترهای دارای <strong>Level 2</strong> ساخته می‌شود:</p><ul><li><strong>همسایگی L1:</strong> فقط بین روترهایی با <code>Area ID</code> کاملاً یکسان برقرار می‌شود.</li><li><strong>همسایگی L2:</strong> می‌تواند هم درون یک Area و هم میان دو Area متفاوت برقرار شود. در Underlayهای بزرگ مانند SD-Access، معمولاً طراحی یکنواخت <strong>Level-2-only</strong> انتخاب می‌شود تا پیچیدگی نشت مسیر L2-to-L1 و مسیرهای غیربهینه از بین برود.</li><li><strong>DIS (Designated Intermediate System):</strong> روی لینک‌های Broadcast یک DIS انتخاب می‌شود (بر اساس بیشترین Priority و سپس بیشترین SNPA/MAC)، اما برخلاف OSPF، <strong>Backup DIS وجود ندارد</strong> و انتخاب DIS دارای ویژگی <strong>Preemption</strong> است؛ یعنی روتر جدید با اولویت بالاتر بلافاصله DIS می‌شود. در لینک‌های دوطرفه اترنت، فعال‌سازی <code>isis network point-to-point</code> باعث حذف انتخاب DIS و کاهش بار Pseudonode LSP و تسریع همگرایی می‌شود.</li></ul>"
+  },
+  {
+   "id": "spec_ent-section-6",
+   "title": "نمودار معماری: از Underlay IS-IS تا پیوند SD-Access و SD-WAN",
+   "html": "<p>در نمودار زیر تفکیک دو لایه کلیدی دیده می‌شود: در Campus، Underlay مبتنی بر IS-IS دسترسی Loopbackها را برای تونل‌های VXLAN-GPO و Control Plane مبتنی بر LISP فراهم می‌کند؛ در مرز Border، هر شبکه مجازی به یک VPN سرویس در SD-WAN نگاشت می‌شود و هم‌زمان هویت SGT از طریق یک مکانیسم صریح منتقل می‌گردد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"IS-IS Underlay and SD-Access to SD-WAN Border Hand-off\"><rect x=\"10\" y=\"15\" width=\"230\" height=\"190\" rx=\"10\" fill=\"#eef6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"125\" y=\"40\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#1e3a8a\">Campus SD-Access Fabric</text><rect x=\"30\" y=\"60\" width=\"190\" height=\"44\" rx=\"6\" fill=\"#ffffff\" stroke=\"#3b82f6\"/><text x=\"125\" y=\"80\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">Edge Node (VXLAN-GPO + LISP)</text><text x=\"125\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#475569\">VN_FINANCE | SGT 15</text><rect x=\"30\" y=\"128\" width=\"190\" height=\"52\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#2563eb\"/><text x=\"125\" y=\"150\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">IS-IS L2 Underlay (CLNS/TLV)</text><text x=\"125\" y=\"167\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">NET: 49.0001.0102.5500.0001.00</text><rect x=\"275\" y=\"45\" width=\"210\" height=\"130\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"72\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#92400e\">Fabric Border / Fusion</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"11\" fill=\"#78350f\">Macro: VRF/VN -&gt; eBGP -&gt; VPN 10</text><text x=\"380\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" fill=\"#78350f\">Micro: SGT via Inline CMD / SXP</text><text x=\"380\" y=\"146\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9a3412\">MTU &amp; Policy Continuity Gate</text><rect x=\"520\" y=\"15\" width=\"230\" height=\"190\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#047857\" stroke-width=\"2\"/><text x=\"635\" y=\"40\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#065f46\">SD-WAN Overlay (100 Branches)</text><rect x=\"540\" y=\"65\" width=\"190\" height=\"48\" rx=\"6\" fill=\"#ffffff\" stroke=\"#10b981\"/><text x=\"635\" y=\"86\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">cEdge WAN Edge (OMP / IPsec)</text><text x=\"635\" y=\"102\" text-anchor=\"middle\" font-size=\"10\" fill=\"#475569\">Service VPN 10 + SGT Policy</text><rect x=\"540\" y=\"132\" width=\"190\" height=\"48\" rx=\"6\" fill=\"#d1fae5\" stroke=\"#059669\"/><text x=\"635\" y=\"153\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">Branch 1..100 (Right-Sized)</text><text x=\"635\" y=\"169\" text-anchor=\"middle\" font-size=\"10\" fill=\"#065f46\">Small: L2/cEdge | Large: Fabric</text><line x1=\"240\" y1=\"110\" x2=\"275\" y2=\"110\" stroke=\"#1e293b\" stroke-width=\"2\"/><line x1=\"485\" y1=\"110\" x2=\"520\" y2=\"110\" stroke=\"#1e293b\" stroke-width=\"2\"/></svg>"
+  },
+  {
+   "id": "spec_ent-section-7",
+   "title": "مقایسه مهندسی IS-IS در برابر OSPF در Underlay سازمانی",
+   "html": "<table><thead><tr><th>معیار فنی</th><th>OSPF (v2 / v3)</th><th>IS-IS (ISO 10589 / RFC 1195)</th></tr></thead><tbody><tr><td>لایه حمل</td><td>مستقیماً روی IP (Protocol 89)</td><td>مستقیماً روی لایه ۲ (CLNS / LLC)</td></tr><tr><td>پشتیبانی دوگانه IPv4 و IPv6</td><td>OSPFv2 برای IPv4 و OSPFv3 برای IPv6 (یا AF در RFC 5838)</td><td>فرایند واحد با TLVهای مجزا (RFC 5308 / RFC 5120)</td></tr><tr><td>مرز Area و Backbone</td><td>مرز داخل ABR؛ وابسته به Area 0</td><td>مرز روی لینک؛ ستون فقرات پیوسته L2 بدون Area 0</td></tr><tr><td>انتخاب در Broadcast</td><td>DR و BDR (بدون Preemption)</td><td>فقط DIS (با Preemption؛ قابل حذف با P2P)</td></tr><tr><td>توسعه‌پذیری Fabric</td><td>ساختار ثابت‌تر LSAها (به علاوه Opaque LSA)</td><td>ساختار منعطف TLV؛ انتخاب پیش‌فرض LAN Automation در Catalyst Center</td></tr></tbody></table>"
+  },
+  {
+   "id": "spec_ent-section-8",
+   "title": "کالبدشکافی Hand-off مرز Border: تفکیک Macro و Micro Segmentation",
+   "html": "<p>در SD-Access، جداسازی در دو سطح انجام می‌شود: <strong>Macro-Segmentation</strong> با کمک <code>Virtual Network (VN)</code> که در سطح روتینگ معادل VRF است و در هدر VXLAN با <code>VNI</code> حمل می‌شود؛ و <strong>Micro-Segmentation</strong> با برچسب ۱۶ بیتی <strong>SGT (Scalable Group Tag)</strong> که درون فیلد Group Policy هدر <code>VXLAN-GPO</code> قرار می‌گیرد.</p><p>به محض اینکه بسته به <strong>Fabric Border</strong> می‌رسد و از VXLAN خارج (Decapsulate) می‌شود، یک بسته IPv4/IPv6 معمولی <strong>هیچ فیلدی برای SGT ندارد</strong>. بنابراین دو لایه باید صریحاً به SD-WAN تحویل داده شوند:</p><ol><li><strong>تحویل Macro (VRF-to-VPN):</strong> میان Fabric Border و روتر لبه SD-WAN (یا Fusion Router)، به ازای هر VN یک زیرینترفیس <code>802.1Q</code> و VRF جداگانه با همسایگی <code>eBGP</code> ایجاد می‌شود و به <code>Service VPN</code> متناظر در SD-WAN (مثلاً <code>VN_FINANCE</code> به <code>VPN 10</code>) نگاشت می‌گردد.</li><li><strong>تحویل Micro (حفظ SGT):</strong> از سه راه ممکن است: (الف) <strong>Inline Tagging (Cisco Meta Data / CMD)</strong> روی لینک لایه ۲ مستقیم بین Border و cEdge که SGT را در هدر لایه ۲ قرار می‌دهد؛ (ب) <strong>حمل متادیتای SGT در Fabric یکپارچه SD-Access/SD-WAN</strong> (در نسخه‌های پشتیبان Cisco Catalyst SD-WAN)؛ یا (ج) همگام‌سازی کنترلی نگاشت <code>IP-to-SGT</code> از طریق پروتکل <strong>SXP (TCP 64999)</strong> یا یکپارچگی با Cisco ISE.</li></ol>"
+  },
+  {
+   "id": "spec_ent-section-9",
+   "title": "مسیر گام‌به‌گام یک بسته از کاربر مالی در Campus تا شعبه ۸۷",
+   "html": "<p>فرض کنید میزبان مالی <code>192.0.2.50</code> در Campus مرکزی (در <code>VN_FINANCE</code> با <code>SGT 15</code>) درخواست HTTPS به سرور شعبه ۸۷ با نشانی <code>198.51.100.87</code> ارسال می‌کند:</p><ol><li>سوئیچ Edge با احراز هویت Cisco ISE به کاربر <code>SGT 15</code> می‌دهد و در جدول LISP می‌بیند مقصد بیرون از Fabric است؛ پس بسته را به سمت <strong>Border Node</strong> درون <code>VXLAN-GPO</code> (حاوی VNI مربوط به <code>VN_FINANCE</code> و <code>SGT 15</code>) کپسوله می‌کند.</li><li>بسته روی Underlay مبتنی بر <strong>IS-IS L2</strong> از طریق Loopbackهای Border مسیریابی می‌شود (با شرط MTU کافی، مثلاً <code>9100</code> یا حداقل بالای <code>1550</code> بایت برای سربار VXLAN).</li><li>Border بسته VXLAN را باز می‌کند، آن را در زیرینترفیس <code>VRF VN_FINANCE</code> تحویل cEdge می‌دهد و SGT 15 را از طریق Inline Tagging یا SXP/متادیتای SD-WAN حفظ می‌کند.</li><li>روتر cEdge بسته را بر اساس مسیرهای <strong>OMP</strong> درون تونل IPsec سرویس <code>VPN 10</code> به cEdge شعبه ۸۷ می‌فرستد. در شعبه ۸۷، سیاست امنیتی مبتنی بر <code>SGT 15</code> بررسی می‌شود و فقط در صورت مجوز در ماتریس SGACL، بسته به سرور مالی تحویل می‌گردد.</li></ol>"
+  },
+  {
+   "id": "spec_ent-section-10",
+   "title": "طراحی متوازن ۱۰۰ شعبه‌ای: پرهیز از Over-Engineering",
+   "html": "<p>یکی از اشتباهات رایج در پروژه‌های بزرگ، کپی کردن معماری کامل ستاد مرکزی در همه ۱۰۰ شعبه است. یک معمار Enterprise شعب را بر اساس اندازه، اهمیت و پیچیدگی دسته‌بندی (Tiering) می‌کند:</p><ul><li><strong>ستاد مرکزی و Campusهای بزرگ (۵۰۰+ کاربر):</strong> پیاده‌سازی کامل SD-Access با Underlay خودکار IS-IS، جداسازی VN و سیاست ریزدانه SGT/ISE.</li><li><strong>شعب متوسط (۵۰ تا ۲۰۰ کاربر):</strong> دو روتر SD-WAN (Active/Active یا Active/Standby) با دو لینک WAN ناهمگن (MPLS + Internet) و سوئیچینگ استاندارد Access با 802.1X؛ در صورت نیاز به جابه‌جایی گسترده کاربر یا IoT می‌توان Fabric-in-a-Box را ارزیابی کرد.</li><li><strong>شعب کوچک (۵ تا ۳۰ کاربر):</strong> یک یا دو cEdge متصل به سوئیچ Access ساده بدون نیاز به LISP/VXLAN محلی؛ جداسازی کلان با Service VPNهای SD-WAN (مثلاً VPN 10 اداری، VPN 20 مهمان) و اجرای سیاست امنیتی روی cEdge یا SGT/SXP. این کار هزینه مجوز (Licensing)، سخت‌افزار و پیچیدگی عملیاتی را به شدت کاهش می‌دهد.</li></ul>"
+  },
+  {
+   "id": "spec_ent-section-11",
+   "title": "کژفهمی‌های رایج و واقعیت مهندسی",
+   "html": "<ul><li><strong>کژفهمی ۱: «در IS-IS هم مانند OSPF باید Area 0 وجود داشته باشد و مرز Area داخل روتر است.»</strong> واقعیت: در IS-IS مرز Area روی لینک بین روترهاست و هیچ Area 0 اجباری نیست؛ پیوستگی ستون فقرات با زنجیره‌ای از روترهای L2 تضمین می‌شود.</li><li><strong>کژفهمی ۲: «تخصیص SGT در SD-Access یعنی این برچسب خودکار روی هر لینک IP تا همه شعب باقی می‌ماند.»</strong> واقعیت: هدر IP استاندارد جایی برای SGT ندارد. بدون Inline Tagging (CMD)، حمل متادیتای SD-WAN یا SXP، برچسب SGT در خروج از Fabric از بین می‌رود.</li><li><strong>کژفهمی ۳: «اگر پینگ دو سر لینک IS-IS جواب دهد، پس مشکل از MTU نیست.»</strong> واقعیت: پینگ پیش‌فرض با بسته‌های کوچک انجام می‌شود، اما IS-IS Hello به‌طور پیش‌فرض تا حداکثر MTU لینک Pad می‌شود؛ اختلاف حتی چند بایتی (مثل ۱۵۰۰ در برابر ۱۴۹۲) می‌تواند همسایگی IS-IS را کاملاً متوقف کند.</li></ul>"
+  },
+  {
+   "id": "spec_ent-section-12",
+   "title": "عیب‌یابی سیستماتیک: همسایگی IS-IS و نشت/گم‌شدن سیاست در مرز",
+   "html": "<p><strong>سناریو ۱ — عدم تشکیل همسایگی IS-IS با وجود Ping سالم:</strong> لینک فیبر <code>Gi0/0</code> بین R1 و R2 در وضعیت <code>up/up</code> است و پینگ ۱۰۰ بایتی برقرار است، اما <code>show isis neighbors</code> خالی است. چک‌لیست تشخیصی: (۱) مقایسه MTU دو سمت با <code>ping &lt;peer&gt; size 1500 df-bit</code> و <code>show clns interface</code> (اثر Hello Padding)؛ (۲) بررسی یکتا بودن <code>System ID</code> شش‌بایتی در <code>net</code> دو روتر؛ (۳) تطابق <code>is-type</code> و <code>circuit-type</code> (روتر L1-only با L2-only همسایه نمی‌شود) و تطابق <code>Area ID</code> در همسایگی L1؛ (۴) یکسان بودن <code>isis network point-to-point</code> در هر دو طرف.</p><p><strong>سناریو ۲ — اعمال نشدن SGACL در شعبه:</strong> اگر ترافیک مالی از Campus به شعبه می‌رسد ولی سیاست مبتنی بر SGT اجرا نمی‌شود، با دستور مرجع <code>show cts role-based sgt-map all</code> بررسی کنید آیا نگاشت <code>IP-to-SGT</code> به تجهیز مرزی یا شعبه رسیده است یا در مرز Border از دست رفته است.</p>"
+  },
+  {
+   "id": "spec_ent-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> برای روتری در Area <code>49.0042</code> با <code>Loopback0 = 198.51.100.14</code>، آدرس <code>NET</code> به روش BCD سیسکو چیست؟ <strong>پاسخ:</strong> سه رقمی کردن اکتت‌ها می‌دهد <code>198.051.100.014</code>؛ گروه‌بندی چهاررقمی می‌دهد <code>1980.5110.0014</code>؛ بنابراین NET برابر <code>49.0042.1980.5110.0014.00</code> است.</p><p><strong>تمرین ۲:</strong> روتر A با <code>49.0001.0102.5500.0001.00</code> و سطح <code>L1L2</code> به روتر B با <code>49.0002.0102.5500.0002.00</code> و سطح <code>L1L2</code> روی لینک P2P با MTU برابر ۱۵۰۰ متصل است. کدام سطح همسایگی بالا می‌آید؟ <strong>پاسخ:</strong> فقط <strong>Level 2</strong> بالا می‌آید؛ زیرا Area IDها متفاوت‌اند (<code>49.0001</code> در برابر <code>49.0002</code>) و همسایگی L1 نیازمند Area ID یکسان است، ولی L2 بین Areaهای مختلف تشکیل می‌شود.</p>"
+  },
+  {
+   "id": "spec_ent-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc1195\" target=\"_blank\" rel=\"noopener\">RFC 1195 (Integrated IS-IS)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc5308\" target=\"_blank\" rel=\"noopener\">RFC 5308 (Routing IPv6 with IS-IS)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc5309\" target=\"_blank\" rel=\"noopener\">RFC 5309 (P2P over LAN)</a> و راهنمای طراحی Cisco SD-Access و SD-WAN Integration.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> در این محیط هیچ تجهیز Cisco IOS-XE، Catalyst Center یا کنترلر SD-WAN اجرا نشده است. فرمان‌های IOS-XE ذکرشده صرفاً مرجع آموزشی هستند و آزمایشگاه Python ارائه‌شده یک <strong>Mock محلی</strong> برای سنجش قواعد NET، همسایگی و پیوستگی Hand-off است. پیش از استقرار عملیاتی، بررسی پشتیبانی دقیق نسخه IOS-XE و SD-WAN برای انتقال Inline SGT یا SXP در مستندات همان نسخه الزامی است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "IS-IS",
+   "fa": "پروتکل IS-IS",
+   "simple": "پروتکل مسیریابی Link-State که مستقیماً روی لایه ۲ (CLNS) و با ساختار TLV کار می‌کند."
+  },
+  {
+   "term": "NET",
+   "fa": "نشانی NET",
+   "simple": "شناسه روتر در IS-IS شامل Area ID، System ID شش‌بایتی و NSEL برابر 00."
+  },
+  {
+   "term": "System ID",
+   "fa": "شناسه سیستم",
+   "simple": "بخش ۶ بایتی و یکتا در آدرس NET برای شناسایی هر روتر در کل دامنه IS-IS."
+  },
+  {
+   "term": "TLV",
+   "fa": "ساختار TLV",
+   "simple": "فرمت Type-Length-Value که افزودن قابلیت‌های جدید مانند IPv6 و SR را به IS-IS ساده می‌کند."
+  },
+  {
+   "term": "Level 1 / Level 2",
+   "fa": "سطوح L1 و L2",
+   "simple": "سطوح سلسله‌مراتبی IS-IS؛ L1 درون یک Area و L2 بین Areaها و در ستون فقرات."
+  },
+  {
+   "term": "DIS",
+   "fa": "سیستم میانی منتخب",
+   "simple": "روتر منتخب روی لینک Broadcast در IS-IS (دارای Preemption و بدون Backup DIS)."
+  },
+  {
+   "term": "Hello Padding",
+   "fa": "پر کردن بسته Hello",
+   "simple": "رفتار پیش‌فرض IS-IS برای رساندن بسته Hello به MTU کامل جهت کشف ناهماهنگی MTU."
+  },
+  {
+   "term": "Underlay",
+   "fa": "شبکه زیرین",
+   "simple": "زیرساخت فیزیکی و مسیریابی پایه (مثل IS-IS) که دسترسی Loopbackها را برای Overlay فراهم می‌کند."
+  },
+  {
+   "term": "SD-Access",
+   "fa": "معماری SD-Access",
+   "simple": "Fabric شبکه‌پردیس سیسکو مبتنی بر کنترل‌پلین LISP، دیتاپلین VXLAN-GPO و مدیریت Catalyst Center."
+  },
+  {
+   "term": "VN / VRF",
+   "fa": "شبکه مجازی / VRF",
+   "simple": "لایه Macro-Segmentation برای جداسازی کامل جداول مسیریابی بخش‌های مختلف سازمان."
+  },
+  {
+   "term": "SGT",
+   "fa": "برچسب گروه مقیاس‌پذیر",
+   "simple": "شناسه ۱۶ بیتی هویت‌محور (TrustSec) برای اعمال Micro-Segmentation مستقل از IP."
+  },
+  {
+   "term": "VXLAN-GPO",
+   "fa": "هدر VXLAN-GPO",
+   "simple": "گسترش هدر VXLAN که علاوه بر VNI، فیلد SGT را نیز در دیتاپلین Fabric حمل می‌کند."
+  },
+  {
+   "term": "Inline Tagging (CMD)",
+   "fa": "برچسب‌گذاری خطی",
+   "simple": "درج مستقیم SGT در هدر لایه ۲ (Cisco Meta Data) روی لینک‌های پشتیبان بین دو تجهیز."
+  },
+  {
+   "term": "SXP",
+   "fa": "پروتکل SXP",
+   "simple": "پروتکل TCP 64999 برای انتقال کنترلی نگاشت IP-to-SGT از تجهیزاتی که Inline Tagging ندارند."
+  },
+  {
+   "term": "Border Hand-off",
+   "fa": "تحویل مرزی Border",
+   "simple": "نقطه اتصال SD-Access به شبکه بیرونی یا SD-WAN با نگاشت VRF-to-VPN و انتقال سیاست."
+  },
+  {
+   "term": "OMP",
+   "fa": "پروتکل OMP",
+   "simple": "پروتکل کنترل‌پلین در Cisco SD-WAN برای توزیع مسیرها، TLOCها و سیاست‌ها میان روترهای لبه."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه Python Mock محلی IS-IS/Hand-off + سناریوی مرجع IOS-XE (تجهیز واقعی اجرا نشده)",
+   "executionStatus": "Python Mock محلی اجرا و تست شده؛ تجهیز واقعی Cisco IOS-XE / SD-Access / SD-WAN اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>Python Mock محلی</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر، سوئیچ، فایروال یا کنترلر واقعی سیسکو اجرا نشده است.</p><p>در این آزمایشگاه ابتدا با یک شبیه‌ساز محلی Python، تبدیل IPv4 Loopback به <code>System ID</code>، شروط برقراری همسایگی IS-IS (از جمله خطای MTU Padding و تفاوت Area در L1/L2) و تداوم Macro/Micro Segmentation در مرز SD-Access به SD-WAN را بررسی می‌کنید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_ent_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_ent_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for spec_ent (IS-IS NET/Adjacency &amp; SD-Access to SD-WAN Hand-off).\n\nNo real Cisco IOS-XE, Catalyst Center, SD-WAN router, or CLNS packet is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\n\n\ndef ipv4_to_isis_system_id(loopback_ipv4: str) -&gt; str:\n    &quot;&quot;&quot;Convert an IPv4 loopback into Cisco&#x27;s standard 6-byte BCD System ID.&quot;&quot;&quot;\n    octets = [int(part) for part in loopback_ipv4.strip().split(&quot;.&quot;)]\n    if len(octets) != 4 or any(not (0 &lt;= o &lt;= 255) for o in octets):\n        raise ValueError(f&quot;Invalid IPv4 address: {loopback_ipv4}&quot;)\n    padded = &quot;&quot;.join(f&quot;{o:03d}&quot; for o in octets)\n    return f&quot;{padded[0:4]}.{padded[4:8]}.{padded[8:12]}&quot;\n\n\ndef parse_isis_net(net: str) -&gt; dict[str, str]:\n    &quot;&quot;&quot;Parse an IS-IS NET address (e.g. 49.0001.0102.5500.0001.00).&quot;&quot;&quot;\n    parts = net.strip().split(&quot;.&quot;)\n    if len(parts) &lt; 5 or parts[-1] != &quot;00&quot;:\n        raise ValueError(f&quot;Invalid IS-IS NET format or non-zero NSEL: {net}&quot;)\n    system_id = &quot;.&quot;.join(parts[-4:-1])\n    if any(len(group) != 4 for group in parts[-4:-1]):\n        raise ValueError(f&quot;System ID must be three 4-hex-digit groups: {system_id}&quot;)\n    area_id = &quot;.&quot;.join(parts[:-4])\n    return {&quot;area_id&quot;: area_id, &quot;system_id&quot;: system_id, &quot;nsel&quot;: parts[-1]}\n\n\n@dataclass(frozen=True)\nclass IsisInterface:\n    router: str\n    net: str\n    level: str  # &quot;L1&quot;, &quot;L2&quot;, &quot;L1L2&quot;\n    mtu: int\n    network_type: str  # &quot;point-to-point&quot; or &quot;broadcast&quot;\n    hello_padding: bool = True\n\n\ndef check_isis_adjacency(a: IsisInterface, b: IsisInterface) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate whether two IS-IS interfaces can form an L1 and/or L2 adjacency.&quot;&quot;&quot;\n    pa = parse_isis_net(a.net)\n    pb = parse_isis_net(b.net)\n    reasons: list[str] = []\n\n    if pa[&quot;system_id&quot;] == pb[&quot;system_id&quot;]:\n        reasons.append(&quot;Duplicate 6-byte System ID prevents adjacency.&quot;)\n    if a.network_type != b.network_type:\n        reasons.append(f&quot;Network type mismatch: {a.network_type} vs {b.network_type}.&quot;)\n    if (a.hello_padding or b.hello_padding) and a.mtu != b.mtu:\n        reasons.append(f&quot;MTU mismatch ({a.mtu} vs {b.mtu}) with hello padding enabled.&quot;)\n\n    levels_a = {&quot;L1&quot;, &quot;L2&quot;} if a.level == &quot;L1L2&quot; else {a.level}\n    levels_b = {&quot;L1&quot;, &quot;L2&quot;} if b.level == &quot;L1L2&quot; else {b.level}\n    common = sorted(levels_a &amp; levels_b)\n    formed: list[str] = []\n\n    if not reasons:\n        if &quot;L1&quot; in common:\n            if pa[&quot;area_id&quot;] == pb[&quot;area_id&quot;]:\n                formed.append(&quot;L1&quot;)\n            else:\n                reasons.append(f&quot;L1 requires matching Area ID ({pa[&#x27;area_id&#x27;]} != {pb[&#x27;area_id&#x27;]}).&quot;)\n        if &quot;L2&quot; in common:\n            formed.append(&quot;L2&quot;)\n        if not common:\n            reasons.append(f&quot;No overlapping IS-IS level ({a.level} vs {b.level}).&quot;)\n\n    return {&quot;up&quot;: bool(formed), &quot;formed_levels&quot;: formed, &quot;reasons&quot;: reasons}\n\n\ndef check_sda_sdwan_handoff(\n    vn_name: str,\n    sdwan_vpn_id: int | None,\n    sgt_id: int,\n    transport_mechanism: str,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Validate macro (VRF/VN -&gt; VPN) and micro (SGT) preservation across Border hand-off.&quot;&quot;&quot;\n    macro_ok = sdwan_vpn_id is not None and sdwan_vpn_id &gt; 0\n    valid_sgt_transports = {&quot;inline_cmd&quot;, &quot;vxlan_gpo_metadata&quot;, &quot;sxp&quot;}\n    micro_ok = transport_mechanism in valid_sgt_transports and 2 &lt;= sgt_id &lt;= 65519\n    notes: list[str] = []\n    if not macro_ok:\n        notes.append(f&quot;VN &#x27;{vn_name}&#x27; is not mapped to a valid SD-WAN service VPN.&quot;)\n    if not micro_ok:\n        notes.append(\n            f&quot;SGT {sgt_id} is lost across hand-off: plain IP carries no SGT &quot;\n            f&quot;(transport=&#x27;{transport_mechanism}&#x27;).&quot;\n        )\n    return {\n        &quot;vn&quot;: vn_name,\n        &quot;sdwan_vpn&quot;: sdwan_vpn_id,\n        &quot;sgt&quot;: sgt_id,\n        &quot;macro_preserved&quot;: macro_ok,\n        &quot;micro_preserved&quot;: micro_ok,\n        &quot;notes&quot;: notes,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real Cisco router, IS-IS process, or SD-WAN fabric is run.&quot;)\n    sys_r1 = ipv4_to_isis_system_id(&quot;10.255.0.1&quot;)\n    sys_r2 = ipv4_to_isis_system_id(&quot;10.255.0.2&quot;)\n    r1 = IsisInterface(&quot;R1-ACCESS&quot;, f&quot;49.0001.{sys_r1}.00&quot;, &quot;L2&quot;, 1500, &quot;point-to-point&quot;)\n    r2 = IsisInterface(&quot;R2-BORDER&quot;, f&quot;49.0002.{sys_r2}.00&quot;, &quot;L2&quot;, 1500, &quot;point-to-point&quot;)\n    r2_mtu_bad = IsisInterface(&quot;R2-BORDER&quot;, f&quot;49.0002.{sys_r2}.00&quot;, &quot;L2&quot;, 1492, &quot;point-to-point&quot;)\n    print(&quot;L2 cross-area healthy:&quot;, check_isis_adjacency(r1, r2))\n    print(&quot;L2 MTU mismatch:&quot;, check_isis_adjacency(r1, r2_mtu_bad))\n    print(&quot;Hand-off with SXP:&quot;, check_sda_sdwan_handoff(&quot;VN_FINANCE&quot;, 10, 15, &quot;sxp&quot;))\n    print(&quot;Hand-off plain IP:&quot;, check_sda_sdwan_handoff(&quot;VN_FINANCE&quot;, 10, 15, &quot;plain_ip&quot;))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> همسایگی L2 بین Area <code>49.0001</code> و <code>49.0002</code> با MTU یکسان <code>up=True</code> برمی‌گرداند؛ با MTU <code>1492</code> به علت Hello Padding رد می‌شود؛ Hand-off با <code>sxp</code> هر دو Macro و Micro را حفظ می‌کند، اما با <code>plain_ip</code> هشدار گم‌شدن SGT 15 می‌دهد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>پلتفرم مرجع:</strong> Cisco IOS-XE (اجرا نشده روی سخت‌افزار). برای آزمون زنده در CML/EVE-NG روی دو روتر با لینک <code>/30</code>:</p><pre dir=\"ltr\"><code>! Reference IOS-XE snippet (NOT executed in this sandbox)\nrouter isis UNDERLAY\n net 49.0001.0102.5500.0001.00\n is-type level-2-only\n metric-style wide\ninterface GigabitEthernet0/0\n ip router isis UNDERLAY\n isis network point-to-point\n! Verify on real/CML router:\n! show isis neighbors | show clns interface Gi0/0 | show ip route isis</code></pre><p>در صورت عدم تشکیل همسایگی در محیط CML، برابر بودن MTU، یکتایی System ID و فعال بودن <code>isis network point-to-point</code> در هر دو سمت را کنترل کنید.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس تخصص Enterprise",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "کدام ویژگی درباره لایه حمل و مرز Area در پروتکل IS-IS دقیق است؟",
+   "options": [
+    "IS-IS مستقیماً روی لایه ۲ (CLNS) حمل می‌شود و مرز Area روی لینک بین روترهاست بدون اجبار وجود Area 0",
+    "IS-IS روی UDP پورت ۵۲۰ اجرا می‌شود و بدون Area 0 کار نمی‌کند",
+    "مرز Area در IS-IS همواره داخل روتر ABR شکسته می‌شود",
+    "IS-IS فقط IPv4 را حمل می‌کند و برای IPv6 نیازمند پروتکل جداگانه است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>IS-IS بر پایه ISO 10589 و RFC 1195 روی CLNS لایه ۲ حمل می‌شود، هر روتر متعلق به یک Area است (مرز روی لینک) و از طریق TLVها هم IPv4 و هم IPv6 را در یک فرایند پشتیبانی می‌کند.</p>"
+  },
+  {
+   "title": "تبدیل متداول Loopback 10.255.0.1 به System ID شش‌بایتی در آدرس NET سیسکو کدام است؟",
+   "options": [
+    "1025.5000.0001",
+    "0102.5500.0001",
+    "0010.0255.0001",
+    "4900.0110.2551"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>هر اکتت به صورت سه‌رقمی نوشته می‌شود (<code>010.255.000.001</code>) و سپس در سه گروه چهاررقمی تقسیم می‌شود: <code>0102.5500.0001</code>.</p>"
+  },
+  {
+   "title": "دو روتر IS-IS با Area IDهای 49.0001 و 49.0002 و سطح L1L2 روی لینک P2P با MTU برابر به هم وصل‌اند. وضعیت همسایگی چگونه است؟",
+   "options": [
+    "هر دو همسایگی L1 و L2 برقرار می‌شوند",
+    "هیچ همسایگی برقرار نمی‌شود چون Area ID متفاوت است",
+    "فقط همسایگی Level 2 برقرار می‌شود",
+    "فقط همسایگی Level 1 برقرار می‌شود"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>همسایگی Level 1 نیازمند تطابق کامل Area ID است، اما Level 2 برای ارتباط میان Areaها طراحی شده و با Area ID متفاوت نیز برقرار می‌شود.</p>"
+  },
+  {
+   "title": "چرا ممکن است دو روتر IS-IS با وجود پاسخ دادن به پینگ عادی، همسایه نشوند؟",
+   "options": [
+    "زیرا IS-IS از TCP پورت ۱۷۹ استفاده می‌کند",
+    "زیرا در IS-IS وجود BDR الزامی است",
+    "زیرا NSEL حتماً باید برابر 01 باشد",
+    "زیرا بسته‌های Hello در IS-IS به‌طور پیش‌فرض تا MTU کامل Pad می‌شوند و اختلاف MTU مانع همسایگی می‌شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>پینگ پیش‌فرض بسته کوچک می‌فرستد، ولی IS-IS Hello padding بسته را تا MTU کامل پر می‌کند؛ اختلاف MTU (مثلاً ۱۵۰۰ در برابر ۱۴۹۲) جلوی تشکیل همسایگی را می‌گیرد.</p>"
+  },
+  {
+   "title": "تفاوت رفتار DIS در IS-IS با DR در OSPF روی لینک Broadcast کدام است؟",
+   "options": [
+    "IS-IS Backup DIS ندارد و انتخاب DIS دارای Preemption است",
+    "IS-IS حتماً دو Backup DIS انتخاب می‌کند",
+    "در IS-IS روتر جدید با اولویت بالاتر هرگز جایگزین DIS فعلی نمی‌شود",
+    "DIS فقط در لینک‌های point-to-point انتخاب می‌شود"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>برخلاف OSPF که DR/BDR بدون Preemption دارد، در IS-IS فقط DIS انتخاب می‌شود و اگر روتری با Priority بالاتر وارد شود جایگزین DIS قبلی می‌گردد.</p>"
+  },
+  {
+   "title": "فعال کردن isis network point-to-point روی یک لینک دوطرفه اترنت چه مزیتی دارد؟",
+   "options": [
+    "آدرس NET را حذف می‌کند",
+    "انتخاب DIS و تولید Pseudonode LSP را حذف کرده و همگرایی را ساده‌تر و سریع‌تر می‌کند",
+    "بسته‌های IS-IS را به UDP تبدیل می‌کند",
+    "باعث می‌شود L1 بین Areaهای متفاوت هم برقرار شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>روی لینک دوطرفه نیازی به DIS و Pseudonode نیست؛ حالت P2P تبادل دیتابیس و همگرایی را سریع‌تر و ساده‌تر می‌کند (به شرط تنظیم در هر دو سمت).</p>"
+  },
+  {
+   "title": "درباره عدد Administrative Distance برابر ۱۱۵ برای IS-IS کدام بیان دقیق‌تر است؟",
+   "options": [
+    "یک ثابت الزامی در ISO 10589 برای همه فروشندگان است",
+    "فقط برای IS-IS IPv6 تعریف شده است",
+    "مقدار پیش‌فرض پیاده‌سازی Cisco IOS/IOS-XE/IOS-XR است و نه یک استاندارد RFC",
+    "شماره پورت لایه ۴ پروتکل IS-IS است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>Administrative Distance مفهومی وابسته به سیستم‌عامل فروشنده است (در سیسکو ۱۱۵ و در برخی سیستم‌عامل‌های دیگر متفاوت) و بخشی از استاندارد ISO/RFC نیست.</p>"
+  },
+  {
+   "title": "در اتصال SD-Access به SD-WAN، تفکیک Macro و Micro Segmentation چگونه نگاشت می‌شود؟",
+   "options": [
+    "هر دو صرفاً با شماره پورت TCP انجام می‌شوند",
+    "SGT برای Macro-Segmentation و VLAN برای Micro-Segmentation است",
+    "VXLAN مستقیماً بدون رمزنگاری روی اینترنت عمومی تا همه شعب امتداد می‌یابد",
+    "VN/VRF به Service VPN در SD-WAN نگاشت می‌شود (Macro) و SGT با Inline Tagging، متادیتا یا SXP منتقل می‌شود (Micro)"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>Macro-Segmentation توسط VN/VRF به Service VPN انجام می‌شود و Micro-Segmentation نیازمند حفظ SGT از طریق مکانیسم صریح (CMD/Inline، متادیتای SD-WAN یا SXP) است.</p>"
+  },
+  {
+   "title": "چرا پس از خروج بسته از Fabric Border روی لینک IP معمولی، SGT به‌طور خودکار به شعبه نمی‌رسد؟",
+   "options": [
+    "زیرا هدر استاندارد IPv4/IPv6 فیلدی برای حمل SGT ندارد و نیازمند CMD/Inline Tagging، متادیتا یا SXP است",
+    "زیرا SGT فقط برای ترافیک IPv6 تعریف شده است",
+    "زیرا IS-IS تمام برچسب‌های SGT را حذف می‌کند",
+    "زیرا SD-WAN از VRF پشتیبانی نمی‌کند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>درون Fabric، SGT در هدر VXLAN-GPO حمل می‌شود؛ هنگام Decapsulation به IP خالص، بدون یک مکانیسم صریح انتقال SGT این برچسب از دست می‌رود.</p>"
+  },
+  {
+   "title": "در معماری ۱۰۰ شعبه‌ای، کدام رویکرد برای شعب کوچک ۵ تا ۱۵ نفره مهندسی‌تر است؟",
+   "options": [
+    "نصب کامل خوشه Catalyst Center و Fabric Border جداگانه در هر شعبه کوچک",
+    "استفاده از روتر SD-WAN متناسب با اندازه شعبه همراه سوئیچ Access ساده و Service VPN، بدون Over-Engineering",
+    "حذف کامل جداسازی ترافیک مهمان و اداری",
+    "استفاده از مسیریابی استاتیک دستی برای تمام ۱۰۰ شعبه بدون کنترلر"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>معماری Tiered (Right-Sizing) از پیچیدگی و هزینه بی‌مورد در شعب کوچک جلوگیری می‌کند و در عین حال امنیت و جداسازی VPN را حفظ می‌نماید.</p>"
+  },
+  {
+   "title": "اگر در NET دو روتر همسایه، System ID شش‌بایتی به اشتباه یکسان تنظیم شود چه رخ می‌دهد؟",
+   "options": [
+    "فقط سرعت لینک نصف می‌شود",
+    "روترها به صورت خودکار System ID را تغییر می‌دهند",
+    "همسایگی IS-IS تشکیل نمی‌شود و تداخل شناسه رخ می‌دهد",
+    "ترافیک به OSPF منتقل می‌شود"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>System ID باید در کل دامنه مسیریابی یکتا باشد؛ تکرار آن مانع برقراری همسایگی و باعث خطای جدی در پایگاه داده LSP می‌شود.</p>"
+  },
+  {
+   "title": "آزمایشگاه Python این درس چه چیزی را ثابت می‌کند و چه چیزی را ثابت نمی‌کند؟",
+   "options": [
+    "پیکربندی زنده Catalyst Center را روی ۱۰۰ شعبه اجرا می‌کند",
+    "بسته‌های واقعی CLNS را روی کارت شبکه ارسال می‌کند",
+    "تضمین می‌کند همه نسخه‌های IOS-XE از Inline SGT پشتیبانی می‌کنند",
+    "فقط قواعد مدل‌شده NET، همسایگی IS-IS و پیوستگی Hand-off را محلی می‌آزماید و جایگزین تست تجهیز واقعی نیست"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه یک Python Mock محلی است و هیچ روتر یا کنترلر واقعی را اجرا نمی‌کند؛ تست واقعی نیازمند CML/EVE-NG یا سخت‌افزار و بررسی نسخه نرم‌افزار است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "spec_ent",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc1195",
+   "https://www.rfc-editor.org/rfc/rfc5308",
+   "https://www.rfc-editor.org/rfc/rfc5309",
+   "https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html"
+  ],
+  "limitations": [
+   "هیچ روتر Cisco IOS-XE، کنترلر Catalyst Center یا تجهیز SD-WAN در این محیط اجرا نشده است.",
+   "آزمایشگاه فقط Python Mock محلی برای شبیه‌سازی منطق NET، همسایگی IS-IS و تداوم Hand-off است.",
+   "پشتیبانی دقیق حمل Inline SGT میان SD-Access و SD-WAN به نسخه سیستم‌عامل و پلتفرم واقعی وابسته است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۶ واژه و ۱۲ پرسش با توضیح کامل.",
+   "تصریح اینکه AD=115 مقدار پیش‌فرض فروشنده (سیسکو) است و نه ثابت RFC/ISO.",
+   "جداسازی شفاف Python Mock قابل اجرا از سناریوی مرجع غیرشبیه‌سازی‌شده IOS-XE."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۶ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/spec_ent-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-specializations",
+   "recommendedCourse": "spec-enterprise",
+   "blueprint": "/academy-assets/v5/blueprints/spec_ent.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_ent_lab.py"
+  }
+ }
+}

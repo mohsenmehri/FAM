@@ -1,0 +1,338 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "spec_ent_campus",
+ "objectiveId": "spec_ent_campus",
+ "kind": "lesson",
+ "track": "Specialist",
+ "course": "spec-enterprise",
+ "title": "۷.۱ Enterprise: طراحی Campus پیشرفته، StackWise Virtual (SVL) و پیشگیری از Split-Brain",
+ "titleEn": "Enterprise Deep Dive: Advanced Campus Design, StackWise Virtual (SVL), MEC & Split-Brain Prevention (DAD)",
+ "domain": "Enterprise Networking",
+ "source": "Legacy spec_ent_campus rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [
+  "spec_ent"
+ ],
+ "sections": [
+  {
+   "id": "spec_ent_campus-section-1",
+   "title": "مسئله واقعی: چرا کابل Stack پشت سوئیچ در هسته Campus جواب نمی‌دهد و قطع SVL چه فاجعه‌ای می‌سازد؟",
+   "html": "<p>در لایه Access سوئیچ‌های Catalyst 9200/9300 با کابل کوتاه <strong>StackWise-480/1T</strong> در یک رک به هم بسته می‌شوند؛ اما در هسته Campus (Core/Distribution)، دو سوئیچ Catalyst 9500 یا 9600 اغلب در دو اتاق یا دو طبقه مجزا (برای تاب‌آوری فیزیکی/آتش‌سوزی) قرار دارند و کابل ۵۰ سانتی پشت سوئیچ اصلاً به هم نمی‌رسد! <strong>StackWise Virtual (SVL)</strong> این دو سوئیچ را از طریق لینک‌های فیبر نوری استاندارد 10G/25G/40G/100G به یک سوئیچ منطقی واحد تبدیل می‌کند تا تمام آپ‌لینک‌ها با <strong>MEC</strong> فعال بمانند و Spanning Tree هیچ لینکی را نبندد — به شرطی که با <strong>Dual-Active Detection (DAD)</strong> جلوی کابوس <strong>Split-Brain</strong> را بگیرید.</p>"
+  },
+  {
+   "id": "spec_ent_campus-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> مبانی Campus، STP، EtherChannel و <code>spec_ent</code>.</p><ul><li>مقایسه دقیق <strong>Physical StackWise</strong> (Access) با <strong>StackWise Virtual / SVL</strong> (Distribution/Core) و <strong>Routed Access (L3 to Access)</strong>.</li><li>تبیین کارکرد <strong>MEC (Multichassis EtherChannel)</strong> در حذف پورت‌های مسدودشده STP و حذف نیاز به FHRP (HSRP/VRRP) روی SVIها.</li><li>کالبدشکافی سناریوی <strong>Split-Brain</strong> و نحوه عملکرد <strong>Dual-Active Detection (DAD)</strong> (تایپ Direct Fast-Hello و Enhanced PAgP).</li><li>رعایت قیدهای سخت‌گیرانه سخت‌افزار، لایسنس و مهاجرت روی سری <strong>Catalyst 9000</strong>.</li></ul>"
+  },
+  {
+   "id": "spec_ent_campus-section-3",
+   "title": "معماری StackWise Virtual (SVL): یک Control Plane، دو Data Plane فعال",
+   "html": "<p>در SVL (جانشین مدرن VSS کلاسیک در سری Catalyst 9400/9500/9600)، دو سوئیچ فیزیکی از نظر <strong>Control Plane و Management Plane</strong> یکپارچه می‌شوند (یک IP مدیریت، یک کانفیگ، یک عضو <code>Active</code> و یک <code>Standby</code> در حالت SSO)، در حالی که هر دو عضو در <strong>Data Plane</strong> به‌طور هم‌زمان ترافیک را به‌صورت محلی (Local Forwarding) سوئیچ و روت می‌کنند.</p><p>ارتباط کنترلی و دیتای بین‌عضوی از طریق <strong>SVL (StackWise Virtual Link)</strong> انجام می‌شود که <em>باید</em> حداقل شامل ۲ لینک فیبر نوری روی پورت‌ها/ماژول‌های مجزا باشد تا قطع یک تار فیبر کلاستر را نشکند.</p>"
+  },
+  {
+   "id": "spec_ent_campus-section-4",
+   "title": "نمودار توپولوژی هسته StackWise Virtual همراه با MEC و لینک مجزای DAD",
+   "html": "<p>نمودار زیر نمایشگر دو سوئیچ Core در یک دامنه SVL، اتصال دوطرفه MEC به Access بدون مسدودسازی STP و لینک مجزای DAD است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"StackWise Virtual Core with MEC Uplinks and Dual-Active Detection Link\"><rect x=\"46\" y=\"18\" width=\"286\" height=\"90\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"189\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Core SW1 (SVL Active)</text><text x=\"189\" y=\"64\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Single Control &amp; Mgmt Plane</text><text x=\"189\" y=\"84\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Catalyst 9500/9600 (Network Advantage)</text><rect x=\"428\" y=\"18\" width=\"286\" height=\"90\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"571\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Core SW2 (SVL Standby)</text><text x=\"571\" y=\"64\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Hot-Standby + Active Data Plane</text><text x=\"571\" y=\"84\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Same Model + Same IOS-XE Version</text><line x1=\"332\" y1=\"44\" x2=\"428\" y2=\"44\" stroke=\"#1d4ed8\" stroke-width=\"4\"/><text x=\"380\" y=\"38\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1e3a8a\">SVL (Fiber 2x+)</text><line x1=\"332\" y1=\"82\" x2=\"428\" y2=\"82\" stroke=\"#b91c1c\" stroke-width=\"3\" stroke-dasharray=\"6,3\"/><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#991b1b\">DAD (Dual-Active)</text><rect x=\"235\" y=\"148\" width=\"290\" height=\"58\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Access Switch (MEC / LACP Port-Channel)</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Both Uplinks Forwarding (ZERO STP Blocking!)</text><line x1=\"189\" y1=\"108\" x2=\"320\" y2=\"148\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"571\" y1=\"108\" x2=\"440\" y2=\"148\" stroke=\"#15803d\" stroke-width=\"3\"/></svg>"
+  },
+  {
+   "id": "spec_ent_campus-section-5",
+   "title": "چرا MEC تمام پورت‌های آپ‌لینک را فعال نگه می‌دارد و STP چیزی را Block نمی‌کند؟",
+   "html": "<p>در طراحی کلاسیک L2 با دو سوئیچ Distribution مستقل، سوئیچ Access دو لینک مجزا به دو روت/سوئیچ مختلف می‌بیند و Spanning Tree برای جلوگیری از حلقه یکی از دو لینک را <strong>Block</strong> می‌کند (۵۰٪ پهنای باند بلااستفاده!). اما در <strong>SVL</strong>، سوئیچ Access هر دو آپ‌لینک (یکی به SW1 و یکی به SW2) را در یک <strong>Multichassis EtherChannel (MEC)</strong> با LACP تجمیع می‌کند؛ از دید STP این یک لینک منطقی واحد و بدون حلقه است، پس ۱۰۰٪ پهنای باند آپ‌لینک‌ها فعال می‌ماند و هر دو عضو از یک SVI/Gateway واحد (بدون نیاز به HSRP/VRRP) سرویس می‌دهند.</p>"
+  },
+  {
+   "id": "spec_ent_campus-section-6",
+   "title": "کابوس Split-Brain و نجات شبکه با Dual-Active Detection (DAD)",
+   "html": "<p>فرض کنید به دلیل قطعی هم‌زمان همه فیبرهای SVL (مثلاً آسیب به یک داکت مشترک)، دو سوئیچ ارتباط SVL خود را از دست بدهند در حالی که <strong>هر دو هنوز روشن هستند!</strong> سوئیچ Standby تصور می‌کند Active مرده است و خودش هم <code>Active</code> می‌شود. نتیجه فاجعه‌بار <strong>Split-Brain (Dual-Active)</strong> است: دو سوئیچ هم‌زمان با <strong>IP و MAC یکسان</strong> در شبکه فعال می‌شوند، جداول ARP/MAC به‌هم می‌ریزد و نیمی از شبکه قطع می‌شود!</p><p><strong>راه‌حل الزامی: Dual-Active Detection (DAD).</strong> دو روش اصلی در Catalyst 9000 وجود دارد:</p><ul><li><strong>Direct Dual-Active Detection (توصیه‌شده):</strong> یک یا دو لینک اختصاصی فیزیکی مستقیم (از مسیر فیزیکی جدا از فیبرهای SVL!) بین SW1 و SW2 با دستور <code>stackwise-virtual dual-active-detection</code>.</li><li><strong>Enhanced PAgP (ePAgP):</strong> عبور پیام‌های DAD از طریق یک سوئیچ Access مورد اعتماد در میان مسیر (نیازمند پشتیبانی ePAgP؛ با LACP کار نمی‌کند!).</li></ul><p>هنگام قطع SVL، اگر پیام DAD برسد، سیستم می‌فهمد هر دو زنده‌اند؛ <strong>عضو Active قبلی بلافاصله وارد حالت <code>Recovery Mode</code> می‌شود</strong> (تمام پورت‌های غیر-DAD خود را Shutdown می‌کند) تا عضو جدید بدون هیچ Split-Brain به تنهایی و سالم شبکه را ادامه دهد!</p>"
+  },
+  {
+   "id": "spec_ent_campus-section-7",
+   "title": "قیدهای سخت‌افزاری، لایسنس و مهاجرت روی Catalyst 9000",
+   "html": "<p>تشکیل SVL چهار پیش‌نیاز سخت‌گیرانه دارد که نقض هرکدام مانع شکل‌گیری کلاستر می‌شود:</p><ol><li><strong>هم‌مدل بودن دقیق دو سوئیچ</strong> (مثلاً هر دو دقیقاً C9500-48Y4C؛ ترکیب 9200 با 9500 یا دو مدل متفاوت غیرمجاز است).</li><li><strong>هم‌نسخه بودن دقیق IOS-XE</strong> و یکسان بودن حالت بوت (Install Mode).</li><li><strong>لایسنس <code>Network Advantage</code></strong> روی هر دو عضو (لایسنس <code>Network Essentials</code> از SVL پشتیبانی نمی‌کند!).</li><li><strong>ریلود (Reload) کامل</strong> پس از اعمال <code>stackwise-virtual domain &lt;id&gt;</code> و اختصاص پورت‌های SVL/DAD (تنظیم SVL روی سیستم زنده بدون ریلود فعال نمی‌شود).</li></ol>"
+  },
+  {
+   "id": "spec_ent_campus-section-8",
+   "title": "مقایسه سه معماری هسته Campus: SVL در برابر Routed Access (L3) در برابر Nexus vPC",
+   "html": "<table><thead><tr><th>ویژگی</th><th>StackWise Virtual (SVL)</th><th>Routed Access (L3 کامل)</th><th>Nexus vPC (دیتاسنتر)</th></tr></thead><tbody><tr><td>صفحه کنترل (Control Plane)</td><td><strong>مشترک (واحد)</strong> — خطر Shared Fate در باگ IOS</td><td><strong>کاملاً مستقل</strong> (OSPF/EIGRP/BGP با ECMP)</td><td><strong>مستقل</strong> (دو Control Plane جدا)</td></tr><tr><td>محدوده L2 و STP</td><td>ساده با MEC بدون پورت Block</td><td>حذف کامل STP میان Access و Distribution</td><td>MEC روی دو Control Plane مستقل</td></tr><tr><td>تأثیر ارتقای نرم‌افزار</td><td>نیازمند ISSU (با قیدهای نسخه) یا قطعی دامنه مشترک</td><td>ارتقای بدون قطعی (Graceful Shutdown یک گره)</td><td>ارتقای مستقل یک سوئیچ در هر زمان</td></tr></tbody></table>"
+  },
+  {
+   "id": "spec_ent_campus-section-9",
+   "title": "محدودیت Shared Fate در SVL و چه زمانی Routed Access برتر است؟",
+   "html": "<p>بزرگ‌ترین نقد معماری به SVL مسئله <strong>Shared Fate (سرنوشت مشترک)</strong> در صفحه کنترل است: چون هر دو سوئیچ یک Control Plane واحد دارند، یک باگ نرم‌افزاری نادر در IOS-XE یا یک دستور اشتباه انسانی روی کل کلاستر اثر می‌گذارد. در Campusهای فوق‌بحرانی (یا معماری SD-Access)، بسیاری از طراحان <strong>Routed Access (لایه ۳ تا سوئیچ Access با ECMP و BFD)</strong> را انتخاب می‌کنند تا دو سوئیچ Core کاملاً Control Plane مستقل داشته باشند.</p>"
+  },
+  {
+   "id": "spec_ent_campus-section-10",
+   "title": "طراحی فیزیکی هوشمند: مسیر فیبر مجزا (Path Diversity) برای SVL و DAD",
+   "html": "<p>اشتباه کلاسیک در پروژه‌های واقعی: مهندس ۲ لینک SVL و ۱ لینک DAD را همگی از <strong>یک پچ‌کورد/داکت فیبر واحد</strong> رد می‌کند! اگر یک پیمانکار ساختمانی آن داکت را ببرد، هم SVL و هم DAD هم‌زمان قطع می‌شوند و درست در همان لحظه <strong>Split-Brain</strong> رخ می‌دهد! مسیر فیزیکی لینک DAD باید تا حد ممکن از مسیر فیبرهای SVL جدا باشد.</p>"
+  },
+  {
+   "id": "spec_ent_campus-section-11",
+   "title": "کژفهمی‌های رایج درباره StackWise Virtual",
+   "html": "<ul><li><strong>کژفهمی ۱: «در SVL همچنان باید روی همه SVIها HSRP یا VRRP پیکربندی کنیم.»</strong> واقعیت: خیر؛ هر دو عضو یک سوئیچ منطقی واحد با یک SVI هستند و HSRP نه‌تنها لازم نیست بلکه پیچیدگی بی‌مورد می‌سازد.</li><li><strong>کژفهمی ۲: «می‌توانیم لینک DAD را با LACP پیاده‌سازی کنیم.»</strong> واقعیت: DAD مبتنی بر کانال فقط با <strong>Enhanced PAgP</strong> کار می‌کند نه LACP؛ روش استاندارد و توصیه‌شده <strong>Direct DAD link</strong> اختصاصی است.</li><li><strong>کژفهمی ۳: «وقتی لینک SVL قطع شود، سوئیچ Standby خاموش می‌شود.»</strong> واقعیت: در Dual-Active Detection، این <strong>Active قبلی</strong> است که وارد <code>Recovery Mode</code> می‌شود و پورت‌هایش را می‌بندد تا <strong>Standby قبلی</strong> (که تازه Active شده) بدون تداخل ترافیک را ادامه دهد.</li></ul>"
+  },
+  {
+   "id": "spec_ent_campus-section-12",
+   "title": "عیب‌یابی و دستورات کلیدی راستی‌آزمایی SVL (مرجع)",
+   "html": "<p>برای ممیزی سلامت SVL روی Catalyst 9500/9600 (دستورات مرجع؛ اجرا نشده روی سخت‌افزار زنده): <code>show stackwise-virtual</code>، <code>show stackwise-virtual link</code>، <code>show stackwise-virtual dual-active-detection</code> و <code>show switch</code> (تأیید حالت <code>Active</code> و <code>Standby</code> در وضعیت <code>Ready</code>).</p><p>اگر سوئیچی پس از رفع قطعی SVL در <code>Recovery Mode</code> مانده است، پس از اطمینان از Up شدن فیبرهای SVL باید سوئیچ در حالت Recovery را <code>reload</code> کرد تا دوباره به عنوان Standby به کلاستر ملحق شود.</p>"
+  },
+  {
+   "id": "spec_ent_campus-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> تیمی می‌خواهد یک <code>C9200-48P</code> با لایسنس Essentials را با یک <code>C9500-48Y4C</code> به صورت SVL ببندد. چرا شکست می‌خورد؟ <strong>پاسخ:</strong> سه نقض پیش‌نیاز هم‌زمان دارد: (۱) مدل سخت‌افزاری متفاوت، (۲) C9200 اصلاً از SVL پشتیبانی نمی‌کند و (۳) لایسنس Essentials فاقد قابلیت SVL (نیازمند Network Advantage) است.</p><p><strong>تمرین ۲:</strong> لینک‌های SVL قطع می‌شوند اما لینک Direct DAD سالم می‌ماند. وضعیت SW1 (Active قبلی) و SW2 (Standby قبلی) چگونه می‌شود؟ <strong>پاسخ:</strong> DAD وجود همتای زنده را تشخیص می‌دهد؛ SW1 وارد <code>Recovery Mode</code> شده و پورت‌های داده‌اش را می‌بندد و SW2 به‌تنهایی <code>Active</code> می‌شود تا Split-Brain رخ ندهد.</p>"
+  },
+  {
+   "id": "spec_ent_campus-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9500/software/release/17-9/configuration_guide/ha/b_179_ha_9500_cg/configuring_cisco_stackwise_virtual.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی Cisco StackWise Virtual روی Catalyst 9500</a> و <a href=\"https://www.cisco.com/c/en/us/solutions/design-zone/networking-design-guides/campus-wired-and-wireless.html\" target=\"_blank\" rel=\"noopener\">Cisco Campus Validated Design</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سخت‌افزار Catalyst 9500/9600 واقعی در این محیط متصل نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "StackWise Virtual (SVL)",
+   "fa": "استک مجازی سیسکو",
+   "simple": "تبدیل دو سوئیچ Catalyst 9400/9500/9600 از طریق فیبر نوری به یک سوئیچ منطقی واحد."
+  },
+  {
+   "term": "MEC",
+   "fa": "اترچنل چندشاسی",
+   "simple": "Multichassis EtherChannel؛ تجمیع آپ‌لینک‌های سوئیچ Access به دو عضو SVL بدون بلاک شدن در STP."
+  },
+  {
+   "term": "Split-Brain (Dual-Active)",
+   "fa": "مغز دوپاره",
+   "simple": "فاجعه فعال شدن هم‌زمان دو عضو Active با IP/MAC یکسان در صورت قطع SVL بدون DAD."
+  },
+  {
+   "term": "DAD",
+   "fa": "تشخیص فعال دوگانه",
+   "simple": "Dual-Active Detection؛ مکانیسم کشف قطع SVL در حالت زنده بودن هر دو سوئیچ برای جلوگیری از Split-Brain."
+  },
+  {
+   "term": "Direct DAD",
+   "fa": "لینک مستقیم DAD",
+   "simple": "اتصال فیزیکی مستقیم اختصاصی (جدا از SVL) میان دو سوئیچ هسته برای پیام‌های DAD."
+  },
+  {
+   "term": "Enhanced PAgP (ePAgP)",
+   "fa": "پروتکل ePAgP برای DAD",
+   "simple": "عبور پیام‌های تشخیص Dual-Active از طریق یک سوئیچ Access میانی (با LACP کار نمی‌کند)."
+  },
+  {
+   "term": "Recovery Mode",
+   "fa": "حالت بازیابی SVL",
+   "simple": "وضعیتی که عضو Active قبلی پس از تشخیص DAD وارد آن شده و پورت‌های داده‌اش را می‌بندد."
+  },
+  {
+   "term": "SSO",
+   "fa": "تغییر وضعیت بدون قطعی",
+   "simple": "Stateful Switchover؛ همگام‌سازی لحظه‌ای وضعیت کنترلی میان عضو Active و Standby."
+  },
+  {
+   "term": "Shared Fate",
+   "fa": "سرنوشت مشترک",
+   "simple": "ریسک مشترک بودن صفحه کنترل در SVL (در برابر صفحه کنترل مستقل در Routed Access یا vPC)."
+  },
+  {
+   "term": "Routed Access",
+   "fa": "دسترسی لایه ۳ کامل",
+   "simple": "معماری بردن لایه ۳ تا سوئیچ Access با ECMP و حذف کامل STP در آپ‌لینک‌ها."
+  },
+  {
+   "term": "Network Advantage",
+   "fa": "لایسنس Network Advantage",
+   "simple": "سطح لایسنس الزامی سیسکو روی Catalyst 9000 برای فعال‌سازی SVL."
+  },
+  {
+   "term": "Path Diversity",
+   "fa": "تنوع مسیر فیزیکی",
+   "simple": "عبور دادن فیبرهای SVL و DAD از داکت‌های فیزیکی مجزا برای جلوگیری از قطع هم‌زمان."
+  },
+  {
+   "term": "Local Forwarding",
+   "fa": "ارسال محلی داده",
+   "simple": "فوروارد مستقیم بسته‌ها روی همان سوئیچ دریافت‌کننده در SVL بدون عبور غیرضروری از لینک SVL."
+  },
+  {
+   "term": "ISSU",
+   "fa": "ارتقای حین سرویس",
+   "simple": "In-Service Software Upgrade؛ ارتقای IOS-XE با حداقل وقفه تحت شروط نسخه پشتیبانی‌شده."
+  },
+  {
+   "term": "StackWise-480/1T",
+   "fa": "استک فیزیکی پشت سوئیچ",
+   "simple": "کابل‌های اختصاصی کوتاه پشت سوئیچ‌های Access (Catalyst 9200/9300) درون یک رک."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (پیش‌نیازهای SVL، فاجعه Split-Brain و حفاظت DAD) — سوئیچ Catalyst واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سوئیچ واقعی Catalyst 9500/9600 متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سخت‌افزار Catalyst 9500/9600 واقعی در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی سه بررسی واقعی مهندسی را مدل می‌کند: (۱) اعتبارسنجی پیش‌نیازهای هم‌مدلی، نسخه IOS-XE و لایسنس Network Advantage، (۲) وضعیت عادی با ۲ آپ‌لینک فعال MEC، و (۳) مقایسه قطعی SVL بدون DAD (وقوع <code>split_brain: True</code>) در برابر قطعی SVL با DAD (ورود SW1 به <code>RECOVERY_MODE</code> و جلوگیری از Split-Brain).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_ent_campus_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_ent_campus_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — spec_ent_campus: StackWise Virtual (SVL), MEC &amp; DAD Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of Catalyst 9500/9600 SVL\nprerequisite checks, MEC STP loop-free forwarding, and Dual-Active Detection\npreventing Split-Brain. No live Catalyst hardware connected.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\n\ndef validate_svl_pair(sw1: dict, sw2: dict) -&gt; list[str]:\n    errs = []\n    if sw1[&quot;model&quot;] != sw2[&quot;model&quot;]:\n        errs.append(&quot;SVL requires identical switch models&quot;)\n    if sw1[&quot;ios_xe&quot;] != sw2[&quot;ios_xe&quot;]:\n        errs.append(&quot;SVL requires matching IOS-XE versions&quot;)\n    if sw1[&quot;license&quot;] != &quot;network-advantage&quot; or sw2[&quot;license&quot;] != &quot;network-advantage&quot;:\n        errs.append(&quot;SVL requires Network Advantage license on both peers&quot;)\n    return errs\n\n\ndef simulate_svl_failure(svl_up: bool, dad_up: bool) -&gt; dict:\n    if svl_up:\n        return {&quot;sw1_role&quot;: &quot;ACTIVE&quot;, &quot;sw2_role&quot;: &quot;STANDBY&quot;, &quot;split_brain&quot;: False, &quot;mec_active_uplinks&quot;: 2}\n    if not svl_up and not dad_up:\n        # Both assume Active with identical virtual MAC/IP -&gt; Split-Brain!\n        return {&quot;sw1_role&quot;: &quot;ACTIVE&quot;, &quot;sw2_role&quot;: &quot;ACTIVE&quot;, &quot;split_brain&quot;: True, &quot;mec_active_uplinks&quot;: 2}\n    # SVL down, DAD alive -&gt; Former Active enters Recovery (shuts non-DAD ports), Standby takes over cleanly!\n    return {&quot;sw1_role&quot;: &quot;RECOVERY_MODE&quot;, &quot;sw2_role&quot;: &quot;ACTIVE&quot;, &quot;split_brain&quot;: False, &quot;mec_active_uplinks&quot;: 1}\n\n\ndef main() -&gt; None:\n    good_errs = validate_svl_pair(\n        {&quot;model&quot;: &quot;C9500-48Y4C&quot;, &quot;ios_xe&quot;: &quot;17.9.4a&quot;, &quot;license&quot;: &quot;network-advantage&quot;},\n        {&quot;model&quot;: &quot;C9500-48Y4C&quot;, &quot;ios_xe&quot;: &quot;17.9.4a&quot;, &quot;license&quot;: &quot;network-advantage&quot;},\n    )\n    bad_errs = validate_svl_pair(\n        {&quot;model&quot;: &quot;C9200-48P&quot;, &quot;ios_xe&quot;: &quot;17.9.4a&quot;, &quot;license&quot;: &quot;network-essentials&quot;},\n        {&quot;model&quot;: &quot;C9500-48Y4C&quot;, &quot;ios_xe&quot;: &quot;17.12.1&quot;, &quot;license&quot;: &quot;network-advantage&quot;},\n    )\n    assert good_errs == [] and len(bad_errs) == 3\n\n    normal = simulate_svl_failure(svl_up=True, dad_up=True)\n    split_brain = simulate_svl_failure(svl_up=False, dad_up=False)\n    dad_protected = simulate_svl_failure(svl_up=False, dad_up=True)\n    assert normal[&quot;mec_active_uplinks&quot;] == 2\n    assert split_brain[&quot;split_brain&quot;] is True\n    assert dad_protected[&quot;split_brain&quot;] is False and dad_protected[&quot;sw1_role&quot;] == &quot;RECOVERY_MODE&quot;\n\n    print(&quot;=== spec_ent_campus SVL &amp; DAD Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;valid_pair_errors&quot;: good_errs,\n        &quot;invalid_pair_errors&quot;: bad_errs,\n        &quot;normal_operation&quot;: normal,\n        &quot;svl_cut_without_dad&quot;: split_brain,\n        &quot;svl_cut_with_dad_protected&quot;: dad_protected,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف ۳ خطای پیش‌نیاز در جفت نامتجانس، وقوع <code>split_brain: True</code> در نبود DAD، و مهار کامل با <code>sw1_role: 'RECOVERY_MODE'</code> در حضور DAD.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع پیکربندی SVL و Direct DAD روی Catalyst 9500 (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference Catalyst 9500 SVL config (NOT executed on live hardware)\nstackwise-virtual\n domain 10\ninterface TwentyFiveGigE1/0/47\n stackwise-virtual link 1\ninterface TwentyFiveGigE1/0/48\n stackwise-virtual dual-active-detection\n! Save config and reload both switches</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس طراحی Campus پیشرفته و StackWise Virtual (SVL)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "هدف اصلی پیکربندی Dual-Active Detection (DAD) در کلاستر StackWise Virtual (SVL) چیست؟",
+   "options": [
+    "افزایش سرعت پورت‌های Access به 100G",
+    "حذف پروتکل OSPF",
+    "تبدیل لایه ۲ به MPLS",
+    "تشخیص قطع شدن تمام لینک‌های SVL در حالی که هر دو سوئیچ هنوز روشنند و جلوگیری از فعال شدن هم‌زمان دو Active با IP/MAC یکسان (Split-Brain)"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>DAD مانع فاجعه Split-Brain می‌شود و با قرار دادن عضو Active قبلی در حالت Recovery، شبکه را ایمن نگه می‌دارد.</p>"
+  },
+  {
+   "title": "چرا هنگام اتصال سوئیچ‌های Access به دو سوئیچ هسته StackWise Virtual، هیچ‌یک از دو آپ‌لینک توسط STP بلاک نمی‌شود؟",
+   "options": [
+    "زیرا سوئیچ Access هر دو آپ‌لینک را به‌صورت یک Multichassis EtherChannel (MEC) متصل به یک سوئیچ منطقی واحد می‌بیند",
+    "زیرا SVL پروتکل STP را در کل جهان غیرفعال می‌کند",
+    "زیرا SVL فقط از یک کابل استفاده می‌کند",
+    "زیرا از RIPv2 استفاده می‌شود"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>از دید STP کل MEC یک لینک منطقی واحد است، بنابراین هر دو لینک فیزیکی هم‌زمان در حالت Forwarding می‌مانند.</p>"
+  },
+  {
+   "title": "کدام مجموعه شروط برای تشکیل StackWise Virtual بین دو سوئیچ Catalyst 9500 الزامی است؟",
+   "options": [
+    "استفاده از کابل کوتاه پشت سوئیچ",
+    "هم‌مدل بودن دقیق سخت‌افزار، هم‌نسخه بودن IOS-XE، داشتن لایسنس Network Advantage روی هر دو عضو و ریلود پس از پیکربندی",
+    "ترکیب یک C9200 و یک C9500",
+    "فعال بودن HSRP روی تمام VLANها"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>SVL الزامات سخت‌افزاری، نرم‌افزاری (IOS-XE یکسان)، لایسنس (Network Advantage) و ریلود اولیه دارد.</p>"
+  },
+  {
+   "title": "هنگام قطع کامل لینک‌های SVL در حضور لینک DAD سالم، دقیقاً کدام سوئیچ وارد Recovery Mode شده و پورت‌های داده‌اش را می‌بندد؟",
+   "options": [
+    "هر دو سوئیچ خاموش می‌شوند",
+    "سوئیچ Access خاموش می‌شود",
+    "عضو Active قبلی وارد Recovery Mode می‌شود تا عضو Standby (که تازه Active شده) بدون تداخل ترافیک را ادامه دهد",
+    "هیچ سوئیچی پورت نمی‌بندد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>رفتار استاندارد SVL DAD قرار دادن Active قبلی در حالت Recovery برای پیشگیری قطعی از Dual-Active است.</p>"
+  },
+  {
+   "title": "چرا عبور دادن فیبرهای SVL و لینک DAD از درون یک داکت فیزیکی مشترک یک اشتباه جدی در طراحی است؟",
+   "options": [
+    "چون نور فیبرها با هم تداخل رادیویی می‌دهند",
+    "چون IOS-XE آن را خطای سینتکس می‌دهد",
+    "چون سرعت DAD کم می‌شود",
+    "چون آسیب فیزیکی به آن داکت واحد هر دو SVL و DAD را هم‌زمان قطع می‌کند و درست در همان لحظه باعث Split-Brain می‌شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>تنوع مسیر فیزیکی (Path Diversity) میان فیبرهای SVL و DAD شرط عملیاتی کارایی DAD در بحران واقعی است.</p>"
+  },
+  {
+   "title": "چرا در یک هسته پیکربندی‌شده با SVL، نیازی به پیکربندی HSRP یا VRRP روی SVIها نیست؟",
+   "options": [
+    "زیرا هر دو سوئیچ فیزیکی یک Control Plane و یک SVI منطقی واحد با IP و MAC یکتا دارند",
+    "زیرا SVL لایه ۳ پشتیبانی نمی‌کند",
+    "زیرا HSRP فقط روی روترهای WAN کار می‌کند",
+    "زیرا کلاینت‌ها به Gateway نیاز ندارند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>معماری یکپارچه SVL نیاز به FHRP را حذف کرده و Gateway واحد با SSO فراهم می‌کند.</p>"
+  },
+  {
+   "title": "کدام یک از دو روش DAD مبتنی بر کانال با پروتکل استاندارد LACP کار نمی‌کند و نیازمند پروتکل اختصاصی سیسکو است؟",
+   "options": [
+    "Direct DAD link",
+    "Enhanced PAgP (ePAgP) — که با LACP کار نمی‌کند و به همین دلیل Direct DAD توصیه می‌شود",
+    "BFD",
+    "CDP"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>ePAgP تنها با PAgP کار می‌کند؛ بنابراین در اکثر طراحی‌های مدرن لینک اختصاصی Direct DAD انتخاب برتر است.</p>"
+  },
+  {
+   "title": "مهم‌ترین نقد معماری به StackWise Virtual در مقایسه با Routed Access (لایه ۳ کامل تا Access) چیست؟",
+   "options": [
+    "کند بودن سرعت پورت‌های فیبر",
+    "نبود پشتیبانی از LACP",
+    "سرنوشت مشترک صفحه کنترل (Control Plane Shared Fate) که در آن یک باگ یا خطای انسانی در صفحه کنترل واحد هر دو سوئیچ هسته را متأثر می‌کند",
+    "عدم پشتیبانی از VLAN"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>در Routed Access دو سوئیچ هسته صفحه کنترل کاملاً مستقل دارند و از Shared Fate در امان‌اند.</p>"
+  },
+  {
+   "title": "تفاوت اصلی میان StackWise-480/1T (فیزیکی) و StackWise Virtual (SVL) در انتخاب محل استقرار چیست؟",
+   "options": [
+    "StackWise فیزیکی فقط برای دیتاسنتر ابری است",
+    "SVL فقط با کابل مسی ۵۰ سانتی کار می‌کند",
+    "هر دو دقیقاً یک فناوری هستند",
+    "StackWise فیزیکی با کابل کوتاه پشت سوئیچ مخصوص رک Access (9200/9300) است؛ SVL با فیبر نوری استاندارد مخصوص هسته/توزیع (9400/9500/9600) حتی در دو اتاق مجزا است"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>فاصله فیزیکی مجزا میان دو اتاق/طبقه اصلی‌ترین انگیزه استفاده از SVL روی فیبر در Core است.</p>"
+  },
+  {
+   "title": "چرا توصیه می‌شود خود لینک SVL حداقل از ۲ لینک فیبر نوری روی ماژول‌ها/پورت‌های مجزا تشکیل شود؟",
+   "options": [
+    "تا قطع شدن یک تار فیبر یا خرابی یک ماژول SFP باعث قطع ارتباط کنترلی SVL و رخداد Dual-Active نشود",
+    "زیرا یک لینک SVL کار نمی‌کند",
+    "برای دو برابر کردن تعداد IP مدیریت",
+    "برای فعال شدن RIP"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>افزونگی درون خود لینک SVL مانع از آن می‌شود که یک خرابی تکی فیبر کل کلاستر را به حالت Recovery ببرد.</p>"
+  },
+  {
+   "title": "پس از رفع خرابی فیبرهای SVL، برای بازگرداندن سوئیچی که در Recovery Mode مانده به کلاستر چه اقدامی لازم است؟",
+   "options": [
+    "خاموش کردن سوئیچ Active سالم",
+    "اطمینان از Up شدن لینک‌های SVL و سپس reload کردن سوئیچِ در حالت Recovery تا مجدداً به عنوان Standby ملحق شود",
+    "حذف لایسنس Network Advantage",
+    "تغییر شماره VLAN 1"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>سوئیچ در حالت Recovery برای جلوگیری از بازگشت ناایمن، پس از ترمیم فیبر SVL با یک Reload کنترل‌شده به عنوان Standby بازمی‌گردد.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "تست زنده قطع فیبر روی دو Catalyst 9500 فیزیکی",
+    "پیکربندی واقعی در دیتاسنتر تولیدی",
+    "فقط متن نظری بدون کد",
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای بررسی پیش‌نیازهای SVL، MEC و مقایسه قطعی SVL با و بدون DAD بدون سخت‌افزار واقعی"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سخت‌افزار Catalyst واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "spec_ent_campus",
+  "sources": [
+   "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9500/software/release/17-9/configuration_guide/ha/b_179_ha_9500_cg/configuring_cisco_stackwise_virtual.html",
+   "https://www.cisco.com/c/en/us/solutions/design-zone/networking-design-guides/campus-wired-and-wireless.html"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سخت‌افزار واقعی Catalyst 9500/9600 متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش نسخه قدیمی از ۳ بخش و ۳ سؤال به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، مقایسه دقیق با Routed Access و Nexus vPC و شبیه‌ساز محلی SVL/DAD."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/spec_ent_campus-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-specializations",
+   "recommendedCourse": "spec-enterprise",
+   "blueprint": "/academy-assets/v5/blueprints/spec_ent_campus.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_ent_campus_lab.py"
+  }
+ }
+}

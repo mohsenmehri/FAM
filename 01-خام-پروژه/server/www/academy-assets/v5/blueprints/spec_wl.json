@@ -1,0 +1,345 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "spec_wl",
+ "objectiveId": "spec_wl",
+ "kind": "lesson",
+ "track": "FAM Specializations",
+ "course": "spec-wireless",
+ "title": "تخصص Wireless: فیزیک RF (dBm/SNR)، تحول Wi-Fi 6/6E/7 و معماری Catalyst 9800",
+ "titleEn": "Wireless Specialization: RF Physics (dBm/SNR), Wi-Fi 6/6E/7 & Cisco Catalyst 9800 Architecture",
+ "domain": "Enterprise Wireless",
+ "source": "Legacy spec_wl rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "spec_wl-section-1",
+   "title": "مسئله واقعی: چرا با وجود «آنتن پر» روی گوشی، تماس صوتی وای‌فای قطع می‌شود؟",
+   "html": "<p>در یک سالن کنفرانس با ۸۰ شرکت‌کننده، آیکون وای‌فای لپ‌تاپ‌ها کامل (RSSI حدود <code>-60 dBm</code>) نشان داده می‌شود، اما تماس‌های صوتی مدام بریده می‌شوند و صفحات وب با تأخیر باز می‌شوند. علت یک واقعیت بنیادین فیزیکی است: شبکه بی‌سیم (IEEE 802.11) یک <strong>محیط اشتراکی نیمه‌دوطرفه (Half-Duplex Shared Medium)</strong> است. قدرت سیگنال خام (RSSI) به‌تنهایی هیچ تضمینی برای کیفیت نیست؛ کیفیت واقعی به <strong>نسبت سیگنال به نویز (SNR)</strong>، میزان تداخل هم‌کانالی (CCI) و راندمان زمان هوا (Airtime Utilization) وابسته است.</p>"
+  },
+  {
+   "id": "spec_wl-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازهای مفهومی:</strong> آشنایی پایه با VLAN، Trunk، استانداردهای 802.11 و تونل CAPWAP.</p><ul><li>محاسبه دقیق توان RF با مقیاس لگاریتمی <code>dBm</code>، قوانین <strong>۳ و ۱۰ دسی‌بل</strong>، <strong>EIRP</strong> و <strong>SNR</strong> به همراه اثر دو برابر شدن عرض کانال بر کف نویز.</li><li>تبیین معماری <strong>Wi-Fi 6 (802.11ax)</strong> (OFDMA، Resource Units، TWT، BSS Coloring)، <strong>Wi-Fi 6E</strong> (باند ۶ گیگاهرتز و الزامات امنیتی WPA3/OWE + PMF) و <strong>Wi-Fi 7 (802.11be)</strong> (MLO، 320 MHz، 4K-QAM و Preamble Puncturing).</li><li>طراحی و عیب‌یابی مدل سه‌تگی <strong>Cisco Catalyst 9800 WLC</strong> (Policy Tag، Site Tag، RF Tag) و تفکیک <strong>Central Switching</strong> از <strong>FlexConnect Local Switching</strong>.</li></ul>"
+  },
+  {
+   "id": "spec_wl-section-3",
+   "title": "ریاضیات کاربردی RF: مقیاس dBm، قوانین ۳ و ۱۰ دسی‌بل و EIRP",
+   "html": "<p>توان فرکانس رادیویی روی مقیاس لگاریتمی <strong>dBm</strong> نسبت به ۱ میلی‌وات تعریف می‌شود: <code>P(dBm) = 10 × log10(P_mW)</code>؛ بنابراین <code>0 dBm = 1 mW</code>. برای محاسبه سریع بدون ماشین‌حساب از «قانون ۳ و ۱۰» استفاده می‌کنیم:</p><ul><li><strong>+3 dB:</strong> دو برابر شدن توان (<code>×2</code>)؛ <strong>-3 dB:</strong> نصف شدن توان (<code>÷2</code>).</li><li><strong>+10 dB:</strong> ده برابر شدن توان (<code>×10</code>)؛ <strong>-10 dB:</strong> یک‌دهم شدن توان (<code>÷10</code>).</li></ul><p><strong>مثال عددی EIRP:</strong> اگر توان خروجی رادیوی AP برابر <code>14 dBm</code> (~25 mW)، افت کابل و کانکتور <code>1 dB</code> و بهره آنتن <code>4 dBi</code> باشد، توان تابش مؤثر همه‌جهته برابر است با: <code>EIRP = Tx Power - Cable Loss + Antenna Gain = 14 - 1 + 4 = 17 dBm (~50.1 mW)</code>. افزایش بی‌رویه توان AP یک خطای کلاسیک است؛ چون کلاینت موبایل توان ارسال محدودی (اغلب ۱۲ تا ۱۵ dBm) دارد و نامتقارن شدن لینک باعث قطع بازگشت ترافیک (Asymmetric Link) و افزایش CCI می‌شود.</p>"
+  },
+  {
+   "id": "spec_wl-section-4",
+   "title": "RSSI، Noise Floor، SNR و تله کانال‌های عریض (80/160 MHz)",
+   "html": "<p><strong>SNR (Signal-to-Noise Ratio)</strong> تفاوت لگاریتمی میان سیگنال دریافتی و کف نویز محیط است: <code>SNR (dB) = RSSI (dBm) - Noise Floor (dBm)</code>. در طراحی سازمانی سیسکو برای سرویس صوتی (VoWLAN) معمولاً حداقل <code>RSSI ≥ -67 dBm</code> و <code>SNR ≥ 25 dB</code> هدف‌گذاری می‌شود.</p><p><strong>چرا کانال ۸۰ یا ۱۶۰ مگاهرتز در دفتر پرجمعیت کیفیت را خراب می‌کند؟</strong> اول، هر بار که پهنای کانال دو برابر می‌شود (۲۰ به ۴۰ به ۸۰)، کف نویز حرارتی دریافتی حدود <strong>+3 dB افزایش</strong> می‌یابد و SNR را <strong>۳ دسی‌بل کاهش</strong> می‌دهد (در ۸۰ مگاهرتز = ۶ دسی‌بل افت SNR نسبت به ۲۰ مگاهرتز). دوم، تعداد کانال‌های غیرهم‌پوشان در باند ۵ گیگاهرتز به‌شدت کم می‌شود و APهای همسایه دچار <strong>تداخل هم‌کانالی (CCI)</strong> و انتظار طولانی CSMA/CA می‌شوند. به همین دلیل در دفاتر متراکم معمولاً کانال‌های <strong>20 MHz</strong> (یا در تراکم متوسط 40 MHz) پایدارتر از 80 MHz هستند.</p>"
+  },
+  {
+   "id": "spec_wl-section-5",
+   "title": "تحول Wi-Fi 6 (802.11ax): OFDMA، BSS Coloring و TWT",
+   "html": "<p>نسل‌های پیشین (Wi-Fi 4/5 با OFDM) در هر لحظه روی یک کانال فقط به <strong>یک کلاینت</strong> اجازه ارسال می‌دادند؛ در سالن شلوغ با بسته‌های کوچک، بخش بزرگی از زمان هوا در برخورد و سربار هدر تلف می‌شد. <strong>Wi-Fi 6 (802.11ax)</strong> برای حل مسئله «تراکم» سه فناوری کلیدی آورد:</p><ul><li><strong>OFDMA (Orthogonal Frequency Division Multiple Access):</strong> یک کانال ۲۰ مگاهرتزی را به زیرحامل‌های کوچک‌تر به نام <strong>Resource Units (RU)</strong> می‌شکند (حداکثر ۹ کلاینت هم‌زمان در یک کانال ۲۰ مگاهرتزی) تا بسته‌های کوچک چندین کلاینت هم‌زمان در یک فریم ارسال شوند.</li><li><strong>BSS Coloring:</strong> با درج یک شناسه رنگی ۶ بیتی در هدر PHY، دستگاه‌ها می‌توانند ترافیک هم‌کانال ضعیفِ BSS دورتر را از BSS خود تشخیص دهند و با Spatial Reuse کارایی را بالا ببرند.</li><li><strong>TWT (Target Wake Time):</strong> زمان‌بندی دقیق بیدار شدن دستگاه‌های IoT و موبایل برای صرفه‌جویی چشمگیر در باتری و کاهش ازدحام رقابت کانال.</li></ul>"
+  },
+  {
+   "id": "spec_wl-section-6",
+   "title": "Wi-Fi 6E (باند 6 GHz) و الزامات سخت‌گیرانه امنیتی",
+   "html": "<p><strong>Wi-Fi 6E</strong> قابلیت‌های 802.11ax را به باند جدید و تمیز <strong>6 GHz</strong> گسترش می‌دهد (بدون حضور دستگاه‌های قدیمی 802.11a/b/g/n/ac و بدون تداخل DFS راداری در بخش عمده طیف، بسته به مقررات رگولاتوری هر کشور). برای تسریع کشف AP در این طیف وسیع، از کانال‌های اسکن ترجیحی <strong>PSC (Preferred Scanning Channels)</strong> و پیام‌های Out-of-Band (مانند RNR در باندهای ۲.۴/۵) استفاده می‌شود.</p><p><strong>قانون امنیتی اجباری در 6 GHz:</strong> پروتکل‌های قدیمی <code>WEP</code>، <code>WPA/WPA2</code> و شبکه‌های <code>Open</code> کلاسیک در باند ۶ گیگاهرتز <strong>ممنوع هستند</strong>. تنها <strong>WPA3 (Personal SAE یا Enterprise)</strong> یا برای شبکه‌های مهمان باز <strong>Enhanced Open (OWE)</strong> همراه با <strong>PMF (Protected Management Frames — 802.11w) در حالت Mandatory</strong> مجاز است.</p>"
+  },
+  {
+   "id": "spec_wl-section-7",
+   "title": "Wi-Fi 7 (802.11be): MLO، کانال ۳۲۰ مگاهرتز، 4K-QAM و Preamble Puncturing",
+   "html": "<p>استاندارد <strong>IEEE 802.11be (Wi-Fi 7)</strong> با هدف «توان عملیاتی فوق‌العاده بالا و تأخیر بسیار پایین» (EHT) چهار قابلیت برجسته معرفی می‌کند:</p><ul><li><strong>MLO (Multi-Link Operation):</strong> کلاینت می‌تواند هم‌زمان روی چند باند (مثلاً ۵ و ۶ گیگاهرتز) متصل بماند و بسته را به‌صورت تجمیعی یا کم‌تأخیر/افزونه (STR / eMLSR) ارسال کند.</li><li><strong>کانال‌های 320 MHz در باند 6 GHz:</strong> دو برابر شدن حداکثر عرض کانال نسبت به Wi-Fi 6E (مناسب برای محیط‌های کم‌تداخل و فواصل کوتاه، نه لزوماً تراکم بالا).</li><li><strong>4096-QAM (4K-QAM):</strong> حمل ۱۲ بیت در هر نماد (۲۰٪ بیشتر از 1024-QAM در Wi-Fi 6)؛ اما نیازمند <strong>SNR بسیار بالا</strong> (فاصله بسیار نزدیک به AP) است.</li><li><strong>Preamble Puncturing:</strong> اگر بخشی کوچک از یک کانال عریض (مثلاً ۲۰ مگاهرتز از یک کانال ۱۶۰ مگاهرتزی) دچار تداخل باشد، کل کانال از دست نمی‌رود و بخش تداخل‌دار سوراخ (Puncture) شده و بقیه طیف مصرف می‌شود.</li></ul>"
+  },
+  {
+   "id": "spec_wl-section-8",
+   "title": "نمودار معماری: پیوند فیزیک RF و مدل Tags & Profiles در Catalyst 9800",
+   "html": "<p>نمودار زیر نشان می‌دهد چگونه سه تگ مستقل در کنترلر Cisco Catalyst 9800 (مبتنی بر IOS-XE) سیاست‌های WLAN، محل استقرار AP (Local/Flex) و تنظیمات رادیویی RF را بدون ساختار صلب قدیمی AireOS به اکسس‌پوینت متصل می‌کنند.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco Catalyst 9800 Tags and Profiles with RF SNR\"><rect x=\"12\" y=\"18\" width=\"235\" height=\"184\" rx=\"10\" fill=\"#eef2ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"129\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#312e81\">RF Physics &amp; Wi-Fi 6/6E/7</text><text x=\"129\" y=\"70\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">SNR = RSSI - Noise Floor</text><text x=\"129\" y=\"92\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">(-64 dBm) - (-90 dBm) = 26 dB</text><text x=\"129\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">2x Channel Width =&gt; +3 dB Noise</text><text x=\"129\" y=\"144\" text-anchor=\"middle\" font-size=\"10\" fill=\"#4338ca\">Wi-Fi 6: OFDMA + TWT + BSS Color</text><text x=\"129\" y=\"166\" text-anchor=\"middle\" font-size=\"10\" fill=\"#4338ca\">6 GHz: WPA3/OWE + Mandatory PMF</text><text x=\"129\" y=\"188\" text-anchor=\"middle\" font-size=\"10\" fill=\"#4338ca\">Wi-Fi 7: MLO + 320 MHz + 4K-QAM</text><rect x=\"278\" y=\"18\" width=\"230\" height=\"184\" rx=\"10\" fill=\"#ecfeff\" stroke=\"#0e7490\" stroke-width=\"2\"/><text x=\"393\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#155e75\">Catalyst 9800 (IOS-XE)</text><rect x=\"296\" y=\"56\" width=\"194\" height=\"36\" rx=\"6\" fill=\"#ffffff\" stroke=\"#06b6d4\"/><text x=\"393\" y=\"78\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">Policy Tag: WLAN -&gt; Policy Profile</text><rect x=\"296\" y=\"102\" width=\"194\" height=\"36\" rx=\"6\" fill=\"#ffffff\" stroke=\"#06b6d4\"/><text x=\"393\" y=\"124\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">Site Tag: AP Join + Flex Profile</text><rect x=\"296\" y=\"148\" width=\"194\" height=\"36\" rx=\"6\" fill=\"#ffffff\" stroke=\"#06b6d4\"/><text x=\"393\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">RF Tag: 2.4 / 5 / 6 GHz RF Profile</text><rect x=\"538\" y=\"28\" width=\"210\" height=\"164\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"643\" y=\"54\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Access Point &amp; Switching</text><text x=\"643\" y=\"84\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">CAPWAP Control: UDP 5246 (DTLS)</text><text x=\"643\" y=\"108\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">CAPWAP Data: UDP 5247</text><text x=\"643\" y=\"138\" text-anchor=\"middle\" font-size=\"10\" fill=\"#166534\">Central: Traffic -&gt; WLC</text><text x=\"643\" y=\"160\" text-anchor=\"middle\" font-size=\"10\" fill=\"#166534\">Flex Local: Direct to Branch VLAN</text><line x1=\"247\" y1=\"110\" x2=\"278\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"508\" y1=\"110\" x2=\"538\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
+  },
+  {
+   "id": "spec_wl-section-9",
+   "title": "معماری Cisco Catalyst 9800 WLC: مدل Tags & Profiles",
+   "html": "<p>کنترلر <strong>Catalyst 9800</strong> بر پایه <strong>IOS-XE</strong> جایگزین مدل قدیمی <code>AP Group</code> در AireOS شده و پیکربندی هر AP را به <strong>۳ تگ مستقل</strong> می‌شکند:</p><ol><li><strong>Policy Tag:</strong> هر <code>WLAN Profile</code> (نام SSID و امنیت L2) را به یک <code>Policy Profile</code> (VLAN، QoS، ACL، Session Timeout و <code>central switching</code> یا <code>no central switching</code>) متصل می‌کند.</li><li><strong>Site Tag:</strong> شامل <code>AP Join Profile</code> (پارامترهای CAPWAP/SSH/Syslog) و تعیین نوع سایت است: با <code>local-site</code> (پیش‌فرض) AP در حالت Local/Central کار می‌کند؛ با <code>no local-site</code> و اتصال یک <code>Flex Profile</code>، AP وارد حالت <strong>FlexConnect</strong> برای شعب می‌شود.</li><li><strong>RF Tag:</strong> پروفایل‌های رادیویی (<code>RF Profile</code> برای باندهای ۲.۴، ۵ و ۶ گیگاهرتز شامل حداقل/حداکثر توان TPC، نرخ‌های پایه و عرض کانال) را به AP نسبت می‌دهد.</li></ol>"
+  },
+  {
+   "id": "spec_wl-section-10",
+   "title": "مقایسه Central Switching و FlexConnect Local Switching در CAPWAP",
+   "html": "<p>پروتکل <strong>CAPWAP</strong> از دو پورت UDP استفاده می‌کند: <strong>UDP 5246</strong> برای Control Plane (رمزنگاری‌شده با DTLS) و <strong>UDP 5247</strong> برای Data Plane.</p><table><thead><tr><th>ویژگی</th><th>Central Switching (Local Mode)</th><th>FlexConnect Local Switching</th></tr></thead><tbody><tr><td>مسیر ترافیک دیتای کلاینت</td><td>تونل CAPWAP UDP 5247 تا WLC مرکزی</td><td>مستقیماً روی VLAN محلی سوئیچ شعبه</td></tr><tr><td>نیاز پورت سوئیچ AP</td><td>معمولاً Access روی VLAN مدیریت AP</td><td>در سناریوی چند-VLAN باید <strong>Trunk</strong> (با Native VLAN مدیریت) باشد</td></tr><tr><td>رفتار هنگام قطع WAN تا WLC</td><td>کلاینت‌ها قطع می‌شوند</td><td>کلاینت‌های فعلی ادامه می‌دهند (و با Local Auth کلاینت جدید هم وصل می‌شود)</td></tr><tr><td>شرط تنظیم در Catalyst 9800</td><td><code>local-site</code> در Site Tag + <code>central switching</code> در Policy Profile</td><td><code>no local-site</code> + <code>Flex Profile</code> در Site Tag و <code>no central switching</code> در Policy Profile</td></tr></tbody></table>"
+  },
+  {
+   "id": "spec_wl-section-11",
+   "title": "کژفهمی‌های رایج در مهندسی وایرلس",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای پوشش بهتر، توان ارسال همه APها را روی حداکثر (Max Power) می‌گذاریم.»</strong> واقعیت: افزایش توان AP باعث تداخل هم‌کانالی (CCI)، Sticky Client و لینک نامتقارن می‌شود چون گوشی موبایل نمی‌تواند با همان توان پاسخ دهد.</li><li><strong>کژفهمی ۲: «اگر RSSI برابر -55 dBm باشد، وای‌فای قطعاً سریع و پایدار است.»</strong> واقعیت: اگر کف نویز محیط <code>-65 dBm</code> باشد، SNR تنها <code>10 dB</code> خواهد بود که ارتباط را پرخطا و ناپایدار می‌کند.</li><li><strong>کژفهمی ۳: «برای پخش شدن SSID جدید در Catalyst 9800 کافی است WLAN را بسازیم.»</strong> واقعیت: باید هر دو <code>wlan</code> و <code>wireless profile policy</code> در حالت <code>no shutdown</code> باشند و <code>Policy Tag</code> مربوطه به AP اختصاص یابد.</li></ul>"
+  },
+  {
+   "id": "spec_wl-section-12",
+   "title": "عیب‌یابی سیستماتیک Catalyst 9800 و افت کیفیت RF",
+   "html": "<p><strong>سناریو ۱ — AP آنلاین است ولی SSID پخش نمی‌شود:</strong> با دستور مرجع <code>show ap tag summary</code> بررسی کنید آیا AP هنوز روی <code>default-policy-tag</code> مانده است یا خیر؛ سپس اطمینان یابید هر دو بخش <code>wlan</code> و <code>wireless profile policy</code> دارای <code>no shutdown</code> هستند (و در صورت تغییر Site Tag، بدانید تغییر Site Tag باعث ریست شدن تونل CAPWAP اکسس‌پوینت می‌شود!).</p><p><strong>سناریو ۲ — افت کیفیت صدا در سالن شلوغ با RSSI مناسب:</strong> مقدار <strong>SNR</strong>، درصد <code>Channel Utilization</code> و نرخ <code>Retry</code> را بررسی کنید؛ کانال‌های ۸۰ مگاهرتز را به ۲۰ یا ۴۰ مگاهرتز کاهش دهید، نرخ‌های پایین قدیمی (مثل 1/2/5.5 Mbps در 2.4 GHz) را غیرفعال کنید تا سربار Management/Beacon کم شود، و از باندهای ۵/۶ گیگاهرتز بهره بگیرید.</p>"
+  },
+  {
+   "id": "spec_wl-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> یک AP در محیطی با کف نویز <code>-90 dBm</code> روی کانال 20 MHz سیگنال <code>-64 dBm</code> به لپ‌تاپ می‌رساند. اگر عرض کانال را به <code>80 MHz</code> افزایش دهیم (با فرض ثابت ماندن RSSI)، کف نویز مؤثر و SNR جدید چقدر می‌شود؟ <strong>پاسخ:</strong> از ۲۰ به ۴۰ (+۳ dB) و از ۴۰ به ۸۰ (+۳ dB دیگر)، جمعاً <strong>+6 dB</strong> افزایش نویز رخ می‌دهد. کف نویز مؤثر می‌شود <code>-84 dBm</code> و SNR از <code>26 dB</code> به <code>20 dB</code> سقوط می‌کند (پایین‌تر از آستانه ۲۵ dB طراحی صوتی).</p><p><strong>تمرین ۲:</strong> توان <code>20 dBm</code> معادل چند میلی‌وات است؟ و اگر ۳ دسی‌بل افت کابل داشته باشیم توان خروجی چند میلی‌وات می‌شود؟ <strong>پاسخ:</strong> <code>0 dBm = 1 mW</code>، با +20 dB (دو بار +10 dB یعنی ×100) برابر <code>100 mW</code> است. با افت 3 dB توان نصف شده و به <code>50 mW</code> (معادل <code>17 dBm</code>) می‌رسد.</p>"
+  },
+  {
+   "id": "spec_wl-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> استانداردهای IEEE 802.11ax (Wi-Fi 6/6E)، IEEE 802.11be (Wi-Fi 7)، <a href=\"https://www.rfc-editor.org/rfc/rfc5415\" target=\"_blank\" rel=\"noopener\">RFC 5415 (CAPWAP Protocol)</a> و راهنمای طراحی Cisco Catalyst 9800 Series WLC.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> در این محیط هیچ کنترلر Cisco Catalyst 9800، اکسس‌پوینت یا تحلیلگر طیف RF واقعی اجرا نشده است. قوانین مجاز بودن کانال‌های 5 GHz (DFS) و 6 GHz (LPI/SP/VLP) به مقررات رگولاتوری هر کشور وابسته است. آزمایشگاه Python محلی صرفاً محاسبات RF، بررسی سیاست امنیتی 6 GHz و مدل تصمیم‌گیری تگ‌های Catalyst 9800 را شبیه‌سازی می‌کند.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "dBm",
+   "fa": "دسی‌بل-میلی‌وات",
+   "simple": "واحد لگاریتمی توان رادیویی نسبت به ۱ میلی‌وات (0 dBm = 1 mW)."
+  },
+  {
+   "term": "EIRP",
+   "fa": "توان تابش مؤثر",
+   "simple": "توان نهایی تابش‌شده از آنتن: Tx Power منهای افت کابل به علاوه بهره آنتن (dBi)."
+  },
+  {
+   "term": "RSSI",
+   "fa": "شاخص قدرت سیگنال",
+   "simple": "میزان قدرت سیگنال دریافتی در گیرنده (معمولاً عدد منفی بر حسب dBm)."
+  },
+  {
+   "term": "Noise Floor",
+   "fa": "کف نویز",
+   "simple": "سطح نویز پس‌زمینه رادیویی محیط روی کانال مورد نظر (بر حسب dBm)."
+  },
+  {
+   "term": "SNR",
+   "fa": "نسبت سیگنال به نویز",
+   "simple": "تفاوت RSSI و کف نویز (dB)؛ معیار اصلی پایداری و نرخ مدولاسیون وایرلس."
+  },
+  {
+   "term": "CCI",
+   "fa": "تداخل هم‌کانالی",
+   "simple": "Co-Channel Interference؛ رقابت چند AP/کلاینت روی کانال یکسان بر سر زمان هوا."
+  },
+  {
+   "term": "OFDMA",
+   "fa": "دسترسی چندگانه OFDMA",
+   "simple": "تقسیم یک کانال Wi-Fi 6 به واحدهای RU برای سرویس هم‌زمان چند کلاینت در یک فریم."
+  },
+  {
+   "term": "TWT",
+   "fa": "زمان بیداری هدف",
+   "simple": "Target Wake Time در Wi-Fi 6 برای زمان‌بندی ارسال/دریافت و کاهش مصرف باتری."
+  },
+  {
+   "term": "BSS Coloring",
+   "fa": "رنگ‌بندی BSS",
+   "simple": "شناسه ۶ بیتی در 802.11ax برای تفکیک فریم‌های BSS محلی از همسایه و بهبود Spatial Reuse."
+  },
+  {
+   "term": "OWE",
+   "fa": "شبکه باز بهبودیافته",
+   "simple": "Enhanced Open (RFC 8110)؛ رمزنگاری فرصت‌طلبانه بدون رمز برای شبکه‌های مهمان در 6 GHz."
+  },
+  {
+   "term": "PMF (802.11w)",
+   "fa": "محافظت فریم‌های مدیریت",
+   "simple": "Protected Management Frames برای جلوگیری از حملات Deauth/Disassoc جعلی؛ اجباری در 6 GHz."
+  },
+  {
+   "term": "MLO",
+   "fa": "عملیات چندلینکی",
+   "simple": "Multi-Link Operation در Wi-Fi 7 برای اتصال هم‌زمان کلاینت روی چند باند رادیویی."
+  },
+  {
+   "term": "CAPWAP",
+   "fa": "پروتکل CAPWAP",
+   "simple": "پروتکل مدیریت و تونل بین AP و WLC روی UDP 5246 (کنترل DTLS) و UDP 5247 (داده)."
+  },
+  {
+   "term": "Policy Tag",
+   "fa": "برچسب سیاست C9800",
+   "simple": "نگاشت WLAN Profile به Policy Profile (VLAN، ACL و حالت Switching) در Catalyst 9800."
+  },
+  {
+   "term": "Site Tag",
+   "fa": "برچسب سایت C9800",
+   "simple": "انتساب AP Join Profile و تعیین Local Site یا FlexConnect Profile برای AP."
+  },
+  {
+   "term": "FlexConnect",
+   "fa": "حالت FlexConnect",
+   "simple": "معماری شعب که اجازه Local Switching ترافیک کلاینت روی VLAN محلی را می‌دهد."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه Python Mock محلی فیزیک RF و Catalyst 9800 + سناریوی مرجع (تجهیز واقعی اجرا نشده)",
+   "executionStatus": "Python Mock محلی اجرا و تست شده؛ هیچ کنترلر Catalyst 9800 یا اکسس‌پوینت واقعی اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>Python Mock محلی</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر، سوئیچ، فایروال یا کنترلر واقعی سیسکو اجرا نشده است.</p><p>در این آزمایشگاه با مدل محلی Python، محاسبه EIRP و افت SNR هنگام عریض کردن کانال از ۲۰ به ۸۰ مگاهرتز، اعتبارسنجی الزامات امنیتی باند ۶ گیگاهرتز و منطق تصمیم‌گیری Catalyst 9800 برای FlexConnect Local Switching را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_wl_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_wl_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for spec_wl (RF dBm/SNR Physics, Wi-Fi 6/6E/7 &amp; Catalyst 9800 Tags).\n\nNo real Cisco Catalyst 9800 WLC, Access Point, CAPWAP tunnel, or 802.11 radio is run.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport math\n\n\ndef dbm_to_mw(dbm: float) -&gt; float:\n    return 10 ** (dbm / 10.0)\n\n\ndef mw_to_dbm(mw: float) -&gt; float:\n    if mw &lt;= 0:\n        raise ValueError(&quot;Power in mW must be positive.&quot;)\n    return 10.0 * math.log10(mw)\n\n\ndef compute_rf_link(\n    tx_power_dbm: float,\n    cable_loss_db: float,\n    antenna_gain_dbi: float,\n    rssi_dbm: float,\n    noise_floor_20mhz_dbm: float,\n    channel_width_mhz: int = 20,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Calculate EIRP, channel-width-adjusted noise floor, and SNR.&quot;&quot;&quot;\n    if channel_width_mhz not in (20, 40, 80, 160, 320):\n        raise ValueError(f&quot;Unsupported 802.11 channel width: {channel_width_mhz}&quot;)\n    eirp_dbm = round(tx_power_dbm - cable_loss_db + antenna_gain_dbi, 2)\n    doublings = int(math.log2(channel_width_mhz // 20))\n    noise_penalty_db = 3.0 * doublings\n    effective_noise = round(noise_floor_20mhz_dbm + noise_penalty_db, 2)\n    snr_db = round(rssi_dbm - effective_noise, 2)\n    voice_ready = snr_db &gt;= 25.0 and rssi_dbm &gt;= -67.0\n    return {\n        &quot;eirp_dbm&quot;: eirp_dbm,\n        &quot;eirp_mw&quot;: round(dbm_to_mw(eirp_dbm), 2),\n        &quot;channel_width_mhz&quot;: channel_width_mhz,\n        &quot;noise_penalty_db&quot;: noise_penalty_db,\n        &quot;effective_noise_dbm&quot;: effective_noise,\n        &quot;snr_db&quot;: snr_db,\n        &quot;enterprise_voice_ready&quot;: voice_ready,\n    }\n\n\ndef check_6ghz_security(security_mode: str, pmf: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Verify Wi-Fi 6E/7 6 GHz mandatory security (WPA3 or OWE + mandatory PMF 802.11w).&quot;&quot;&quot;\n    allowed_modes = {&quot;wpa3-enterprise&quot;, &quot;wpa3-personal-sae&quot;, &quot;owe&quot;}\n    valid = security_mode.lower() in allowed_modes and pmf.lower() == &quot;mandatory&quot;\n    return {\n        &quot;band&quot;: &quot;6 GHz&quot;,\n        &quot;security_mode&quot;: security_mode,\n        &quot;pmf&quot;: pmf,\n        &quot;compliant&quot;: valid,\n        &quot;note&quot;: &quot;Compliant with 6 GHz rules.&quot; if valid else &quot;6 GHz forbids WPA2/Open and requires mandatory PMF.&quot;,\n    }\n\n\ndef resolve_c9800_ap_behavior(\n    wlan_no_shut: bool,\n    policy_profile_no_shut: bool,\n    central_switching: bool,\n    site_tag_local_site: bool,\n    flex_profile_assigned: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model Cisco Catalyst 9800 Policy Tag + Site Tag switching decision.&quot;&quot;&quot;\n    if not (wlan_no_shut and policy_profile_no_shut):\n        return {\n            &quot;ssid_broadcasting&quot;: False,\n            &quot;mode&quot;: &quot;disabled&quot;,\n            &quot;reason&quot;: &quot;Both WLAN and Policy Profile must have &#x27;no shutdown&#x27; in Catalyst 9800.&quot;,\n        }\n    if site_tag_local_site:\n        return {\n            &quot;ssid_broadcasting&quot;: True,\n            &quot;mode&quot;: &quot;central_switching_local_ap&quot;,\n            &quot;capwap_data_tunnel_udp_5247&quot;: True,\n        }\n    if not flex_profile_assigned:\n        return {\n            &quot;ssid_broadcasting&quot;: False,\n            &quot;mode&quot;: &quot;misconfigured_flex&quot;,\n            &quot;reason&quot;: &quot;Non-local Site Tag requires a Flex Profile.&quot;,\n        }\n    return {\n        &quot;ssid_broadcasting&quot;: True,\n        &quot;mode&quot;: &quot;flexconnect_local_switching&quot; if not central_switching else &quot;flexconnect_central_switching&quot;,\n        &quot;capwap_data_tunnel_udp_5247&quot;: central_switching,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real Catalyst 9800 WLC or RF hardware is invoked.&quot;)\n    print(&quot;20 MHz RF:&quot;, compute_rf_link(14.0, 1.0, 4.0, -64.0, -90.0, 20))\n    print(&quot;80 MHz RF (noise penalty):&quot;, compute_rf_link(14.0, 1.0, 4.0, -64.0, -90.0, 80))\n    print(&quot;6 GHz WPA2 invalid:&quot;, check_6ghz_security(&quot;wpa2-psk&quot;, &quot;optional&quot;))\n    print(&quot;6 GHz WPA3 valid:&quot;, check_6ghz_security(&quot;wpa3-enterprise&quot;, &quot;mandatory&quot;))\n    print(&quot;C9800 FlexConnect Local:&quot;, resolve_c9800_ap_behavior(True, True, False, False, True))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> روی کانال ۲۰ مگاهرتز <code>SNR=26.0 dB</code> (مناسب صوت)، اما روی ۸۰ مگاهرتز به دلیل +6 dB افزایش نویز <code>SNR=20.0 dB</code> (نامناسب صوت) می‌شود؛ WPA2 در باند 6 GHz رد و WPA3 + Mandatory PMF پذیرفته می‌شود؛ در C9800 ترکیب <code>no local-site</code> + Flex Profile + <code>no central switching</code> خروجی <code>flexconnect_local_switching</code> می‌دهد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>پلتفرم مرجع:</strong> Cisco Catalyst 9800-CL (IOS-XE؛ اجرا نشده روی سخت‌افزار):</p><pre dir=\"ltr\"><code>! Reference Catalyst 9800 FlexConnect Local Switching snippet (NOT executed)\nwireless profile policy CORP-FLEX-POL\n no central switching\n vlan VLAN180_CORP\n no shutdown\nwireless tag site BRANCH-SITE\n no local-site\n flex-profile BRANCH-FLEX-PROF\n! Verify on real/CML C9800:\n! show wireless summary | show ap tag summary</code></pre><p>در محیط واقعی، به یاد داشته باشید تغییر <code>Site Tag</code> باعث قطع لحظه‌ای تونل CAPWAP اکسس‌پوینت می‌شود.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس تخصص Wireless",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "اگر RSSI برابر -64 dBm و کف نویز محیط برابر -90 dBm باشد، مقدار SNR چقدر است؟",
+   "options": [
+    "154 dB",
+    "-26 dB",
+    "26 dB",
+    "36 dB"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p><code>SNR = RSSI - Noise Floor = (-64) - (-90) = 26 dB</code> که بالاتر از حد معمول ۲۵ dB برای طراحی سازمانی/صوتی است.</p>"
+  },
+  {
+   "title": "طبق قانون ۳ و ۱۰ دسی‌بل، توان 20 dBm معادل چند میلی‌وات است و پس از افت 3 dB به چند میلی‌وات می‌رسد؟",
+   "options": [
+    "20 mW و سپس 17 mW",
+    "100 mW و سپس 50 mW",
+    "10 mW و سپس 5 mW",
+    "1000 mW و سپس 500 mW"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p><code>0 dBm = 1 mW</code>، پس <code>+20 dBm = 100 mW</code> است و کاهش <code>3 dB</code> توان را نصف می‌کند (<code>50 mW</code> معادل <code>17 dBm</code>).</p>"
+  },
+  {
+   "title": "افزایش پهنای کانال از 20 MHz به 80 MHz چه تأثیری بر کف نویز حرارتی دریافتی و SNR دارد؟",
+   "options": [
+    "کف نویز ۶ dB کمتر و SNR بهتر می‌شود",
+    "تأثیری بر کف نویز ندارد",
+    "فقط در باند ۲.۴ گیگاهرتز رخ می‌دهد",
+    "کف نویز حدود ۶ dB افزایش می‌یابد (دو بار دو برابر شدن = ۲×۳ dB) و SNR کاهش پیدا می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>هر دو برابر شدن عرض کانال حدود +3 dB کف نویز را بالا می‌برد؛ از ۲۰ به ۴۰ به ۸۰ یعنی +6 dB نویز بیشتر به علاوه تشدید CCI.</p>"
+  },
+  {
+   "title": "مهم‌ترین فناوری Wi-Fi 6 (802.11ax) که یک کانال را به Resource Unitهای کوچک‌تر برای ارسال هم‌زمان چند کلاینت تقسیم می‌کند چیست؟",
+   "options": [
+    "OFDMA",
+    "CSMA/CD",
+    "WEP",
+    "STP"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>OFDMA کانال را به زیرحامل‌های RU می‌شکند تا چندین کلاینت با بسته‌های کوچک هم‌زمان در یک فریم سرویس بگیرند.</p>"
+  },
+  {
+   "title": "در باند 6 GHz (Wi-Fi 6E و Wi-Fi 7)، کدام ترکیب امنیتی مجاز و الزامی است؟",
+   "options": [
+    "WPA2-PSK بدون PMF",
+    "WPA3 یا Enhanced Open (OWE) همراه با PMF (802.11w) در حالت Mandatory",
+    "Open کلاسیک بدون رمزنگاری",
+    "WEP 128-bit"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در باند ۶ گیگاهرتز استانداردهای قدیمی بدون PMF ممنوع هستند و فقط WPA3 یا OWE به همراه PMF اجباری مجاز است.</p>"
+  },
+  {
+   "title": "قابلیت MLO (Multi-Link Operation) در Wi-Fi 7 (802.11be) چه امکانی فراهم می‌کند؟",
+   "options": [
+    "حذف نیاز به کنترلر در شبکه‌های سیمی",
+    "تبدیل سیگنال رادیویی به فیبر نوری",
+    "اتصال و تبادل هم‌زمان داده کلاینت روی چند باند/لینک (مثلاً ۵ و ۶ گیگاهرتز) برای کاهش تأخیر و افزایش توان",
+    "اجرای WPA2 روی باند ۶ گیگاهرتز"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>MLO یکی از شاخص‌ترین ویژگی‌های 802.11be است که به کلاینت اجازه می‌دهد هم‌زمان از چند باند برای تجمیع یا پایداری کم‌تأخیر استفاده کند.</p>"
+  },
+  {
+   "title": "در Cisco Catalyst 9800 WLC، برای فعال‌سازی FlexConnect Local Switching روی APهای یک شعبه کدام ترکیب صحیح است؟",
+   "options": [
+    "فقط ساخت یک RF Profile جدید",
+    "فقط روشن کردن VTP روی سوئیچ",
+    "تنظیم local-site در Site Tag و central switching در Policy Profile",
+    "تنظیم no local-site + Flex Profile در Site Tag و no central switching در Policy Profile (همراه پورت Trunk برای چند VLAN)"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>حالت FlexConnect AP در Site Tag و محلی بودن سوئیچینگ WLAN در Policy Profile تعیین می‌شود.</p>"
+  },
+  {
+   "title": "پروتکل CAPWAP از کدام پورت‌های UDP برای Control Plane و Data Plane استفاده می‌کند؟",
+   "options": [
+    "UDP 5246 برای کنترل (DTLS) و UDP 5247 برای داده",
+    "TCP 80 برای کنترل و TCP 443 برای داده",
+    "UDP 1812 برای کنترل و UDP 1813 برای داده",
+    "UDP 5060 برای کنترل و UDP 16384 برای داده"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>مطابق RFC 5415، پورت UDP 5246 برای کانال کنترل CAPWAP (محافظت‌شده با DTLS) و UDP 5247 برای تونل داده به کار می‌رود.</p>"
+  },
+  {
+   "title": "اگر در Catalyst 9800 اکسس‌پوینت آنلاین باشد ولی SSID جدید پخش نشود، کدام دو مورد از رایج‌ترین علت‌ها هستند؟",
+   "options": [
+    "نبود BGP روی اکسس‌پوینت و کمبود آدرس MAC",
+    "فراموشی no shutdown در WLAN یا Policy Profile، یا انتساب ندادن Policy Tag صحیح به AP",
+    "فعال بودن DHCP Snooping روی سرور DNS",
+    "استفاده از کابل فیبر به جای مس"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در Catalyst 9800 باید هم WLAN و هم Policy Profile فعال (no shutdown) باشند و Policy Tag مرتبط به AP اختصاص یافته باشد.</p>"
+  },
+  {
+   "title": "چرا تنظیم توان ارسال (Tx Power) همه APها روی حداکثر مقدار در یک محیط اداری معمولاً تصمیم اشتباهی است؟",
+   "options": [
+    "چون مصرف برق PoE صفر می‌شود",
+    "چون پروتکل OFDMA را خاموش می‌کند",
+    "چون باعث تداخل هم‌کانالی (CCI)، Sticky Client و لینک نامتقارن نسبت به توان محدود کلاینت موبایل می‌شود",
+    "چون سرعت 4K-QAM را در فاصله دور تضمین می‌کند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>کلاینت‌ها توان ارسال محدودی دارند؛ توان بیش از حد AP موجب عدم تقارن لینک و افزایش تداخل سلول‌های مجاور می‌گردد.</p>"
+  },
+  {
+   "title": "نقش Preamble Puncturing در Wi-Fi 7 چیست؟",
+   "options": [
+    "حذف کامل رمزنگاری مدیریت فریم‌ها",
+    "کاهش توان ارسال به زیر 0 dBm",
+    "جایگزینی CAPWAP با RADIUS",
+    "نادیده‌گرفتن بخش تداخل‌دار یک کانال عریض و استفاده مؤثر از بقیه طیف همان کانال"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>Preamble Puncturing اجازه می‌دهد وجود تداخل باریک در بخشی از یک کانال عریض (مثلاً ۸۰/۱۶۰/۳۲۰ MHz) مانع بهره‌برداری از باقی کانال نشود.</p>"
+  },
+  {
+   "title": "آزمایشگاه Python این درس چه چیزی را بررسی می‌کند؟",
+   "options": [
+    "محاسبات محلی RF (EIRP/SNR/عرض کانال)، قواعد امنیتی 6 GHz و مدل تگ‌های Catalyst 9800 بدون اجرای WLC یا رادیوی واقعی",
+    "اندازه‌گیری واقعی طیف رادیویی با کارت Wi-Fi 7",
+    "راه‌اندازی تونل زنده CAPWAP به Catalyst 9800-CL",
+    "تغییر توان واقعی آنتن‌های ساختمان"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه یک Python Mock محلی است و هیچ کنترلر، اکسس‌پوینت یا سیگنال رادیویی واقعی در این محیط اجرا نشده است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "spec_wl",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc5415",
+   "https://www.rfc-editor.org/rfc/rfc8110",
+   "https://www.cisco.com/c/en/us/products/wireless/catalyst-9800-series-wireless-controllers/index.html"
+  ],
+  "limitations": [
+   "هیچ کنترلر Cisco Catalyst 9800، اکسس‌پوینت یا تحلیلگر طیف واقعی در این محیط اجرا نشده است.",
+   "محدودیت کانال‌های DFS و طیف 6 GHz به مقررات رگولاتوری کشور محل استقرار وابسته است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۶ واژه و ۱۲ پرسش با محاسبات دقیق EIRP و افت SNR.",
+   "افزودن تشریح کامل Preamble Puncturing، 4K-QAM و PSC در کنار OFDMA، TWT، MLO و Catalyst 9800 Tags.",
+   "جایگزینی آزمایشگاه VLAN صرفِ شبیه‌ساز قدیمی با Python Mock قابل اجرای فیزیک RF و Catalyst 9800 به همراه سناریوی مرجع شفاف."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۶ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/spec_wl-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-specializations",
+   "recommendedCourse": "spec-wireless",
+   "blueprint": "/academy-assets/v5/blueprints/spec_wl.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_wl_lab.py"
+  }
+ }
+}

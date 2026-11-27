@@ -1,0 +1,336 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_19",
+ "objectiveId": "auto_19",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۱۹ از ۲۰): Streaming Telemetry و Grafana / ELK",
+ "titleEn": "Automation 19: Model-Driven Streaming Telemetry (MDT), gNMI/gRPC, Protobuf, TIG & ELK",
+ "domain": "Network Automation",
+ "source": "Legacy auto_19 rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_19-section-1",
+   "title": "مسئله واقعی: چرا یک میکرو-قطعی ۳ ثانیه‌ای که تماس‌های صوتی را قطع می‌کند در مانیتورینگ SNMP هرگز دیده نمی‌شود؟",
+   "html": "<p>در پایش سنتی <strong>SNMP Polling</strong>، سرور مانیتورینگ هر ۵ دقیقه یک‌بار از تک‌تک روترها سؤال می‌پرسد (Pull). اگر یک لینک برای ۳ ثانیه قطع و وصل شود (Flap) یا یک Microburst بافر سوئیچ را در ۲۰۰ میلی‌ثانیه پر کند، میان دو نوبت ۵ دقیقه‌ای SNMP کاملاً ناپدید می‌شود! علاوه بر این، پیمایش MIB/OIDها روی صدها روتر بار CPU بالایی ایجاد می‌کند. <strong>Model-Driven Telemetry (MDT)</strong> با معماری <strong>Push</strong> بر پایه مدل‌های YANG و پروتکل‌های <strong>gRPC / gNMI</strong> این مشکل را از ریشه حل می‌کند.</p>"
+  },
+  {
+   "id": "auto_19-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> YANG (درس <code>auto_10</code>)، HTTP/2 و TLS (درس <code>auto_07</code>) و Docker Compose (درس <code>auto_17</code>).</p><ul><li>مقایسه دقیق <strong>SNMP (Polling + Trap/Inform)</strong> با <strong>Model-Driven Telemetry (MDT: Push + YANG)</strong>.</li><li>تبیین پروتکل‌های <strong>gRPC</strong> و <strong>gNMI (Capabilities/Get/Set/Subscribe)</strong> و تفاوت <strong>Dial-In</strong> با <strong>Dial-Out</strong> و حالت‌های <strong><code>sample</code></strong> در برابر <strong><code>on-change</code></strong>.</li><li>تحلیل دقیق رمزگذاری <strong>Protobuf (GPB / GPB-KV)</strong> در برابر <strong>JSON</strong> (اندازه پیام در برابر سرعت واقعی وابسته به پیاده‌سازی).</li><li>معماری پشته‌های مشاهده‌پذیری مدرن: <strong>TIG (Telegraf + InfluxDB + Grafana)</strong> برای متریک‌های سری زمانی و <strong>ELK / OpenSearch</strong> برای لاگ‌ها، همراه با طراحی Alerting بدون طوفان هشدار (Hysteresis).</li></ul>"
+  },
+  {
+   "id": "auto_19-section-3",
+   "title": "چرا SNMP بازنشسته می‌شود؟ مقایسه SNMP با Model-Driven Telemetry (MDT)",
+   "html": "<table><thead><tr><th>معیار</th><th>SNMP (سنتی)</th><th>Model-Driven Telemetry (MDT)</th></tr></thead><tbody><tr><td>مدل انتقال</td><td>عمدتاً <strong>Pull / Polling</strong> دوره‌ای (همراه Trap/Inform محدود روی UDP که Trap نامطمئن است)</td><td><strong>Push پیوسته</strong> روی TCP/HTTP2/gRPC (مطمئن و رمزنگاری‌شده با TLS)</td></tr><tr><td>دقت زمانی</td><td>معمولاً ۱ تا ۵ دقیقه (میکروقطعی‌ها گم می‌شوند)</td><td>ثانیه‌ای (<code>sample</code>) یا آنی میلی‌ثانیه‌ای (<code>on-change</code>)</td></tr><tr><td>مدل داده</td><td>MIB/OIDهای عددی قدیمی و ناهمگن</td><td>مدل‌های استاندارد <strong>YANG (OpenConfig / Native)</strong></td></tr><tr><td>سربار CPU تجهیز</td><td>بالا در Pollingهای فشرده</td><td>بسیار بهینه‌تر (ارسال مستقیم از حافظه سیستم‌عامل به جریان Push)</td></tr></tbody></table>"
+  },
+  {
+   "id": "auto_19-section-4",
+   "title": "نمودار معماری سرتاسری Streaming Telemetry (gNMI -> TIG / ELK -> Grafana)",
+   "html": "<p>نمودار زیر تفکیک مسیر متریک‌های سری زمانی (TIG) و لاگ‌های متنی (ELK) تا لایه نمایش و هشداردهی را نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Model-Driven Streaming Telemetry Pipeline: gNMI/gRPC Push to TIG and ELK Stacks\"><rect x=\"12\" y=\"20\" width=\"184\" height=\"176\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"104\" y=\"44\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Network Devices</text><text x=\"104\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">YANG Models (OpenConfig)</text><text x=\"104\" y=\"98\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">PUSH: sample (5-10s)</text><text x=\"104\" y=\"122\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1d4ed8\">PUSH: on-change (ms!)</text><text x=\"104\" y=\"150\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Dial-In (gNMI) or</text><text x=\"104\" y=\"166\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Dial-Out (gRPC/TLS)</text><rect x=\"226\" y=\"54\" width=\"150\" height=\"108\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"301\" y=\"78\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">gRPC / gNMI</text><text x=\"301\" y=\"102\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">HTTP/2 + TLS</text><text x=\"301\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Protobuf (Compact)</text><text x=\"301\" y=\"144\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">or JSON_IETF</text><rect x=\"406\" y=\"18\" width=\"160\" height=\"84\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"486\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Metrics: TIG Stack</text><text x=\"486\" y=\"62\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Telegraf -&gt; InfluxDB</text><text x=\"486\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">(or Prometheus TSDB)</text><rect x=\"406\" y=\"116\" width=\"160\" height=\"84\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"486\" y=\"138\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">Logs: ELK / OpenSearch</text><text x=\"486\" y=\"160\" text-anchor=\"middle\" font-size=\"10\" fill=\"#3730a3\">Syslog / NetFlow -&gt;</text><text x=\"486\" y=\"180\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Logstash/Vector -&gt; ES</text><rect x=\"594\" y=\"44\" width=\"154\" height=\"128\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"671\" y=\"68\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">Grafana &amp; Alerting</text><text x=\"671\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">Unified Dashboards</text><text x=\"671\" y=\"120\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">Hysteresis &amp; Dedup</text><text x=\"671\" y=\"144\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">No Alert Storms!</text><line x1=\"196\" y1=\"108\" x2=\"226\" y2=\"108\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"376\" y1=\"88\" x2=\"406\" y2=\"60\" stroke=\"#15803d\" stroke-width=\"2\"/><line x1=\"376\" y1=\"128\" x2=\"406\" y2=\"156\" stroke=\"#4338ca\" stroke-width=\"2\"/><line x1=\"566\" y1=\"60\" x2=\"594\" y2=\"90\" stroke=\"#b91c1c\" stroke-width=\"2\"/><line x1=\"566\" y1=\"156\" x2=\"594\" y2=\"128\" stroke=\"#b91c1c\" stroke-width=\"2\"/></svg>"
+  },
+  {
+   "id": "auto_19-section-5",
+   "title": "gRPC و gNMI: چهار عملیات استاندارد و تفاوت Dial-In با Dial-Out",
+   "html": "<p><strong>gNMI (gRPC Network Management Interface)</strong> استاندارد توسعه داده‌شده توسط OpenConfig بر بستر <strong>gRPC (HTTP/2 + TLS)</strong> است که هم پیکربندی و هم Telemetry را با ۴ RPC واحد ارائه می‌دهد: <code>Capabilities</code>، <code>Get</code>، <code>Set</code> و <strong><code>Subscribe</code></strong> (قلب Streaming Telemetry).</p><ul><li><strong>Dial-In (مثلاً gNMI Subscribe):</strong> کالکتور به تجهیز شبکه وصل می‌شود و اشتراک (Subscription) مسیرهای YANG را درخواست می‌کند.</li><li><strong>Dial-Out (بسیار رایج در Cisco MDT روی IOS-XE/IOS-XR/NX-OS):</strong> خود روتر به‌صورت پیکربندی‌شده، اتصال gRPC خروجی به کالکتور (مانند Telegraf) باز می‌کند و داده‌ها را Push می‌نماید (بسیار مناسب برای عبور تمیز از فایروال و تجهیزات پشت NAT).</li></ul>"
+  },
+  {
+   "id": "auto_19-section-6",
+   "title": "دو حالت طلایی Subscription: دوره‌ای (Sample) در برابر رویدادمحور (On-Change)",
+   "html": "<p>انتخاب حالت اشتراک بر اساس نوع داده حیاتی است: برای متریک‌های پیوسته مانند <code>in-octets</code>، مصرف CPU/RAM و دمای سنسورها از <strong><code>sample</code></strong> (مثلاً هر ۵ یا ۱۰ ثانیه) استفاده می‌کنیم؛ اما برای تغییرات وضعیت گسسته مانند <code>oper-status</code> اینترفیس‌ها یا تغییر وضعیت همسایه BGP از <strong><code>on-change</code></strong> استفاده می‌شود تا تنها در لحظه وقوع تغییر، اعلان آنی (در حد میلی‌ثانیه) بدون هدررفت پهنای باند ارسال گردد!</p>"
+  },
+  {
+   "id": "auto_19-section-7",
+   "title": "Protobuf در برابر JSON: تحلیل دقیق بدون اغراق",
+   "html": "<p><strong>Protocol Buffers (Protobuf)</strong> یک قالب سریال‌سازی باینری مبتنی بر Schema (فایل <code>.proto</code>) است که در gRPC/gNMI به کار می‌رود. مزیت قطعی Protobuf <strong>اندازه پیام به‌مراتب کوچک‌تر روی سیم</strong> نسبت به JSON متنی است (زیرا نام کلیدهای متنی طولانی در هر رکورد تکرار نمی‌شوند و اعداد فشرده کدگذاری می‌شوند). <em>نکته دقت مهندسی:</em> اگرچه Protobuf معمولاً پهنای باند و سربار شبکه بسیار کمتری مصرف می‌کند، سرعت نهایی پردازش در مقایسه با پارسرهای JSON بسیار بهینه‌شده به پیاده‌سازی و زبان مقصد نیز وابسته است؛ همچنین JSON برای عیب‌یابی اولیه انسان‌خوان‌تر است در حالی که Protobuf برای جریان‌های پرترافیک تولیدی (هزاران پیام در ثانیه) انتخاب برتر است.</p>"
+  },
+  {
+   "id": "auto_19-section-8",
+   "title": "پشته TIG (متریک‌های سری زمانی) در برابر ELK / OpenSearch (لاگ‌ها و رویدادها)",
+   "html": "<p>یک اشتباه رایج ریختن همه چیز در یک دیتابیس نامناسب است! در مشاهده‌پذیری مدرن (Observability) داده‌ها را تفکیک می‌کنیم:</p><ul><li><strong>پشته TIG (Telegraf + InfluxDB + Grafana) یا Prometheus + Grafana:</strong> مخصوص <strong>Time-Series Metrics</strong> (اعداد برچسب‌دار در طول زمان مثل پهنای باند، CPU، خطای CRC). Telegraf پلاگین رسمی <code>inputs.cisco_telemetry_mdt</code> و <code>inputs.gnmi</code> دارد، داده‌ها را به InfluxDB (TSDB) می‌فرستد و Grafana آن‌ها را مصورسازی می‌کند.</li><li><strong>پشته ELK (Elasticsearch + Logstash/Vector + Kibana) یا OpenSearch / Loki:</strong> مخصوص <strong>لاگ‌های متنی، Syslog، رویدادهای امنیتی و NetFlow</strong> که نیازمند جست‌وجوی تمام‌متن (Full-Text Search) هستند.</li></ul>"
+  },
+  {
+   "id": "auto_19-section-9",
+   "title": "مهندسی Alerting: جلوگیری از طوفان هشدار با Hysteresis و Deduplication",
+   "html": "<p>اگر یک قانون هشدار ساده بگذارید «وقتی CPU >= 85% بود هشدار بده» و CPU بین ۸۳٪ و ۸۷٪ نوسان کند، تیم NOC در چند دقیقه با ۵۰ پیامک تکراری (Flapping Alert) بمباران می‌شود! راه‌حل استاندارد سه مکانیسم است: (۱) <strong>Hysteresis</strong> (آستانه روشن شدن مثلاً ۸۵٪ و آستانه خاموش شدن ۷۰٪)، (۲) <strong>Hold-down / <code>for: 2m</code></strong> (تداوم خطا به مدت مشخص) و (۳) <strong>Deduplication &amp; Grouping</strong> (ادغام هشدارهای هم‌منشأ).</p>"
+  },
+  {
+   "id": "auto_19-section-10",
+   "title": "مدیریت نگهداری داده (Retention Policy) و کنترل Cardinality در TSDB",
+   "html": "<p>با Telemetry پنج‌ثانیه‌ای از ۵۰۰ روتر، حجم داده‌ها در چند هفته به صدها گیگابایت می‌رسد! باید <strong>Retention Policy</strong> (مثلاً نگه‌داری داده با دقت ۵ ثانیه برای ۷ روز و Downsampling میانگین ۵ دقیقه‌ای برای ۱ سال) تعریف کنید و از قرار دادن فیلدهای بسیار پرمقدار و یکتا (مثل Session ID یا پورت مبدأ تصادفی) به عنوان <strong>Tag</strong> در InfluxDB/Prometheus بپرهیزید (خطر <strong>High Cardinality Explosion</strong> که حافظه TSDB را پر می‌کند).</p>"
+  },
+  {
+   "id": "auto_19-section-11",
+   "title": "کژفهمی‌های رایج درباره Streaming Telemetry",
+   "html": "<ul><li><strong>کژفهمی ۱: «SNMP اصلاً قابلیت Push ندارد.»</strong> واقعیت: SNMP دارای <code>Trap</code> (روی UDP بدون تأیید تحویل) و <code>Inform</code> است، اما این‌ها محدود، غیرمدل‌محور (MIB) و نامناسب برای جریان پیوسته و ساختاریافته کل متریک‌های YANG هستند.</li><li><strong>کژفهمی ۲: «برای همه مسیرهای YANG باید از sample یک‌ثانیه‌ای استفاده کنیم.»</strong> واقعیت: Sample بسیار تند روی جداول عظیم (مثل کل جدول BGP اینترنت) می‌تواند CPU روتر و دیسک TSDB را اشباع کند؛ مسیرهای وضعیت باید <code>on-change</code> و مسیرهای متریک با فاصله متناسب (مثلاً ۱۰–۳۰ ثانیه) باشند.</li><li><strong>کژفهمی ۳: «Grafana خودش دیتابیس ذخیره متریک است.»</strong> واقعیت: Grafana لایه مصورسازی و هشداردهی است و به منابع داده (InfluxDB، Prometheus، Elasticsearch، Loki) متصل می‌شود.</li></ul>"
+  },
+  {
+   "id": "auto_19-section-12",
+   "title": "عیب‌یابی خطاهای پرتکرار در پیاده‌سازی MDT و gNMI",
+   "html": "<p><strong>خطای ۱ — عدم دریافت داده در Telegraf در حالت Dial-Out:</strong> بررسی پورت TCP مقصد روی فایروال، تطابق VRF مبدأ در تنظیمات Telemetry روتر (<code>source-vrf Mgmt-intf</code>) و تطابق گواهینامه TLS میان روتر و Telegraf.</p><p><strong>خطای ۲ — پیام خطای <code>XPath not supported for on-change</code>:</strong> روی برخی نسخه‌های IOS-XE فقط زیرمجموعه‌ای از مسیرهای YANG از <code>on-change</code> پشتیبانی می‌کنند و بقیه نیازمند حالت <code>sample</code> هستند؛ باید لیست پشتیبانی پلتفرم (Sensor Path Support Matrix) بررسی شود.</p>"
+  },
+  {
+   "id": "auto_19-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> یک لینک برای ۳ ثانیه قطع و وصل می‌شود. در شبکه‌ای با SNMP Polling هر ۳۰۰ ثانیه (۵ دقیقه) و بدون Trap، آیا این قطعی دیده می‌شود؟ کدام حالت Telemetry آن را آنی ثبت می‌کند؟ <strong>پاسخ:</strong> در SNMP Polling 5 دقیقه‌ای به‌کلی از دست می‌رود؛ اما <strong>MDT / gNMI با اشتراک <code>on-change</code></strong> روی <code>oper-status</code> آن را در همان لحظه ثبت می‌کند.</p><p><strong>تمرین ۲:</strong> CPU یک روتر توالی <code>[60, 86, 83, 87, 82, 86, 68, 65]</code> را طی می‌کند. با آستانه Hysteresis (روشن >= ۸۵٪، خاموش <= ۷۰٪) چند بار هشدار Firing ارسال می‌شود؟ <strong>پاسخ:</strong> تنها <strong>۱ بار</strong> (در نمونه ۸۶٪ روشن می‌شود و تا رسیدن به ۶۸٪ روشن می‌ماند و سپس Resolve می‌شود؛ از ۳ هشدار تکراری جلوگیری می‌گردد).</p>"
+  },
+  {
+   "id": "auto_19-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://github.com/openconfig/reference/blob/master/rpc/gnmi/gnmi-specification.md\" target=\"_blank\" rel=\"noopener\">مشخصات رسمی OpenConfig gNMI</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/prog/configuration/1712/b_1712_programmability_cg/m_1712_mdt.html\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Cisco IOS-XE Model-Driven Telemetry</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر gNMI زنده، سرور InfluxDB/Telegraf یا Grafana در این محیط اجرا نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "MDT",
+   "fa": "تله‌متری مدل‌محور",
+   "simple": "Model-Driven Telemetry؛ ارسال Push و ساختاریافته داده‌های شبکه بر پایه مدل‌های YANG."
+  },
+  {
+   "term": "gNMI",
+   "fa": "رابط مدیریت شبکه gNMI",
+   "simple": "gRPC Network Management Interface؛ پروتکل OpenConfig روی gRPC برای مدیریت و Streaming Telemetry."
+  },
+  {
+   "term": "gRPC",
+   "fa": "پروتکل gRPC",
+   "simple": "چارچوب RPC مدرن روی HTTP/2 + TLS با پشتیبانی از جریان دوطرفه و Protobuf."
+  },
+  {
+   "term": "Protobuf",
+   "fa": "بافرهای پروتکل",
+   "simple": "قالب سریال‌سازی باینری فشرده مبتنی بر Schema با اندازه پیام بسیار کمتر از JSON."
+  },
+  {
+   "term": "Dial-In vs Dial-Out",
+   "fa": "اتصال ورودی در برابر خروجی",
+   "simple": "در Dial-In کالکتور به روتر وصل می‌شود؛ در Dial-Out روتر اتصال خروجی به کالکتور باز می‌کند."
+  },
+  {
+   "term": "Sample Subscription",
+   "fa": "اشتراک دوره‌ای",
+   "simple": "ارسال متریک‌های پیوسته (CPU/پهنای باند) با بازه زمانی ثابت مثلاً هر ۵–۱۰ ثانیه."
+  },
+  {
+   "term": "On-Change Subscription",
+   "fa": "اشتراک رویدادمحور",
+   "simple": "ارسال فوری پیام فقط در لحظه تغییر وضعیت گسسته (مثل افت اینترفیس یا همسایه BGP)."
+  },
+  {
+   "term": "TIG Stack",
+   "fa": "پشته پایش TIG",
+   "simple": "Telegraf (کالکتور) + InfluxDB (دیتابیس سری زمانی) + Grafana (داشبورد و هشدار)."
+  },
+  {
+   "term": "ELK / OpenSearch",
+   "fa": "پشته تحلیل لاگ ELK",
+   "simple": "Elasticsearch + Logstash + Kibana برای ذخیره‌سازی و جست‌وجوی تمام‌متن Syslog و رویدادها."
+  },
+  {
+   "term": "TSDB",
+   "fa": "پایگاه‌داده سری زمانی",
+   "simple": "دیتابیس بهینه‌شده برای ذخیره و تجمیع اعداد برچسب‌دار بر حسب زمان (InfluxDB/Prometheus)."
+  },
+  {
+   "term": "Alert Hysteresis",
+   "fa": "هیسترزیس هشدار",
+   "simple": "تعیین دو آستانه مجزا برای روشن شدن (مثلاً ۸۵٪) و خاموش شدن (مثلاً ۷۰٪) برای جلوگیری از نوسان هشدار."
+  },
+  {
+   "term": "Downsampling",
+   "fa": "کاهش تفکیک‌پذیری تاریخی",
+   "simple": "تبدیل داده‌های خام ثانیه‌ای قدیمی به میانگین ۵ دقیقه‌ای برای صرفه‌جویی در دیسک."
+  },
+  {
+   "term": "High Cardinality",
+   "fa": "تنوع بیش‌ازحد برچسب‌ها",
+   "simple": "قرار دادن مقادیر یکتای فراوان (مثل Session ID) به عنوان Tag که حافظه TSDB را منفجر می‌کند."
+  },
+  {
+   "term": "Sensor Path (XPath)",
+   "fa": "مسیر حسگر YANG",
+   "simple": "مسیر دقیق شاخه YANG (مثل openconfig-interfaces:interfaces/interface/state/counters) برای Telemetry."
+  },
+  {
+   "term": "SNMP Trap vs Inform",
+   "fa": "ترپ و اینفورم SNMP",
+   "simple": "Trap پیام UDP بدون تأیید و Inform دارای ACK است؛ هر دو فاقد غنای مدل YANG در MDT هستند."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (مقایسه اندازه Binary در برابر JSON، میکرو-قطعی SNMP و Hysteresis هشدار) — gNMI/Grafana واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر gNMI زنده، InfluxDB یا Grafana در این محیط اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر gNMI/MDT زنده، سرور Telegraf/InfluxDB یا Grafana در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی سه موضوع کلیدی را عملاً مدل و اثبات می‌کند: (۱) کاهش چشمگیر حجم پیام در کدگذاری باینری فشرده نسبت به JSON متنی، (۲) از دست رفتن قطعی ۳ ثانیه‌ای در SNMP Polling 5 دقیقه‌ای، و (۳) جلوگیری از طوفان هشدار هنگام نوسان CPU با <strong>Alert Hysteresis</strong>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_19_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_19_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_19: Model-Driven Streaming Telemetry (gNMI/MDT),\nCompact Binary Encoding vs JSON &amp; Alert Hysteresis Local Mock.\nExecution boundary: Pure Python 3 stdlib educational model comparing SNMP\npolling vs MDT on-change/sample push, compact binary struct vs JSON payload\nsizes, and hysteresis-based alerting. No live gNMI router, InfluxDB, or Grafana.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\nimport struct\n\n\ndef encode_compact_metric(ts: int, if_id: int, in_octets: int, cpu_pct: float) -&gt; bytes:\n    &quot;&quot;&quot;Compact fixed binary struct (illustrative of binary efficiency vs verbose JSON).&quot;&quot;&quot;\n    return struct.pack(&quot;!IHQf&quot;, ts, if_id, in_octets, cpu_pct)\n\n\ndef evaluate_alert_hysteresis(cpu_samples: list[float], high_thresh: float = 85.0, clear_thresh: float = 70.0) -&gt; list[dict]:\n    firing = False\n    transitions = []\n    for idx, val in enumerate(cpu_samples):\n        if not firing and val &gt;= high_thresh:\n            firing = True\n            transitions.append({&quot;sample&quot;: idx, &quot;cpu&quot;: val, &quot;event&quot;: &quot;ALERT_FIRING&quot;})\n        elif firing and val &lt;= clear_thresh:\n            firing = False\n            transitions.append({&quot;sample&quot;: idx, &quot;cpu&quot;: val, &quot;event&quot;: &quot;ALERT_RESOLVED&quot;})\n    return transitions\n\n\ndef main() -&gt; None:\n    sample_record = {\n        &quot;timestamp&quot;: 1764201600,\n        &quot;interface_id&quot;: 101,\n        &quot;in_octets&quot;: 987654321012,\n        &quot;cpu_utilization_percent&quot;: 87.5,\n    }\n    json_bytes = json.dumps(sample_record).encode(&quot;utf-8&quot;)\n    bin_bytes = encode_compact_metric(1764201600, 101, 987654321012, 87.5)\n    assert len(bin_bytes) &lt; len(json_bytes)\n\n    # Flapping CPU near 85% would spam naive threshold alerts; hysteresis fires once!\n    cpu_series = [60, 86, 83, 87, 82, 86, 68, 65]\n    events = evaluate_alert_hysteresis(cpu_series, high_thresh=85.0, clear_thresh=70.0)\n    assert len(events) == 2 and events[0][&quot;event&quot;] == &quot;ALERT_FIRING&quot; and events[1][&quot;event&quot;] == &quot;ALERT_RESOLVED&quot;\n\n    # On-change telemetry detects 3-second link flap that 300s SNMP polling misses completely!\n    snmp_poll_interval_s = 300\n    flap_duration_s = 3\n    missed_by_snmp_poll = flap_duration_s &lt; snmp_poll_interval_s\n\n    print(&quot;=== auto_19 Streaming Telemetry &amp; Alert Hysteresis Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;json_payload_bytes&quot;: len(json_bytes),\n        &quot;compact_binary_bytes&quot;: len(bin_bytes),\n        &quot;size_reduction_percent&quot;: round((1 - len(bin_bytes) / len(json_bytes)) * 100, 1),\n        &quot;short_flap_missed_by_5min_snmp_poll&quot;: missed_by_snmp_poll,\n        &quot;hysteresis_alert_transitions&quot;: events,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کاهش حدود ۸۳٪ حجم پیام باینری نسبت به JSON، <code>short_flap_missed_by_5min_snmp_poll: True</code> و تنها یک رویداد <code>ALERT_FIRING</code> و یک <code>ALERT_RESOLVED</code> با وجود ۳ بار عبور CPU از ۸۵٪.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>نمونه مرجع اشتراک Telemetry Dial-Out روی Cisco IOS-XE (اجرا نشده روی تجهیز زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XE MDT snippet (NOT executed against live hardware)\ntelemetry ietf subscription 101\n encoding encode-kvgpb\n filter xpath /interfaces-ios-xe-oper:interfaces/interface/statistics\n stream yang-push\n update-policy periodic 1000\n receiver ip address 192.0.2.50 57000 protocol grpc-tcp</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس Streaming Telemetry و Grafana / ELK",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "تفاوت اصلی میان SNMP سنتی و Model-Driven Telemetry (MDT) چیست؟",
+   "options": [
+    "SNMP فقط Push است و MDT فقط Pull",
+    "SNMP عمدتاً مبتنی بر Polling (و Trap/Inform محدود روی MIB) است، اما MDT مبتنی بر Push ساختاریافته و مدل‌محور (YANG) روی gRPC/TLS با دقت ثانیه‌ای و on-change است",
+    "هیچ تفاوتی ندارند",
+    "MDT فقط روی UDP پورت ۱۶۱ کار می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>MDT محدودیت‌های Polling کند، بار CPU بالا و MIBهای پراکنده SNMP را با Push مدل‌محور YANG برطرف می‌کند.</p>"
+  },
+  {
+   "title": "پروتکل gNMI چیست؟",
+   "options": [
+    "رابط مدیریت شبکه و Streaming Telemetry توسعه‌یافته توسط OpenConfig بر بستر gRPC (HTTP/2 + TLS)",
+    "یک پروتکل لایه ۲ جایگزین STP",
+    "یک سیستم‌عامل لینوکسی",
+    "قالب فشرده‌سازی ویدیو"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>gNMI با چهار عملیات <code>Capabilities/Get/Set/Subscribe</code> هم پیکربندی و هم Streaming Telemetry را روی gRPC فراهم می‌کند.</p>"
+  },
+  {
+   "title": "کدام ارزیابی درباره مقایسه Protobuf و JSON در Streaming Telemetry از نظر مهندسی دقیق‌تر است؟",
+   "options": [
+    "Protobuf همیشه از JSON حجیم‌تر است",
+    "JSON باینری و غیرقابل خواندن است",
+    "Protobuf به دلیل باینری و Schema-محور بودن معمولاً پیام‌های به‌مراتب کوچک‌تری تولید می‌کند، اما سرعت نهایی پردازش نسبت به JSON به پیاده‌سازی نیز وابسته است",
+    "Protobuf فقط برای Syslog متنی است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>مزیت قطعی Protobuf کاهش چشمگیر حجم روی شبکه است؛ ضمن آنکه JSON برای دیباگ انسانی خواناتر است.</p>"
+  },
+  {
+   "title": "برای پایش تغییر وضعیت گسسته یک اینترفیس (oper-status) یا قطع ناگهانی همسایه BGP، کدام حالت Subscription در Telemetry بهینه‌تر است؟",
+   "options": [
+    "Polling هر ۱۵ دقیقه یک‌بار",
+    "Sample هر ۱ ساعت",
+    "خاموش کردن Telemetry",
+    "On-Change (ارسال آنی پیام تنها در لحظه تغییر وضعیت)"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p><code>on-change</code> میکروقطعی‌ها را در میلی‌ثانیه ثبت می‌کند بدون آنکه ترافیک تکراری در حالت عادی بفرستد.</p>"
+  },
+  {
+   "title": "تفاوت دو مدل ارتباطی Dial-In و Dial-Out در Streaming Telemetry چیست؟",
+   "options": [
+    "در Dial-In کالکتور به روتر وصل و Subscribe می‌کند؛ در Dial-Out خود روتر اتصال gRPC خروجی به سمت کالکتور باز کرده و داده را Push می‌نماید",
+    "در Dial-Out از مودم تلفنی استفاده می‌شود",
+    "Dial-In فقط روی UDP کار می‌کند",
+    "هر دو دقیقاً یک جهت اتصال دارند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Dial-Out در شبکه‌های دارای فایروال و NAT بسیار محبوب است زیرا روترها اتصال خروجی به کالکتور مرکزی باز می‌کنند.</p>"
+  },
+  {
+   "title": "در پشته پایش TIG (Telegraf + InfluxDB + Grafana)، نقش هر جزء به ترتیب چیست؟",
+   "options": [
+    "هر سه دیتابیس هستند",
+    "Telegraf جمع‌آوری‌کننده (Collector)، InfluxDB پایگاه‌داده سری زمانی (TSDB) و Grafana لایه مصورسازی و هشداردهی است",
+    "Grafana جمع‌آوری‌کننده است و Telegraf داشبورد",
+    "InfluxDB فقط فایل PDF ذخیره می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>تفکیک نقش Collector، TSDB و Visualization امکان مقیاس‌پذیری مستقل هر لایه را می‌دهد.</p>"
+  },
+  {
+   "title": "برای ذخیره‌سازی و جست‌وجوی تمام‌متن (Full-Text Search) میلیون‌ها خط Syslog و لاگ فایروال، کدام پشته مناسب‌تر است؟",
+   "options": [
+    "فقط فایل متنی روی روتر",
+    "فقط یک جدول Excel",
+    "پشته ELK (Elasticsearch + Logstash/Vector + Kibana) یا OpenSearch / Loki",
+    "فقط پروتکل ARP"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>متریک‌های عددی در TSDB (InfluxDB/Prometheus) و لاگ‌های متنی در موتورهای جست‌وجوی لاگ (ELK/OpenSearch/Loki) بهترین کارایی را دارند.</p>"
+  },
+  {
+   "title": "مکانیسم Alert Hysteresis (مثلاً آستانه روشن شدن ۸۵٪ و خاموش شدن ۷۰٪) چه مشکلی را در NOC حل می‌کند؟",
+   "options": [
+    "افزایش سرعت لینک اترنت",
+    "کاهش مصرف حافظه روتر",
+    "جایگزینی رمزنگاری TLS",
+    "جلوگیری از طوفان هشدارهای تکراری (Flapping Alerts) هنگام نوسان متریک در مرز یک آستانه ثابت"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>اختلاف میان آستانه Firing و آستانه Clear مانع ارسال ده‌ها هشدار پشت‌سرهم هنگام نوسان جزئی می‌شود.</p>"
+  },
+  {
+   "title": "خطر High Cardinality Explosion در پایگاه‌داده‌های سری زمانی (InfluxDB / Prometheus) چگونه ایجاد می‌شود؟",
+   "options": [
+    "قرار دادن فیلدهای بسیار پرمقدار و یکتا (مانند پورت مبدأ تصادفی یا Session ID) به عنوان Tag/Label که تعداد سری‌های زمانی و مصرف RAM را منفجر می‌کند",
+    "کم بودن تعداد روترها",
+    "استفاده از Grafana",
+    "تنظیم Retention Policy"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Tagها باید مقادیر محدود و پایدار (مثل نام روتر، نام اینترفیس، نام سایت) داشته باشند نه شناسه‌های یکتای میلیونی.</p>"
+  },
+  {
+   "title": "هدف از پیاده‌سازی Retention Policy و Downsampling در InfluxDB/TSDB چیست؟",
+   "options": [
+    "پاک کردن فوری همه داده‌ها پس از ۱ ثانیه",
+    "نگهداری داده‌های خام با دقت بالا برای بازه کوتاه (مثلاً ۷ روز) و نگهداری میانگین‌های تجمیع‌شده برای تحلیل روندهای بلندمدت بدون پر شدن دیسک",
+    "تبدیل Protobuf به SNMPv1",
+    "افزایش ترافیک شبکه"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>ترکیب Retention و Downsampling تعادل بهینه میان دقت عیب‌یابی اخیر و هزینه ذخیره‌سازی بلندمدت برقرار می‌کند.</p>"
+  },
+  {
+   "title": "چرا هنگام بروز یک قطعی ۳ ثانیه‌ای لینک، SNMP Polling با دوره ۵ دقیقه معمولاً آن را نشان نمی‌دهد؟",
+   "options": [
+    "چون SNMP فقط روی IPv6 کار می‌کند",
+    "چون روتر لینک را عمداً مخفی می‌کند",
+    "چون تا زمان رسیدن نوبت Polling بعدی، لینک دوباره Up شده و نمونه لحظه‌ای وضعیت را Up می‌بیند",
+    "چون Grafana لینک‌های کوتاه را فیلتر می‌کند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>پایش دوره‌ای کند بین دو نمونه نسبت به رویدادهای کوتاه (Micro-outages و Microbursts) کور است.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "اتصال زنده gNMI به روترهای Core سیسکو",
+    "نصب کلاستر تولیدی InfluxDB و Elasticsearch",
+    "فقط متن نظری بدون کد",
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای مقایسه حجم پیام باینری در برابر JSON، تشخیص خطای SNMP 5 دقیقه‌ای و منطق Alert Hysteresis"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ روتر gNMI یا سرور Grafana زنده متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "auto_19",
+  "sources": [
+   "https://github.com/openconfig/reference/blob/master/rpc/gnmi/gnmi-specification.md",
+   "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/prog/configuration/1712/b_1712_programmability_cg/m_1712_mdt.html"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر gNMI زنده، InfluxDB یا Grafana در این محیط اجرا نشده است."
+  ],
+  "legacyAuditFixes": [
+   "رفع عبارت نیمه‌انگلیسی نسخه قدیمی («سرعت Compare به JSON») و گسترش به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش با دقت فنی درباره Protobuf vs JSON، Dial-In/Dial-Out، High Cardinality و Alert Hysteresis."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_19-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_19.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_19_lab.py"
+  }
+ }
+}

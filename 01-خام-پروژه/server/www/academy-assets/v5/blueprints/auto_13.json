@@ -1,0 +1,337 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_13",
+ "objectiveId": "auto_13",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۱۳ از ۲۰): Cisco NSO (Network Services Orchestrator)",
+ "titleEn": "Automation 13: Cisco NSO — Model-Driven Multi-Vendor Service Orchestration",
+ "domain": "Network Automation",
+ "source": "Legacy auto_13 rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_13-section-1",
+   "title": "مسئله واقعی: وقتی یک سرویس L3VPN روی ۵ روتر از ۳ برند مختلف است، اگر روتر چهارم خطا بدهد چه می‌شود؟",
+   "html": "<p>در یک اپراتور یا سازمان بزرگ، راه‌اندازی یک سرویس واقعی (مثلاً L3VPN مشتری جدید) نیازمند هماهنگی هم‌زمان روی PE1 (Cisco IOS-XR)، PE2 (Juniper Junos) و یک فایروال مرزی است. اگر یک اسکریپت معمولی یا Playbook ساده روی ۳ روتر اول موفق شود و روی روتر چهارم خطا بدهد، شبکه در وضعیت <strong>نیمه‌کاره (Inconsistent)</strong> رها می‌شود و پاک‌سازی آن کابوس است! <strong>Cisco NSO (Network Services Orchestrator)</strong> با تکیه بر <strong>YANG، دیتابیس CDB، الگوریتم FASTMAP و درایورهای NED</strong>، مدیریت کل چرخه عمر سرویس‌های چندفروشنده‌ای را تراکنشی و یکپارچه می‌کند.</p>"
+  },
+  {
+   "id": "auto_13-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> NETCONF (درس <code>auto_08</code>)، RESTCONF (درس <code>auto_09</code>)، YANG (درس <code>auto_10</code>) و Ansible (درس <code>auto_11</code>).</p><ul><li>تبیین معماری سه‌لایه Cisco NSO: <strong>Northbound APIs</strong>، هسته <strong>Service Manager + CDB</strong> و <strong>Southbound NEDs</strong>.</li><li>درک دقیق نقش <strong>Service Model (YANG)</strong>، <strong><code>servicepoint</code></strong>، <strong>Service Package</strong> و الگوریتم <strong>FASTMAP</strong> (تولید خودکار Modify و Delete از یک کد Create!).</li><li>شناخت رفتار تراکنشی، Rollback اتمیک و تفاوت آن با حالت <strong>Commit Queue</strong> (ناهمزمان) در مقیاس بزرگ.</li><li>تشخیص و رفع انحراف پیکربندی (Drift) با دستورات <code>check-sync</code>، <code>sync-from</code> و <code>sync-to</code>.</li></ul>"
+  },
+  {
+   "id": "auto_13-section-3",
+   "title": "معماری هسته Cisco NSO: جداسازی لایه «سرویس» از لایه «تجهیز»",
+   "html": "<p>قدرت اصلی NSO در جداسازی <strong>Service Layer (چه سرویسی می‌خواهیم؟)</strong> از <strong>Device Layer (چگونه روی هر برند پیکربندی شود؟)</strong> است. مهندس سرویس در Northbound (از طریق RESTCONF، NETCONF، CLI یا Web UI) تنها می‌گوید: «سرویس L3VPN به نام <code>CUST_A</code> با RD=<code>65000:100</code> میان PE1 و PE2 بساز». NSO با استفاده از <strong>CDB (Configuration Database)</strong> که مدل دقیق همه سرویس‌ها و همه تجهیزات را در یک درخت YANG نگه می‌دارد، پیکربندی اختصاصی هر برند را محاسبه و از طریق <strong>NED</strong>ها اعمال می‌کند.</p>"
+  },
+  {
+   "id": "auto_13-section-4",
+   "title": "نمودار معماری Cisco NSO: Northbound، FASTMAP/CDB و Southbound NEDs",
+   "html": "<p>نمودار زیر جریان تبدیل یک درخواست سرویس در Northbound به پیکربندی چندفروشنده‌ای در Southbound را نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco NSO Architecture: Northbound API, Service Manager, CDB, FASTMAP and Multi-Vendor NEDs\"><rect x=\"14\" y=\"14\" width=\"732\" height=\"44\" rx=\"8\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"380\" y=\"34\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Northbound Interfaces: RESTCONF / NETCONF / CLI / Web UI / Python &amp; Java API</text><text x=\"380\" y=\"50\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">OSS/BSS / Self-Service Portal requests: \"Create L3VPN CUST_A across PE1 + PE2\"</text><rect x=\"14\" y=\"72\" width=\"352\" height=\"68\" rx=\"8\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"190\" y=\"94\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Service Manager &amp; FASTMAP</text><text x=\"190\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">YANG Service Model (servicepoint)</text><text x=\"190\" y=\"130\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">Auto-calculates Create / Modify / Delete diffs</text><rect x=\"394\" y=\"72\" width=\"352\" height=\"68\" rx=\"8\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"570\" y=\"94\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">CDB (Configuration Database)</text><text x=\"570\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Single YANG Tree + Transaction Engine</text><text x=\"570\" y=\"130\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">check-sync / sync-from / Atomic Rollback</text><rect x=\"14\" y=\"156\" width=\"228\" height=\"50\" rx=\"8\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"128\" y=\"177\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#312e81\">CLI NED (IOS / NX-OS)</text><text x=\"128\" y=\"194\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Translates YANG &lt;-&gt; Vendor CLI</text><rect x=\"266\" y=\"156\" width=\"228\" height=\"50\" rx=\"8\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"380\" y=\"177\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#312e81\">NETCONF NED (IOS-XR / Junos)</text><text x=\"380\" y=\"194\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Native YANG/XML over SSH 830</text><rect x=\"518\" y=\"156\" width=\"228\" height=\"50\" rx=\"8\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"632\" y=\"177\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#312e81\">Generic NED (REST / Cloud)</text><text x=\"632\" y=\"194\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Controllers / Firewalls / APIs</text><line x1=\"190\" y1=\"58\" x2=\"190\" y2=\"72\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"570\" y1=\"58\" x2=\"570\" y2=\"72\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"366\" y1=\"106\" x2=\"394\" y2=\"106\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"190\" y1=\"140\" x2=\"128\" y2=\"156\" stroke=\"#4338ca\" stroke-width=\"2\"/><line x1=\"380\" y1=\"140\" x2=\"380\" y2=\"156\" stroke=\"#4338ca\" stroke-width=\"2\"/><line x1=\"570\" y1=\"140\" x2=\"632\" y2=\"156\" stroke=\"#4338ca\" stroke-width=\"2\"/></svg>"
+  },
+  {
+   "id": "auto_13-section-5",
+   "title": "NED (Network Element Driver): مترجم چندفروشنده‌ای در Southbound",
+   "html": "<p><strong>NED</strong> لایه انتزاعی میان CDB و تجهیزات واقعی شبکه است که یک مدل YANG یکنواخت برای هر پلتفرم می‌سازد. چهار نوع اصلی NED وجود دارد:</p><ul><li><strong>NETCONF NED:</strong> برای تجهیزاتی با پشتیبانی قوی از NETCONF/YANG (مثل IOS-XR، Junos، IOS-XE).</li><li><strong>CLI NED:</strong> برای تجهیزات سنتی CLI-محور (مثل IOS کلاسیک، NX-OS، ASA)؛ دستورات CLI را به درخت YANG و برعکس ترجمه می‌کند.</li><li><strong>SNMP NED:</strong> برای تجهیزات قدیمی مبتنی بر MIB/SNMP.</li><li><strong>Generic NED:</strong> برای کنترلرها و APIهای اختصاصی (REST/JSON، فایروال‌ها، سرویس‌های ابری).</li></ul>"
+  },
+  {
+   "id": "auto_13-section-6",
+   "title": "Service Package، servicepoint و جادوی الگوریتم FASTMAP",
+   "html": "<p>هر سرویس در NSO درون یک <strong>Service Package</strong> تعریف می‌شود که شامل مدل YANG سرویس و منطق نگاشت (Template XML و/یا کد پایتون/جاوا) است. بیانیه <strong><code>tailf:servicepoint</code></strong> در مدل YANG سرویس، پیوند رسمی میان مدل داده سرویس و کد/قالب نگاشت مسئول پیاده‌سازی آن را مشخص می‌کند.</p><p><strong>جادوی FASTMAP:</strong> توسعه‌دهنده فقط منطق <strong>ایجاد (<code>cb_create</code> / Template)</strong> را می‌نویسد! NSO خودش سابقه دقیق تغییراتی را که آن سرویس روی تک‌تک تجهیزات ساخته در CDB نگه می‌دارد؛ بنابراین هنگام <strong>تغییر (Modify)</strong> یا <strong>حذف (Delete)</strong> سرویس، FASTMAP به‌طور خودکار فقط حداقل تفاوت (Minimal Diff) یا دستورات دقیق حذف همان سرویس را بدون آسیب به سرویس‌های دیگر روی تجهیزات محاسبه می‌کند!</p>"
+  },
+  {
+   "id": "auto_13-section-7",
+   "title": "تراکنش همه‌یاهیچ (Network-Wide Transaction) در برابر Commit Queue",
+   "html": "<p>در حالت تراکنش هم‌زمان (Synchronous Commit)، NSO پیش از نهایی‌سازی از مکانیسم شبیه <strong>Two-Phase Commit</strong> استفاده می‌کند: اگر در سرویس ۵ روتری، روتر پنجم در Southbound خطا بدهد، NSO تغییرات اعمال‌شده روی ۴ روتر اول را نیز <strong>به‌صورت خودکار Rollback</strong> می‌کند تا کل شبکه یکپارچه بماند.</p><p><strong>نکته دقیق عملیاتی:</strong> در شبکه‌های بسیار بزرگ با هزاران تراکنش هم‌زمان، ممکن است <strong>Commit Queue</strong> (ارسال ناهمزمان به صف تجهیزات) فعال شود؛ در حالت Commit Queue و سناریوهای مرحله‌ای، رفتار و تضمین Rollback به تنظیمات دقیق صف (مانند <code>atomic</code>، <code>error-option rollback-on-error</code> یا <code>continue-on-error</code>) وابسته است و باید آگاهانه پیکربندی شود.</p>"
+  },
+  {
+   "id": "auto_13-section-8",
+   "title": "کشف و حل انحراف پیکربندی (Drift): check-sync، sync-from و sync-to",
+   "html": "<p>اگر مهندسی خارج از NSO (به‌صورت دستی با SSH) پیکربندی روتری را تغییر دهد، CDB با روتر واقعی اختلاف پیدا می‌کند (Drift). NSO سه ابزار کلیدی برای مدیریت این وضعیت دارد:</p><ul><li><strong><code>check-sync</code>:</strong> مقایسه سریع وضعیت CDB با تجهیز واقعی (خروجی: <code>in-sync</code> یا <code>out-of-sync</code>).</li><li><strong><code>compare-config</code>:</strong> نمایش دقیق خطوط متفاوت میان CDB و تجهیز.</li><li><strong><code>sync-from</code> در برابر <code>sync-to</code>:</strong> دستور <code>sync-from</code> پیکربندی روتر را به داخل CDB می‌کشد (پذیرش تغییر دستی)؛ دستور <code>sync-to</code> پیکربندی CDB را روی روتر بازنویسی می‌کند (حذف تغییر دستی غیرمجاز).</li></ul>"
+  },
+  {
+   "id": "auto_13-section-9",
+   "title": "تفاوت NSO با ابزارهای Configuration Management مثل Ansible",
+   "html": "<table><thead><tr><th>معیار</th><th>Ansible</th><th>Cisco NSO</th></tr></thead><tbody><tr><td>نگهداری State شبکه</td><td>Stateless (دیتابیس وضعیت دائمی ندارد)</td><td><strong>Stateful با CDB</strong> (مدل کامل سرویس و تجهیز)</td></tr><tr><td>چرخه عمر Modify/Delete سرویس</td><td>نیاز به نوشتن Playbook جداگانه برای حذف/ویرایش</td><td><strong>خودکار با FASTMAP</strong> (فقط منطق Create نوشته می‌شود)</td></tr><tr><td>تراکنش اتمیک چندتجهیزه</td><td>ندارد (شکست روی روتر ۴، روتر ۱ تا ۳ را برنمی‌گرداند)</td><td><strong>پشتیبانی بومی</strong> (همراه dry-run و rollback)</td></tr><tr><td>پیچیدگی و هزینه راه‌اندازی</td><td>بسیار سبک، سریع و متن‌باز</td><td>پلتفرم سازمانی/مخابراتی (نیازمند لایسنس و طراحی YANG)</td></tr></tbody></table>"
+  },
+  {
+   "id": "auto_13-section-10",
+   "title": "پیشنمایش ایمن قبل از اعمال: commit dry-run outformat native",
+   "html": "<p>یکی از محبوب‌ترین قابلیت‌های NSO در عملیات روزانه دستور <strong><code>commit dry-run outformat native</code></strong> است: پیش از آنکه حتی یک بسته به روترهای واقعی ارسال شود، NSO دقیقاً دستورات بومی IOS-XE، XMLهای NETCONF یا دستورات Junos را که قرار است به هر تجهیز بفرستد نمایش می‌دهد تا مهندس شبکه با اطمینان کامل تأیید کند.</p>"
+  },
+  {
+   "id": "auto_13-section-11",
+   "title": "کژفهمی‌های رایج درباره Cisco NSO",
+   "html": "<ul><li><strong>کژفهمی ۱: «Cisco NSO فقط تجهیزات سیسکو را مدیریت می‌کند.»</strong> واقعیت: NSO یکی از قوی‌ترین Orchestratorهای <strong>Multi-Vendor</strong> صنعت است و صدها NED برای Juniper، Arista، Nokia، Huawei، Palo Alto، F5 و ابرها دارد.</li><li><strong>کژفهمی ۲: «برای کار با NSO حتماً همه روترها باید NETCONF داشته باشند.»</strong> واقعیت: خیر؛ از طریق CLI NED، SNMP NED و Generic NED می‌تواند تجهیزات قدیمی CLI یا APIهای REST را نیز زیر یک چتر YANG بیاورد.</li><li><strong>کژفهمی ۳: «NSO در هر پیکربندی و حتی در Commit Queue بدون هیچ شرطی Rollback قطعی دارد.»</strong> واقعیت: رفتار Rollback در سناریوهای Commit Queue و چندمرحله‌ای به سیاست‌های تنظیم‌شده (<code>atomic</code> / <code>error-option</code>) و قابلیت بازگشت NED وابسته است.</li></ul>"
+  },
+  {
+   "id": "auto_13-section-12",
+   "title": "عیب‌یابی خطاهای رایج در NSO",
+   "html": "<p><strong>خطای ۱ — شکست Commit با پیام <code>Device is out of sync</code>:</strong> تغییر خارج از باند (Out-of-Band) روی روتر انجام شده؛ ابتدا با <code>compare-config</code> علت را بررسی و سپس تصمیم بگیرید <code>sync-from</code> بزنید یا <code>sync-to</code>.</p><p><strong>خطای ۲ — ناهماهنگی نسخه NED با نسخه سیستم‌عامل روتر:</strong> پس از ارتقای IOS-XE/Junos، سینتکس برخی دستورات ممکن است تغییر کند و NED قدیمی خطای پارس بدهد؛ باید NED به‌روزرسانی شده و در محیط آزمایشگاهی <code>netsim</code> تست شود.</p>"
+  },
+  {
+   "id": "auto_13-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> هنگام راه‌اندازی سرویس <code>CUST_A</code> روی <code>PE1-IOSXE</code> و <code>PE2-JUNOS</code>، پیکربندی روی PE1 پذیرفته می‌شود اما PE2 خطای RPC برمی‌گرداند. در حالت تراکنش هم‌زمان NSO چه اتفاقی برای PE1 می‌افتد؟ <strong>پاسخ:</strong> NSO تراکنش را Abort کرده و تغییرات PE1 را نیز به‌صورت اتمیک Rollback می‌کند تا هیچ پیکربندی یتیم و نیمه‌کاره‌ای روی PE1 نماند.</p><p><strong>تمرین ۲:</strong> اگر پس از استقرار موفق سرویس، فردی به‌طور دستی یک خط <code>description</code> روی PE1 اضافه کند، خروجی <code>check-sync</code> برای PE1 چه خواهد بود؟ <strong>پاسخ:</strong> <code>out-of-sync</code>، زیرا وضعیت زنده تجهیز از تصویر ذخیره‌شده در CDB منحرف شده است.</p>"
+  },
+  {
+   "id": "auto_13-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://developer.cisco.com/site/nso/\" target=\"_blank\" rel=\"noopener\">پورتال رسمی Cisco DevNet NSO</a> و <a href=\"https://www.cisco.com/c/en/us/products/cloud-systems-management/network-services-orchestrator/index.html\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Cisco NSO</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک شبیه‌ساز محلی (Local Mock) در Python 3 است و هیچ سرور واقعی Cisco NSO یا شبیه‌ساز <code>ncs-netsim</code> در این محیط اجرا نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Cisco NSO",
+   "fa": "هماهنگ‌ساز سرویس سیسکو",
+   "simple": "Network Services Orchestrator؛ پلتفرم مدل‌محور و چندفروشنده‌ای برای ارکستراسیون سرتاسری سرویس‌های شبکه."
+  },
+  {
+   "term": "CDB",
+   "fa": "پایگاه‌داده پیکربندی NSO",
+   "simple": "Configuration Database؛ مخزن مرکزی YANG شامل مدل سرویس‌ها و وضعیت تجهیزات."
+  },
+  {
+   "term": "NED",
+   "fa": "درایور عنصر شبکه",
+   "simple": "Network Element Driver؛ مترجم Southbound میان CDB و پروتکل‌های CLI/NETCONF/REST/SNMP تجهیزات."
+  },
+  {
+   "term": "FASTMAP",
+   "fa": "الگوریتم FASTMAP",
+   "simple": "مکانیسم کلیدی NSO برای محاسبه خودکار Modify و Delete سرویس صرفاً از روی منطق Create."
+  },
+  {
+   "term": "servicepoint",
+   "fa": "نقطه اتصال سرویس",
+   "simple": "نشانگر در مدل YANG سرویس که نگاشت Template یا کد Callback مسئول آن سرویس را مشخص می‌کند."
+  },
+  {
+   "term": "Service Package",
+   "fa": "بسته سرویس NSO",
+   "simple": "مجموعه فایل‌های YANG، Template و کد پایتون/جاوا که یک سرویس قابل استقرار را تعریف می‌کند."
+  },
+  {
+   "term": "Two-Phase Commit",
+   "fa": "تراکنش دومرحله‌ای",
+   "simple": "اعمال همه‌یاهیچ تغییر روی چند تجهیز با بازگشت خودکار همه در صورت شکست یک تجهیز."
+  },
+  {
+   "term": "Commit Queue",
+   "fa": "صف اعمال ناهمزمان",
+   "simple": "مکانیسم صف‌بندی تغییرات برای مقیاس‌پذیری بالا (رفتار Rollback وابسته به تنظیمات صف است)."
+  },
+  {
+   "term": "check-sync",
+   "fa": "بررسی همگامی CDB",
+   "simple": "مقایسه پیکربندی ذخیره‌شده در CDB با تجهیز واقعی برای کشف Drift (in-sync / out-of-sync)."
+  },
+  {
+   "term": "sync-from / sync-to",
+   "fa": "همگام‌سازی دوطرفه",
+   "simple": "sync-from پیکربندی تجهیز را وارد CDB می‌کند؛ sync-to پیکربندی CDB را روی تجهیز بازنویسی می‌نماید."
+  },
+  {
+   "term": "dry-run native",
+   "fa": "پیش‌نمایش دستورات بومی",
+   "simple": "نمایش دقیق دستورات بومی IOS/Junos/XML پیش از ارسال واقعی به شبکه."
+  },
+  {
+   "term": "Northbound API",
+   "fa": "رابط شمالی NSO",
+   "simple": "رابط‌های RESTCONF/NETCONF/CLI/Python برای ارتباط سیستم‌های OSS/BSS با NSO."
+  },
+  {
+   "term": "Southbound Interface",
+   "fa": "رابط جنوبی NSO",
+   "simple": "لایه ارتباط NSO با تجهیزات واقعی شبکه از طریق NEDها."
+  },
+  {
+   "term": "netsim",
+   "fa": "شبیه‌ساز تجهیزات NSO",
+   "simple": "ابزار داخلی همراه NSO برای ساخت تجهیزات مجازی شبیه‌سازی‌شده جهت تست پکیج‌های سرویس."
+  },
+  {
+   "term": "Out-of-Band Drift",
+   "fa": "انحراف خارج از باند",
+   "simple": "تغییر دستی روی تجهیز خارج از NSO که موجب out-of-sync شدن CDB می‌گردد."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (FASTMAP، NED دو برند، Atomic Rollback و check-sync) — NSO واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سرور واقعی Cisco NSO یا ncs-netsim اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور واقعی Cisco NSO، لایسنس یا شبیه‌ساز netsim در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی یک سرویس L3VPN را روی دو NED متفاوت (<code>PE1-IOSXE</code> و <code>PE2-JUNOS</code>) پیاده‌سازی می‌کند: در مرحله اول شکست Southbound روی PE2 موجب <strong>Rollback اتمیک PE1</strong> می‌شود؛ در مرحله دوم تراکنش موفق است و سپس تغییر دستی روی PE1 توسط <strong><code>check-sync</code></strong> به عنوان <code>out-of-sync</code> کشف می‌شود.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_13_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_13_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_13: Cisco NSO (CDB, NED, FASTMAP &amp; Atomic Rollback) Mock.\nExecution boundary: Pure Python 3 stdlib simulation of NSO multi-vendor service\nmapping (L3VPN servicepoint -&gt; IOS-XE &amp; Junos NEDs), two-phase atomic commit\nwith rollback on southbound failure, and check-sync drift detection. No live NSO.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport copy\nimport json\n\n\nclass NsoOrchestratorMock:\n    def __init__(self) -&gt; None:\n        self.cdb_devices = {&quot;PE1-IOSXE&quot;: [], &quot;PE2-JUNOS&quot;: []}\n        self.live_devices = copy.deepcopy(self.cdb_devices)\n\n    def render_ned_commands(self, vrf_name: str, rd: str) -&gt; dict[str, list[str]]:\n        return {\n            &quot;PE1-IOSXE&quot;: [f&quot;vrf definition {vrf_name}&quot;, f&quot; rd {rd}&quot;, &quot; address-family ipv4&quot;],\n            &quot;PE2-JUNOS&quot;: [f&quot;set routing-instances {vrf_name} instance-type vrf&quot;, f&quot;set routing-instances {vrf_name} route-distinguisher {rd}&quot;],\n        }\n\n    def commit_service(self, vrf_name: str, rd: str, fail_on_device: str | None = None) -&gt; dict:\n        rendered = self.render_ned_commands(vrf_name, rd)\n        cdb_backup = copy.deepcopy(self.cdb_devices)\n        live_backup = copy.deepcopy(self.live_devices)\n        try:\n            for dev, cmds in rendered.items():\n                if dev == fail_on_device:\n                    raise RuntimeError(f&quot;Southbound NED error on {dev}: RPC rejected&quot;)\n                self.live_devices[dev].extend(cmds)\n                self.cdb_devices[dev].extend(cmds)\n            return {&quot;status&quot;: &quot;committed&quot;, &quot;rollback_triggered&quot;: False, &quot;rendered&quot;: rendered}\n        except RuntimeError as exc:\n            # Atomic rollback restores BOTH PE1 and PE2 to pre-transaction snapshot\n            self.cdb_devices = cdb_backup\n            self.live_devices = live_backup\n            return {&quot;status&quot;: &quot;aborted&quot;, &quot;error&quot;: str(exc), &quot;rollback_triggered&quot;: True}\n\n    def check_sync(self, device: str) -&gt; str:\n        return &quot;in-sync&quot; if self.cdb_devices[device] == self.live_devices[device] else &quot;out-of-sync&quot;\n\n\ndef main() -&gt; None:\n    nso = NsoOrchestratorMock()\n    # 1. Failed transaction on PE2 must roll back PE1 too!\n    failed_tx = nso.commit_service(&quot;CUST_A&quot;, &quot;65000:100&quot;, fail_on_device=&quot;PE2-JUNOS&quot;)\n    assert failed_tx[&quot;rollback_triggered&quot;] is True\n    assert nso.live_devices[&quot;PE1-IOSXE&quot;] == [], &quot;PE1 must be rolled back atomically&quot;\n\n    # 2. Successful multi-vendor service provisioning\n    ok_tx = nso.commit_service(&quot;CUST_A&quot;, &quot;65000:100&quot;)\n    assert ok_tx[&quot;status&quot;] == &quot;committed&quot;\n    assert nso.check_sync(&quot;PE1-IOSXE&quot;) == &quot;in-sync&quot;\n\n    # 3. Simulate manual out-of-band CLI edit causing drift\n    nso.live_devices[&quot;PE1-IOSXE&quot;].append(&quot;description MANUAL_HOTFIX_BY_ADMIN&quot;)\n    drift_status = nso.check_sync(&quot;PE1-IOSXE&quot;)\n    assert drift_status == &quot;out-of-sync&quot;\n\n    print(&quot;=== auto_13 Cisco NSO FASTMAP &amp; Atomic Rollback Mock ===&quot;)\n    print(json.dumps({\n        &quot;failed_tx_atomic_rollback&quot;: failed_tx,\n        &quot;successful_tx_status&quot;: ok_tx[&quot;status&quot;],\n        &quot;drift_check_after_manual_cli&quot;: drift_status,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>rollback_triggered: True</code>، وضعیت تراکنش دوم <code>committed</code> و <code>drift_check_after_manual_cli: 'out-of-sync'</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>دستورات مرجع در CLI واقعی Cisco NSO (اجرا نشده در این مخزن):</strong></p><pre dir=\"ltr\"><code># Reference NSO CLI commands (NOT executed against live NSO)\nncs_cli -u admin\nrequest devices check-sync\ncommit dry-run outformat native</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس Cisco NSO (Network Services Orchestrator)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در معماری Cisco NSO، لایه Southbound (NED) با چه تجهیزات و پروتکل‌هایی کار می‌کند؟",
+   "options": [
+    "فقط با مرورگر وب",
+    "تنها با NETCONF تجهیزات سیسکو",
+    "با تجهیزات چندفروشنده‌ای شبکه از طریق NETCONF، RESTCONF، CLI، SNMP یا REST API حسب نوع NED",
+    "فقط با SNMPv1"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>NEDها انواع مختلفی (NETCONF، CLI، SNMP، Generic) دارند و NSO را به یک Orchestrator واقعی Multi-Vendor تبدیل می‌کنند.</p>"
+  },
+  {
+   "title": "نقش servicepoint در مدل YANG یک سرویس Cisco NSO چیست؟",
+   "options": [
+    "تعیین آدرس IP سرور NTP",
+    "ذخیره فایل‌های لاگ لینوکس",
+    "حذف خودکار تمام NEDها",
+    "مشخص کردن پیوند میان مدل داده سرویس و بخش مسئول نگاشت سرویس (Template یا Callback کد پایتون/جاوا)"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p><code>tailf:servicepoint</code> به Service Manager می‌گوید کدام Template یا Callback باید تغییرات این سرویس را تولید کند.</p>"
+  },
+  {
+   "title": "در استقرار سرویس در Cisco NSO، رفتار دقیق Rollback به چه عواملی وابسته است؟",
+   "options": [
+    "به تنظیمات و شرایط اجرا (مانند حالت هم‌زمان در برابر Commit Queue و گزینه‌های atomic / error-option) و قابلیت بازگشت NED",
+    "همیشه بدون هیچ شرط و تنظیماتی یکسان است",
+    "فقط به رنگ کابل شبکه",
+    "NSO اصلاً Rollback ندارد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>در تراکنش هم‌زمان Rollback اتمیک انجام می‌شود، اما در سناریوهای Commit Queue و مرحله‌ای، رفتار به تنظیمات دقیق صف و سیاست خطا وابسته است.</p>"
+  },
+  {
+   "title": "مزیت اصلی الگوریتم FASTMAP در Cisco NSO برای توسعه‌دهندگان سرویس چیست؟",
+   "options": [
+    "جایگزینی پروتکل BGP",
+    "توسعه‌دهنده فقط منطق Create را می‌نویسد و NSO عملیات Modify و Delete را با حداقل تفاوت به‌طور خودکار محاسبه می‌کند",
+    "حذف کامل نیاز به YANG",
+    "تبدیل XML به CSV"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>FASTMAP ردپای تغییرات هر سرویس را در CDB نگه می‌دارد و چرخه عمر کامل CRUD سرویس را خودکار می‌کند.</p>"
+  },
+  {
+   "title": "پایگاه‌داده CDB در هسته Cisco NSO چه نقشی دارد؟",
+   "options": [
+    "فقط ذخیره تصاویر نمودار",
+    "جایگزینی DNS سازمان",
+    "نگهداری درخت یکپارچه YANG از وضعیت همه سرویس‌ها و همه تجهیزات مدیریت‌شده به عنوان منبع حقیقت NSO",
+    "فقط ذخیره رمزهای عبور"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>CDB به NSO ماهیت Stateful می‌دهد تا تفاوت‌ها، انحراف‌ها (Drift) و وابستگی سرویس‌ها را دقیق بداند.</p>"
+  },
+  {
+   "title": "تفاوت دو دستور sync-from و sync-to در مدیریت انحراف (out-of-sync) در NSO چیست؟",
+   "options": [
+    "هر دو یک کار انجام می‌دهند",
+    "sync-from روتر را ریبوت می‌کند",
+    "sync-to پیکربندی روتر را پاک می‌کند",
+    "sync-from پیکربندی واقعی تجهیز را به CDB می‌آورد (پذیرش تغییر دستی)، اما sync-to پیکربندی CDB را روی تجهیز بازنویسی می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>انتخاب اشتباه میان <code>sync-from</code> و <code>sync-to</code> بسیار حساس است؛ اول پیش از اقدام باید با <code>compare-config</code> تفاوت را دید.</p>"
+  },
+  {
+   "title": "کاربرد دستور commit dry-run outformat native در NSO چیست؟",
+   "options": [
+    "نمایش دقیق دستورات بومی هر برند (IOS/Junos/XML) پیش از ارسال واقعی به شبکه برای بررسی و تأیید ایمن",
+    "اعمال فوری بدون بررسی",
+    "حذف CDB",
+    "تغییر رمز مدیر"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p><code>dry-run outformat native</code> دید شفاف مهندسی روی تغییرات واقعی پیش از استقرار می‌دهد.</p>"
+  },
+  {
+   "title": "تفاوت کلیدی معماری Cisco NSO با Ansible در استقرار یک سرویس چندتجهیزه چیست؟",
+   "options": [
+    "Ansible فقط برای سیسکو است",
+    "NSO دارای CDB (Stateful)، الگوریتم FASTMAP و تراکنش اتمیک چندتجهیزه است؛ در حالی که Ansible به ذات Stateless بوده و فاقد تراکنش همه‌یاهیچ چندتجهیزه است",
+    "NSO بدون YANG کار می‌کند",
+    "هیچ تفاوتی ندارند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>این دو ابزار مکمل‌اند: Ansible سبک و سریع برای مدیریت پیکربندی، و NSO ارکستراتور تراکنشی سرتاسری سرویس‌هاست.</p>"
+  },
+  {
+   "title": "اگر فردی خارج از NSO به‌طور دستی با SSH یک خط پیکربندی روی روتر اضافه کند، خروجی دستور check-sync چه خواهد بود؟",
+   "options": [
+    "in-sync",
+    "committed",
+    "out-of-sync",
+    "locked"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>هر تغییر خارج از باند باعث اختلاف میان CDB و تجهیز واقعی شده و <code>check-sync</code> آن را <code>out-of-sync</code> گزارش می‌دهد.</p>"
+  },
+  {
+   "title": "برای افزودن یک سوئیچ قدیمی که فقط از CLI روی SSH پشتیبانی می‌کند به Cisco NSO، کدام نوع NED به کار می‌رود؟",
+   "options": [
+    "فقط SNMPv3 trap",
+    "فقط RESTCONF",
+    "نمی‌توان آن را به NSO اضافه کرد",
+    "CLI NED"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>CLI NED دستورات متنی دستگاه‌های قدیمی را به یک مدل YANG ساختاریافته در CDB نگاشت می‌کند.</p>"
+  },
+  {
+   "title": "نقش ابزار netsim در چرخه توسعه سرویس‌های Cisco NSO چیست؟",
+   "options": [
+    "ساخت تجهیزات مجازی شبیه‌سازی‌شده بر پایه NED برای تست ایمن Service Packageها پیش از محیط تولید",
+    "اسکن آسیب‌پذیری Wi-Fi",
+    "پایش ترافیک NetFlow",
+    "جایگزینی CDB"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p><code>ncs-netsim</code> محیط آزمایشگاهی سریع و کم‌هزینه برای تست CI/CD پکیج‌های NSO فراهم می‌کند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "اتصال به کلاستر تولیدی Cisco NSO",
+    "پیکربندی واقعی PE1 و PE2 در شبکه اپراتور",
+    "فقط متن بدون کد",
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای NED دو برند، Rollback اتمیک هنگام خطای PE2 و کشف out-of-sync بدون اجرای سرور واقعی NSO"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سرور واقعی NSO متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "auto_13",
+  "sources": [
+   "https://developer.cisco.com/site/nso/",
+   "https://www.cisco.com/c/en/us/products/cloud-systems-management/network-services-orchestrator/index.html"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سرور واقعی Cisco NSO یا netsim در این محیط اجرا نشده است."
+  ],
+  "legacyAuditFixes": [
+   "بازنویسی کامل فارسی فنی روان (رفع عبارات شکسته «equipmentها»، «different models» و «orchestrating services پیچیده» در نسخه قدیمی).",
+   "افزودن مقایسه دقیق با Ansible، دستور dry-run native، check-sync/sync-from/sync-to و شبیه‌ساز محلی Rollback اتمیک."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_13-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_13.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_13_lab.py"
+  }
+ }
+}

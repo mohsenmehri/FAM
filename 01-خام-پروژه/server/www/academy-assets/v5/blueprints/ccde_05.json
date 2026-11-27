@@ -1,0 +1,338 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccde_05",
+  "objectiveId": "ccde_05",
+  "kind": "lesson",
+  "track": "CCDE",
+  "course": "ccde-design",
+  "title": "۹.۵ CCDE — معماری دیتاسنتر و DCI: Active/Active در برابر DR، فیزیک فیبر و معمای کشش لایه ۲",
+  "titleEn": "CCDE Topic 5: Data Center & DCI Architecture — Active/Active vs DR, Speed of Light & L2 Stretch Risks",
+  "domain": "Data Center Architecture",
+  "source": "Legacy ccde_05 rewritten, typo-cleaned, and expanded",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccde_01",
+    "ccie_dc"
+  ],
+  "sections": [
+    {
+      "id": "ccde_05-section-1",
+      "title": "مسئله واقعی: چرا وقتی مدیر می‌گوید «دو دیتاسنتر Active/Active با RPO=0 بین دو کشور می‌خواهم»، قوانین فیزیک به او نه می‌گویند؟",
+      "html": "<p>یکی از مشهورترین دوئل‌های جلسات معماری CCDE این است: کارفرما می‌گوید «می‌خواهیم دو دیتاسنتر در دو شهر با فاصله ۵٬۰۰۰ کیلومتر کاملاً Active/Active با همگام‌سازی لحظه‌ای (Sync Replication) باشند و همه سرورها روی یک VLAN مشترک جابه‌جا شوند!» معمار CCDE با دو سلاح علمی پاسخ می‌دهد: <strong>قانون سرعت نور در فیبر نوری</strong> (~۱ میلی‌ثانیه RTT به ازای هر ۱۰۰ کیلومتر) و <strong>قانون ایزوله‌سازی دامنه خرابی (عدم کشش خام لایه ۲ بین دیتاسنترها)</strong>!</p>"
+    },
+    {
+      "id": "ccde_05-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code>، <code>spec_dc_aci</code> و <code>ccie_dc</code>.</p><ul><li>مقایسه عمیق <strong>Active/Standby (DR)</strong> در برابر <strong>Active/Active Multi-DC</strong> (هزینه، پیچیدگی دیتابیس، RPO/RTO و Split-Brain).</li><li>محاسبه دقیق تاخیر <strong>سرعت نور در فیبر نوری</strong> (۵ میکروثانیه بر کیلومتر یک‌طرفه = ۱ms RTT به ازای ۱۰۰km) برای تصمیم <strong>Synchronous در برابر Asynchronous Replication</strong>.</li><li>تبیین اصل طلایی <strong>عدم کشش لایه ۲ خام بین دیتاسنترها</strong> و مقایسه <strong>L3 DCI + GSLB</strong> با <strong>EVPN/ACI Multi-Site</strong>.</li><li>حل دو تله مهلک Active/Active: <strong>ترافیک گردشی (Ingress/Egress Tromboning)</strong> و <strong>عدم تقارن فایروال Stateful</strong>.</li></ul>"
+    },
+    {
+      "id": "ccde_05-section-3",
+      "title": "برتری Spine-Leaf بر طراحی سه‌لایه سنتی در دیتاسنتر مدرن",
+      "html": "<p>در دیتاسنترهای سه‌لایه قدیمی (Access-Aggregation-Core)، ترافیک شرق-غرب (East-West) میان دو سرور مجبور بود چند هاپ بالا و پایین برود و نیمی از لینک‌ها توسط STP مسدود بود. اما در <strong>Spine-Leaf</strong> هر سرور تا هر سرور دیگر دقیقاً <strong>یک تعداد پرش ثابت و کوتاه (۲ هاپ)</strong> دارد، تمام لینک‌ها به‌صورت <strong>ECMP Active/Active</strong> کار می‌کنند و تاخیر کاملاً قابل پیش‌بینی است.</p>"
+    },
+    {
+      "id": "ccde_05-section-4",
+      "title": "نمودار معماری DCI دو دیتاسنتر: فیزیک فیبر نوری و تصمیم L3 در برابر L2",
+      "html": "<p>نمودار زیر تاثیر فاصله جغرافیایی بر Sync/Async Replication و اصل جداسازی دامنه خرابی میان دو دیتاسنتر را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Data Center Architecture: Active/Active vs Active/Standby, Fiber Speed-of-Light DCI RTT and L3 vs Contained L2 DCI\"><rect x=\"14\" y=\"16\" width=\"218\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"123\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Data Center 1 (Spine-Leaf)</text><text x=\"123\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">ECMP Equal Hop East-West</text><text x=\"123\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Independent Control Plane</text><text x=\"123\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Local Anycast GW + Firewall</text><rect x=\"254\" y=\"16\" width=\"252\" height=\"114\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">DCI Link &amp; Speed of Light</text><text x=\"380\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Fiber: ~1 ms RTT per 100 km!</text><text x=\"380\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">&lt;=5ms (~500km): Sync RPO=0 OK</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">5,000km (50ms): MUST Use Async!</text><text x=\"380\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">Prefer L3 DCI + GSLB over L2!</text><rect x=\"528\" y=\"16\" width=\"218\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"637\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Data Center 2 (Active/DR)</text><text x=\"637\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Isolated L2 Failure Domain</text><text x=\"637\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Host-Route /32 for Ingress Opt</text><text x=\"637\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Avoid Asymmetric FW Drop!</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">CCDE DCI Golden Law: Never Stretch Raw L2 Across Cities — Contain Faults with L3 + GSLB (or EVPN/ACI Multi-Site)!</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Also Solve Ingress/Egress Tromboning &amp; Stateful Firewall Asymmetry in Active/Active Data Centers</text></svg>"
+    },
+    {
+      "id": "ccde_05-section-5",
+      "title": "انتخاب حیاتی CCDE: Active/Standby (DR) در برابر Active/Active",
+      "html": "<table><thead><tr><th>معیار</th><th>Active/Standby (Disaster Recovery)</th><th>Active/Active (Dual-Active DC)</th></tr></thead><tbody><tr><td>سادگی شبکه و دیتابیس</td><td><strong>ساده، کم‌خطر، عدم Split-Brain دیتابیس</strong></td><td>بسیار پیچیده (نیازمند کلاسترینگ اپلیکیشن/دیتابیس + Witness سایت سوم!)</td></tr><tr><td>زمان بازیابی (RTO)</td><td>چند دقیقه تا چند ساعت (تست دوره‌ای DR لازم است)</td><td><strong>نزدیک به صفر (ثانیه‌ای)</strong></td></tr><tr><td>توجیه واقعی</td><td>بیش از ۸۰٪ سازمان‌ها که RTO ۱۵–۶۰ دقیقه می‌پذیرند</td><td>بانکداری مرکزی، بورس و سرویس‌های ۲۴/۷ با خسارت میلیونی هر دقیقه قطعی</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccde_05-section-6",
+      "title": "قانون فیزیک سرعت نور در فیبر و سقف Synchronous Storage Replication",
+      "html": "<p>نور در فیبر نوری تک‌حالته با سرعت حدود <code>200,000 km/s</code> حرکت می‌کند (ضریب شکست شیشه ~۱٫۵)؛ یعنی <strong>۵ میکروثانیه به ازای هر کیلومتر در یک جهت و ۱ میلی‌ثانیه RTT به ازای هر ۱۰۰ کیلومتر فیبر</strong> (تازه بدون احتساب تاخیر تجهیزات DWDM و مسیر غیرمستقیم حفاری!). در <strong>Synchronous Replication (RPO = 0)</strong>، هر عملیات نوشتن (Write) روی دیتابیس باید منتظر تایید نوشتن در دیتاسنتر دوم بماند؛ بنابراین معمولاً تاخیر بالای <strong>۵ میلی‌ثانیه RTT</strong> (فاصله واقعی حدود ۱۰۰ تا ۳۰۰ کیلومتر فیبر) باعث کندی شدید اپلیکیشن می‌شود و در فواصل دورتر (مثل ۵٬۰۰۰ کیلومتر با حداقل <strong>۵۰ms RTT</strong>!) <strong>اجباراً باید از Asynchronous Replication استفاده کرد</strong>!</p>"
+    },
+    {
+      "id": "ccde_05-section-7",
+      "title": "معمای بزرگ DCI: چرا هرگز نباید لایه ۲ خام را بین دو دیتاسنتر بکشیم؟",
+      "html": "<p><strong>اصل طلایی CCDE:</strong> اگر اپلیکیشن مدرن است (می‌تواند روی دو ساب‌نت مجزا در DC1 و DC2 کار کند و با <strong>DNS GSLB / BGP Anycast</strong> ترافیک را پخش کند)، <strong>مطلقاً DCI را صرفاً لایه ۳ (L3-Only) طراحی کنید!</strong> چرا؟ زیرا کشش خام لایه ۲ (Raw L2 VLAN Stretch) دو دیتاسنتر را به یک دامنه خرابی واحد ادغام می‌کند: یک طوفان ARP/Broadcast یا خطای STP در DC1 از روی لینک DCI عبور کرده و <strong>هم‌زمان DC2 را هم خاموش می‌کند</strong>!</p><p>اما اگر یک اپلیکیشن قدیمی (Legacy ERP) واقعاً هنگام جابه‌جایی مجبور به حفظ IP ثابت خود بود چه؟ تنها در این استثنا از <strong>Overlay مهارشده (EVPN Multi-Site یا ACI Multi-Site)</strong> همراه با ARP Suppression، کنترل طوفان BUM و جلوگیری از عبور STP (BPDU Filter) استفاده می‌کنیم.</p>"
+    },
+    {
+      "id": "ccde_05-section-8",
+      "title": "تله مهلک Active/Active: عدم تقارن مسیر (Tromboning) و Drop فایروال Stateful",
+      "html": "<p>فرض کنید یک ساب‌نت بین DC1 و DC2 کشیده شده و VM از DC1 به DC2 منتقل شده است: (۱) ترافیک ورودی کاربر (Ingress) از اینترنت همچنان به DC1 می‌آید (چون پیشوند <code>/24</code> در هر دو DC تبلیغ شده)، از فایروال DC1 می‌گذرد و از روی DCI به DC2 می‌رود (<strong>Ingress Tromboning</strong>)؛ (۲) حالا ترافیک برگشت (Egress) از دروازه محلی Anycast در DC2 مستقیم به فایروال DC2 می‌رود! فایروال Stateful در DC2 که بسته <code>SYN</code> اولیه را ندیده است، بلافاصله بسته <code>SYN-ACK</code> را <strong>Drop</strong> می‌کند!</p><p><strong>راه‌حل‌های CCDE:</strong> (الف) حذف کشش L2 و استفاده از ساب‌نت مجزا + GSLB، (ب) تبلیغ مسیر دقیق <strong><code>/32 Host Route</code></strong> با EVPN/LISP برای Ingress Optimization، یا (ج) طراحی دقیق همگام‌سازی/سیاست‌گذاری فایروال‌های DCI.</p>"
+    },
+    {
+      "id": "ccde_05-section-9",
+      "title": "سایت سوم (Witness / Tie-Breaker) در معماری Active/Active برای جلوگیری از Split-Brain",
+      "html": "<p>اگر لینک DCI میان DC1 و DC2 قطع شود و هر دو دیتاسنتر فکر کنند دیگری مرده است، هر دو شروع به نوشتن داده‌های متفاوت روی دیتابیس می‌کنند (فاجعه <strong>Split-Brain Data Corruption</strong>)! بنابراین هر معماری Active/Active واقعی نیازمند یک <strong>سایت سوم سبک (Quorum Witness — حتی در ابر عمومی)</strong> است تا در صورت قطع DCI دقیقاً مشخص شود کدام دیتاسنتر اکثریت (Quorum) دارد و به سرویس ادامه دهد.</p>"
+    },
+    {
+      "id": "ccde_05-section-10",
+      "title": "امنیت لایه ۱/۲ روی لینک‌های DCI بین‌شهری (MACsec / DWDM Encryption / IPsec)",
+      "html": "<p>ترافیک بین دو دیتاسنتر شامل تکرار خام دیتابیس‌ها و داده‌های حساس سازمان است که از فیبرهای اجاره‌ای مخابراتی بیرون از ساختمان عبور می‌کند! معمار CCDE باید رمزنگاری بدون افت سرعت <strong>Line-Rate Encryption</strong> را با <strong>MACsec (IEEE 802.1AE)</strong>، رمزنگاری سخت‌افزاری لایه ۱ روی <strong>DWDM Optical</strong> یا <strong>IPsec Hardware-Offloaded</strong> در طرح DCI ببیند.</p>"
+    },
+    {
+      "id": "ccde_05-section-11",
+      "title": "کژفهمی‌های رایج درباره طراحی دیتاسنتر و DCI",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای داشتن دو دیتاسنتر Active/Active، حتماً باید VLANها را بین دو شهر بکشیم.»</strong> واقعیت: بهترین و پایدارترین معماری‌های Active/Active جهان (مانند ابرشرکت‌ها) ۱۰۰٪ <strong>L3-Only با GSLB / Anycast</strong> در لایه اپلیکیشن هستند بدون ذره‌ای کشش لایه ۲!</li><li><strong>کژفهمی ۲: «اگر لینک ۱۰۰ گیگابیتی بخریم، می‌توانیم بین فرانکفورت و دبی Synchronous Replication (RPO=0) داشته باشیم.»</strong> واقعیت: پهنای باند (Bandwidth) با تاخیر (Latency) فرق دارد! حتی با لینک ۱٬۰۰۰ گیگابیتی نیز سرعت نور در فیبر ۵٬۰۰۰ کیلومتری حداقل ۵۰ میلی‌ثانیه RTT می‌سازد که برای Sync Storage غیرعملی است.</li><li><strong>کژفهمی ۳: «فقط دو دیتاسنتر برای Active/Active کافی است و نیازی به سایت سوم نیست.»</strong> واقعیت: بدون Witness/Quorum سوم، قطع شدن DCI میان دو دیتاسنتر منجر به Split-Brain خطرناک دیتابیس می‌شود.</li></ul>"
+    },
+    {
+      "id": "ccde_05-section-12",
+      "title": "اصلاح خطای نگارشی نسخه قدیمی و چک‌لیست طراحی DCI",
+      "html": "<p><strong>یادداشت ممیزی:</strong> غلط املایی نسخه قدیمی به «معماری Spine-Leaf» اصلاح شد.</p><p><strong>چک‌لیست طراحی DCI:</strong> (۱) محاسبه واقعی RTT فیبر برای Sync/Async، (۲) اصرار بر L3 DCI + GSLB به عنوان گزینه پیش‌فرض، (۳) حل عدم تقارن فایروال، (۴) تعریف Quorum Witness سوم و (۵) رمزنگاری MACsec/DWDM لینک بین‌شهری.</p>"
+    },
+    {
+      "id": "ccde_05-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> فاصله فیبر بین DC1 (تهران) و DC2 (کرج) برابر ۶۵ کیلومتر و بین DC1 (فرانکفورت) و DC2 (دبی) برابر ۵٬۰۰۰ کیلومتر است. حداقل RTT فیزیکی هر کدام چقدر است و کدام‌یک برای Synchronous Storage (RPO=0) عملی است؟ <strong>پاسخ:</strong> تهران-کرج <code>0.65 ms</code> (کاملاً مناسب Sync RPO=0)، اما فرانکفورت-دبی حداقل <code>50 ms</code> (بسیار فراتر از حد ۵ms؛ اجباراً Asynchronous Replication).</p><p><strong>تمرین ۲:</strong> یک اپلیکیشن وب مدرن Stateless می‌خواهد در دو دیتاسنتر Active/Active اجرا شود. آیا به کشش لایه ۲ نیاز دارد؟ <strong>پاسخ:</strong> <strong>خیر</strong>؛ بهترین انتخاب CCDE، <strong>L3-Only DCI + DNS GSLB / BGP Anycast</strong> با ایزوله‌سازی کامل دامنه‌های لایه ۲ است.</p>"
+    },
+    {
+      "id": "ccde_05-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-739609.html\" target=\"_blank\" rel=\"noopener\">راهنمای معماری Cisco Multi-Site &amp; Data Center Interconnect (DCI)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای فیزیک فیبر و تصمیمات DCI است و به هیچ تجهیز نوری DWDM یا دیتاسنتر زنده متصل نیست.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "DCI (Data Center Interconnect)",
+      "fa": "اتصال بین دو دیتاسنتر",
+      "simple": "زیرساخت ارتباطی (فیبر تاریک، DWDM، MPLS یا EVPN Multi-Site) بین دو یا چند مرکز داده."
+    },
+    {
+      "term": "Fiber Speed-of-Light RTT",
+      "fa": "تاخیر فیزیکی نور در فیبر",
+      "simple": "حدود ۵ میکروثانیه بر کیلومتر یک‌طرفه (۱ میلی‌ثانیه RTT به ازای هر ۱۰۰ کیلومتر فیبر)."
+    },
+    {
+      "term": "Synchronous Replication (RPO=0)",
+      "fa": "تکرار هم‌زمان بدون افت داده",
+      "simple": "انتظار برای تایید نوشتن در هر دو دیتاسنتر؛ عملاً محدود به تاخیر زیر ~۵ میلی‌ثانیه RTT."
+    },
+    {
+      "term": "Asynchronous Replication",
+      "fa": "تکرار ناهم‌زمان بین‌شهری",
+      "simple": "تایید محلی نوشتن و ارسال پیوسته تغییرات به DC دورتر (RPO چند ثانیه تا دقیقه، مناسب فواصل طولانی)."
+    },
+    {
+      "term": "L3-Only DCI + GSLB",
+      "fa": "DCI تماماً لایه ۳ با توازن جهانی DNS",
+      "simple": "استاندارد طلایی Active/Active بدون کشش لایه ۲ و با صفر سرنوشت خرابی مشترک STP/Broadcast."
+    },
+    {
+      "term": "Raw L2 Stretch Anti-Pattern",
+      "fa": "ضدالگوی کشش خام لایه ۲",
+      "simple": "کشیدن مستقیم VLAN/Trunk بین دو دیتاسنتر که خطر سقوط هم‌زمان هر دو DC بر اثر یک طوفان L2 دارد."
+    },
+    {
+      "term": "EVPN / ACI Multi-Site",
+      "fa": "کشش مهارشده Overlay چندسایتی",
+      "simple": "ایزوله نگه داشتن کنترل‌پلین و کنترل BUM/ARP در مواقع اجباری نیاز به حفظ IP در اپلیکیشن‌های Legacy."
+    },
+    {
+      "term": "Ingress/Egress Tromboning",
+      "fa": "گردش اضافی ترافیک بین دو DC",
+      "simple": "ورود ترافیک از DC1 و عبور از DCI به VM منتقل‌شده در DC2 که تاخیر و بار DCI را بالا می‌برد."
+    },
+    {
+      "term": "Stateful Firewall Asymmetry",
+      "fa": "عدم تقارن فایروال حالت‌مند",
+      "simple": "عبور رفت بسته از فایروال DC1 و برگشت از فایروال DC2 که موجب Drop فوری بسته توسط فایروال دوم می‌شود."
+    },
+    {
+      "term": "Host-Route (/32) Injection",
+      "fa": "تزریق مسیر دقیق میزبان",
+      "simple": "تبلیغ دقیق IP یک VM جابه‌جاشده (/32) در DC میزبان فعلی جهت بهینه‌سازی مسیر ورودی (Ingress)."
+    },
+    {
+      "term": "Split-Brain (Multi-DC)",
+      "fa": "دوتکه‌شدن مغز دو دیتاسنتر",
+      "simple": "ادامه نوشتن هم‌زمان و مستقل هر دو DC هنگام قطع DCI که به تخریب داده منجر می‌شود."
+    },
+    {
+      "term": "Quorum Witness (3rd Site)",
+      "fa": "سایت سوم داور Quorum",
+      "simple": "یک گره سبک در موقعیت سوم جغرافیایی برای تعیین دیتاسنتر برنده و پیشگیری از Split-Brain."
+    },
+    {
+      "term": "Spine-Leaf Architecture",
+      "fa": "معماری ستون‌فقرات-برگ دیتاسنتر",
+      "simple": "توپولوژی با تعداد پرش ثابت (۲ هاپ) و ECMP کامل برای مقیاس ترافیک شرق-غرب."
+    },
+    {
+      "term": "MACsec (IEEE 802.1AE)",
+      "fa": "رمزنگاری خطی لایه ۲",
+      "simple": "رمزنگاری سخت‌افزاری با سرعت کامل لینک روی اتصالات DCI بین‌شهری بدون تاخیر اضافی."
+    },
+    {
+      "term": "Active/Standby (DR)",
+      "fa": "معماری فعال/آماده‌باش بازیابی بحران",
+      "simple": "مدل ساده‌تر و ارزان‌تر با یک DC عملیاتی و یک DC آماده بازیابی هنگام بحران واقعی."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (محاسبه‌گر RTT فیزیک فیبر نوری برای Sync/Async و انتخابگر معماری DCI) — بدون تجهیزات نوری واقعی",
+      "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ تجهیز DWDM یا دیتاسنتر زنده متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ تجهیز نوری DWDM یا دو دیتاسنتر فیزیکی در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو تصمیم بنیادی DCI در CCDE را می‌سنجد: (۱) محاسبه حداقل تاخیر فیزیکی فیبر نوری برای سه مسیر (تهران-کرج ۶۵km، تهران-اصفهان ۴۵۰km و فرانکفورت-دبی ۵٬۰۰۰km) جهت تعیین امکان‌پذیری <code>Sync RPO=0</code>، و (۲) مقایسه طراحی <code>L3-Only + GSLB</code> در برابر <code>Contained EVPN/ACI Multi-Site</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_05_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_05_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_05 (CCDE Data Center Architecture: Speed-of-Light DCI RTT, Sync vs Async &amp; Active/Active)\nCalculates fiber speed-of-light RTT (~1 ms per 100 km round-trip), determines Synchronous vs Asynchronous\nstorage replication feasibility, and evaluates Active/Active DCI vs L3-only DCI with GSLB.\nNo real DWDM optical equipment or data center fabrics are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef evaluate_dci_distance(city_pair: str, fiber_km: float) -&gt; dict:\n    # Light in single-mode fiber travels ~200,000 km/s =&gt; 5 us/km one-way =&gt; 10 us/km RTT (1 ms per 100 km)\n    rtt_ms = round(fiber_km * 0.01, 2)\n    sync_replication_ok = rtt_ms &lt;= 5.0\n    return {\n        &quot;pair&quot;: city_pair,\n        &quot;fiber_distance_km&quot;: fiber_km,\n        &quot;physics_min_rtt_ms&quot;: rtt_ms,\n        &quot;synchronous_storage_rpo0_feasible&quot;: sync_replication_ok,\n        &quot;recommended_replication&quot;: &quot;Synchronous Replication (RPO = 0 possible)&quot; if sync_replication_ok else &quot;Asynchronous Replication (RPO &gt; 0) — fiber physics exceeds 5ms sync write limit&quot;,\n    }\n\n\ndef evaluate_dci_l2_stretch(app_hardcodes_ip_on_failover: bool, budget_for_evpn_multisite: bool) -&gt; dict:\n    if not app_hardcodes_ip_on_failover:\n        return {\n            &quot;dci_model&quot;: &quot;L3-Only DCI + DNS GSLB / Anycast BGP&quot;,\n            &quot;l2_stretched&quot;: False,\n            &quot;reason&quot;: &quot;Gold-standard CCDE choice: zero shared L2 broadcast/STP fate between data centers&quot;,\n        }\n    if budget_for_evpn_multisite:\n        return {\n            &quot;dci_model&quot;: &quot;Contained Overlay DCI (EVPN Multi-Site / ACI Multi-Site) with BUM Storm Control + Host-Route Injection&quot;,\n            &quot;l2_stretched&quot;: True,\n            &quot;reason&quot;: &quot;Isolates broadcast/control plane faults while meeting legacy IP-persistence requirement&quot;,\n        }\n    return {\n        &quot;dci_model&quot;: &quot;Refactor Application / DNS Failover (Reject Raw L2 Trunk Stretch!)&quot;,\n        &quot;l2_stretched&quot;: False,\n        &quot;reason&quot;: &quot;Raw L2 VLAN stretch across cities risks dual-DC meltdown from a single STP/BUM storm&quot;,\n    }\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_DC_DCI_MODELER&quot;,\n        &quot;fiber_physics_dci_checks&quot;: [\n            evaluate_dci_distance(&quot;Tehran_DC1 &lt;-&gt; Karaj_DC2&quot;, 65.0),\n            evaluate_dci_distance(&quot;Tehran_DC1 &lt;-&gt; Isfahan_DC2&quot;, 450.0),\n            evaluate_dci_distance(&quot;Frankfurt_DC1 &lt;-&gt; Dubai_DC2&quot;, 5000.0),\n        ],\n        &quot;l2_stretch_design_decisions&quot;: {\n            &quot;modern_stateless_web_app&quot;: evaluate_dci_l2_stretch(False, True),\n            &quot;legacy_erp_fixed_ip&quot;: evaluate_dci_l2_stretch(True, True),\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>0.65ms</code> (Sync OK)، <code>50.0ms</code> برای فرانکفورت-دبی (<code>synchronous_storage_rpo0_feasible: False</code>)، و توصیه <code>L3-Only DCI + GSLB</code> برای اپلیکیشن مدرن.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>فرمول مرجع تاخیر فیبر نوری در سند HLD (اجرا نشده روی DWDM زنده):</strong></p><pre dir=\"ltr\"><code># Fiber Physics Quick Rule of Thumb (CCDE HLD)\n# One-way delay ~= 5 microseconds / km (~0.5 ms per 100 km)\n# Round-Trip Time (RTT) ~= 1.0 ms per 100 km of actual fiber route\n# Synchronous Storage Write Limit: typically &lt;= 5 ms RTT</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس معماری دیتاسنتر و DCI در CCDE (Active/Active، فیزیک فیبر و لایه ۲)",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "مزیت کلیدی معماری Spine-Leaf نسبت به طراحی سه‌لایه سنتی دیتاسنتر چیست؟",
+      "options": [
+        "استفاده از کابل‌های کوتاه‌تر در کل ساختمان",
+        "توزیع بار هم‌هزینه روی تمام مسیرها (ECMP)، حذف انسداد STP و تعداد پرش (Hop Count) ثابت و پایین برای ترافیک شرق-غرب",
+        "حذف کامل لایه ۳",
+        "کاهش سرعت پورت‌ها"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Spine-Leaf تاخیر یکنواخت ۲هاپه و بهره‌برداری ۱۰۰٪ از تمام لینک‌های Uplink با ECMP را فراهم می‌کند.</p>"
+    },
+    {
+      "title": "بر اساس فیزیک سرعت نور در فیبر نوری (~۱ میلی‌ثانیه RTT به ازای هر ۱۰۰ کیلومتر)، چرا اجرای Synchronous Storage Replication (RPO=0) میان دو دیتاسنتر با فاصله ۵٬۰۰۰ کیلومتر غیرعملی است؟",
+      "options": [
+        "زیرا فیبر بالای ۵۰۰ کیلومتر ساخته نمی‌شود",
+        "زیرا حتی با پهنای باند بی‌نهایت، حداقل تاخیر رفت‌وبرگشت فیزیکی حدود ۵۰ میلی‌ثانیه است که بسیار فراتر از سقف ~۵ms نوشتن هم‌زمان بوده و دیتابیس را فلج می‌کند",
+        "زیرا پروتکل TCP در فاصله ۵٬۰۰۰ کیلومتر کار نمی‌کند",
+        "زیرا نور در فیبر با سرعت صفر حرکت می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>افزایش پهنای باند نمی‌تواند سرعت نور را بشکند! در فواصل طولانی باید از Asynchronous Replication استفاده کرد.</p>"
+    },
+    {
+      "title": "اصل طلایی معمار CCDE درباره کشش لایه ۲ (Stretching VLAN/Subnet) بین دو دیتاسنتر در دو شهر چیست؟",
+      "options": [
+        "همیشه تمام VLANها را با Trunk خام بین دو شهر بکشید",
+        "در صورت امکان هرگز لایه ۲ را نکشید و از L3-Only DCI + GSLB استفاده کنید؛ تنها در اجبار اپلیکیشن Legacy از Overlay مهارشده (EVPN/ACI Multi-Site) بهره ببرید",
+        "کشش لایه ۲ هیچ ریسک خرابی مشترکی ندارد",
+        "STP جلوی تمام مشکلات دو دیتاسنتر را می‌گیرد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>جداسازی دامنه‌های لایه ۲ بین دیتاسنترها مانع سقوط هم‌زمان هر دو مرکز داده بر اثر یک طوفان Broadcast یا حلقه می‌شود.</p>"
+    },
+    {
+      "title": "در یک معماری دو دیتاسنتر Active/Active، اگر بسته رفت از فایروال DC1 و بسته برگشت از فایروال DC2 عبور کند چه رخ می‌دهد؟",
+      "options": [
+        "سرعت تماس دو برابر می‌شود",
+        "فایروال Stateful در DC2 که بسته SYN اولیه را ندیده است، بسته برگشت را به دلیل عدم تقارن (Asymmetric Routing) فوری Drop می‌کند!",
+        "فایروال‌ها خودکار به هاب تبدیل می‌شوند",
+        "هیچ خطایی رخ نمی‌دهد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>عدم تقارن ترافیک روی فایروال‌های Stateful یکی از مشهورترین تله‌های معماری Active/Active با کشش لایه ۲ است.</p>"
+    },
+    {
+      "title": "چرا هر معماری دو دیتاسنتر Active/Active واقعی نیازمند یک سایت سوم سبک (Quorum Witness) است؟",
+      "options": [
+        "برای ذخیره فیلم‌های آموزشی",
+        "برای جلوگیری از Split-Brain و تخریب داده در صورت قطع لینک DCI میان DC1 و DC2 (تعیین دیتاسنتر دارای اکثریت)",
+        "برای جایگزینی لینک DWDM",
+        "برای خاموش کردن DNS"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون داور سوم (Quorum Witness)، قطع ارتباط دو DC می‌تواند باعث نوشتن متناقض هم‌زمان در هر دو سایت شود.</p>"
+    },
+    {
+      "title": "در سناریوی اجباری کشش لایه ۲ با EVPN/ACI Multi-Site، چگونه مشکل Ingress Tromboning (ورود ترافیک از DC اشتباه برای یک VM جابه‌جاشده) کاهش می‌یابد؟",
+      "options": [
+        "با تبلیغ مسیر دقیق میزبان (/32 Host Route Injection) از دیتاسنتر میزبان فعلی VM به سمت WAN/اینترنت",
+        "با خاموش کردن BGP",
+        "با استفاده از ساب‌نت /8",
+        "با حذف روتر مرزی"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تبلیغ <code>/32 Host Route</code> (همراه با Longest Match) ترافیک ورودی کاربر را مستقیم به دیتاسنتر میزبان فعلی VM هدایت می‌کند.</p>"
+    },
+    {
+      "title": "چه زمانی معماری Active/Standby (DR) نسبت به Active/Active انتخاب هوشمندانه‌تری از دید CCDE است؟",
+      "options": [
+        "وقتی RTO چند دقیقه تا یک ساعت برای کسب‌وکار قابل قبول است و سازمان می‌خواهد از هزینه و پیچیدگی شدید کلاسترینگ Active/Active و Split-Brain پرهیز کند",
+        "وقتی سازمان RTO زیر ۱ ثانیه می‌خواهد",
+        "هیچ‌وقت",
+        "فقط وقتی یک دیتاسنتر داریم"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بیش از ۸۰٪ کسب‌وکارها با یک DR منظم و تست‌شده (Active/Standby) بهترین نسبت تاب‌آوری به هزینه را می‌گیرند.</p>"
+    },
+    {
+      "title": "برای محافظت از داده‌های حساس دیتابیس در حال تکرار روی لینک‌های فیبر اجاره‌ای DCI بین دو شهر بدون افت سرعت، کدام فناوری استاندارد است؟",
+      "options": [
+        "ارسال متن ساده بدون رمزنگاری",
+        "MACsec (IEEE 802.1AE) یا رمزنگاری سخت‌افزاری لایه ۱ DWDM در سرعت کامل خط (Line-Rate)",
+        "فقط تغییر شماره VLAN",
+        "استفاده از Telnet"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>رمزنگاری Line-Rate روی DCI امنیت داده‌های در حال عبور از خارج ساختمان را بدون تحمیل تاخیر قابل توجه تضمین می‌کند.</p>"
+    },
+    {
+      "title": "دو دیتاسنتر در فاصله ۶۵ کیلومتری (تهران-کرج) حدوداً چه حداقل RTT فیزیکی روی فیبر دارند و آیا Synchronous Replication (RPO=0) برای آن‌ها ممکن است؟",
+      "options": [
+        "حدود ۵۰ میلی‌ثانیه؛ غیرممکن است",
+        "حدود ۰٫۶۵ میلی‌ثانیه؛ کاملاً زیر آستانه ۵ms بوده و Synchronous Replication با RPO=0 امکان‌پذیر است",
+        "حدود ۵۰۰ میلی‌ثانیه",
+        "صفر ثانیه"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در فواصل شهری/حومه‌ای (زیر ~۱۰۰–۲۰۰ کیلومتر فیبر)، RTT بسیار پایین است و RPO=0 کاملاً عملی می‌باشد.</p>"
+    },
+    {
+      "title": "نقش GSLB (Global Server Load Balancing) در معماری L3-Only Active/Active Multi-DC چیست؟",
+      "options": [
+        "ایجاد حلقه STP بین دو شهر",
+        "پاسخ هوشمند DNS برای هدایت کاربران به نزدیک‌ترین دیتاسنتر سالم و جابه‌جایی خودکار ترافیک هنگام افت یک DC بدون نیاز به کشش لایه ۲",
+        "تبدیل اترنت به Fibre Channel",
+        "خاموش کردن فایروال"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>GSLB همراه با Health Checkهای دقیق، تمیزترین راه توزیع و Failover ترافیک کاربران بین دیتاسنترهای تماماً لایه ۳ است.</p>"
+    },
+    {
+      "title": "در صورت اجبار به استفاده از Overlay DCI (مانند EVPN Multi-Site)، کدام قابلیت‌ها از سرایت طوفان لایه ۲ میان دو DC جلوگیری می‌کنند؟",
+      "options": [
+        "باز گذاشتن Flood نامحدود ARP و BPDU",
+        "ARP Suppression، محدودسازی نرخ BUM (Storm Control) و فیلتر کردن عبور BPDUهای STP میان سایت‌ها",
+        "حذف BGP EVPN",
+        "استفاده از هاب اترنت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مهار BUM و ARP Suppression مرز ایمنی میان دامنه‌های لایه ۲ دو سایت را حتی در حالت Stretch حفظ می‌کند.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "تست واقعی روی فیبر ۵٬۰۰۰ کیلومتری فرانکفورت-دبی",
+        "پیکربندی زنده روی دو دیتاسنتر بانکی",
+        "فقط متن نظری بدون کد",
+        "مدل‌سازی محلی (Local Mock) در Python 3 برای محاسبه فیزیک فیبر نوری (Sync/Async) و تصمیم‌گیری L3 DCI در برابر L2 Stretch"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ دیتاسنتر یا لینک DWDM واقعی متصل نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccde_05",
+    "sources": [
+      "https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-739609.html"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ تجهیز نوری DWDM یا دیتاسنتر زنده متصل نیست."
+    ],
+    "legacyAuditFixes": [
+      "اصلاح غلط املایی نسخه قدیمی («سبین-لیف») و گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Quorum Witness، Tromboning/Asymmetric FW، MACsec و مدل‌ساز فیزیک فیبر DCI."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccde_05-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-ccde",
+      "recommendedCourse": "ccde-design",
+      "blueprint": "/academy-assets/v5/blueprints/ccde_05.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_05_lab.py"
+    }
+  }
+}

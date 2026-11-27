@@ -1,0 +1,342 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccde_19",
+ "objectiveId": "ccde_19",
+ "kind": "lesson",
+ "track": "CCDE",
+ "course": "ccde-design",
+ "title": "۹.۱۹ CCDE — مطالعه موردی جامع ۲: نوسازی اپراتور مخابراتی و ۵G (شرکت Aria-Telecom)",
+ "titleEn": "CCDE Topic 19: Capstone Case Study 2 — Aria-Telecom Service Provider & 5G Modernization (SR/EVPN/Flex-Algo)",
+ "domain": "Service Provider Architecture Capstone",
+ "source": "Legacy ccde_19 rewritten and expanded",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [
+  "ccde_03",
+  "ccde_12",
+  "ccde_13",
+  "ccde_16",
+  "spec_sp_sr"
+ ],
+ "sections": [
+  {
+   "id": "ccde_19-section-1",
+   "title": "معرفی پرونده جامع ۲ (Aria-Telecom): نوسازی یک اپراتور ۵میلیون‌مشترکی با ۲٬۰۰۰ روتر مترو برای عصر ۵G",
+   "html": "<p>در مطالعه موردی جامع دوم، کلاه معمار ارشد مخابراتی (Service Provider Architect) را بر سر می‌گذاریم: <strong>اپراتور Aria-Telecom</strong> با ۵ میلیون مشترک، دارای <strong>۲٬۰۰۰ روتر مترو/دسترسی (Metro Rings)</strong> و <strong>۵۰ روتر هسته (Core)</strong> است. شبکه فعلی روی <strong>MPLS LDP + RSVP-TE + VPLS قدیمی</strong> اجرا می‌شود، جدول IGP زیر بار رشد روترها نفس‌نفس می‌زند، هزینه Transit جهانی سر به فلک کشیده، و شرکت می‌خواهد طی ۱۸ ماه <strong>سرویس‌های برش شبکه ۵G (URLLC کم‌تاخیر و eMBB پرسرعت)</strong> را <em>بدون حتی یک دقیقه قطعی سراسری</em> راه‌اندازی کند!</p>"
+  },
+  {
+   "id": "ccde_19-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_03</code>، <code>ccde_12</code>، <code>ccde_13</code>، <code>ccde_16</code> و <code>spec_sp_sr</code>.</p><ul><li>حل بحران مقیاس ۲٬۰۰۰ روتر با شکستن IGP به دامنه‌های کوچک ۲۰۰روتری و اتصال سرتاسری <strong>Unified/Seamless SR-MPLS (BGP-LU)</strong>.</li><li>طراحی <strong>برش شبکه ۵G (5G Network Slicing)</strong> با <strong>SR Flex-Algo 128 (Min-Delay)</strong>، <strong>Flex-Algo 129 (High-BW)</strong> و <strong>TI-LFA زیر ۵۰ms</strong>.</li><li>یکپارچه‌سازی لایه سرویس (حذف VPLS/Pseudowire قدیمی) با <strong>BGP EVPN + L3VPN روی هسته BGP-Free</strong>.</li><li>تدوین <strong>مهاجرت تدریجی بدون قطعی از LDP به SR-MPLS</strong> از طریق <strong>SRMS (Segment Routing Mapping Server)</strong> و بهینه‌سازی اقتصادی <strong>IXP/CDN + MANRS</strong>.</li></ul>"
+  },
+  {
+   "id": "ccde_19-section-3",
+   "title": "ستون ۱ — شکستن دیوار مقیاس ۲٬۰۰۰ روتر: Unified / Seamless SR-MPLS + BGP-LU",
+   "html": "<p>گذاشتن ۲٬۰۰۰ روتر مترو و ۵۰ روتر هسته در یک ناحیه OSPF/IS-IS واحد باعث طوفان SPF، کندی همگرایی و فشار سنگین CPU روی روترهای ارزان‌قیمت رینگ‌های مترو می‌شود! <strong>راه‌حل CCDE:</strong> تقسیم شبکه به <strong>۱۰ دامنه کوچک IS-IS دسترسی/مترو (هر دامنه حداکثر ۲۰۰ روتر)</strong> + <strong>یک دامنه Core ۵۰روتری</strong>، و دوختن لیبل‌های SR-MPLS در مرز ABRها با <strong>BGP Labeled Unicast (BGP-LU / RFC 8277)</strong> تا LSP سرتاسری بین هر دکل ۵G و هسته بدون انفجار LSDB برقرار شود!</p>"
+  },
+  {
+   "id": "ccde_19-section-4",
+   "title": "نمودار معماری نوسازی Aria-Telecom: Seamless SR-MPLS، ۵G Flex-Algo و مهاجرت SRMS",
+   "html": "<p>نمودار زیر معماری ۵ستونه نوسازی اپراتور Aria-Telecom از رینگ‌های ۵G تا هسته BGP-Free و لبه IXP را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Capstone 2 Aria-Telecom Service Provider and 5G Modernization: Unified SR-MPLS, Flex-Algo Slicing, EVPN and SRMS Migration\"><rect x=\"14\" y=\"14\" width=\"222\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"125\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">2,000 Metro/5G Access</text><text x=\"125\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Small IS-IS Domains (&lt;=200)</text><text x=\"125\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">5G RAN: URLLC + eMBB</text><text x=\"125\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">TI-LFA 100% &lt;50ms FRR!</text><rect x=\"260\" y=\"14\" width=\"240\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">50 Core (Unified SR-MPLS)</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">BGP-Free Core + BGP-LU Stitch</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Flex-Algo 128 (Delay) / 129 (BW)</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Unified EVPN + L3VPN Services</text><rect x=\"524\" y=\"14\" width=\"222\" height=\"114\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"635\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Edge, Peering &amp; Security</text><text x=\"635\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">65%+ IXP &amp; Local CDN Offload</text><text x=\"635\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">MANRS: RPKI ROV + Filtering</text><text x=\"635\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">FlowSpec + Scrubbing Center</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">Aria-Telecom Zero-Downtime Brownfield Upgrade: Phased LDP-to-SR Migration via SRMS (Ring-by-Ring)!</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Eliminates Legacy LDP/RSVP/VPLS Sprawl While Delivering Commercial 5G SLA Slicing to 5M+ Subscribers</text></svg>"
+  },
+  {
+   "id": "ccde_19-section-5",
+   "title": "ستون ۲ — پیاده‌سازی تجاری برش شبکه ۵G (5G Network Slicing با Flex-Algo و TI-LFA)",
+   "html": "<p>شبکه ۵G دو دسته سرویس با نیازمندی متضاد دارد که روی یک زیرساخت فیزیکی باید تفکیک SLA شوند:</p><ul><li><strong>برش URLLC (جراحی راه‌دور، کارخانه هوشمند، خودرو خودران — تاخیر زیر ۱۰ms):</strong> نگاشت به <strong>Flex-Algo 128 با متریک Min-Delay (اندازه‌گیری مداوم TWAMP)</strong> + حفاظت <strong>TI-LFA زیر ۵۰ میلی‌ثانیه</strong> در ۱۰۰٪ توپولوژی‌های رینگ مترو!</li><li><strong>برش eMBB (پهنای باند فوق‌سریع موبایل و ویدیو ۴K):</strong> نگاشت به <strong>Flex-Algo 129 با متریک IGP/Bandwidth</strong> تا ترافیک پرحجم از لینک‌های کم‌تاخیر گران URLLC دور بماند.</li><li><strong>حذف کامل وضعیت RSVP-TE از هسته:</strong> تمام ۵۰ روتر هسته Stateless شده و دیگر نیازی به نگهداری هزاران تونل RSVP ندارند!</li></ul>"
+  },
+  {
+   "id": "ccde_19-section-6",
+   "title": "ستون ۳ — یکپارچه‌سازی صفحه سرویس: BGP EVPN + L3VPN روی هسته BGP-Free",
+   "html": "<p>در شبکه قدیمی Aria-Telecom، سرویس‌های لایه ۲ سازمانی با VPLS/LDP Pseudowire (همراه با Flooding سنگین و Active/Standby) و لایه ۳ با L3VPN جداگانه اداره می‌شدند. در معماری هدف: <strong>یک صفحه کنترل واحد BGP (EVPN برای همه سرویس‌های L2/ELAN/ELINE/IRB + VPNv4/v6 برای L3VPN)</strong> روی <strong>Route Reflectorهای Out-of-Band مجزا (یکی برای VPN/EVPN، یکی برای اینترنت)</strong> و با <strong>هسته ۱۰۰٪ BGP-Free</strong> (روترهای P تنها ~۲٬۰۵۰ برچسب SR/BGP-LU حمل می‌کنند، نه میلیون‌ها مسیر مشتری!).</p>"
+  },
+  {
+   "id": "ccde_19-section-7",
+   "title": "ستون ۴ — مهاجرت بدون قطعی Brownfield از LDP به SR-MPLS با SRMS (حلقه-به-حلقه)",
+   "html": "<p>در میان ۲٬۰۰۰ روتر مترو، صدها روتر قدیمی هنوز از SR-MPLS پشتیبانی نمی‌کنند و نمی‌توان طی یک شب همه را تعویض کرد! <strong>معماری هم‌زیستی استاندارد RFC 8661:</strong></p><ol><li>فعال‌سازی <strong>SR-MPLS در کنار LDP</strong> روی ۵۰ روتر هسته و ABRها (با اولویت اولیه LDP تا هیچ تغییری در Forwarding رخ ندهد).</li><li>راه‌اندازی جفت افزونه <strong>SRMS (Segment Routing Mapping Server)</strong> برای تخصیص خودکار SID به روترهای قدیمی LDP-Only تا دو جهان LDP و SR کاملاً با هم صحبت کنند!</li><li>مهاجرت رینگ-به-رینگ (<strong>Pilot Metro Ring -&gt; موج‌های تدریجی</strong>): تغییر اولویت به SR-Preferred، بررسی صفر افت بسته، و در پایان ۱۸ ماه، خاموش کردن کامل LDP و RSVP-TE قدیمی!</li></ol>"
+  },
+  {
+   "id": "ccde_19-section-8",
+   "title": "ستون ۵ — اقتصاد اینترنت (IXP/CDN Offload) و امنیت اپراتوری (MANRS + FlowSpec)",
+   "html": "<p>برای احیای سودآوری اپراتور هم‌زمان با رشد ۲برابری ترافیک ۵G: (۱) اتصال به ۲ نقطه تبادل <strong>IXP</strong> اصلی و نصب <strong>کش‌های محلی CDN (Google/Meta/Video)</strong> در کلان‌شهرها جهت برداشتن <strong>بیش از ۶۵٪ ترافیک</strong> از لینک‌های گران Tier-1 Transit (و کاهش تاخیر کاربران به زیر ۵ms!)؛ (۲) اجرای کامل <strong>MANRS</strong> (RPKI ROV + Prefix Filtering خودکار با IRR) در تمام ASBRها؛ و (۳) حفاظت از هسته و مشتریان تجاری با <strong>BGP FlowSpec + Scrubbing Center</strong> (جایگزین RTBH مخرب!).</p>"
+  },
+  {
+   "id": "ccde_19-section-9",
+   "title": "الزام پنهان ۵G: همگام‌سازی فوق‌دقیق زمانی (PTP IEEE 1588v2 + SyncE)",
+   "html": "<p>یکی از ظریف‌ترین نکات CCDE در پرونده‌های ۵G که بسیاری فراموش می‌کنند: دکل‌های ۵G TDD برای جلوگیری از تداخل رادیویی میان آنتن‌های مجاور به همگام‌سازی فاز زیر <strong>۱٫۵ میکروثانیه</strong> نیاز دارند (NTP میلی‌ثانیه‌ای هزار بار کندتر است!). بنابراین تمام روترهای مترو و هسته در مسیر ۵G باید سخت‌افزار <strong>SyncE (فرکانس) + PTP IEEE 1588v2 Boundary Clock (فاز)</strong> با منابع GPS/GNSS افزونه داشته باشند!</p>"
+  },
+  {
+   "id": "ccde_19-section-10",
+   "title": "تله‌متری و اتوماسیون بسته (Closed-Loop Automation) در مقیاس ۲٬۰۰۰ روتر",
+   "html": "<p>مدیریت دستی ۲٬۰۰۰ روتر مترو و سرویس‌های EVPN/5G غیرممکن است! در معماری Aria-Telecom، یک <strong>ارکستراتور سرویس (مانند Cisco NSO / YANG Model-Driven)</strong> سرویس‌های L3VPN/EVPN را خودکار تولید می‌کند و <strong>Streaming Telemetry (gNMI) + Stateful PCE</strong> در صورت افزایش تاخیر یک فیبر بالای آستانه، مسیر برش ۵G URLLC را خودکار و لحظه‌ای به مسیر کم‌تاخیرتر هدایت می‌کند!</p>"
+  },
+  {
+   "id": "ccde_19-section-11",
+   "title": "تله‌های مرگبار پرونده Aria-Telecom که در این معماری خنثی شدند",
+   "html": "<ul><li><strong>تله ۱:</strong> نگه داشتن تمام ۲٬۰۰۰ روتر در یک دامنه IS-IS/OSPF واحد (انفجار LSDB و کندی SPF).</li><li><strong>تله ۲:</strong> تلاش برای حذف یک‌شبه LDP بدون SRMS روی ۲٬۰۰۰ روتر (قطعی میلیون‌ها مشترک!).</li><li><strong>تله ۳:</strong> فراموش کردن همگام‌سازی میکروثانیه‌ای <strong>PTP 1588v2 + SyncE</strong> برای دکل‌های ۵G TDD!</li><li><strong>تله ۴:</strong> خرید پهنای باند بیشتر Transit به جای استقرار IXP Peering و CDN محلی (سوزاندن میلیون‌ها دلار سود!).</li></ul>"
+  },
+  {
+   "id": "ccde_19-section-12",
+   "title": "چک‌لیست نهایی ۵ ستون نوسازی Aria-Telecom",
+   "html": "<p>تمام ۵ ستون — (۱) Unified SR-MPLS با دامنه‌های &lt;=۲۰۰ روتری، (۲) ۵G Flex-Algo + TI-LFA + PTP 1588v2، (۳) EVPN+L3VPN روی هسته BGP-Free، (۴) مهاجرت SRMS رینگ-به-رینگ بدون قطعی، و (۵) ۶۵٪+ IXP/CDN Offload + MANRS/FlowSpec — یک طرح جامع آماده دفاع در سطح CCDE می‌سازند!</p>"
+  },
+  {
+   "id": "ccde_19-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> چرا در شبکه ۲٬۰۰۰روتری Aria-Telecom، با وجود مهاجرت به SR-MPLS، همچنان به شکستن دامنه‌های IGP و BGP-LU (Unified SR-MPLS) نیاز است؟ <strong>پاسخ:</strong> زیرا SR-MPLS خود از IGP برای انتشار SIDها استفاده می‌کند و ۲٬۰۰۰ روتر در یک دامنه IGP واحد همچنان باعث سنگینی LSDB و کندی همگرایی در روترهای مترو می‌شود؛ شکستن به دامنه‌های &lt;=۲۰۰ روتری با BGP-LU مقیاس و سرعت را تضمین می‌کند.</p><p><strong>تمرین ۲:</strong> چرا NTP برای همگام‌سازی دکل‌های ۵G TDD در Aria-Telecom کافی نیست؟ <strong>پاسخ:</strong> زیرا ۵G TDD نیازمند دقت فاز زیر ۱٫۵ میکروثانیه است که تنها با <strong>PTP IEEE 1588v2 + SyncE</strong> سخت‌افزاری تامین می‌شود نه NTP میلی‌ثانیه‌ای!</p>"
+  },
+  {
+   "id": "ccde_19-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8661\" target=\"_blank\" rel=\"noopener\">RFC 8661 (SR-MPLS Interworking with LDP)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc9350\" target=\"_blank\" rel=\"noopener\">RFC 9350 (IGP Flexible Algorithm for 5G Network Slicing)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> پرونده Aria-Telecom یک مطالعه موردی آموزشی در سبک آزمون عملی CCDE است و آزمایشگاه آن یک اعتبارسنج محلی Python 3 بدون اتصال به شبکه مخابراتی زنده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Aria-Telecom Capstone",
+   "fa": "مطالعه موردی جامع اپراتور ۵G",
+   "simple": "سناریوی نوسازی ۲٬۰۰۰ روتر مترو و ۵۰ هسته از LDP/VPLS به Seamless SR-MPLS، EVPN و ۵G Slicing."
+  },
+  {
+   "term": "Seamless / Unified SR-MPLS",
+   "fa": "SR-MPLS یکپارچه چنددامنه‌ای",
+   "simple": "تقسیم ۲٬۰۰۰ روتر به دامنه‌های IS-IS کوچک (<=200) و پیوند لیبل‌های آن‌ها با BGP-LU."
+  },
+  {
+   "term": "5G Network Slicing",
+   "fa": "برش منطقی شبکه برای ۵G",
+   "simple": "تفکیک تضمینی SLA روی یک فیبر مشترک (برش کم‌تاخیر URLLC جدا از برش پرحجم eMBB)."
+  },
+  {
+   "term": "URLLC vs eMBB",
+   "fa": "سرویس فوق‌کم‌تاخیر در برابر پهنای باند بالا",
+   "simple": "دو کلاس کلیدی ۵G که با Flex-Algo 128 (Delay) و Flex-Algo 129 (Bandwidth) جدا می‌شوند."
+  },
+  {
+   "term": "TI-LFA (100% Ring Protection)",
+   "fa": "بازیابی زیر ۵۰ms مستقل از توپولوژی",
+   "simple": "تضمین مسیر پشتیبان بدون حلقه در ۱۰۰٪ رینگ‌های مترو ۵G برخلاف LFA کلاسیک."
+  },
+  {
+   "term": "SRMS (Mapping Server)",
+   "fa": "سرور هم‌زیستی مهاجرت LDP به SR",
+   "simple": "تخصیص SID به روترهای قدیمی LDP-Only برای مهاجرت تدریجی رینگ-به-رینگ بدون قطعی."
+  },
+  {
+   "term": "PTP IEEE 1588v2 + SyncE",
+   "fa": "همگام‌سازی فاز و فرکانس میکروثانیه‌ای",
+   "simple": "الزام سخت‌افزاری حیاتی رینگ‌های ۵G TDD برای دقت زیر ۱٫۵ میکروثانیه (فراتر از NTP)."
+  },
+  {
+   "term": "Unified EVPN + L3VPN",
+   "fa": "یکپارچه‌سازی صفحه سرویس روی BGP",
+   "simple": "جایگزینی VPLS/Pseudowire قدیمی با EVPN Active/Active کنار L3VPN روی یک صفحه کنترل BGP."
+  },
+  {
+   "term": "TWAMP Delay Measurement",
+   "fa": "سنجش پیوسته تاخیر واقعی لینک‌ها",
+   "simple": "تغذیه متریک دقیق تاخیر لینک‌ها به IS-IS/Flex-Algo 128 و PCE برای مسیریابی واقعی کم‌تاخیر."
+  },
+  {
+   "term": "Closed-Loop Automation",
+   "fa": "اتوماسیون حلقه بسته با تله‌متری و PCE",
+   "simple": "تشخیص لحظه‌ای افت کیفیت فیبر توسط gNMI و هدایت خودکار مسیر ۵G به مسیر سالم توسط PCE."
+  },
+  {
+   "term": "Out-of-Band Specialized RRs",
+   "fa": "بازتاب‌دهنده‌های تخصصی خارج از مسیر داده",
+   "simple": "جداسازی کلاسترهای RR اینترنت از RR سرویس‌های VPN/EVPN جهت پایداری و مقیاس ۵میلیون‌مشترکی."
+  },
+  {
+   "term": "Model-Driven Orchestrator (NSO)",
+   "fa": "ارکستراتور سرویس مبتنی بر YANG",
+   "simple": "تولید خودکار و بدون خطای سرویس‌های L3VPN/EVPN روی ۲٬۰۰۰ روتر چندفروشنده‌ای."
+  },
+  {
+   "term": "Metro Ring Convergence",
+   "fa": "همگرایی سریع رینگ‌های شهری",
+   "simple": "تحقق بازیابی زیر ۵۰ms در توپولوژی‌های حلقوی مترو از طریق TI-LFA و BFD."
+  },
+  {
+   "term": "65%+ IXP/CDN Offload",
+   "fa": "تخلیه بیش از ۶۵٪ ترافیک روی IXP/CDN",
+   "simple": "اهرم اصلی سودآوری Aria-Telecom هم‌زمان با دو برابر شدن مصرف ترافیک ۵G."
+  },
+  {
+   "term": "MANRS + FlowSpec Scrubbing",
+   "fa": "سپر امنیتی مسیریابی و ضد DDoS اپراتور",
+   "simple": "حفظ یکپارچگی BGP (RPKI) و پاک‌سازی حملات حجمی بدون سیاه‌چاله کردن مشتریان تجاری."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (اعتبارسنج جامع ۵ ستون HLD نوسازی اپراتور ۵G Aria-Telecom) — بدون شبکه مخابراتی واقعی",
+   "executionStatus": "اسکریپت اعتبارسنجی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ شبکه مخابراتی یا دکل ۵G زنده متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اعتبارسنجی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر مخابراتی یا زیرساخت ۵G RAN واقعی در این محیط متصل نشده است.</p><p>این اعتبارسنج محلی، تمام ۵ ستون معماری نوسازی <strong>Aria-Telecom</strong> (۲٬۰۰۰ روتر مترو + ۵۰ هسته) را ممیزی می‌کند: (۱) مقیاس Unified SR-MPLS با سقف &lt;=۲۰۰ روتر در هر دامنه IS-IS، (۲) دو برش ۵G Flex-Algo + TI-LFA، (۳) یکپارچگی EVPN/L3VPN روی هسته BGP-Free، (۴) مهاجرت بی‌قطعی SRMS، و (۵) MANRS + ۶۵٪ IXP/CDN Offload.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_19_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_19_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_19 (CCDE Capstone Case Study 2: Aria-Telecom Service Provider &amp; 5G Modernization)\nValidates the end-to-end HLD for Aria-Telecom (2,000 Metro/Access + 50 Core routers, legacy LDP brownfield\nupgrading to Seamless SR-MPLS, EVPN, 5G URLLC/eMBB Flex-Algo slicing, TI-LFA &lt;50ms &amp; IXP/CDN offload).\nNo real telecom core or 5G RAN infrastructure is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef validate_aria_telecom_hld(design: dict) -&gt; dict:\n    checks = [\n        {\n            &quot;pillar&quot;: &quot;2,000-Router IGP Scale (Unified / Seamless SR-MPLS)&quot;,\n            &quot;pass&quot;: design[&quot;max_routers_per_igp_domain&quot;] &lt;= 300 and design[&quot;inter_domain_stitching&quot;] == &quot;bgp_lu_unified_sr&quot;,\n            &quot;note&quot;: &quot;Splits 2,000 metro rings into &lt;=300-node IS-IS domains stitched end-to-end via BGP-LU / SR-MPLS&quot;,\n        },\n        {\n            &quot;pillar&quot;: &quot;5G Network Slicing (URLLC &lt;10ms vs eMBB High-BW)&quot;,\n            &quot;pass&quot;: design[&quot;flex_algo_slices&quot;] &gt;= 2 and design[&quot;tilfa_enabled&quot;],\n            &quot;note&quot;: &quot;Flex-Algo 128 (Min-Delay for 5G URLLC) + Flex-Algo 129 (IGP/BW for eMBB) + 100% &lt;50ms TI-LFA!&quot;,\n        },\n        {\n            &quot;pillar&quot;: &quot;Unified L2/L3 Service Layer (EVPN + L3VPN over BGP-Free Core)&quot;,\n            &quot;pass&quot;: design[&quot;service_plane&quot;] == &quot;evpn_plus_l3vpn_bgp_free_core&quot;,\n            &quot;note&quot;: &quot;Replaces legacy VPLS/Pseudowire sprawl with unified BGP EVPN + L3VPN; P-routers stay BGP-Free&quot;,\n        },\n        {\n            &quot;pillar&quot;: &quot;Zero-Downtime Brownfield Migration (LDP -&gt; SR-MPLS)&quot;,\n            &quot;pass&quot;: design[&quot;migration_mechanism&quot;] == &quot;phased_srms_coexistence&quot;,\n            &quot;note&quot;: &quot;SR Mapping Server (SRMS) enables ring-by-ring migration without forklift outage for 5M subscribers&quot;,\n        },\n        {\n            &quot;pillar&quot;: &quot;Carrier Security &amp; Peering Economics (MANRS + IXP/CDN)&quot;,\n            &quot;pass&quot;: design[&quot;rpki_and_flowspec&quot;] and design[&quot;ixp_cdn_offload_pct&quot;] &gt;= 60,\n            &quot;note&quot;: &quot;RPKI ROV + FlowSpec/Scrubbing + &gt;=60% IXP/CDN offload protects core &amp; maximizes profit margin&quot;,\n        },\n    ]\n    return {\n        &quot;case_study&quot;: &quot;Aria-Telecom (2,000 Metro + 50 Core Routers | 5G Modernization)&quot;,\n        &quot;all_pillars_validated&quot;: all(c[&quot;pass&quot;] for c in checks),\n        &quot;pillars&quot;: checks,\n    }\n\n\ndef main() -&gt; None:\n    aria_hld = {\n        &quot;max_routers_per_igp_domain&quot;: 200,\n        &quot;inter_domain_stitching&quot;: &quot;bgp_lu_unified_sr&quot;,\n        &quot;flex_algo_slices&quot;: 2,\n        &quot;tilfa_enabled&quot;: True,\n        &quot;service_plane&quot;: &quot;evpn_plus_l3vpn_bgp_free_core&quot;,\n        &quot;migration_mechanism&quot;: &quot;phased_srms_coexistence&quot;,\n        &quot;rpki_and_flowspec&quot;: True,\n        &quot;ixp_cdn_offload_pct&quot;: 65,\n    }\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_CAPSTONE_ARIA_TELECOM&quot;,\n        &quot;validation_result&quot;: validate_aria_telecom_hld(aria_hld),\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> قبولی کامل <code>all_pillars_validated: True</code> در تمام ۵ ستون نوسازی مخابراتی ۵G.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>خلاصه اجرایی معماری تاییدشده Aria-Telecom (الگوی مرجع HLD):</strong></p><pre dir=\"ltr\"><code># Aria-Telecom Approved 5G SP Modernization HLD\nScale    : 2,000 Metro split into &lt;=200-node IS-IS domains + BGP-LU Unified SR-MPLS\n5G Slice : Flex-Algo 128 (TWAMP Delay URLLC) + Flex-Algo 129 (BW eMBB) + TI-LFA &lt;50ms\nTiming   : Hardware SyncE + PTP IEEE 1588v2 Boundary Clock across all 5G RAN rings\nServices : Unified BGP EVPN + L3VPN over BGP-Free Core | Phased SRMS LDP-&gt;SR Migration</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون مطالعه موردی جامع ۲ CCDE (نوسازی اپراتور ۵G Aria-Telecom)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در نوسازی شبکه ۲٬۰۰۰روتری Aria-Telecom، چرا تمام ۲٬۰۰۰ روتر در یک دامنه IS-IS واحد قرار داده نشدند و چه معماری‌ای جایگزین شد؟",
+   "options": [
+    "قرار دادن ۲٬۰۰۰ روتر در یک دامنه IGP باعث انفجار LSDB و کندی SPF در روترهای مترو می‌شود؛ راه‌حل تقسیم به دامنه‌های کوچک IS-IS (<=200 روتر) و اتصال لیبل‌شده با BGP-LU (Unified SR-MPLS) است",
+    "زیرا IS-IS حداکثر ۱۰ روتر پشتیبانی می‌کند",
+    "باید همه را با RIPv2 وصل می‌کردیم",
+    "همه باید در یک OSPF Area 0 می‌ماندند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Unified/Seamless SR-MPLS با BGP-LU راه‌حل استاندارد جهانی مقیاس شبکه‌های چندهزارروتری مخابراتی است.</p>"
+  },
+  {
+   "title": "چگونه Aria-Telecom بدون ذخیره هزاران تونل Stateful RSVP-TE در هسته، دو برش ۵G URLLC (کم‌تاخیر) و eMBB (پهنای باند بالا) را تفکیک می‌کند؟",
+   "options": [
+    "با PBR دستی روی همه ۲٬۰۰۰ روتر",
+    "با SR-MPLS Flex-Algo 128 (متریک تاخیر واقعی TWAMP برای URLLC) و Flex-Algo 129 (متریک IGP/BW برای eMBB) با صفر State در هسته!",
+    "با خرید دو شبکه فیزیکی کاملاً جداگانه در کل کشور",
+    "با خاموش کردن QoS"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Flex-Algo (RFC 9350) برش شبکه ۵G را با سادگی، مقیاس‌پذیری و دقت تاخیر واقعی ممکن می‌سازد.</p>"
+  },
+  {
+   "title": "کدام مکانیزم امکان مهاجرت تدریجی بدون قطعی (رینگ-به-رینگ) از LDP به SR-MPLS را برای صدها روتر قدیمی LDP-Only در Aria-Telecom فراهم می‌کند؟",
+   "options": [
+    "خاموش کردن یک‌شبه LDP در کل کشور",
+    "SRMS (Segment Routing Mapping Server — RFC 8661) جهت هم‌زیستی مسالمت‌آمیز و ترجمه لیبل میان روترهای LDP و SR-MPLS",
+    "حذف MPLS در حین مهاجرت",
+    "فقط تغییر نام روترها"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>SRMS کلید طلایی مهاجرت Brownfield در اپراتورهای واقعی بدون قطعی سرویس میلیون‌ها مشترک است.</p>"
+  },
+  {
+   "title": "کدام الزام سخت‌افزاری پنهان ۵G TDD در رینگ‌های مترو Aria-Telecom با NTP معمولی قابل تامین نیست؟",
+   "options": [
+    "همگام‌سازی فاز و فرکانس زیر ۱٫۵ میکروثانیه از طریق PTP IEEE 1588v2 (Boundary Clock) + SyncE",
+    "تغییر سرعت پورت به ۱۰۰ مگابیت",
+    "نصب فایروال روی آنتن",
+    "پروتکل Telnet"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>فراموش کردن PTP 1588v2 + SyncE در طراحی حمل‌ونقل ۵G منجر به تداخل رادیویی شدید میان دکل‌های مجاور می‌شود!</p>"
+  },
+  {
+   "title": "چرا در توپولوژی‌های حلقوی (Metro Rings) Aria-Telecom، TI-LFA بر LFA کلاسیک برتری مطلق دارد؟",
+   "options": [
+    "زیرا LFA کلاسیک در توپولوژی‌های رینگ اغلب مسیر پشتیبان بدون حلقه پیدا نمی‌کند، اما TI-LFA با پشته لیبل SR حفاظت ۱۰۰٪ زیر ۵۰ میلی‌ثانیه روی هر توپولوژی می‌دهد",
+    "زیرا TI-LFA هیچ نیازی به IGP ندارد",
+    "زیرا LFA زیر ۱۰ ثانیه کار نمی‌کند",
+    "هیچ تفاوتی ندارند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>پوشش ۱۰۰٪ توپولوژی با بازیابی زیر ۵۰ms دلیل اصلی انتخاب TI-LFA برای SLAهای ۵G URLLC است.</p>"
+  },
+  {
+   "title": "چرا Aria-Telecom سرویس‌های قدیمی VPLS/Pseudowire را با BGP EVPN کنار L3VPN جایگزین کرد؟",
+   "options": [
+    "برای یکپارچه‌سازی همه سرویس‌های L2/L3 روی یک صفحه کنترل مقیاس‌پذیر BGP، حذف Flooding سنگین، و دستیابی به Active/Active Multi-Homing بدون STP",
+    "زیرا EVPN فقط لایه ۱ است",
+    "برای افزایش ترافیک Broadcast",
+    "برای حذف BGP از شبکه"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>یکپارچه‌سازی صفحه سرویس روی EVPN + L3VPN هزینه‌های عملیاتی (OpEx) نگهداری چند فناوری موازی را ریشه‌کن می‌کند.</p>"
+  },
+  {
+   "title": "نقش ۶۵٪+ IXP Peering و کش‌های محلی CDN در پرونده اقتصادی Aria-Telecom چیست؟",
+   "options": [
+    "افزایش وابستگی به لینک گران Tier-1 Transit",
+    "برداشتن اکثریت ترافیک ویدیو و محتوای ۵G از دوش لینک گران Transit برای حفظ حاشیه سود اپراتور و کاهش تاخیر کاربران",
+    "قطع دسترسی به اینترنت جهانی",
+    "جایگزینی روترهای مترو"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>با رشد شدید مصرف داده ۵G، بدون IXP و کش محلی CDN، هزینه Transit تمام سود فروش بسته‌های ۵G را می‌بلعد!</p>"
+  },
+  {
+   "title": "چگونه معماری Aria-Telecom از ۵۰ روتر هسته (P-Routers) در برابر سرریز جدول ۱ میلیون مسیر اینترنت و هزاران VRF محافظت می‌کند؟",
+   "options": [
+    "حفظ معماری BGP-Free Core (روترهای P صرفاً برچسب‌های SR/BGP-LU را جابه‌جا می‌کنند) همراه با کلاسترهای Route Reflector مجزا خارج از مسیر داده",
+    "نصب جدول کامل اینترنت روی همه ۵۰ روتر P",
+    "حذف BGP از لبه ASBR",
+    "استفاده از Static Route روی هسته"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>BGP-Free Core در کنار RRهای تخصصی، هسته را فوق‌سریع، ارزان‌تر و پایدار نگه می‌دارد.</p>"
+  },
+  {
+   "title": "نقش TWAMP در برش ۵G URLLC (Flex-Algo 128) چیست؟",
+   "options": [
+    "اندازه‌گیری پیوسته تاخیر واقعی فیزیکی لینک‌ها و تغذیه آن به IS-IS/PCE تا مسیر URLLC همیشه واقعی‌ترین مسیر کم‌تاخیر را انتخاب کند",
+    "رمزنگاری پیامک‌های مشترکان",
+    "تخصیص شماره سیم‌کارت",
+    "جایگزینی BGP"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>مسیریابی مبتنی بر تاخیر واقعی اندازه‌گیری‌شده (Performance Measurement / TWAMP) اساس تضمین SLA در ۵G است.</p>"
+  },
+  {
+   "title": "چرا در Aria-Telecom برای مهار حملات DDoS روی مشتریان تجاری از BGP FlowSpec + Scrubbing Center به جای صرفاً RTBH استفاده می‌شود؟",
+   "options": [
+    "زیرا RTBH کل ترافیک مشروع و مخرب مشتری را سیاه‌چاله (قطع کامل) می‌کند، اما FlowSpec و Scrubbing ترافیک حمله را پاک کرده و سرویس SLAدار مشتری را زنده نگه می‌دارند",
+    "زیرا FlowSpec رایگان‌تر از قطع کابل است",
+    "زیرا RTBH روی IPv4 کار نمی‌کند",
+    "تفاوتی ندارند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>در شبکه اپراتوری، حفظ تداوم سرویس مشتریان تجاری تحت حمله یک مزیت رقابتی و درآمدزا است.</p>"
+  },
+  {
+   "title": "نقش ارکستراتور مبتنی بر مدل (مانند NSO/YANG) و اتوماسیون حلقه بسته (Telemetry + PCE) در مقیاس ۲٬۰۰۰ روتر Aria-Telecom چیست؟",
+   "options": [
+    "حذف کانفیگ دستی پرخطا برای سرویس‌های L3VPN/EVPN و واکنش خودکار ثانیه‌ای به افت کیفیت لینک‌ها برای حفظ SLA برش‌های ۵G",
+    "جایگزینی کل کابل‌های فیبر",
+    "خاموش کردن مانیتورینگ",
+    "افزایش زمان تحویل سرویس به ۳ ماه"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>اتوماسیون حلقه بسته (Closed-Loop) تنها راه اداره سودآور یک شبکه ۵G دوهزارروتری است.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "اتصال زنده به هسته یک اپراتور ۵G واقعی",
+    "مهاجرت واقعی ۲٬۰۰۰ روتر مترو",
+    "فقط متن نظری بدون کد",
+    "اعتبارسنجی محلی (Local Mock) در Python 3 برای ممیزی ۵ ستون جامع HLD نوسازی اپراتور Aria-Telecom"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ شبکه مخابراتی واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccde_19",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc8661",
+   "https://www.rfc-editor.org/rfc/rfc9350"
+  ],
+  "limitations": [
+   "پرونده Aria-Telecom یک مطالعه موردی آموزشی در سبک CCDE است و آزمایشگاه آن یک اعتبارسنج محلی Python 3 بدون اتصال به زیرساخت مخابراتی واقعی است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش مطالعه موردی Aria-Telecom نسخه قدیمی به ۱۴ بخش جامع، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، PTP 1588v2/SyncE، TWAMP، Closed-Loop Automation و اعتبارسنج ۵-ستونه Python."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccde_19-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccde",
+   "recommendedCourse": "ccde-design",
+   "blueprint": "/academy-assets/v5/blueprints/ccde_19.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_19_lab.py"
+  }
+ }
+}

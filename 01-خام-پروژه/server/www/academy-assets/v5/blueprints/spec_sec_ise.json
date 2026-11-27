@@ -1,0 +1,338 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "spec_sec_ise",
+ "objectiveId": "spec_sec_ise",
+ "kind": "lesson",
+ "track": "Specialist",
+ "course": "spec-security",
+ "title": "۷.۲ Security: معماری خوشه‌ای Cisco ISE، مدیریت دستگاه با TACACS+، Posture و pxGrid",
+ "titleEn": "Security Deep Dive: Cisco ISE Distributed Architecture, TACACS+ Device Admin, Posture & pxGrid",
+ "domain": "Network Security",
+ "source": "Legacy spec_sec_ise rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [
+  "spec_sec"
+ ],
+ "sections": [
+  {
+   "id": "spec_sec_ise-section-1",
+   "title": "مسئله واقعی: چرا یک سرور تکی Cisco ISE در سازمان چند‌هزارنفری به تک‌نقطه خرابی و گلوگاه تبدیل می‌شود؟",
+   "html": "<p>در یک سازمان با ۱۰٬۰۰۰ نقطه پایانی، اگر تمام وظایف مدیریتی، ثبت لاگ، احراز هویت 802.1X/MAB، بررسی سلامت دستگاه (Posture)، کنترل دستورات CLI مهندسان (TACACS+) و اشتراک‌گذاری اطلاعات با فایروال روی یک سرور تکی ISE باشد، هنگام ارتقا یا خرابی آن کل دسترسی شبکه متوقف می‌شود! <strong>معماری توزیع‌شده (Distributed Deployment) Cisco ISE</strong> وظایف را به چهار نقش (Persona) تفکیک می‌کند تا هم مقیاس‌پذیری افقی و هم دسترس‌پذیری بدون تک‌نقطه خرابی (HA) فراهم گردد.</p>"
+  },
+  {
+   "id": "spec_sec_ise-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> مبانی 802.1X، MAB و RADIUS CoA در درس <code>spec_sec</code>.</p><ul><li>تفکیک دقیق چهار نقش خوشه Cisco ISE: <strong>PAN</strong>، <strong>MnT</strong>، <strong>PSN</strong> و <strong>pxGrid</strong>.</li><li>تبیین چرایی استفاده از <strong>TACACS+ (TCP 49)</strong> به جای <strong>RADIUS</strong> برای مدیریت دستگاه‌ها (Device Administration) و کنترل تک‌تک دستورات CLI.</li><li>کالبدشکافی چرخه <strong>Posture Assessment</strong> (تأیید سلامت آنتی‌ویروس/وصله‌ها با Cisco Secure Client و CoA از قرنطینه به دسترسی کامل).</li><li>درک کاربرد <strong>pxGrid</strong> در تبادل لحظه‌ای زمینه (User/IP/SGT/Posture) میان ISE، فایروال FTD، Catalyst Center و SIEM/SOAR.</li></ul>"
+  },
+  {
+   "id": "spec_sec_ise-section-3",
+   "title": "کالبدشکافی چهار نقش (Persona) در خوشه توزیع‌شده Cisco ISE",
+   "html": "<ul><li><strong>PAN (Policy Administration Node):</strong> مغز مدیریتی و کنسول وب تنظیم سیاست‌ها (حداکثر ۲ نود: Primary و Secondary برای Failover). اگر PAN موقتاً قطع شود، PSNها همچنان به احراز هویت کاربران ادامه می‌دهند!</li><li><strong>MnT (Monitoring and Troubleshooting Node):</strong> جمع‌آوری و نگهداری لاگ‌های زنده (Live Logs)، گزارش‌ها و هشدارها (حداکثر ۲ نود: Primary و Secondary).</li><li><strong>PSN (Policy Service Node):</strong> <strong>موتور عملیاتی خط مقدم</strong> که مستقیماً ترافیک <code>802.1X</code>، <code>MAB</code>، <code>RADIUS CoA</code>، <code>Posture</code>، <code>Guest Portal</code> و <code>TACACS+</code> تجهیزات را پردازش می‌کند و به‌صورت افقی (مثلاً ۴ تا ۵۰ نود پشت Load Balancer یا محلی در سایت‌های بزرگ) مقیاس می‌گیرد.</li><li><strong>pxGrid Node:</strong> گذرگاه انتشار/اشتراک (Publish/Subscribe) اطلاعات زمینه میان ISE و اکوسیستم امنیتی سازمان.</li></ul>"
+  },
+  {
+   "id": "spec_sec_ise-section-4",
+   "title": "نمودار معماری خوشه‌ای Cisco ISE و جریان TACACS+ / Posture / pxGrid",
+   "html": "<p>نمودار زیر تفکیک چهار نقش ISE و ارتباط آن‌ها با تجهیزات شبکه و فایروال‌ها را نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco ISE Distributed Deployment: PAN, MnT, PSN, TACACS+, Posture and pxGrid\"><rect x=\"14\" y=\"16\" width=\"166\" height=\"90\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"97\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">PAN (Primary/Sec)</text><text x=\"97\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Admin UI &amp; Policy Config</text><text x=\"97\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Replicates to Nodes</text><rect x=\"196\" y=\"16\" width=\"166\" height=\"90\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"279\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">MnT (Primary/Sec)</text><text x=\"279\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Live Logs &amp; Reports</text><text x=\"279\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">Troubleshooting &amp; Alarms</text><rect x=\"378\" y=\"16\" width=\"180\" height=\"90\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"468\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">PSN Pool (Load-Balanced)</text><text x=\"468\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">RADIUS 802.1X / MAB / CoA</text><text x=\"468\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">TACACS+ (TCP 49) &amp; Posture</text><rect x=\"574\" y=\"16\" width=\"172\" height=\"90\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"660\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">pxGrid Node</text><text x=\"660\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Context Pub/Sub Bus</text><text x=\"660\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">User/IP/SGT -&gt; FTD/DNAC</text><rect x=\"14\" y=\"136\" width=\"732\" height=\"68\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"380\" y=\"160\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f172a\">Network Enforcement &amp; Ecosystem Consumers</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Catalyst Switches / WLC (RADIUS/CoA) | Routers (TACACS+ Per-Cmd) | Secure Firewall FTD &amp; SIEM (pxGrid)</text><line x1=\"468\" y1=\"106\" x2=\"468\" y2=\"136\" stroke=\"#15803d\" stroke-width=\"2\"/><line x1=\"660\" y1=\"106\" x2=\"660\" y2=\"136\" stroke=\"#4338ca\" stroke-width=\"2\"/></svg>"
+  },
+  {
+   "id": "spec_sec_ise-section-5",
+   "title": "چرا TACACS+ (نه RADIUS) برای مدیریت CLI مهندسان روی روترها و سوئیچ‌ها استاندارد است؟",
+   "html": "<table><thead><tr><th>ویژگی</th><th>TACACS+ (RFC 8907)</th><th>RADIUS (RFC 2865/2866)</th></tr></thead><tbody><tr><td>پروتکل و پورت</td><td><strong>TCP 49</strong> (ارتباط مطمئن)</td><td>UDP 1812/1813 (یا RadSec روی TCP/TLS 2083)</td></tr><tr><td>رمزنگاری بدنه بسته</td><td><strong>کل بدنه بسته</strong> (پس از هدر TACACS+)</td><td>فقط فیلد رمز عبور در RADIUS سنتی</td></tr><tr><td>تفکیک AAA</td><td><strong>تفکیک کامل</strong> AuthN، AuthZ و Accounting</td><td>ترکیب AuthN و AuthZ در یک پاسخ</td></tr><tr><td>کنترل تک‌تک دستورات CLI</td><td><strong>بله (Command Authorization)</strong> — مثلاً اجازه <code>show</code> ولی منع <code>reload</code> یا <code>conf t</code></td><td>خیر (فقط سطح امتیاز کلی مثل Privilege 15)</td></tr><tr><td>کاربرد اصلی در ISE</td><td><strong>Device Administration</strong> (مدیران شبکه)</td><td><strong>Network Access</strong> (802.1X / MAB / VPN)</td></tr></tbody></table>"
+  },
+  {
+   "id": "spec_sec_ise-section-6",
+   "title": "چرخه ارزیابی سلامت دستگاه (Posture Assessment) و گذار با CoA",
+   "html": "<p>احراز هویت کاربری (802.1X) ثابت می‌کند کاربر «علی» است، اما ثابت نمی‌کند لپ‌تاپ علی آنتی‌ویروس به‌روز دارد یا به باج‌افزار آلوده نیست! چرخه <strong>Posture</strong> این خلأ را پر می‌کند:</p><ol><li>کلاینت ابتدا احراز هویت 802.1X می‌شود اما وضعیت Posture هنوز <code>Unknown</code> است -> ISE یک <strong>Redirect URL / dACL محدود</strong> اعمال می‌کند که فقط دسترسی به پورتال Posture و سرورهای آپدیت را می‌دهد.</li><li>ماژول Posture در <strong>Cisco Secure Client</strong> (یا Temporal Agent) وضعیت آنتی‌ویروس، رمزنگاری دیسک (BitLocker) و وصله‌های سیستم‌عامل را به PSN گزارش می‌دهد.</li><li>اگر <code>Non-Compliant</code> باشد کاربر به Remediation (نصب آپدیت) هدایت می‌شود؛ به محض رسیدن به وضعیت <code>Compliant</code>، نود PSN یک پیام <strong>RADIUS CoA</strong> به سوئیچ/WLC می‌فرستد تا دسترسی کامل سازمانی (و SGT اصلی) باز شود!</li></ol>"
+  },
+  {
+   "id": "spec_sec_ise-section-7",
+   "title": "قدرت اکوسیستم pxGrid: تبدیل ISE به مغز زمینه (Context) برای کل امنیت سازمان",
+   "html": "<p><strong>pxGrid (Platform Exchange Grid، نسخه 2.0 مبتنی بر WebSockets/STOMP روی TLS)</strong> باعث می‌شود ابزارهای امنیتی سازمان جزیره‌ای کار نکنند: ISE به محض ورود کاربر، نگاشت لحظه‌ای <code>(User -> IP -> MAC -> Device Profile -> Posture -> SGT)</code> را از طریق pxGrid به <strong>Cisco Secure Firewall (FTD/FMC)</strong>، <strong>Catalyst Center</strong>، <strong>Stealthwatch/SNA</strong> و <strong>SIEM/SOAR</strong> منتشر می‌کند. همچنین در جهت معکوس، اگر SIEM/EDR تشخیص دهد یک لپ‌تاپ آلوده شده است، از طریق API <strong>ANC (Adaptive Network Control)</strong> روی pxGrid به ISE فرمان <strong>Quarantine</strong> می‌دهد تا پورت سوئیچ آن لپ‌تاپ در چند ثانیه ایزوله شود!</p>"
+  },
+  {
+   "id": "spec_sec_ise-section-8",
+   "title": "طراحی Policy Sets در ISE: ترتیب ارزیابی Top-Down و تله اولویت قوانین",
+   "html": "<p>در Cisco ISE (بخش Policy Sets)، قوانین از بالا به پایین (<strong>First-Match</strong>) ارزیابی می‌شوند. در هر Policy Set دو بخش اصلی داریم: <strong>Authentication Policy</strong> (چگونه هویت تأیید شود — مثلاً AD، گواهینامه PKI یا Internal) و <strong>Authorization Policy</strong> (بر اساس عضویت گروه AD، نوع تجهیز Profiling و وضعیت Posture چه dACL، VLAN یا SGT اعمال شود). اشتباه کلاسیک: گذاشتن یک قانون خیلی کلی در بالای لیست که قوانین دقیق‌تر زیرین را Shadow (بی‌اثر) می‌کند!</p>"
+  },
+  {
+   "id": "spec_sec_ise-section-9",
+   "title": "طراحی بدون تک‌نقطه خرابی (HA) و رفتار Fail-Open / Inaccessible Auth Bypass",
+   "html": "<p>در طراحی واقعی نباید فرض کرد PSNها هرگز قطع نمی‌شوند: (۱) قرار دادن حداقل ۲ PSN در هر دیتاسنتر (با Load Balancer و قابلیت <strong>Session Persistence / RADIUS Calling-Station-ID stickiness</strong> تا تمام بسته‌های یک نشست EAP و Posture به همان PSN برسند!)؛ و (۲) تنظیم <strong>Critical Authentication (Inaccessible Auth Bypass)</strong> روی سوئیچ‌های Access تا در صورت قطعی کامل WAN و از دست رفتن همه PSNها، کاربران دفتر در VLAN اضطراری کار خود را ادامه دهند و کل شعبه فلج نشود.</p>"
+  },
+  {
+   "id": "spec_sec_ise-section-10",
+   "title": "Profiling دستگاه‌های فاقد 802.1X (چاپگرها، دوربین‌ها و IoT)",
+   "html": "<p>بسیاری از چاپگرها، دوربین‌های مداربسته و تجهیزات پزشکی از 802.1X پشتیبانی نمی‌کنند و با <strong>MAB</strong> وارد می‌شوند. برای جلوگیری از جعل MAC (MAC Spoofing)، از <strong>ISE Profiling</strong> (جمع‌آوری Probeهای DHCP، CDP/LLDP، HTTP، SNMP و NMAP) همراه با شرط <strong>Anomalous Behaviour Detection</strong> استفاده می‌شود تا اگر فردی MAC یک چاپگر HP را روی لپ‌تاپ لینوکسی جعل کرد، ناهماهنگی اثر انگشت سیستم‌عامل کشف و دسترسی مسدود گردد.</p>"
+  },
+  {
+   "id": "spec_sec_ise-section-11",
+   "title": "کژفهمی‌های رایج درباره Cisco ISE و TACACS+",
+   "html": "<ul><li><strong>کژفهمی ۱: «اگر سرور PAN از دسترس خارج شود، تمام کاربران در شبکه قطع می‌شوند.»</strong> واقعیت: خیر؛ PAN صرفاً مدیریت و ویرایش سیاست‌ها را بر عهده دارد و تا زمانی که PSNها زنده‌اند، احراز هویت کاربران بدون اختلال ادامه می‌یابد.</li><li><strong>کژفهمی ۲: «برای کنترل تک‌تک دستورات CLI مهندسان می‌توانیم به‌راحتی از RADIUS استفاده کنیم.»</strong> واقعیت: RADIUS استاندارد فاقد Command-by-Command Authorization است؛ برای کنترل دقیق دستورات CLI و Accounting هر دستور باید از <strong>TACACS+</strong> استفاده کرد.</li><li><strong>کژفهمی ۳: «پیکربندی Load Balancer جلوی PSNها مثل وب‌سرور ساده Round-Robin است.»</strong> واقعیت: خیر؛ نشست‌های EAP و Posture چندین رفت‌وبرگشت دارند و باید با <strong>Stickiness (بر اساس Calling-Station-ID / Framed-IP)</strong> همه بسته‌های یک کلاینت به یک PSN واحد هدایت شوند.</li></ul>"
+  },
+  {
+   "id": "spec_sec_ise-section-12",
+   "title": "عیب‌یابی پرتکرار در ISE (Live Logs، AD Join و TACACS+ Lockout)",
+   "html": "<p><strong>تله ۱ — قفل شدن مدیر بیرون از روتر هنگام تست TACACS+:</strong> همیشه در خطوط <code>aaa authentication login</code> کلیدواژه <strong><code>local</code></strong> را به عنوان Fallback برای زمانی که سرورهای TACACS+ <em>در دسترس نیستند</em> قرار دهید (و هنگام تست اولیه یک نشست SSH باز دیگر را نگه دارید تا در صورت خطا دسترسی را برگردانید).</p><p><strong>تله ۲ — شکست احراز هویت Active Directory:</strong> بیشترین علل: اختلاف ساعت NTP بیش از ۵ دقیقه (شکست Kerberos)، خطای DNS یا مسدود بودن پورت‌های AD روی فایروال میان PSN و Domain Controller.</p>"
+  },
+  {
+   "id": "spec_sec_ise-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> مهندس Helpdesk با TACACS+ وارد روتر شده و دستور <code>show ip interface brief</code> و سپس <code>configure terminal</code> را می‌زند؛ مهندس ارشد <code>configure terminal</code> و سپس <code>reload</code> را می‌زند. با سیاست حداقل دسترسی کدام‌ها مجاز و کدام‌ها رد می‌شوند؟ <strong>پاسخ:</strong> برای Helpdesk فقط <code>show</code> مجاز و <code>configure terminal</code> رد می‌شود؛ برای Net-Admin دستور <code>configure terminal</code> مجاز اما <code>reload</code> مسدود می‌گردد.</p><p><strong>تمرین ۲:</strong> لپ‌تاپ کارمندی با آنتی‌ویروس منقضی وصل می‌شود و پس از ۱۰ دقیقه آنتی‌ویروس را به‌روزرسانی می‌کند. چه تغییری در SGT و pxGrid رخ می‌دهد؟ <strong>پاسخ:</strong> ابتدا با <code>Non-Compliant</code> در SGT قرنطینه (مثلاً ۹۹) و dACL محدود قرار می‌گیرد؛ پس از به‌روزرسانی، PSN پیام CoA می‌فرستد، وضعیت به <code>Compliant</code> و SGT سازمانی (۱۰) تغییر کرده و نگاشت جدید فوری روی pxGrid به فایروال FTD منتشر می‌شود.</p>"
+  },
+  {
+   "id": "spec_sec_ise-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/security/ise/3-3/admin_guide/b_ise_admin_3_3.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی مدیریت Cisco ISE 3.3</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8907\" target=\"_blank\" rel=\"noopener\">RFC 8907 (TACACS+ Protocol)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سرور واقعی Cisco ISE، فایروال FTD یا روتر متصل به TACACS+ در این محیط اجرا نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "PAN",
+   "fa": "گره مدیریت سیاست ISE",
+   "simple": "Policy Administration Node؛ رابط مدیریتی و پیکربندی سیاست‌های کل خوشه ISE."
+  },
+  {
+   "term": "MnT",
+   "fa": "گره پایش و عیب‌یابی ISE",
+   "simple": "Monitoring and Troubleshooting Node؛ ذخیره Live Logs، گزارش‌ها و هشدارهای خوشه."
+  },
+  {
+   "term": "PSN",
+   "fa": "گره سرویس سیاست ISE",
+   "simple": "Policy Service Node؛ موتور خط مقدم پردازش 802.1X، MAB، Posture، CoA و TACACS+."
+  },
+  {
+   "term": "pxGrid",
+   "fa": "گذرگاه تبادل زمینه",
+   "simple": "Platform Exchange Grid؛ تبادل لحظه‌ای اطلاعات User/IP/SGT/Posture میان ISE و FTD/SIEM/DNAC."
+  },
+  {
+   "term": "TACACS+ (RFC 8907)",
+   "fa": "پروتکل TACACS+",
+   "simple": "پروتکل TCP 49 با تفکیک کامل AAA و رمزنگاری کل بدنه، استاندارد مدیریت دستورات CLI تجهیزات."
+  },
+  {
+   "term": "Command Authorization",
+   "fa": "مجوزدهی تک‌دستوری",
+   "simple": "قابلیت TACACS+ برای اجازه یا منع تک‌تک دستورات CLI بر اساس نقش مدیر."
+  },
+  {
+   "term": "Posture Assessment",
+   "fa": "ارزیابی سلامت نقطه پایانی",
+   "simple": "بررسی وضعیت آنتی‌ویروس، رمزنگاری و وصله‌های سیستم‌عامل پیش از اعطای دسترسی کامل."
+  },
+  {
+   "term": "Remediation dACL",
+   "fa": "لیست دسترسی قرنطینه/اصلاح",
+   "simple": "دسترسی محدود اولیه برای دستگاه Non-Compliant جهت اتصال صرفاً به سرورهای آپدیت."
+  },
+  {
+   "term": "ANC (Adaptive Network Control)",
+   "fa": "کنترل تطبیقی قرنطینه",
+   "simple": "قرنطینه آنی یک نقطه پایانی آلوده از طریق API/pxGrid (مثلاً به درخواست SIEM/EDR)."
+  },
+  {
+   "term": "ISE Profiling",
+   "fa": "شناسایی نوع تجهیز",
+   "simple": "تشخیص خودکار نوع دستگاه‌های IoT/چاپگر از طریق Probeهای DHCP/CDP/HTTP/SNMP."
+  },
+  {
+   "term": "Policy Set",
+   "fa": "مجموعه سیاست ISE",
+   "simple": "گروه‌بندی قوانین Authentication و Authorization با ارزیابی ترتیبی از بالا به پایین."
+  },
+  {
+   "term": "Calling-Station-ID Stickiness",
+   "fa": "چسبندگی نشست Load Balancer",
+   "simple": "هدایت همه بسته‌های یک نشست 802.1X/Posture به همان PSN برای جلوگیری از شکست EAP."
+  },
+  {
+   "term": "Critical Auth (Fail-Open)",
+   "fa": "احراز اضطراری در قطعی ISE",
+   "simple": "اعطای دسترسی به VLAN اضطراری روی سوئیچ در صورت غیرقابل دسترس شدن کامل PSNها."
+  },
+  {
+   "term": "Local Fallback",
+   "fa": "بازگشت به حساب محلی",
+   "simple": "نگه داشتن اکانت محلی اضطراری در AAA روتر صرفاً برای زمان قطع کامل سرورهای TACACS+."
+  },
+  {
+   "term": "SGT (Security Group Tag)",
+   "fa": "برچسب گروه امنیتی",
+   "simple": "شناسه منطقی نقش کاربر/تجهیز در TrustSec مستقل از IP، قابل انتشار روی pxGrid."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (مجوزدهی تک‌دستوری TACACS+، گذار Posture CoA و انتشار pxGrid) — سرور ISE واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سرور واقعی Cisco ISE یا فایروال FTD متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور واقعی Cisco ISE، اکتیو دایرکتوری یا فایروال FTD در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی دو منطق کلیدی Cisco ISE را آزمون می‌کند: (۱) مجوزدهی تک‌تک دستورات CLI با <strong>TACACS+</strong> برای نقش‌های <code>helpdesk</code> و <code>net-admin</code>، و (۲) گذار یک لپ‌تاپ از وضعیت <code>Non-Compliant</code> (قرنطینه SGT 99) به <code>Compliant</code> (SGT 10 با CoA) همراه انتشار زمینه روی <strong>pxGrid</strong>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_sec_ise_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_sec_ise_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — spec_sec_ise: Cisco ISE Personas, TACACS+ Per-Command AuthZ,\nPosture CoA Transition &amp; pxGrid Context Exchange Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of ISE distributed roles,\nTACACS+ command-level RBAC, Posture quarantine-to-compliant CoA, and pxGrid\npublishing to FTD. No live Cisco ISE appliance connected.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\nTACACS_SHELL_POLICY = {\n    &quot;helpdesk&quot;: {&quot;allow_prefixes&quot;: (&quot;show &quot;,), &quot;deny_prefixes&quot;: (&quot;configure &quot;, &quot;reload&quot;, &quot;debug &quot;)},\n    &quot;net-admin&quot;: {&quot;allow_prefixes&quot;: (&quot;show &quot;, &quot;configure &quot;, &quot;copy &quot;), &quot;deny_prefixes&quot;: (&quot;reload&quot;,)},\n}\n\n\ndef tacacs_authorize_command(role: str, command: str) -&gt; bool:\n    pol = TACACS_SHELL_POLICY.get(role, {&quot;allow_prefixes&quot;: (), &quot;deny_prefixes&quot;: ()})\n    if any(command.startswith(d) for d in pol[&quot;deny_prefixes&quot;]):\n        return False\n    return any(command.startswith(a) for a in pol[&quot;allow_prefixes&quot;])\n\n\ndef evaluate_posture_and_pxgrid(user: str, ip: str, av_updated: bool, os_patched: bool) -&gt; dict:\n    compliant = av_updated and os_patched\n    if compliant:\n        return {\n            &quot;posture_status&quot;: &quot;Compliant&quot;,\n            &quot;coa_action&quot;: &quot;Reauthenticate -&gt; Full Corp Access&quot;,\n            &quot;sgt&quot;: 10,\n            &quot;pxgrid_topic_published&quot;: {&quot;user&quot;: user, &quot;ip&quot;: ip, &quot;sgt&quot;: 10, &quot;posture&quot;: &quot;Compliant&quot;},\n        }\n    return {\n        &quot;posture_status&quot;: &quot;Non-Compliant&quot;,\n        &quot;coa_action&quot;: &quot;Apply Remediation dACL (AV/Patch Server Only)&quot;,\n        &quot;sgt&quot;: 99,\n        &quot;pxgrid_topic_published&quot;: {&quot;user&quot;: user, &quot;ip&quot;: ip, &quot;sgt&quot;: 99, &quot;posture&quot;: &quot;Non-Compliant&quot;},\n    }\n\n\ndef main() -&gt; None:\n    assert tacacs_authorize_command(&quot;helpdesk&quot;, &quot;show ip interface brief&quot;) is True\n    assert tacacs_authorize_command(&quot;helpdesk&quot;, &quot;configure terminal&quot;) is False\n    assert tacacs_authorize_command(&quot;net-admin&quot;, &quot;configure terminal&quot;) is True\n    assert tacacs_authorize_command(&quot;net-admin&quot;, &quot;reload&quot;) is False\n\n    before = evaluate_posture_and_pxgrid(&quot;ali@corp&quot;, &quot;10.20.1.55&quot;, av_updated=False, os_patched=True)\n    after = evaluate_posture_and_pxgrid(&quot;ali@corp&quot;, &quot;10.20.1.55&quot;, av_updated=True, os_patched=True)\n    assert before[&quot;sgt&quot;] == 99 and after[&quot;sgt&quot;] == 10\n\n    print(&quot;=== spec_sec_ise TACACS+, Posture &amp; pxGrid Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;tacacs_helpdesk_show&quot;: True,\n        &quot;tacacs_helpdesk_conf_t&quot;: False,\n        &quot;posture_before_patch&quot;: before,\n        &quot;posture_after_remediation_coa&quot;: after,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> پذیرش <code>show</code> و رد <code>configure terminal</code> برای Helpdesk، رد <code>reload</code> برای Net-Admin و به‌روزرسانی SGT از <code>99</code> به <code>10</code> روی pxGrid پس از وصله‌گذاری.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع پیکربندی TACACS+ با Local Fallback روی IOS-XE (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XE TACACS+ AAA config (NOT executed on live hardware)\naaa new-model\naaa group server tacacs+ ISE_TACACS\n server name PSN1\naaa authentication login VTY_AUTH group ISE_TACACS local\naaa authorization commands 15 default group ISE_TACACS if-authenticated\naaa accounting commands 15 default start-stop group ISE_TACACS</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس معماری خوشه‌ای Cisco ISE، TACACS+، Posture و pxGrid",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در معماری خوشه‌ای Cisco ISE، کدام نقش (Persona) مستقیماً درخواست‌های احراز هویت 802.1X، MAB، Posture و TACACS+ تجهیزات را پردازش می‌کند؟",
+   "options": [
+    "PSN (Policy Service Node)",
+    "MnT (Monitoring Node)",
+    "PAN (Policy Administration Node)",
+    "SNMP Receiver"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>PSN موتور عملیاتی خط مقدم خوشه ISE است و برای مقیاس‌پذیری افقی چند نمونه از آن مستقر می‌شود.</p>"
+  },
+  {
+   "title": "چرا برای مدیریت دسترسی مهندسان به CLI تجهیزات شبکه (Device Administration)، پروتکل TACACS+ بر RADIUS ترجیح داده می‌شود؟",
+   "options": [
+    "زیرا TACACS+ از UDP 1812 استفاده می‌کند",
+    "زیرا TACACS+ (روی TCP 49) کل بدنه بسته را رمزنگاری می‌کند و با تفکیک کامل AAA امکان کنترل مجوز تک‌تک دستورات CLI را فراهم می‌سازد",
+    "زیرا TACACS+ برای 802.1X کلاینت‌های وای‌فای اجباری است",
+    "زیرا TACACS+ نیازی به کلید مشترک ندارد"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>کنترل دقیق Command-by-Command Authorization و Accounting هر دستور نقطه قوت بی‌رقیب TACACS+ است.</p>"
+  },
+  {
+   "title": "نقش pxGrid در اکوسیستم امنیتی Cisco ISE چیست؟",
+   "options": [
+    "فشرده‌سازی فریم‌های VLAN",
+    "جایگزینی کابل فیبر نوری",
+    "تبادل لحظه‌ای اطلاعات زمینه (User، IP، SGT، وضعیت Posture) و فرمان‌های قرنطینه ANC میان ISE و فایروال FTD، Catalyst Center و SIEM",
+    "تخصیص آدرس DHCP به کاربران"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>pxGrid اطلاعات هویتی و سلامت ISE را به سایر سامانه‌های امنیتی متصل می‌کند تا سیاست‌ها یکپارچه و هوشمند شوند.</p>"
+  },
+  {
+   "title": "در یک خوشه توزیع‌شده Cisco ISE، اگر سرور PAN موقتاً از دسترس خارج شود، چه اتفاقی برای احراز هویت کاربران فعلی و جدید می‌افتد؟",
+   "options": [
+    "کل شبکه در همان ثانیه قطع می‌شود",
+    "تمام پورت‌های سوئیچ Shutdown می‌شوند",
+    "لاگ‌های MnT حذف می‌شوند",
+    "PSNها همچنان بر اساس سیاست‌های همگام‌سازی‌شده قبلی به احراز هویت کاربران ادامه می‌دهند و فقط امکان اعمال تغییرات جدید در سیاست‌ها متوقف می‌شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>جداسازی PAN (مدیریت) از PSN (سرویس‌دهی) تاب‌آوری عملیاتی بسیار بالایی ایجاد می‌کند.</p>"
+  },
+  {
+   "title": "در فرآیند Posture Assessment، پس از آنکه یک لپ‌تاپ Non-Compliant آنتی‌ویروس خود را به‌روزرسانی کرد و Compliant شد، ISE چگونه دسترسی سوئیچ را به سطح کامل ارتقا می‌دهد؟",
+   "options": [
+    "با ارسال پیام RADIUS CoA (Change of Authorization) به سوئیچ/WLC برای اعمال پروفایل دسترسی کامل و SGT اصلی",
+    "با ریبوت فیزیکی سوئیچ",
+    "با خاموش کردن 802.1X روی پورت",
+    "با تغییر دستی VLAN از طریق Telnet"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>RADIUS CoA به ISE اجازه می‌دهد دسترسی یک نشست زنده را به‌طور پویا بدون قطع کابل کاربر ارتقا یا محدود کند.</p>"
+  },
+  {
+   "title": "چرا هنگام قرار دادن Load Balancer در مقابل چند نود PSN، فعال‌سازی Session Stickiness (مثلاً بر اساس Calling-Station-ID) ضروری است؟",
+   "options": [
+    "برای افزایش حجم لاگ‌ها",
+    "زیرا تبادل چندمرحله‌ای EAP (802.1X) و Posture باید همگی به همان نود PSN برسند تا نشست احراز هویت نشکند",
+    "زیرا Load Balancer از UDP پشتیبانی نمی‌کند",
+    "برای حذف نیاز به MnT"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>پخش شدن بسته‌های یک Handshake EAP میان دو PSN مختلف باعث شکست فوری احراز هویت می‌شود.</p>"
+  },
+  {
+   "title": "منظور از قابلیت ANC (Adaptive Network Control) در یکپارچه‌سازی SIEM/EDR با Cisco ISE از طریق pxGrid چیست؟",
+   "options": [
+    "تغییر خودکار رمز عبور مدیر",
+    "افزایش پهنای باند وای‌فای",
+    "امکان صدور فرمان قرنطینه آنی (Quarantine via CoA) برای یک دستگاه آلوده از سمت SIEM/EDR به ISE",
+    "پاک کردن فایل‌های دیسک سرور"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>ANC پاسخ خودکار به رخداد (SOAR) را تا سطح پورت لایه ۲ سوئیچ و WLC گسترش می‌دهد.</p>"
+  },
+  {
+   "title": "در پیکربندی TACACS+ روی روترها و سوئیچ‌ها، چرا افزودن کلیدواژه local در پایان خط aaa authentication login اهمیت حیاتی دارد؟",
+   "options": [
+    "تا کاربران همیشه فقط با اکانت محلی وارد شوند",
+    "تا رمزنگاری TACACS+ غیرفعال شود",
+    "تا همه دستورات بدون لاگ اجرا شوند",
+    "تا صرفاً در صورت قطع کامل ارتباط با سرورهای TACACS+، مدیر بتواند با حساب اضطراری محلی وارد شده و قفل (Lockout) نشود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>Local Fallback تنها زمانی فعال می‌شود که هیچ سرور TACACS+ پاسخ ندهد و از Lockout کامل جلوگیری می‌کند.</p>"
+  },
+  {
+   "title": "قابلیت ISE Profiling همراه با Anomalous Behaviour Detection چه تهدیدی را در پورت‌های مبتنی بر MAB (چاپگرها/دوربین‌ها) مهار می‌کند؟",
+   "options": [
+    "حمله MAC Spoofing (جعل آدرس MAC یک چاپگر روی لپ‌تاپ مهاجم با کشف ناهماهنگی اثر انگشت DHCP/HTTP/CDP)",
+    "حمله DDoS روی لینک اینترنت",
+    "قطعی برق دیتاسنتر",
+    "عدم تطابق MTU در OSPF"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>تغییر ویژگی‌های واقعی سیستم‌عامل نسبت به پروفایل چاپگر، جعل MAC را افشا کرده و امکان مسدودسازی آنی می‌دهد.</p>"
+  },
+  {
+   "title": "هدف از پیکربندی Critical Authentication (Inaccessible Auth Bypass) روی پورت‌های Access سوئیچ چیست؟",
+   "options": [
+    "حذف کامل 802.1X در روزهای عادی",
+    "تضمین تداوم کار کاربران در یک VLAN اضطراری مشخص در سناریوی نادر قطع کامل ارتباط شعبه با تمام نودهای PSN",
+    "ارسال ترافیک به اینترنت بدون فایروال",
+    "تبدیل پورت Access به Trunk"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Fail-Open کنترل‌شده مانع از آن می‌شود که یک قطعی WAN باعث فلج کامل کاربران داخلی یک شعبه شود.</p>"
+  },
+  {
+   "title": "کدام مورد یکی از پرتکرارترین علل شکست یکپارچه‌سازی Cisco ISE با Active Directory (Kerberos) است؟",
+   "options": [
+    "استفاده از کابل Cat6A",
+    "زیاد بودن تعداد VLANها",
+    "اختلاف ساعت (NTP Skew) بیش از ۵ دقیقه میان نودهای ISE و Domain Controller",
+    "استفاده از pxGrid 2.0"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>احراز هویت Kerberos در AD به هم‌زمانی دقیق ساعت (حداکثر ۵ دقیقه اختلاف) حساس است.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "اتصال زنده به خوشه تولیدی Cisco ISE 3.3",
+    "قرنطینه واقعی لپ‌تاپ کارمندان با CoA",
+    "فقط متن نظری بدون کد",
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای مجوزدهی تک‌دستوری TACACS+، گذار Posture CoA و انتشار زمینه pxGrid"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سرور ISE واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "spec_sec_ise",
+  "sources": [
+   "https://www.cisco.com/c/en/us/td/docs/security/ise/3-3/admin_guide/b_ise_admin_3_3.html",
+   "https://www.rfc-editor.org/rfc/rfc8907"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سرور واقعی Cisco ISE، AD یا فایروال FTD متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Profiling/ANC، Stickiness Load Balancer و شبیه‌ساز محلی TACACS+/Posture/pxGrid."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/spec_sec_ise-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-specializations",
+   "recommendedCourse": "spec-security",
+   "blueprint": "/academy-assets/v5/blueprints/spec_sec_ise.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_sec_ise_lab.py"
+  }
+ }
+}

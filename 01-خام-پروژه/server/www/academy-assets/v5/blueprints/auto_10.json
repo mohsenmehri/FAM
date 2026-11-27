@@ -1,0 +1,337 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_10",
+ "objectiveId": "auto_10",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۱۰ از ۲۰): زبان مدل‌سازی داده YANG",
+ "titleEn": "Automation 10: YANG Data Modeling Language (RFC 7950)",
+ "domain": "Network Automation",
+ "source": "Legacy auto_10 rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 50,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_10-section-1",
+   "title": "مسئله واقعی: بدون قرارداد رسمی، چگونه مطمئن شویم VLAN 5000 یا IP نامعتبر اصلاً به روتر ارسال نمی‌شود؟",
+   "html": "<p>NETCONF و RESTCONF صرفاً «لوله‌های انتقال» هستند؛ آن‌ها به‌تنهایی نمی‌گویند یک اینترفیس چه فیلدهایی دارد، شماره VLAN باید بین ۱ تا ۴۰۹۴ باشد، یا کدام فیلد فقط-خواندنی (State) و کدام قابل ویرایش (Config) است. <strong>YANG (Yet Another Next Generation، استاندارد RFC 7950)</strong> زبان رسمی مدل‌سازی داده‌های شبکه است که قرارداد دقیق، ساختار درختی، نوع داده و محدودیت‌های اعتبارسنجی را به شکل ماشین‌خوان تعریف می‌کند تا هم NETCONF، هم RESTCONF و هم gNMI از یک مدل واحد پیروی کنند.</p>"
+  },
+  {
+   "id": "auto_10-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> XML/JSON (درس <code>auto_05</code>)، NETCONF (درس <code>auto_08</code>) و RESTCONF (درس <code>auto_09</code>).</p><ul><li>تشخیص چهار گره اصلی داده در YANG: <code>container</code>، <code>list</code> (با <code>key</code>)، <code>leaf</code> و <code>leaf-list</code>.</li><li>به‌کارگیری قیدهای YANG: <code>length</code> برای رشته، <code>range</code> برای اعداد، <code>pattern</code> (Regex)، <code>mandatory</code>، <code>choice/case</code> و <code>config true/false</code>.</li><li>تفاوت مدل‌های <strong>Native (Vendor)</strong>، <strong>IETF</strong> و <strong>OpenConfig</strong> در شبکه‌های چندفروشنده‌ای.</li><li>کاربرد ابزارهایی مثل <code>pyang -f tree</code> و تفکیک مرز میان اعتبارسنج آموزشی سبک با کامپایلر کامل YANG 1.1.</li></ul>"
+  },
+  {
+   "id": "auto_10-section-3",
+   "title": "چهار بلوک سازنده درخت YANG: container، list، leaf و leaf-list",
+   "html": "<ul><li><strong><code>leaf</code>:</strong> تک‌مقدار با نوع دقیق (مثل <code>uint16</code>، <code>string</code>، <code>boolean</code>، <code>inet:ipv4-address</code>).</li><li><strong><code>leaf-list</code>:</strong> آرایه‌ای از مقادیر اسکالر هم‌نوع (مثلاً فهرست سرورهای DNS یا NTP).</li><li><strong><code>container</code>:</strong> گره گروه‌بندی برای سازمان‌دهی زیرگره‌ها (مثل <code>container interfaces</code>).</li><li><strong><code>list</code>:</strong> مجموعه‌ای از رکوردهای ساختاریافته که هر عضو آن (برای <code>config true</code>) <strong>الزاماً یک <code>key</code> یکتا</strong> دارد (مثل <code>key \"name\"</code> برای لیست اینترفیس‌ها یا <code>key \"vlan-id\"</code> برای لیست VLANها).</li></ul>"
+  },
+  {
+   "id": "auto_10-section-4",
+   "title": "نمودار ساختار YANG، اکوسیستم مدل‌ها و نگاشت به NETCONF/RESTCONF/gNMI",
+   "html": "<p>نمودار زیر جایگاه YANG را به‌عنوان زبان مدل‌سازی مستقل از پروتکل انتقال نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"YANG Data Model Tree, Node Types and Protocol Mapping\"><rect x=\"14\" y=\"16\" width=\"232\" height=\"186\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"130\" y=\"38\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">YANG 1.1 (RFC 7950)</text><text x=\"130\" y=\"64\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">container (grouping node)</text><text x=\"130\" y=\"88\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">list + key (unique entries)</text><text x=\"130\" y=\"112\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">leaf / leaf-list (scalars)</text><text x=\"130\" y=\"136\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">choice (mandatory=false default)</text><text x=\"130\" y=\"160\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">config true (rw) vs false (ro)</text><text x=\"130\" y=\"184\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">length / range / pattern / must</text><rect x=\"266\" y=\"16\" width=\"228\" height=\"186\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"38\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Model Ecosystem</text><text x=\"380\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">1. Native (Vendor-specific)</text><text x=\"380\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">e.g. Cisco-IOS-XE-native</text><text x=\"380\" y=\"122\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">2. IETF Standard Models</text><text x=\"380\" y=\"142\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">e.g. ietf-interfaces (RFC 8343)</text><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#92400e\">3. OpenConfig (Multi-Vendor)</text><rect x=\"514\" y=\"16\" width=\"232\" height=\"186\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"630\" y=\"38\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Transport &amp; Encoding</text><text x=\"630\" y=\"74\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">NETCONF -&gt; XML (SSH 830)</text><text x=\"630\" y=\"106\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">RESTCONF -&gt; JSON / XML (HTTPS)</text><text x=\"630\" y=\"138\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">gNMI -&gt; Protobuf / JSON (gRPC)</text><text x=\"630\" y=\"174\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Validate with pyang -f tree</text></svg>"
+  },
+  {
+   "id": "auto_10-section-5",
+   "title": "قیدهای اعتبارسنجی در YANG: length، range، pattern و choice/case",
+   "html": "<p>دقت نحوی در YANG حیاتی است:</p><ul><li><strong><code>length \"1..32\"</code>:</strong> محدودیت طول برای <strong>رشته‌ها (<code>string</code>)</strong> و <code>binary</code>. (کلیدواژه‌های <code>min-length</code> یا <code>size</code> در YANG وجود ندارند!)</li><li><strong><code>range \"1..4094\"</code>:</strong> محدودیت بازه برای <strong>انواع عددی</strong> (مثل <code>uint16</code>، <code>int32</code>).</li><li><strong><code>pattern</code>:</strong> عبارت منظم مطابق استاندارد XSD برای محدود کردن فرمت رشته.</li><li><strong><code>choice</code> و <code>case</code>:</strong> انتخاب انحصاری (Mutually Exclusive) میان چند شاخه (مثلاً <code>static-ip</code> یا <code>dhcp</code> — نه هر دو هم‌زمان!). <strong>نکته دقیق RFC 7950:</strong> پیش‌فرض <code>mandatory</code> در <code>choice</code> برابر <strong><code>false</code></strong> است؛ یعنی صفر یا یک <code>case</code> مجاز است و تنها با نوشتن <code>mandatory true</code> دقیقاً یک <code>case</code> الزامی می‌شود.</li></ul>"
+  },
+  {
+   "id": "auto_10-section-6",
+   "title": "تفکیک config true (rw) از config false (ro) و خواندن خروجی pyang -f tree",
+   "html": "<p>در خروجی درختی <code>pyang -f tree</code> (استاندارد RFC 8340) علامت‌ها سریعاً قرارداد را نشان می‌دهند: <strong><code>+--rw</code></strong> یعنی گره پیکربندی قابل خواندن و نوشتن (<code>config true</code>)؛ <strong><code>+--ro</code></strong> یعنی داده وضعیت عملیاتی فقط-خواندنی (<code>config false</code> مثل <code>oper-status</code> و شمارنده خطا)؛ علامت <strong><code>?</code></strong> یعنی اختیاری؛ علامت <strong><code>*</code></strong> یعنی لیست همراه با کلید در کروشه مثل <code>[name]</code>.</p>"
+  },
+  {
+   "id": "auto_10-section-7",
+   "title": "سه خانواده مدل‌های YANG: Native در برابر IETF در برابر OpenConfig",
+   "html": "<table><thead><tr><th>خانواده مدل</th><th>نمونه</th><th>مزیت اصلی</th><th>محدودیت</th></tr></thead><tbody><tr><td><strong>Native (Vendor)</strong></td><td><code>Cisco-IOS-XE-native</code></td><td>پوشش تقریباً ۱۰۰٪ قابلیت‌های اختصاصی آن برند</td><td>وابسته به یک فروشنده (غیرقابل انتقال به Juniper/Arista)</td></tr><tr><td><strong>IETF Standard</strong></td><td><code>ietf-interfaces</code>، <code>ietf-routing</code></td><td>استاندارد باز RFC</td><td>ممکن است قابلیت‌های جدیدتر را دیرتر پوشش دهد</td></tr><tr><td><strong>OpenConfig</strong></td><td><code>openconfig-interfaces</code>، <code>openconfig-bgp</code></td><td>طراحی‌شده توسط اپراتورهای بزرگ برای شبکه‌های Multi-Vendor و gNMI</td><td>پشتیبانی همه قابلیت‌های خاص یک برند در آن تضمین نیست</td></tr></tbody></table>"
+  },
+  {
+   "id": "auto_10-section-8",
+   "title": "مفاهیم پیشرفته پرکاربرد: grouping / uses، augment، leafref و must/when",
+   "html": "<p>برای جلوگیری از تکرار کد در ماژول‌های بزرگ، YANG از <code>grouping</code> و <code>uses</code> (مثل کلاس پایه/ترکیب)، از <code>augment</code> برای افزودن شاخه‌های جدید به یک ماژول موجود (مثلاً افزودن تنظیمات IPv4 به <code>ietf-interfaces</code>)، از <code>leafref</code> برای ارجاع به کلید موجود در جای دیگر (مثل ارجاع نام VRF به لیست VRFهای تعریف‌شده) و از عبارات XPath در <code>must</code> و <code>when</code> برای قیدهای شرطی استفاده می‌کند.</p>"
+  },
+  {
+   "id": "auto_10-section-9",
+   "title": "ارتباط YANG با NETCONF، RESTCONF و gNMI (مدل واحد، انتقال متنوع)",
+   "html": "<p>زیبایی معماری Model-Driven در این است که یک مدل <code>openconfig-interfaces.yang</code> را می‌توان هم با NETCONF (XML)، هم با RESTCONF (JSON/XML) و هم با gNMI (Protobuf/JSON برای Streaming Telemetry) مصرف کرد؛ دیگر نیازی نیست برای هر پروتکل ساختار داده جداگانه‌ای اختراع شود.</p>"
+  },
+  {
+   "id": "auto_10-section-10",
+   "title": "اعتبارسنجی مدل YANG و داده نمونه: تفاوت Validator سبک با pyang/libyang",
+   "html": "<p>یک اسکریپت ساده پایتون می‌تواند قواعدی مانند بازه عددی، طول رشته، یکتایی کلید و انحصار <code>choice</code> را روی یک داده نمونه بررسی کند، اما <strong>جایگزین کامپایلر کامل YANG 1.1 نیست!</strong> ابزارهای حرفه‌ای مثل <strong><code>pyang</code></strong>، <strong><code>yanglint</code> (libyang)</strong> و <strong>YANG Suite</strong> کل گرامر RFC 7950، import/include ماژول‌ها، <code>augment</code>، <code>leafref</code> و ارزیابی کامل XPath در <code>must/when</code> را انجام می‌دهند.</p>"
+  },
+  {
+   "id": "auto_10-section-11",
+   "title": "کژفهمی‌های رایج درباره YANG",
+   "html": "<ul><li><strong>کژفهمی ۱: «YANG یک پروتکل شبکه یا فرمت انتقال مثل JSON/XML است.»</strong> واقعیت: YANG <strong>زبان مدل‌سازی داده (Schema)</strong> است؛ داده روی سیم با XML (NETCONF)، JSON (RESTCONF) یا Protobuf (gNMI) منتقل می‌شود.</li><li><strong>کژفهمی ۲: «در YANG برای محدودیت طول رشته از range یا min-length استفاده می‌شود.»</strong> واقعیت: برای رشته و باینری فقط <code>length</code> و برای اعداد <code>range</code> به کار می‌رود.</li><li><strong>کژفهمی ۳: «در choice همیشه حتماً باید یکی از caseها انتخاب شود.»</strong> واقعیت: پیش‌فرض <code>mandatory false</code> است (صفر یا یک case)؛ مگر آنکه صریحاً <code>mandatory true</code> تعریف شده باشد.</li></ul>"
+  },
+  {
+   "id": "auto_10-section-12",
+   "title": "عیب‌یابی خطاهای مدل YANG در پروژه‌های واقعی",
+   "html": "<p><strong>خطای ۱ — عدم تطابق نسخه Revision ماژول YANG:</strong> اگر کلاینت از نسخه ۲۰۲۰ یک ماژول OpenConfig استفاده کند اما روتر نسخه ۲۰۲۳ را پیاده کرده باشد، نام برخی برگ‌ها یا مسیرها ممکن است تغییر کرده باشد؛ همیشه فهرست دقیق ماژول‌ها و Revisionها را از <code>ietf-yang-library</code> خود تجهیز بخوانید.</p><p><strong>خطای ۲ — تلاش برای نوشتن روی گره <code>config false</code>:</strong> ارسال فیلدهایی مانند <code>oper-status</code> یا <code>in-octets</code> درون بدنه <code>PUT/PATCH</code> باعث رد درخواست با خطای <code>unknown-element</code> یا <code>invalid-value</code> می‌شود.</p>"
+  },
+  {
+   "id": "auto_10-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> در یک مدل YANG برای نام کاربری (<code>string</code>) طول ۱ تا ۳۲ و برای شماره VLAN (<code>uint16</code>) مقدار ۱ تا ۴۰۹۴ می‌خواهیم. کدام دو statement دقیقاً باید به کار روند؟ <strong>پاسخ:</strong> <code>length \"1..32\";</code> برای <code>string</code> و <code>range \"1..4094\";</code> برای <code>uint16</code>.</p><p><strong>تمرین ۲:</strong> در خروجی <code>pyang -f tree</code> خط <code>+--ro oper-status? enumeration</code> را می‌بینید. هر نماد چه معنایی دارد؟ <strong>پاسخ:</strong> <code>ro</code> یعنی فقط-خواندنی (<code>config false</code>)، علامت <code>?</code> یعنی اختیاری، و <code>enumeration</code> یعنی نوع داده مجموعه‌ای از مقادیر تعریف‌شده است.</p>"
+  },
+  {
+   "id": "auto_10-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc7950\" target=\"_blank\" rel=\"noopener\">RFC 7950 (YANG 1.1)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc8340\" target=\"_blank\" rel=\"noopener\">RFC 8340 (YANG Tree Diagrams)</a> و <a href=\"https://github.com/YangModels/yang\" target=\"_blank\" rel=\"noopener\">مخزن رسمی YangModels</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> اسکریپت آزمایشگاه یک اعتبارسنج آموزشی سبک در Python 3 stdlib است که ۵ نوع خطای مدل را محلی کشف می‌کند و به‌صراحت جایگزین کامپایلر کامل <code>pyang</code> یا <code>libyang</code> نیست.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "YANG (RFC 7950)",
+   "fa": "زبان مدل‌سازی YANG",
+   "simple": "زبان رسمی تعریف ساختار، نوع و قید داده‌های پیکربندی و وضعیت در شبکه."
+  },
+  {
+   "term": "container",
+   "fa": "گره کانتینر",
+   "simple": "گره گروه‌بندی در درخت YANG بدون مقدار مستقیم."
+  },
+  {
+   "term": "list & key",
+   "fa": "لیست و کلید یکتا",
+   "simple": "مجموعه رکوردهای ساختاریافته که در config true الزاماً کلید یکتا دارد."
+  },
+  {
+   "term": "leaf / leaf-list",
+   "fa": "برگ و لیست برگ",
+   "simple": "leaf یک مقدار اسکالر و leaf-list آرایه‌ای از مقادیر اسکالر هم‌نوع است."
+  },
+  {
+   "term": "length",
+   "fa": "قید طول رشته",
+   "simple": "statement استاندارد YANG برای محدودیت طول نوع string و binary."
+  },
+  {
+   "term": "range",
+   "fa": "قید بازه عددی",
+   "simple": "statement استاندارد YANG برای محدودیت بازه انواع عددی (مثل uint16)."
+  },
+  {
+   "term": "pattern",
+   "fa": "قید الگوی Regex",
+   "simple": "محدود کردن فرمت رشته در YANG با عبارت منظم XSD."
+  },
+  {
+   "term": "choice / case",
+   "fa": "انتخاب انحصاری",
+   "simple": "تعریف شاخه‌های مانعه‌الجمع (در پیش‌فرض mandatory=false صفر یا یک شاخه مجاز است)."
+  },
+  {
+   "term": "config true / false",
+   "fa": "پیکربندی در برابر وضعیت",
+   "simple": "true یعنی قابل ویرایش (rw) و false یعنی وضعیت عملیاتی فقط-خواندنی (ro)."
+  },
+  {
+   "term": "OpenConfig",
+   "fa": "مدل‌های OpenConfig",
+   "simple": "مدل‌های YANG خنثی از فروشنده طراحی‌شده برای شبکه‌های Multi-Vendor و Telemetry."
+  },
+  {
+   "term": "Native YANG Model",
+   "fa": "مدل بومی فروشنده",
+   "simple": "مدل اختصاصی یک برند (مانند Cisco-IOS-XE-native) با پوشش حداکثری قابلیت‌ها."
+  },
+  {
+   "term": "augment",
+   "fa": "توسعه ماژول YANG",
+   "simple": "افزودن گره‌های جدید به درخت یک ماژول YANG دیگر بدون دستکاری فایل اصلی."
+  },
+  {
+   "term": "leafref",
+   "fa": "ارجاع به برگ دیگر",
+   "simple": "نوع داده‌ای که مقدارش باید به یک برگ موجود در جای دیگر درخت اشاره کند."
+  },
+  {
+   "term": "pyang",
+   "fa": "ابزار pyang",
+   "simple": "کامپایلر و اعتبارسنج استاندارد پایتون برای تحلیل و ترسیم درخت (tree) فایل‌های YANG."
+  },
+  {
+   "term": "ietf-yang-library",
+   "fa": "کتابخانه مدل‌های تجهیز",
+   "simple": "ماژول استاندارد که فهرست دقیق ماژول‌ها و Revisionهای پشتیبانی‌شده روتر را اعلام می‌کند."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه محلی Python 3 (اعتبارسنجی قیدهای YANG: range/length/pattern/key/config-false/choice) — pyang واقعی اجرا نشده",
+   "executionStatus": "اعتبارسنج آموزشی سبک در Python 3 اجرا و تست شده؛ ابزارهای pyang/libyang یا تجهیز واقعی در این محیط اجرا نشده‌اند.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اسکریپت اعتبارسنج آموزشی محلی در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. این اسکریپت جایگزین کامپایلر کامل RFC 7950 مانند pyang یا libyang نیست و به تجهیز واقعی متصل نشده است.</p><p>این آزمایشگاه یک اعتبارسنج آموزشی محلی در Python 3 اجرا می‌کند که قیدهای <code>uint16 range 1..4094</code>، <code>string length/pattern</code>، یکتایی <code>list key</code>، فقط-خواندنی بودن <code>config false</code> و انحصار <code>choice</code> (با <code>mandatory=false</code>) را روی داده معتبر و نامعتبر آزمون می‌کند.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_10_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_10_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_10: YANG (RFC 7950) Local Data-Model Validator.\nExecution boundary: Pure Python 3 stdlib educational validator checking\nYANG leaf types, string length/pattern, uint16 range, list key uniqueness,\nconfig false immutability, and choice mandatory=false/true semantics.\nDoes NOT replace a full YANG 1.1 compiler such as pyang or libyang.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\nimport re\n\n\ndef validate_vlan_payload(payload: dict) -&gt; list[str]:\n    &quot;&quot;&quot;Validate an instance against a simplified YANG module contract.&quot;&quot;&quot;\n    errors: list[str] = []\n    seen_keys: set[int] = set()\n    vlans = payload.get(&quot;vlans&quot;, [])\n    if not isinstance(vlans, list):\n        return [&quot;vlans must be a YANG list&quot;]\n\n    for idx, item in enumerate(vlans):\n        # leaf vlan-id { type uint16 { range &quot;1..4094&quot;; } } (list key)\n        vid = item.get(&quot;vlan-id&quot;)\n        if not isinstance(vid, int) or isinstance(vid, bool) or not (1 &lt;= vid &lt;= 4094):\n            errors.append(f&quot;vlans[{idx}].vlan-id={vid!r} violates uint16 range 1..4094&quot;)\n        elif vid in seen_keys:\n            errors.append(f&quot;vlans[{idx}].vlan-id={vid} violates YANG list key uniqueness&quot;)\n        else:\n            seen_keys.add(vid)\n\n        # leaf name { type string { length &quot;1..32&quot;; pattern &quot;[A-Za-z0-9_-]+&quot;; } }\n        name = item.get(&quot;name&quot;, &quot;&quot;)\n        if not isinstance(name, str) or not (1 &lt;= len(name) &lt;= 32):\n            errors.append(f&quot;vlans[{idx}].name violates YANG length 1..32&quot;)\n        elif not re.fullmatch(r&quot;[A-Za-z0-9_-]+&quot;, name):\n            errors.append(f&quot;vlans[{idx}].name={name!r} violates YANG pattern&quot;)\n\n        # leaf oper-packet-count { config false; } -&gt; must not be edited in config payload\n        if &quot;oper-packet-count&quot; in item:\n            errors.append(f&quot;vlans[{idx}].oper-packet-count is config false (read-only state)&quot;)\n\n        # choice addressing { mandatory false; case static-ip; case dhcp; }\n        has_static = &quot;static-ip&quot; in item\n        has_dhcp = &quot;dhcp&quot; in item\n        if has_static and has_dhcp:\n            errors.append(f&quot;vlans[{idx}] violates YANG choice mutual exclusion (both static-ip and dhcp set)&quot;)\n        # Note: neither set is valid because choice default is mandatory=false!\n\n    return errors\n\n\ndef main() -&gt; None:\n    valid_payload = {\n        &quot;vlans&quot;: [\n            {&quot;vlan-id&quot;: 10, &quot;name&quot;: &quot;USERS_CORP&quot;, &quot;static-ip&quot;: &quot;10.10.10.1/24&quot;},\n            {&quot;vlan-id&quot;: 20, &quot;name&quot;: &quot;VOICE_L2_ONLY&quot;},  # 0 choice cases allowed when mandatory=false\n        ]\n    }\n    invalid_payload = {\n        &quot;vlans&quot;: [\n            {&quot;vlan-id&quot;: 5000, &quot;name&quot;: &quot;BAD NAME!&quot;, &quot;oper-packet-count&quot;: 99, &quot;static-ip&quot;: &quot;10.0.0.1/24&quot;, &quot;dhcp&quot;: True},\n            {&quot;vlan-id&quot;: 10, &quot;name&quot;: &quot;DUP_A&quot;},\n            {&quot;vlan-id&quot;: 10, &quot;name&quot;: &quot;DUP_B&quot;},\n        ]\n    }\n\n    valid_errs = validate_vlan_payload(valid_payload)\n    invalid_errs = validate_vlan_payload(invalid_payload)\n    assert valid_errs == [], f&quot;Expected valid payload, got {valid_errs}&quot;\n    assert len(invalid_errs) == 5, f&quot;Expected 5 YANG violations, got {invalid_errs}&quot;\n\n    print(&quot;=== auto_10 YANG RFC 7950 Local Validator Lab ===&quot;)\n    print(json.dumps({\n        &quot;valid_payload_errors&quot;: valid_errs,\n        &quot;invalid_payload_error_count&quot;: len(invalid_errs),\n        &quot;invalid_payload_errors&quot;: invalid_errs,\n        &quot;boundary_note&quot;: &quot;Educational Python validator only; full RFC 7950 checks require pyang/libyang.&quot;,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> صفر خطا روی <code>valid_payload</code> (از جمله VLAN بدون انتخاب <code>choice</code>) و دقیقاً ۵ خطای دقیق روی <code>invalid_payload</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>دستور مرجع بررسی کامل ماژول‌های YANG با <code>pyang</code> در محیط دارای ابزار (اجرا نشده در این مخزن):</strong></p><pre dir=\"ltr\"><code># Reference pyang command (NOT executed in this stdlib-only sandbox)\npyang --strict -f tree ietf-interfaces.yang</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس زبان مدل‌سازی داده YANG",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در مدل YANG (RFC 7950)، محدودیت طول یک مقدار رشته‌ای (string) با کدام statement تعریف می‌شود؟",
+   "options": [
+    "min-length / max-length",
+    "length",
+    "range",
+    "size"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در YANG برای طول رشته و باینری <code>length</code> و برای بازه اعداد <code>range</code> به کار می‌رود.</p>"
+  },
+  {
+   "title": "در YANG، ساختار choice با مقدار پیش‌فرض mandatory چه رفتاری دارد؟",
+   "options": [
+    "همه caseها باید هم‌زمان پر شوند",
+    "هیچ case مجاز نیست",
+    "پیش‌فرض mandatory=false است، بنابراین صفر یا حداکثر یک case مجاز است",
+    "همیشه دقیقاً دو case می‌خواهد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>در <code>choice</code> انتخاب‌ها مانعه‌الجمع‌اند و تا وقتی <code>mandatory true</code> نوشته نشده باشد، انتخاب نکردن هیچ‌کدام (۰ case) نیز معتبر است.</p>"
+  },
+  {
+   "title": "تفاوت یک اعتبارسنج ساده پایتونی با کامپایلر کامل YANG (مانند pyang یا libyang) چیست؟",
+   "options": [
+    "اعتبارسنج ساده از pyang کامل‌تر است",
+    "هیچ تفاوتی ندارند",
+    "pyang فقط فایل JSON می‌خواند",
+    "اعتبارسنج ساده فقط چند قید پایه را بررسی می‌کند و بررسی کامل گرامر RFC 7950، augment، leafref و XPath (must/when) نیازمند pyang/libyang است"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>مرزبندی دقیق ابزارها مهم است: اسکریپت آموزشی همه پیچیدگی‌های RFC 7950 را پوشش نمی‌دهد.</p>"
+  },
+  {
+   "title": "کدام تعریف درباره جایگاه YANG در اتوماسیون شبکه دقیق است؟",
+   "options": [
+    "زبان مدل‌سازی داده (Schema) مستقل از پروتکل انتقال که توسط NETCONF، RESTCONF و gNMI مصرف می‌شود",
+    "یک پروتکل لایه ۳ شبیه OSPF",
+    "یک قالب فشرده‌سازی تصویر",
+    "جایگزین پروتکل SSH"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>YANG ساختار و قرارداد داده‌ها را توصیف می‌کند؛ انتقال توسط NETCONF/RESTCONF/gNMI انجام می‌شود.</p>"
+  },
+  {
+   "title": "در YANG، کدام نوع گره برای یک list دارای config true الزامی است؟",
+   "options": [
+    "حتماً باید config false باشد",
+    "تعریف یک key یکتا برای شناسایی هر عضو لیست",
+    "تبدیل به YAML",
+    "حذف تمام leafها"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در لیست‌های پیکربندی (<code>config true</code>)، وجود <code>key</code> یکتا الزامی است تا عضوهای لیست قابل آدرس‌دهی و ویرایش باشند.</p>"
+  },
+  {
+   "title": "در خروجی درختی pyang -f tree، پیشوند +--ro نشانه چیست؟",
+   "options": [
+    "گره قابل ویرایش با PUT",
+    "گره رمزنگاری‌شده",
+    "گره config false (داده وضعیت عملیاتی فقط-خواندنی)",
+    "گره حذف‌شده"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p><code>ro</code> مخفف Read-Only (<code>config false</code>) و <code>rw</code> مخفف Read-Write (<code>config true</code>) است.</p>"
+  },
+  {
+   "title": "کدام خانواده از مدل‌های YANG با هدف مدیریت یکپارچه در شبکه‌های چندفروشنده‌ای (Multi-Vendor) توسط اپراتورهای بزرگ توسعه یافته است؟",
+   "options": [
+    "فقط فایل‌های متنی CLI",
+    "Cisco-IOS-XE-native",
+    "SNMPv1 MIB",
+    "OpenConfig"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>مدل‌های OpenConfig ساختار یکنواختی را میان تجهیزات برندهای مختلف (Cisco، Juniper، Arista و...) فراهم می‌کنند.</p>"
+  },
+  {
+   "title": "تفاوت leaf و leaf-list در YANG چیست؟",
+   "options": [
+    "leaf تک‌مقدار اسکالر دارد، اما leaf-list آرایه‌ای از چند مقدار اسکالر هم‌نوع (مانند چند IP سرور NTP) نگه می‌دارد",
+    "leaf-list کلید دارد ولی list کلید ندارد",
+    "هر دو دقیقاً یکسان‌اند",
+    "leaf فقط برای اعداد است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>برای مقادیر اسکالر تکراری (مثل لیست سرورهای DNS) از <code>leaf-list</code> و برای رکوردهای چندفیلدی از <code>list</code> استفاده می‌شود.</p>"
+  },
+  {
+   "title": "کاربرد statementهای grouping و uses در یک ماژول بزرگ YANG چیست؟",
+   "options": [
+    "رمزنگاری نشست SSH",
+    "تعریف الگوهای قابل استفاده مجدد برای جلوگیری از تکرار تعریف فیلدهای مشترک",
+    "حذف کلید لیست",
+    "تغییر پورت RESTCONF"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p><code>grouping</code> مجموعه گره‌های قابل بازاستفاده تعریف می‌کند و <code>uses</code> آن‌ها را در بخش‌های مختلف درخت وارد می‌کند.</p>"
+  },
+  {
+   "title": "بیانیه augment در YANG چه امکانی می‌دهد؟",
+   "options": [
+    "فشرده‌سازی پیام XML",
+    "خاموش کردن اینترفیس",
+    "افزودن گره‌ها و شاخه‌های جدید به درخت یک ماژول YANG موجود بدون تغییر مستقیم فایل ماژول اصلی",
+    "تبدیل range به length"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>به‌عنوان نمونه ماژول <code>ietf-ip</code> با <code>augment</code> تنظیمات IPv4/IPv6 را به <code>ietf-interfaces</code> اضافه می‌کند.</p>"
+  },
+  {
+   "title": "اگر اسکریپت RESTCONF تلاش کند فیلدی با config false (مانند oper-packet-count) را در بدنه PUT ارسال کند، نتیجه صحیح چیست؟",
+   "options": [
+    "سرور شمارنده را به دلخواه بازنویسی می‌کند",
+    "پورت ۸۳۰ باز می‌شود",
+    "مدل به OpenConfig تبدیل می‌شود",
+    "درخواست به دلیل نقض قرارداد YANG (تلاش برای نوشتن روی داده وضعیت فقط-خواندنی) رد می‌شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>فیلدهای <code>config false</code> فقط توسط خود سیستم‌عامل تجهیز تولید می‌شوند و قابل پیکربندی نیستند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چه چیزی را محلی اجرا و اثبات کرده است؟",
+   "options": [
+    "اعتبارسنجی آموزشی قیدهای range، length/pattern، list key، config false و choice در Python 3 بدون اجرای pyang یا اتصال به تجهیز واقعی",
+    "کامپایل تمام ماژول‌های OpenConfig روی روتر واقعی",
+    "اعمال پیکربندی با NETCONF زنده",
+    "تغییر فریم‌ور سوئیچ"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه یک اسکریپت آموزشی محلی Python 3 است و مرز آن با کامپایلر کامل <code>pyang</code> شفاف بیان شده است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "auto_10",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc7950",
+   "https://www.rfc-editor.org/rfc/rfc8340",
+   "https://github.com/YangModels/yang"
+  ],
+  "limitations": [
+   "اعتبارسنج آزمایشگاه آموزشی و در Python 3 stdlib است؛ ابزارهای pyang/libyang یا تجهیز واقعی در این محیط اجرا نشده‌اند."
+  ],
+  "legacyAuditFixes": [
+   "گسترش کامل نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و آزمایشگاه اعتبارسنجی ۵ نوع نقض قید YANG."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_10-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_10.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_10_lab.py"
+  }
+ }
+}

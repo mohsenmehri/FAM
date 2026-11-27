@@ -1,0 +1,339 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccde_10",
+  "objectiveId": "ccde_10",
+  "kind": "lesson",
+  "track": "CCDE",
+  "course": "ccde-design",
+  "title": "۹.۱۰ CCDE — معماری دسترس‌پذیری بالا (High Availability): ریاضی سری/موازی، N+1 در برابر 2N و Multi-Box HA",
+  "titleEn": "CCDE Topic 10: High Availability Architecture — Series/Parallel Math, N/N+1/2N & Multi-Box vs In-Box HA",
+  "domain": "High Availability Architecture",
+  "source": "Legacy ccde_10 rewritten, typo-cleaned, and expanded",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 50,
+  "prerequisites": [
+    "ccde_01",
+    "ccde_09"
+  ],
+  "sections": [
+    {
+      "id": "ccde_10-section-1",
+      "title": "مسئله واقعی: چرا قرار دادن سه تجهیز ۹۹٫۹٪ پشت‌سرهم دسترس‌پذیری را به ۹۹٫۷٪ سقوط می‌دهد، اما موازی‌سازی آن را به ۹۹٫۹۹۹٪ می‌رساند؟",
+      "html": "<p>بسیاری از مدیران تصور می‌کنند اگر یک سوئیچ، یک فایروال و یک روتر WAN بخرند که هر کدام روی کاتالوگ <code>99.9%</code> هستند، شبکه آن‌ها نیز ۹۹٫۹٪ در دسترس خواهد بود! اما <strong>ریاضی قابلیت اطمینان (Reliability Math)</strong> حقیقت تکان‌دهنده‌ای را نشان می‌دهد: در اتصال <strong>سری (Series)</strong> احتمال‌ها در هم ضرب می‌شوند (<code>0.999³ = 99.7003%</code> یعنی <strong>۱٬۵۷۶ دقیقه قطعی سالانه — بیش از ۲۶ ساعت!</strong>)، در حالی که <strong>موازی‌سازی چنددستگاهی (Multi-Box 2N/Mesh)</strong> همان اجزا را به <strong>۹۹٫۹۹۹۷٪ (فقط ۱٫۵۸ دقیقه در سال!)</strong> می‌رساند.</p>"
+    },
+    {
+      "id": "ccde_10-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code> و <code>ccde_09</code>.</p><ul><li>محاسبه دقیق دسترس‌پذیری <strong>سامانه‌های سری (<code>A1 × A2</code>)</strong>، <strong>موازی (<code>1 - (1-A1)(1-A2)</code>)</strong> و تبدیل آن به دقیقه قطعی سالانه با <code>MTBF / (MTBF + MTTR)</code>.</li><li>انتخاب مهندسی میان الگوهای افزونگی <strong>N</strong>، <strong>N+1</strong> و <strong>2N (و 2N+1)</strong> بر پایه توازن هزینه، SLA و پنجره نگهداری.</li><li>تبیین تفاوت بنیادین <strong>افزونگی درون‌شاسی (In-Box HA: Dual Sup/SSO/NSF/ISSU)</strong> در برابر <strong>افزونگی چنددستگاهی (Multi-Box HA)</strong>.</li><li>تحلیل تله <strong>ظرفیت ۵۰٪ در حالت Active/Active</strong> (اگر هنگام خرابی یک گره، گره دوم ظرفیت ۱۰۰٪ بار را نداشته باشد، کل HA بی‌معناست!).</li></ul>"
+    },
+    {
+      "id": "ccde_10-section-3",
+      "title": "ریاضی دسترس‌پذیری (Availability Math): MTBF، MTTR، سری و موازی",
+      "html": "<p>دسترس‌پذیری یک قطعه برابر <code>A = MTBF / (MTBF + MTTR)</code> است (پس کاهش <strong>MTTR</strong> با اتوماسیون و قطعه یدکی محلی، به‌اندازه افزایش سخت‌افزار <strong>MTBF</strong> اثر دارد!). اکنون قوانین ترکیب:</p><ul><li><strong>اتصال سری (Series — بدون افزونگی):</strong> <code>A_total = A1 × A2 × A3</code> -> هر عضو جدید در مسیر، دسترس‌پذیری کل را <em>کمتر از ضعیف‌ترین عضو</em> می‌کند! (۳ تجهیز ۹۹٫۹٪ = <code>99.7003%</code> = <strong>۱٬۵۷۶ دقیقه قطعی/سال</strong>).</li><li><strong>اتصال موازی دو زنجیره مستقل (Parallel 2N):</strong> <code>A_total = 1 - (1 - A_chain)²</code> -> دو مسیر مستقل سه‌تجهیزه به <code>99.9991%</code> (<strong>۴٫۷۲ دقیقه/سال</strong>) می‌رسند!</li><li><strong>موازی‌سازی مش در تک‌تک لایه‌ها (Per-Tier Mesh):</strong> هر لایه موازی شده و سپس لایه‌ها سری می‌شوند -> <strong><code>99.9997%</code> (فقط ۱٫۵۸ دقیقه/سال!)</strong>.</li></ul>"
+    },
+    {
+      "id": "ccde_10-section-4",
+      "title": "نمودار ریاضی High Availability: سری در برابر 2N و Per-Tier Mesh",
+      "html": "<p>نمودار زیر جهش دسترس‌پذیری از ۱٬۵۷۶ دقیقه قطعی به ۱٫۵۸ دقیقه در سال با حذف زنجیره سری و تفاوت In-Box با Multi-Box HA را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE High Availability Math: Series vs Parallel Availability, N vs N+1 vs 2N and Multi-Box vs In-Box HA\"><rect x=\"14\" y=\"14\" width=\"234\" height=\"114\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"131\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">Series Chain (SPOF!)</text><text x=\"131\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">A = A1 x A2 x A3</text><text x=\"131\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">3 x 99.9% = 99.7003%</text><text x=\"131\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">~1,576 min/yr Outage!</text><rect x=\"263\" y=\"14\" width=\"234\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Parallel 2N Multi-Box</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">A = 1 - (1-A1) x (1-A2)</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Dual Chains = 99.9991%</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Only ~4.72 min/yr!</text><rect x=\"512\" y=\"14\" width=\"234\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"629\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Per-Tier Full Mesh</text><text x=\"629\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Parallel at EVERY Layer</text><text x=\"629\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Reaches 99.9997%</text><text x=\"629\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Only ~1.58 min/yr!</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">In-Box HA (Dual Sup/SSO/NSF/ISSU) != Multi-Box HA! Chassis Backplane/Power/OS Remains a Single Point of Failure!</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Choose N+1 (Cost-Effective 1 Spare) vs 2N (Full Active Mirror Surviving Maintenance + Fault)</text></svg>"
+    },
+    {
+      "id": "ccde_10-section-5",
+      "title": "مقایسه الگوهای افزونگی: N در برابر N+1 در برابر 2N",
+      "html": "<table><thead><tr><th>الگو</th><th>ساختار</th><th>موازنه هزینه و تاب‌آوری</th></tr></thead><tbody><tr><td><strong>N</strong></td><td>فقط تجهیزات لازم بدون یدکی</td><td>ارزان‌ترین، اما هر خرابی واحد = قطعی کامل (مناسب آزمایشگاه/کیوسک غیرحیاتی)</td></tr><tr><td><strong>N+1</strong></td><td>یک یدکی مشترک (مثلاً ۳ روتر برای بار ۲ روتر)</td><td><strong>بسیار اقتصادی در مقیاس بزرگ</strong> (مثل ۴ Spine برای بار ۳ Spine)؛ تحمل ۱ خرابی</td></tr><tr><td><strong>2N (یا 2N+1)</strong></td><td>آینه کامل ۱۰۰٪ افزونه</td><td>گران‌تر اما <strong>تحمل سقوط کامل نیمی از سیستم یا خرابی هم‌زمان در حین نگهداری!</strong></td></tr></tbody></table>"
+    },
+    {
+      "id": "ccde_10-section-6",
+      "title": "تفاوت حیاتی: افزونگی درون‌شاسی (In-Box HA) در برابر چنددستگاهی (Multi-Box HA)",
+      "html": "<p>قابلیت‌های درون‌شاسی مانند <strong>Dual Power Supply، Dual Supervisor، SSO (Stateful Switchover)، NSF (Non-Stop Forwarding) و ISSU (In-Service Software Upgrade)</strong> بسیار مفیدند، اما <strong>هرگز جایگزین Multi-Box HA نمی‌شوند!</strong> چرا؟ زیرا در یک شاسی واحد، صفحه پشتی (Backplane)، برق یک رک، کل سیستم‌عامل و خطای انسانی ریبوت کل شاسی همچنان یک <strong>تک‌نقطه خرابی (SPOF)</strong> هستند! برای SLA ۹۹٫۹۹٪ به بالا، <strong>دو دستگاه فیزیکی مجزا (Multi-Box HA)</strong> با فناوری‌های لایه ۳ (ECMP/BFD) یا لایه ۲ مستقل (vPC/EVPN-MH) الزامی است.</p>"
+    },
+    {
+      "id": "ccde_10-section-7",
+      "title": "تله ۵۰٪ ظرفیت در طراحی Active/Active HA (خطای Oversubscription در Failover!)",
+      "html": "<p>فرض کنید دو فایروال ۱۰ گیگابیتی به‌صورت Active/Active هر کدام ۸ گیگابیت ترافیک عبور می‌دهند (مجموع ۱۶ گیگابیت). در حالت عادی همه چیز عالی است؛ اما به محض سوختن فایروال ۱، کل ۱۶ گیگابیت روی فایروال ۲ (با سقف ۱۰G) می‌ریزد و <strong>۶۰٪ ترافیک Drop شده و فایروال دوم هم زیر بار می‌میرد!</strong> <strong>قانون طلایی HA:</strong> در جفت 2N، مصرف عادی هر گره نباید از <strong>۴۰ تا ۵۰ درصد ظرفیت</strong> فراتر رود (و در N+1، هر یک از N+1 گره حداکثر <code>N/(N+1)</code> ظرفیت).</p>"
+    },
+    {
+      "id": "ccde_10-section-8",
+      "title": "موازنه جفت مستقل (Independent Multi-Box) در برابر کلاسترینگ صفحه کنترل مشترک (StackWise / VSS)",
+      "html": "<p>کلاستر کردن دو سوئیچ با <strong>StackWise Virtual / VSS</strong> مدیریت را ساده می‌کند (یک صفحه کنترل واحد)، اما <strong>یک صفحه کنترل مشترک = یک سرنوشت خرابی نرم‌افزاری مشترک!</strong> به همین دلیل در دیتاسنتر و هسته‌های فوق‌حیاتی CCDE، <strong>کنترل‌پلین مستقل در دو جعبه مجزا</strong> (مانند <strong>vPC / EVPN Multi-Homing / Pure L3 ECMP</strong>) بر ادغام صفحه کنترل ترجیح داده می‌شود تا باگ یا ارتقای نرم‌افزاری یک سوئیچ هرگز سوئیچ دوم را با خود نبرد!</p>"
+    },
+    {
+      "id": "ccde_10-section-9",
+      "title": "نگهداری بدون قطعی (Hitless Maintenance): Graceful Shutdown (g-shut / BGP / IGP Overload)",
+      "html": "<p>حتی بهترین شبکه 2N اگر هنگام تعویض کارت یا ارتقای IOS ناگهان سیم را بکشید، دچار افت بسته چندثانیه‌ای می‌شود! در طراحی HA حرفه‌ای، پیش از هر عملیات نگهداری روی یک روتر، با فعال کردن <strong>BGP Graceful Shutdown (RFC 8326)</strong> و <strong>OSPF Max-Metric / IS-IS Overload Bit</strong> ترافیک به‌صورت نرم و بدون حتی یک بسته افت (Zero Packet Loss) روی روتر همتا تخلیه (Drain) می‌شود و سپس ارتقا انجام می‌گیرد.</p>"
+    },
+    {
+      "id": "ccde_10-section-10",
+      "title": "نقش همگام‌سازی حالت (Stateful Failover) در فایروال‌ها و Load Balancerها",
+      "html": "<p>در روترهای Stateless (لایه ۳)، قطع یک روتر و جابه‌جایی به روتر دوم نشست TCP کاربران را قطع نمی‌کند؛ اما در <strong>فایروال‌های Stateful و ADC/Load Balancerها</strong>، جدول نشست‌ها (Session Table) باید به‌صورت لحظه‌ای از طریق <strong>لینک اختصاصی State-Sync</strong> به عضو دوم منتقل شود تا هنگام Failover تمام تماس‌ها، VPNها و تراکنش‌های بانکی بدون قطع ادامه یابند.</p>"
+    },
+    {
+      "id": "ccde_10-section-11",
+      "title": "کژفهمی‌های رایج درباره High Availability",
+      "html": "<ul><li><strong>کژفهمی ۱: «N، N+1 و 2N همگی دقیقاً یک معنا دارند و فقط اسم‌های تجاری هستند.»</strong> واقعیت: N بدون یدکی است، N+1 یک عضو یدکی مشترک دارد و 2N آینه کامل ۱۰۰٪ است که حتی خرابی هم‌زمان در حین نگهداری را تاب می‌آورد.</li><li><strong>کژفهمی ۲: «داشتن یک شاسی بزرگ با دو Supervisor و ISSU برای رسیدن به ۹۹٫۹۹۹٪ کافی است.»</strong> واقعیت: خیر! یک شاسی واحد همچنان Backplane و بدنه مشترک دارد؛ <strong>Multi-Box HA</strong> برای دسترس‌پذیری بالای ۹۹٫۹۹٪ الزامی است.</li><li><strong>کژفهمی ۳: «اگر دو فایروال ۱۰G داریم، می‌توانیم با خیال راحت در حالت عادی ۱۶G ترافیک روی آن‌ها بیندازیم.»</strong> واقعیت: در صورت سقوط یکی از آن‌ها، فایروال باقی‌مانده زیر بار ۱۶G اشباع شده و کل سرویس قطع می‌شود!</li></ul>"
+    },
+    {
+      "id": "ccde_10-section-12",
+      "title": "اصلاح خطای نسخه قدیمی و چک‌لیست طراحی HA",
+      "html": "<p><strong>یادداشت ممیزی:</strong> عبارت غلط نگارشی نسخه قدیمی به فارسی صحیح و فنی اصلاح شد.</p><p><strong>چک‌لیست HA در CCDE:</strong> (۱) محاسبه ریاضی سری/موازی، (۲) انتخاب آگاهانه N+1 در برابر 2N، (۳) اولویت Multi-Box با کنترل‌پلین مستقل، (۴) رعایت سقف ۵۰٪ ظرفیت هر عضو در 2N، (۵) رویه تخلیه نرم ترافیک (Graceful Drain).</p>"
+    },
+    {
+      "id": "ccde_10-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> سه تجهیز هر کدام با دسترس‌پذیری ۹۹٫۹٪ به‌صورت سری بسته شده‌اند. دسترس‌پذیری کل و دقیقه قطعی سالانه چقدر است؟ اگر به شکل دو زنجیره موازی 2N بسته شوند چقدر می‌شود؟ <strong>پاسخ:</strong> سری برابر <code>99.7003%</code> (<strong>۱٬۵۷۶٫۳ دقیقه/سال</strong>) و موازی 2N برابر <code>99.9991%</code> (<strong>۴٫۷۲ دقیقه/سال</strong>) — بیش از ۳۳۰ برابر بهبود!</p><p><strong>تمرین ۲:</strong> یک دیتاسنتر ۴ سوئیچ Spine با توان هر کدام ۱۰ Tbps برای ترافیک حداکثر ۳۰ Tbps دارد. این کدام الگوی افزونگی است و هنگام خرابی ۱ Spine چه رخ می‌دهد؟ <strong>پاسخ:</strong> الگوی <strong>N+1</strong> (با <code>N=3</code>)؛ هنگام خرابی ۱ Spine، ۳ Spine باقی‌مانده دقیقاً ۳۰ Tbps را بدون هیچ افتی حمل می‌کنند و بسیار اقتصادی‌تر از 2N (۶ Spine) است!</p>"
+    },
+    {
+      "id": "ccde_10-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8326\" target=\"_blank\" rel=\"noopener\">RFC 8326 (Graceful BGP Session Shutdown for Hitless Maintenance)</a> و <a href=\"https://www.cisco.com/c/en/us/solutions/enterprise/design-zone-networking/index.html\" target=\"_blank\" rel=\"noopener\">مجموعه Cisco Validated Designs — High Availability Best Practices</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز ریاضی محلی در Python 3 برای محاسبات سری/موازی و الگوهای HA است و به هیچ کلاستر یا شاسی زنده متصل نیست.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Series Availability",
+      "fa": "دسترس‌پذیری اتصال سری",
+      "simple": "حاصل‌ضرب دسترس‌پذیری اجزای متوالی (A1×A2×A3) که همواره از تک‌تک اجزا کمتر است."
+    },
+    {
+      "term": "Parallel Availability",
+      "fa": "دسترس‌پذیری اتصال موازی",
+      "simple": "فرمول 1-(1-A1)(1-A2) که با حذف تک‌نقطه خرابی، دسترس‌پذیری کل را به‌صورت جهشی بالا می‌برد."
+    },
+    {
+      "term": "MTBF & MTTR",
+      "fa": "میانگین فاصله خرابی و زمان بازیابی",
+      "simple": "Availability = MTBF / (MTBF + MTTR)؛ کاهش MTTR با اتوماسیون اثر مستقیم بر SLA دارد."
+    },
+    {
+      "term": "N / N+1 / 2N Redundancy",
+      "fa": "الگوهای افزونگی بدون یدکی، یک یدکی و دوگانه",
+      "simple": "موازنه هزینه و تاب‌آوری میان صفر یدکی (N)، یک یدکی مشترک (N+1) و آینه کامل (2N)."
+    },
+    {
+      "term": "In-Box HA (SSO/NSF/ISSU)",
+      "fa": "افزونگی درون یک شاسی واحد",
+      "simple": "دو Supervisor و دو برق درون یک جعبه؛ مفید است اما جایگزین Multi-Box HA نمی‌شود."
+    },
+    {
+      "term": "Multi-Box HA",
+      "fa": "افزونگی چنددستگاهی فیزیکی مجزا",
+      "simple": "حذف کامل Backplane و شاسی به عنوان تک‌نقطه خرابی جهت دستیابی به ۹۹٫۹۹٪ و ۹۹٫۹۹۹٪."
+    },
+    {
+      "term": "50% Failover Headroom Rule",
+      "fa": "قانون سقف ۵۰٪ بار در جفت 2N",
+      "simple": "نگه داشتن مصرف عادی هر عضو زیر ۵۰٪ تا عضو سالم بتواند ۱۰۰٪ بار را هنگام خرابی همتا تحمل کند."
+    },
+    {
+      "term": "Shared Control Plane Risk",
+      "fa": "ریسک صفحه کنترل مشترک (Stack/VSS)",
+      "simple": "تبدیل شدن باگ یا ارتقای صفحه کنترل واحد به عامل قطعی هم‌زمان هر دو سوئیچ فیزیکی."
+    },
+    {
+      "term": "Independent Control Plane (vPC/ECMP)",
+      "fa": "صفحه کنترل مستقل در دو دستگاه",
+      "simple": "استاندارد طلایی HA در هسته و دیتاسنتر جهت ایزوله‌سازی کامل خطاها و ارتقای بدون قطعی."
+    },
+    {
+      "term": "Graceful Traffic Drain (g-shut)",
+      "fa": "تخلیه نرم ترافیک پیش از نگهداری",
+      "simple": "استفاده از BGP Graceful Shutdown و IGP Overload برای جابه‌جایی بدون افت بسته پیش از خاموشی."
+    },
+    {
+      "term": "Stateful Failover (State-Sync)",
+      "fa": "انتقال حالت‌مند نشست‌ها در فایروال",
+      "simple": "همگام‌سازی لحظه‌ای جدول نشست‌های TCP/NAT میان دو فایروال جهت جلوگیری از قطع کاربران."
+    },
+    {
+      "term": "Per-Tier Full Mesh",
+      "fa": "موازی‌سازی مش در تک‌تک لایه‌ها",
+      "simple": "اتصال متقاطع تمام گره‌های هر لایه به هر دو گره لایه بعدی که بالاترین عدد Availability را می‌دهد."
+    },
+    {
+      "term": "ISSU (In-Service Software Upgrade)",
+      "fa": "ارتقای سیستم‌عامل بدون قطعی سرویس",
+      "simple": "به‌روزرسانی نرم‌افزار سوپروایزر یدکی و Switchover نرم در حین عبور ترافیک."
+    },
+    {
+      "term": "Dual-Homing",
+      "fa": "اتصال دوگانه میزبان یا شعبه",
+      "simple": "اتصال هر سرور/شعبه به دو سوئیچ یا دو روتر فیزیکی مجزا برای حذف SPOF در لبه."
+    },
+    {
+      "term": "2N+1 Redundancy",
+      "fa": "افزونگی دوگانه به‌علاوه یک یدکی",
+      "simple": "معماری فوق‌حیاتی برای تحمل خرابی یک عضو حتی در حین خارج بودن نیمی دیگر برای نگهداری."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (ماشین‌حساب دقیق دسترس‌پذیری سری در برابر موازی 2N و Per-Tier Mesh) — بدون تجهیزات زنده",
+      "executionStatus": "اسکریپت مدل‌سازی ریاضی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ کلاستر یا شاسی زنده متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی ریاضی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ شاسی، فایروال یا کلاستر HA زنده در این محیط متصل نشده است.</p><p>این مدل‌ساز ریاضی دقیقاً نشان می‌دهد که چگونه سه تجهیز ۹۹٫۹٪ در حالت <code>Series</code> به <strong>۹۹٫۷۰۰۳٪ (۱٬۵۷۶٫۳ دقیقه قطعی/سال)</strong> سقوط می‌کنند، در حالت <code>Dual_Independent_Chains_2N</code> به <strong>۹۹٫۹۹۹۱٪ (۴٫۷۲ دقیقه/سال)</strong> و در حالت <code>Redundant_Per_Tier_Full_Mesh</code> به <strong>۹۹٫۹۹۹۷٪ (۱٫۵۸ دقیقه/سال)</strong> جهش می‌یابند!</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_10_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_10_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_10 (CCDE High Availability: Series vs Parallel Availability Math &amp; N+1 vs 2N)\nCalculates exact end-to-end availability for series vs parallel component chains,\nconverts availability into annual downtime minutes, and evaluates N vs N+1 vs 2N &amp; Multi-Box vs In-Box HA.\nNo real chassis routers, power feeds, or live clusters are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef series_availability(components: list[float]) -&gt; float:\n    a = 1.0\n    for c in components:\n        a *= c\n    return a\n\n\ndef parallel_availability(components: list[float]) -&gt; float:\n    unavail = 1.0\n    for c in components:\n        unavail *= (1.0 - c)\n    return 1.0 - unavail\n\n\ndef summarize_availability(label: str, avail: float) -&gt; dict:\n    downtime_min_yr = round(365.25 * 24 * 60 * (1.0 - avail), 2)\n    return {&quot;topology&quot;: label, &quot;availability_pct&quot;: round(avail * 100.0, 5), &quot;expected_downtime_min_per_year&quot;: downtime_min_yr}\n\n\ndef main() -&gt; None:\n    # Single path: Switch (99.9%) -&gt; Firewall (99.9%) -&gt; WAN Router (99.9%)\n    single_chain = series_availability([0.999, 0.999, 0.999])\n    # Dual independent parallel paths (2N multi-box): each path is a 3-device chain\n    dual_parallel_2n = parallel_availability([single_chain, single_chain])\n    # Dual per-layer mesh (parallel at every tier, then series across tiers)\n    mesh_per_tier = series_availability([\n        parallel_availability([0.999, 0.999]),\n        parallel_availability([0.999, 0.999]),\n        parallel_availability([0.999, 0.999]),\n    ])\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_HA_MATH_MODELER&quot;,\n        &quot;availability_models&quot;: [\n            summarize_availability(&quot;Single_Path_Series_3x99.9%&quot;, single_chain),\n            summarize_availability(&quot;Dual_Independent_Chains_2N&quot;, dual_parallel_2n),\n            summarize_availability(&quot;Redundant_Per_Tier_Full_Mesh&quot;, mesh_per_tier),\n        ],\n        &quot;redundancy_patterns&quot;: {\n            &quot;N&quot;: &quot;Zero spare — any single fault causes outage&quot;,\n            &quot;N+1&quot;: &quot;One shared spare (e.g., 3 routers carrying load of 2) — survives 1 fault cost-effectively&quot;,\n            &quot;2N&quot;: &quot;Full active mirror — survives full half-loss or simultaneous maintenance + fault&quot;,\n        },\n        &quot;in_box_vs_multi_box&quot;: &quot;In-Box SSO/NSF/ISSU cannot survive chassis/power/OS-wide bug -&gt; Multi-Box HA is mandatory for &gt;=99.99%&quot;,\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کاهش بیش از ۱٬۰۰۰ برابری زمان قطعی سالانه از <code>1576.3</code> دقیقه به <code>1.58</code> دقیقه صرفاً با تغییر توپولوژی به Per-Tier Mesh!</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع تخلیه نرم ترافیک پیش از نگهداری روتر HA (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference Hitless Maintenance Drain Sequence (CCDE Operations)\n# Step 1: Apply BGP Graceful Shutdown community (65535:0) + OSPF max-metric router-lsa\n# Step 2: Verify traffic drained to peer router (~0 pps on transit links)\n# Step 3: Upgrade OS / replace hardware with ZERO packet loss!</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس معماری دسترس‌پذیری بالا (High Availability) در CCDE",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "کدام گزینه تفاوت دقیق الگوهای افزونگی N، N+1 و 2N را در طراحی High Availability بیان می‌کند؟",
+      "options": [
+        "هر سه دقیقاً یک مفهوم هستند",
+        "N یعنی بدون یدکی (حداقل ظرفیت لازم)، N+1 یعنی یک عضو یدکی مشترک (اقتصادی و مقاوم به ۱ خرابی)، و 2N یعنی آینه کامل ۱۰۰٪ افزونه",
+        "N+1 یعنی حذف تمام مسیرهای پشتیبان",
+        "2N فقط برای کابل برق است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>انتخاب میان N، N+1 و 2N یکی از مستقیم‌ترین موازنه‌های هزینه در برابر SLA در معماری CCDE است.</p>"
+    },
+    {
+      "title": "اگر سه تجهیز (سوئیچ، فایروال، روتر WAN) هر کدام با دسترس‌پذیری ۹۹٫۹٪ به‌صورت سری (بدون افزونگی) پشت‌سرهم قرار گیرند، دسترس‌پذیری کل سیستم چگونه می‌شود؟",
+      "options": [
+        "همچنان ۹۹٫۹٪ باقی می‌ماند",
+        "به ۹۹٫۹۹۹٪ افزایش می‌یابد",
+        "به حدود ۹۹٫۷۰۰۳٪ (بیش از ۱٬۵۷۶ دقیقه قطعی در سال!) سقوط می‌کند زیرا در اتصال سری احتمال‌ها در هم ضرب می‌شوند",
+        "به ۱۰۰٪ می‌رسد"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>در زنجیره سری (<code>0.999 × 0.999 × 0.999</code>)، هر تجهیز اضافه بدون افزونگی، کل سیستم را آسیب‌پذیرتر می‌کند.</p>"
+    },
+    {
+      "title": "چرا افزونگی درون‌شاسی (In-Box HA مانند Dual Supervisor، SSO/NSF و ISSU) به تنهایی برای SLA ۹۹٫۹۹٪ به بالا کافی نیست؟",
+      "options": [
+        "زیرا Backplane شاسی، برق رک، باگ سیستم‌عامل کل دستگاه و خطای انسانی ریبوت کل شاسی همچنان یک تک‌نقطه خرابی (SPOF) باقی می‌مانند؛ Multi-Box HA الزامی است",
+        "زیرا Dual Supervisor کار نمی‌کند",
+        "زیرا ISSU فقط روی سوئیچ لایه ۲ است",
+        "کاملاً کافی است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تفکیک In-Box HA از Multi-Box HA یک قانون طلایی در تمام طرح‌های حیاتی CCDE است.</p>"
+    },
+    {
+      "title": "چرا در یک جفت فایروال 2N Active/Active، مصرف عادی هر فایروال نباید از ۴۰ تا ۵۰ درصد ظرفیت کل آن بیشتر شود؟",
+      "options": [
+        "برای زیبا بودن نمودار پایش",
+        "زیرا در صورت خرابی یکی از فایروال‌ها، فایروال زنده باید ۱۰۰٪ ترافیک کل سازمان را بدون اشباع و افت بسته تحمل کند",
+        "زیرا فایروال‌ها بالای ۵۰٪ خاموش می‌شوند",
+        "مهم نیست؛ می‌توان ۹۵٪ بار روی هر دو گذاشت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>نادیده گرفتن قانون ۵۰٪ Headroom باعث می‌شود در لحظه Failover، عضو دوم نیز زیر بار اضافه سقوط کند (Cascading Failure).</p>"
+    },
+    {
+      "title": "در مقایسه دو طراحی Multi-Box، چرا در هسته و دیتاسنتر فوق‌حیاتی، کنترل‌پلین مستقل (مانند vPC / EVPN-MH / L3 ECMP) بر کلاسترینگ کنترل‌پلین مشترک (StackWise/VSS) ترجیح داده می‌شود؟",
+      "options": [
+        "زیرا در کنترل‌پلین مستقل، یک باگ نرم‌افزاری یا ارتقای سیستم‌عامل روی دستگاه اول هرگز دستگاه دوم را هم‌زمان دچار قطعی نمی‌کند",
+        "زیرا StackWise از اترنت پشتیبانی نمی‌کند",
+        "زیرا ECMP فقط ۱ لینک دارد",
+        "هیچ فرقی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>حذف «صفحه کنترل مشترک» یکی از مهم‌ترین گام‌ها برای رسیدن به دسترس‌پذیری ۹۹٫۹۹۹٪ است.</p>"
+    },
+    {
+      "title": "در فرمول دسترس‌پذیری A = MTBF / (MTBF + MTTR)، چگونه می‌توان بدون خرید سخت‌افزار گران‌تر، دسترس‌پذیری را به‌طور چشمگیری بالا برد؟",
+      "options": [
+        "با افزایش MTTR",
+        "با کاهش شدید MTTR (زمان بازیابی) از طریق پایش هوشمند، اتوماسیون بازیابی، قطعه یدکی محلی (Cold Spare) و مستندات Runbook شفاف",
+        "با حذف بکاپ کانفیگ",
+        "ممکن نیست"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>کاهش زمان بازیابی از ۴ ساعت به ۴ دقیقه اثر عظیمی بر عدد نهایی SLA سالانه دارد.</p>"
+    },
+    {
+      "title": "کدام توپولوژی بیشترین دسترس‌پذیری ریاضی را بین سه گزینه زیر ایجاد می‌کند؟",
+      "options": [
+        "زنجیره سری تک‌مسیره (۹۹٫۷۰۰۳٪)",
+        "دو زنجیره موازی جداگانه بدون اتصال متقاطع (۹۹٫۹۹۹۱٪)",
+        "موازی‌سازی مش متقاطع در تک‌تک لایه‌ها (Per-Tier Full Mesh — ۹۹٫۹۹۹۷٪ / ۱٫۵۸ دقیقه در سال!)",
+        "همه یکسان‌اند"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>در Per-Tier Full Mesh حتی اگر سوئیچ چپ و روتر راست هم‌زمان خراب شوند، ترافیک از طریق لینک‌های متقاطع زنده می‌ماند!</p>"
+    },
+    {
+      "title": "برای ارتقای بدون قطعی (Hitless Maintenance) یکی از دو روتر مرزی HA، کدام اقدام پیش از خاموش کردن روتر باید انجام شود؟",
+      "options": [
+        "کشیدن ناگهانی کابل برق",
+        "تخلیه نرم ترافیک (Graceful Drain) با BGP Graceful Shutdown (RFC 8326) و OSPF Max-Metric / IS-IS Overload تا ترافیک بدون افت بسته به روتر همتا منتقل شود",
+        "حذف کل کانفیگ BGP",
+        "خاموش کردن هم‌زمان هر دو روتر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تخلیه نرم ترافیک (Graceful Drain) عملیات نگهداری را به صفر بسته افت (Zero Packet Loss) می‌رساند.</p>"
+    },
+    {
+      "title": "چرا در جفت فایروال HA، وجود لینک اختصاصی State-Sync برای Stateful Failover ضروری است؟",
+      "options": [
+        "برای انتقال لحظه‌ای جدول نشست‌های فعال (TCP/NAT/VPN) به فایروال دوم تا هنگام Failover ارتباطات جاری کاربران قطع نشوند",
+        "برای ارسال ایمیل به مدیر",
+        "برای افزایش سرعت اینترنت",
+        "فایروال‌ها Stateful نیستند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بدون همگام‌سازی جدول نشست‌ها، هنگام Failover همه کاربران مجبور به برقراری مجدد نشست و ورود دوباره می‌شوند.</p>"
+    },
+    {
+      "title": "در دیتاسنتری که ظرفیت ترافیک اوج ۳۰ ترابیت است و هر سوئیچ Spine توان ۱۰ ترابیت دارد، خرید ۴ سوئیچ Spine چه الگویی است و چرا انتخابی اقتصادی است؟",
+      "options": [
+        "الگوی N (بدون یدکی)",
+        "الگوی N+1 (با N=3): تنها با ۲۵٪ هزینه اضافه، خرابی کامل ۱ سوئیچ Spine را بدون افت ظرفیت تحمل می‌کند (به جای ۱۰۰٪ هزینه اضافه در 2N)",
+        "الگوی 2N+1",
+        "طراحی نامعتبر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در لایه‌های چندگره‌ای مانند Spineها یا سرورهای وب، الگوی N+1 بهترین بازگشت سرمایه HA را ایجاد می‌کند.</p>"
+    },
+    {
+      "title": "اگر دو مسیر موازی کاملاً مستقل هر کدام دسترس‌پذیری ۹۹٫۹٪ (0.999) داشته باشند، دسترس‌پذیری ترکیبی موازی آن‌ها چقدر است؟",
+      "options": [
+        "۹۹٫۸٪",
+        "۹۹٫۹۹۹۹٪ (شش نه؛ 1 - 0.001 × 0.001 = 0.999999)",
+        "۹۹٫۹٪",
+        "۵۰٪"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>1 - (1 - 0.999) × (1 - 0.999) = 1 - 0.000001 = 0.999999</code> (البته به شرط نبود هیچ Shared Fate پنهان!).</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "مدل‌سازی ریاضی محلی (Local Mock) در Python 3 برای محاسبه دقیق دسترس‌پذیری سری در برابر موازی 2N و Per-Tier Full Mesh",
+        "خاموش کردن واقعی یک فایروال بانکی",
+        "اتصال زنده به کلاستر VSS تولیدی",
+        "فقط متن نظری بدون کد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ تجهیز تولیدی متصل نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccde_10",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc8326",
+      "https://www.cisco.com/c/en/us/solutions/enterprise/design-zone-networking/index.html"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک مدل‌ساز ریاضی محلی در Python 3 است و به هیچ تجهیز یا کلاستر زنده متصل نیست."
+    ],
+    "legacyAuditFixes": [
+      "اصلاح عبارت غلط عربی-فارسی نسخه قدیمی («هماً یک الشيء هستند») و گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، قانون ۵۰٪ Headroom، کنترل‌پلین مستقل، Graceful Drain و ماشین‌حساب ریاضی HA."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccde_10-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-ccde",
+      "recommendedCourse": "ccde-design",
+      "blueprint": "/academy-assets/v5/blueprints/ccde_10.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_10_lab.py"
+    }
+  }
+}

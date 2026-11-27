@@ -1,0 +1,339 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccde_07",
+ "objectiveId": "ccde_07",
+ "kind": "lesson",
+ "track": "CCDE",
+ "course": "ccde-design",
+ "title": "۹.۷ CCDE — معماری اتصال ابری و چندابری (Cloud Connectivity): Colo Hub، Direct Connect و ۳ تله کلاسیک",
+ "titleEn": "CCDE Topic 7: Cloud Connectivity Architecture — Colo Cloud Exchange, Direct Connect vs VPN & 3 Classic Traps",
+ "domain": "Hybrid & Multi-Cloud Architecture",
+ "source": "Legacy ccde_07 rewritten and expanded",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 50,
+ "prerequisites": [
+  "ccde_05",
+  "ccde_06"
+ ],
+ "sections": [
+  {
+   "id": "ccde_07-section-1",
+   "title": "مسئله واقعی: چرا بسیاری از سازمان‌ها پس از مهاجرت به AWS/Azure، ناگهان با قبض‌های نجومی Egress، هم‌پوشانی IP و تاخیر غیرقابل پیش‌بینی غافلگیر می‌شوند؟",
+   "html": "<p>اتصال سازمان به ابر عمومی (AWS، Azure، GCP) فقط کشیدن یک تونل VPN ساده نیست! معمار CCDE باید سه تصمیم کلیدی بگیرد: (۱) انتخاب میان <strong>Site-to-Site IPsec VPN</strong>، <strong>Direct Connect / ExpressRoute</strong> و <strong>Colocation Cloud Exchange Hub</strong>؛ (۲) طراحی افزونگی واقعی در دو نقطه جغرافیایی مجزا (Dual-Location)؛ و (۳) خنثی‌سازی <strong>سه تله مرگبار Hybrid Cloud</strong> (هزینه‌های خروج داده Egress، تداخل آدرس‌های <code>RFC 1918</code> در ادغام‌ها و Hairpinning ترافیک بین‌ابری).</p>"
+  },
+  {
+   "id": "ccde_07-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_05</code> و <code>ccde_06</code>.</p><ul><li>مقایسه فنی و مالی <strong>Site-to-Site IPsec VPN</strong> در برابر <strong>Direct Connect / ExpressRoute / Cloud Interconnect</strong> (پهنای باند، SLA، سقف ۱٫۲۵Gbps تونل IPsec، رمزنگاری و هزینه Egress).</li><li>طراحی <strong>معماری Colocation Cloud Exchange Hub (مانند Equinix/Megaport)</strong> برای سازمان‌های چندابری (Multi-Cloud) جهت حذف Hairpinning.</li><li>شناخت و مهار <strong>۳ تله کلاسیک Hybrid Cloud</strong>: قبض Egress، هم‌پوشانی CIDR (Overlapping IPs) و نبود رمزنگاری ذاتی روی مدار خصوصی ابر!</li><li>طراحی <strong>Cloud Transit Hub (AWS Transit Gateway / Azure Virtual WAN / SD-WAN Cloud OnRamp)</strong> برای مقیاس ده‌ها VPC/VNet و صدها شعبه.</li></ul>"
+  },
+  {
+   "id": "ccde_07-section-3",
+   "title": "مقایسه جامع اتصال ابری: Site-to-Site IPsec VPN در برابر Direct Connect / ExpressRoute",
+   "html": "<table><thead><tr><th>معیار</th><th>Site-to-Site IPsec VPN</th><th>Direct Connect / ExpressRoute</th></tr></thead><tbody><tr><td>پهنای باند و تاخیر</td><td>معمولاً سقف <strong>۱٫۲۵ Gbps در هر تونل</strong>، نوسان اینترنت عمومی</td><td><strong>۱ تا ۱۰۰+ Gbps اختصاصی</strong> با تاخیر پایدار و قابل پیش‌بینی</td></tr><tr><td>هزینه خروج داده (Egress)</td><td>گران (~$0.09/GB روی اینترنت عمومی)</td><td><strong>تا ۷۵–۷۸٪ ارزان‌تر</strong> (~$0.02/GB) — روی ۵۰TB/ماه بیش از ۴۳٬۰۰۰ دلار صرفه‌جویی سالانه!</td></tr><tr><td>رمزنگاری</td><td><strong>رمزنگاری IPsec بومی</strong></td><td><strong>به‌طور پیش‌فرض بدون رمزنگاری!</strong> (نیازمند MACsec یا IPsec روی DX برای داده‌های حساس)</td></tr><tr><td>زمان راه‌اندازی و نقش</td><td>چند دقیقه؛ عالی برای Dev/Test، حجم کم و <strong>پشتیبان ارزان DX</strong></td><td>چند روز تا هفته؛ الزامی برای Production پرحجم و تاخیرحساس</td></tr></tbody></table>"
+  },
+  {
+   "id": "ccde_07-section-4",
+   "title": "نمودار معماری Colocation Cloud Exchange Hub و اتصال چندابری (Multi-Cloud)",
+   "html": "<p>نمودار زیر نقش هاب Colocation (نظیر Equinix) در اتصال پرسرعت، کم‌هزینه و بدون Hairpinning میان On-Prem و ابرهای چندگانه را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Cloud Connectivity Architecture: Colocation Cloud Exchange Hub, Direct Connect vs IPsec VPN and Hybrid Cloud Traps\"><rect x=\"14\" y=\"16\" width=\"212\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"120\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Enterprise On-Prem</text><text x=\"120\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">DC + SD-WAN Branches</text><text x=\"120\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Non-Overlapping IPAM!</text><text x=\"120\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">BGP Dual-Homed Edge</text><rect x=\"252\" y=\"16\" width=\"256\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Colocation Cloud Exchange Hub</text><text x=\"380\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">e.g. Equinix / Megaport (Dual-PoP)</text><text x=\"380\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Private Direct Connect / ExpressRoute</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Fast Cloud-to-Cloud Without Hairpin!</text><rect x=\"534\" y=\"16\" width=\"212\" height=\"114\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"640\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Multi-Cloud VPCs/VNets</text><text x=\"640\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">AWS TGW / Azure vWAN / GCP</text><text x=\"640\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">Dedicated DX Cuts Egress ~78%!</text><text x=\"640\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">IPsec VPN as Low-Cost Backup</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">3 Classic Hybrid Cloud Traps: (1) Surprise Egress Fees, (2) Overlapping RFC 1918 CIDRs, (3) Cloud Hairpinning!</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Always Deploy Redundant Direct Connect Across TWO Diverse Colo Locations + IPsec Encryption If Required</text></svg>"
+  },
+  {
+   "id": "ccde_07-section-5",
+   "title": "چرا «Colocation Cloud Exchange Hub» معماری طلایی Multi-Cloud در CCDE است؟",
+   "html": "<p>فرض کنید دیتابیس شما در Azure و موتور پردازش AI در AWS است. اگر هر ابر فقط به دیتاسنتر قدیمی شما در شهر دیگر وصل باشد، ترافیک بین AWS و Azure مجبور است صدها کیلومتر تا On-Prem رفته و دوباره برگردد (<strong>Cloud Hairpinning</strong>)! اما اگر یک جفت روتر/SD-WAN Gateway در <strong>دو مرکز Colocation خنثی (Carrier-Neutral Colo مثل Equinix/Megaport)</strong> نزدیک به Regionهای ابر بگذارید، با کراس‌کانکت‌های مجازی چندمیلی‌ثانیه‌ای (Virtual Cross-Connect) هم به AWS و هم به Azure/GCP وصل می‌شوید، ترافیک بین‌ابری مستقیم و با کمترین Egress تبادل می‌شود و شعب SD-WAN مستقیم به هاب نزدیک ابر متصل می‌گردند!</p>"
+  },
+  {
+   "id": "ccde_07-section-6",
+   "title": "تله شماره ۱: غافلگیری مالی Cloud Data Egress Fees (ورود رایگان، خروج گران!)",
+   "html": "<p>در ابرهای عمومی، ارسال داده <em>به داخل ابر (Ingress)</em> رایگان است، اما بیرون کشیدن داده از ابر (<em>Egress</em>) پول سنگینی دارد! یک اشتباه ساده معماری مثل ارسال روزانه ۵۰ ترابایت بکاپ یا ترافیک Hairpin شده روی اینترنت عمومی می‌تواند سالانه بیش از <strong>۵۵٬۰۰۰ دلار</strong> فقط قبض Egress بسازد، در حالی که روی Direct Connect همان حجم به <strong>۱۲٬۲۸۸ دلار</strong> (بیش از ۴۳٬۰۰۰ دلار صرفه‌جویی سالانه) کاهش می‌یابد و در حالت ایده‌آل داده‌های پردازشی باید کنار هم در یک Region بمانند!</p>"
+  },
+  {
+   "id": "ccde_07-section-7",
+   "title": "تله شماره ۲: هم‌پوشانی آدرس‌های خصوصی (Overlapping RFC 1918 CIDRs)",
+   "html": "<p>تیم‌های توسعه‌دهنده بدون هماهنگی با تیم شبکه، یک VPC جدید در AWS یا Azure با رنج پیش‌فرض <code>10.0.0.0/16</code> می‌سازند که دقیقاً با رنج دیتاسنتر On-Prem هم‌پوشانی دارد؛ یا شرکت یک استارتاپ جدید می‌خرد که همان <code>10.0.128.0/17</code> را دارد! نتیجه: مسیریابی مستقیم BGP شکست می‌خورد و مجبور به <strong>NAT دوطرفه پیچیده، PrivateLink / Endpoint Services یا بازآدرس‌دهی پرهزینه</strong> می‌شوید. راه حل CCDE: مدیریت متمرکز <strong>Enterprise IPAM</strong> از روز اول و تخصیص بلوک‌های غیرهم‌پوشان به هر Region ابری.</p>"
+  },
+  {
+   "id": "ccde_07-section-8",
+   "title": "تله شماره ۳: توهم افزونگی و رمزنگاری در Direct Connect / ExpressRoute",
+   "html": "<p>دو خطای مکرر در طراحی Direct Connect: (۱) گرفتن دو لینک DX در <strong>یک مکان Colocation واحد</strong> — قطع برق همان Colo هر دو لینک را می‌اندازد! برای SLA بالا (<code>99.99%</code>) باید حداقل در <strong>دو مکان جغرافیایی مستقل (Dual Diverse Locations)</strong> اتصال بگیرید (و یک IPsec VPN به عنوان پشتیبان نهایی)؛ (۲) فراموش کردن این نکته که <strong>مدار Direct Connect/ExpressRoute به خودی خود رمزنگاری نمی‌کند</strong>؛ پس برای ترافیک بانکی/قانونی باید <strong>MACsec (روی پورت ۱۰G/100G اختصاصی)</strong> یا <strong>IPsec over DX</strong> اضافه کنید!</p>"
+  },
+  {
+   "id": "ccde_07-section-9",
+   "title": "مقیاس‌پذیری داخل ابر: از VPC Peering نقطه‌به‌نقطه به Transit Gateway / Virtual WAN",
+   "html": "<p>پیرینگ مستقیم VPC Peering ویژگی <strong>غیرتعدی (Non-Transitive)</strong> دارد: اگر ۵۰ VPC داشته باشید، برای ارتباط همه با هم به <code>1,225</code> پیرینگ مجزا نیاز است! در معماری CCDE، کل VPCها به یک هاب مرکزی <strong>AWS Transit Gateway (TGW) / Azure Virtual WAN</strong> وصل می‌شوند و بازرسی امنیتی شرق-غرب و شمال-جنوب از طریق یک <strong>Inspection VPC (با GWLB + فایروال‌های NGFW)</strong> متمرکز می‌گردد.</p>"
+  },
+  {
+   "id": "ccde_07-section-10",
+   "title": "بهینه‌سازی دسترسی شعب به ابر: SD-WAN Cloud OnRamp",
+   "html": "<p>به جای کشیدن ترافیک ۱۰۰ شعبه از روی WAN به دیتاسنتر مرکزی و سپس به AWS/Azure، معماری <strong>SD-WAN Cloud OnRamp</strong> روترهای مجازی SD-WAN را مستقیم داخل Transit VPC/VNet یا در Colocation Hub مستقر می‌کند تا هر شعبه با کوتاه‌ترین مسیر، رمزنگاری سرتاسری و سیاست AAR مستقیم به نزدیک‌ترین Region ابری متصل شود.</p>"
+  },
+  {
+   "id": "ccde_07-section-11",
+   "title": "کژفهمی‌های رایج درباره Cloud Connectivity",
+   "html": "<ul><li><strong>کژفهمی ۱: «مدار Direct Connect / ExpressRoute چون خصوصی است، خودکار تمام داده‌ها را رمزنگاری می‌کند.»</strong> واقعیت: خیر! خصوصی بودن مسیر فیزیکی به معنای رمزنگاری نیست؛ برای الزامات Compliance باید MACsec یا IPsec روی DX فعال شود.</li><li><strong>کژفهمی ۲: «برای اتصال دو VPC به یک VPC سوم، کافی است A به B و B به C پیرینگ مستقیم شوند.»</strong> واقعیت: VPC Peering غیرتعدی (Non-Transitive) است و B ترافیک A را به C عبور نمی‌دهد؛ برای ترافیک ترانزیت به Transit Gateway / vWAN نیاز است.</li><li><strong>کژفهمی ۳: «انتقال داده از ابر به On-Prem رایگان است.»</strong> واقعیت: ورود داده رایگان اما خروج (Egress) یکی از بزرگ‌ترین هزینه‌های پنهان ابر است و باید دقیقاً در TCO مدل شود.</li></ul>"
+  },
+  {
+   "id": "ccde_07-section-12",
+   "title": "چک‌لیست پنج‌پرسشی طراحی اتصال ابری در CCDE",
+   "html": "<ol><li>آیا طرح IPAM سازمانی از <strong>هم‌پوشانی RFC 1918</strong> میان On-Prem و تمام VPC/VNetها پیشگیری کرده است؟</li><li>آیا هزینه سالانه <strong>Egress</strong> در انتخاب بین VPN و Direct Connect محاسبه شده است؟</li><li>آیا برای محیط چندابری از <strong>Dual-Location Colocation Cloud Exchange Hub</strong> جهت حذف Hairpinning استفاده شده است؟</li><li>آیا افزونگی در <strong>دو موقعیت Colo مجزا</strong> + IPsec Backup دیده شده است؟</li><li>آیا الزام رمزنگاری روی مدار خصوصی (<strong>MACsec یا IPsec over DX</strong>) بررسی شده است؟</li></ol>"
+  },
+  {
+   "id": "ccde_07-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> سازمانی ماهانه ۵۰ ترابایت داده از AWS خارج می‌کند (اینترنت عمومی <code>$0.09/GB</code> و Direct Connect برابر <code>$0.02/GB</code>). صرفه‌جویی سالانه Egress با Direct Connect چقدر است؟ <strong>پاسخ:</strong> هزینه اینترنت <code>$55,296/yr</code> و هزینه Direct Connect برابر <code>$12,288/yr</code> است؛ یعنی <strong>۴۳٬۰۰۸ دلار صرفه‌جویی سالانه فقط از محل Egress</strong>!</p><p><strong>تمرین ۲:</strong> شرکتی با On-Prem <code>10.0.0.0/16</code> شرکتی را با Azure VNet <code>10.0.128.0/17</code> می‌خرد. مشکل چیست و راه‌حل‌های موقت/دائم کدام‌اند؟ <strong>پاسخ:</strong> هم‌پوشانی مستقیم CIDR! راه‌حل سریع: <strong>PrivateLink / NAT در لبه</strong>؛ راه‌حل تمیز بلندمدت: تخصیص رنج غیرهم‌پوشان از IPAM مرکزی.</p>"
+  },
+  {
+   "id": "ccde_07-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://docs.aws.amazon.com/whitepapers/latest/aws-vpc-connectivity-options/welcome.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی معماری AWS VPC Connectivity Options &amp; Direct Connect Resiliency</a> و <a href=\"https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/hybrid-networking/expressroute\" target=\"_blank\" rel=\"noopener\">معماری مرجع Microsoft Azure ExpressRoute &amp; Virtual WAN</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای انتخاب اتصال ابری، هزینه Egress و کشف هم‌پوشانی CIDR است و به هیچ حساب AWS/Azure زنده متصل نیست.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Direct Connect / ExpressRoute",
+   "fa": "مدار خصوصی اختصاصی اتصال به ابر",
+   "simple": "اتصال فیزیکی/مجازی خصوصی با پهنای باند ۱ تا ۱۰۰G، تاخیر پایدار و هزینه Egress بسیار کمتر از اینترنت."
+  },
+  {
+   "term": "Colocation Cloud Exchange Hub",
+   "fa": "هاب کولوکیشن تبادل چندابری",
+   "simple": "مرکز خنثی (مانند Equinix/Megaport) برای اتصال چندمیلی‌ثانیه‌ای به AWS/Azure/GCP بدون Hairpinning."
+  },
+  {
+   "term": "Cloud Egress Fees",
+   "fa": "هزینه خروج داده از ابر",
+   "simple": "هزینه کلان خروج ترافیک از ابر عمومی به اینترنت یا On-Prem که باید در TCO معماری محاسبه شود."
+  },
+  {
+   "term": "Cloud Hairpinning",
+   "fa": "چرخش اضافی ترافیک بین‌ابری به On-Prem",
+   "simple": "عبور ترافیک بین دو ابر از مسیر دیتاسنتر قدیمی سازمان که تاخیر و هزینه Egress را مضاعف می‌کند."
+  },
+  {
+   "term": "Overlapping RFC 1918 CIDRs",
+   "fa": "هم‌پوشانی آدرس‌های خصوصی",
+   "simple": "تداخل رنج IP بین On-Prem و VPC/VNetهای ابری یا شرکت‌های خریداری‌شده که مانع مسیریابی مستقیم می‌شود."
+  },
+  {
+   "term": "AWS Transit Gateway / Azure vWAN",
+   "fa": "هاب ترانزیت مرکزی درون ابر",
+   "simple": "روتر ابری مقیاس‌پذیر برای اتصال ده‌ها VPC/VNet و عبور از محدودیت غیرتعدی VPC Peering."
+  },
+  {
+   "term": "Non-Transitive VPC Peering",
+   "fa": "پیرینگ غیرتعدی بین VPCها",
+   "simple": "در پیرینگ ساده A-B و B-C، ترافیک A نمی‌تواند از طریق B به C برسد و نیاز به هاب ترانزیت است."
+  },
+  {
+   "term": "Inspection VPC + GWLB",
+   "fa": "VPC متمرکز بازرسی امنیتی",
+   "simple": "تزریق شفاف فایروال‌های NGFW در مسیر ترافیک شمال-جنوب و شرق-غرب ابری با Gateway Load Balancer."
+  },
+  {
+   "term": "Dual Diverse Colo Locations",
+   "fa": "افزونگی در دو مکان کولوکیشن مستقل",
+   "simple": "اخذ دو مدار Direct Connect در دو مرکز فیزیکی جداگانه برای دستیابی به SLA ۹۹٫۹۹٪ و حذف SPOF."
+  },
+  {
+   "term": "IPsec over Direct Connect",
+   "fa": "رمزنگاری IPsec روی مدار خصوصی ابر",
+   "simple": "افزودن رمزنگاری سرتاسری روی مدار خصوصی (که ذاتاً رمزنگاری نشده) برای رعایت الزامات امنیتی."
+  },
+  {
+   "term": "SD-WAN Cloud OnRamp",
+   "fa": "اتصال بهینه شعب SD-WAN به ابر",
+   "simple": "توسعه مستقیم فابریک SD-WAN تا داخل ابر یا Colo Hub برای کمترین تاخیر شعب به اپلیکیشن‌های ابری."
+  },
+  {
+   "term": "PrivateLink / Private Endpoint",
+   "fa": "اتصال خصوصی در سطح سرویس",
+   "simple": "ارائه یک سرویس ابری مشخص در شبکه مقصد بدون نیاز به مسیریابی کل رنج IP (راه‌حل هم‌پوشانی CIDR)."
+  },
+  {
+   "term": "Virtual Cross-Connect (VXC)",
+   "fa": "کراس‌کانکت مجازی نرم‌افزاری",
+   "simple": "برقراری سریع اتصالات لایه ۲/۳ به چندین ارائه‌دهنده ابر روی یک پورت فیزیکی در Colo Exchange."
+  },
+  {
+   "term": "1.25 Gbps IPsec Tunnel Limit",
+   "fa": "سقف ۱٫۲۵ گیگابیت هر تونل VPN ابری",
+   "simple": "محدودیت معمول هر تونل VPN مدیریت‌شده ابری (قابل افزایش محدود با ECMP روی Transit Gateway)."
+  },
+  {
+   "term": "Enterprise IPAM",
+   "fa": "مدیریت متمرکز آدرس‌دهی سازمانی",
+   "simple": "سامانه واحد تخصیص بلوک‌های IP غیرهم‌پوشان به On-Prem و تمام Regionهای چندابری."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (انتخابگر اتصال ابری Colo/DX/VPN، محاسبه‌گر قبض Egress و ممیز هم‌پوشانی CIDR) — بدون حساب ابری واقعی",
+   "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ حساب AWS/Azure/GCP یا مرکز Colocation زنده متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ حساب AWS/Azure/GCP یا مرکز Colocation واقعی در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی سه بررسی اساسی معماری Cloud Connectivity را انجام می‌دهد: (۱) انتخاب میان <code>Colocation Cloud Exchange Hub</code>، <code>Direct Connect</code> و <code>IPsec VPN</code>، (۲) محاسبه صرفه‌جویی سالانه <strong>۴۳٬۰۰۸ دلاری Egress</strong> روی ۵۰TB/ماه، و (۳) ممیزی خودکار کشف هم‌پوشانی <code>10.0.0.0/16</code> با <code>10.0.128.0/17</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_07_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_07_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_07 (CCDE Cloud Connectivity: Direct Connect vs VPN, Colo Hub &amp; Hybrid Cloud Trap Auditor)\nEvaluates Direct Connect/ExpressRoute vs IPsec VPN vs Colocation Cloud Exchange Hub,\ncalculates annual cloud egress cost impact, and checks for RFC 1918 CIDR overlaps across VPCs/On-Prem.\nNo real AWS/Azure/GCP accounts or Equinix Colocation exchanges are connected.\n&quot;&quot;&quot;\n\nimport ipaddress\nimport json\n\n\ndef select_cloud_interconnect(bandwidth_gbps: float, needs_deterministic_latency: bool, multi_cloud: bool) -&gt; dict:\n    if multi_cloud and bandwidth_gbps &gt;= 5.0:\n        return {\n            &quot;recommended&quot;: &quot;Colocation Cloud Exchange Hub (e.g. Equinix Fabric) -&gt; Private Virtual Cross-Connects to AWS/Azure/GCP&quot;,\n            &quot;reason&quot;: &quot;Single high-speed aggregation hub avoids hairpinned cloud-to-cloud traffic and lowers Direct Connect egress fees&quot;,\n        }\n    if needs_deterministic_latency or bandwidth_gbps &gt; 1.25:\n        return {\n            &quot;recommended&quot;: &quot;Redundant Dedicated Direct Connect / ExpressRoute (Dual Diversely Routed Locations) + IPsec Backup&quot;,\n            &quot;reason&quot;: &quot;Bypasses public internet jitter, exceeds 1.25Gbps single-tunnel IPsec limit, and cuts cloud egress rate&quot;,\n        }\n    return {\n        &quot;recommended&quot;: &quot;Redundant Site-to-Site IPsec VPN (BGP ECMP) over Dual ISP&quot;,\n        &quot;reason&quot;: &quot;Fastest deployment and lowest OpEx for small workloads without strict latency SLA&quot;,\n    }\n\n\ndef detect_cidr_overlaps(allocations: dict[str, str]) -&gt; list[dict]:\n    items = [(name, ipaddress.ip_network(cidr)) for name, cidr in allocations.items()]\n    overlaps = []\n    for i in range(len(items)):\n        for j in range(i + 1, len(items)):\n            if items[i][1].overlaps(items[j][1]):\n                overlaps.append({&quot;site_a&quot;: items[i][0], &quot;cidr_a&quot;: str(items[i][1]), &quot;site_b&quot;: items[j][0], &quot;cidr_b&quot;: str(items[j][1])})\n    return overlaps\n\n\ndef cloud_egress_annual_cost(monthly_tb: float, internet_per_gb: float = 0.09, direct_connect_per_gb: float = 0.02) -&gt; dict:\n    inet_yr = round(monthly_tb * 1024 * internet_per_gb * 12, 2)\n    dx_yr = round(monthly_tb * 1024 * direct_connect_per_gb * 12, 2)\n    return {&quot;monthly_egress_tb&quot;: monthly_tb, &quot;internet_egress_annual_usd&quot;: inet_yr, &quot;direct_connect_egress_annual_usd&quot;: dx_yr, &quot;annual_egress_savings_usd&quot;: round(inet_yr - dx_yr, 2)}\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_CLOUD_MODELER&quot;,\n        &quot;interconnect_choices&quot;: {\n            &quot;multi_cloud_enterprise_10g&quot;: select_cloud_interconnect(10.0, True, True),\n            &quot;single_cloud_low_latency_2g&quot;: select_cloud_interconnect(2.0, True, False),\n            &quot;dev_test_small_300m&quot;: select_cloud_interconnect(0.3, False, False),\n        },\n        &quot;cloud_egress_trap_50tb_month&quot;: cloud_egress_annual_cost(50.0),\n        &quot;cidr_overlap_audit&quot;: detect_cidr_overlaps({\n            &quot;OnPrem_DC&quot;: &quot;10.0.0.0/16&quot;,\n            &quot;AWS_Prod_VPC&quot;: &quot;10.10.0.0/16&quot;,\n            &quot;Acquired_Azure_VNet&quot;: &quot;10.0.128.0/17&quot;,\n        }),\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> توصیه <code>Colocation Cloud Exchange Hub</code> برای سازمان چندابری ۱۰G، صرفه‌جویی <code>$43,008</code> Egress و کشف دقیق <code>OnPrem_DC &lt;-&gt; Acquired_Azure_VNet</code> در <code>cidr_overlap_audit</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع افزونگی حداکثری Direct Connect در سند HLD (اجرا نشده روی ابر زنده):</strong></p><pre dir=\"ltr\"><code># Reference AWS/Azure High-Resiliency Cloud Connectivity (99.99% SLA)\nColo_Pop_A (City1): DX_Circuit_1 (BGP Active) + MACsec/IPsec\nColo_Pop_B (City2): DX_Circuit_2 (BGP Active) + MACsec/IPsec\nEmergency Backup  : Redundant S2S IPsec VPN over Internet (Higher BGP AS-Path Prepend)</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس معماری اتصال ابری و چندابری CCDE (Colo Hub، Direct Connect و تله‌های Hybrid)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "کدام گزینه بهترین مزیت استفاده از Colocation Cloud Exchange Hub (مانند Equinix/Megaport) در معماری Multi-Cloud است؟",
+   "options": [
+    "حذف نیاز به BGP",
+    "ایجاد نقطه تجمع پرسرعت نزدیک به Regionهای ابری برای اتصال مستقیم و کم‌تاخیر به AWS/Azure/GCP و حذف Cloud Hairpinning به On-Prem",
+    "کاهش پهنای باند به ۱۰۰ مگابیت",
+    "اجبار به استفاده از IPv4 عمومی برای دیتابیس"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>هاب کولوکیشن بهترین معماری استاندارد CCDE برای سازمان‌های چندابری با تبادل داده بالا است.</p>"
+  },
+  {
+   "title": "چرا در ترافیک خروجی سنگین از ابر (مثلاً ۵۰ ترابایت در ماه)، استفاده از Direct Connect / ExpressRoute نسبت به Site-to-Site IPsec VPN صرفه‌جویی مالی چشمگیری دارد؟",
+   "options": [
+    "زیرا هزینه خروج داده (Egress) روی Direct Connect معمولاً ۷۰ تا ۷۸ درصد ارزان‌تر از Egress روی اینترنت عمومی است",
+    "زیرا Direct Connect هیچ هزینه ماهانه پورتی ندارد",
+    "زیرا VPN فقط متن ساده می‌فرستد",
+    "زیرا ابرها پول Egress نمی‌گیرند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>کاهش نرخ هر گیگابایت Egress (مثلاً از ۹ سنت به ۲ سنت) اغلب کل هزینه مدار خصوصی را جبران کرده و هزاران دلار صرفه‌جویی می‌سازد.</p>"
+  },
+  {
+   "title": "کدام نکته امنیتی مهم درباره مدارهای خصوصی Direct Connect / ExpressRoute اغلب توسط طراحان تازه‌کار فراموش می‌شود؟",
+   "options": [
+    "این مدارها از BGP پشتیبانی نمی‌کنند",
+    "این مدارها به‌طور پیش‌فرض رمزنگاری (Encryption) ندارند و برای داده‌های حساس باید MACsec یا IPsec روی آن‌ها اضافه شود",
+    "سرعت آن‌ها زیر ۱۰ مگابیت است",
+    "نمی‌توان دو عدد از آن‌ها خرید"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>خصوصی بودن مدار به معنای رمزنگاری نیست؛ همیشه در HLD الزامات محرمانگی و رمزنگاری روی DX/ER را مشخص کنید.</p>"
+  },
+  {
+   "title": "اگر On-Prem از 10.0.0.0/16 استفاده کند و یک شرکت خریداری‌شده در Azure رنج 10.0.128.0/17 داشته باشد، چه مشکلی پیش می‌آید و راه‌حل سریع سرویس‌محور کدام است؟",
+   "options": [
+    "هیچ مشکلی نیست و BGP خودکار حلش می‌کند",
+    "هم‌پوشانی مستقیم CIDR (Overlapping RFC 1918) رخ می‌دهد؛ راه‌حل سریع استفاده از PrivateLink/NAT در لبه و راه‌حل دائم تخصیص IP غیرهم‌پوشان در IPAM است",
+    "باید DNS را خاموش کرد",
+    "فقط در IPv6 این مشکل هست"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>تداخل آدرس‌های خصوصی یکی از ۳ تله مشهور Hybrid Cloud در پروژه‌های واقعی و آزمون CCDE است.</p>"
+  },
+  {
+   "title": "چرا برای دستیابی به SLA ۹۹٫۹۹٪ در اتصال Direct Connect، خرید دو مدار درون یک مرکز Colocation واحد ناکافی است؟",
+   "options": [
+    "زیرا کل آن مرکز Colocation (برق/فیبر/روترهای ارائه‌دهنده) یک سرنوشت خرابی مشترک (SPOF) است و دو مدار باید در دو مکان جغرافیایی مجزا (Dual Diverse Locations) باشند",
+    "زیرا یک مکان فقط یک پورت دارد",
+    "زیرا BGP فقط در دو شهر کار می‌کند",
+    "کافی است و نیازی به مکان دوم نیست"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>تنوع مکانی واقعی (Dual Location) پیش‌نیاز رسمی AWS/Azure برای SLA بالای ۹۹٫۹۹٪ است.</p>"
+  },
+  {
+   "title": "چرا در معماری سازمانی دارای ۵۰ VPC درون ابر، به جای VPC Peering نقطه‌به‌نقطه از AWS Transit Gateway (یا Azure Virtual WAN) استفاده می‌شود؟",
+   "options": [
+    "زیرا VPC Peering غیرتعدی (Non-Transitive) است و برای ۵۰ VPC به ۱٬۲۲۵ پیرینگ مجزا نیاز دارد، اما Transit Gateway یک هاب مقیاس‌پذیر با بازرسی امنیتی متمرکز فراهم می‌کند",
+    "زیرا VPC Peering از IP پشتیبانی نمی‌کند",
+    "زیرا Transit Gateway رایگان است",
+    "برای حذف فایروال"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Transit Gateway / Virtual WAN ساختار Hub-and-Spoke تمیز، قابل مدیریت و سازگار با Inspection VPC ایجاد می‌کند.</p>"
+  },
+  {
+   "title": "چه زمانی انتخاب Site-to-Site IPsec VPN روی اینترنت عمومی انتخاب هوشمندانه‌تر CCDE نسبت به Direct Connect است؟",
+   "options": [
+    "برای انتقال ۵۰ ترابایت ماهانه با تاخیر بسیار حساس",
+    "برای محیط‌های Dev/Test، حجم ترافیک کوچک (زیر ~۱Gbps)، نیاز به راه‌اندازی فوری در چند دقیقه، یا به عنوان پشتیبان ارزان برای Direct Connect",
+    "برای اتصال ۱۰ گیگابیتی دیتابیس بانکی",
+    "هرگز نباید استفاده شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>اصل تناسب‌سازی (Right-Sizing): خرید Direct Connect گران برای یک محیط آزمایشی کوچک مصداق Over-Engineering است.</p>"
+  },
+  {
+   "title": "پدیده «Cloud Hairpinning» چه ضرر دوگانه‌ای به سازمان‌های چندابری می‌زند؟",
+   "options": [
+    "فقط کابل‌کشی را زیبا می‌کند",
+    "ترافیک بین دو ابر را از مسیر طولانی دیتاسنتر On-Prem عبور می‌دهد که هم تاخیر (Latency) را بالا می‌برد و هم هزینه Egress و پهنای باند WAN را چندبرابر می‌کند",
+    "باعث رایگان شدن Egress می‌شود",
+    "تعداد VPCها را کاهش می‌دهد"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>قرار دادن مسیریابی بین‌ابری در یک Colocation Cloud Exchange نزدیک Regionها، Hairpinning را ریشه‌کن می‌کند.</p>"
+  },
+  {
+   "title": "محدودیت معمول پهنای باند یک تونل واحد Site-to-Site IPsec VPN مدیریت‌شده در ابرهای عمومی (مانند AWS VGW) چقدر است؟",
+   "options": [
+    "۱۰۰ گیگابیت بر ثانیه",
+    "حدود ۱٫۲۵ گیگابیت بر ثانیه در هر تونل",
+    "۱۰ مگابیت بر ثانیه",
+    "نامحدود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>سقف ~۱٫۲۵Gbps در هر تونل IPsec یکی از دلایل فنی گذار به ECMP روی TGW یا Direct Connect ۱۰G/100G است.</p>"
+  },
+  {
+   "title": "در معماری Cloud Security داخل AWS/Azure، الگوی «Inspection VPC + Gateway Load Balancer (GWLB)» چه مشکلی را حل می‌کند؟",
+   "options": [
+    "بازرسی متمرکز و مقیاس‌پذیر ترافیک شمال-جنوب و شرق-غرب توسط فایروال‌های NGFW بدون نیاز به استقرار فایروال جداگانه در تک‌تک VPCها",
+    "حذف کل فایروال‌ها",
+    "ایجاد هم‌پوشانی IP",
+    "کاهش سرعت اینترنت"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>متمرکزسازی بازرسی امنیتی در Inspection VPC هم هزینه لایسنس فایروال را کاهش می‌دهد و هم سیاست امنیتی یکپارچه می‌سازد.</p>"
+  },
+  {
+   "title": "چگونه معماری SD-WAN Cloud OnRamp دسترسی ۱۰۰ شعبه پراکنده را به سرورهای AWS/Azure بهینه می‌کند؟",
+   "options": [
+    "با بازگرداندن ترافیک همه ۱۰۰ شعبه به یک دیتاسنتر دور",
+    "با امتداد مستقیم فابریک SD-WAN تا داخل ابر یا Colocation Hub نزدیک هر منطقه جهت کمترین تاخیر و اعمال خودکار سیاست AAR",
+    "با حذف رمزنگاری شعب",
+    "با جایگزینی DNS"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Cloud OnRamp شعب را مستقیم و امن به نزدیک‌ترین دروازه ابری متصل می‌کند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "اتصال زنده به حساب AWS سازمانی و خرید مدار Direct Connect واقعی",
+    "فقط متن نظری بدون کد",
+    "مدل‌سازی محلی (Local Mock) در Python 3 برای انتخاب اتصال ابری (Colo/DX/VPN)، محاسبه صرفه‌جویی Egress و ممیزی خودکار هم‌پوشانی CIDR",
+    "پیکربندی واقعی Equinix Fabric"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ حساب ابری یا مدار زنده متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccde_07",
+  "sources": [
+   "https://docs.aws.amazon.com/whitepapers/latest/aws-vpc-connectivity-options/welcome.html",
+   "https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/hybrid-networking/expressroute"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ حساب AWS/Azure/GCP یا مرکز Colocation زنده متصل نیست."
+  ],
+  "legacyAuditFixes": [
+   "گسترش نسخه قدیمی (۱ پرسش) به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Inspection VPC/GWLB، SD-WAN Cloud OnRamp و مدل‌ساز Egress/CIDR Overlap."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccde_07-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccde",
+   "recommendedCourse": "ccde-design",
+   "blueprint": "/academy-assets/v5/blueprints/ccde_07.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_07_lab.py"
+  }
+ }
+}

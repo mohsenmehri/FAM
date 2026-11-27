@@ -1,0 +1,338 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccde_14",
+ "objectiveId": "ccde_14",
+ "kind": "lesson",
+ "track": "CCDE",
+ "course": "ccde-design",
+ "title": "۹.۱۴ CCDE — معماری امنیت شبکه: دفاع در عمق، Zero Trust و مهار گلوگاه فایروال شرق-غرب",
+ "titleEn": "CCDE Topic 14: Network Security Architecture — Defense in Depth, Zero Trust & East-West Firewall Bottleneck",
+ "domain": "Security Architecture",
+ "source": "Legacy ccde_14 rewritten and expanded",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 50,
+ "prerequisites": [
+  "ccde_08",
+  "ccie_sec"
+ ],
+ "sections": [
+  {
+   "id": "ccde_14-section-1",
+   "title": "مسئله واقعی: چرا معماری «پوسته سخت و هسته نرم» (فقط یک فایروال در اینترنت) و هم‌زمان «عبور کل ۲۰۰ گیگابیت شرق-غرب از یک فایروال مرکزی» هر دو شکست می‌خورند؟",
+   "html": "<p>در گذشته سازمان‌ها مثل یک قلعه قرون‌وسطایی بودند: دیوار بلند در لبه اینترنت و اعتماد مطلق در داخل (<strong>Castle-and-Moat</strong>) — پس یک فیشینگ ساده کل سازمان را تسلیم می‌کرد! اما وقتی تیم‌های امنیت در واکنش به آن، تمام ۲۰۰ گیگابیت ترافیک شرق-غرب دیتاسنتر را به سمت یک جفت فایروال مرکزی ۴۰ گیگابیتی Hairpin کردند، شبکه در ثانیه اول زیر بار <strong>گلوگاه فایروال شرق-غرب (East-West Bottleneck)</strong> و عدم تقارن (Asymmetry) سقوط کرد! معمار CCDE <strong>دفاع در عمق + Zero Trust توزیع‌شده + بازرسی هوشمند L7 انتخابی</strong> را یکپارچه می‌سازد.</p>"
+  },
+  {
+   "id": "ccde_14-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_08</code> و <code>ccie_sec</code>.</p><ul><li>طراحی <strong>دفاع در عمق (Defense in Depth)</strong> در تمام لایه‌ها (فیزیکی، لبه اینترنت، WAN، Campus، دیتاسنتر، ابر و میزبان/هویت).</li><li>تبدیل اصول <strong>Zero Trust (NIST SP 800-207)</strong> به معماری شبکه‌ای عملیاتی (هویت، وضعیت سلامت دستگاه، حداقل دسترسی و پایش مداوم).</li><li>حل <strong>تله گلوگاه فایروال شرق-غرب (East-West Bottleneck)</strong> با ترکیب <strong>اعمال توزیع‌شده L4 (SGT/EPG/Host eBPF)</strong> و <strong>بازرسی L7 متمرکز صرفاً روی جریان‌های پرریسک</strong>.</li><li>تحلیل موازنه <strong>TLS 1.3 Inspection</strong> در برابر <strong>حریم خصوصی/قوانین/کارایی</strong> و استفاده مکمل از <strong>Encrypted Traffic Analytics (ETA) و NDR</strong>.</li></ul>"
+  },
+  {
+   "id": "ccde_14-section-3",
+   "title": "فلسفه دفاع در عمق (Defense in Depth) و مرگ مدل Castle-and-Moat",
+   "html": "<p>در جهان دورکاری، موبایل و ابر (SaaS/IaaS)، دیگر «مرز داخلی امن» وجود ندارد! <strong>دفاع در عمق</strong> یعنی هیچ لایه امنیتی منفردی نباید آخرین خط دفاع باشد: (۱) لبه اینترنت با Anti-DDoS + NGFW + WAF، (۲) دسترسی کاربر با <code>802.1X + MFA + Posture</code>، (۳) شبکه داخلی با Macro VRF + Micro SGT/EPG، (۴) سرور/اپلیکیشن با EDR + Host FW + رمزنگاری mTLS، و (۵) صفحه کنترل/مدیریت با CoPP + AAA TACACS+ + شبکه OOB ایزوله!</p>"
+  },
+  {
+   "id": "ccde_14-section-4",
+   "title": "نمودار معماری امنیت CCDE: Zero Trust و درمان گلوگاه ۲۰۰G فایروال شرق-غرب",
+   "html": "<p>نمودار زیر تفکیک اعمال توزیع‌شده ۸۵٪ ترافیک شرق-غرب و هدایت صرفاً ۳۰G ترافیک پرریسک به فایروال NGFW را نمایش می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Network Security Architecture: Defense in Depth, Zero Trust and Solving the East-West Firewall Bottleneck\"><rect x=\"14\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"130\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Zero Trust (NIST 800-207)</text><text x=\"130\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Never Trust, Always Verify</text><text x=\"130\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Strong Identity + Posture</text><text x=\"130\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Least Privilege + Continuous</text><rect x=\"264\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">East-West FW Bottleneck</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">200G E-W -&gt; 40G Central FW</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">Central Hairpin Melts Down!</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">+ Stateful Asymmetry Drops!</text><rect x=\"514\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"630\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">CCDE Hybrid Security Cure</text><text x=\"630\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">85% E-W Enforced Distributed</text><text x=\"630\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">(SGT / ACI EPG / Host eBPF)</text><text x=\"630\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Only 30G High-Risk -&gt; NGFW!</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Defense in Depth + Selective TLS Inspection / ETA + Continuous NDR/SIEM Telemetry + Symmetric Paths</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Never Bolt Security On After Network Design — Embed Zero Trust at Every Architectural Layer from Day 1!</text></svg>"
+  },
+  {
+   "id": "ccde_14-section-5",
+   "title": "درمان گلوگاه فایروال شرق-غرب (East-West Bottleneck): مدل هیبریدی CCDE",
+   "html": "<p>فرض کنید دیتاسنتر ۲۰۰ گیگابیت ترافیک شرق-غرب (مانند دیتابیس-به-بکاپ، کش-به-وب) و یک جفت فایروال ۴۰ گیگابیتی دارد. کشیدن کل ۲۰۰G به فایروال مرکزی (Central Hairpin) فاجعه است! <strong>راه‌حل مهندسی CCDE:</strong> (۱) حدود ۸۵٪ ترافیک داخلی با <strong>اعمال توزیع‌شده در خط سرعت (Line-Rate Distributed Micro-Segmentation: ACI Contracts / VXLAN SGT / Host eBPF / SmartNIC DPU)</strong> کنترل می‌شود بدون هیچ گلوگاه و تاخیری؛ و (۲) تنها حدود ۱۵٪ جریان‌های واقعاً پرریسک یا بین‌زون کلان (<code>30 Gbps &lt; 40 Gbps</code>) از طریق <strong>Service Insertion (PBR-based / GWLB)</strong> به فایروال NGFW برای بازرسی عمیق L7/IPS هدایت می‌گردند!</p>"
+  },
+  {
+   "id": "ccde_14-section-6",
+   "title": "موازنه بازرسی ترافیک رمزنگاری‌شده: TLS Inspection در برابر ETA و حریم خصوصی",
+   "html": "<p>امروز بیش از ۹۵٪ ترافیک وب و بدافزارها رمزنگاری TLS 1.3 دارند. اگر هیچ دیدی نداشته باشید، فایروال عملاً کور است؛ اما اگر ۱۰۰٪ ترافیک را Decrypt کنید با سه مشکل روبرو می‌شوید: (۱) افت ۷۰٪ کارایی فایروال، (۲) شکستن اپلیکیشن‌های دارای <strong>Certificate Pinning</strong>، و (۳) نقض قوانین حریم خصوصی (بانکی/درمانی/GDPR)! <strong>طراحی متوازن CCDE:</strong> <strong>Selective TLS Decryption</strong> (استثنا کردن دسته‌های بانکی/درمانی/پین‌شده) همراه با <strong>تحلیل ترافیک رمزنگاری‌شده بدون رمزگشایی (ETA / JA3-JA4 Fingerprinting / NetFlow + NDR)</strong>.</p>"
+  },
+  {
+   "id": "ccde_14-section-7",
+   "title": "تضمین تقارن مسیر (Path Symmetry) برای تجهیزات Stateful و IPS",
+   "html": "<p>همان‌طور که در DCI و TE دیدیم، فایروال‌های Stateful دشمن سرسخت عدم تقارن‌اند! معمار CCDE هنگام قرار دادن جفت فایروال یا کلاستر Multi-Node در مسیر دیتاسنتر و ابر، حتماً با یکی از این ۴ الگوی استاندارد تقارن را تضمین می‌کند: (۱) کلاستر Active/Standby تمیز، (۲) <strong>Symmetric Hashing روی Load Balancer / GWLB (GENEVE)</strong>، (۳) همگام‌سازی Session Clustering (در حالت Active/Active)، یا (۴) <strong>Policy-Based Redirect (PBR/Service Graph) با Symmetric Return</strong> در فابریک ACI/EVPN.</p>"
+  },
+  {
+   "id": "ccde_14-section-8",
+   "title": "سخت‌سازی خود زیرساخت شبکه (Infrastructure Security Plane)",
+   "html": "<p>یک اشتباه رایج این است که امنیت را فقط در فایروال ببینند و خود روترها و سوئیچ‌ها بی‌دفاع رها شوند! ستون‌های سخت‌سازی زیرساخت: (۱) <strong>احراز هویت پروتکل‌های مسیریابی</strong> (OSPF SHA-256، BGP TCP-AO / GTSM TTL Security)، (۲) <strong>امنیت لایه ۲ دسترسی</strong> (DHCP Snooping، DAI، Port Security)، (۳) <strong>جداسازی کامل صفحه مدیریت (OOB + SSHv2/mTLS + RBAC TACACS+)</strong>، و (۴) <strong>بسیار مهم: Zero Default Credentials و Secure Boot</strong>.</p>"
+  },
+  {
+   "id": "ccde_14-section-9",
+   "title": "چشم بینای معماری امنیت: Telemetry پیوسته، NDR و SIEM/SOAR",
+   "html": "<p>پیشگیری ۱۰۰٪ غیرممکن است؛ بنابراین معماری امنیت بدون <strong>دید و کشف (Visibility &amp; Detection)</strong> ناقص است! ارسال یکپارچه <strong>NetFlow/IPFIX</strong>، لاگ فایروال، لاگ <strong>DNS Security</strong>، رویدادهای <strong>ISE/EDR</strong> و تپ‌های شبکه به <strong>NDR (Network Detection &amp; Response) و SIEM</strong> تضمین می‌کند هر حرکت ناهنجار (مثل اسکن داخلی یا استخراج داده DNS Tunneling) ظرف دقیقه کشف و با <strong>SOAR/ISE CoA</strong> قرنطینه شود.</p>"
+  },
+  {
+   "id": "ccde_14-section-10",
+   "title": "امنیت بدون اصطکاک برای نیروی کار دورکار: گذار از VPN سنگین به ZTNA + SASE",
+   "html": "<p>در VPN سنتی، به محض ورود کاربر دورکار، به کل ساب‌نت شرکت دسترسی شبکه پیدا می‌کرد و کل ترافیک او به HQ بازمی‌گشت. در معماری مدرن <strong>ZTNA (Zero Trust Network Access)</strong>، کاربر هیچ دسترسی شبکه‌ای عامی نمی‌گیرد؛ بلکه به ازای <em>هر اپلیکیشن مجاز</em> پس از سنجش هویت، MFA و سلامت لپ‌تاپ (Posture)، یک اتصال رمزنگاری‌شده نقطه-به-اپلیکیشن از نزدیک‌ترین PoP ابری SASE برقرار می‌شود.</p>"
+  },
+  {
+   "id": "ccde_14-section-11",
+   "title": "کژفهمی‌های رایج درباره معماری امنیت شبکه",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای امنیت کامل، باید ۱۰۰٪ ترافیک شرق-غرب دیتاسنتر را از یک فایروال فیزیکی مرکزی عبور دهیم.»</strong> واقعیت: Hairpin کردن صدها گیگابیت شرق-غرب به فایروال مرکزی، هم کارایی را نابود می‌کند و هم هزینه نجومی دارد؛ اعمال توزیع‌شده + بازرسی L7 انتخابی راه‌حل استاندارد CCDE است.</li><li><strong>کژفهمی ۲: «Zero Trust یعنی خرید یک محصول جادویی به نام Zero Trust Box.»</strong> واقعیت: Zero Trust یک <strong>رویکرد معماری</strong> (NIST SP 800-207) متشکل از هویت، Posture، Micro-Segmentation، رمزنگاری و پایش مداوم است نه یک جعبه!</li><li><strong>کژفهمی ۳: «فقط امنیت لبه اینترنت مهم است و داخل شبکه می‌توان بدون احراز هویت OSPF/BGP و بدون Telemetry کار کرد.»</strong> واقعیت: پس از اولین نفوذ داخلی یا فیشینگ، مهاجم دقیقاً نبود دفاع در عمق و نبود Telemetry داخلی را هدف می‌گیرد.</li></ul>"
+  },
+  {
+   "id": "ccde_14-section-12",
+   "title": "چک‌لیست پنج‌پرسشی ممیزی امنیت معماری CCDE",
+   "html": "<ol><li>آیا معماری از مدل Castle-and-Moat به <strong>Defense in Depth + Zero Trust</strong> ارتقا یافته است؟</li><li>آیا <strong>گلوگاه فایروال شرق-غرب</strong> با اعمال توزیع‌شده L4 + بازرسی L7 انتخابی حل شده است؟</li><li>آیا <strong>تقارن مسیر (Symmetry)</strong> برای تمام فایروال‌های Stateful تضمین شده است؟</li><li>آیا <strong>Selective TLS Inspection + ETA</strong> با رعایت قوانین حریم خصوصی طراحی شده است؟</li><li>آیا <strong>NDR / NetFlow / SIEM Telemetry</strong> و امنیت صفحه کنترل/مدیریت (OOB/CoPP/Routing Auth) کامل‌اند؟</li></ol>"
+  },
+  {
+   "id": "ccde_14-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> دیتاسنتری ۲۰۰ گیگابیت ترافیک شرق-غرب و یک فایروال ۴۰ گیگابیتی دارد. اگر ۸۵٪ ترافیک داخلی با ریزجداسازی توزیع‌شده (SGT/EPG/eBPF) اعمال شود، چقدر ترافیک به فایروال می‌رسد و آیا سالم است؟ <strong>پاسخ:</strong> تنها <code>30 Gbps</code> (<code>30 &lt; 40</code>) به فایروال می‌رسد و معماری هیبریدی کاملاً سالم، کم‌تاخیر و امن عمل می‌کند!</p><p><strong>تمرین ۲:</strong> سازمانی همه ستون‌های پیشگیری Zero Trust را پیاده کرده اما هنوز NDR/SIEM Telemetry پیوسته ندارد. چرا در ممیزی CCDE نقص دارد؟ <strong>پاسخ:</strong> زیرا یکی از اصول محوری NIST SP 800-207 <strong>پایش و ارزیابی پیوسته (Continuous Diagnostics &amp; Visibility)</strong> است؛ بدون آن نفوذهای پیچیده ماه‌ها پنهان می‌مانند.</p>"
+  },
+  {
+   "id": "ccde_14-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.nist.gov/publications/zero-trust-architecture\" target=\"_blank\" rel=\"noopener\">استاندارد رسمی NIST SP 800-207 (Zero Trust Architecture)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای ممیزی گلوگاه فایروال شرق-غرب و ستون‌های Zero Trust است و به هیچ فایروال یا SIEM زنده متصل نیست.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Defense in Depth",
+   "fa": "دفاع چندلایه در عمق",
+   "simple": "چیدن لایه‌های امنیتی مستقل در لبه، شبکه، هویت، میزبان و داده تا شکست یک لایه به سقوط کل سازمان نینجامد."
+  },
+  {
+   "term": "Zero Trust (NIST SP 800-207)",
+   "fa": "معماری اعتماد صفر",
+   "simple": "هرگز بر پایه مکان شبکه اعتماد نکن؛ پیوسته هویت، سلامت دستگاه و حداقل دسترسی را راستی‌آزمایی کن."
+  },
+  {
+   "term": "Castle-and-Moat Anti-Pattern",
+   "fa": "مدل منسوخ قلعه و خندق",
+   "simple": "تکیه صرف بر فایروال مرزی اینترنت و اعتماد کامل به همه ترافیک‌های داخلی سازمان."
+  },
+  {
+   "term": "East-West Firewall Bottleneck",
+   "fa": "گلوگاه فایروال مرکزی شرق-غرب",
+   "simple": "اشباع فایروال مرکزی هنگام Hairpin کردن کل ترافیک پرحجم سرور-به-سرور دیتاسنتر."
+  },
+  {
+   "term": "Distributed Micro-Segmentation",
+   "fa": "اعمال توزیع‌شده سیاست امنیتی",
+   "simple": "اجرای قوانین L4 در سرعت خط روی سوئیچ‌های Leaf/SGT یا کرنل میزبان (eBPF/DPU) برای حذف گلوگاه."
+  },
+  {
+   "term": "Selective TLS Decryption",
+   "fa": "رمزگشایی هوشمند و انتخابی TLS",
+   "simple": "بازرسی ترافیک رمزنگاری‌شده با استثنا کردن دسته‌های محرمانه (بانکی/درمانی) و اپلیکیشن‌های پین‌شده."
+  },
+  {
+   "term": "ETA (Encrypted Traffic Analytics)",
+   "fa": "تحلیل ترافیک رمزنگاری‌شده بدون رمزگشایی",
+   "simple": "کشف بدافزار در ترافیک TLS از طریق الگوی جریان، متادیتای Handshake و اثرانگشت JA3/JA4."
+  },
+  {
+   "term": "ZTNA (Zero Trust Network Access)",
+   "fa": "دسترسی اپلیکیشن‌محور اعتماد صفر",
+   "simple": "جایگزین مدرن VPN که به جای دسترسی کل شبکه، فقط اتصال تاییدشده به اپلیکیشن خاص می‌دهد."
+  },
+  {
+   "term": "NDR (Network Detection & Response)",
+   "fa": "کشف و واکنش تهدید در سطح شبکه",
+   "simple": "پایش پیوسته NetFlow و بسته‌ها برای کشف ناهنجاری‌های شرق-غرب و حرکت افقی مهاجم."
+  },
+  {
+   "term": "GWLB / Service Insertion",
+   "fa": "تزریق شفاف سرویس امنیتی",
+   "simple": "هدایت متقارن و خودکار تنها جریان‌های منتخب به کلاستر NGFW در دیتاسنتر و ابر."
+  },
+  {
+   "term": "Device Posture Assessment",
+   "fa": "ارزیابی سلامت امنیتی دستگاه",
+   "simple": "بررسی وضعیت EDR، آپدیت سیستم‌عامل و رمزنگاری دیسک پیش از اعطای دسترسی به منابع حساس."
+  },
+  {
+   "term": "Routing Protocol Auth (TCP-AO)",
+   "fa": "احراز هویت پروتکل‌های مسیریابی",
+   "simple": "محافظت از همسایگی‌های OSPF/IS-IS/BGP در برابر تزریق مسیر جعلی و Hijack داخلی."
+  },
+  {
+   "term": "GTSM (TTL Security)",
+   "fa": "حفاظت TTL نشست‌های BGP",
+   "simple": "پذیرش بسته‌های eBGP فقط با TTL=255 جهت جلوگیری از حملات راه‌دور به نشست روتر."
+  },
+  {
+   "term": "SmartNIC / DPU Offload",
+   "fa": "فایروال توزیع‌شده روی کارت شبکه هوشمند",
+   "simple": "اجرای فایروال Stateful و رمزنگاری IPsec درون تراشه کارت شبکه سرور بدون اشغال CPU میزبان."
+  },
+  {
+   "term": "SOAR + ISE CoA",
+   "fa": "قرنطینه خودکار واکنش سریع",
+   "simple": "جداسازی فوری دستگاه آلوده در لحظه کشف تهدید توسط SIEM/NDR از طریق تغییر مجوز لحظه‌ای ISE."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (مدل‌ساز گلوگاه ۲۰۰G فایروال شرق-غرب و ممیز ۶ ستون Zero Trust) — بدون فایروال زنده",
+   "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ فایروال NGFW یا SIEM زنده متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ فایروال NGFW، سرور ISE یا سامانه SIEM زنده در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو تصمیم کلیدی امنیت CCDE را نشان می‌دهد: (۱) شکست حتمی ارسال ۲۰۰G شرق-غرب به فایروال مرکزی ۴۰G در برابر سلامت کامل مدل هیبریدی (۸۵٪ اعمال توزیع‌شده + ۳۰G به NGFW)، و (۲) ممیزی ۶ ستون <strong>Zero Trust (NIST SP 800-207)</strong> با کشف نبود <code>continuous_telemetry_siem_ndr</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_14_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_14_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_14 (CCDE Network Security Architecture: Defense in Depth, Zero Trust &amp; EW Firewall Bottleneck)\nAudits Defense-in-Depth &amp; Zero Trust controls (NIST SP 800-207) and models the classic East-West\nCentral Firewall Hairpin Bottleneck vs Distributed Micro-Segmentation + Selective L7 Inspection.\nNo real NGFW appliances, SIEMs, or production fabrics are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef model_east_west_firewall_bottleneck(east_west_gbps: float, central_fw_capacity_gbps: float, distributed_microseg_offload_pct: float) -&gt; dict:\n    central_only_overloaded = east_west_gbps &gt; central_fw_capacity_gbps\n    remaining_for_fw = round(east_west_gbps * (1.0 - distributed_microseg_offload_pct), 2)\n    hybrid_overloaded = remaining_for_fw &gt; central_fw_capacity_gbps\n    return {\n        &quot;total_east_west_gbps&quot;: east_west_gbps,\n        &quot;central_ngfw_capacity_gbps&quot;: central_fw_capacity_gbps,\n        &quot;central_hairpin_only_melts_down&quot;: central_only_overloaded,\n        &quot;after_distributed_l4_microseg_gbps&quot;: remaining_for_fw,\n        &quot;hybrid_design_healthy&quot;: not hybrid_overloaded,\n    }\n\n\ndef audit_zero_trust_pillars(controls: dict[str, bool]) -&gt; dict:\n    missing = [k for k, v in controls.items() if not v]\n    return {&quot;maturity&quot;: &quot;ZERO_TRUST_ALIGNED&quot; if not missing else &quot;GAPS_FOUND&quot;, &quot;missing_controls&quot;: missing}\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_SECURITY_ARCH_MODELER&quot;,\n        &quot;east_west_inspection_tradeoff&quot;: model_east_west_firewall_bottleneck(\n            east_west_gbps=200.0,\n            central_fw_capacity_gbps=40.0,\n            distributed_microseg_offload_pct=0.85,\n        ),\n        &quot;zero_trust_architecture_audit&quot;: audit_zero_trust_pillars({\n            &quot;strong_identity_mfa_8021x&quot;: True,\n            &quot;device_posture_verification&quot;: True,\n            &quot;least_privilege_microsegmentation&quot;: True,\n            &quot;encrypted_traffic_analytics_or_selective_tls&quot;: True,\n            &quot;symmetric_stateful_firewall_paths&quot;: True,\n            &quot;continuous_telemetry_siem_ndr&quot;: False,\n        }),\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>central_hairpin_only_melts_down: True</code>، <code>hybrid_design_healthy: True</code> (<code>30.0 Gbps</code>) و کشف شکاف <code>continuous_telemetry_siem_ndr</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع ماتریس معماری امنیت چندلایه در سند HLD (اجرا نشده روی تجهیزات زنده):</strong></p><pre dir=\"ltr\"><code># Reference CCDE Security Placement Matrix (HLD)\n# Perimeter Edge : Anti-DDoS + HA NGFW (Selective TLS) + WAF\n# Campus / WAN   : 802.1X/ISE + SGT + SD-WAN IPsec + SASE/ZTNA\n# Data Center EW : Distributed L4 (EPG/SGT/eBPF) + Selective L7 Service Insertion\n# Visibility     : NetFlow/IPFIX + NDR + SIEM + Automated ISE CoA Quarantine</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس معماری امنیت شبکه CCDE (دفاع در عمق، Zero Trust و فایروال شرق-غرب)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "چرا عبور دادن ۱۰۰٪ ترافیک ۲۰۰ گیگابیتی شرق-غرب دیتاسنتر از یک جفت فایروال مرکزی ۴۰ گیگابیتی یک خطای معماری است و راه‌حل CCDE چیست؟",
+   "options": [
+    "باعث گلوگاه شدید (East-West Bottleneck) و سقوط فایروال می‌شود؛ راه‌حل CCDE اعمال توزیع‌شده L4 در سرعت خط (SGT/EPG/eBPF) برای اکثریت ترافیک و ارسال صرفاً جریان‌های پرریسک به NGFW است",
+    "فایروال ۴۰G خودکار ۲۰۰G را رد می‌کند",
+    "باید فایروال را کلاً حذف کرد",
+    "فقط کافی است سرعت سرورها را کم کنیم"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>ترکیب اعمال توزیع‌شده با بازرسی L7 انتخابی، هم امنیت بالا و هم مقیاس صدها گیگابیتی دیتاسنتر را یکجا تامین می‌کند.</p>"
+  },
+  {
+   "title": "فلسفه اصلی معماری Zero Trust (استاندارد NIST SP 800-207) در برابر مدل منسوخ Castle-and-Moat چیست؟",
+   "options": [
+    "اعتماد کامل به هر دستگاهی که داخل کابل LAN دفتر است",
+    "«هرگز بر پایه مکان شبکه اعتماد نکن، پیوسته راستی‌آزمایی کن» — احراز هویت قوی، ارزیابی سلامت دستگاه (Posture)، حداقل دسترسی و پایش پیوسته",
+    "باز گذاشتن تمام پورت‌های داخلی",
+    "حذف رمزنگاری داخل سازمان"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Zero Trust فرض می‌کند شبکه داخلی نیز می‌تواند آلوده باشد (Assume Breach) و هر دسترسی را مستقل تایید می‌کند.</p>"
+  },
+  {
+   "title": "چرا در معماری بازرسی ترافیک رمزنگاری‌شده (TLS 1.3)، از رویکرد «Selective TLS Decryption + ETA» به جای رمزگشایی ۱۰۰٪ کورکورانه استفاده می‌شود؟",
+   "options": [
+    "برای رعایت قوانین حریم خصوصی (بانکی/درمانی/GDPR)، جلوگیری از شکستن اپلیکیشن‌های دارای Certificate Pinning و حفظ کارایی فایروال در کنار حفظ دید تهدید با ETA/NDR",
+    "زیرا TLS 1.3 اصلا امن نیست",
+    "زیرا ETA همه رمزها را می‌شکند",
+    "فرقی ندارند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>موازنه بین دید امنیتی، حریم خصوصی قانونی و کارایی سخت‌افزار از ظریف‌ترین تصمیمات امنیتی CCDE است.</p>"
+  },
+  {
+   "title": "فناوری ETA (Encrypted Traffic Analytics) چگونه بدون رمزگشایی محتوای بسته TLS، ترافیک بدافزار را شناسایی می‌کند؟",
+   "options": [
+    "با شکستن کلید ۲۵۶بیتی AES",
+    "با تحلیل الگوی طول/زمان‌بندی بسته‌ها، متادیتای اولیه TLS Handshake و اثرانگشت‌هایی نظیر JA3/JA4 همراه با یادگیری ماشین",
+    "با خاموش کردن HTTPS",
+    "فقط روی HTTP کار می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>ETA امکان کشف فرماندهی بدافزار (C2) را حتی روی ترافیک‌های استثناشده از رمزگشایی فراهم می‌کند.</p>"
+  },
+  {
+   "title": "چگونه می‌توان در یک دیتاسنتر یا ابر، تقارن مسیر (Path Symmetry) را هنگام تزریق کلاستر فایروال‌های NGFW در مسیر ترافیک تضمین کرد؟",
+   "options": [
+    "با Symmetric Hashing روی Load Balancer / GWLB (یا Service Graph با Symmetric Return) و State-Sync میان فایروال‌ها",
+    "با رها کردن مسیریابی ECMP بدون هماهنگی",
+    "با خاموش کردن بررسی Stateful فایروال",
+    "تقارن اهمیتی ندارد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>بدون تضمین تقارن، تزریق فایروال Active/Active به سرعت باعث Drop بسته‌های مشروع کاربران می‌شود.</p>"
+  },
+  {
+   "title": "مزیت کلیدی ZTNA (Zero Trust Network Access) نسبت به VPN راه‌دور سنتی چیست؟",
+   "options": [
+    "اعطای دسترسی کامل به کل ساب‌نت داخلی شرکت",
+    "اعطای دسترسی حداقلی در سطح اپلیکیشن خاص (نه کل شبکه) پس از بررسی هویت و سلامت دستگاه (Posture)، بدون باز کردن سطح حمله حرکت افقی",
+    "حذف کامل MFA",
+    "نیاز نداشتن به اینترنت"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>ZTNA سطح حمله دورکاران را به شدت کوچک کرده و ریسک سرایت بدافزار از لپ‌تاپ خانگی به کل LAN را حذف می‌کند.</p>"
+  },
+  {
+   "title": "چرا وجود NDR (Network Detection & Response) و SIEM Telemetry پیوسته حتی در شبکه‌ای با قوی‌ترین فایروال‌ها و Micro-Segmentation الزامی است؟",
+   "options": [
+    "زیرا پیشگیری ۱۰۰٪ وجود ندارد و بدون دید پیوسته (NetFlow/DNS/Logs)، تهدیدهای پیشرفته و حرکت افقی ماه‌ها پنهان می‌مانند",
+    "زیرا NDR جایگزین فایروال است",
+    "فقط برای پر کردن هارددیسک",
+    "الزامی نیست"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>پایش پیوسته و واکنش سریع (Detection & Response) نیمه دوم حیاتی هر معماری امنیتی بالغ است.</p>"
+  },
+  {
+   "title": "کدام اقدامات مستقیماً «صفحه زیرساخت شبکه (Infrastructure Security Plane)» را در برابر دستکاری روترها و سوئیچ‌ها محافظت می‌کنند؟",
+   "options": [
+    "احراز هویت پروتکل‌های مسیریابی (OSPF SHA-256 / BGP TCP-AO / GTSM)، امنیت لایه ۲ (DAI/DHCP Snooping)، CoPP و مدیریت ایزوله OOB با TACACS+",
+    "فقط گذاشتن فایروال در اینترنت",
+    "فعال کردن Telnet و SNMPv1",
+    "حذف رمز کنسول"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>اگر خود صفحه کنترل و مدیریت روترها امن نباشد، مهاجم می‌تواند کل ترافیک را از اطراف فایروال دور بزند!</p>"
+  },
+  {
+   "title": "نقش SmartNIC / DPU (Data Processing Unit) در معماری امنیت دیتاسنترهای مدرن چیست؟",
+   "options": [
+    "افزایش مصرف برق بدون کارکرد",
+    "اجرای فایروال توزیع‌شده Stateful، ریزجداسازی و رمزنگاری IPsec درون تراشه سخت‌افزاری کارت شبکه هر سرور بدون اشغال CPU سرور و بدون گلوگاه فایروال مرکزی",
+    "حذف کابل شبکه",
+    "تبدیل سرور به سوئیچ لایه ۱"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>DPUها فایروال Stateful را مستقیم به لبه هر سرور می‌برند و هم مقیاس خطی می‌دهند و هم سیستم‌عامل میزبان را از فایروال ایزوله نگه می‌دارند.</p>"
+  },
+  {
+   "title": "در مدل دفاع در عمق (Defense in Depth)، چرا نباید امنیت را در مرحله آخر (پس از پایان طراحی شبکه) به صورت وصله اضافه کرد؟",
+   "options": [
+    "زیرا اضافه کردن فایروال و سگمنتاسیون به شبکه‌ای که از اول برای تقارن، VRF و Zero Trust طراحی نشده، منجر به گلوگاه، عدم تقارن و هزینه‌های بازطراحی سنگین می‌شود",
+    "زیرا فایروال‌ها دیر روشن می‌شوند",
+    "اضافه کردن در آخر ساده‌تر است",
+    "فرقی ندارد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>اصل Security-by-Design در CCDE: امنیت تاروپود معماری از روز اول است، نه برچسب روز آخر.</p>"
+  },
+  {
+   "title": "یکپارچه‌سازی SOAR/SIEM با Cisco ISE CoA (Change of Authorization) چه قابلیتی به تیم امنیت می‌دهد؟",
+   "options": [
+    "قرنطینه خودکار و ثانیه‌ای یک دستگاه آلوده در لبه پورت شبکه بلافاصله پس از کشف رفتار مشکوک توسط NDR/EDR",
+    "افزایش سرعت دانلود بدافزار",
+    "حذف تمام لاگ‌ها",
+    "خاموش کردن کل دیتاسنتر"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>مهار خودکار (Automated Containment) زمان توقف تهدید را از چند ساعت به چند ثانیه کاهش می‌دهد.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "تست نفوذ زنده روی فایروال بانکی",
+    "اتصال زنده به SIEM سازمانی",
+    "فقط متن نظری بدون کد",
+    "مدل‌سازی محلی (Local Mock) در Python 3 برای شبیه‌سازی گلوگاه فایروال شرق-غرب ۲۰۰G در برابر مدل هیبریدی و ممیزی ۶ ستون Zero Trust"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ فایروال یا SIEM زنده متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccde_14",
+  "sources": [
+   "https://www.nist.gov/publications/zero-trust-architecture"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ فایروال NGFW یا SIEM زنده متصل نیست."
+  ],
+  "legacyAuditFixes": [
+   "گسترش نسخه قدیمی (۱ پرسش) به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، SmartNIC/DPU، Selective TLS+ETA، ZTNA و مدل‌ساز گلوگاه شرق-غرب."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccde_14-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccde",
+   "recommendedCourse": "ccde-design",
+   "blueprint": "/academy-assets/v5/blueprints/ccde_14.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_14_lab.py"
+  }
+ }
+}

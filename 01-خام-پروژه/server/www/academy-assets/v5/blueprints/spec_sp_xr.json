@@ -1,0 +1,338 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "spec_sp_xr",
+ "objectiveId": "spec_sp_xr",
+ "kind": "lesson",
+ "track": "Specialist",
+ "course": "spec-sp",
+ "title": "۷.۴ Service Provider: سیستم‌عامل Cisco IOS-XR، مدل Two-Stage Commit و زبان RPL",
+ "titleEn": "Service Provider Deep Dive: Cisco IOS-XR Architecture, Two-Stage Commit, Rollback & RPL",
+ "domain": "Service Provider Routing",
+ "source": "Legacy spec_sp_xr rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [
+  "spec_sp"
+ ],
+ "sections": [
+  {
+   "id": "spec_sp_xr-section-1",
+   "title": "مسئله واقعی: یک خطای تایپی روی روتر Core مخابراتی یعنی قطع اینترنت میلیون‌ها کاربر — IOS-XR چگونه از آن جلوگیری می‌کند؟",
+   "html": "<p>در IOS کلاسیک، به محض زدن کلید Enter روی یک دستور اشتباه BGP یا ACL، همان ثانیه در حافظه زنده اعمال می‌شود و ممکن است ارتباط SSH خودتان را قطع کند یا مسیرهای میلیون‌ها مشترک را خراب کند! <strong>Cisco IOS-XR</strong> (سیستم‌عامل ۶۴بیتی لینوکسی/میکروکرنل روترهای مخابراتی ASR 9000، NCS 5500 و Cisco 8000) برای بقا در مقیاس مخابراتی ساخته شده است: فرآیندهای کاملاً ایزوله، <strong>تغییر دومرحله‌ای (Two-Stage Commit)</strong>، <strong><code>commit confirmed</code> ضدقفل</strong>، <strong>Rollback فوری</strong> و زبان قدرتمند <strong>RPL (Route Policy Language)</strong>.</p>"
+  },
+  {
+   "id": "spec_sp_xr-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> مبانی BGP، MPLS و درس <code>spec_sp</code>.</p><ul><li>تبیین معماری میکروکرنل و حافظه محافظت‌شده <strong>Cisco IOS-XR</strong> (جداسازی فرآیندها و نصب <code>SMU</code> بدون ریبوت).</li><li>تسلط بر چرخه <strong>Two-Stage Commit</strong> (<code>show configuration</code>، <code>commit confirmed</code>، <code>commit best-effort</code>، <code>abort</code> و <code>rollback configuration</code>).</li><li>نوشتن و تحلیل سیاست‌های <strong>RPL (Route Policy Language)</strong> شامل <code>prefix-set</code>، <code>as-path-set</code>، <code>pass</code>، <code>drop</code>، <code>done</code> و سیاست‌های پارامتردار.</li><li>شناخت قانون ایمنی <strong>eBGP Default-Deny (RFC 8212)</strong> در IOS-XR و جلوگیری از نشت ناخواسته مسیر (BGP Route Leak).</li></ul>"
+  },
+  {
+   "id": "spec_sp_xr-section-3",
+   "title": "معماری میکروکرنل IOS-XR: چرا کرش کردن فرآیند BGP روتر را ریبوت نمی‌کند؟",
+   "html": "<p>در IOS-XR هر سرویس (<code>bgp</code>، <code>isis</code>، <code>ospf</code>، <code>ldp</code>، <code>fib_mgr</code>) در فضای حافظه محافظت‌شده و مجزای خود (Process Isolation) اجرا می‌شود. اگر باگی باعث کرش فرآیند OSPF شود، سیستم‌عامل صرفاً همان فرآیند را در کسری از ثانیه Restart می‌کند بدون آنکه BGP، ترافیک سخت‌افزاری FIB یا کل روتر متوقف شود! همچنین بسته‌های اصلاحی امنیتی (<strong>SMU — Software Maintenance Upgrade</strong>) اغلب بدون ریبوت کامل روتر (Hitless) نصب می‌شوند.</p>"
+  },
+  {
+   "id": "spec_sp_xr-section-4",
+   "title": "نمودار معماری IOS-XR: میکروکرنل، چرخه Commit Confirmed و موتور RPL",
+   "html": "<p>نمودار زیر سه ستون اصلی Cisco IOS-XR را نشان می‌دهد: ایزوله‌سازی فرآیندها، چرخه ایمن Two-Stage Commit و زبان RPL با ایمنی eBGP Default-Deny.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco IOS-XR Microkernel, Two-Stage Commit Confirmed and RPL Policy Engine\"><rect x=\"14\" y=\"16\" width=\"222\" height=\"188\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"125\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">IOS-XR Microkernel (64-bit)</text><text x=\"125\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Isolated Processes (bgp, isis, ospf)</text><text x=\"125\" y=\"84\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Process Crash != Router Reboot</text><text x=\"125\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Modular Packages (SMU Hot-Patch)</text><text x=\"125\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">ASR 9000 / NCS 5500 / Cisco 8000</text><text x=\"125\" y=\"160\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1e3a8a\">gNMI / gRPC / NETCONF Native</text><rect x=\"258\" y=\"16\" width=\"244\" height=\"188\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Two-Stage Commit Model</text><text x=\"380\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">1. Edit Target Config (Staged)</text><text x=\"380\" y=\"90\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">2. show configuration (Review Diff)</text><text x=\"380\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#b45309\">3. commit confirmed 60</text><text x=\"380\" y=\"138\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Confirmed =&gt; Commit ID Saved</text><text x=\"380\" y=\"158\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">Lockout =&gt; Auto Rollback in 60s!</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">rollback configuration last 1</text><rect x=\"524\" y=\"16\" width=\"222\" height=\"188\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"635\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">RPL (Route Policy Language)</text><text x=\"635\" y=\"68\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#b91c1c\">eBGP Default-Deny (RFC 8212)!</text><text x=\"635\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">No RPL attached =&gt; 0 Prefixes!</text><text x=\"635\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">if destination in CUST_PFX then</text><text x=\"635\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">  set local-preference 200 / pass</text><text x=\"635\" y=\"150\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">else drop / endif</text><text x=\"635\" y=\"178\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Parameterized &amp; Reusable Policies</text></svg>"
+  },
+  {
+   "id": "spec_sp_xr-section-5",
+   "title": "چرخه Two-Stage Commit و فرمان نجات‌بخش commit confirmed",
+   "html": "<ol><li>وقتی وارد <code>configure</code> می‌شوید و تغییراتی می‌دهید، هیچ چیز هنوز روی <code>running-config</code> اعمال نمی‌شود؛ همه چیز در <strong>Target/Candidate Buffer</strong> خصوصی نشست شما جمع می‌شود.</li><li>با <code>show configuration</code> دقیقاً همان خطوط جدید (Diff) را قبل از اعمال بازبینی می‌کنید (و با <code>abort</code> می‌توانید همه را دور بریزید).</li><li>برای تغییرات پرریسک (مثل ACL روی VTY یا BGP Core)، فرمان <strong><code>commit confirmed 60</code></strong> را می‌زنید: تغییر برای ۶۰ ثانیه اعمال می‌شود؛ اگر ارتباط SSH شما قطع شد و نتوانستید دستور دوم <code>commit</code> را برای تأیید بزنید، IOS-XR پس از ۶۰ ثانیه <strong>به‌طور خودکار Rollback می‌کند</strong>!</li><li>هر Commit موفق یک <code>Commit ID</code> یکتا می‌گیرد تا در آینده با <code>rollback configuration last 1</code> یا <code>to &lt;commit-id&gt;</code> به هر نقطه تاریخی برگردید.</li></ol>"
+  },
+  {
+   "id": "spec_sp_xr-section-6",
+   "title": "تله شماره ۱ تازه‌واردان IOS-XR: قانون eBGP Default-Deny (RFC 8212)",
+   "html": "<p>در IOS کلاسیک اگر همسایه eBGP بسازید بدون آنکه Route-Map بگذارید، روتر بلافاصله تمام جدول اینترنت را برای مشتری می‌فرستد و ممکن است فاجعه <strong>BGP Route Leak</strong> رخ دهد! در <strong>Cisco IOS-XR</strong> (منطبق با RFC 8212)، یک همسایه eBGP تا زمانی که صریحاً <code>route-policy ... in</code> و <code>route-policy ... out</code> روی آن تنظیم نشود، <strong>هیچ پیشوندی را نه می‌پذیرد و نه تبلیغ می‌کند</strong> (اگرچه نشست BGP به حالت <code>Established</code> می‌رسد!). برای پذیرش همه مسیرها در محیط آزمایشگاه باید یک RPL صریح مثل <code>route-policy PASS-ALL / pass / end-policy</code> نوشت.</p>"
+  },
+  {
+   "id": "spec_sp_xr-section-7",
+   "title": "زبان RPL (Route Policy Language): جایگزین مدرن و برنامه‌نویسی‌شکل Route-Map",
+   "html": "<p>در IOS-XR دیگر <code>route-map</code> وجود ندارد و جای آن را زبان <strong>RPL</strong> با ساختار خوانای <code>if / elseif / else / endif</code>، قابلیت <code>apply</code> (فراخوانی یک سیاست درون سیاست دیگر) و حتی پارامترگیری گرفته است. تفاوت سه دستور پایانی حیاتی در RPL:</p><ul><li><strong><code>pass</code>:</strong> پیشوند را «تیک پذیرش» می‌زند اما اجرای خطوط بعدی RPL ادامه می‌یابد (اگر خط بعدی <code>drop</code> نکند، در پایان پذیرفته می‌شود).</li><li><strong><code>done</code>:</strong> پیشوند را فوراً می‌پذیرد و <strong>همان لحظه از RPL خارج می‌شود</strong> (خطوط بعدی ارزیابی نمی‌شوند).</li><li><strong><code>drop</code>:</strong> پیشوند را فوراً رد می‌کند و از RPL خارج می‌شود (پیش‌فرض ضمنی پایان هر RPL نیز <code>drop</code> است!).</li></ul>"
+  },
+  {
+   "id": "spec_sp_xr-section-8",
+   "title": "نکته کلیدی ویرایش RPL: جایگزینی کامل در برابر ویرایش خطی و prefix-set",
+   "html": "<p>در IOS-XR ویرایش یک <code>route-policy</code> یا <code>prefix-set</code> در CLI به صورت پیش‌فرض آن شیء را <strong>کاملاً بازنویسی (Replace)</strong> می‌کند (مگر از ابزار <code>edit route-policy ... inline</code> استفاده کنید). همچنین در IOS-XR می‌توان کل یک <code>prefix-set</code> را تغییر داد و Commit کرد بدون آنکه نیاز به پاک کردن و ساختن مجدد همسایگی BGP باشد!</p>"
+  },
+  {
+   "id": "spec_sp_xr-section-9",
+   "title": "مقایسه سریع کار روزمره IOS-XE در برابر IOS-XR",
+   "html": "<table><thead><tr><th>موضوع</th><th>IOS / IOS-XE</th><th>Cisco IOS-XR</th></tr></thead><tbody><tr><td>اعمال دستور</td><td>آنی با Enter (مگر Config Replace)</td><td><strong>Two-Stage Commit</strong> + <code>commit confirmed</code></td></tr><tr><td>فیلتر مسیریابی</td><td><code>route-map</code> + <code>prefix-list</code></td><td><strong>RPL</strong> (<code>route-policy</code> + <code>prefix-set</code>)</td></tr><tr><td>رفتار پیش‌فرض eBGP بدون فیلتر</td><td>ارسال و دریافت همه (خطر Route Leak)</td><td><strong>Default-Deny (۰ پیشوند)</strong> — امن به صورت پیش‌فرض</td></tr><tr><td>بررسی وضعیت BGP</td><td><code>show ip bgp summary</code></td><td><code>show bgp ipv4 unicast summary</code></td></tr></tbody></table>"
+  },
+  {
+   "id": "spec_sp_xr-section-10",
+   "title": "تله‌متری و اتوماسیون بومی در IOS-XR (NETCONF / gNMI / Model-Driven Telemetry)",
+   "html": "<p>IOS-XR یکی از پیشرفته‌ترین سیستم‌عامل‌های شبکه از نظر اتوماسیون مدل‌محور است: علاوه بر <strong>NETCONF</strong> (با مدل‌های OpenConfig و Cisco-IOS-XR YANG)، از <strong>gNMI / gRPC</strong> و <strong>Streaming Telemetry (Dial-Out / Dial-In)</strong> با فرکانس چند ثانیه‌ای پشتیبانی می‌کند تا اپراتورها به جای Polling کند SNMP، وضعیت BGP/Optical DOM و Drops سخت‌افزاری را زنده ببینند.</p>"
+  },
+  {
+   "id": "spec_sp_xr-section-11",
+   "title": "کژفهمی‌های رایج درباره Cisco IOS-XR",
+   "html": "<ul><li><strong>کژفهمی ۱: «در IOS-XR چون نشست eBGP در حالت Established است، پس مسیرها خودبه‌خود تبادل می‌شوند.»</strong> واقعیت: خیر! بدون اتصال <code>route-policy</code> در ورودی و خروجی همسایه eBGP، تعداد پیشوندهای تبادل‌شده دقیقاً <strong>صفر</strong> است.</li><li><strong>کژفهمی ۲: «در RPL دستور pass دقیقاً مثل done عمل می‌کند.»</strong> واقعیت: خیر؛ <code>pass</code> اجازه می‌دهد خطوط بعدی RPL نیز اجرا شوند (و حتی مسیر بعداً <code>drop</code> شود یا صفت دیگری تغییر کند)، اما <code>done</code> فوراً اجرا را متوقف کرده و می‌پذیرد.</li><li><strong>کژفهمی ۳: «برای لغو تغییرات قبل از Commit باید روتر را Reload کرد.»</strong> واقعیت: کافی است دستور <code>abort</code> (یا <code>clear</code>) بزنید تا بافر Candidate بدون هیچ اثری بر <code>running-config</code> پاک شود.</li></ul>"
+  },
+  {
+   "id": "spec_sp_xr-section-12",
+   "title": "عیب‌یابی پرتکرار در Cisco IOS-XR",
+   "html": "<p><strong>تله ۱ — خطای <code>Failed to commit one or more configuration items</code>:</strong> دستور <strong><code>show configuration failed</code></strong> را بزنید تا IOS-XR دقیقاً خط خطاکار و علت رد شدن (مثلاً ارجاع به یک RPL تعریف‌نشده) را چاپ کند.</p><p><strong>تله ۲ — قفل شدن دیتابیس پیکربندی (Exclusive Mode):</strong> اگر مدیر دیگری با <code>configure exclusive</code> وارد شده باشد، سایرین نمی‌توانند Commit کنند؛ با <code>show configuration sessions</code> می‌توان نشست‌های باز را بررسی کرد.</p>"
+  },
+  {
+   "id": "spec_sp_xr-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> مهندسی روی روتر Core از راه دور قصد تغییر ACL دسترسی SSH را دارد و دستور <code>commit confirmed 60</code> را می‌زند، اما اشتباهاً IP خودش را می‌بندد. پس از یک دقیقه چه اتفاقی می‌افتد؟ <strong>پاسخ:</strong> چون فرمان دوم <code>commit</code> (تأیید) در بازه ۶۰ ثانیه دریافت نمی‌شود، IOS-XR به‌طور خودکار به تنظیمات سالم قبلی <strong>Rollback</strong> کرده و دسترسی SSH مهندس بازمی‌گردد!</p><p><strong>تمرین ۲:</strong> یک همسایه eBGP روی IOS-XR به حالت <code>Established</code> رسیده ولی <code>show bgp</code> هیچ پیشوندی دریافتی نشان نمی‌دهد. اولین موردی که بررسی می‌کنید چیست؟ <strong>پاسخ:</strong> بررسی اینکه آیا <code>route-policy ... in</code> و <code>route-policy ... out</code> زیر <code>address-family ipv4 unicast</code> آن همسایه تنظیم شده است یا خیر (قانون eBGP Default-Deny).</p>"
+  },
+  {
+   "id": "spec_sp_xr-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/routers/asr9000/software/asr9k-r7-9/routing/configuration/guide/b-routing-cg-asr9000-79x/implementing-routing-policy.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی Cisco IOS-XR Routing Policy Language (RPL)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8212\" target=\"_blank\" rel=\"noopener\">RFC 8212 (Default eBGP Route Propagation Behavior without Policies)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی Cisco ASR 9000 / NCS 5500 یا ماشین مجازی IOS-XRv در این محیط اجرا نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Cisco IOS-XR",
+   "fa": "سیستم‌عامل مخابراتی سیسکو",
+   "simple": "سیستم‌عامل ۶۴بیتی میکروکرنل با ایزوله‌سازی فرآیندها برای روترهای Service Provider."
+  },
+  {
+   "term": "Two-Stage Commit",
+   "fa": "اعمال دومرحله‌ای پیکربندی",
+   "simple": "جمع‌آوری تغییرات در بافر Candidate و اعمال اتمیک همه آن‌ها تنها با دستور commit."
+  },
+  {
+   "term": "commit confirmed",
+   "fa": "اعمال تایمردار ضدقفل",
+   "simple": "اعمال موقت تغییر با بازگشت خودکار در صورت عدم تأیید مجدد پیش از پایان تایمر."
+  },
+  {
+   "term": "Rollback Configuration",
+   "fa": "بازگشت تاریخی پیکربندی",
+   "simple": "بازگرداندن اتمیک پیکربندی روتر به هر Commit ID قبلی با یک دستور."
+  },
+  {
+   "term": "RPL",
+   "fa": "زبان سیاست مسیریابی IOS-XR",
+   "simple": "Route Policy Language؛ جایگزین مدرن، برنامه‌نویسی‌شکل و قابل استفاده مجدد برای route-map."
+  },
+  {
+   "term": "eBGP Default-Deny (RFC 8212)",
+   "fa": "رد پیش‌فرض eBGP",
+   "simple": "قاعده ایمنی IOS-XR که بدون RPL صریح، هیچ پیشوندی در همسایگی eBGP مبادله نمی‌شود."
+  },
+  {
+   "term": "pass vs done vs drop",
+   "fa": "اعمال پایانی RPL",
+   "simple": "pass می‌پذیرد و ادامه می‌دهد؛ done فوراً می‌پذیرد و خارج می‌شود؛ drop فوراً رد می‌کند."
+  },
+  {
+   "term": "prefix-set",
+   "fa": "مجموعه پیشوند در RPL",
+   "simple": "فهرست نام‌گذاری‌شده پیشوندهای IP قابل ارجاع در چند route-policy."
+  },
+  {
+   "term": "SMU",
+   "fa": "بسته وصله داغ IOS-XR",
+   "simple": "Software Maintenance Upgrade؛ نصب وصله باگ یا امنیت بدون ارتقای کل سیستم‌عامل."
+  },
+  {
+   "term": "Process Isolation",
+   "fa": "ایزوله‌سازی فرآیندها",
+   "simple": "اجرای مستقل bgp/isis/ospf در حافظه جداگانه تا کرش یک فرآیند کل روتر را نیندازد."
+  },
+  {
+   "term": "show configuration failed",
+   "fa": "نمایش خطای Commit",
+   "simple": "دستور کلیدی عیب‌یابی برای دیدن دقیق خطاهای ردشده هنگام تلاش برای Commit."
+  },
+  {
+   "term": "configure exclusive",
+   "fa": "حالت ویرایش انحصاری",
+   "simple": "قفل کردن دیتابیس پیکربندی برای جلوگیری از تداخل هم‌زمان دو مهندس."
+  },
+  {
+   "term": "abort",
+   "fa": "انصراف از بافر Candidate",
+   "simple": "پاک کردن کل تغییرات اعمال‌نشده نشست جاری بدون اثرگذاری روی running-config."
+  },
+  {
+   "term": "gNMI / MDT",
+   "fa": "تله‌متری جریانی مدل‌محور",
+   "simple": "ارسال پیوسته آمار روتر روی gRPC با مدل‌های YANG (جایگزین مدرن SNMP Polling)."
+  },
+  {
+   "term": "BGP Route Leak",
+   "fa": "نشت ناخواسته مسیر BGP",
+   "simple": "ارسال اشتباه مسیرهای یک بالادست به همتای دیگر؛ با RFC 8212 و RPL مهار می‌شود."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (چرخه Two-Stage Commit، بازیابی خودکار commit confirmed و موتور RPL/RFC 8212) — روتر IOS-XR واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر واقعی Cisco IOS-XR یا IOS-XRv متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر واقعی Cisco ASR 9000 / NCS 5500 یا IOS-XRv در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی سه رفتار حیاتی Cisco IOS-XR را مدل‌سازی می‌کند: (۱) جدایی بافر Candidate از Running تا زمان <code>commit</code>، (۲) بازگشت خودکار <code>commit confirmed 60</code> هنگام قفل شدن اپراتور، و (۳) ارزیابی <code>RPL</code> با قانون <strong>eBGP Default-Deny</strong> پیش از اتصال سیاست و پذیرش/رد پیشوند پس از اتصال.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_sp_xr_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_sp_xr_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — spec_sp_xr (Service Provider Cisco IOS-XR: Two-Stage Commit, Commit Confirmed &amp; RPL)\nSimulates IOS-XR candidate vs running datastore, automatic rollback on unconfirmed commit,\nand Route Policy Language (RPL) filtering with eBGP default-deny safety.\nNo real Cisco IOS-XR router (ASR 9000 / NCS 5500) is connected.\n&quot;&quot;&quot;\n\nimport copy\nimport json\n\n\nclass MockIOSXRRouter:\n    def __init__(self) -&gt; None:\n        self.running = {&quot;hostname&quot;: &quot;PE-TEHRAN-01&quot;, &quot;ebgp_neighbor_policy_in&quot;: None, &quot;ebgp_neighbor_policy_out&quot;: None}\n        self.candidate = copy.deepcopy(self.running)\n        self.commit_history: list[dict] = [{&quot;commit_id&quot;: 1000000001, &quot;state&quot;: copy.deepcopy(self.running)}]\n\n    def stage_config(self, updates: dict) -&gt; dict:\n        self.candidate.update(updates)\n        diff = {k: (self.running.get(k), v) for k, v in self.candidate.items() if self.running.get(k) != v}\n        return {&quot;staged_diff&quot;: diff, &quot;running_unchanged&quot;: self.running}\n\n    def commit(self, confirmed_seconds: int | None = None, confirmed_by_operator: bool = True) -&gt; dict:\n        prev = copy.deepcopy(self.running)\n        self.running = copy.deepcopy(self.candidate)\n        if confirmed_seconds and not confirmed_by_operator:\n            # Simulate operator lockout -&gt; automatic rollback after timer expiry\n            self.running = prev\n            self.candidate = copy.deepcopy(prev)\n            return {\n                &quot;status&quot;: &quot;AUTO_ROLLED_BACK&quot;,\n                &quot;reason&quot;: f&quot;No &#x27;commit&#x27; confirmation received within {confirmed_seconds}s — lockout prevented!&quot;,\n                &quot;active_running&quot;: self.running,\n            }\n        commit_id = self.commit_history[-1][&quot;commit_id&quot;] + 1\n        self.commit_history.append({&quot;commit_id&quot;: commit_id, &quot;state&quot;: copy.deepcopy(self.running)})\n        return {&quot;status&quot;: &quot;COMMITTED&quot;, &quot;commit_id&quot;: commit_id, &quot;active_running&quot;: self.running}\n\n\ndef eval_rpl_policy(policy_name: str | None, prefix: str, prefix_len: int, local_pref: int = 100) -&gt; dict:\n    # IOS-XR eBGP default safety (RFC 8212): without an attached RPL policy, all prefixes are denied!\n    if policy_name is None:\n        return {&quot;prefix&quot;: f&quot;{prefix}/{prefix_len}&quot;, &quot;action&quot;: &quot;DROP&quot;, &quot;reason&quot;: &quot;IOS-XR eBGP default-deny (no RPL policy attached)&quot;}\n    if policy_name == &quot;RPL_CUST_IN&quot;:\n        if prefix.startswith(&quot;198.51.100.&quot;) and 21 &lt;= prefix_len &lt;= 24:\n            return {&quot;prefix&quot;: f&quot;{prefix}/{prefix_len}&quot;, &quot;action&quot;: &quot;PASS&quot;, &quot;set_local_pref&quot;: 200, &quot;policy&quot;: policy_name}\n        return {&quot;prefix&quot;: f&quot;{prefix}/{prefix_len}&quot;, &quot;action&quot;: &quot;DROP&quot;, &quot;reason&quot;: &quot;Did not match customer prefix-set (implicit drop)&quot;}\n    return {&quot;prefix&quot;: f&quot;{prefix}/{prefix_len}&quot;, &quot;action&quot;: &quot;DROP&quot;, &quot;reason&quot;: &quot;Unknown policy&quot;}\n\n\ndef main() -&gt; None:\n    xr = MockIOSXRRouter()\n    staged = xr.stage_config({&quot;ebgp_neighbor_policy_in&quot;: &quot;RPL_CUST_IN&quot;, &quot;ebgp_neighbor_policy_out&quot;: &quot;RPL_CUST_OUT&quot;})\n    # Scenario 1: simulated lockout on a risky ACL/BGP change using commit confirmed 60\n    lockout_test = xr.commit(confirmed_seconds=60, confirmed_by_operator=False)\n    # Scenario 2: re-stage and properly confirm\n    xr.stage_config({&quot;ebgp_neighbor_policy_in&quot;: &quot;RPL_CUST_IN&quot;, &quot;ebgp_neighbor_policy_out&quot;: &quot;RPL_CUST_OUT&quot;})\n    good_commit = xr.commit(confirmed_seconds=60, confirmed_by_operator=True)\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_IOS_XR_HARDWARE&quot;,\n        &quot;two_stage_diff_before_commit&quot;: staged[&quot;staged_diff&quot;],\n        &quot;commit_confirmed_lockout_recovery&quot;: lockout_test,\n        &quot;confirmed_commit_result&quot;: good_commit,\n        &quot;rpl_evaluation&quot;: {\n            &quot;before_policy_attached_ebgp&quot;: eval_rpl_policy(None, &quot;198.51.100.0&quot;, 24),\n            &quot;valid_customer_prefix&quot;: eval_rpl_policy(xr.running[&quot;ebgp_neighbor_policy_in&quot;], &quot;198.51.100.0&quot;, 24),\n            &quot;bogus_hijack_prefix&quot;: eval_rpl_policy(xr.running[&quot;ebgp_neighbor_policy_in&quot;], &quot;8.8.8.0&quot;, 24),\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>AUTO_ROLLED_BACK</code> در سناریوی Lockout، تخصیص <code>commit_id: 1000000002</code> پس از تأیید، و <code>DROP</code> در نبود RPL در برابر <code>PASS (local_pref=200)</code> برای پیشوند مجاز مشتری.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع RPL و اتصال به همسایه eBGP در IOS-XR (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XR RPL snippet (NOT executed on live router)\nprefix-set CUST_PFX\n  198.51.100.0/24\nend-set\nroute-policy RPL_CUST_IN\n  if destination in CUST_PFX then\n    set local-preference 200\n    pass\n  else\n    drop\n  endif\nend-policy</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس سیستم‌عامل Cisco IOS-XR، Two-Stage Commit و RPL",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "پس از پیکربندی یک همسایه eBGP در Cisco IOS-XR بدون تعریف هیچ route-policy، وضعیت نشست و تبادل مسیر چگونه است؟",
+   "options": [
+    "همه مسیرهای اینترنت خودکار ارسال می‌شوند",
+    "نشست به حالت Established می‌رسد اما به دلیل قانون eBGP Default-Deny (RFC 8212) دقیقاً صفر پیشوند دریافت یا ارسال می‌شود",
+    "روتر ریبوت می‌شود",
+    "فقط مسیرهای OSPF ارسال می‌شوند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>IOS-XR برای پیشگیری از BGP Route Leak، بدون RPL صریح هیچ پیشوندی در همسایگی eBGP مبادله نمی‌کند.</p>"
+  },
+  {
+   "title": "کاربرد اصلی دستور commit confirmed 60 در Cisco IOS-XR هنگام اعمال یک تغییر پرریسک از راه دور چیست؟",
+   "options": [
+    "ذخیره دائمی بدون نیاز به تأیید",
+    "پاک کردن کل پیکربندی بعد از ۶۰ ثانیه",
+    "اعمال موقت تغییر و Rollback خودکار به پیکربندی سالم قبلی در صورت عدم دریافت دستور تأیید commit ظرف ۶۰ ثانیه (جلوگیری از Lockout)",
+    "ریبوت کردن روتر بعد از یک دقیقه"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p><code>commit confirmed</code> کمربند ایمنی مهندسان Service Provider در برابر قطع شدن دسترسی SSH هنگام تغییرات حساس است.</p>"
+  },
+  {
+   "title": "در زبان RPL (Route Policy Language) در IOS-XR، تفاوت کلیدی دستور pass با دستور done چیست؟",
+   "options": [
+    "هیچ تفاوتی ندارند",
+    "done مسیر را رد می‌کند",
+    "pass روتر را ری‌استارت می‌کند",
+    "pass مسیر را علامت پذیرش می‌زند اما ارزیابی خطوط بعدی RPL ادامه می‌یابد؛ در حالی که done مسیر را فوراً می‌پذیرد و اجرا را همان‌جا متوقف می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>درک تفاوت <code>pass</code> (ادامه ارزیابی) و <code>done</code> (خروج فوری با پذیرش) در سیاست‌های ترکیبی RPL بسیار مهم است.</p>"
+  },
+  {
+   "title": "چرا در معماری میکروکرنل Cisco IOS-XR، کرش کردن یک فرآیند مانند OSPF یا BGP کل روتر را از کار نمی‌اندازد؟",
+   "options": [
+    "زیرا هر فرآیند در فضای حافظه محافظت‌شده و ایزوله خود (Process Isolation) اجرا می‌شود و سیستم‌عامل صرفاً همان فرآیند را مستقل Restart می‌کند",
+    "زیرا IOS-XR فاقد OSPF است",
+    "زیرا تمام فرآیندها در یک رشته واحد اجرا می‌شوند",
+    "زیرا کنترل‌پلین روی ابر قرار دارد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>جداسازی فرآیندها و صفحه کنترل/داده اساس پایداری مخابراتی (Five-Nines) در IOS-XR است.</p>"
+  },
+  {
+   "title": "پیش از اجرای دستور commit در IOS-XR، کدام دستور تغییرات اعمال‌نشده (Diff) موجود در بافر Candidate شما را نمایش می‌دهد؟",
+   "options": [
+    "write memory",
+    "show configuration",
+    "reload in 5",
+    "debug all"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>دستور <code>show configuration</code> دقیقاً تغییرات staged نشست جاری شما را پیش از اعمال نشان می‌دهد.</p>"
+  },
+  {
+   "title": "اگر دستور commit با خطا مواجه شود (Failed to commit)، کدام دستور دقیقاً خط خطاکار و علت رد شدن آن را گزارش می‌کند؟",
+   "options": [
+    "show version",
+    "clear bgp all",
+    "show configuration failed",
+    "ping 127.0.0.1"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p><code>show configuration failed</code> خطاهای نحوی یا معنایی (مثل نبود RPL ارجاع‌شده) را با جزئیات نشان می‌دهد.</p>"
+  },
+  {
+   "title": "اگر در میانه ویرایش تغییرات در حالت configure پشیمان شدید و نخواستید هیچ تغییری روی running-config اعمال شود، چه دستوری می‌زنید؟",
+   "options": [
+    "commit force",
+    "shutdown",
+    "erase startup-config",
+    "abort"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p><code>abort</code> کل بافر Candidate نشست جاری را پاک کرده و بدون هیچ اثری بر روتر از حالت ویرایش خارج می‌شود.</p>"
+  },
+  {
+   "title": "برای بازگرداندن روتر IOS-XR به وضعیت دقیق پیش از آخرین Commit انجام‌شده، کدام دستور استاندارد است؟",
+   "options": [
+    "rollback configuration last 1",
+    "undo all",
+    "no running-config",
+    "reset factory"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>هر Commit در IOS-XR یک شناسه تاریخی دارد و با <code>rollback configuration last N</code> یا <code>to &lt;id&gt;</code> قابل بازگشت است.</p>"
+  },
+  {
+   "title": "بسته SMU (Software Maintenance Upgrade) در Cisco IOS-XR چه مزیتی برای اپراتور مخابراتی دارد؟",
+   "options": [
+    "تغییر رمز روتر",
+    "نصب هدفمند وصله یک باگ یا آسیب‌پذیری امنیتی (اغلب بدون ریبوت کامل روتر) به جای ارتقای پرریسک کل سیستم‌عامل",
+    "افزایش تعداد پورت‌های فیزیکی",
+    "حذف پروتکل MPLS"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>SMU زمان نگهداری (Maintenance Window) و ریسک تغییرات نرم‌افزاری را در شبکه Core به شدت کاهش می‌دهد.</p>"
+  },
+  {
+   "title": "رفتار پیش‌فرض انتهای یک route-policy در RPL برای پیشوندهایی که هیچ شرط if و هیچ دستور pass/done را لمس نکرده‌اند چیست؟",
+   "options": [
+    "پذیرش با Local Preference 500",
+    "تبدیل به Static Route",
+    "رد شدن ضمنی (Implicit Drop)",
+    "ارسال به همه همسایه‌ها"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>همانند ACL و Route-Map، انتهای هر RPL یک <code>drop</code> ضمنی دارد مگر آنکه صریحاً <code>pass</code> یا <code>done</code> شود.</p>"
+  },
+  {
+   "title": "تفاوت ورود با configure exclusive نسبت به configure معمولی در IOS-XR چیست؟",
+   "options": [
+    "اجازه می‌دهد ۱۰ نفر هم‌زمان یک خط را تغییر دهند",
+    "تغییرات را بدون commit اعمال می‌کند",
+    "دسترسی SSH را می‌بندد",
+    "دیتابیس پیکربندی را به‌طور انحصاری برای یک مهندس قفل می‌کند تا تداخل Commit هم‌زمان رخ ندهد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p><code>configure exclusive</code> هنگام تغییرات حساس Core از تداخل پیکربندی هم‌زمان مدیران جلوگیری می‌کند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای چرخه Two-Stage Commit، بازگشت خودکار commit confirmed و ارزیابی RPL / eBGP Default-Deny",
+    "اتصال زنده به ASR 9000 اپراتور",
+    "تغییر BGP اینترنت جهانی",
+    "فقط متن نظری بدون کد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ روتر IOS-XR واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "spec_sp_xr",
+  "sources": [
+   "https://www.cisco.com/c/en/us/td/docs/routers/asr9000/software/asr9k-r7-9/routing/configuration/guide/b-routing-cg-asr9000-79x/implementing-routing-policy.html",
+   "https://www.rfc-editor.org/rfc/rfc8212"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی Cisco IOS-XR یا IOS-XRv متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، تفکیک دقیق pass/done/drop، RFC 8212، SMU و شبیه‌ساز Two-Stage Commit / RPL."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/spec_sp_xr-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-specializations",
+   "recommendedCourse": "spec-sp",
+   "blueprint": "/academy-assets/v5/blueprints/spec_sp_xr.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_sp_xr_lab.py"
+  }
+ }
+}

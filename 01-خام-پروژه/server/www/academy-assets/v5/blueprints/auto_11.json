@@ -1,0 +1,337 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_11",
+ "objectiveId": "auto_11",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۱۱ از ۲۰): اتوماسیون با Ansible (Playbook & Inventory)",
+ "titleEn": "Automation 11: Network Automation with Ansible (Playbooks, Inventory, Collections & Idempotency)",
+ "domain": "Network Automation",
+ "source": "Legacy auto_11 rewritten and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_11-section-1",
+   "title": "مسئله واقعی: چگونه یک تغییر استاندارد NTP/Banner/ACL را یکنواخت و بدون Agent روی ۲۰۰ روتر اعمال کنیم؟",
+   "html": "<p>وقتی نیاز است پیکربندی ۲۰۰ روتر و سوئیچ یکسان، مستند و تکرارپذیر باشد، نمی‌توانید روی IOS-XE یا NX-OS نرم‌افزار Agent نصب کنید. <strong>Ansible</strong> یک موتور اتوماسیون <strong>بدون Agent (Agentless)</strong> است که از یک <strong>Control Node لینوکسی</strong>، از طریق پروتکل‌های استاندارد (<code>network_cli</code> روی SSH، <code>netconf</code> یا <code>httpapi</code>) به تجهیزات شبکه وصل می‌شود و وضعیت مطلوب (Desired State) را به زبان ساده <strong>YAML</strong> اعمال می‌کند.</p>"
+  },
+  {
+   "id": "auto_11-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> لینوکس و SSH (درس <code>auto_01</code> و <code>auto_03</code>) و YAML (درس <code>auto_05</code>).</p><ul><li>تبیین معماری Control Node (اجرا روی لینوکس/WSL)، Managed Nodes بدون Agent و تفاوت اجرای محلی ماژول‌های شبکه در Ansible.</li><li>طراحی <strong>Inventory</strong> (گروه‌ها، <code>group_vars</code>، <code>host_vars</code>) و تطبیق الگوهای <code>hosts:</code>.</li><li>استفاده صحیح از Collection رسمی <strong><code>cisco.ios</code></strong> (به‌ویژه <code>cisco.ios.ios_config</code> با کلید جمع <strong><code>parents</code></strong> و Resource Modules مانند <code>ios_vlans</code> / <code>ios_interfaces</code>).</li><li>به‌کارگیری <strong>Idempotency</strong>، حالت پیش‌نمایش <code>--check --diff</code>، <strong>Handlers</strong> و رمزنگاری اسرار با <strong>Ansible Vault</strong>.</li></ul>"
+  },
+  {
+   "id": "auto_11-section-3",
+   "title": "چرا Ansible در شبکه Agentless است و ماژول‌های شبکه دقیقاً کجا اجرا می‌شوند؟",
+   "html": "<p>در سرورهای لینوکسی، Ansible معمولاً کد پایتون ماژول را با SSH به سرور مقصد کپی و آنجا اجرا می‌کند؛ اما روی روترها و سوئیچ‌ها (IOS-XE، NX-OS، EOS، Junos) دسترسی پوسته پایتون دلخواه وجود ندارد. بنابراین در <strong>Ansible Network Automation</strong>، کد پایتون ماژول روی خود <strong>Control Node</strong> اجرا می‌شود و از طریق پلاگین اتصال <code>ansible.netcommon.network_cli</code> (یا <code>netconf</code> / <code>httpapi</code>) دستورات استاندارد را به تجهیز ارسال و پاسخ آن را تحلیل می‌کند. به همین دلیل هیچ Agent یا پایتونی روی Managed Node شبکه لازم نیست!</p>"
+  },
+  {
+   "id": "auto_11-section-4",
+   "title": "نمودار معماری Agentless انسیبل در اتوماسیون شبکه",
+   "html": "<p>در نمودار زیر ارتباط Control Node، Inventory/Vault، پلاگین‌های اتصال و تجهیزات شبکه نمایش داده شده است.</p><svg viewBox=\"0 0 760 215\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Ansible Agentless Control Node, Inventory, Playbook and Managed Network Nodes\"><rect x=\"14\" y=\"20\" width=\"236\" height=\"174\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"132\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Control Node (Linux/WSL)</text><text x=\"132\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Inventory (hosts + group_vars)</text><text x=\"132\" y=\"94\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Playbooks (YAML + Jinja2)</text><text x=\"132\" y=\"118\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Collections (cisco.ios / nxos)</text><text x=\"132\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">Ansible Vault (Encrypted Secrets)</text><text x=\"132\" y=\"166\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">--check --diff before apply!</text><rect x=\"282\" y=\"54\" width=\"194\" height=\"106\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"379\" y=\"80\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Agentless Transport</text><text x=\"379\" y=\"104\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">network_cli (SSH)</text><text x=\"379\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">netconf (SSH 830)</text><text x=\"379\" y=\"144\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">httpapi (REST / HTTPS)</text><rect x=\"508\" y=\"20\" width=\"238\" height=\"174\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"627\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Managed Network Nodes</text><text x=\"627\" y=\"74\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">R1-CORE / R2-CORE (IOS-XE)</text><text x=\"627\" y=\"100\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">SW1-ACC (Catalyst / NX-OS)</text><text x=\"627\" y=\"128\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">No Agent Installed on Router!</text><text x=\"627\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Idempotent: 2nd run =&gt; changed=0</text><line x1=\"250\" y1=\"107\" x2=\"282\" y2=\"107\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"476\" y1=\"107\" x2=\"508\" y2=\"107\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
+  },
+  {
+   "id": "auto_11-section-5",
+   "title": "ساختار Inventory، الگوهای hosts و متغیرهای group_vars / host_vars",
+   "html": "<p><strong>Inventory</strong> (در قالب INI یا YAML) فهرست تجهیزات و گروه‌بندی آن‌ها (مثلاً <code>core_routers</code>، <code>access_switches</code>) را نگه می‌دارد. کلید <code>hosts:</code> در یک Play می‌تواند نام یک <strong>Group</strong>، نام یک <strong>Host واحد</strong>، یک <strong>الگو (Pattern)</strong> (مثل <code>core_routers:!R2-CORE</code>) یا <code>all</code> باشد — به شرطی که در Inventory تعریف شده باشند.</p><p>به‌جای تکرار متغیرها درون فایل Inventory، از پوشه‌های استاندارد <code>group_vars/core_routers.yml</code> (مثل <code>ansible_network_os: cisco.ios.ios</code> و <code>ansible_connection: ansible.netcommon.network_cli</code>) و <code>host_vars/R1-CORE.yml</code> (مثل IP اختصاصی Loopback0) استفاده می‌کنیم.</p>"
+  },
+  {
+   "id": "auto_11-section-6",
+   "title": "ساختار Playbook و نکته طلایی parents در cisco.ios.ios_config",
+   "html": "<p>یک Playbook شامل یک یا چند <strong>Play</strong> و هر Play شامل فهرستی از <strong>Tasks</strong> است. در تجهیزات شبکه معمولاً <code>gather_facts: false</code> قرار می‌دهیم (تا ماژول لینوکسی <code>setup</code> روی روتر شکست نخورد) و در صورت نیاز از <code>cisco.ios.ios_facts</code> استفاده می‌کنیم.</p><p><strong>نکته کلیدی در <code>cisco.ios.ios_config</code>:</strong> برای قرار دادن دستورات درون یک بخش سلسله‌مراتبی (مانند زیر <code>interface Loopback0</code> یا <code>router ospf 1</code>)، نام دقیق کلید <strong><code>parents</code> (به صورت جمع)</strong> است نه <code>parent</code>! مثلاً:</p><pre dir=\"ltr\"><code>- name: Configure Loopback0 description\n  cisco.ios.ios_config:\n    parents: interface Loopback0\n    lines:\n      - description MANAGEMENT_LO0\n  notify: save_running_to_startup</code></pre>"
+  },
+  {
+   "id": "auto_11-section-7",
+   "title": "نسل جدید Ansible Network: Resource Modules در برابر ios_config ساده",
+   "html": "<p>اگرچه <code>ios_config</code> برای ارسال خطوط CLI بسیار پرکاربرد است، اما Collections مدرن سیسکو (<code>cisco.ios</code>) <strong>Resource Modules</strong> ساختاریافته (مانند <code>ios_vlans</code>، <code>ios_l3_interfaces</code>، <code>ios_bgp_global</code>) ارائه می‌دهند که ورودی ساختاریافته YAML می‌گیرند و حالت‌های دقیق <code>merged</code>، <code>replaced</code>، <code>overridden</code>، <code>deleted</code> و <code>gathered</code> (خواندن وضعیت فعلی به شکل YAML) را پشتیبانی می‌کنند.</p>"
+  },
+  {
+   "id": "auto_11-section-8",
+   "title": "Idempotency، پیش‌نمایش --check --diff و Handlers",
+   "html": "<p><strong>Idempotency</strong> قلب اتوماسیون ایمن در Ansible است: اگر Playbook را یک بار اجرا کنید و ۱ تغییر اعمال شود (<code>changed=1</code>)، اجرای دوباره همان Playbook باید <strong>صفر تغییر (<code>changed=0</code>)</strong> گزارش دهد و دستوری به روتر نفرستد! همیشه پیش از اجرای واقعی از <strong><code>ansible-playbook site.yml --check --diff</code></strong> استفاده کنید تا بدون تغییر روتر، دقیقاً تفاوت خطوط را ببینید. همچنین <strong>Handlers</strong> (مثل ذخیره <code>save_when: modified</code> یا <code>copy run start</code>) فقط در صورتی اجرا می‌شوند که Task مرتبط با <code>notify</code> واقعاً <code>changed=True</code> شده باشد.</p>"
+  },
+  {
+   "id": "auto_11-section-9",
+   "title": "قالب‌سازی پویا با Jinja2 و رمزنگاری اسرار با Ansible Vault",
+   "html": "<p>برای تولید پیکربندی‌های تکراری (مثل ۱۰ اینترفیس یا ۳۰ VLAN با یک الگو)، از قالب‌های <strong>Jinja2 (<code>.j2</code>)</strong> همراه حلقه‌های <code>{% for %}</code> و شرط <code>{% if %}</code> استفاده می‌کنیم. برای محافظت از <code>ansible_password</code> و <code>ansible_become_password</code> نیز هرگز آن‌ها را متن‌باز در Git ذخیره نکنید؛ از <strong><code>ansible-vault encrypt group_vars/all/vault.yml</code></strong> یا تزریق از Vault/CI Secrets استفاده کنید.</p>"
+  },
+  {
+   "id": "auto_11-section-10",
+   "title": "محدودیت‌های عملی Ansible در مقیاس بسیار بزرگ (مقایسه با Nornir)",
+   "html": "<p>Ansible برای شروع سریع، استانداردسازی تیمی و خوانایی YAML فوق‌العاده است (در شبکه‌های ده‌ها تا چندصد تجهیز). اما برای هزاران تجهیز با منطق برنامه‌نویسی پیچیده، پردازش هم‌روند بسیار سریع یا کنترل دقیق بر داده‌ها در پایتون، گاهی مهندسان از <strong>Nornir</strong> (پایتون خالص) یا <strong>AWX / Automation Controller</strong> با اجرای توزیع‌شده استفاده می‌کنند.</p>"
+  },
+  {
+   "id": "auto_11-section-11",
+   "title": "کژفهمی‌های رایج درباره Ansible در شبکه",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای اجرای Ansible باید روی روترهای سیسکو Python نصب کنیم.»</strong> واقعیت: خیر؛ ماژول‌های شبکه Ansible روی Control Node اجرا شده و از طریق <code>network_cli</code>/<code>netconf</code>/<code>httpapi</code> با تجهیز صحبت می‌کنند.</li><li><strong>کژفهمی ۲: «کلید <code>hosts:</code> در Playbook فقط می‌تواند نام یک Group باشد.»</strong> واقعیت: می‌تواند نام یک Group، یک Host تکی، ترکیب چند گروه/استثنا (Pattern) یا <code>all</code> باشد.</li><li><strong>کژفهمی ۳: «فراموش کردن <code>gather_facts: false</code> روی روتر بی‌اثر است.»</strong> واقعیت: <code>gather_facts: true</code> پیش‌فرض تلاش می‌کند ماژول لینوکسی <code>setup</code> را روی روتر اجرا کند که معمولاً با خطای اتصال/پایتون شکست می‌خورد.</li></ul>"
+  },
+  {
+   "id": "auto_11-section-12",
+   "title": "عیب‌یابی خطاهای پرتکرار Playbookهای شبکه",
+   "html": "<p><strong>خطای ۱ — <code>Unsupported parameters for (cisco.ios.ios_config) module: parent</code>:</strong> اشتباه رایج نوشتن <code>parent</code> به جای <strong><code>parents</code></strong> (جمع)!</p><p><strong>خطای ۲ — <code>command timeout triggered</code> هنگام ذخیره پیکربندی یا اجرای <code>show tech</code>:</strong> مقدار <code>ansible_command_timeout</code> (پیش‌فرض ۳۰ ثانیه) برای دستور کند کم است؛ باید در <code>ansible.cfg</code> یا متغیرهای گروه افزایش یابد و هنگام تست با <code>-vvv</code> لاگ دقیق اتصال بررسی شود.</p>"
+  },
+  {
+   "id": "auto_11-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> در Playbook زیر، <code>R1-CORE</code> هنوز توضیحات جدید Loopback0 را ندارد ولی <code>R2-CORE</code> از قبل آن را دارد. پس از اجرای اول و سپس اجرای دوم بدون تغییر، وضعیت <code>changed</code> و اجرای Handler ذخیره پیکربندی چگونه خواهد بود؟ <strong>پاسخ:</strong> در اجرای اول <code>R1-CORE</code> مقدار <code>changed=True</code> (و Handler فقط برای آن اجرا می‌شود) و <code>R2-CORE</code> مقدار <code>changed=False</code> است؛ در اجرای دوم هر دو <code>changed=False</code> بوده و Handler اصلاً اجرا نمی‌شود (اثبات Idempotency).</p><p><strong>تمرین ۲:</strong> چطور پیش از اعمال تغییرات یک Playbook روی ۲۰۰ روتر تولیدی، تنها گزارش تغییرات احتمالی را بدون لمس پیکربندی ببینیم؟ <strong>پاسخ:</strong> با اجرای <code>ansible-playbook playbook.yml --check --diff</code> (و تست اولیه روی یک روتر با <code>--limit R1-CORE</code>).</p>"
+  },
+  {
+   "id": "auto_11-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://docs.ansible.com/ansible/latest/network/index.html\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Ansible Network Automation</a> و <a href=\"https://docs.ansible.com/ansible/latest/collections/cisco/ios/index.html\" target=\"_blank\" rel=\"noopener\">مستندات Collection رسمی cisco.ios</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است که منطق Inventory، <code>parents</code>، <code>--check</code>، Handler و Idempotency را شبیه‌سازی و آزمون می‌کند؛ باینری <code>ansible-playbook</code> یا اتصال SSH به روتر واقعی در این محیط اجرا نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Control Node",
+   "fa": "گره کنترل انسیبل",
+   "simple": "ماشین لینوکسی که Ansible روی آن نصب و Playbookها از آنجا اجرا می‌شوند."
+  },
+  {
+   "term": "Managed Node",
+   "fa": "تجهیز مدیریت‌شده",
+   "simple": "روتر، سوئیچ یا سروری که توسط Control Node بدون نیاز به نصب Agent مدیریت می‌شود."
+  },
+  {
+   "term": "Inventory",
+   "fa": "فهرست دارایی‌ها",
+   "simple": "فایل YAML یا INI تعریف‌کننده تجهیزات، گروه‌ها و متغیرهای اتصال."
+  },
+  {
+   "term": "Playbook",
+   "fa": "فایل پلی‌بوک",
+   "simple": "فایل YAML شامل یک یا چند Play و Task برای توصیف وضعیت مطلوب شبکه."
+  },
+  {
+   "term": "parents (ios_config)",
+   "fa": "کلید سلسله‌مراتب parents",
+   "simple": "کلید جمع در cisco.ios.ios_config برای مشخص کردن بلوک والد (مثل interface Loopback0)."
+  },
+  {
+   "term": "Collection (cisco.ios)",
+   "fa": "مجموعه ماژول رسمی",
+   "simple": "بسته استاندارد ماژول‌ها و پلاگین‌های یک پلتفرم مانند cisco.ios یا cisco.nxos."
+  },
+  {
+   "term": "Resource Module",
+   "fa": "ماژول منبع ساختاریافته",
+   "simple": "ماژول مدرن Ansible (مثل ios_vlans) با پشتیبانی از حالت‌های merged/replaced/overridden/deleted."
+  },
+  {
+   "term": "network_cli",
+   "fa": "پلاگین اتصال network_cli",
+   "simple": "پلاگین استاندارد اتصال SSH به CLI تجهیزات شبکه با اجرای ماژول روی Control Node."
+  },
+  {
+   "term": "Idempotency",
+   "fa": "تکرارپذیری بدون تغییر اضافه",
+   "simple": "ویژگی اجرای مجدد Playbook بدون ایجاد تغییر تکراری (changed=0) وقتی وضعیت قبلاً برقرار است."
+  },
+  {
+   "term": "--check --diff",
+   "fa": "حالت پیش‌نمایش و تفاوت",
+   "simple": "اجرای Dry-run بدون تغییر واقعی روی تجهیز همراه نمایش دقیق خطوط افزوده/حذف‌شونده."
+  },
+  {
+   "term": "Handler & notify",
+   "fa": "هندلر واکنشی",
+   "simple": "وظیفه‌ای (مانند ذخیره پیکربندی) که فقط در صورت changed=True شدن Task مرتبط اجرا می‌شود."
+  },
+  {
+   "term": "group_vars / host_vars",
+   "fa": "متغیرهای گروه و میزبان",
+   "simple": "پوشه‌های استاندارد جداسازی متغیرهای مشترک گروه و متغیرهای اختصاصی هر تجهیز."
+  },
+  {
+   "term": "Jinja2 Template",
+   "fa": "قالب پویا Jinja2",
+   "simple": "موتور تولید خودکار متن پیکربندی از ترکیب قالب .j2 و متغیرهای YAML."
+  },
+  {
+   "term": "Ansible Vault",
+   "fa": "گاوصندوق انسیبل",
+   "simple": "ابزار رمزنگاری AES-256 برای محافظت از رمزها و اسرار درون مخزن Git."
+  },
+  {
+   "term": "--limit",
+   "fa": "محدودسازی دامنه اجرا",
+   "simple": "پرچم محدود کردن اجرای Playbook به یک یا چند تجهیز مشخص (مناسب Canary)."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (Inventory، parents، --check، Handlers و Idempotency) — Ansible واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ باینری ansible-playbook یا اتصال SSH به روتر واقعی اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ باینری Ansible یا اتصال SSH به روتر سیسکو واقعی در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی چرخه کامل یک Task مشابه <code>cisco.ios.ios_config</code> با کلید <code>parents</code> را در سه مرحله آزمون می‌کند: (۱) حالت <code>check_mode=True</code> بدون تغییر وضعیت، (۲) اجرای اول که فقط روی <code>R1-CORE</code> تغییر ایجاد و Handler ذخیره را فعال می‌کند، و (۳) اجرای دوم که <code>changed=False</code> روی همه تجهیزات (Idempotency) را اثبات می‌کند.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_11_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_11_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_11: Ansible Playbook, Inventory &amp; Idempotency Mock.\nExecution boundary: Pure Python 3 stdlib mock simulating Ansible inventory\ngroup matching, ios_config parents hierarchy, --check diff mode, handlers,\nand idempotency across two consecutive playbook runs. No real Ansible/SSH run.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\nINVENTORY = {\n    &quot;core_routers&quot;: [&quot;R1-CORE&quot;, &quot;R2-CORE&quot;],\n    &quot;access_switches&quot;: [&quot;SW1-ACC&quot;],\n}\n\nDEVICE_STATE: dict[str, dict[str, list[str]]] = {\n    &quot;R1-CORE&quot;: {&quot;interface Loopback0&quot;: [&quot;description OLD&quot;, &quot;ip address 10.255.0.1 255.255.255.255&quot;]},\n    &quot;R2-CORE&quot;: {&quot;interface Loopback0&quot;: [&quot;description MANAGEMENT_LO0&quot;, &quot;ip address 10.255.0.2 255.255.255.255&quot;]},\n    &quot;SW1-ACC&quot;: {},\n}\n\n\ndef resolve_hosts(pattern: str) -&gt; list[str]:\n    if pattern == &quot;all&quot;:\n        return sorted({h for hs in INVENTORY.values() for h in hs})\n    if pattern in INVENTORY:\n        return list(INVENTORY[pattern])\n    all_hosts = {h for hs in INVENTORY.values() for h in hs}\n    return [pattern] if pattern in all_hosts else []\n\n\ndef run_ios_config_task(hosts_pattern: str, parents: list[str], lines: list[str], check_mode: bool = False) -&gt; dict:\n    parent_key = &quot; &gt; &quot;.join(parents)\n    results = {}\n    handler_notified = []\n    for host in resolve_hosts(hosts_pattern):\n        current = DEVICE_STATE[host].get(parent_key, [])\n        missing = [line for line in lines if line not in current]\n        changed = bool(missing)\n        if changed and not check_mode:\n            DEVICE_STATE[host][parent_key] = current + missing\n        if changed:\n            handler_notified.append(host)\n        results[host] = {&quot;changed&quot;: changed, &quot;planned_additions&quot;: missing, &quot;check_mode&quot;: check_mode}\n    return {&quot;results&quot;: results, &quot;save_config_handler_triggered_for&quot;: handler_notified}\n\n\ndef main() -&gt; None:\n    parents = [&quot;interface Loopback0&quot;]\n    desired_lines = [&quot;description MANAGEMENT_LO0&quot;]\n\n    dry_run = run_ios_config_task(&quot;core_routers&quot;, parents, desired_lines, check_mode=True)\n    assert dry_run[&quot;results&quot;][&quot;R1-CORE&quot;][&quot;changed&quot;] is True\n    assert dry_run[&quot;results&quot;][&quot;R2-CORE&quot;][&quot;changed&quot;] is False\n    # Dry-run must NOT mutate device state\n    assert &quot;description MANAGEMENT_LO0&quot; not in DEVICE_STATE[&quot;R1-CORE&quot;][&quot;interface Loopback0&quot;]\n\n    run1 = run_ios_config_task(&quot;core_routers&quot;, parents, desired_lines, check_mode=False)\n    assert run1[&quot;save_config_handler_triggered_for&quot;] == [&quot;R1-CORE&quot;]\n\n    # Second run proves idempotency: zero changes, handler NOT re-triggered\n    run2 = run_ios_config_task(&quot;core_routers&quot;, parents, desired_lines, check_mode=False)\n    assert run2[&quot;results&quot;][&quot;R1-CORE&quot;][&quot;changed&quot;] is False\n    assert run2[&quot;results&quot;][&quot;R2-CORE&quot;][&quot;changed&quot;] is False\n    assert run2[&quot;save_config_handler_triggered_for&quot;] == []\n\n    print(&quot;=== auto_11 Ansible Idempotency &amp; Parents Local Mock ===&quot;)\n    print(json.dumps({&quot;check_mode&quot;: dry_run, &quot;first_run&quot;: run1, &quot;second_run_idempotent&quot;: run2}, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> در <code>check_mode</code> هیچ تغییری در حافظه ذخیره نمی‌شود؛ در <code>first_run</code> فقط <code>R1-CORE</code> تغییر می‌کند؛ در <code>second_run_idempotent</code> هر دو <code>changed=False</code> و لیست Handler خالی است.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع اجرای واقعی در محیط دارای Ansible و Collection <code>cisco.ios</code> (اجرا نشده روی تجهیز زنده):</strong></p><pre dir=\"ltr\"><code># Reference command (NOT executed against live routers)\nansible-playbook -i inventory.yml configure_loopback.yml --limit core_routers --check --diff</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس اتوماسیون با Ansible (Playbook & Inventory)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در اتوماسیون شبکه با Ansible، چرا Managed Node (روتر/سوئیچ) نیازی به نصب Agent یا Python ندارد؟",
+   "options": [
+    "زیرا ماژول شبکه روی Control Node اجرا شده و از طریق پروتکل‌های استاندارد مانند SSH (network_cli)، NETCONF یا HTTPAPI با تجهیز ارتباط می‌گیرد",
+    "زیرا Ansible فقط با SNMPv1 کار می‌کند",
+    "زیرا روترها فقط فایل CSV می‌خوانند",
+    "زیرا Ansible بدون اتصال شبکه کار می‌کند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>معماری Agentless انسیبل در شبکه با اجرای پلاگین روی Control Node و ارسال دستورات/RPC از طریق SSH/NETCONF/REST عمل می‌کند.</p>"
+  },
+  {
+   "title": "در Playbook انسیبل هنگام استفاده از ماژول cisco.ios.ios_config، کدام کلید برای تعیین سلسله‌مراتب والد (مانند interface Loopback0) صحیح است؟",
+   "options": [
+    "parent",
+    "parents",
+    "parent_lines",
+    "hierarchy"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>نام دقیق پارامتر در <code>ios_config</code> به صورت جمع <strong><code>parents</code></strong> است؛ نوشتن <code>parent</code> باعث خطای Unsupported parameter می‌شود.</p>"
+  },
+  {
+   "title": "کدام عبارت درباره مقدار مجاز کلید hosts: در یک Ansible Playbook دقیق است؟",
+   "options": [
+    "فقط می‌تواند نام یک گروه باشد",
+    "فقط hosts: all مجاز است",
+    "می‌تواند نام یک Group، نام یک Host واحد، یک Pattern معتبر (مثل استثناگذاری) یا all باشد مشروط به وجود در Inventory",
+    "فقط آدرس MAC می‌پذیرد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>Ansible از الگوهای انعطاف‌پذیر برای <code>hosts:</code> (گروه، هاست واحد، اشتراک و استثنا) پشتیبانی می‌کند.</p>"
+  },
+  {
+   "title": "معنای دقیق Idempotency در اجرای یک Ansible Playbook چیست؟",
+   "options": [
+    "هر بار اجرا باید همه پیکربندی را پاک و دوباره بنویسد",
+    "پلی‌بوک فقط یک‌بار در عمر روتر قابل اجراست",
+    "پلی‌بوک رمز عبور را حذف می‌کند",
+    "اجرای تکراری همان Playbook در صورتی که وضعیت مطلوب قبلاً برقرار باشد، هیچ تغییر اضافه‌ای ایجاد نکرده و changed=0 گزارش می‌دهد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>Idempotency امکان اجرای ایمن و مکرر Playbookها برای حفظ هم‌ترازی شبکه را فراهم می‌کند.</p>"
+  },
+  {
+   "title": "ترکیب دو پرچم --check --diff هنگام اجرای ansible-playbook چه کاری انجام می‌دهد؟",
+   "options": [
+    "اجرای آزمایشی (Dry-run) بدون تغییر واقعی پیکربندی همراه با نمایش دقیق تفاوت خطوطی که تغییر خواهند کرد",
+    "حذف فایل Inventory",
+    "رمزگشایی تمام فایل‌های Vault در خروجی",
+    "ریبوت فوری همه روترها"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p><code>--check --diff</code> بهترین روش پیش‌نمایش و ممیزی تغییر پیش از اعمال روی شبکه تولیدی است.</p>"
+  },
+  {
+   "title": "چرا در Playbookهای تجهیزات شبکه معمولاً gather_facts: false تنظیم می‌شود؟",
+   "options": [
+    "چون جمع‌آوری اطلاعات در شبکه غیرقانونی است",
+    "چون gather_facts پیش‌فرض سعی در اجرای ماژول لینوکسی setup روی روتر دارد که روی IOS-XE/NX-OS شکست می‌خورد (به‌جای آن از cisco.ios.ios_facts استفاده می‌شود)",
+    "چون SSH را خاموش می‌کند",
+    "چون YAML را به XML تبدیل می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>تجهیزات شبکه سیستم‌عامل لینوکس عمومی با پایتون مقصد نیستند؛ بنابراین باید از ماژول facts اختصاصی پلتفرم استفاده کرد.</p>"
+  },
+  {
+   "title": "یک Handler (متصل با notify) در Ansible دقیقاً چه زمانی اجرا می‌شود؟",
+   "options": [
+    "همیشه حتی وقتی هیچ تغییری رخ نداده باشد",
+    "فقط وقتی Task شکست بخورد",
+    "تنها در صورتی که حداقل یک Task مرتبط با آن وضعیت changed=True گزارش کرده باشد",
+    "فقط روی تجهیزات خاموش"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>به‌عنوان نمونه ذخیره پیکربندی (<code>write memory</code>) در Handler فقط زمانی انجام می‌شود که واقعاً تغییری اعمال شده باشد.</p>"
+  },
+  {
+   "title": "بهترین روش نگهداری رمزهای عبور (مانند ansible_password) در مخزن Git پروژه Ansible چیست؟",
+   "options": [
+    "نوشتن متن ساده داخل فایل inventory.ini",
+    "ارسال آن‌ها در کامنت Playbook",
+    "غیرفعال کردن احراز هویت روی روتر",
+    "رمزنگاری با Ansible Vault یا تزریق امن از Secret Manager هنگام اجرا"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>هرگز اسرار را به صورت متن ساده در Inventory یا Playbook داخل Git ذخیره نکنید.</p>"
+  },
+  {
+   "title": "مزیت اصلی Resource Modules (مانند cisco.ios.ios_vlans) نسبت به ارسال خام خطوط CLI با ios_config چیست؟",
+   "options": [
+    "دریافت داده ساختاریافته YAML و پشتیبانی دقیق از حالت‌های چرخه عمر مانند merged، replaced، overridden، deleted و gathered",
+    "عدم نیاز به شبکه یا SSH",
+    "اجرا فقط روی پورت ۲۳ Telnet",
+    "حذف نیاز به Inventory"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Resource Modules وضعیت شبکه را ساختاریافته و مدل‌محور مدیریت می‌کنند و کنترل دقیق‌تری بر همگرایی وضعیت می‌دهند.</p>"
+  },
+  {
+   "title": "کاربرد پرچم --limit R1-CORE هنگام اجرای ansible-playbook چیست؟",
+   "options": [
+    "محدود کردن سرعت CPU روتر",
+    "محدود کردن اجرای Playbook به فقط تجهیز R1-CORE (مناسب تست Canary پیش از اجرای کل گروه)",
+    "حذف R1-CORE از شبکه",
+    "تغییر رمز عبور R1-CORE"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>با <code>--limit</code> می‌توان تغییر را ابتدا روی یک روتر آزمایشی/Canary آزمود و سپس به کل ناوگان تعمیم داد.</p>"
+  },
+  {
+   "title": "نقش پوشه‌های group_vars/ و host_vars/ در ساختار حرفه‌ای پروژه Ansible چیست؟",
+   "options": [
+    "ذخیره لاگ‌های فایروال",
+    "جایگزینی موتور YAML",
+    "جداسازی تمیز متغیرهای مشترک هر گروه تجهیزات از متغیرهای اختصاصی هر تجهیز",
+    "نصب Agent روی سوئیچ"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>این ساختار از شلوغی فایل Inventory جلوگیری کرده و مدیریت صدها تجهیز را مقیاس‌پذیر می‌کند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "اجرای زنده ansible-playbook روی ۲۰۰ روتر واقعی",
+    "نصب Ansible روی IOS-XE",
+    "فقط توضیح متنی بدون کد",
+    "شبیه‌سازی محلی (Local Mock) با Python 3 برای بررسی check_mode، کلید parents، Handlers و Idempotency بدون اجرای باینری Ansible یا اتصال به روتر واقعی"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ تجهیز واقعی درگیر نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "auto_11",
+  "sources": [
+   "https://docs.ansible.com/ansible/latest/network/index.html",
+   "https://docs.ansible.com/ansible/latest/collections/cisco/ios/index.html"
+  ],
+  "limitations": [
+   "آزمایشگاه یک Local Mock در Python 3 است؛ باینری ansible-playbook یا اتصال SSH به روتر واقعی در این محیط اجرا نشده است."
+  ],
+  "legacyAuditFixes": [
+   "رفع عبارات نامأنوس نسخه قدیمی («deklarative state»، «installing agent»، «متن داشته باشد») و بازنویسی کامل به فارسی فنی استاندارد در ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش.",
+   "افزودن Resource Modules، Ansible Vault، --check --diff، --limit و شبیه‌ساز Idempotency در Python."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_11-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_11.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_11_lab.py"
+  }
+ }
+}

@@ -1,0 +1,340 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccie_sp",
+ "objectiveId": "ccie_sp",
+ "kind": "lesson",
+ "track": "CCIE",
+ "course": "ccie-sp",
+ "title": "۸.۴ CCIE Service Provider: مقیاس‌پذیری هسته، Inter-AS VPN، EVPN و دیباگ لایه‌به‌لایه IOS-XR",
+ "titleEn": "CCIE Service Provider (350-501 SPCOR + 8-Hour Lab v5.1): Core Scale, Inter-AS MPLS/SR VPN, EVPN & IOS-XR",
+ "domain": "Service Provider Expert",
+ "source": "Legacy ccie_sp rewritten, typo-cleaned, and audited",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 60,
+ "prerequisites": [
+  "spec_sp",
+  "spec_sp_xr",
+  "spec_sp_sr"
+ ],
+ "sections": [
+  {
+   "id": "ccie_sp-section-1",
+   "title": "مسئله واقعی: در هسته مخابراتی ۲۰ روتری بدون دیباگ از پایین به بالا، چگونه یک خطای کوچک RT یا Prefix-SID ساعت‌ها وقت می‌سوزاند؟",
+   "html": "<p>آزمون عملی <strong>CCIE Service Provider (v5.1)</strong> (پس از <code>350-501 SPCOR</code>) اوج مهندسی شبکه‌های مخابراتی روی ترکیبی از <strong>Cisco IOS-XR</strong> و <strong>IOS-XE</strong> است. در یک شبکه MPLS/SR با L3VPN، Inter-AS Option B/C، EVPN و Multicast VPN (mVPN)، وقتی مشتری در CE1 نمی‌تواند CE2 را پینگ کند، پریدن مستقیم به سراغ BGP یا VRF بزرگ‌ترین اشتباه است! استادان CCIE SP همیشه با انضباط آهنین <strong>از پایین به بالا (Bottom-Up: Underlay -&gt; Label/SR -&gt; Overlay MP-BGP -&gt; PE-CE RPL)</strong> دیباگ می‌کنند.</p>"
+  },
+  {
+   "id": "ccie_sp-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر MPLS L3VPN، Cisco IOS-XR و Segment Routing در درس‌های <code>spec_sp</code>، <code>spec_sp_xr</code> و <code>spec_sp_sr</code>.</p><ul><li>اجرای متدولوژی <strong>عیب‌یابی لایه‌به‌لایه (Bottom-Up)</strong> از Loopback <code>/32</code> تا MP-BGP و PE-CE RPL.</li><li>مقایسه و انتخاب دقیق سه روش <strong>Inter-AS MPLS VPN (Option A، B و C)</strong> و معماری <strong>Carrier Supporting Carrier (CsC)</strong>.</li><li>تسلط بر <strong>EVPN (VPWS / ELAN / IRB)</strong>، <strong>Unified MPLS (BGP-LU)</strong> و <strong>SR-MPLS + SR-TE + TI-LFA</strong> روی IOS-XR.</li><li>پرهیز از تله‌های کشنده IOS-XR در روز آزمون: فراموش کردن <code>commit</code>، نبود <strong>RPL روی eBGP</strong>، تداخل Prefix-SID و خطای <code>next-hop</code> در Route Reflector.</li></ul>"
+  },
+  {
+   "id": "ccie_sp-section-3",
+   "title": "نقش واقعی روترهای P در هسته MPLS/SR و چرایی معماری BGP-Free Core",
+   "html": "<p>در قلب شبکه Service Provider، <strong>روترهای P (Provider Core)</strong> هرگز جدول مسیریابی مشتریان (VRFها یا کل جدول BGP اینترنت) را نمی‌بینند و به بار مفید بسته مشتری نگاه نمی‌کنند! وظیفه یگانه روترهای P، <strong>تعویض پرسرعت برچسب بیرونی (Label Switching / MPLS Swap)</strong> بر پایه IGP + LDP/SR است (<strong>BGP-Free Core</strong>) تا هسته مخابراتی با حداکثر سرعت و کمترین مصرف حافظه مقیاس بگیرد و تمام هوش VRF و سرویس مشتریان روی روترهای لبه <strong>PE (Provider Edge)</strong> متمرکز شود.</p>"
+  },
+  {
+   "id": "ccie_sp-section-4",
+   "title": "نمودار پشته عیب‌یابی لایه‌به‌لایه (Bottom-Up) در لب CCIE Service Provider",
+   "html": "<p>نمودار زیر ۴ لایه عیب‌یابی ترتیبی از زیرساخت IGP و لیبل تا سرویس MP-BGP و سیاست‌های RPL در IOS-XR را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCIE Service Provider v5.1 Bottom-Up Troubleshooting Stack: Underlay, Label/SR, MP-BGP VPN/EVPN and PE-CE RPL\"><rect x=\"14\" y=\"160\" width=\"732\" height=\"48\" rx=\"8\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"380\" y=\"180\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Layer 1 (Bottom): IGP Underlay (IS-IS / OSPF) — Verify /32 PE Loopback Ping First!</text><text x=\"380\" y=\"198\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">No /32 Reachability or MTU Mismatch =&gt; Stop Here and Fix Underlay Before Touching BGP!</text><rect x=\"14\" y=\"108\" width=\"732\" height=\"44\" rx=\"8\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"127\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Layer 2: Label Plane — SR-MPLS (Unique Prefix-SID / TI-LFA) or LDP/RSVP-TE (P-Routers Swap Labels Only!)</text><text x=\"380\" y=\"144\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Check SID Collision, SRGB Match &amp; Explicit mpls Interface Enablement</text><rect x=\"14\" y=\"56\" width=\"732\" height=\"44\" rx=\"8\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"75\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Layer 3: Service Overlay — MP-BGP VPNv4/VPNv6, EVPN, Inter-AS Option A/B/C &amp; RT Import/Export</text><text x=\"380\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Check RR Next-Hop, RD Uniqueness &amp; Exact Route-Target Overlap</text><rect x=\"14\" y=\"10\" width=\"732\" height=\"38\" rx=\"8\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"380\" y=\"33\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">Layer 4 (Top): PE-CE Peering — IOS-XR eBGP Mandatory RPL Policy (RFC 8212) + Commit &amp; Rollback Safety</text></svg>"
+  },
+  {
+   "id": "ccie_sp-section-5",
+   "title": "مقایسه دقیق سه روش Inter-AS MPLS VPN (Option A، Option B و Option C)",
+   "html": "<table><thead><tr><th>روش Inter-AS</th><th>مکانیسم بین دو ASBR</th><th>مقیاس‌پذیری و امنیت</th></tr></thead><tbody><tr><td><strong>Option A (Back-to-Back VRF)</strong></td><td>ساخت VRF و ساب‌اینترفیس مجزا برای هر مشتری بین دو ASBR</td><td>بیشترین ایزوله‌سازی، اما <strong>کمترین مقیاس‌پذیری</strong> (مناسب تعداد کم مشتری)</td></tr><tr><td><strong>Option B (eBGP VPNv4 بین ASBRها)</strong></td><td>تبادل مستقیم مسیرهای <code>VPNv4/VPNv6</code> با لیبل بین دو ASBR (بدون ساخت VRF روی ASBR!)</td><td><strong>توازن عالی مقیاس‌پذیری و امنیت</strong> (پرتکرارترین در آزمون‌ها؛ مراقب <code>retain route-target all</code> باشید!)</td></tr><tr><td><strong>Option C (Multihop eBGP بین RRها)</strong></td><td>تبادل Loopbackهای PE با <code>BGP-LU</code> بین ASBRها و برقراری Multihop VPNv4 مستقیم بین Route Reflector دو اپراتور</td><td><strong>بالاترین مقیاس‌پذیری</strong> (بار صفر VPN روی ASBR)، اما نیازمند اعتماد متقابل بیشتر (افشای Loopbackها)</td></tr></tbody></table>"
+  },
+  {
+   "id": "ccie_sp-section-6",
+   "title": "EVPN و Unified MPLS (BGP-LU): سرویس‌های مدرن لایه ۲/۳ و مقیاس‌پذیری صدها هزار گره",
+   "html": "<p>در نسخه v5.1، دو موضوع کلیدی سهم بزرگی دارند: (۱) <strong>EVPN (Ethernet VPN)</strong> به عنوان جایگزین واحد و مدرن VPLS/PW برای سرویس‌های لایه ۲ نقطه-به-نقطه (<code>EVPN-VPWS</code>) و چندنقطه‌ای (<code>EVPN-ELAN</code>) همراه با <strong>All-Active Multi-Homing (ESI)</strong>؛ و (۲) <strong>Unified MPLS (Seamless MPLS)</strong> که با تفکیک شبکه دسترسی و تجمیع به چند دامنه IGP مستقل و چسباندن آن‌ها از طریق <strong>BGP Labeled Unicast (BGP-LU / RFC 8277)</strong>، از انفجار جدول IGP در شبکه‌های با ده‌ها هزار روتر جلوگیری می‌کند.</p>"
+  },
+  {
+   "id": "ccie_sp-section-7",
+   "title": "پنج خطای کشنده و پرتکرار در آزمایشگاه CCIE Service Provider",
+   "html": "<ol><li><strong>عدم اتصال <code>route-policy</code> (RPL) به همسایه eBGP روی IOS-XR:</strong> نشست بالا می‌آید ولی دقیقاً صفر مسیر ردوبدل می‌شود (RFC 8212).</li><li><strong>تبلیغ Loopback روتر PE به صورت <code>/24</code> به جای <code>/32</code> (یا خلاصه‌سازی در IGP):</strong> خلاصه‌سازی آدرس Loopbackهای PE در OSPF/IS-IS زنجیره لیبل MPLS/SR را می‌شکند!</li><li><strong>تداخل <code>Prefix-SID Index</code> در SR-MPLS:</strong> اختصاص یک اندیس تکراری به دو PE باعث SID Collision و افت ترافیک VPN می‌شود.</li><li><strong>نبود <code>retain route-target all</code> در Inter-AS Option B روی ASBR (در IOS-XR):</strong> بدون آن، ASBR که خود VRF محلی ندارد تمام مسیرهای VPNv4 دریافتی را Drop می‌کند!</li><li><strong>فراموش کردن دستور <code>commit</code> در IOS-XR یا ناهماهنگی <code>Route-Target Import/Export</code></strong> بین PE1 و PE2.</li></ol>"
+  },
+  {
+   "id": "ccie_sp-section-8",
+   "title": "کیفیت سرویس مخابراتی (MPLS QoS: Uniform، Pipe و Short-Pipe) و امنیت هسته (RPKI/RTBH)",
+   "html": "<p>در هسته MPLS، نحوه نگاشت DSCP مشتری به ۳ بیت <strong>MPLS EXP (TC)</strong> در سه مدل تعریف می‌شود: <strong>Uniform</strong> (تغییر EXP روی بسته اثر می‌گذارد)، <strong>Pipe</strong> (تغییرات EXP داخل هسته به DSCP مشتری سرایت نمی‌کند، فقط آخرین هاپ PHP می‌بیند) و <strong>Short-Pipe</strong> (در PE خروجی سیاست بر اساس DSCP اصلی مشتری اجرا می‌شود). در امنیت SP نیز <strong>uRPF</strong>، <strong>BGP FlowSpec</strong>، <strong>RTBH (Remotely Triggered Black Hole)</strong> و <strong>RPKI ROV</strong> برای مهار حملات DDoS و BGP Hijacking حیاتی‌اند.</p>"
+  },
+  {
+   "id": "ccie_sp-section-9",
+   "title": "اتوماسیون مخابراتی در CCIE SP (NETCONF/YANG، gNMI Telemetry و Cisco NSO)",
+   "html": "<p>در بخش Automation لب CCIE SP، اپراتورها از مدل‌های <strong>OpenConfig و Native IOS-XR YANG</strong> روی <strong>NETCONF / gNMI</strong>، <strong>Model-Driven Telemetry (MDT)</strong> برای پایش زنده BGP/LSP و <strong>Cisco NSO</strong> جهت ساخت خودکار سرویس‌های L3VPN روی ده‌ها روتر PE بدون خطای دستی استفاده می‌کنند.</p>"
+  },
+  {
+   "id": "ccie_sp-section-10",
+   "title": "مالتی‌کست مخابراتی: Draft-Rosen در برابر Next-Gen mVPN (NG-mVPN)",
+   "html": "<p>برای انتقال ترافیک Multicast مشتریان (مانند IPTV یا تیکر بورس) درون MPLS L3VPN، روش مدرن <strong>NG-mVPN (RFC 6513/6514)</strong> از خود <strong>MP-BGP</strong> (با مسیرهای mVPN Type 1 تا Type 7) به عنوان صفحه کنترل برای کشف خودکار PEها و ساخت تونل‌های P2MP/mLDP/BIER استفاده می‌کند و جایگزین روش قدیمی و پرپیچیدگی Draft-Rosen (GRE MDT) شده است.</p>"
+  },
+  {
+   "id": "ccie_sp-section-11",
+   "title": "کژفهمی‌های رایج درباره CCIE Service Provider",
+   "html": "<ul><li><strong>کژفهمی ۱: «روترهای P در هسته MPLS باید تمام VRFهای مشتریان را در جدول مسیریابی خود داشته باشند.»</strong> واقعیت: خیر! هسته MPLS یک <strong>BGP-Free Core</strong> است و روترهای P تنها برچسب بیرونی Transport را Swap می‌کنند و از VRF مشتریان بی‌خبرند.</li><li><strong>کژفهمی ۲: «برای صرفه‌جویی در جدول IGP، بهتر است آدرس‌های Loopback روترهای PE را روی ABR خلاصه‌سازی (Summarize) کنیم.»</strong> واقعیت: یکی از مشهورترین قاتل‌های MPLS/SR! خلاصه‌سازی Loopbackهای PE باعث شکستن LSP End-to-End و قطع کامل L3VPN می‌شود.</li><li><strong>کژفهمی ۳: «در Inter-AS Option B باید تمام VRFهای مشتریان را روی روترهای مرزی ASBR هم بسازیم.»</strong> واقعیت: ساخت VRF روی ASBR مخصوص Option A است؛ در Option B هیچ VRFای روی ASBR ساخته نمی‌شود و مسیرهای VPNv4 مستقیم با لیبل تبادل می‌گردند.</li></ul>"
+  },
+  {
+   "id": "ccie_sp-section-12",
+   "title": "اصلاح خطاهای نسخه قدیمی و چک‌لیست تست نهایی لب CCIE SP",
+   "html": "<p><strong>یادداشت ممیزی:</strong> عبارات معیوب و نامفهوم نسخه قدیمی («VLAN vacuumها»، «چه Purposeی»، «ترمیناليزة»، «مبارزه ترافیک لانه‌بالستن») به‌طور کامل با مفاهیم دقیق مهندسی SP جایگزین شدند.</p><p><strong>چک‌لیست پایانی لب CCIE SP:</strong> (۱) تأیید نبود تغییرات Commitنشده در تمام روترهای IOS-XR، (۲) بررسی <code>traceroute vrf ...</code> میان CEها برای تایید دوپشته لیبل MPLS/SR، (۳) تأیید <code>write memory</code> روی روترهای IOS-XE.</p>"
+  },
+  {
+   "id": "ccie_sp-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> در دیباگ لایه‌به‌لایه یک L3VPN، پینگ بین Loopback <code>/32</code> روترهای PE1 و PE2 برقرار و Prefix-SIDها یکتا هستند، اما PE1 با <code>RT Export 65000:100</code> و PE2 با <code>RT Import 65000:200</code> پیکربندی شده و RPL روی PE2 بسته نیست. در کدام لایه خطا رخ می‌دهد؟ <strong>پاسخ:</strong> در لایه ۳ (<code>MP_BGP_VPNV4_RT_MISMATCH</code>) مسیر مشتری در VRF سمت PE2 وارد نمی‌شود و حتی پس از اصلاح RT، نبود RPL روی eBGP در IOS-XR مانع ارسال مسیر به CE2 خواهد شد!</p><p><strong>تمرین ۲:</strong> دو اپراتور با ۵٬۰۰۰ مشتری VPN می‌خواهند به هم متصل شوند بدون آنکه VRF روی ASBR بسازند و بدون آنکه Loopbackهای PE داخلی را به هم افشا کنند. کدام Option مناسب است؟ <strong>پاسخ:</strong> <strong>Inter-AS Option B</strong> (تبادل مستقیم VPNv4 بین ASBRها بدون ساخت VRF و بدون افشای Loopbackهای داخلی PE).</p>"
+  },
+  {
+   "id": "ccie_sp-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://learningnetwork.cisco.com/s/ccie-service-provider-exam-topics\" target=\"_blank\" rel=\"noopener\">سرفصل‌های رسمی آزمون عملی CCIE Service Provider v5.1 (Cisco Learning Network)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc4364\" target=\"_blank\" rel=\"noopener\">RFC 4364 (BGP/MPLS IP VPNs)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی Cisco IOS-XR/IOS-XE یا شبکه مخابراتی MPLS/SR در این محیط متصل نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "CCIE Service Provider v5.1",
+   "fa": "گواهینامه خبره سرویس‌دهندگان سیسکو",
+   "simple": "بالاترین سطح اجرایی مهندسی مخابراتی سیسکو شامل SPCOR (350-501) و لب ۸ساعته."
+  },
+  {
+   "term": "BGP-Free Core (P-Routers)",
+   "fa": "هسته عاری از BGP",
+   "simple": "معماری هسته MPLS/SR که در آن روترهای P فقط برچسب بیرونی را Swap کرده و VRF مشتری را نمی‌بینند."
+  },
+  {
+   "term": "Inter-AS Option A",
+   "fa": "اتصال بین‌اپراتوری با VRF مجزا",
+   "simple": "ساخت VRF و ساب‌اینترفیس جدا برای هر مشتری میان دو ASBR؛ امن اما کم‌مقیاس."
+  },
+  {
+   "term": "Inter-AS Option B",
+   "fa": "اتصال بین‌اپراتوری با eBGP VPNv4",
+   "simple": "تبادل مستقیم مسیرهای برچسب‌دار VPNv4 میان دو ASBR بدون ساخت VRF روی ASBR."
+  },
+  {
+   "term": "Inter-AS Option C",
+   "fa": "اتصال بین‌اپراتوری Multihop RR",
+   "simple": "تبادل Loopbackهای PE با BGP-LU و برقراری مستقیم VPNv4 میان Route Reflector دو AS."
+  },
+  {
+   "term": "retain route-target all",
+   "fa": "نگهداری همه مسیرهای VPNv4 روی ASBR",
+   "simple": "تنظیم حیاتی روی ASBR در Option B تا مسیرهای فاقد VRF محلی Drop نشوند."
+  },
+  {
+   "term": "EVPN (VPWS / ELAN)",
+   "fa": "سرویس مدرن اترنت روی MP-BGP",
+   "simple": "استاندارد مدرن خدمات لایه ۲ مخابراتی با All-Active Multi-Homing (ESI) و جایگزین VPLS."
+  },
+  {
+   "term": "Unified MPLS (BGP-LU)",
+   "fa": "MPLS یکپارچه چنددامنه‌ای",
+   "simple": "جداسازی شبکه بزرگ به چند IGP مستقل و اتصال End-to-End لیبل‌ها با BGP Labeled Unicast."
+  },
+  {
+   "term": "NG-mVPN",
+   "fa": "مالتی‌کست VPN نسل جدید",
+   "simple": "استفاده از MP-BGP (RFC 6513/6514) برای حمل ترافیک Multicast مشتریان درون MPLS L3VPN."
+  },
+  {
+   "term": "MPLS QoS (Uniform/Pipe/Short-Pipe)",
+   "fa": "مدل‌های QoS تونل MPLS",
+   "simple": "تعیین نحوه تعامل و حفظ یا تغییر DSCP مشتری هنگام کپسوله‌سازی در بیت‌های EXP/TC."
+  },
+  {
+   "term": "BGP FlowSpec",
+   "fa": "توزیع خودکار فیلتر DDoS با BGP",
+   "simple": "ارسال قوانین دقیق مسدودسازی یا Rate-Limit ترافیک حمله در کل شبکه از طریق پیام‌های BGP."
+  },
+  {
+   "term": "RTBH",
+   "fa": "سیاه‌چاله از راه دور",
+   "simple": "Remotely Triggered Black Hole؛ هدایت فوری ترافیک به سمت IP هدف حمله DDoS به Null0 در لبه."
+  },
+  {
+   "term": "RPKI ROV",
+   "fa": "اعتبارسنجی اصالت مبدأ BGP",
+   "simple": "بررسی رمزنگاری ROA برای جلوگیری از پذیرش مسیرهای ربوده‌شده (BGP Hijacking)."
+  },
+  {
+   "term": "CsC (Carrier Supporting Carrier)",
+   "fa": "اپراتور پشتیبان اپراتور دیگر",
+   "simple": "ارائه زیرساخت MPLS Backbone توسط یک اپراتور بزرگ به یک ISP کوچک‌تر به عنوان مشتری."
+  },
+  {
+   "term": "Bottom-Up MPLS Debugging",
+   "fa": "عیب‌یابی لایه‌به‌لایه از پایین به بالا",
+   "simple": "بررسی ترتیبی /32 IGP -> Label/SR -> MP-BGP RT -> PE-CE RPL در لب CCIE SP."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (دیباگر لایه‌به‌لایه MPLS/SR L3VPN: بررسی IGP /32، تداخل Prefix-SID، تطابق RT و RPL در IOS-XR) — روتر واقعی اجرا نشده",
+   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر واقعی Cisco IOS-XR یا شبکه MPLS متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر واقعی Cisco IOS-XR/IOS-XE یا شبکه MPLS Core در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی متدولوژی ۴لایه <strong>Bottom-Up Debugging</strong> در CCIE Service Provider را پیاده‌سازی می‌کند: به ترتیب IGP <code>/32</code>، یکتا بودن <code>SR Prefix-SID</code>، هم‌پوشانی <code>Route-Target Import/Export</code> و اتصال اجباری <code>RPL</code> به همسایه eBGP روی IOS-XR را بررسی می‌کند.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccie_sp_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccie_sp_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccie_sp (CCIE Service Provider v5.1: Bottom-Up MPLS/SR L3VPN &amp; Inter-AS Option B Debugger)\nSimulates bottom-up Service Provider lab troubleshooting:\nLayer 1: PE Loopback /32 IGP reachability, Layer 2: SR-MPLS Prefix-SID collision check,\nLayer 3: MP-BGP VPNv4 Route-Target Import/Export matching + IOS-XR eBGP RPL policy check.\nNo real Cisco IOS-XR / IOS-XE router or carrier core is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef debug_mpls_l3vpn_bottom_up(pe1: dict, pe2: dict) -&gt; dict:\n    steps = []\n    # 1. Underlay /32 Loopback reachability\n    if not (pe1[&quot;igp_lo0_reachable&quot;] and pe2[&quot;igp_lo0_reachable&quot;]):\n        return {&quot;healthy&quot;: False, &quot;failed_layer&quot;: &quot;IGP_UNDERLAY&quot;, &quot;fix&quot;: &quot;Verify IS-IS/OSPF /32 Loopback advertisement&quot;}\n    steps.append(&quot;1_IGP_LOOPBACK_32_OK&quot;)\n\n    # 2. SR-MPLS Prefix-SID uniqueness\n    if pe1[&quot;prefix_sid_index&quot;] == pe2[&quot;prefix_sid_index&quot;]:\n        return {\n            &quot;healthy&quot;: False,\n            &quot;failed_layer&quot;: &quot;SR_MPLS_LABEL_PLANE&quot;,\n            &quot;fix&quot;: f&quot;Prefix-SID Collision! Both PE1 and PE2 use index {pe1[&#x27;prefix_sid_index&#x27;]}&quot;,\n        }\n    steps.append(&quot;2_SR_MPLS_PREFIX_SID_UNIQUE_OK&quot;)\n\n    # 3. MP-BGP VPNv4 Route-Target match\n    rt_overlap = set(pe1[&quot;rt_export&quot;]) &amp; set(pe2[&quot;rt_import&quot;])\n    if not rt_overlap:\n        return {\n            &quot;healthy&quot;: False,\n            &quot;failed_layer&quot;: &quot;MP_BGP_VPNV4_RT_MISMATCH&quot;,\n            &quot;fix&quot;: f&quot;PE1 exports {pe1[&#x27;rt_export&#x27;]} but PE2 imports {pe2[&#x27;rt_import&#x27;]} — no overlap!&quot;,\n        }\n    steps.append(f&quot;3_VPNV4_RT_MATCH_OK ({sorted(rt_overlap)})&quot;)\n\n    # 4. IOS-XR PE-CE eBGP RPL Policy attached (RFC 8212)\n    if not (pe1[&quot;xr_ebgp_rpl_attached&quot;] and pe2[&quot;xr_ebgp_rpl_attached&quot;]):\n        return {\n            &quot;healthy&quot;: False,\n            &quot;failed_layer&quot;: &quot;IOS_XR_EBGP_RPL_MISSING&quot;,\n            &quot;fix&quot;: &quot;Attach inbound &amp; outbound RPL route-policy to IOS-XR PE-CE eBGP neighbor!&quot;,\n        }\n    steps.append(&quot;4_IOS_XR_PE_CE_RPL_OK&quot;)\n    return {&quot;healthy&quot;: True, &quot;verified_layers&quot;: steps}\n\n\ndef main() -&gt; None:\n    broken_pe1 = {&quot;igp_lo0_reachable&quot;: True, &quot;prefix_sid_index&quot;: 1, &quot;rt_export&quot;: [&quot;65000:100&quot;], &quot;xr_ebgp_rpl_attached&quot;: True}\n    broken_pe2 = {&quot;igp_lo0_reachable&quot;: True, &quot;prefix_sid_index&quot;: 2, &quot;rt_import&quot;: [&quot;65000:200&quot;], &quot;xr_ebgp_rpl_attached&quot;: False}\n    fixed_pe2 = {&quot;igp_lo0_reachable&quot;: True, &quot;prefix_sid_index&quot;: 2, &quot;rt_import&quot;: [&quot;65000:100&quot;], &quot;xr_ebgp_rpl_attached&quot;: True}\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_IOS_XR_OR_MPLS_CORE&quot;,\n        &quot;before_fix_diagnosis&quot;: debug_mpls_l3vpn_bottom_up(broken_pe1, broken_pe2),\n        &quot;after_fix_verification&quot;: debug_mpls_l3vpn_bottom_up(broken_pe1, fixed_pe2),\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف دقیق خطای لایه ۳ <code>MP_BGP_VPNV4_RT_MISMATCH</code> پیش از اصلاح و عبور کامل هر ۴ لایه پس از تطبیق RT و اتصال RPL.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع چهار دستور دیباگ لایه‌به‌لایه در Cisco IOS-XR (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XR Bottom-Up MPLS/SR L3VPN verification (NOT executed on live router)\nping 10.255.0.2 source Loopback0\nshow isis segment-routing label table\nshow bgp vpnv4 unicast summary\nshow bgp vrf CUST_A ipv4 unicast</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس CCIE Service Provider v5.1 (Inter-AS VPN، EVPN و دیباگ IOS-XR)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در معماری MPLS L3VPN (هسته BGP-Free Core)، وظیفه دقیق روترهای P (Provider Core) چیست؟",
+   "options": [
+    "نگهداری VRF همه مشتریان و باز کردن بار مفید بسته‌ها",
+    "سوئیچینگ پرسرعت برچسب بیرونی MPLS/SR (Label Swap) بدون دیدن VRF یا جدول مسیریابی مشتریان",
+    "توزیع DHCP به مشترکان خانگی",
+    "اجرای NAT برای اینترنت"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>هسته BGP-Free باعث می‌شود روترهای P صرفاً با برچسب Transport کار کنند و جدول مسیریابی آن‌ها کوچک و فوق‌سریع بماند.</p>"
+  },
+  {
+   "title": "در عیب‌یابی لایه‌به‌لایه (Bottom-Up) یک سرویس MPLS/SR L3VPN که پینگ بین CE1 و CE2 برقرار نیست، ترتیب صحیح بررسی کدام است؟",
+   "options": [
+    "تغییر تصادفی Route-Target پیش از بررسی IGP",
+    "۱) دسترسی /32 Loopback PEها در IGP، ۲) صفحه لیبل LDP یا یکتا بودن SR Prefix-SID، ۳) نشست MP-BGP VPNv4 و تطابق RT، و ۴) همسایگی PE-CE و RPL در IOS-XR",
+    "ریبوت کردن روترهای P",
+    "پاک کردن کل VRF"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>اگر لایه ۱ (پینگ /32 Loopback) یا لایه ۲ (لیبل) خراب باشد، بررسی BGP یا VRF تنها وقت لب را هدر می‌دهد.</p>"
+  },
+  {
+   "title": "چرا خلاصه‌سازی (Summarization) آدرس‌های Loopback /32 روترهای PE در IGP (مانند OSPF یا IS-IS) یک اشتباه کشنده در MPLS/SR است؟",
+   "options": [
+    "زیرا زنجیره برچسب End-to-End (LSP) دقیقاً به آدرس /32 Next-Hop روتر PE وابسته است و خلاصه‌سازی باعث شکستن لیبل و قطع کامل VPNها می‌شود",
+    "زیرا OSPF از /32 پشتیبانی نمی‌کند",
+    "زیرا مصرف CPU را به صفر می‌رساند",
+    "تاثیری بر MPLS ندارد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>همیشه در شبکه‌های MPLS و SR باید آدرس‌های Loopback روترهای PE بدون خلاصه‌سازی به شکل <code>/32</code> تبلیغ شوند.</p>"
+  },
+  {
+   "title": "کدام روش Inter-AS MPLS VPN بدون ساخت هیچ VRF روی روترهای مرزی ASBR و بدون افشای Loopbackهای PE داخلی، مسیرهای VPNv4 برچسب‌دار را مستقیم بین دو ASBR تبادل می‌کند؟",
+   "options": [
+    "Option A (Back-to-Back VRF)",
+    "Option B (eBGP VPNv4 بین ASBRها)",
+    "Option C (Multihop RR + BGP-LU)",
+    "Static Route"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Option B تعادل بسیار خوبی میان مقیاس‌پذیری و امنیت بین دو اپراتور برقرار می‌کند.</p>"
+  },
+  {
+   "title": "در پیاده‌سازی Inter-AS Option B روی Cisco IOS-XR، اگر دستور retain route-target all روی ASBR فراموش شود چه رخ می‌دهد؟",
+   "options": [
+    "مسیرها با دو برابر سرعت عبور می‌کنند",
+    "ASBR به دلیل نداشتن VRF محلی، تمام مسیرهای VPNv4 دریافتی را Drop کرده و به AS همسایه تبلیغ نمی‌کند!",
+    "همسایگی OSPF قطع می‌شود",
+    "پورت کنسول قفل می‌شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>به‌طور پیش‌فرض هر روتر BGP مسیرهای VPNv4 را که Route-Target آن‌ها با VRF محلی هم‌خوانی ندارد دور می‌ریزد مگر <code>retain route-target all</code> فعال باشد.</p>"
+  },
+  {
+   "title": "مزیت اصلی Unified MPLS (Seamless MPLS با BGP-LU) در شبکه‌های مخابراتی با ده‌ها هزار روتر چیست؟",
+   "options": [
+    "حذف کامل BGP از شبکه",
+    "تبدیل کل شبکه کشور به یک Area واحد OSPF",
+    "جداسازی شبکه به چند دامنه کوچک IGP و اتصال لیبل‌شده آن‌ها با BGP-LU (RFC 8277) برای جلوگیری از انفجار جدول IGP",
+    "استفاده از RIPv2 در هسته"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>Unified MPLS کلید مقیاس‌پذیری شبکه‌های عظیم تجمیع موبایل (5G Backhaul) و اپراتورهای سراسری است.</p>"
+  },
+  {
+   "title": "در Cisco IOS-XR، چرا تغییر پیکربندی تا پیش از دستور commit اعمال نمی‌شود؟",
+   "options": [
+    "برای کند کردن کار مهندس",
+    "چون IOS-XR فاقد CLI است",
+    "زیرا سیستم‌عامل فاقد حافظه است",
+    "به دلیل مدل اتمیک Two-Stage Commit که امکان بازبینی Diff پیش از اعمال، commit confirmed و Rollback فوری کل تغییر را فراهم می‌کند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>مدل Commit اتمیک خطر خطای انسانی و اعمال نیمه‌کاره تغییرات در هسته مخابراتی را به شدت کاهش می‌دهد.</p>"
+  },
+  {
+   "title": "کدام قابلیت EVPN به یک سایت مشتری اجازه می‌دهد هم‌زمان به دو روتر PE متصل شود و ترافیک خود را به‌صورت Active/Active روی هر دو لینک توزیع کند؟",
+   "options": [
+    "All-Active Multi-Homing با شناسه ESI (Ethernet Segment Identifier)",
+    "Spanning Tree Blocking",
+    "VTP Pruning",
+    "Static ARP"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>All-Active Multi-Homing مبتنی بر ESI یکی از بزرگ‌ترین برتری‌های EVPN نسبت به VPLS قدیمی است.</p>"
+  },
+  {
+   "title": "ابزار امنیتی BGP FlowSpec در شبکه‌های Service Provider برای چه هدفی به کار می‌رود؟",
+   "options": [
+    "تخصیص آدرس IP به موبایل‌ها",
+    "توزیع سریع و خودکار قوانین دقیق فیلترینگ یا Rate-Limit (بر اساس IP/پورت/طول بسته) در سراسر لبه شبکه برای مهار حملات DDoS",
+    "جایگزینی رمزنگاری IPsec",
+    "پشتیبان‌گیری از فایل کانفیگ"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>برعکس RTBH که کل ترافیک مقصد را سیاه‌چاله می‌کند، BGP FlowSpec امکان فیلتر جراحی و دقیق ترافیک حمله را می‌دهد.</p>"
+  },
+  {
+   "title": "فناوری RPKI ROV (Route Origin Validation) در مرزهای BGP اپراتورها از چه تهدید جدی جهانی جلوگیری می‌کند؟",
+   "options": [
+    "قطعی فیبر نوری",
+    "حمله فیشینگ ایمیل",
+    "پذیرش مسیرهای ربوده‌شده یا نشت‌شده (BGP Prefix Hijacking) با بررسی رمزنگاری ROA",
+    "خطای MTU در اترنت"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>RPKI ROV اصالت ارتباط میان یک پیشوند IP و شماره AS مبدا مجاز آن را از نظر رمزنگاری تایید می‌کند.</p>"
+  },
+  {
+   "title": "در MPLS L3VPN، چه ترکیبی برای جداسازی ترافیک مشتریان مختلف و ارسال بسته‌های آن‌ها روی هسته مشترک لازم است؟",
+   "options": [
+    "فقط VLAN معمولی در کل کشور",
+    "فقط ACL روی روترهای P",
+    "فقط مسیرهای استاتیک بدون لیبل",
+    "VRF (با RD یکتا و RT Import/Export) در روترهای PE + MP-BGP VPNv4/VPNv6 + صفحه برچسب MPLS (SR-MPLS یا LDP)"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>هم‌افزایی VRF/RD/RT، MP-BGP و دوپشته لیبل (برچسب بیرونی Transport + برچسب درونی VPN) اساس MPLS L3VPN است.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "شبیه‌سازی محلی (Local Mock) در Python 3 برای دیباگر ۴لایه Bottom-Up MPLS/SR L3VPN (IGP /32، Prefix-SID، RT و IOS-XR RPL)",
+    "اتصال زنده به شبکه مخابراتی ملی",
+    "تغییر BGP روی ASR 9000 واقعی",
+    "فقط متن نظری بدون کد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ روتر IOS-XR یا شبکه MPLS واقعی متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "legacyId": "ccie_sp",
+  "sources": [
+   "https://learningnetwork.cisco.com/s/ccie-service-provider-exam-topics",
+   "https://www.rfc-editor.org/rfc/rfc4364"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی Cisco IOS-XR/IOS-XE یا شبکه MPLS Core متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "اصلاح کامل غلط‌ها و عبارات نامفهوم نسخه قدیمی («VLAN vacuumها»، «چه Purposeی»، «ترمیناليزة»، «مبارزه ترافیک لانه‌بالستن») و بازنویسی جامع به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG، جدول Inter-AS A/B/C، EVPN/BGP-LU/RPKI و دیباگر Bottom-Up."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccie_sp-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccie",
+   "recommendedCourse": "ccie-sp",
+   "blueprint": "/academy-assets/v5/blueprints/ccie_sp.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccie_sp_lab.py"
+  }
+ }
+}
