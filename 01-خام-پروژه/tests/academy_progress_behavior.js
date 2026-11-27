@@ -86,7 +86,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 
   // The account session did not read, overwrite or clear standalone progress,
   // including after a failed server save; sign-out leaves those keys intact.
-  const sharedKeys = ['fam_academy_progress_v1', 'fam_academy_sections_v1'];
+  const sharedKeys = ['fam_academy_progress_v1', 'fam_academy_sections_v1', 'fam_academy_quiz_v1'];
   assert(!storageReads.some(key => sharedKeys.includes(key)));
   assert(!storageWrites.some(key => sharedKeys.includes(key)));
   // Without a bridge, standalone callers retain their existing local fallback.

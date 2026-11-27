@@ -1,0 +1,317 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "academy-automation-terraform",
+ "objectiveId": "auto_12",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-iac",
+ "title": "Terraform: پیکربندی، state و drift",
+ "titleEn": "Terraform state and drift",
+ "domain": "Infrastructure as Code",
+ "source": "academy-labs/terraform-draft-fa.md",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 50,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "tf-section-1",
+   "title": "چرا state مهم است؟",
+   "html": "<p>تیمی VLAN را بیرون از فرایند IaC از ۱۰ به ۲۰ تغییر می‌دهد. پیکربندی مطلوب هنوز ۱۰ و آخرین state ثبت‌شده نیز ۱۰ است. چگونه این سه مشاهده را از هم تفکیک می‌کنیم، بدون آنکه به اشتباه تصور کنیم برنامه‌ای روی دستگاه اجرا شده است؟</p>"
+  },
+  {
+   "id": "tf-section-2",
+   "title": "پیش‌نیاز و هدف",
+   "html": "<p>با دیکشنری Python، خط فرمان و مفهوم API آشنا باشید. پس از درس بتوانید پیکربندی مطلوب، state و وضعیت مشاهده‌شده را تفکیک، یک plan را بررسی و مرز شبیه‌سازی و ابزار واقعی را بیان کنید.</p>"
+  },
+  {
+   "id": "tf-section-3",
+   "title": "پیکربندی و منابع",
+   "html": "<p>در فایل HCL منابع و ویژگی‌های مطلوب را تعریف می‌کنیم. resource واحدی است که provider مدیریت می‌کند؛ data source معمولاً داده‌ای را برای استفاده در پیکربندی می‌خواند. قابلیت‌های دقیق هر resource به provider و نسخه آن وابسته است.</p>"
+  },
+  {
+   "id": "tf-section-4",
+   "title": "Provider و API",
+   "html": "<p>Provider افزونه‌ای است که عملیات و schema منابع را پیاده می‌کند. پشتیبانی Terraform از یک تجهیز به وجود provider مناسب، نسخه سازگار، API، مجوز و مستندات آن بستگی دارد. نام resource یا دستور ساخت VLAN را نمی‌توان بدون تعیین provider تعمیم داد.</p>"
+  },
+  {
+   "id": "tf-section-5",
+   "title": "State و هویت منابع",
+   "html": "<p>State پیوند بین آدرس منابع در پیکربندی و اشیای مدیریت‌شده و ویژگی‌های ثبت‌شده آنها را نگه می‌دارد. ممکن است state با واقعیت عقب‌مانده یا ناقص باشد. در state می‌تواند اطلاعات حساس وجود داشته باشد؛ دسترسی، پشتیبان‌گیری و رمزگذاری backend را مدیریت کنید.</p>"
+  },
+  {
+   "id": "tf-section-6",
+   "title": "سه وضعیت، یک سناریو",
+   "html": "<p>در مثال: پیکربندی مطلوب ۱۰، state قبلی ۱۰ و مقدار مشاهده‌شده توسط provider برابر ۲۰ است. تغییر خارجی نمونه‌ای از drift است. صرف مقایسه فایل کد با state قدیمی لزوماً تغییر واقعی را آشکار نمی‌کند.</p>"
+  },
+  {
+   "id": "tf-section-7",
+   "title": "Plan معمولی",
+   "html": "<p>Terraform معمولاً پیش از برنامه‌ریزی از provider وضعیت فعلی منابع را بازخوانی می‌کند و تفاوت با پیکربندی را برای بررسی پیشنهاد می‌دهد. اگر refresh خطا دهد، برنامه موفق یا وضعیت حدسی فرض نشود. plan به‌تنهایی اعمال تغییرات منبع نیست.</p>"
+  },
+  {
+   "id": "tf-section-8",
+   "title": "Refresh-only",
+   "html": "<p>plan -refresh-only تغییرات پیشنهادی برای به‌روزرسانی state و output بر پایه واقعیت مشاهده‌شده را نشان می‌دهد. apply -refresh-only پس از تأیید state را به‌روز می‌کند، اما منبع بیرونی را به مقدار مطلوب برنمی‌گرداند. پس از آن اختلاف با کد ممکن است همچنان برقرار باشد.</p>"
+  },
+  {
+   "id": "tf-section-9",
+   "title": "تصمیم بعد از drift",
+   "html": "<p>ابتدا دامنه و مجوز تغییر را بررسی کنید. اگر مقدار ۲۰ مطلوب است، پیکربندی را پس از تأیید تغییر دهید؛ اگر مقدار ۱۰ مطلوب است، plan معمولی را بررسی کنید و فقط در پنجره تغییر مجاز apply کنید. هیچ‌کدام بدون بررسی پیامدها اقدام خودکار توصیه نمی‌شود.</p>"
+  },
+  {
+   "id": "tf-section-10",
+   "title": "قفل و همکاری تیمی",
+   "html": "<p>پشتیبانی و محدوده state locking به backend و تنظیمات بستگی دارد. از خاموش‌کردن قفل برای دور زدن خطا پرهیز کنید؛ مالک اجرا، وضعیت job و سیاست تیم را بررسی کنید. قفل state به‌تنهایی مانع تغییر دستی خارج از Terraform نیست.</p>"
+  },
+  {
+   "id": "tf-section-11",
+   "title": "Terraform در کنار Ansible",
+   "html": "<p>Terraform غالباً برای مدیریت چرخه عمر منابع بر اساس provider و state به کار می‌رود؛ Ansible معمولاً برای اجرای وظایف و پیکربندی به کار می‌رود. این تقسیم‌بندی انحصاری نیست: قابلیت واقعی به ماژول‌ها، providerها و طراحی وابسته است.</p>"
+  },
+  {
+   "id": "tf-section-12",
+   "title": "خطا و بازیابی",
+   "html": "<p>خطای احراز هویت، نبود دسترسی API، نسخه ناسازگار provider یا قفل backend می‌تواند مانع plan شود. پیام خطا را بخوانید، دسترسی و نسخه را تأیید و بدون افشای رمز بررسی کنید. state تولیدی را برای آزمایش دستی ویرایش نکنید.</p>"
+  },
+  {
+   "id": "tf-section-13",
+   "title": "تمرین تحلیل",
+   "html": "<p>اگر بعد از refresh-only هنوز در کد VLAN ۱۰ و در منبع ۲۰ باشد، آیا drift نسبت به مطلوب حذف شده است؟ خیر؛ فقط state با مشاهده همگام شده است. برای تصمیم بازگردانی یا تغییر کد، طرح معمولی و مجوز لازم را بررسی کنید.</p>"
+  },
+  {
+   "id": "tf-section-14",
+   "title": "منابع و محدودیت",
+   "html": "<p>منابع: مستندات HashiCorp درباره Manage resource drift و terraform_data. مثال‌های این درس به معنای تأیید پشتیبانی هیچ provider شبکه یا اجرای آزمایش روی تجهیز نیستند. Terraform یک ابزار مستقل است و IOS CLI این درس را اجرا نمی‌کند.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Terraform",
+   "fa": "Terraform",
+   "simple": "ابزار مدیریت منابع بر اساس پیکربندی و provider."
+  },
+  {
+   "term": "HCL",
+   "fa": "HCL",
+   "simple": "زبان نوشتن پیکربندی Terraform."
+  },
+  {
+   "term": "provider",
+   "fa": "provider",
+   "simple": "افزونه رابط انواع منابع و APIهای سرویس."
+  },
+  {
+   "term": "resource",
+   "fa": "resource",
+   "simple": "عنصر مدیریت‌شده با نوع و ویژگی‌های تعریف‌شده در پیکربندی."
+  },
+  {
+   "term": "data source",
+   "fa": "data source",
+   "simple": "روش خواندن اطلاعات از provider برای استفاده در پیکربندی."
+  },
+  {
+   "term": "state",
+   "fa": "state",
+   "simple": "داده ثبت‌شده درباره منابع مدیریت‌شده و ارتباط آنها با پیکربندی."
+  },
+  {
+   "term": "backend",
+   "fa": "backend",
+   "simple": "محل و سازوکار نگهداری state و قابلیت‌های وابسته به آن."
+  },
+  {
+   "term": "locking",
+   "fa": "locking",
+   "simple": "سازوکار جلوگیری از دسترسی متعارض به state در backendهای پشتیبان."
+  },
+  {
+   "term": "plan",
+   "fa": "plan",
+   "simple": "طرح تغییرات پیشنهادی برای بررسی پیش از اجرا."
+  },
+  {
+   "term": "apply",
+   "fa": "apply",
+   "simple": "اجرای طرح تأییدشده و ثبت نتیجه در state."
+  },
+  {
+   "term": "drift",
+   "fa": "drift",
+   "simple": "تغییر وضعیت منبع واقعی نسبت به وضعیت مطلوب، مثلاً از مسیر بیرونی."
+  },
+  {
+   "term": "refresh",
+   "fa": "refresh",
+   "simple": "بازخوانی وضعیت منبع از provider برای به‌روزرسانی اطلاعات state."
+  },
+  {
+   "term": "refresh-only",
+   "fa": "refresh-only",
+   "simple": "حالت برنامه‌ریزی یا اعمال برای همگام‌سازی state با مشاهدات، بدون بازگردانی منبع به پیکربندی."
+  },
+  {
+   "term": "output",
+   "fa": "output",
+   "simple": "مقداری که پیکربندی برای نمایش یا استفاده بیرونی اعلام می‌کند."
+  },
+  {
+   "term": "terraform_data",
+   "fa": "terraform_data",
+   "simple": "منبع داخلی Terraform برای نگهداری داده در چرخه عمر، بدون ساخت منبع بیرونی."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه Python Mock و Terraform محلی (اجرا نشده)",
+   "executionStatus": "Designed — Not Run — آزمایشگاه واقعی اجرا نشده است.",
+   "html": "<p><strong>وضعیت:</strong> کاربرگ طراحی شده؛ Terraform واقعی و تجهیز شبکه اجرا نشده‌اند. بخش Python یک Mock است و نه Terraform یا provider واقعی.</p><h4>بخش ۱: اجرای Python Mock</h4><p>پیش‌نیاز: Python 3. متن زیر را در فایلی به نام <code>terraform_mock.py</code> در پوشه آزمایشی ذخیره کنید و سپس <code>python3 terraform_mock.py</code> را اجرا کنید. فقط dictionaryهای حافظه تغییر می‌کنند؛ به هیچ API یا دستگاهی وصل نمی‌شود.</p><pre dir=\"ltr\"><code>&quot;&quot;&quot;Educational Python mock: no Terraform provider, network or device is invoked.&quot;&quot;&quot;\nfrom copy import deepcopy\n\n\ndef refresh_only_plan(state, observed):\n    &quot;&quot;&quot;Propose an updated state, without modifying state or observed objects.&quot;&quot;&quot;\n    return {&quot;before&quot;: deepcopy(state), &quot;after&quot;: deepcopy(observed)}\n\n\ndef refresh_only_apply(plan):\n    &quot;&quot;&quot;Return a new simulated state; do not change the observed objects.&quot;&quot;&quot;\n    return deepcopy(plan[&quot;after&quot;])\n\n\ndef normal_plan(desired, observed):\n    &quot;&quot;&quot;Return field-level differences after a simplified successful refresh.&quot;&quot;&quot;\n    return {key: {&quot;observed&quot;: observed.get(key), &quot;desired&quot;: desired.get(key)}\n            for key in sorted(desired.keys() | observed.keys())\n            if observed.get(key) != desired.get(key)}\n\n\ndef main():\n    desired = {&quot;name&quot;: &quot;lab&quot;, &quot;vlan&quot;: 10}\n    previous_state = {&quot;name&quot;: &quot;lab&quot;, &quot;vlan&quot;: 10}\n    observed = {&quot;name&quot;: &quot;lab&quot;, &quot;vlan&quot;: 20}  # imagined external change\n    refresh_plan = refresh_only_plan(previous_state, observed)\n    refreshed_state = refresh_only_apply(refresh_plan)\n    print(&quot;refresh-only proposed state:&quot;, refresh_plan[&quot;after&quot;])\n    print(&quot;state after mock apply:&quot;, refreshed_state)\n    print(&quot;observed object unchanged:&quot;, observed)\n    print(&quot;normal plan against desired:&quot;, normal_plan(desired, observed))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p>انتظار: state بعد از refresh فرضی ۲۰، شیء مشاهده‌شده بدون تغییر، و normal plan با observed=20 و desired=10. اگر خروجی تفاوت داشت، نسخه Python و کد ذخیره‌شده را بررسی کنید.</p><h4>بخش ۲: Terraform واقعی اختیاری</h4><p>پیش‌نیاز: Terraform 1.4 یا جدیدتر، پوشه موقت قابل نوشتن و اجازه آزمایش. دستورها در checkout یا پوشه پروژه عملیاتی اجرا نشوند. <code>terraform_data</code> منبع داخلی Terraform است؛ این آزمایش شبکه یا VLAN واقعی نمی‌سازد.</p><pre dir=\"ltr\"><code>workdir=&quot;$(mktemp -d)&quot; &amp;&amp; cd &quot;$workdir&quot; || exit 1\ncat &gt; main.tf &lt;&lt;&#x27;HCL&#x27;\nterraform {\n  required_version = &quot;&gt;= 1.4.0&quot;\n}\nresource &quot;terraform_data&quot; &quot;example&quot; {\n  input = { name = &quot;lab&quot;, vlan = 10 }\n}\noutput &quot;example&quot; {\n  value = terraform_data.example.output\n}\nHCL\nterraform init\nterraform plan\nterraform apply\nterraform plan\nterraform output example</code></pre><p>در apply فقط بعد از بررسی طرح تأیید کنید. انتظار: plan اول ایجاد یک منبع و plan پس از apply موفق معمولاً عدم تغییر را گزارش کند؛ output باید vlan=10 باشد. این نتایج از پیش اجرا نشده‌اند. برای پاک‌سازی در همان پوشه موقت ابتدا طرح <code>terraform destroy</code> را بررسی و فقط با اطمینان تأیید کنید. این تمرین drift تجهیز واقعی را اثبات نمی‌کند.</p><p>عیب‌یابی: نسخه و مجوز پوشه و پیام خطا را بررسی کنید. با خطای init یا apply، اجرای موفق فرض نشود. منبع واقعی و backend تولیدی را برای آزمایش به کار نبرید.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس",
+   "instructions": "پس از انتخاب پاسخ‌ها، نتیجه و توضیح هر سؤال را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "کدام مورد پیکربندی مطلوب را تعریف می‌کند؟",
+   "options": [
+    "فایل پیکربندی HCL",
+    "فقط state قبلی",
+    "فقط لاگ دستگاه",
+    "خروجی DNS"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>کد پیکربندی ویژگی‌های مطلوب را تعریف می‌کند.</p>"
+  },
+  {
+   "title": "اگر تجهیز بیرون از Terraform تغییر کند، چه چیزی ممکن است رخ دهد؟",
+   "options": [
+    "state همواره هم‌زمان به‌روز می‌شود",
+    "drift بین وضعیت واقعی و پیکربندی",
+    "Terraform فوراً تغییر را لغو می‌کند",
+    "قفل backend تجهیز را خاموش می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>تغییر بیرونی می‌تواند وضعیت واقعی را از پیکربندی دور کند.</p>"
+  },
+  {
+   "title": "وظیفه provider چیست؟",
+   "options": [
+    "رمزگذاری خودکار همه stateها",
+    "تضمین مجوز همه APIها",
+    "پیاده‌سازی رابط منابع و عملیات برای یک سرویس",
+    "حذف نیاز به بررسی plan"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>provider منابع و تعاملات پشتیبانی‌شده را مشخص می‌کند.</p>"
+  },
+  {
+   "title": "plan معمولی به‌تنهایی چه می‌کند؟",
+   "options": [
+    "همه منابع را حذف می‌کند",
+    "همیشه apply را شروع می‌کند",
+    "پیکربندی فایل را تغییر می‌دهد",
+    "تغییرات پیشنهادی را برای بررسی نشان می‌دهد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>plan عملیات پیشنهادی را نشان می‌دهد، نه اعمال آن را.</p>"
+  },
+  {
+   "title": "plan -refresh-only چه پیشنهادی ارائه می‌دهد؟",
+   "options": [
+    "به‌روزرسانی state و output براساس وضعیت مشاهده‌شده",
+    "بازگردانی خودکار منبع به کد",
+    "ایجاد تضمینی VLAN روی همه تجهیزات",
+    "حذف state بدون بررسی"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>حالت refresh-only برای بازبینی همگام‌سازی state است.</p>"
+  },
+  {
+   "title": "apply -refresh-only با drift چه می‌کند؟",
+   "options": [
+    "منبع واقعی را همیشه به مقدار مطلوب برمی‌گرداند",
+    "state را با مشاهده همگام می‌کند و منبع را به مطلوب بازنمی‌گرداند",
+    "فایل HCL را خودکار بازنویسی می‌کند",
+    "فقط روی روتر Cisco کار می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>همگام‌سازی state و بازگردانی منبع دو اقدام متفاوت‌اند.</p>"
+  },
+  {
+   "title": "پشتیبانی قفل state به چه وابسته است؟",
+   "options": [
+    "رنگ چراغ switch",
+    "تعداد کاربران VLAN",
+    "backend و تنظیمات آن",
+    "نام فایل HCL"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>قابلیت locking در backendها و تنظیمات متفاوت است.</p>"
+  },
+  {
+   "title": "آیا قفل state جلوی هر تغییر دستی روی تجهیز را می‌گیرد؟",
+   "options": [
+    "بله در همه providerها",
+    "بله اگر plan اجرا شود",
+    "فقط اگر از Python استفاده شود",
+    "خیر، تغییر بیرونی می‌تواند مستقل از قفل state رخ دهد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>قفل از دسترسی هم‌زمان به state محافظت می‌کند، نه الزاماً از همه APIهای دیگر.</p>"
+  },
+  {
+   "title": "در مثال Python Mock کدام ادعا درست است؟",
+   "options": [
+    "هیچ تجهیز یا provider شبکه اجرا نمی‌شود",
+    "Terraform واقعی VLAN را می‌سازد",
+    "state واقعی تغییر می‌کند",
+    "provider شبکه به API متصل است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>مثال فقط دیکشنری‌های حافظه Python را مقایسه می‌کند.</p>"
+  },
+  {
+   "title": "منبع terraform_data در آزمایش واقعی این درس چه می‌سازد؟",
+   "options": [
+    "VLAN واقعی در سوئیچ",
+    "منبع داخلی Terraform، بدون ساخت شبکه بیرونی",
+    "ماشین AWS با دسترسی عمومی",
+    "قفل سخت‌افزاری روی روتر"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>terraform_data منبع داخلی Terraform است نه provider شبکه.</p>"
+  },
+  {
+   "title": "برای حفظ تغییر خارجی به‌عنوان وضعیت مطلوب چه باید کرد؟",
+   "options": [
+    "بدون بررسی apply اجرا شود",
+    "state تولیدی دستی حذف شود",
+    "پس از تأیید پیکربندی را با تصمیم مطلوب تطبیق دهید",
+    "گزارش drift را نادیده بگیرید"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>ابتدا تصمیم و مجوز، سپس هم‌راستا کردن کد با وضعیت مطلوب لازم است.</p>"
+  },
+  {
+   "title": "کدام گزاره درباره Terraform و Ansible صحیح‌تر است؟",
+   "options": [
+    "Terraform هرگز منابع موجود را تغییر نمی‌دهد",
+    "Ansible هرگز منبع نمی‌سازد",
+    "هر دو همیشه رفتار کاملاً یکسان دارند",
+    "قابلیت‌ها به provider و module وابسته‌اند و مرزبندی مطلق نیست"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>هر دو ابزار کاربردهای هم‌پوشان دارند و جزئیات به افزونه‌ها وابسته است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "draft.1",
+  "sources": [
+   "https://developer.hashicorp.com/terraform/tutorials/state/resource-drift",
+   "https://developer.hashicorp.com/terraform/language/resources/terraform-data"
+  ]
+ }
+}

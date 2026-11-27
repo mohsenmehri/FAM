@@ -239,6 +239,33 @@ class FamAppApiTests(unittest.TestCase):
         self.assertEqual(out.status_code, 200)
         self.assertEqual(self.client.get("/api/state", environ_base=self.https_env).status_code, 401)
 
+    def test_terraform_lesson_assets_and_quiz_progress_require_session(self):
+        path = "/academy-assets/v5/blueprints/academy-automation-terraform.json"
+        self.assertEqual(self.client.get(path, environ_base=self.https_env).status_code, 401)
+        login = self._login_admin()
+        self.assertEqual(login.status_code, 200)
+        csrf = login.get_json()["csrf"]
+        catalog = self.client.get("/academy-assets/curriculum-catalog.json", environ_base=self.https_env).get_json()
+        lesson = next(lesson for track in catalog["paths"] for course in track["courses"]
+                      for lesson in course["lessons"] if lesson["id"] == "academy-automation-terraform")
+        self.assertEqual(lesson["blueprint"], path)
+        res = self.client.get(path, environ_base=self.https_env)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["lessonId"], lesson["id"])
+        res.close()
+        state = {"completed": [], "labs": {"quizAttempts": {lesson["id"]: {
+            "correct": 6, "incorrect": 2, "unanswered": 4, "total": 12}}}}
+        saved = self.client.post("/api/academy/progress", json={"changes": {"fam4.learn.v1": json.dumps(state)}},
+                                 headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf}, environ_base=self.https_env)
+        self.assertEqual(saved.status_code, 200)
+        page = self.client.get("/academy", environ_base=self.https_env).get_data(as_text=True)
+        self.assertIn('academy-automation-terraform', page)
+        self.assertIn('quizAttempts', page)
+        out = self.client.post("/api/logout", json={}, headers={"Origin": self.ORIGIN, "X-FAM-CSRF": csrf},
+                               environ_base=self.https_env)
+        self.assertEqual(out.status_code, 200)
+        self.assertEqual(self.client.get(path, environ_base=self.https_env).status_code, 401)
+
     def test_login_rate_limit_blocks_after_ten_failures(self):
         for attempt in range(10):
             res = self.client.post(

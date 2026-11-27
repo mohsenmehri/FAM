@@ -3,6 +3,7 @@
 
   const STORAGE_KEY = 'fam_academy_progress_v1';
   const SEC_STORAGE_KEY = 'fam_academy_sections_v1';
+  const QUIZ_STORAGE_KEY = 'fam_academy_quiz_v1';
 
   function getSectionsMap() {
     // A bridge identifies the authenticated account. Never read or write
@@ -31,6 +32,30 @@
       selfAssessed: current.selfAssessed || [],
       profile: current.profile
     });
+  }
+
+  function getQuizAttempts() {
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      const attempts = bridge.progress?.labs?.quizAttempts;
+      return attempts && typeof attempts === 'object' && !Array.isArray(attempts) ? { ...attempts } : {};
+    }
+    try {
+      const value = JSON.parse(localStorage.getItem(QUIZ_STORAGE_KEY) || '{}');
+      if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+    } catch {}
+    return {};
+  }
+
+  function saveQuizAttempt(lessonId, attempt) {
+    const attempts = getQuizAttempts();
+    attempts[lessonId] = attempt;
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      persistProgress(getCompletedList(), { ...(bridge.progress?.labs || {}), quizAttempts: attempts });
+    } else {
+      try { localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(attempts)); } catch {}
+    }
   }
 
   function isSectionDone(lessonId, secId) {
@@ -517,6 +542,10 @@
     const quizQuestions = getQuizQuestions(bp);
     if (quiz && Array.isArray(quizQuestions)) {
       const result = quiz.querySelector('.lesson-quiz-result');
+      const previous = getQuizAttempts()[bp.lessonId];
+      if (previous && Number.isInteger(previous.correct) && Number.isInteger(previous.total) && previous.total > 0) {
+        result.textContent = `آخرین نتیجه ثبت‌شده: ${previous.correct} از ${previous.total} پاسخ درست`;
+      }
       quiz.querySelector('[data-quiz-grade]').onclick = () => {
         let correct = 0, incorrect = 0, unanswered = 0;
         quizQuestions.forEach((q, i) => {
@@ -531,6 +560,7 @@
           feedback.hidden = false;
         });
         result.textContent = `نمره: ${Number((correct * 10 / quizQuestions.length).toFixed(2))} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered}`;
+        saveQuizAttempt(bp.lessonId, { correct, incorrect, unanswered, total: quizQuestions.length });
       };
       quiz.querySelector('[data-quiz-retry]').onclick = () => {
         quiz.querySelectorAll('input:checked').forEach(input => { input.checked = false; });

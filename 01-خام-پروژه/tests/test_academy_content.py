@@ -160,13 +160,26 @@ class AcademyContentTests(unittest.TestCase):
                 self.assertIn(WEB_ROOT.resolve(), local_path.parents)
                 self.assertTrue(local_path.is_file())
 
-    def test_served_curriculum_is_curriculum_5_0_only(self):
-        prefixes = ("ccna-v11-", "ccna-v20-", "academy-stage-zero-")
-        self.assertEqual([p["id"] for p in self.catalog["paths"]], ["fam-c5"])
-        for _, _, lesson in self.records:
+    def test_curriculum_five_and_automation_are_separate(self):
+        paths = {path["id"]: path for path in self.catalog["paths"]}
+        self.assertEqual(set(paths), {"fam-c5", "fam-automation"})
+        for path, _, lesson in self.records:
             with self.subTest(lesson=lesson["id"]):
-                self.assertTrue(lesson["id"].startswith(prefixes), lesson["id"])
+                if path["id"] == "fam-c5":
+                    self.assertTrue(lesson["id"].startswith(("ccna-v11-", "ccna-v20-", "academy-stage-zero-")))
+                else:
+                    self.assertEqual(lesson["id"], "academy-automation-terraform")
                 self.assertTrue(lesson["blueprint"].startswith("/academy-assets/v5/blueprints/"))
+
+    def test_terraform_blueprint_embeds_the_actual_mock_source(self):
+        from html import unescape
+        blueprint = json.loads((ASSET_ROOT / "v5/blueprints/academy-automation-terraform.json").read_text(encoding="utf-8"))
+        lab = unescape(blueprint["stages"]["lab"]["html"])
+        source = (PACKAGE_ROOT / "academy-labs/terraform_mock.py").read_text(encoding="utf-8")
+        self.assertIn(source, lab)
+        self.assertIn("terraform_data", lab)
+        self.assertIn("اجرا نشده", lab)
+        self.assertEqual(len(blueprint["interactiveQuiz"]), 12)
 
     def test_every_lesson_carries_the_sixteen_section_contract(self):
         for _, _, lesson in self.records:

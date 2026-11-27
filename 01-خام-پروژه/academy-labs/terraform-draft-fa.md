@@ -49,3 +49,7 @@ terraform output example
 Drift می‌تواند از تغییر منبع واقعی خارج از گردش کار Terraform به وجود آید. در شرایط معمول، `plan` وضعیت منبع را از provider بازخوانی می‌کند. `terraform plan -refresh-only` تغییر پیشنهادی state را برای بررسی نشان می‌دهد؛ `terraform apply -refresh-only` پس از تأیید state را با وضعیت مشاهده‌شده همگام می‌کند، نه اینکه منبع بیرونی را به پیکربندی برگرداند. برای بازگردانی، ابتدا طرح معمولی و اثر آن را با مجوز بررسی کنید. قابلیت refresh و lock و جزئیات خطا به provider و backend وابسته‌اند. در صورت خطای احراز هویت، API یا قفل، دستورات را موفق فرض نکنید؛ پیام خطا، سطح دسترسی و backend را بررسی کنید. هرگز state واقعی را برای آزمایش دستی ویرایش نکنید.
 
 منابع: [Terraform: Manage resource drift](https://developer.hashicorp.com/terraform/tutorials/state/resource-drift)، [terraform_data](https://developer.hashicorp.com/terraform/language/resources/terraform-data).
+
+## اتصال به آکادمی
+
+کاربرگ فوق اکنون به‌صورت متن داخل blueprint درس `academy-automation-terraform` در مسیر مستقل اتوماسیون نمایش داده می‌شود. این اتصال به‌معنای اجرای Terraform یا پایان بازبینی فنی محتوای درس نیست.
