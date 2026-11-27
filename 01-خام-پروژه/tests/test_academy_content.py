@@ -1963,17 +1963,21 @@ class RegressionTests(unittest.TestCase):
 
     def test_auto05_quiz_answers_evidence_based(self):
         """auto_05 پاسخ‌های بازبینی‌شده Q0 و Q1 باید با شواهد فنی مطابقت داشته باشند.
-        Q0: ans=1 (YAML قابل-read月より، کامنت، JSONstrict) نه ans=2 ('فقط YAML برای API' که غلط است).
+        Q0: پاسخ صحیح "YAML voyait humaine-readable + کامنت" (گزینهش پس از جابجایی opts[1]<->opts[2] در اندیس 2 قرار دارد).
         Q1: ans=1 (safe_load اجرای کد Python را مسدود می‌کند) نه ans=3 ('safe_load فقط برای JSON' که غلط است).
+        کلیدها بر اساس معنی تصحیح شده‌اند؛ جهت حفظ توزیع b5_dist={0:4,1:4,2:4,3:3} گزینه‌ها و کلیدها با هم جابجا شده‌اند (معنای پاسخ تغییر نکرده است).
         """
         data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
         a5 = data["lessons"]["auto_05"]
         self.assertEqual(len(a5["quiz"]), 3, "auto_05 must have 3 quiz questions")
         q0 = a5["quiz"][0]
         q1 = a5["quiz"][1]
-        self.assertEqual(q0["ans"], 1, "auto_05 Q0: correct ans must be 1 (YAML human-readable + comments)")
-        self.assertIn("فقط YAML برای APIها", q0["opts"][2], "auto_05 Q0: option 2 must be the wrong distractor")
-        self.assertNotEqual(q0["ans"], 2, "auto_05 Q0: ans must NOT be 2 (wrong: 'YAML only for APIs')")
+        # Q0: correct answer text is "YAML دیدگاه انسانی‌خوانا‌تر است و کامنت حمایت می‌کند؛ JSONstrictتر است"
+        # گزینه صحیح پس از جابجایی opts[1]<->opts[2] در اندیس 2 است؛ خوانا‌بودن و پشتیبانی از کامنت را تأیید می‌کند.
+        self.assertIn("کامنت پشتیبانی می", q0["opts"][2], "auto_05 Q0: option 2 must hold the correct answer text")
+        self.assertEqual(q0["ans"], 2, "auto_05 Q0: key must point to option 2 after opts swap")
+        self.assertIn("فقط YAML برای APIها", q0["opts"][1], "auto_05 Q0: option 1 must hold the wrong distractor after swap")
+        # Q1: correct answer is option 1 (safe_load prevents code execution)
         self.assertEqual(q1["ans"], 1, "auto_05 Q1: correct ans must be 1 (safe_load prevents code execution)")
         self.assertIn("safe_load فقط برای JSON", q1["opts"][3], "auto_05 Q1: option 3 must be the wrong distractor")
         self.assertNotEqual(q1["ans"], 3, "auto_05 Q1: ans must NOT be 3 (wrong: 'safe_load only for JSON')")
