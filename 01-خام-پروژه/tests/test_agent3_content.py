@@ -883,6 +883,96 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             a20.remediation_decision("shift", 1, 1.5, False)
 
+    def test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs(self):
+        """Phase 8A: ccde_18 dynamic macro_vrfs + empty/container bool rejections + 5 Specialist Core labs."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. ccde_18: dynamic macro_vrfs message + "", [], {} bool rejections
+        c18 = load_module(AGENT3_LAB_DIR / "ccde_18_lab.py", "ccde_18_phase8a_testmod")
+        base_c18 = {
+            "dc_distance_km": 5000,
+            "storage_replication": "asynchronous",
+            "target_rpo_minutes": 15,
+            "dci_l2_stretched": False,
+            "gslb_enabled": True,
+            "wan_model": "hybrid_sdwan_regional_hubs_plus_sase",
+            "cloud_hub": "dual_colo_cloud_exchange_direct_connect",
+            "macro_vrfs": 4,
+            "micro_sgt_enabled": True,
+            "eu_residency_policy_enforced": True,
+            "eu_personal_data_transferred_outside_eea": False,
+            "chapter_v_transfer_safeguard": None,
+            "encryption_in_transit_assumed": True,
+        }
+        for vrf_count in (3, 5, 6):
+            res = c18.validate_pars_global_hld({**base_c18, "macro_vrfs": vrf_count})
+            self.assertTrue(res["all_architectural_checks_passed"])
+            note = res["domain_validations"][3]["note"]
+            self.assertIn(f"{vrf_count} Macro VRFs", note)
+            self.assertNotIn("4 Macro VRFs", note)
+
+        extra_bad_bools = ("", [], {})
+        for key in (
+            "dci_l2_stretched",
+            "gslb_enabled",
+            "micro_sgt_enabled",
+            "eu_residency_policy_enforced",
+            "eu_personal_data_transferred_outside_eea",
+            "encryption_in_transit_assumed",
+        ):
+            for bad_val in extra_bad_bools:
+                with self.assertRaises(ValueError):
+                    c18.validate_pars_global_hld({**base_c18, key: bad_val})
+
+        # 2. spec_ent: hex NET, strict hello_padding bool, non-bool VPN/SGT
+        sent = load_module(AGENT3_LAB_DIR / "spec_ent_lab.py", "spec_ent_phase8a_testmod")
+        with self.assertRaises(ValueError):
+            sent.parse_isis_net("49.0001.ZZZZ.0000.0001.00")
+        with self.assertRaises(ValueError):
+            sent.IsisInterface("R1", "49.0001.0102.5500.0001.00", "L2", 1500, "point-to-point", hello_padding="False")
+        with self.assertRaises(ValueError):
+            sent.check_sda_sdwan_handoff("VN_A", True, 15, "sxp")
+
+        # 3. spec_sp: non-PHP swap returns VPN label (not transport label!) + label bounds
+        ssp = load_module(AGENT3_LAB_DIR / "spec_sp_lab.py", "spec_sp_phase8a_testmod")
+        non_php = ssp.simulate_mpls_l3vpn_forwarding(24, 30, 18001, 1500, 1508)
+        self.assertTrue(non_php["delivered"])
+        self.assertEqual(non_php["final_vpn_label"], 18001)
+        with self.assertRaises(ValueError):
+            ssp.simulate_mpls_l3vpn_forwarding(24, 3, 2_000_000, 1500, 1508)
+
+        # 4. spec_wl: strict bool on C9800 flags + negative cable loss rejected
+        swl = load_module(AGENT3_LAB_DIR / "spec_wl_lab.py", "spec_wl_phase8a_testmod")
+        for bad in ("False", "True", 0, 1, None):
+            with self.assertRaises(ValueError):
+                swl.resolve_c9800_ap_behavior(bad, True, False, False, True)
+        with self.assertRaises(ValueError):
+            swl.compute_rf_link(14.0, -1.0, 4.0, -64.0, -90.0, 20)
+
+        # 5. spec_collab: strict dot1q bool + packetization_ms=0 prevented
+        scol = load_module(AGENT3_LAB_DIR / "spec_collab_lab.py", "spec_collab_phase8a_testmod")
+        with self.assertRaises(ValueError):
+            scol.voip_bandwidth_per_direction("G.711", dot1q="False")
+        with self.assertRaises(ValueError):
+            scol.voip_bandwidth_per_direction("G.711", packetization_ms=0)
+        with self.assertRaises(ValueError):
+            scol.evaluate_cucm_dial_plan("", ["PT_A"], [], [])
+
+        # 6. spec_cyber: threshold<=0, bool ts, empty fqdn rejected
+        scyb = load_module(AGENT3_LAB_DIR / "spec_cyber_lab.py", "spec_cyber_phase8a_testmod")
+        with self.assertRaises(ValueError):
+            scyb.detect_ssh_bruteforce([], threshold=0)
+        with self.assertRaises(ValueError):
+            scyb.detect_ssh_bruteforce([{"ts": True, "src_ip": "198.51.100.1", "service": "ssh", "outcome": "failure"}])
+        with self.assertRaises(ValueError):
+            scyb.score_dns_tunneling("")
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

@@ -9,3 +9,10 @@
 
 ## راستی‌آزمایی آزمایشگاه
 - فایل `01-خام-پروژه/academy-labs/agent3/spec_wl_lab.py` یک **Python Mock محلی** است که اجرا و تست شده است. هیچ WLC یا AP واقعی اجرا نشده است.
+
+## بازبینی فنی فاز ۸A (2026-11-27)
+- **ایراد:** عدم اعتبارسنجی بولی روی ۵ پرچم `resolve_c9800_ap_behavior` (`wlan_no_shut='False'` SSID را فعال نشان می‌داد) و عدم رد `cable_loss_db < 0` یا مقادیر غیرمتناهی/bool در `compute_rf_link`.
+- **منبع معتبر:** IEEE 802.11ax/be (6 GHz WPA3/OWE + Mandatory PMF) و Cisco Catalyst 9800 Configuration Model.
+- **اصلاح انجام‌شده:** اعمال `_require_bool` روی ۵ پرچم C9800، `_require_finite_num` و `cable_loss_db >= 0` + assertها.
+- **تست مرتبط:** `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** مدل محلی بدون WLC 9800 یا رادیو واقعی؛ بازبینی نویسنده (نه مستقل).

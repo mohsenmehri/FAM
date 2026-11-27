@@ -8,3 +8,10 @@
 
 ## راستی‌آزمایی فنی و آزمایشگاه
 - فایل `01-خام-پروژه/academy-labs/agent3/spec_sp_lab.py` یک **Python Mock محلی** برای شبیه‌سازی RD/RT، پشته دوبرچسبی، PHP/Explicit Null و MPLS MTU است که اجرا و آزمون شده است. هیچ تجهیز PE/P واقعی اجرا نشده است.
+
+## بازبینی فنی فاز ۸A (2026-11-27)
+- **ایراد:** ۱) باگ واقعی در `simulate_mpls_l3vpn_forwarding`: در حالت غیر-PHP (swap برچسب transport)، روتر PE2 برچسب بیرونی را به‌اشتباه به‌عنوان `final_vpn_label` برمی‌داشت؛ ۲) جمله مطلق «P1 هرگز به هدر IP نگاه نمی‌کند» در بخش ۵ بدون اشاره به ECMP/RFC 6790.
+- **منبع معتبر:** RFC 3031/3032 (MPLS Label Stack)، RFC 4364 (BGP/MPLS IP VPNs) و RFC 6790 (MPLS Entropy Labels).
+- **اصلاح انجام‌شده:** رفع منطق Pop دولایه در PE2 برای حالت غیر-PHP، اعتبارسنجی برچسب ۲۰ بیتی (`0..1048575`) و MTU/Payload مثبت، و دقیق‌سازی متن بخش ۵.
+- **تست مرتبط:** `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** شبیه‌ساز محلی بدون PE/P/LDP/MP-BGP زنده؛ بازبینی نویسنده (نه مستقل).

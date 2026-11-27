@@ -10,3 +10,10 @@
 ## راستی‌آزمایی فنی و آزمایشگاه
 - قواعد RFC 1195 (Integrated IS-IS)، RFC 5308 (IPv6 TLV) و RFC 5309 (P2P over LAN) کنترل شدند؛ تبدیل BCD Loopback (`10.255.0.1` -> `0102.5500.0001` و `198.51.100.14` -> `1980.5110.0014`) با کد Python راستی‌آزمایی شد.
 - فایل `01-خام-پروژه/academy-labs/agent3/spec_ent_lab.py` یک **Python Mock محلی** است که اجرا و با تست خودکار بررسی شده است. هیچ تجهیز واقعی Cisco IOS-XE، Catalyst Center یا SD-WAN اجرا نشده است.
+
+## بازبینی فنی فاز ۸A (2026-11-27)
+- **ایراد:** عدم اعتبارسنجی هگز NET/Area، نبود `_require_bool` روی `hello_padding`، پذیرش `mtu <= 0` یا `level`/`network_type` نامعتبر و پذیرش `bool` به‌عنوان `int` در `sdwan_vpn_id`/`sgt_id`.
+- **منبع معتبر:** ISO/IEC 10589 (IS-IS) و Cisco SD-Access/SD-WAN Border Hand-off.
+- **اصلاح انجام‌شده:** استفاده از `ipaddress.IPv4Address`، اعتبارسنجی هگز NET، `_require_bool`/`_require_int` و لیست مجاز مقادیر + assertها.
+- **تست مرتبط:** `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** مدل محلی بدون IOS-XE/Catalyst Center واقعی؛ بازبینی نویسنده (نه مستقل).

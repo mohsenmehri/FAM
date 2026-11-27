@@ -9,3 +9,10 @@
 
 ## راستی‌آزمایی آزمایشگاه
 - فایل `01-خام-پروژه/academy-labs/agent3/spec_cyber_lab.py` یک **Python Mock محلی** روی داده‌های مصنوعی است که اجرا و آزمون شده است. هیچ SIEM واقعی، EDR یا ترافیک زنده درگیر نشده است.
+
+## بازبینی فنی فاز ۸A (2026-11-27)
+- **ایراد:** پذیرش `threshold <= 0`، `window_sec < 0`، `max_cv < 0`، برچسب‌های زمانی `bool` و `fqdn` خالی در `spec_cyber_lab.py`.
+- **منبع معتبر:** NIST SP 800-61r3 (آوریل ۲۰۲۵ / CSF 2.0) و MITRE ATT&CK (T1110.001, T1071.001, T1048.003).
+- **اصلاح انجام‌شده:** افزودن نگهبان‌های نوع و بازه روی همه توابع SIEM/Beaconing/DNS + assertها.
+- **تست مرتبط:** `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** داده‌های مصنوعی محلی بدون SIEM/EDR زنده؛ بازبینی نویسنده (نه مستقل).

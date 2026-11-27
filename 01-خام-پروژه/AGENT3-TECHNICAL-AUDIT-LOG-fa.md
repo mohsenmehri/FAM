@@ -149,4 +149,19 @@
 | CCDE باقی‌مانده | `ccde_17` (`ccde_17.json` + `ccde_17_lab.py`) | `ZeroDivisionError` هنگام صفر بودن کل هزینه‌ها و پذیرش هزینه منفی در `compute_5yr_tco`. | مدل مالی 5-Year TCO | `_require_non_negative_cost`، شرط `tco_5yr > 0`، تصریح فرضی بودن ارقام + assertها. | `test_phase7_strict_boolean_typing_and_remaining_labs` | ارقام آموزشی بدون قیمت واقعی فروشنده؛ بازبینی نویسنده (نه مستقل). |
 | Automation باقی‌مانده | `auto_20` (`auto_20.json` + `auto_20_lab.py`) | `human_approved="False"` باعث اجرای خودکار Failover ۱۲۵ شعبه بدون تأیید انسانی می‌شد؛ `z_score` روی baseline خالی/ثابت خطا یا عدد مصنوعی می‌داد. | Python Data Model، آمار Z-score و AIOps HITL | `_require_bool` روی `human_approved`، بازه `confidence`/`impacted_branches` و نگهبان baseline خالی/ثابت در `z_score`. | `test_phase7_strict_boolean_typing_and_remaining_labs` | شبیه‌ساز محلی بدون کنترلر یا کلاستر ML زنده؛ بازبینی نویسنده (نه مستقل). |
 
+---
+
+## بخش ۸A: بازبینی فنی فاز ۸A (2026-11-27 — پاسخ به `agent-intake-a4d38ca2-fa.md` + ممیزی ۵ درس پایه Specialist)
+
+پس از بررسی آخرین شاخه Agent 2 (`arena/ab96c97c-fam`، مطالعه `agent-intake-a4d38ca2-fa.md` و `agent-intake-d0fdaa06-fa.md`)، ایراد پیام ثابت `4 Macro VRFs` در `ccde_18_lab.py` برطرف شد و هم‌زمان ۵ درس Specialist با وضعیت `reviewed.1` (`spec_ent`, `spec_sp`, `spec_wl`, `spec_collab`, `spec_cyber`) به‌طور کامل بازبینی و سخت‌گیرانه شدند:
+
+| دسته | شناسه درس | ایراد شناسایی‌شده | منبع معتبر | اصلاح انجام‌شده | تست مرتبط | محدودیت |
+|---|---|---|---|---|---|---|
+| اصلاح intake (`ccde_18`) | `ccde_18` | پیام موفقیت ثابت `4 Macro VRFs` برای مقادیر ۳/۵/۶ + تکمیل تست‌های `''`, `[]`, `{}` روی ۶ فیلد بولی. | `agent-intake-a4d38ca2-fa.md` و Python Data Model | پویاسازی پیام به `{macro_vrfs} Macro VRFs` + افزودن تست‌های `''`, `[]`, `{}`. | `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` | اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل). |
+| Specialist Core | `spec_ent` | نبود اعتبارسنجی هگز NET، نبود `_require_bool` روی `hello_padding` و پذیرش `bool` در VPN/SGT. | ISO/IEC 10589 و Cisco SD-Access/SD-WAN | `IPv4Address`، اعتبارسنجی هگز NET، `_require_bool`/`_require_int` و لیست مجاز مقادیر. | `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` | مدل محلی بدون IOS-XE/Catalyst Center؛ بازبینی نویسنده. |
+| Specialist Core | `spec_sp` | باگ Pop برچسب در حالت غیر-PHP (PE2 برچسب Transport را جای VPN برمی‌داشت) + جمله مطلق بخش ۵. | RFC 3031/3032، RFC 4364، RFC 6790 | رفع Pop دولایه PE2، اعتبارسنجی برچسب ۲۰ بیتی/MTU + تعدیل بخش ۵ (ECMP/Entropy Label). | `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` | مدل محلی بدون PE/P/MP-BGP زنده؛ بازبینی نویسنده. |
+| Specialist Core | `spec_wl` | نبود `_require_bool` روی ۵ پرچم C9800 (`wlan_no_shut="False"`) و پذیرش `cable_loss_db < 0`. | IEEE 802.11ax/be و Cisco C9800 | `_require_bool` روی ۵ پرچم + `_require_finite_num` و `cable_loss_db >= 0`. | `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` | مدل محلی بدون WLC 9800/رادیو؛ بازبینی نویسنده. |
+| Specialist Core | `spec_collab` | نبود `_require_bool` روی `dot1q`/wire و `ZeroDivisionError` در `packetization_ms=0`. | ITU-T G.711/G.729، RFC 3550، CUCM | `_require_bool`، `packetization_ms > 0`، سربار غیرمنفی و `dialed_number` غیرخالی. | `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` | مدل محلی بدون CUCM/CUBE؛ بازبینی نویسنده. |
+| Specialist Core | `spec_cyber` | پذیرش `threshold<=0`، `window_sec<0`، `max_cv<0`، `ts=bool` و `fqdn` خالی. | NIST SP 800-61r3 و MITRE ATT&CK | نگهبان‌های نوع و بازه روی توابع SIEM/Beaconing/DNS. | `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` | داده‌های مصنوعی محلی بدون SIEM؛ بازبینی نویسنده. |
+
 > **یادآوری پایانی:** با وجود این ممیزی فنی و معنایی عمیق و آزمون‌های رگرسیون خودکار، این گزارش همچنان **بازبینی نویسنده** است و پیش از انتشار رسمی عمومی، **بازبینی مستقل توسط متخصص شبکه/امنیت انسانی (Independent Human SME Review)** توصیه می‌شود.

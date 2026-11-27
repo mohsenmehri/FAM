@@ -280,12 +280,12 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "vmware_v
     if not comp_reasons:
         if not transferred_outside_eea:
             comp_reasons.append(
-                "HLD technical assumptions consistent: 4 Macro VRFs + Micro SGT + encryption in transit + "
+                f"HLD technical assumptions consistent: {macro_vrfs} Macro VRFs + Micro SGT + encryption in transit + "
                 "corporate EU residency policy enforced (no EU personal data transferred outside EEA; Chapter V safeguard not triggered)."
             )
         else:
             comp_reasons.append(
-                f"HLD technical assumptions consistent: 4 Macro VRFs + Micro SGT + encryption in transit + "
+                f"HLD technical assumptions consistent: {macro_vrfs} Macro VRFs + Micro SGT + encryption in transit + "
                 f"documented GDPR Chapter V transfer safeguard '{safeguard}'."
             )
 

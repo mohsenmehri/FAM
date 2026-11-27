@@ -35,3 +35,10 @@
 - **اصلاح انجام‌شده:** اعمال `_require_bool` سخت‌گیرانه روی هر ۶ فیلد بولی (`dci_l2_stretched`، `gslb_enabled`، `micro_sgt_enabled`، `eu_residency_policy_enforced`، `eu_personal_data_transferred_outside_eea`، `encryption_in_transit_assumed`) با رد `"False"`، `"True"`، `0`، `1` و `None`؛ اعتبارسنجی `str` روی فیلدهای رشته‌ای؛ افزودن `rpo_scope_note` صریح در خروجی و متن آزمایشگاه.
 - **تست مرتبط:** `test_phase7_strict_boolean_typing_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** اعتبارسنج محلی Python 3؛ جایگزین اندازه‌گیری واقعی RPO/RTT یا تأیید حقوقی DPO/QSA نیست و بازبینی مستقل انجام نشده است.
+
+## بازبینی فنی فاز ۸A (2026-11-27)
+- **ایراد:** یافته Agent 2 در `agent-intake-a4d38ca2-fa.md`: پیام موفقیت ثابت `4 Macro VRFs` حتی برای `macro_vrfs` برابر `3`، `5` یا `6` چاپ می‌شد؛ همچنین پوشش تست `''`، `[]` و `{}` روی ورودی‌های بولی لازم بود.
+- **منبع معتبر:** گزارش intake ایجنت دوم (`agent-intake-a4d38ca2-fa.md`) و Python Data Model.
+- **اصلاح انجام‌شده:** پویاسازی پیام به `{macro_vrfs} Macro VRFs` و افزودن زیرتست‌های `''`، `[]` و `{}` روی هر ۶ ورودی بولی.
+- **تست مرتبط:** `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل) و جایگزین تست زنده DR یا DPO/QSA نیست.
