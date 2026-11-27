@@ -442,55 +442,83 @@ class FamEquipmentConcurrencyTests(unittest.TestCase):
                 pass
 
     def test_multithreaded_global_concurrency_cap_race(self):
+        # SQLite triggers observe the table at the actual INSERT and DELETE,
+        # within the same serialized transaction as the lease mutation.
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.dict(os.environ, {"FAM_EQUIPMENT_MAX_CONCURRENT": "3"}):
-                guard = equipment_guard.EquipmentGuard(Path(tmpdir) / "race.sqlite3")
-            self.assertEqual(guard.maximum, 3)
+            path = Path(tmpdir) / "race.sqlite3"
+            guard = equipment_guard.EquipmentGuard(path, maximum=3)
+            with sqlite3.connect(path) as db:
+                db.executescript("""
+                    CREATE TABLE lease_events (action TEXT, n INTEGER);
+                    CREATE TRIGGER lease_added AFTER INSERT ON equipment_leases BEGIN
+                        INSERT INTO lease_events VALUES ('insert', (SELECT COUNT(*) FROM equipment_leases));
+                    END;
+                    CREATE TRIGGER lease_removed AFTER DELETE ON equipment_leases BEGIN
+                        INSERT INTO lease_events VALUES ('delete', (SELECT COUNT(*) FROM equipment_leases));
+                    END;
+                """)
 
-            total_threads = 8
-            barrier = threading.Barrier(total_threads)
-            state_lock = threading.Lock()
-            active = 0
-            peak_active = 0
-            admitted = []
-            busy = []
-            errors = []
+            admitted, busy, errors = [], [], []
+            lock = threading.Lock()
+            # All workers in each wave attempt admission while successful workers
+            # remain in their contexts; the main thread alone releases them.
+            for wave in range(2):
+                start = threading.Barrier(9)
+                release = threading.Event()
+                finished_attempts = threading.Condition()
+                attempts = [0]
 
-            def worker(idx):
-                nonlocal active, peak_active
-                host = f"10.20.0.{idx + 1}"
+                def worker(idx):
+                    reported = False
+                    try:
+                        start.wait(timeout=10)
+                        with guard.admit(f"10.20.{wave}.{idx + 1}"):
+                            with lock:
+                                admitted.append((wave, idx))
+                            with finished_attempts:
+                                attempts[0] += 1
+                                reported = True
+                                finished_attempts.notify_all()
+                            if not release.wait(timeout=15):
+                                raise TimeoutError("lease release not signalled")
+                    except equipment_guard.AdmissionError as exc:
+                        with lock:
+                            busy.append(exc.code)
+                    except BaseException as exc:
+                        with lock:
+                            errors.append(repr(exc))
+                    finally:
+                        if not reported:
+                            with finished_attempts:
+                                attempts[0] += 1
+                                finished_attempts.notify_all()
+
+                threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+                for thread in threads:
+                    thread.start()
                 try:
-                    barrier.wait(timeout=5)
-                    with guard.admit(host):
-                        with state_lock:
-                            active += 1
-                            if active > peak_active:
-                                peak_active = active
-                            admitted.append(host)
-                        time.sleep(0.08)
-                        with state_lock:
-                            active -= 1
-                except equipment_guard.AdmissionError as err:
-                    busy.append((host, err.code))
-                except BaseException as exc:  # pragma: no cover
-                    errors.append(exc)
-
-            threads = [threading.Thread(target=worker, args=(i,)) for i in range(total_threads)]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join(timeout=10)
+                    start.wait(timeout=10)
+                    with finished_attempts:
+                        all_attempted = finished_attempts.wait_for(lambda: attempts[0] == 8, timeout=12)
+                    self.assertTrue(all_attempted, "workers did not finish admission attempts")
+                    with sqlite3.connect(path) as db:
+                        self.assertEqual(db.execute("SELECT COUNT(*) FROM equipment_leases").fetchone()[0], 3)
+                finally:
+                    release.set()
+                    for thread in threads:
+                        thread.join(timeout=20)
+                self.assertFalse(any(thread.is_alive() for thread in threads))
 
             self.assertEqual(errors, [])
-            self.assertEqual(len(admitted), 3)
-            self.assertEqual(len(busy), 5)
-            self.assertTrue(all(code == "equipment_busy" for _, code in busy))
-            self.assertEqual(peak_active, 3)
-            self.assertEqual(active, 0)
-
-            # Verify all leases were released after the burst
-            with guard.admit("10.20.0.1"), guard.admit("10.20.0.2"), guard.admit("10.20.0.3"):
-                pass
+            self.assertEqual(len(admitted), 6)  # total across both waves, not simultaneous
+            self.assertEqual(busy, ["equipment_busy"] * 10)
+            with sqlite3.connect(path) as db:
+                events = db.execute("SELECT action, n FROM lease_events ORDER BY rowid").fetchall()
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM equipment_leases").fetchone()[0], 0)
+            self.assertEqual(sum(action == "insert" for action, _ in events), 6)
+            self.assertEqual(sum(action == "delete" for action, _ in events), 6)
+            self.assertEqual(max(n for _, n in events), 3)
+            self.assertTrue(all(0 <= n <= 3 for _, n in events))
 
     @unittest.skipUnless(HAS_FLASK, "Flask is not installed in this Python environment")
     def test_app_wires_fam_equipment_max_concurrent_from_env(self):
