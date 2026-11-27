@@ -1,0 +1,324 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "s11",
+ "objectiveId": "s11",
+ "kind": "lesson",
+ "track": "FAM Curriculum 5.0",
+ "course": "c5-stage-zero",
+ "title": "Leaf–Spine، VXLAN و EVPN با مرزهای طراحی",
+ "titleEn": "Leaf-spine, VXLAN and EVPN",
+ "domain": "Network fundamentals",
+ "source": "Legacy s11 rewritten",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 45,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "s11-section-1",
+   "title": "سناریو",
+   "html": "<p>دو سرور روی دو leaf به یک شبکه مجازی تعلق دارند. underlay میان leafها IP دارد و چند spine مسیرهای برابر فراهم می‌کنند. چرا ping کوچک عبور می‌کند ولی جریان بزرگ ممکن است شکست بخورد؟</p>"
+  },
+  {
+   "id": "s11-section-2",
+   "title": "هدف",
+   "html": "<p>توپولوژی ساده leaf–spine، underlay و overlay، VXLAN و نقش EVPN را جدا توضیح دهید و اندازه نمونه کپسوله‌شده را با واحد مشخص محاسبه کنید. این درس طراحی مفهومی است و اجرای EVPN واقعی نیست.</p>"
+  },
+  {
+   "id": "s11-section-3",
+   "title": "توپولوژی",
+   "html": "<p>در یک طراحی دو لایه متقارن، هر leaf به هر spine متصل است و مسیر دو leaf مختلف از یک spine عبور می‌کند. اتصال مستقیم leaf یا spine در طرح کلاسیک وجود ندارد، اما منع عمومی پروتکلی نیست؛ طرح‌های متفاوت و موارد استثنا ممکن‌اند.</p>"
+  },
+  {
+   "id": "s11-section-4",
+   "title": "ECMP و ظرفیت",
+   "html": "<p>در وجود چند مسیر واجد شرایط با هزینه برابر، ECMP می‌تواند ترافیک را میان مسیرها توزیع کند. اغلب hash جریان روی یک مسیر می‌ماند؛ توازن دقیق به توزیع جریان، الگوریتم و پلتفرم وابسته است و پهنای باند یک جریان لزوماً جمع کل لینک‌ها نیست.</p>"
+  },
+  {
+   "id": "s11-section-5",
+   "title": "Underlay",
+   "html": "<p>underlay شبکه انتقال IP بین endpointهای تونل است؛ مسیرهای IP و MTU باید سرتاسر برقرار باشند. استفاده از OSPF یا BGP به طراحی وابسته است و وجود ارتباط underlay به تنهایی صحت کنترل‌پلین overlay را ثابت نمی‌کند.</p>"
+  },
+  {
+   "id": "s11-section-6",
+   "title": "Overlay و VTEP",
+   "html": "<p>VXLAN فریم Ethernet داخلی را در UDP/IP بیرونی کپسوله می‌کند. VTEP مبدأ و مقصد این کپسوله‌سازی را انجام می‌دهد و VNI در header مربوط به شناسایی سگمنت overlay است؛ به‌خودی‌خود سیاست امنیتی نیست.</p>"
+  },
+  {
+   "id": "s11-section-7",
+   "title": "VNI و UDP",
+   "html": "<p>VNI در VXLAN معمولی ۲۴ بیت است و IANA پورت UDP مقصد 4789 را اختصاص داده است. پورت مبدأ می‌تواند برای entropy انتخاب شود؛ مقادیر و قابلیت‌های واقعی پیاده‌سازی و پیکربندی را باید بررسی کرد.</p>"
+  },
+  {
+   "id": "s11-section-8",
+   "title": "MTU با واحد روشن",
+   "html": "<p>برای بسته IP داخلی 1500 بایتی در فریم Ethernet بدون tag، بدون inner FCS و با outer IPv4 بدون options، اندازه بسته outer IP برابر 1500+14+8 VXLAN+8 UDP+20 IPv4 یعنی 1550 بایت است. این عدد شامل header Ethernet بیرونی، FCS یا tag بیرونی نیست.</p>"
+  },
+  {
+   "id": "s11-section-9",
+   "title": "IPv6 و tag",
+   "html": "<p>در فرض مشابه با outer IPv6 بدون extension، اندازه outer IP برابر 1570 است؛ یک tag داخلی چهار بایت می‌افزاید. حد MTU پورت ممکن است برحسب IP packet یا Ethernet frame مستند شده باشد؛ پیش از مقایسه دقیقاً واحد و سربارها را مشخص کنید.</p>"
+  },
+  {
+   "id": "s11-section-10",
+   "title": "EVPN و VXLAN",
+   "html": "<p>EVPN یک کنترل‌پلین برای توزیع اطلاعات دسترسی فراهم می‌کند و VXLAN شیوه کپسوله‌سازی است؛ VXLAN الزاماً مستلزم EVPN نیست. RFC 7432 پایه EVPN و RFC 8365 کاربرد آن با data-plane شبکه مجازی از جمله VXLAN را شرح می‌دهند.</p>"
+  },
+  {
+   "id": "s11-section-11",
+   "title": "Route Type 2 و 3",
+   "html": "<p>EVPN Type 2 برای اعلان MAC و در صورت وجود IP مرتبط استفاده می‌شود. Type 3 یا IMET اطلاعات مورد استفاده در توزیع ترافیک چندمقصدی را حمل می‌کند؛ سازوکار replication و ARP/ND suppression به پیاده‌سازی و تنظیمات وابسته است.</p>"
+  },
+  {
+   "id": "s11-section-12",
+   "title": "Route Type 5 و gateway",
+   "html": "<p>EVPN Type 5 امکان اعلان prefix IP را فراهم می‌کند. Distributed anycast gateway در بعضی طراحی‌ها gateway یکسان را نزدیک میزبان ارائه می‌دهد؛ سازگاری تنظیمات، VRF، MAC/IP gateway و رفتار multihoming باید بر اساس پلتفرم بررسی شوند.</p>"
+  },
+  {
+   "id": "s11-section-13",
+   "title": "عیب‌یابی مبتنی بر شواهد",
+   "html": "<p>ابتدا وضعیت فیزیکی، route و MTU underlay، سپس session و routeهای EVPN، VNI/VRF، MAC و همسایه و سیاست امنیتی را بررسی کنید. عبور ping کوچک همراه با شکست بزرگ فرضیه MTU می‌سازد، اما علت قطعی نیست.</p>"
+  },
+  {
+   "id": "s11-section-14",
+   "title": "مرز آزمایشگاه",
+   "html": "<p>مدل Python فقط جمع اندازه header را با IP MTU مقایسه می‌کند و fragmentation، IP options، extension header، QinQ بیرونی، BGP، ECMP یا VTEP واقعی ندارد. نتایج آن اندازه‌گیری بسته یا تأیید پیکربندی تجهیز نیست.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "Leaf",
+   "fa": "Leaf",
+   "simple": "سوئیچ لبه fabric که به endpointها متصل است."
+  },
+  {
+   "term": "Spine",
+   "fa": "Spine",
+   "simple": "لایه میانی اتصال leafها."
+  },
+  {
+   "term": "Clos",
+   "fa": "Clos",
+   "simple": "خانواده توپولوژی‌های چندمرحله‌ای."
+  },
+  {
+   "term": "ECMP",
+   "fa": "ECMP",
+   "simple": "استفاده از چند مسیر دارای هزینه برابر."
+  },
+  {
+   "term": "Underlay",
+   "fa": "Underlay",
+   "simple": "شبکه انتقال IP برای overlay."
+  },
+  {
+   "term": "Overlay",
+   "fa": "Overlay",
+   "simple": "شبکه منطقی ساخته‌شده روی underlay."
+  },
+  {
+   "term": "VXLAN",
+   "fa": "VXLAN",
+   "simple": "روش کپسوله‌سازی Ethernet در UDP/IP."
+  },
+  {
+   "term": "VTEP",
+   "fa": "VTEP",
+   "simple": "نقطه پایانی تونل VXLAN."
+  },
+  {
+   "term": "VNI",
+   "fa": "VNI",
+   "simple": "شناسه ۲۴ بیتی سگمنت VXLAN."
+  },
+  {
+   "term": "EVPN",
+   "fa": "EVPN",
+   "simple": "کنترل‌پلین BGP برای اطلاعات دسترسی شبکه مجازی."
+  },
+  {
+   "term": "BGP",
+   "fa": "BGP",
+   "simple": "پروتکل تبادل اطلاعات مسیریابی."
+  },
+  {
+   "term": "IMET",
+   "fa": "IMET",
+   "simple": "مسیر inclusive multicast Ethernet tag در EVPN."
+  },
+  {
+   "term": "MTU",
+   "fa": "MTU",
+   "simple": "بیشینه اندازه داده مجاز در مرز مشخص."
+  },
+  {
+   "term": "Header",
+   "fa": "Header",
+   "simple": "اطلاعات کنترلی اضافه‌شده به داده."
+  },
+  {
+   "term": "Anycast gateway",
+   "fa": "Anycast gateway",
+   "simple": "دروازه مشترک ارائه‌شده در چند نقطه طبق طراحی."
+  },
+  {
+   "term": "VRF",
+   "fa": "VRF",
+   "simple": "جدول مسیریابی مجازی مجزا."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ Python Mock — تجهیز واقعی اجرا نشده",
+   "executionStatus": "Designed — Not Run — تجهیز واقعی اجرا نشده است.",
+   "html": "<p><strong>Python Mock / محاسبه محلی:</strong> تجهیز واقعی و ترافیک شبکه اجرا نشده است. برای IP داخلی 1500 بایت و IP MTU بیرونی 1550، اندازه outer IPv4 برابر 1550 و جا می‌شود؛ IPv6 برابر 1570 است و جا نمی‌شود. این محاسبه فقط IP packet است؛ فریم بیرونی محاسبه نمی‌شود.</p><p>Python 3 لازم است؛ کد زیر را در پوشه آزمایشی به نام <code>vxlan_mtu_mock.py</code> ذخیره و اجرا کنید.</p><pre dir=\"ltr\"><code>python3 vxlan_mtu_mock.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;VXLAN size arithmetic only; no network, BGP, tunnels or packets.&quot;&quot;&quot;\n\ndef outer_ip_size(inner_ip_size, *, inner_vlan_tags=0, outer_ip_version=4):\n    &quot;&quot;&quot;Inner IPv4/IPv6 packet in Ethernet frame, excluding inner FCS.\n\n    Returns outer IP packet bytes, including outer IP/UDP/VXLAN headers,\n    excluding outer Ethernet header, VLAN tags, FCS, and physical overhead.\n    No IP options, IPv6 extensions, security encapsulation or fragmentation.\n    &quot;&quot;&quot;\n    if not isinstance(inner_ip_size, int) or inner_ip_size &lt;= 0:\n        raise ValueError(&#x27;inner IP size must be a positive integer&#x27;)\n    if inner_vlan_tags not in (0, 1, 2) or outer_ip_version not in (4, 6):\n        raise ValueError(&#x27;unsupported VLAN tag count or outer IP version&#x27;)\n    outer_ip = 20 if outer_ip_version == 4 else 40\n    return inner_ip_size + 14 + 4 * inner_vlan_tags + 8 + 8 + outer_ip\n\n\ndef fits(inner_ip_size, underlay_ip_mtu, **kwargs):\n    if not isinstance(underlay_ip_mtu, int) or underlay_ip_mtu &lt;= 0:\n        raise ValueError(&#x27;underlay IP MTU must be positive&#x27;)\n    size = outer_ip_size(inner_ip_size, **kwargs)\n    return size, size &lt;= underlay_ip_mtu\n\n\nif __name__ == &#x27;__main__&#x27;:\n    for version in (4, 6):\n        size, ok = fits(1500, 1550, outer_ip_version=version)\n        print(f&#x27;Outer IPv{version}: {size} IP bytes; fits 1550 IP MTU: {ok}&#x27;)\n    print(&#x27;Arithmetic only; no encapsulation or network traffic&#x27;)\n</code></pre><p>اگر خروجی متفاوت بود، ورودی و نسخه Python را بررسی کنید. خروجی شاهد اجرای تجهیز یا packet capture نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس",
+   "instructions": "پاسخ‌ها و توضیحات را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در دو لایه متقارن کلاسیک، اتصال متعارف کدام است؟",
+   "options": [
+    "هر leaf به هر spine",
+    "هر leaf فقط به یک leaf",
+    "همه spineها به یکدیگر به جای leaf",
+    "فقط اتصال سرورها به spine"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>در طرح متقارن دو لایه، leafها به تمام spineها متصل می‌شوند.</p>"
+  },
+  {
+   "title": "آیا ممنوعیت اتصال مستقیم leafها قانون همگانی پروتکل است؟",
+   "options": [
+    "بله همیشه",
+    "خیر؛ یک ویژگی طرح ساده است و استثنا وجود دارد",
+    "فقط برای IPv6",
+    "فقط در BGP"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>طراحی‌های مختلف ممکن است اتصال دیگری داشته باشند.</p>"
+  },
+  {
+   "title": "آیا ECMP تضمین می‌کند یک جریان منفرد تمام پهنای باند لینک‌ها را بگیرد؟",
+   "options": [
+    "بله همواره",
+    "فقط با DNS",
+    "خیر؛ hashing اغلب یک جریان را به یک مسیر می‌برد",
+    "فقط با NAT"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>رفتار به الگوریتم و توزیع جریان وابسته است.</p>"
+  },
+  {
+   "title": "نقش underlay چیست؟",
+   "options": [
+    "ذخیره رمز عبور",
+    "تعریف user interface",
+    "حذف نیاز به route",
+    "انتقال IP میان endpointهای overlay"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>underlay شبکه انتقال بسته‌های بیرونی است.</p>"
+  },
+  {
+   "title": "نقش VXLAN چیست؟",
+   "options": [
+    "کپسوله‌سازی فریم لایه ۲ روی UDP/IP",
+    "پروتکل احراز هویت کاربر",
+    "مسیر پیش‌فرض اجباری",
+    "رمزنگاری تضمینی"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>VXLAN فریم داخلی را در بسته بیرونی قرار می‌دهد.</p>"
+  },
+  {
+   "title": "طول VNI متداول VXLAN چقدر است؟",
+   "options": [
+    "12 بیت",
+    "24 بیت",
+    "32 بیت",
+    "128 بیت"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>VNI در header دارای ۲۴ بیت است.</p>"
+  },
+  {
+   "title": "در فرض درس، بسته داخلی IP با 1500 بایت و outer IPv4 چه اندازه outer IP دارد؟",
+   "options": [
+    "1500",
+    "1514",
+    "1550",
+    "1564"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>1500+14+8+8+20 برابر 1550 است؛ Ethernet بیرونی حساب نشده.</p>"
+  },
+  {
+   "title": "آیا 1550 بایت مثال شامل Ethernet بیرونی و FCS است؟",
+   "options": [
+    "بله هر دو",
+    "فقط FCS",
+    "فقط Ethernet بیرونی",
+    "خیر، اندازه outer IP packet است"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>واحد مثال IP MTU است نه اندازه کامل فریم بیرونی.</p>"
+  },
+  {
+   "title": "EVPN Type 2 معمولاً چه اطلاعاتی حمل می‌کند؟",
+   "options": [
+    "MAC و در صورت وجود IP مرتبط",
+    "فقط prefix به صورت Type 5",
+    "فقط تنظیم MTU",
+    "فقط نام VLAN"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>Type 2 مسیر MAC/IP Advertisement است.</p>"
+  },
+  {
+   "title": "کدام route برای اعلان prefix IP استفاده می‌شود؟",
+   "options": [
+    "Type 3",
+    "Type 5",
+    "Type 2 فقط",
+    "هیچ EVPN routeی"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Type 5 مسیر IP Prefix است.</p>"
+  },
+  {
+   "title": "ping کوچک موفق و ترافیک بزرگ ناموفق چه نتیجه‌ای دارد؟",
+   "options": [
+    "قطعاً مشکل DNS است",
+    "قطعاً حمله است",
+    "فرضیه MTU قابل بررسی است، نه تشخیص قطعی",
+    "حتماً EVPN خاموش است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>سایر علل هم ممکن هستند و شواهد لازم است.</p>"
+  },
+  {
+   "title": "مدل آزمایشگاه چه کاری انجام نمی‌دهد؟",
+   "options": [
+    "جمع اندازه headerها",
+    "مقایسه با IP MTU",
+    "محاسبه تفاوت IPv4 و IPv6 بیرونی",
+    "راه‌اندازی VXLAN یا BGP واقعی"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>مدل فقط محاسبه محلی است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "draft.1",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc7348",
+   "https://www.rfc-editor.org/rfc/rfc7432",
+   "https://www.rfc-editor.org/rfc/rfc8365",
+   "https://www.rfc-editor.org/rfc/rfc9136"
+  ]
+ }
+}

@@ -67,7 +67,12 @@ for (const item of catalog.paths.flatMap(track => track.courses.flatMap(course =
   w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), lesson);
   const notice = w.document.querySelector('.lesson-review-status');
   assert(notice, `${item.id} must display a review notice`);
-  assert.match(notice.textContent, /در انتظار بازبینی/);
+  if (["s04", "s05", "s06"].includes(item.id)) {
+    assert.match(notice.textContent, /بازبینی معنایی توسط نویسنده/);
+    assert.match(notice.textContent, /بازبینی مستقل انجام نشده/);
+  } else {
+    assert.match(notice.textContent, /در انتظار بازبینی/);
+  }
   assert.match(notice.textContent, /اجرای واقعی آن تأیید نشده/);
 }
 const unknown = {...bp, reviewStatus: '', evidence: ''};

@@ -166,7 +166,7 @@ class AcademyContentTests(unittest.TestCase):
         for path, _, lesson in self.records:
             with self.subTest(lesson=lesson["id"]):
                 if path["id"] == "fam-c5":
-                    self.assertTrue(lesson["id"].startswith(("ccna-v11-", "ccna-v20-", "academy-stage-zero-")) or lesson["id"] in {"s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10"})
+                    self.assertTrue(lesson["id"].startswith(("ccna-v11-", "ccna-v20-", "academy-stage-zero-")) or lesson["id"] in {"s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "ccna_01", "ccna_02"})
                 else:
                     self.assertEqual(lesson["id"], "academy-automation-terraform")
                 self.assertTrue(lesson["blueprint"].startswith("/academy-assets/v5/blueprints/"))

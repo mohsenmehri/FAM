@@ -43,18 +43,23 @@ class FoundationModelsTests(unittest.TestCase):
         self.assertEqual((result['python_host_first'], result['python_host_last'], result['python_host_count']),
                          ('192.0.2.129', '192.0.2.190', 62))
         self.assertEqual(m.describe('192.0.2.0/31')['python_host_count'], 2)
+        self.assertEqual(m.describe('192.0.2.1/32')['python_host_count'], 1)
+        self.assertEqual(m.describe('192.0.2.1/32')['python_host_first'], '192.0.2.1')
         self.assertEqual(m.describe('0.0.0.0/0')['address_count'], 2**32)
 
     def test_blueprints_embed_model_and_pending_status(self):
         assets = LABS.parent / "server/www/academy-assets/v5/blueprints"
-        for lesson, name in (("s02", "ethernet_arp_mock"), ("s03", "switch_learning_mock"), ("s04", "ipv4_subnet_lab"), ("s05", "route_summary_mock"), ("s06", "ipv6_tcp_mock"), ("s07", "services_mock"), ("s08", "ios_modes_mock"), ("s09", "route_selection_mock"), ("s10", "vlan_trunk_mock")):
+        for lesson, name in (("s02", "ethernet_arp_mock"), ("s03", "switch_learning_mock"), ("s04", "ipv4_subnet_lab"), ("s05", "route_summary_mock"), ("s06", "ipv6_tcp_mock"), ("s07", "services_mock"), ("s08", "ios_modes_mock"), ("s09", "route_selection_mock"), ("s10", "vlan_trunk_mock"), ("s11", "vxlan_mtu_mock"), ("s12", "automation_response_mock"), ("ccna_01", "optical_budget_mock"), ("ccna_02", "stp_root_mock")):
             with self.subTest(lesson=lesson):
                 bp = json.loads((assets / f"{lesson}.json").read_text())
-                self.assertIn("Pending", bp["reviewStatus"])
+                if lesson in {"s04", "s05", "s06"}:
+                    self.assertIn("بازبینی معنایی توسط نویسنده", bp["reviewStatus"])
+                else:
+                    self.assertIn("Pending", bp["reviewStatus"])
                 self.assertIn((LABS / f"{name}.py").read_text(), html.unescape(bp["stages"]["lab"]["html"]))
 
     def test_examples_run_locally(self):
-        for name in ('ethernet_arp_mock', 'switch_learning_mock', 'ipv4_subnet_lab', 'route_summary_mock', 'ipv6_tcp_mock', 'services_mock', 'ios_modes_mock', 'route_selection_mock', 'vlan_trunk_mock'):
+        for name in ('ethernet_arp_mock', 'switch_learning_mock', 'ipv4_subnet_lab', 'route_summary_mock', 'ipv6_tcp_mock', 'services_mock', 'ios_modes_mock', 'route_selection_mock', 'vlan_trunk_mock', 'vxlan_mtu_mock', 'automation_response_mock', 'optical_budget_mock', 'stp_root_mock'):
             with self.subTest(name=name):
                 r = subprocess.run([sys.executable, str(LABS / f'{name}.py')], text=True, capture_output=True, check=True, timeout=5)
                 self.assertTrue(r.stdout)
