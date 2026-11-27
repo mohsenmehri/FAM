@@ -266,6 +266,19 @@ class FamAppApiTests(unittest.TestCase):
         self.assertEqual(out.status_code, 200)
         self.assertEqual(self.client.get(path, environ_base=self.https_env).status_code, 401)
 
+    def test_auto_10_lesson_online_requires_auth_and_is_catalogued(self):
+        path='/academy-assets/v5/blueprints/auto_10.json'
+        self.assertEqual(self.client.get(path,environ_base=self.https_env).status_code,401)
+        self.assertEqual(self._login_admin().status_code,200)
+        catalog=self.client.get('/academy-assets/curriculum-catalog.json',environ_base=self.https_env).get_json()
+        entries=[lesson for track in catalog['paths'] for course in track['courses'] for lesson in course['lessons'] if lesson['id']=='auto_10']
+        self.assertEqual(len(entries),1)
+        self.assertEqual(entries[0]['blueprint'],path)
+        response=self.client.get(path,environ_base=self.https_env)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.get_json()['lessonId'],'auto_10')
+        response.close()
+
     def test_academy_progress_existing_database_schema_upgrade_preserves_payload(self):
         # Model the pre-revision database schema. This tests schema upgrade,
         # not migration of the historic learning data inside the payload.

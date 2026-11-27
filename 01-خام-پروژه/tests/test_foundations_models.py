@@ -52,7 +52,7 @@ class FoundationModelsTests(unittest.TestCase):
         for lesson, name in (("s02", "ethernet_arp_mock"), ("s03", "switch_learning_mock"), ("s04", "ipv4_subnet_lab"), ("s05", "route_summary_mock"), ("s06", "ipv6_tcp_mock"), ("s07", "services_mock"), ("s08", "ios_modes_mock"), ("s09", "route_selection_mock"), ("s10", "vlan_trunk_mock"), ("s11", "vxlan_mtu_mock"), ("s12", "automation_response_mock"), ("ccna_01", "optical_budget_mock"), ("ccna_02", "stp_root_mock")):
             with self.subTest(lesson=lesson):
                 bp = json.loads((assets / f"{lesson}.json").read_text())
-                if lesson in {"s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11"}:
+                if lesson in {"s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12"}:
                     self.assertIn("بازبینی معنایی توسط نویسنده", bp["reviewStatus"])
                 else:
                     self.assertIn("Pending", bp["reviewStatus"])

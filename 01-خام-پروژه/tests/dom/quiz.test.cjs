@@ -67,10 +67,10 @@ for (const item of catalog.paths.flatMap(track => track.courses.flatMap(course =
   w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), lesson);
   const notice = w.document.querySelector('.lesson-review-status');
   assert(notice, `${item.id} must display a review notice`);
-  if (["s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11"].includes(item.id)) {
+  if (["s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12"].includes(item.id)) {
     assert.match(notice.textContent, /بازبینی معنایی توسط نویسنده/);
     assert.match(notice.textContent, /بازبینی مستقل انجام نشده/);
-  } else if (["auto_02", "auto_04", "auto_05"].includes(item.id)) {
+  } else if (["auto_02", "auto_04", "auto_05", "auto_10"].includes(item.id)) {
     assert.match(notice.textContent, /بازبینی فنی توسط یکپارچه‌ساز/);
     assert.match(notice.textContent, /بازبینی مستقل انسانی انجام نشده/);
     assert.match(notice.textContent, item.id === "auto_05" ? /پارس JSON و XML محلی/ : item.id === "auto_04" ? /Git محلی/ : /Python محلی/);
@@ -78,7 +78,7 @@ for (const item of catalog.paths.flatMap(track => track.courses.flatMap(course =
   } else {
     assert.match(notice.textContent, /در انتظار بازبینی/);
   }
-  if (!["auto_02", "auto_04", "auto_05"].includes(item.id)) assert.match(notice.textContent, /اجرای واقعی آن تأیید نشده/);
+  if (!["auto_02", "auto_04", "auto_05", "auto_10"].includes(item.id)) assert.match(notice.textContent, /اجرای واقعی آن تأیید نشده/);
 }
 const unknown = {...bp, reviewStatus: '', evidence: ''};
 w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), unknown);
