@@ -67,7 +67,7 @@ for (const item of catalog.paths.flatMap(track => track.courses.flatMap(course =
   w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), lesson);
   const notice = w.document.querySelector('.lesson-review-status');
   assert(notice, `${item.id} must display a review notice`);
-  if (["s02", "s04", "s05", "s06"].includes(item.id)) {
+  if (["s02", "s03", "s04", "s05", "s06"].includes(item.id)) {
     assert.match(notice.textContent, /بازبینی معنایی توسط نویسنده/);
     assert.match(notice.textContent, /بازبینی مستقل انجام نشده/);
   } else {
