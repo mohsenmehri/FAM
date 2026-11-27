@@ -1,0 +1,216 @@
+{
+  "id": "ccnp_enc_inf",
+  "faculty": "دانشکده ۳ · CCNP Enterprise",
+  "title": "ENCOR حوزه ۳: زیرساخت L2/L3 (نوع شبکه OSPF، eBGP و Wireless Roaming)",
+  "lead": "بین دو روتر هسته یک لینک فیبر مستقیم (`/30`) بسته شده که با هم OSPF دارند؛ اما هر بار که یکی از روترها ریست می‌شود به جای همگرایی آنی، ۴۰ ثانیه برای انتخاب `DR/BDR` معطل می‌مانند! هم‌زمان در ساختمان اداری، کاربران هنگام راه رفتن با لپ‌تاپ از سالن A به سالن B (که در ساب‌نت دیگری است) قطع می‌شوند در حالی که قرار بود نشست VPN آن‌ها زنده بماند! چطور نوع شبکهٔ OSPF، مسیرهای eBGP و معماری Roaming بی‌سیم را در ENCOR مهندسی کنیم؟",
+  "goal": "بهینه‌سازی لینک‌های OSPF (`Point-to-Point` vs `Broadcast`)، پیاده‌سازی eBGP پایه، Filtering (Prefix-List / Route-Map) و دستکاری مسیر (`LOCAL_PREF`, `AS_PATH Prepend`)، و درک عمیق معماری Wireless (کشف WLC، حالت‌های AP و تفاوت L2 در برابر L3 Roaming با Mobility Group).",
+  "prereq": "آشنایی با STP/OSPF/BGP و مبانی وایرلس (درس‌های `ccna_wl`، `adv_01`، `adv_02` و `adv_bgp`).",
+  "sections": [
+    {
+      "h": "۱. ظرافت مهندسی OSPF: چرا لینک فیبر `/30` را `point-to-point` کنیم؟",
+      "p": [
+        "روی هر پورت اترنت (`Gi0/0`)، OSPF به‌طور پیش‌فرض نوع شبکه (`Network Type`) را **`Broadcast`** می‌گذارد. در حالت Broadcast فرض بر این است که چند روتر روی یک سوئیچ نشسته‌اند؛ بنابراین OSPF تا **۴۰ ثانیه (`Wait Timer`)** صبر می‌کند تا ببیند آیا `DR/BDR` هست یا نه، و بعد یک **Type-2 Network LSA** اضافه تولید می‌کند!",
+        "روی یک لینک فیبر یا کابل مستقیم فقط بین دو روتر (`P2P`)، هیچ نیازی به `DR/BDR` و LSA Type 2 نیست! با یک خط دستور **`ip ospf network point-to-point`** روی هر دو سر لینک:"
+      ],
+      "bullets": [
+        "انتخاب `DR/BDR` و تأخیر `40` ثانیه‌ای Wait Timer کاملاً حذف می‌شود (همسایگی مستقیماً به `FULL` می‌رود).",
+        "حجم پایگاه‌دادهٔ OSPF (`LSDB`) با حذف Type-2 LSAها سبک‌تر و محاسبهٔ SPF سریع‌تر می‌شود. *(تلهٔ مهم: اگر فقط یک سمت را `point-to-point` و سمت دیگر را `broadcast` بگذارید، همسایگی `FULL` می‌شود اما چون یک سمت Type-2 LSA می‌سازد و سمت دیگر نه، مسیرها وارد جدول مسیریابی نمی‌شوند!)*"
+      ],
+      "think": {
+        "q": "سناریوی خطا: مهندسی روی `R1` دستور `ip ospf network point-to-point` را می‌زند اما فراموش می‌کند روی `R2` بزند (`R2` همچنان `Broadcast` است). در خروجی `show ip ospf neighbor` وضعیت را **`FULL`** می‌بیند، اما در `show ip route` هیچ مسیر OSPFای از همسایه یاد گرفته نشده است! چرا؟",
+        "a": "در OSPF اگر تایمر Hello/Dead دو طرف یکی باشد (`10s/40s` در هر دو مد)، همسایگی تا مرحلهٔ `FULL` بالا می‌آید؛ اما در محاسبهٔ درخت SPF، `R1` (به عنوان Point-to-Point) در Type-1 LSA لینک را به Router IDِ `R2` وصل می‌بیند، در حالی که `R2` (به عنوان Broadcast) دنبال DR و Type-2 LSA است و لینک را در Type-1 LSA به صورت `Transit Network` به DR می‌بندد! در نتیجه توپولوژی دوطرفهٔ SPF تطابق نمی‌کند و مسیرها ساخته نمی‌شوند."
+      }
+    },
+    {
+      "h": "۲. فیلترینگ و مهندسی ترافیک در eBGP",
+      "p": [
+        "در شبکهٔ چند-ISP (`Dual-Homed eBGP`) در ENCOR، نباید اجازه دهیم روتر سازمانی به اشتباه تبدیل به **Transit AS** شود (یعنی ترافیک اینترنتِ ISP-A از داخل شبکهٔ ما رد شود تا برود به ISP-B!). دو کنترل اصلی در eBGP عبارت‌اند از:"
+      ],
+      "steps": [
+        "**فیلترینگ خروجی (`Out`):** با یک `ip prefix-list` و `route-map` فقط پیشوندهای عمومی خود سازمان (مثلاً `198.51.100.0/24`) را به ISPها تبلیغ کنیم؛ هرگز مسیرهای یادگرفته‌شده از ISP-A را به ISP-B تبلیغ نکنید! (در صورت نیاز حتی می‌توان با `filter-list` روی `AS_PATH` با رجکس `^$` تنها پیشوندهای محلی را خروجی داد).",
+        "**کنترل مسیر خروجی و ورودی:** برای انتخاب مسیر **خروج ترافیک ما به اینترنت**، روی `R1` یا داخل سازمان از **`LOCAL_PREF`** استفاده می‌کنیم (فقط در iBGP بین روترهای خودمان اثر دارد). برای تأثیرگذاری روی **ورود ترافیک اینترنت به ما** از بیرون، روی تبلیغ خروجی به ISP پشتیبان از **`AS_PATH Prepending`** (`set as-path prepend 65100 65100`) استفاده می‌کنیم تا مسیر طولانی‌تر دیده شود."
+      ],
+      "bullets": []
+    },
+    {
+      "h": "۳. زیرساخت Wireless در ENCOR: کشف WLC، حالت‌های AP و L2 در برابر L3 Roaming",
+      "p": [
+        "در معماری Split-MAC کنترلری (CAPWAP: کنترل `UDP 5246` و داده `UDP 5247`)، یک **Access Point (AP)** پس از گرفتن IP از DHCP باید کنترلر **WLC** خود را با این اولویت پیدا کند: **۱) حافظهٔ قبلی، ۲) DHCP Option 43، ۳) DNS (`CISCO-CAPWAP-CONTROLLER.localdomain`)، ۴) Broadcast روی ساب‌نت محلی**. بسته به نیاز سایت، AP در حالت **`Local Mode`** (تمام ترافیک به WLC تونل می‌شود) یا **`FlexConnect`** (در شعبه‌ها ترافیک محلی بدون رفتن به WLC مرکزی مستقیماً در شعبه سوئیچ می‌شود) کار می‌کند.",
+        "اما یکی از سؤالات کلیدی ENCOR تفاوت جابه‌جایی (**Roaming**) کلاینت بین دو AP است:"
+      ],
+      "bullets": [
+        "**Intra-Controller / L2 Roaming (یک ساب‌نت مشترک):** کاربر بین دو AP وصل به یک WLC (یا دو WLC دارای همان VLAN/Subnet) حرکت می‌کند؛ IP کلاینت بدون نیاز به تغییر یا تونل اضافه حفظ می‌شود.",
+        "**Inter-Controller / L3 Roaming (ساب‌نت متفاوت):** کاربر از ساختمان ۱ (`VLAN 10`, متصل به `WLC-1`) به ساختمان ۲ (`VLAN 20`, متصل به `WLC-2`) می‌رود! چون اگر IP کاربر تغییر کند تمام نشست‌های فعال TCP/VPN قطع می‌شوند، `WLC-1` نقش **Anchor Controller** و `WLC-2` نقش **Foreign Controller** را می‌گیرد؛ تمام بسته‌های کاربر بین `WLC-2` و `WLC-1` در یک تونل **CAPWAP Mobility Tunnel** جابه‌جا می‌شوند تا IP کلاینتِ ساختمان ۱ بدون قطعی زنده بماند!"
+      ],
+      "think": {
+        "q": "یک کارمند از طبقهٔ اول به طبقهٔ دوم می‌رود و به AP جدیدی در همان **Mobility Group** وصل می‌شود، اما `VLAN` این طبقه با طبقهٔ اول فرق دارد (`L3 Roam`). در این حالت سرور داخلی که کنار طبقهٔ دوم است به این کارمند بسته می‌فرستد؛ مسیر واقعیِ حرکت بسته از میان دو WLC چگونه است؟",
+        "a": "از آنجا که IP کلاینت متعلق به ساب‌نت طبقهٔ اول است، بستهٔ سرور ابتدا به روتر/سوییچ و **`WLC-1` (Anchor Controller)** در طبقهٔ اول می‌رسد؛ سپس `WLC-1` بسته را درون **Mobility Tunnel** به **`WLC-2` (Foreign Controller)** در طبقهٔ دوم می‌فرستد و `WLC-2` آن را به AP طبقهٔ دوم و لپ‌تاپ تحویل می‌دهد! این رفتار نشست‌های فعال را بدون قطعی حفظ می‌کند."
+      }
+    }
+  ],
+  "analogy": "در **L3 Wireless Roaming**، نقش **Anchor Controller** دقیقاً شبیه «سیستم دایورت ثابتِ شماره تلفن دفتر مرکزی شما» هنگام رفتن به یک شعبهٔ دیگر است: وقتی برای جلسه به ساختمان جدید (`Foreign WLC`) می‌روید، همهٔ تماس‌ها همچنان به میز قدیمی شما (`Anchor WLC`) زنگ می‌خورند و منشی قدیمی آن‌ها را با خط داخلی ویژه (`Mobility Tunnel`) روی میز جدید شما می‌اندازد تا تماس مشتری وسط صحبت قطع نشود! محل شکست تشبیه اینجاست: اگر این ترافیک بسیار سنگین باشد و کاربر ساعت‌ها در ساختمان جدید بماند، تمام بسته‌هایش بی‌جهت یک دور رفت‌وبرگشت اضافه تا Anchor طی می‌کنند (تأخیر اضافی / Asymmetric Path) تا زمانی که اتصالش را تجدید کند.",
+  "table": {
+    "title": "مقایسهٔ رفتار OSPF Network Type و حالت‌های Roaming بی‌سیم",
+    "headers": [
+      "سناریو / حالت",
+      "پیکربندی و ویژگی کلیدی",
+      "پیامد عملیاتی / تلهٔ رایج"
+    ],
+    "rows": [
+      [
+        "OSPF Broadcast (پیش‌فرض روی اترنت)",
+        "انتخاب DR/BDR (تاخیر ۴۰s) + Type-2 LSA",
+        "روی لینک ۲-نفرهٔ `/30` یا `/31` کندتر و پرحجم‌تر است"
+      ],
+      [
+        "OSPF Point-to-Point",
+        "`ip ospf network point-to-point` — بدون DR/BDR",
+        "اگر فقط یک سر لینک تغییر کند همسایه `FULL` می‌شود ولی مسیر نمی‌سازد!"
+      ],
+      [
+        "L2 Wireless Roaming",
+        "یکسان بودن VLAN/Subnet در مقصد جدید",
+        "سریع و مستقیم بدون نیاز به تونل Anchor-to-Foreign"
+      ],
+      [
+        "L3 Wireless Roaming",
+        "تفاوت VLAN/Subnet در WLC جدید (هم‌گروه Mobility)",
+        "حفظ IP با تونل CAPWAP Mobility بین Anchor و Foreign"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "آیا برای کار کردن `Inter-Controller Roaming` بین `WLC-1` و `WLC-2` باید نام `Mobility Group` یکسان باشد؟",
+      "a": "در Mobility List می‌توان بین دو WLC با نام گروه یکسان (**Intra-Mobility Group**) یا متفاوت (**Inter-Mobility Group**) رومینگ داشت؛ اما همه‌جا باید **Security/SSID** و نوع کلید احراز هویت (مثل 802.1X و PMK Caching) هم‌تراز باشند تا هنگام جابه‌جایی تأخیر دوبارهٔ احراز هویت رخ ندهد."
+    },
+    {
+      "q": "در فیلترینگ eBGP آیا `route-map` روی همان Neighbor هم از `prefix-list` و هم از `as-path` می‌تواند هم‌زمان استفاده کند؟",
+      "a": "بله، داخل یک `route-map` می‌توان چند دستور `match` گذاشت (در یک بند با منطق `AND` و در چند `sequence` با منطق `OR`)، و حتی به ازای هر همسایه (`in`/`out`) بهترین ترکیب را اعمال کرد؛ پس از تغییر سیاست BGP باید `clear ip bgp <ip> soft` (بدون قطع نشست با **Route Refresh**) را اجرا کرد."
+    }
+  ],
+  "summary": "در زیرساخت حوزهٔ ۳ ENCOR، تغییر لینک‌های نقطه‌به‌نقطهٔ OSPF به `point-to-point` تایمر ۴۰ ثانیه‌ای DR و Type-2 LSA را حذف می‌کند (به شرط تطابق دو طرف)؛ در لبهٔ eBGP، کنترل `Prefix-List/Route-Map` مانع تبدیل سازمان به Transit AS می‌شود؛ و در شبکهٔ بی‌سیم، کشف WLC (به‌ویژه Option 43 و DNS) و تونل Mobility بین `Anchor` و `Foreign` امکان **L3 Roaming** بدون قطع نشست را فراهم می‌کنند.",
+  "ciscoRef": "Cisco CCNP ENCOR 350-401 Official Cert Guide — Ch 7 (STP/L2), Ch 9 (OSPF), Ch 11 (BGP) & Ch 18–19 (Wireless Architecture & Roaming)",
+  "protocolAnalysis": [
+    "در **CAPWAP** کنترل و مدیریت AP روی **`UDP 5246`** (رمزنگاری DTLS اجباری) و ترافیک دیتای کاربران روی **`UDP 5247`** (به‌صورت پیش‌فرض بدون رمزنگاری روی سیم تا WLC، مگر فعال شدن Data DTLS) حرکت می‌کند.",
+    "در **eBGP Soft Reconfiguration / Route Refresh**, پس از تغییر `route-map` خروجی یا ورودی، با زدن `clear ip bgp * soft` روتر به جای ریست کامل TCP 179 (که باعث قطعی ترافیک می‌شود)، فقط پیام سبک `Route Refresh` را می‌فرستد تا جدول بر اساس سیاست جدید بازمحاسبه شود."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show ip ospf neighbor",
+      "out": "Neighbor ID     Pri   State           Dead Time   Address         Interface\n10.255.0.2        1   FULL/DR         00:00:34    10.10.0.2       GigabitEthernet0/0",
+      "note": "نمایش همسایگی OSPF. [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی به‌صورت خروجی نمونهٔ ثابت آموزشی (در مد Broadcast با DR) برگردانده می‌شود و تغییر نمی‌کند؛ تست زندهٔ `ip ospf network point-to-point` و `clear ip bgp` نیازمند CML یا EVE-NG است.]",
+      "why": "مشاهدهٔ وضعیت همسایه (`FULL/DR` در Broadcast در برابر `FULL/ -` در Point-to-Point) و کنترل Dead Time.",
+      "anatomy": "در مد `point-to-point` به‌جای `FULL/DR` عبارت `FULL/  -` ظاهر می‌شود که یعنی انتخاب DR کاملاً حذف شده است.",
+      "lookFor": "وضعیت `FULL` و تطابق Network Type دو سمت لینک در `show ip ospf interface Gi0/0`.",
+      "ifUnexpected": "اگر وضعیت `FULL` است ولی در `show ip route` مسیر OSPF وجود ندارد، اولین مظنون همین ناهمخوانی `point-to-point` با `broadcast` بین دو روتر است!",
+      "executable": false
+    },
+    {
+      "cmd": "show interfaces trunk",
+      "out": "Port        Mode             Encapsulation  Status        Native vlan\nGi0/1       on               802.1q         trunking      1",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای تایید ترانک بالادستی سوئیچِ متصل به Access Pointها (در حالت FlexConnect یا Local Mode با چند VLAN).",
+      "why": "APهای FlexConnect یا پورت‌های متصل به WLC برای حمل چند SSID در VLANهای مختلف نیازمند پورت ترانک تمیز با Native VLAN درست برای مدیریت AP هستند.",
+      "anatomy": "لیست پورت‌های ترانک، Native VLAN (که AP برای تماس CAPWAP اولیه استفاده می‌کند) و VLANهای مجاز.",
+      "lookFor": "هم‌خوانی Native VLAN روی ترانک AP/WLC با VLAN مدیریتی Access Point.",
+      "ifUnexpected": "اشتباه بودن Native VLAN یا حذف VLAN وایرلس از ترانک مانع اتصال کاربران به آن SSID می‌شود.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه آماده‌سازی لینک ترانک AP/FlexConnect و بررسی خروجی OSPF/BGP در زیرساخت",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `ip ospf network point-to-point`، `router bgp` و `wireless mobility` را اجرا نمی‌کند (برای آزمایش زنده از CML یا EVE-NG استفاده کنید). در اینجا پیکربندی ترانک چند-VLANی برای یک Access Point حالت `FlexConnect` و بررسی زندهٔ لینک لایه ۳ `Gi0/0` را انجام می‌دهیم.",
+      "۲. با `enable` وارد شوید و `show ip ospf neighbor` (خروجی نمونهٔ مد Broadcast با `FULL/DR`) و `show interfaces trunk` را ببینید.",
+      "۳. فرض کنید پورت `Gi0/7` قرار است به یک AP در حالت **FlexConnect** متصل شود که مدیریت AP در `VLAN 99` (به صورت Native Untagged) و ترافیک دو SSID شرکتی و مهمان در `VLAN 10` و `VLAN 70` عبور کنند: `configure terminal` -> `vlan 99` -> `name AP_MGMT` -> `vlan 70` -> `name WLAN_GUEST` -> `exit` -> `interface Gi0/7` -> `description AP-FLEXCONNECT` -> `switchport trunk encapsulation dot1q` -> `switchport mode trunk` -> `switchport nonegotiate` -> `switchport trunk native vlan 99` -> `switchport trunk allowed vlan 10,70,99` -> `interface Gi0/0` -> `description OSPF-P2P-UPLINK` -> `end`.",
+      "۴. با `show interfaces trunk`، `show interfaces Gi0/7 switchport`، `show running-config` و `ping 10.255.0.2` بررسی کنید تنظیمات ترانک `Gi0/7` (`nonegotiate`, `Native vlan 99`, `10,70,99`) و دسترسی پایه در شبیه‌ساز ثبت شده‌اند (اجرای زندهٔ OSPF point-to-point، BGP و پروتکل CAPWAP نیازمند CML/EVE-NG است).",
+      "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (قطعه‌فرمان مرجع OSPF P2P و eBGP — وابسته به پیش‌نیازهای توپولوژی کامل):** **پیش‌نیازها و فرمان‌ها:** این قطعات نیازمند فعال بودن فرایند OSPF در **هر دو سمت** لینک `/30` (`R1` و `R2`: `router ospf 1` -> `network 198.51.100.0 0.0.0.3 area 0` و در هر دو اینترفیس `ip ospf network point-to-point`) و پیکربندی متناظر eBGP در هر دو روتر (`R1: router bgp 65100` / `neighbor 198.51.100.2 remote-as 65200` و `R2: router bgp 65200` / `neighbor 198.51.100.1 remote-as 65100` همراه با `network` در صورت انتظار دریافت پیشوند) هستند. پس از تکمیل دو طرف، `show ip ospf neighbor`، `show ip route ospf` و `show ip bgp summary` را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** در `show ip ospf neighbor` وضعیت `FULL/  -` (حذف DR/BDR روی P2P؛ یادآوری: همسایگی `FULL/-` به‌تنهایی همگرایی زیرثانیه‌ای را تضمین نمی‌کند و نیازمند تایمر/BFD و بررسی `show ip route` است)، و در `show ip bgp summary` عددی بودن ستون `State/PfxRcd` (`0` هم نشانهٔ نشست `Established` است؛ عدد `> 0` فقط وقتی انتظار دریافت مسیر داریم معیار است). **نشانهٔ شکست:** ماندن OSPF در `EXSTART/EXCHANGE` (اختلاف MTU) یا ماندن BGP در `Active`/`Idle`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی تنها ترانک `Gi0/7` را زنده تست کرده و خروجی `show ip ospf neighbor` و `show ip bgp summary` آن ثابت است."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show interfaces trunk",
+      "show interfaces Gi0/7 switchport",
+      "show running-config"
+    ],
+    "labType": "Reference"
+  },
+  "troubleshooting": {
+    "fault": "پس از راه‌اندازی یک شعبه‌ جدید و اتصال آن به دو ISP مجزا با eBGP (محدودهٔ عمومی شرکت `198.51.100.0/24`)، مدیر متوجه می‌شود پهنای باند لینک ISP1 به طور غیرعادی اشباع شده و ترافیک نامربوطی از خارج وارد شبکه شده و از ISP2 خارج می‌شود!",
+    "analysis": "هیچ **فیلتر خروجی (`Outbound Route-Map / Prefix-List`)** روی همسایگی‌های eBGP اعمال نشده است؛ در نتیجه روتر شرکت تمام جدول کامل اینترنت را که از ISP1 گرفته به ISP2 (و برعکس) تبلیغ کرده و کل شرکت به یک **Transit AS** رایگان برای عبور ترافیک اینترنت تبدیل شده است!",
+    "fix": "تعریف فوری `ip prefix-list ONLY_OURS permit 198.51.100.0/24` (یا `ip as-path access-list 1 permit ^$`) و اعمال آن روی هر دو همسایهٔ eBGP در جهت **`out`**، سپس اجرای `clear ip bgp * soft out`."
+  },
+  "misconceptions": [
+    {
+      "myth": "در OSPF روی لینک مستقیم فیبر بین دو روتر، اگر یک سمت را `point-to-point` و سمت دیگر را روی حالت پیش‌فرض `broadcast` بگذاریم، تا وقتی همسایگی `FULL` بشود مشکلی نیست و ترافیک عبور می‌کند.",
+      "reality": "با یکی بودن تایمرهای Hello/Dead (`10/40`)، همسایگی واقعی `FULL` می‌شود ولی به دلیل ساختار متفاوت LSAهای Type-1 و Type-2 بین این دو حالت، الگوریتم SPF مسیرها را در `show ip route` نصب نمی‌کند!",
+      "howToSpot": "همسایه در `show ip ospf neighbor` حالت `FULL` دارد، اما مسیرهای آن همسایه در `show ip route ospf` غایب هستند."
+    },
+    {
+      "myth": "در L3 Wireless Roaming، به محض اینکه کلاینت به ساختمان جدید می‌رود IP جدید می‌گیرد تا اتصال ادامه یابد.",
+      "reality": "در **L3 Roaming** بین دو WLC با ساب‌نت متفاوت، اگر IP عوض شود نشست‌های زنده قطع می‌شوند؛ بنابراین برای حفظ IP قبلی، بین `Anchor WLC` و `Foreign WLC` یک تونل Mobility برقرار می‌شود.",
+      "howToSpot": "در داشبورد WLC وضعیت کلاینت در کنترلر جدید به صورت **`Foreign`** و در کنترلر اول به صورت **`Anchor`** ثبت می‌شود."
+    }
+  ],
+  "exercise": "تنظیمات کامل **eBGP** روی روتر مرزی `R1` (`AS 65100`) را برای اتصال هم‌زمان به `ISP-1` (`203.0.113.2`, `AS 65001`) و `ISP-2` (`192.0.2.2`, `AS 65002`) بنویسید به‌طوری که: ۱) فقط پیشوند `198.51.100.0/24` به هر دو ISP تبلیغ شود (ضد Transit AS)؛ ۲) خروجی ترافیک شرکت از `ISP-1` برود (`LOCAL_PREF = 250`) و ترافیک ورودی اینترنت هم `ISP-1` را ترجیح دهد (روی `ISP-2` دو بار `AS 65100` اضافه شود).",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "یک Access Point جدید از جعبه خارج شده و به سوئیچ وصل شده است؛ با فرض وجود DHCP بدون گزینهٔ ۴۳ و عدم وجود WLC در VLAN محلی AP، چه مکانیسم ساده‌ای (معمولاً مرحلهٔ ۳ کشف) به AP کمک می‌کند آدرس WLC مرکزی را پیدا کند؟",
+      "hint": "AP یک رکورد استاندارد میزبان را در سرور DNS محلی شبکه جستجو می‌کند.",
+      "solution": "تنظیم رکورد `A` در سرور DNS سازمان برای نام پیش‌فرض **`CISCO-CAPWAP-CONTROLLER.<domain-name>`** (به عنوان مثال `CISCO-CAPWAP-CONTROLLER.corp.ir`) اشاره به IP مدیریتی WLC؛ در نبود Option 43، AP این نام را از DNS می‌پرسد."
+    },
+    {
+      "level": "متوسط",
+      "task": "در خروجی دستور `show ip ospf interface Gi0/0` روی روتر `R1` نوشته شده `Network Type BROADCAST` و روی `R2` نوشته شده `Network Type POINT_TO_POINT`. همسایه `FULL` است ولی مسیرها نیستند! چرا و دستور اصلاح یکپارچه کدام است؟",
+      "hint": "نیازمند یکدست کردن نوع شبکه روی هر دو طرف و تایید حذف `DR/BDR` با `FULL/-` است.",
+      "solution": "به دلیل ناهماهنگی نوع لینک در LSA Type-1 و نبود Type-2 در سمت P2P، درخت SPF بسته نمی‌شود. راه‌حل: روی **هر دو** سمت `R1` و `R2` زیر `interface Gi0/0` دستور `ip ospf network point-to-point` بزنید و با `show ip ospf neighbor` وضعیت `FULL/  -` را تایید کنید."
+    },
+    {
+      "level": "چالشی",
+      "task": "پیکربندی کامل سناریوی eBGP بخش `exercise` بالا (جلوگیری از Transit AS با Prefix-List، اعمال `LOCAL_PREF 250` برای `ISP-1` و `AS_PATH Prepend` دوگانه روی خروجی به `ISP-2`) را روی `R1` بنویسید.",
+      "hint": "نیازمند دو `route-map` برای جهت `out` (هر دو با `match ip address prefix-list`) و یک `route-map` برای جهت `in` از سمت `ISP-1` هستیم (و یک مسیر `Null0` یا IGP تا `network` تبلیغ شود).",
+      "solution": "`ip route 198.51.100.0 255.255.255.0 Null0`\n`ip prefix-list OUR_NET seq 10 permit 198.51.100.0/24`\n`route-map ISP1_IN permit 10`\n` set local-preference 250`\n`route-map TO_ISP1 permit 10`\n` match ip address prefix-list OUR_NET`\n`route-map TO_ISP2 permit 10`\n` match ip address prefix-list OUR_NET`\n` set as-path prepend 65100 65100`\n`router bgp 65100`\n` network 198.51.100.0 mask 255.255.255.0`\n` neighbor 203.0.113.2 remote-as 65001`\n` neighbor 203.0.113.2 route-map ISP1_IN in`\n` neighbor 203.0.113.2 route-map TO_ISP1 out`\n` neighbor 192.0.2.2 remote-as 65002`\n` neighbor 192.0.2.2 route-map TO_ISP2 out`"
+    }
+  ],
+  "quiz": [
+    {
+      "q": "چرا توصیه می‌شود روی یک لینک اترنتِ `/30` که دقیقاً دو روتر را در OSPF به هم وصل کرده است دستور `ip ospf network point-to-point` بزنیم؟",
+      "opts": [
+        "تا رمزنگاری MD5 خودکار روشن شود",
+        "تا AD پروتکل OSPF از ۱۱۰ به ۹۰ تغییر کند",
+        "تا همسایه بدون معطلی برای انتخاب DR/BDR و بدون تولید Type-2 LSA سریع‌تر `FULL` شود",
+        "تا OSPF روی پروتکل TCP کار کند"
+      ],
+      "ans": 2,
+      "exp": "در مد Point-to-Point انتخاب DR/BDR و تایمر ۴۰ ثانیه‌ای انتظار حذف شده و Type-2 LSA تولید نمی‌شود."
+    },
+    {
+      "q": "در **L3 Wireless Roaming** بین دو WLC با ساب‌نت متفاوت، کارکرد تونل بین `Anchor` و `Foreign` چیست؟",
+      "opts": [
+        "پاک کردن جدول MAC سوئیچ دسترسی",
+        "تغییر خودکار پسورد وایرلس کلاینت",
+        "خاموش کردن DHCP در کل شبکه",
+        "جلوگیری از تغییر آدرس IP کاربر و زنده نگه داشتن نشست‌های فعال هنگام ورود به ساب‌نت جدید"
+      ],
+      "ans": 3,
+      "exp": "کلاینت IP ساب‌نت مبدأ را نگه می‌دارد و ترافیکش بین Foreign WLC و Anchor WLC تونل می‌شود تا نشست‌ها قطع نشوند."
+    },
+    {
+      "q": "برای جلوگیری از تبدیل شدن روتر مرزی سازمان به **Transit AS** هنگام اتصال به دو ISP با eBGP، مؤثرترین اقدام کدام است؟",
+      "opts": [
+        "اعمال Prefix-List/AS-Path Filter در جهت `out` تا فقط پیشوندهای خود سازمان تبلیغ شوند",
+        "تغییر `Router-ID` به `0.0.0.0`",
+        "روشن کردن `ip directed-broadcast`",
+        "فعال کردن VTP Server"
+      ],
+      "ans": 0,
+      "exp": "محدود کردن تبلیغات خروجی (`out`) به فقط پیشوندهای خود سازمان (با Prefix-List یا رجکس `^$`) اجازه نمی‌دهد ترافیک بین دو ISP از شبکهٔ ما عبور کند."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "این تکنیک‌ها در پیاده‌سازی روزانهٔ WAN چندمسیره (BGP + OSPF) و شبکه‌های بی‌سیم پردیسی در مقیاس CCNP کاربرد مستقیم دارند.",
+    "nextQuestion": "تا اینجا زیرساخت L2/L3 و وایرلس را مهندسی کردیم؛ اما اگر یک مهاجم یا حتی یک خطای اسکریپتی، صدها هزار بستهٔ جعلی را مستقیم به آدرس IP خودِ روتر (`OSPF/BGP/SSH`) سیلاب کند، **مغز روتر (`Control Plane`)** در لحظه قفل می‌کند! در **حوزهٔ ۵ ENCOR** یاد می‌گیریم چطور با **CoPP (Control Plane Policing)**، کنترل دسترسی **AAA/ACL** و ایمن‌سازی **REST API** مغز شبکه را زره‌پوش کنیم.",
+    "nextId": "ccnp_enc_sec"
+  }
+}

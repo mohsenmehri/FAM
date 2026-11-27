@@ -1,0 +1,230 @@
+{
+  "id": "ccnp_ensdwi",
+  "faculty": "دانشکده ۳ · CCNP Enterprise",
+  "title": "تخصصی 300-415 ENSDWI: معماری Cisco Catalyst SD-WAN (OMP، TLOC و AAR)",
+  "lead": "یک فروشگاه زنجیره‌ای با ۲۰۰ شعبه، به جای خرید لینک MPLS گران‌قیمت برای هر مغازه، هر شعبه را به یک لینک MPLS ارزان‌تر و یک فیبر اینترنت پرسرعت وصل کرده است. اما در زمان شلوغی ظهر، افت بسته (Packet Loss) روی اینترنت به ۵٪ می‌رسد و تماس‌های صوتی و تراکنش‌های POS خراب می‌شوند—با اینکه پورت اینترنت هنوز `up/up` است! چطور در Cisco SD-WAN با جداسازی ۴ صفحه و معیار لحظه‌ای کیفیت خط (`AAR` + `BFD`)، ترافیک حساس در لحظه به MPLS کوچ کند در حالی که ترافیک وب همچنان روی اینترنت بماند؟",
+  "goal": "درک کامل معماری ۴صفحه‌ای Cisco SD-WAN (`vBond`، `vManage`، `vSmart` و `WAN Edge`)، مکانیسم کارکرد پروتکل **OMP**، مفاهیم **TLOC / Color / Encapsulation** و پیاده‌سازی **Application-Aware Routing (AAR)** و سیاست‌های متمرکز (**Centralized Control/Data Policies**).",
+  "prereq": "آشنایی با DMVPN، BGP، IPsec و مفاهیم BFD (درس‌های `adv_bfd`، `ccnp_01` و `ccnp_02`).",
+  "sections": [
+    {
+      "h": "۱. معماری ۴صفحه‌ای Cisco SD-WAN: هر کنترلر دقیقاً چه می‌کند؟",
+      "p": [
+        "برخلاف DMVPN که هر روتر خودش هم تصمیم می‌گیرد و هم کلید IPsec و جدول مسیرش را مدیریت می‌کند، Cisco Catalyst SD-WAN (مبتنی بر Viptela سابق) شبکه را به **۴ صفحهٔ کاملاً مجزا** می‌شکند:"
+      ],
+      "bullets": [
+        "**Orchestration Plane (`vBond`):** نگهبانِ درِ ورودی! تمام کنترلرها و WAN Edgeها آدرس vBond را می‌دانند. هنگام بوت شدن یک WAN Edge جدید (با Zero-Touch Provisioning)، vBond هویت گواهینامهٔ دستگاه را تایید کرده، IP عمومی و پورت NATشدهٔ آن را با مکانیسم **STUN** کشف می‌کند و آدرس **vManage** و **vSmart** را به آن تحویل می‌دهد. *(هیچ ترافیک دیتا و مسیر کاربر از vBond عبور نمی‌کند!)*",
+        "**Management Plane (`vManage`):** داشبورد مرکزی (GUI + REST API) برای ساخت Templateها، مانیتورینگ، ارتقای نرم‌افزار و نگه‌داری تمام سیاست‌ها.",
+        "**Control Plane (`vSmart`):** مغز مسیریابی Overlay! با هر WAN Edge یک تونل امن **DTLS/TLS** می‌زند و از طریق پروتکل اختصاصی **OMP (Overlay Management Protocol)** مسیرهای شبکهٔ کاربران، کلیدهای IPsec و TLOCها را توزیع می‌کند. *(vSmart جایگزین همسایگی‌های انبوه Full-Mesh iBGP/NHRP است!)*",
+        "**Data Plane (`WAN Edge / cEdge`):** روترهای شعب و مرکز (مانند Catalyst 8000 / ISR) که مستقیماً بین خودشان تونل‌های **IPsec** (یا GRE) می‌زنند و بسته‌های کاربران را جابه‌جا می‌کنند."
+      ]
+    },
+    {
+      "h": "۲. قلب SD-WAN: پروتکل OMP، رنگ‌های `TLOC` و سنجش زنده با BFD",
+      "p": [
+        "پروتکل **OMP** (شبیه به BGP ولی اختصاصی SD-WAN و همواره فعال بین `WAN Edge` و `vSmart`) سه نوع مسیر تبلیغ می‌کند:"
+      ],
+      "steps": [
+        "**OMP Routes (`vRoutes`):** پیشوندهای داخلی خودِ سایت‌ها (مثل `10.50.0.0/24` که از OSPF/Connected/Static شعبه به OMP ریدیستربیوت شده‌اند).",
+        "**TLOC Routes (Transport Locations):** آدرسِ نقطهٔ اتصالِ هر روتر به دنیای WAN که با یک سه‌تایی یکتا شناخته می‌شود: **`(System-IP, Color, Encapsulation)`**! مثلاً یک روتر با `System-IP 10.255.0.1` روی دو لینک MPLS و اینترنت دو TLOC مجزا دارد: یکی با رنگ `mpls` و دیگری با رنگ `biz-internet` و کپسوله‌سازی `ipsec`.",
+        "**Service Routes:** معرفی سرویس‌های میانی مثل فایروال یا IDS برای Service Chaining. *(نکتهٔ کلیدی امنیتی: کلیدهای رمزنگاری Data Plane بدون نیاز به IKE کامل بین تک‌تک جفتِ روترها، به شکل خودکار از طریق OMP روی بستر امن DTLS توزیع و جابه‌جا می‌شوند!)*"
+      ],
+      "think": {
+        "q": "در یک شبکهٔ SD-WAN، دو لینک MPLS و `biz-internet` روی یک `WAN Edge` متصل‌اند و به پیشفرض با دیگر روترها تونل IPsec می‌سازند. به صورت پیش‌فرض، آیا لینک با رنگ `mpls` سعی می‌کند مستقیم به لینک با رنگ `biz-internet` روی روتر مقابل تونل IPsec بزند؟ و اگر این دو در واقعیت به هم راه نداشته باشند چه می‌شود؟",
+        "a": "**بله، به صورت پیش‌فرض WAN Edge تلاش می‌کند Full-Mesh بین تمام TLOCها تونل بزند!** اگر شبکهٔ خصوصی MPLS هیچ مسیری به اینترنت عمومی نداشته باشد، تونل بین `mpls <-> biz-internet` برقرار نمی‌شود و BFD آن را `Down` نگه می‌دارد (و وقت/منابع هدر می‌رود). در این حالت با زدن دستور **`restrict`** زیر `color mpls` می‌گوییم رنگ `mpls` فقط با همان رنگ `mpls` (یا گروه مجاز `color-group`) تونل بسازد!"
+      },
+      "bullets": []
+    },
+    {
+      "h": "۳. مسیریابی هوشمند برنامه (AAR) و تفاوت Centralized Control در برابر Data Policy",
+      "p": [
+        "روی تمام تونل‌های IPsec بین WAN Edgeها به‌طور خودکار پروتکل **BFD** در حال ارسال بسته‌های سنجش است تا **Loss، Latency و Jitter** لحظه‌ای هر مسیر را اندازه بگیرد. در **Application-Aware Routing (AAR)** یک کلاس SLA تعریف می‌کنیم (مثلاً برای **Voice/POS**: `Loss <= 1%`، `Latency <= 150ms`، `Jitter <= 30ms`). تا وقتی اینترنت خوب است می‌تواند بار را ببرد؛ به محض افت کیفیت اینترنت بالای آستانه، روتر بی‌درنگ فقط ترافیک Voice/POS را به لینک **`mpls`** می‌اندازد!",
+        "از نظر محل اثر سیاست‌ها در vManage، تفکیک زیر کلیدی است: **Centralized Control Policy** روی `vSmart` اجرا می‌شود و جدول مسیر OMP را دستکاری می‌کند (مثل تغییر توپولوژی به Hub-and-Spoke یا سرویس‌چین فایروال)؛ در حالی که **Centralized Data Policy** (شامل **AAR** و QoS/NAT) از `vSmart` به `WAN Edge`ها فرستاده می‌شود تا بسته به بسته در Data Plane اعمال گردد."
+      ],
+      "think": {
+        "q": "سناریوی خطا: در یک پیاده‌سازی SD-WAN با ۲ کنترلر `vSmart` و ۵۰ شعبه، هر دو کنترلر `vSmart` ناگهان به علت قطعی ارتباط اینترنتی دیتاسنتر مرکزی از دسترس شعبه‌ها خارج می‌شوند (`Control Connections Down`)! آیا ترافیک فعلی مشتریان بین شعبه A و مرکز پشتیبان (Data Center 2) بلافاصله قطع می‌شود؟",
+        "a": "**خیر، ترافیک موجود بلافاصله قطع نمی‌شود—اما تداوم آن برای کل ۱۲ ساعت نیز تضمین‌شده نیست!** با مکانیسم **OMP Graceful Restart** (که پیش‌فرض معمول آن در بسیاری استقرارها `12` ساعت است و قابل تنظیم)، روترهای `WAN Edge` آخرین مسیرها و کلیدهای IPsec شناخته‌شده از `vSmart` را تا پایان تایمر نگه می‌دارند (**Headless Operation**). با این حال، تداوم بدون اختلال به پایداری مسیر Underlay، سلامت تونل‌های IPsec/BFD، منقضی نشدن کلیدها/گواهی‌ها و نبود تغییرات توپولوژی یا سایت‌های جدید وابسته است."
+      },
+      "bullets": []
+    }
+  ],
+  "analogy": "معماری ۴صفحه‌ای Cisco SD-WAN مثل یک **شبکهٔ تاکسی‌رانی هوشمند کشوری** است: **`vBond`** مثل میز پذیرش و احراز هویت رانندگان جدید است که فقط مدرک راننده را چک می‌کند و آدرس دیسپاچر را می‌دهد؛ **`vManage`** داشبورد مدیران کل و تنظیم قوانین تعرفه است؛ **`vSmart`** مرکز دیسپاچینگ هوشمند (`Control Plane`) است که لیست مسافران (`OMP Routes`) و موقعیت ایستگاه‌ها (`TLOC`) را به همه می‌دهد بی‌آنکه خودش یک مسافر را سوار کند؛ و **`WAN Edge`** همان تاکسی‌ها هستند که مستقیم در خیابان (`Data Plane`) مسافر را می‌برند و با سنسور ترافیک لحظه‌ای (`BFD + AAR`) به محض شلوغ شدن جادهٔ آزاد (`biz-internet`)، مسافران ویژه (صدا/بانک) را به اتوبان اختصاصی (`mpls`) منتقل می‌کنند! محل شکست تشبیه اینجاست: در شبکهٔ واقعی اگر `System-IP` دو روتر تکراری تنظیم شود یا ساعت گواهینامهٔ دیجیتال (`Certificate`) روی `WAN Edge` به هم بریزد، کل اتصال کنترلی به `vBond/vSmart` حتی با داشتن اینترنت سالم فوراً رد می‌شود.",
+  "table": {
+    "title": "چهار صفحهٔ معماری Cisco Catalyst SD-WAN و نقش پروتکل‌ها",
+    "headers": [
+      "صفحه (Plane)",
+      "تجهیز / نرم‌افزار",
+      "پروتکل اصلی",
+      "وظیفه و رفتار در هنگام قطعی"
+    ],
+    "rows": [
+      [
+        "Orchestration",
+        "vBond",
+        "DTLS + STUN",
+        "احراز هویت اولیه، کشف NAT و معرفی vManage/vSmart (بدون حمل دیتا)"
+      ],
+      [
+        "Management",
+        "vManage",
+        "NETCONF + HTTPS API",
+        "مدیریت Templateها، پایش، ارتقا و داشبورد متمرکز"
+      ],
+      [
+        "Control",
+        "vSmart",
+        "OMP روی DTLS/TLS",
+        "توزیع مسیرها (vRoutes)، TLOCها، کلیدها و Control Policy (نگهداری موقت در Graceful Restart)"
+      ],
+      [
+        "Data",
+        "WAN Edge (cEdge)",
+        "IPsec/GRE + BFD",
+        "حمل مستقیم ترافیک بین سایت‌ها و اجرای AAR بر اساس SLA لحظه‌ای"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "تفاوت `System-IP` با آدرس IP اینترفیس `Tunnel` یا `Transport` در SD-WAN چیست؟",
+      "a": "**`System-IP`** یک شناسهٔ ثابت ۳۲ بیتی (مشابه `Router-ID` در OSPF/BGP، مثلاً `10.255.0.1`) است که **اصلاً لازم نیست در شبکه قابل مسیریابی باشد**؛ فقط به‌عنوان نام یکتای روتر در کل Fabric و در سه‌تایی TLOC عمل می‌کند، در حالی که IP اینترفیس WAN (مثل `203.0.113.1`) آدرس قابل مسیریابی واقعی روی زیرساخت است."
+    },
+    {
+      "q": "اگر در `AAR` هیچ‌کدام از دو لینک (`mpls` و `biz-internet`) شرط SLA (مثلاً `Loss <= 1%`) را پاس نکنند، چه اتفاقی می‌افتد؟ آیا ترافیک رها می‌شود؟",
+      "a": "به‌طور پیش‌فرض اگر هیچ رنگ مناسبی SLA را برآورده نکند، ترافیک بین رنگ‌های موجود پخش می‌شود (یا به **Fallback Best Tunnel / Backup Color** تعریف‌شده می‌رود) تا ترافیک کاملاً قطع نشود—مگر اینکه ادمین صراحتاً اکشن `Strict Drop` را در سیاست اعمال کرده باشد."
+    }
+  ],
+  "summary": "Cisco Catalyst SD-WAN کنترل شبکهٔ گسترده را به ۴ صفحه (`vBond`, `vManage`, `vSmart`, `WAN Edge`) تقسیم می‌کند. پروتکل **OMP** روی تونل DTLS مسیرهای کاربران و سه‌تایی‌های **`TLOC (System-IP, Color, Encap)`** را توزیع می‌کند؛ **BFD** کیفیت لحظه‌ای لینک‌ها را می‌سنجد تا **AAR** ترافیک حساس را به بهترین رنگ هدایت کند؛ و **OMP Graceful Restart** اطلاعات قبلی را برای مدتی موقت (مثلاً پیش‌فرض معمول ۱۲ ساعت) نگه می‌دارد، هرچند پایداری واقعی به سلامت Underlay، تونل‌ها و کلیدها وابسته است.",
+  "ciscoRef": "Cisco CCNP Implementing Cisco SD-WAN Solutions (300-415 ENSDWI) Official Cert Guide — Ch 1–6 (Architecture, OMP, TLOC & Policies)",
+  "protocolAnalysis": [
+    "در اتصال اولیهٔ **WAN Edge**, روتر با `vBond` یک تونل موقت **DTLS** می‌زند، گواهی‌نامهٔ امضاشده (Whitelist) را نشان می‌دهد، و پس از گرفتن لیست IPهای `vSmart` و `vManage` اتصال به `vBond` را می‌بندد و نشست‌های دائمی با `vSmart/vManage` برقرار می‌کند.",
+    "حمل برچسب‌های ترافیک و تفکیک سگمنت‌ها در SD-WAN با **VPN ID** انجام می‌شود: **`VPN 0`** منحصراً Transport VPN (لینک‌های WAN)، **`VPN 512`** منحصراً Management VPN (Out-of-Band)، و **`VPN 1..511`** (بخش سرویس) شبکه‌های داخلی کاربران و شعب هستند."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show sdwan omp routes",
+      "out": "Code: C - chosen, I - installed, Red - redistributed, R - resolved\nVPN    PREFIX            PATH ID  FROM PEER       COLOR            STATUS\n10     10.50.0.0/24      1        10.255.0.2      mpls             C,I,R\n10     10.50.0.0/24      2        10.255.0.2      biz-internet     C,R",
+      "note": "بررسی مسیرهای OMP دریافت‌شده از vSmart روی روتر cEdge. [نکتهٔ شبیه‌ساز: دستورات `show sdwan ...` و `show control connections` در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شوند و خروجی بالا نمونهٔ مرجع آموزشی است؛ تمرین زندهٔ SD-WAN نیازمند Cisco DevNet SD-WAN Sandbox یا CML/EVE-NG با کنترلرهای vManage/vSmart است.]",
+      "why": "برای بررسی اینکه آیا پیشوندهای سایت مقابل از `vSmart` رسیده‌اند (`C`), TLOC آن‌ها در دسترس است (`R` = Resolved) و در جدول روتینگ نصب شده‌اند (`I`).",
+      "anatomy": "شماره `VPN` سرویسی (مثل 10)، پیشوند، `FROM PEER` (System-IP کنترلر یا مبدا)، `COLOR` و وضعیت‌های `C,I,R` را نمایش می‌دهد.",
+      "lookFor": "حضور پرچم **`C, I, R`**؛ اگر `R` (Resolved) نیست یعنی تونل IPsec/TLOC تا سمت مقابل بالا نیامده است.",
+      "ifUnexpected": "در صورت نبود `R`، دستور `show sdwan bfd sessions` و `show sdwan control connections` را برای یافتن علت قطعی TLOC یا گواهی‌نامه چک کنید.",
+      "executable": false
+    },
+    {
+      "cmd": "show ip interface brief",
+      "out": "Interface              IP-Address      OK? Method Status                Protocol\nGigabitEthernet0/0     10.10.0.1       YES manual up                    up\nLoopback0              10.255.0.1      YES manual up                    up",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای تایید اینترفیس Transport (`Gi0/0` معادل زیرساخت `VPN 0`) و شناسهٔ ثابت (`Loopback0` معادل `System-IP` در توپولوژی).",
+      "why": "تمام اتصالات DTLS به کنترلرها و تونل‌های IPsec بین TLOCها روی سلامت اینترفیس‌های `VPN 0` (Transport) بنا می‌شوند.",
+      "anatomy": "وضعیت آدرس‌های IP و فعال بودن فیزیکی/منطقی پورت‌ها.",
+      "lookFor": "`up / up` بودن لینک خروجی WAN و پایداری Loopback.",
+      "ifUnexpected": "هرگونه افت روی `Gi0/0` بلافاصله BFD آن رنگ (`Color`) را Down می‌کند و ترافیک به لینک دوم منتقل می‌شود.",
+      "executable": true
+    },
+    {
+      "cmd": "show sdwan app-route stats",
+      "out": "app-route statistics 10.255.0.12 10.255.0.14\n remote-system-ip  local-color  remote-color  mean-loss  mean-latency  mean-jitter\n 10.255.0.14       mpls         mpls          0.00%      18            2\n 10.255.0.14       biz-internet biz-internet  2.40%      95            18",
+      "note": "نمایش خلاصه‌شده و ساده‌شدهٔ آموزشی برای درک شاخص‌های کیفیت مسیر (`Loss / Latency / Jitter`) در AAR (نه خروجی عین CLI در نسخهٔ مشخص؛ در خروجی کامل Cisco SD-WAN، جدول `app-route statistics` به تفکیک هر تونل، پورت، شاخص‌های sla-class و بازه‌های زمانی نمایش داده می‌شود). [نکتهٔ شبیه‌ساز: دستور مرجع غیرشبیه‌سازی‌شده روی cEdge.]",
+      "why": "چون `show sdwan bfd sessions` به‌تنهایی فقط برقراری نشست `up` را نشان می‌دهد؛ برای تشخیص رعایت یا نقض آستانهٔ `sla-class` باید خروجی `show sdwan app-route stats` بررسی شود.",
+      "anatomy": "آدرس System-IP مقصد، رنگ‌های مبدأ/مقصد و مقادیر `mean-loss`, `mean-latency`, `mean-jitter`.",
+      "lookFor": "ماندن اعداد هر رنگ زیر آستانهٔ تعریف‌شده در `sla-class` (و وجود حداقل یک رنگ/مسیر جایگزین معتبر هنگام نقض SLA).",
+      "ifUnexpected": "اگر با وجود بالا بودن `mean-loss` ترافیک به رنگ دوم نرفت، فعال بودن `app-route-policy` روی `vSmart` و وجود رنگ پشتیبانِ دارای تونل `up` را بررسی کنید.",
+      "executable": false
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه آماده‌سازی نقش‌های Transport (`VPN 0`) و Service (`VPN 10/20`) در شبیه‌ساز",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی کنترلرهای `vBond/vManage/vSmart` و دستورات `show sdwan ...` را ندارد (برای آزمایش زنده از DevNet SD-WAN Sandbox یا EVE-NG استفاده کنید). در اینجا جداسازی برچسب پورت Transport (`Gi0/0`) از پورت‌های VLAN سرویسی و بررسی وضعیت پایهٔ `Gi0/0` (خروجی ازپیش‌تعریف‌شدهٔ `ping` در شبیه‌ساز) تمرین می‌شود.",
+      "۲. با `enable` وارد شوید و با `show ip interface brief` و `show vlan brief` پورت Transport و VLANهای سرویسی را مشاهده کنید.",
+      "۳. فرض کنید می‌خواهیم پورت‌های شبکه را دقیقاً مطابق تفکیک SD-WAN مستند و ایزوله کنیم: `configure terminal` -> `interface Gi0/0` -> `description VPN0-TRANSPORT-MPLS` -> `interface Loopback0` -> `description SYSTEM-IP-10-255-0-1` -> `vlan 512` -> `name VPN512_MGMT_OOB` -> `exit` -> `interface Gi0/7` -> `description MGMT-OOB-PORT` -> `switchport mode access` -> `switchport access vlan 512` -> `end`.",
+      "۴. با `show running-config`، `show vlan brief` و `ping 10.255.0.2` بررسی کنید تنها تفکیک تمرینیِ پورت‌های شبیه‌ساز (`Gi0/7` در `VLAN 512` و برچسب‌های `Gi0/0`/`Lo0`) و دسترسی پایه به `10.255.0.2` ثبت شده است (اجرای واقعی `OMP`، `TLOC` و `AAR` نیازمند کنترلرهای SD-WAN در CML/DevNet است).",
+      "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (OMP، BFD و AAR SLA در SD-WAN — پلتفرم مرجع: Catalyst 8000v / cEdge IOS-XE SD-WAN):** **پیش‌نیازها و فرمان‌ها:** داشتن `app-route-policy` فعال از `vSmart` با تعریف `sla-class` و حداقل دو رنگ/مسیر معتبر (`mpls` و `biz-internet`) تا مقصد. روی cEdge دستورات `show sdwan control connections`، `show sdwan omp peers`، `show sdwan bfd sessions` و **`show sdwan app-route stats`** را اجرا کنید. **خروجی مرجع و نشانهٔ موفقیت:** وضعیت `up` تا `vSmart`/`vManage` در `control connections` و `omp peers`، برقراری پروب‌ها در `bfd sessions` (که تنها سلامت تونل را نشان می‌دهد)، و ماندن `mean-loss`/`mean-latency`/`mean-jitter` در `show sdwan app-route stats` زیر آستانهٔ `sla-class` (یا جابه‌جایی به رنگ پشتیبان در صورت نقض SLA). **نشانهٔ شکست:** `init`/`connect` ماندن `vSmart` (خطای گواهی/System-IP/DTLS)، `down` شدن `bfd`، یا نبود رنگ جایگزین سالم/Policy فعال هنگام بالا رفتن `mean-loss` در `app-route stats`. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی فقط نام‌گذاری و جداسازی پورت‌های تمرینی را ذخیره می‌کند و پروتکل‌های کنترل/دادهٔ SD-WAN را اجرا نمی‌نماید."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show vlan brief",
+      "show running-config",
+      "ping 10.255.0.2"
+    ],
+    "labType": "Reference"
+  },
+  "troubleshooting": {
+    "fault": "یک روتر `WAN Edge` جدید به شبکهٔ شعبه‌ای اضافه شده و DHCP به آن IP اینترنتی سالم داده است (پینگِ `vBond` کار می‌کند)، اما در `show sdwan control connections` هیچ تونل کنترلی به `vSmart` و `vManage` بالا نمی‌آید و وضعیت در `connect` یا `challenge` می‌ماند!",
+    "analysis": "سه علت متداول ENSDWI در بالا نیامدن Control Connections عبارت‌اند از: ۱) **ساعت سیستم (NTP)** روتر جدید دقیق نیست و گواهی‌نامهٔ دیجیتال (Certificate) را معتبر نمی‌شمارد (مثلاً تاریخ در گذشته است و گواهی هنوز شروع نشده)؛ ۲) نام `Organization-Name` در پیکربندی روتر دقیقاً با `Organization-Name` داخل گواهی `vBond/vManage` یکی نیست؛ ۳) فایروال شعبه پورت‌های `UDP 12346–12426` (DTLS) را بسته است.",
+    "fix": "تطابق دقیق `system clock / NTP`، چک کردن یکسان بودن حرف‌به‌حرف `organization-name` و `system-ip` یکتا در vManage، و بررسی باز بودن پورت‌های DTLS/TLS تا کنترلرها."
+  },
+  "misconceptions": [
+    {
+      "myth": "در Cisco SD-WAN تمام ترافیک داده‌های کاربران بین شعبه‌ها از طریق کنترلرهای `vSmart` و `vManage` رد می‌شود.",
+      "reality": "هیچ بستهٔ دیتای کاربری از `vBond`، `vManage` یا `vSmart` عبور نمی‌کند! کنترلرها صرفاً کنترلی/مدیریتی هستند و ترافیک کاربران مستقیم روی تونل‌های **IPsec** بین خود روترهای **`WAN Edge`** جریان دارد (مگر اینکه عمداً با یک Control Policy ترافیک را از یک مرکز خاص مثل Hub عبور دهید).",
+      "howToSpot": "در نمودارهای کنترلر، پهنای باند مصرفی `vSmart` همیشه در حد چند ده کیلوبیت است در حالی که `WAN Edge`ها گیگابیت ترافیک می‌فرستند."
+    },
+    {
+      "myth": "در SD-WAN، `VPN 0` متعلق به کاربران عادی و `VPN 1` برای مدیریت است.",
+      "reality": "برعکس: **`VPN 0`** همیشه Transport VPN (زیرساخت WAN مثل MPLS و اینترنت) است؛ **`VPN 512`** همیشه Out-of-Band Management است؛ و شبکه‌های داخلی کاربران و سرویس‌ها در **`VPN 1` تا `511`** (غیر از صفر و ۵۱۲) ساخته می‌شوند.",
+      "howToSpot": "اینترفیس‌های فیزیکی رو به مودم/ISP همواره زیر `vpn 0` تنظیم می‌شوند."
+    }
+  ],
+  "exercise": "در یک شعبهٔ دارای Cisco SD-WAN، دو لینک `mpls` و `biz-internet` وجود دارد. مدیر می‌خواهد: ۱) لینک `mpls` فقط با لینک‌های `mpls` سایت‌های دیگر تونل بزند (نه با `biz-internet`)؛ ۲) برای اپلیکیشن `VoIP_RTP` شرط `Loss <= 1%` و `Latency <= 150ms` بگذارد و ترجیحاً از `mpls` و در صورت خرابی به `biz-internet` برود. این دو منطق را به زبان ساختاریافتهٔ سیاست‌های SD-WAN شرح دهید و بگویید اولی کجا (Template) و دومی در کدام بخش سیاست (Centralized Data Policy) تعریف می‌شود.",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "کدام یک از چهار جزء SD-WAN (`vBond`, `vManage`, `vSmart`, `WAN Edge`) مسئول وظایف زیر است؟\n۱) کشف آدرس NATشدهٔ روتر جدید هنگام بوت، ۲) اجرای پروتکل OMP و توزیع کلیدهای IPsec، ۳) اندازه‌گیری واقعی Loss و Latency روی تونل با BFD، ۴) نگهداری Templateها و داشبورد API.",
+      "hint": "تفکیک Orchestration / Control / Data / Management.",
+      "solution": "۱) **`vBond`**؛ ۲) **`vSmart`**؛ ۳) **`WAN Edge`**؛ ۴) **`vManage`**."
+    },
+    {
+      "level": "متوسط",
+      "task": "در پیام `show sdwan omp routes` برای یک پیشوند دو خط ظاهر شده: خط اول (`mpls`) وضعیت **`C, I, R`** دارد و خط دوم (`biz-internet`) فقط وضعیت **`R`** دارد (بدون `C` و `I`)! این یعنی چه و برای اینکه ترافیک هم‌زمان بین هر دو لینک تقسیم شود (ECMP) چه شرطی باید برقرار باشد؟",
+      "hint": "`C` یعنی Chosen (انتخاب‌شده)، `I` یعنی Installed در جدول مسیر، و `R` یعنی Resolved.",
+      "solution": "وضعیت `R` بدون `C, I` نشان می‌دهد تونل به هر دو رنگ برقرار است (`Resolved`) ولی الگوریتم بهترین مسیر OMP تنها یکی (`mpls`) را انتخاب (`Chosen`) و نصب (`Installed`) کرده است—احتمالاً به خاطر برتری Administrative Distance/Preference یا TLOC Preference در سمت مبدأ. برای **ECMP هم‌زمان** روی هر دو رنگ، باید Preference/Origin/Metric هر دو مسیر در OMP برابر بوده و `ecmp-limit` (پیش‌فرض ۴) روی روتر فعال باشد."
+    },
+    {
+      "level": "چالشی",
+      "task": "پاسخ کامل سناریوی بخش `exercise` بالا را توضیح دهید و بنویسید چرا بدون `restrict` کردن رنگ `mpls` روی یک شبکهٔ خصوصی MPLS، BFD مدام در وضعیت خطا (`Down`) گزارش می‌شود و چگونه **`AAR`** با **SLA Class** آن را مدیریت می‌کند.",
+      "hint": "نحوهٔ اعمال `restrict` در VPN 0 Interface Template و تعریف `SLA Class` + `App-Route Policy` در Centralized Data Policy.",
+      "solution": "۱) در **Feature Template مربوط به `VPN 0`** زیر اینترفیس MPLS (بخش Tunnel Interface)، رنگ `mpls` را انتخاب و گزینهٔ **`Restrict`** را فعال می‌کنیم تا `WAN Edge` فقط با TLOCهای دارای رنگ `mpls` سعی در ساخت تونل IPsec کند (بدون `restrict`، تلاش برای ساخت تونل به `biz-internet` شکست خورده و BFDهای بلااستفاده `Down` می‌مانند).\n۲) در **`vManage -> Configuration -> Policies -> Centralized Policy`**: ابتدا یک **`SLA Class`** (مثلاً `VOICE_SLA`: `Loss <= 1%`, `Latency <= 150ms`) می‌سازیم؛ سپس درون یک **Application-Aware Routing (AAR) Policy** ترافیک `VoIP` را با این SLA تطابق می‌دهیم و `Preferred Color = mpls` (و `Backup = biz-internet`) را تنظیم می‌کنیم؛ در نهایت این **Centralized Data Policy** را به سایت‌های هدف اعمال می‌کنیم تا `vSmart` آن را به تمام `WAN Edge`ها Push کند."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "در معماری Cisco Catalyst SD-WAN، کدام کنترلر هنگام اولین اتصال یک `WAN Edge` هویت آن را با STUN/NAT کشف کرده و آدرس `vManage` و `vSmart` را به آن می‌دهد؟",
+      "opts": [
+        "`Catalyst Center`",
+        "`vSmart` (Control Plane)",
+        "`vBond` (Orchestration Plane)",
+        "`WLC`"
+      ],
+      "ans": 2,
+      "exp": "`vBond` اولین نقطهٔ تماس در Orchestration Plane است که عبور از NAT را مدیریت و کنترلرهای دیگر را معرفی می‌کند."
+    },
+    {
+      "q": "سه مؤلفهٔ یکتاساز هر **`TLOC`** در پروتکل OMP کدام‌ها هستند؟",
+      "opts": [
+        "VLAN ID، MAC Address، Subnet Mask",
+        "AS Number، OSPF Area، Router Priority",
+        "Username، Password و Token",
+        "System-IP، Color و Encapsulation (`ipsec`/`gre`)"
+      ],
+      "ans": 3,
+      "exp": "هر نقطهٔ اتصال WAN در SD-WAN با سه‌تایی `(System-IP, Color, Encapsulation)` شناخته می‌شود."
+    },
+    {
+      "q": "اگر ارتباط کنترلرهای `vSmart` با یک شعبهٔ عملیاتی SD-WAN قطع شود، مکانیسم **OMP Graceful Restart** چه کمکی می‌کند و چه محدودیتی دارد؟",
+      "opts": [
+        "مسیرها و کلیدهای قبلی را برای مدتی موقت (تایمر قابل تنظیم، پیش‌فرض معمول ۱۲ ساعت) نگه می‌دارد تا دیتاپلین ادامه یابد، ولی تداوم کامل همچنان به سلامت Underlay/تونل‌ها/کلیدها وابسته است و مسیرهای جدید توزیع نمی‌شوند",
+        "کل ترافیک در لحظه قطع می‌شود",
+        "تمام پورت‌های سوئیچ در حالت Err-Disable می‌روند",
+        "روتر به صورت خودکار به `RIPv2` تغییر وضعیت می‌دهد"
+      ],
+      "ans": 0,
+      "exp": "OMP Graceful Restart مسیرها و کلیدهای فعلی را تا پایان تایمر نگه می‌دارد، اما تغییر مسیر جدید انجام نمی‌شود و پایداری هنوز وابسته به سلامت لینک‌های زیرساخت و تونل‌هاست."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "معماری SD-WAN اکنون جایگزین استاندارد WANهای سنتی در بانک‌ها و سازمان‌های چندشعبه‌ای شده است.",
+    "nextQuestion": "تا اینجا طراحی یک فناوری را یاد گرفتیم؛ اما یک مهندس سطح **300-420 ENSLD (Designing Cisco Enterprise Networks)** قبل از نوشتن حتی یک خط دستور، باید بتواند بپرسد: «این ساختمان به چند آپ‌لینک `10G` نیاز دارد تا نسبت **Oversubscription** از سقف مجاز بالا نرود؟ چطور `IGP/BGP` را برای ۵۰۰ روتر بدون فاجعهٔ مقیاس‌پذیری طراحی کنیم؟ و چطور طرح آدرس‌دهی **IPv6 سازمانی** را بریزیم که ده سال آینده هم عوض نشود؟»",
+    "nextId": "ccnp_ensld"
+  }
+}

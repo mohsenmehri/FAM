@@ -1,0 +1,216 @@
+{
+  "id": "adv_bfd",
+  "faculty": "دانشکده ۲ · مهندسی پیشرفته",
+  "title": "پروتکل BFD (کشف خرابی میلی‌ثانیه‌ای) و Flexible NetFlow",
+  "lead": "بین دو روتر هسته یک سوئیچ لایه ۲ یا مبدل رادیویی قرار دارد؛ ناگهان لینک پشت رادیو قطع می‌شود، اما پورت‌های روتر هر دو `up/up` می‌مانند! اگر روتر منتظر تایمر پیش‌فرض `OSPF (40s)` یا `BGP (180s)` بماند، ده‌ها ثانیه ترافیک مشتریان سیاهچاله می‌شود. چطور با BFD خرابی را در ۱۰۰ تا ۱۵۰ میلی‌ثانیه کشف کنیم و با Flexible NetFlow هم‌زمان ریز جریان‌ها را ثبت کنیم؟",
+  "goal": "درک معماری و مزایای BFD (جداسازی از Control Plane، کارکرد میلی‌ثانیه‌ای مستقل از پروتکل)، پیکربندی BFD و اتصال آن به OSPF/BGP/Static Route، و پیاده‌سازی گام‌به‌گام Flexible NetFlow (Record, Exporter, Monitor).",
+  "prereq": "آشنایی با تایمرهای همسایگی OSPF/BGP (درس‌های adv_02 و adv_bgp) و مفهوم NetFlow (درس adv_03).",
+  "sections": [
+    {
+      "h": "۱. چرا کاهش تایمرهای OSPF/BGP برای همگرایی زیرثانیه‌ای راه‌حل خوبی نیست؟",
+      "p": [
+        "اولین فکری که به ذهن می‌رسد این است: «خب، تایمر Hello و Dead در OSPF را به ۱ ثانیه کم کنیم!» اما اگر روی یک روتر با ۵۰ همسایه و ده‌ها هزار مسیر، Control Plane (پردازندهٔ اصلی روتر) مجبور باشد هر چند میلی‌ثانیه بسته‌های Hello سنگین تک‌تک پروتکل‌های OSPF، EIGRP و BGP را پردازش کند، هنگام شلوغی CPU (مثل محاسبهٔ جدول BGP) پردازنده جا می‌ماند و همسایگی‌ها به اشتباه سقوط می‌کنند!",
+        "**BFD (Bidirectional Forwarding Detection — RFC 5880)** راه‌حل تمیز مهندسی است: یک پروتکل بسیار سبک و تک‌وظیفه روی **`UDP 3784/3785`** (و `4784` برای Multihop) که در بسیاری پلتفرم‌ها مستقیم به صورت سخت‌افزاری یا با اولویت بالا خارج از Control Plane سنگین پروتکل‌های روتینگ اجرا می‌شود. BFD یک جلسهٔ واحد بین دو همسایه می‌سازد و در صورت کشف خرابی در **۱۰۰ تا ۱۵۰ میلی‌ثانیه** (مثلاً `interval 50 min_rx 50 multiplier 3`)، فوراً به همهٔ کلاینت‌های ثبت‌نام‌شده (OSPF، EIGRP، BGP و حتی Static Route) اعلام می‌کند مسیر قطع شده است!"
+      ],
+      "bullets": [
+        "**فرمول محاسبهٔ زمان تشخیص BFD در حالت Async (RFC 5880):** `Detection Time_local = Negotiated_TX_Interval(peer -> local) × Detect_Mult_peer`. یعنی نرخ ارسال همسایه برابر `max(Desired_Min_TX_peer, Required_Min_RX_local)` است و هر روتر زمان قطع شدن همسایه را با **ضریب (`Detect Mult`) اعلام‌شده توسط طرف مقابل** می‌سنجد! (مثلاً اگر هر دو سمت `50 ms` و `multiplier 3` داشته باشند، `50 × 3 = 150 ms`؛ اما در مقادیر نامتقارن، ضریب طرف مقابل تعیین‌کننده است).",
+        "**نکتهٔ مهم Async vs Echo Mode:** در حالت متداول **Asynchronous** هر دو طرف پیام‌های کنترلی می‌فرستند؛ در **Echo Mode** (`bfd echo`) یک سمت بسته را به سمت همسایه می‌فرستد تا همسایه در **Data Plane** بدون درگیر کردن CPU خودش آن را فوراً برگرداند تا سریع‌ترین و سبک‌ترین تشخیص حاصل شود."
+      ],
+      "think": {
+        "q": "در حالت Asynchronous، روتر `R1` با `interval 50 min_rx 50 multiplier 3` به روتر `R2` وصل است که تنظیمات محافظه‌کارانه‌تر `interval 100 min_rx 100 multiplier 5` دارد. هر طرف با چه نرخی بسته می‌فرستد و طبق RFC 5880 زمان تشخیص خرابی از دید `R1` و `R2` چقدر است؟",
+        "a": "در هر جهت نرخ واقعی برابر بیشینهٔ Desired TX فرستنده و Required Min RX گیرنده است؛ اینجا هر دو جهت روی `max(50, 100) = 100 ms` مذاکره می‌شوند. اما طبق RFC 5880 هر روتر با **ضریب (`Detect Mult`) طرف مقابل** قطعی را حس می‌کند: **`R1`** منتظر بسته‌های `R2` می‌ماند پس با ضریب `R2` (`5`) در **`5 × 100 = 500 ms`** خرابی را تشخیص می‌دهد؛ و **`R2`** منتظر بسته‌های `R1` می‌ماند پس با ضریب `R1` (`3`) در **`3 × 100 = 300 ms`** خرابی را تشخیص می‌دهد!"
+      }
+    },
+    {
+      "h": "۲. اتصال BFD به OSPF، BGP و Static Route",
+      "p": [
+        "خود BFD جدول مسیر نمی‌سازد؛ فقط خبرچینِ فوق‌سریع برای پروتکل‌های مسیریابی است. پیاده‌سازی در دو گام ساده انجام می‌شود: اول تنظیم تایمرها زیر اینترفیس (`bfd interval 50 min_rx 50 multiplier 3`)، و دوم فعال کردن عضویت در پروتکل مربوطه (`ip ospf bfd` زیر اینترفیس یا `bfd all-interfaces` زیر `router ospf`؛ `neighbor <ip> fall-over bfd` زیر `router bgp`؛ و `ip route static bfd ...` برای مسیر ثابت)."
+      ],
+      "bullets": []
+    },
+    {
+      "h": "۳. کالبدشکافی و پیکربندی ۳مرحله‌ای Flexible NetFlow (v9 / IPFIX)",
+      "p": [
+        "در کنار کشف سریع قطعی، تیم عملیات شبکه نیاز دارد دقیقاً جریان‌ها را با ساختار **Flexible NetFlow (FNF)** رصد کند. برخلاف NetFlow نسخه ۵ قدیمی با فیلدهای ثابت، در **Flexible NetFlow** خودتان تعریف می‌کنید چه فیلدهایی بررسی و صادر شوند (پشتیبانی کامل از IPv4، IPv6، لایه ۲ و برچسب‌های امنیتی). FNF مثل MQC یک ساختار سه-تکه‌ای دارد:"
+      ],
+      "steps": [
+        "گام ۱ (**`flow record <NAME>`**): تعریف فیلدهای **Key** (معیار گروه‌بندی جریان، مثل `match ipv4 source address`، `destination`، `protocol`، `transport source/destination-port`) و فیلدهای **Non-Key** (مقادیر آماری که جمع می‌شوند، مثل `collect counter bytes`، `collect counter packets`، `collect timestamp absolute first/last`).",
+        "گام ۲ (**`flow exporter <NAME>`**): آدرس سرور Collector (`destination 10.99.0.50`)، منبع ارسال (`source Loopback0`)، پورت مقصد (`transport udp 2055`) و نسخهٔ پروتکل (`export-protocol netflow-v9` یا `ipfix`).",
+        "گام ۳ (**`flow monitor <NAME>`** و اعمال روی اینترفیس): اتصال `record` و `exporter` درون `flow monitor` (همراه با تایمر `cache timeout active 60` برای اینکه جریان‌های طولانی هر دقیقه گزارش شوند و تجمیع نشوند!) و سپس اعمال با `ip flow monitor <NAME> input` (و/یا `output`) روی اینترفیس."
+      ],
+      "think": {
+        "q": "سناریوی خطا: مهندسی در `Flexible NetFlow` همه‌چیز را درست می‌نویسد اما فراموش می‌کند `cache timeout active 60` را بگذارد (و پیش‌فرض روتر مثلاً `1800` ثانیه = ۳۰ دقیقه است)؛ یا در جهت‌های پورت‌های متعدد، هم روی پورت `WAN` و هم روی کل پورت‌های `LAN` هر دو جهت `input` و `output` را فعال می‌کند! دو مشکل عملی این دو اشتباه چیست؟",
+        "a": "۱) اگر `active timeout` خیلی طولانی (۳۰ دقیقه) باشد، یک دانلود یا حملهٔ ۲۵ دقیقه‌ای تا تمام نشود در نمودار مانیتورینگ دیده نمی‌شود و ناگهان یک قلهٔ دروغین در دقیقهٔ ۳۰ ثبت می‌شود! ۲) اگر روی تمام پورت‌های ورودی و خروجی یک روتر بدون برنامه‌ریزی هر دو `input` و `output` را بگذارید، هر بسته **دو بار** شمارش و به Collector فرستاده می‌شود (استاندارد معمول: اعمال `input` روی تمام اینترفیس‌های روتر بدون `output` تا هر بسته دقیقاً یک بار هنگام ورود ثبت شود، مگر در سناریوهای خاص NAT)."
+      },
+      "bullets": []
+    }
+  ],
+  "analogy": "BFD شبیه سنسور نوریِ قطع نخ در دستگاه‌های بافندگی صنعتی است: به‌جای اینکه مهندس ناظر (Control Planeِ OSPF/BGP) هر ۴۰ ثانیه یک بار از اتاق کنترل بیرون بیاید و ببیند آیا دستگاه کار می‌کند یا نه، یک سنسور ساده و مستقل هر ۵۰ میلی‌ثانیه یک پالس برقی می‌فرستد و به محض قطع شدن، بلافاصله آژیر را می‌کشد تا خط پشتیبان وارد شود! محل شکست تشبیه BFD اینجاست: در برخی سخت‌افزارها اگر CPU روتر زیر فشار سنگین قرار گیرد و BFD روی آن پلتفرم در نرم‌افزار (Software-switched) باشد (به‌جای Offload سخت‌افزاری)، تنظیم تایمر خیلی تهاجمی مثل `10ms` ممکن است باعث قطع‌ووصل کاذب (False Positive Flap) در شبکه شود!",
+  "table": {
+    "title": "مقایسهٔ زمان تشخیص خرابی در روش‌های مختلف و سه جزء Flexible NetFlow",
+    "headers": [
+      "مکانیزم / جزء",
+      "زمان تشخیص یا نقش معماری",
+      "پارامتر کلیدی در Cisco IOS"
+    ],
+    "rows": [
+      [
+        "OSPF پیش‌فرض (Broadcast)",
+        "۴۰ ثانیه (Hello 10s × 4)",
+        "`ip ospf dead-interval` (بدون BFD)"
+      ],
+      [
+        "BGP پیش‌فرض",
+        "۱۸۰ ثانیه (Keepalive 60s × 3)",
+        "`timers bgp` (بدون BFD)"
+      ],
+      [
+        "BFD استاندارد",
+        "معمولاً ۱۵۰ میلی‌ثانیه (50ms × 3)",
+        "`bfd interval 50 min_rx 50 multiplier 3` + `fall-over bfd` / `ip ospf bfd`"
+      ],
+      [
+        "FNF: `flow record`",
+        "تعیین کلید جریان و شمارنده‌ها",
+        "`match ipv4 ...` (Key) و `collect counter bytes` (Non-Key)"
+      ],
+      [
+        "FNF: `flow exporter` & `monitor`",
+        "ارسال Template/داده و زمان‌بندی کش",
+        "`export-protocol netflow-v9` (یا `ipfix`) + `cache timeout active 60`"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "آیا برای اینکه `BFD` بین `R1` و `R2` کار کند، باید یک سوئیچ لایه ۲ میانی هم از BFD پشتیبانی کند؟",
+      "a": "خیر! سوئیچ لایه ۲ میانی بسته‌های `UDP 3784` را مانند یک ترافیک Unicast عادی عبور می‌دهد؛ فقط دو سر نشست (`R1` و `R2`) باید BFD را فعال کرده باشند (اگرچه روشن بودن CoS/اولویت بالا روی سوئیچ میانی در ترافیک‌های سنگین مانع افتادن بسته‌های BFD می‌شود)."
+    },
+    {
+      "q": "اگر در شبکه‌ای پرحجم با ده‌ها گیگابیت ترافیک نتوانیم تک‌تک بسته‌ها را در NetFlow پردازش کنیم چه می‌کنیم؟",
+      "a": "از **Sampled NetFlow** (مثلاً نمونه‌برداری ۱ بسته از هر ۱۰۰ یا ۱۰۰۰ بسته) استفاده می‌کنند که سربار پردازنده را به شدت کاهش می‌دهد و تصویر آماری دقیق ترافیک‌های کلان را حفظ می‌کند."
+    }
+  ],
+  "summary": "BFD (`UDP 3784/3785`) با ارسال سبک پالس‌های میلی‌ثانیه‌ای مستقل از Control Plane پروتکل‌های مسیریابی، قطعی‌های غیرفیزیکی مسیر (مانند پشت سوئیچ یا رادیو) را در `interval × multiplier` (مثل ۱۵۰ میلی‌ثانیه) به OSPF، EIGRP، BGP و Static Route گزارش می‌دهد. در کنار آن، Flexible NetFlow با ساختار ۳گانهٔ `flow record`، `flow exporter` و `flow monitor` دیده‌پذیری دقیق جریان‌ها را روی v9 یا IPFIX فراهم می‌کند.",
+  "ciscoRef": "Cisco CCNP ENCOR 350-410 Official Cert Guide — Ch 22 & Cisco IOS BFD / Flexible NetFlow Configuration Guides (RFC 5880 / RFC 7011)",
+  "protocolAnalysis": [
+    "در `BFD` (RFC 5880) اگر یک همسایه برنامه‌ریزی‌شده خاموش شود پیام `AdminDown` می‌فرستد تا همسایه آن را قطعی غیرمنتظره نخواند؛ اما در قطع ناگهانی در حالت Async، هر سمت پس از `max(Desired_Min_TX_peer, Required_Min_RX_local) × Detect_Mult_peer` وضعیت نشست را به `Down` می‌برد.",
+    "در `Flexible NetFlow` باید روی اینترفیس‌ها تفاوت **`flow exporter`** (استفاده از `source Loopback0` برای ثبات آدرس در سمت Collector) و نوع پروتکل (**`IPFIX` یا `NetFlow v9`**) را به‌دقت تنظیم کرد."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show bfd neighbors",
+      "out": "IPv4 Sessions\nNeighAddr                              LD/RD         RH/RS     State     Int\n10.10.0.2                               1/2          Up        Up        Gi0/0",
+      "note": "نمایش وضعیت جلسات BFD. [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ آموزشی مرجع است؛ تمرین زندهٔ BFD و Flexible NetFlow نیازمند CML، EVE-NG یا تجهیزات واقعی است.]",
+      "why": "تأیید اینکه آیا نشست BFD بین دو روتر به وضعیت `Up` رسیده و به کدام پروتکل (`OSPF`/`BGP`) سرویس می‌دهد.",
+      "anatomy": "`LD/RD` شناسه محلی/دور نشست، `RH/RS` وضعیت دریافت، `State: Up` یعنی پالس میلی‌ثانیه‌ای فعال و `Int` اینترفیس متصل را نشان می‌دهد.",
+      "lookFor": "وضعیت `Up` در دو ستون `RH/RS` و `State`؛ با دستور `show bfd neighbors details` لیست کلاینت‌های ثبت‌شده (مثل `OSPF`, `BGP`) را نیز می‌بینید.",
+      "ifUnexpected": "اگر وضعیت `Down` یا `Init` است، فایروال روی `UDP 3784/3785` یا نبود فرمان BFD در سمت مقابل را چک کنید.",
+      "executable": false
+    },
+    {
+      "cmd": "show ip interface brief",
+      "out": "Interface              IP-Address      OK? Method Status                Protocol\nGigabitEthernet0/0     10.10.0.1       YES manual up                    up\nLoopback0              10.255.0.1      YES manual up                    up",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای تأیید لینک `Gi0/0` (محل اعمال `bfd interval` و `ip flow monitor`) و `Loopback0` (منبع پایدار `flow exporter`).",
+      "why": "در BFD لینک فیزیکی (`Gi0/0`) محل اجرای تشخیص سریع است، و در Flexible NetFlow آدرس `Loopback0` بهترین مبدأ برای ارسال بسته‌های آمار به Collector است.",
+      "anatomy": "وضعیت و IP اینترفیس‌های فعال روتر.",
+      "lookFor": "`up / up` بودن `Gi0/0` و `Loopback0` و برقراری مسیر تا همسایه.",
+      "ifUnexpected": "خاموش شدن `Gi0/0` بلافاصله مسیر به `10.10.0.2` را قطع می‌کند.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه آماده‌سازی لینک و شبیه‌سازی قطع مسیر بین اینترفیس و همسایه در شبیه‌ساز",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `bfd interval`، `show bfd neighbors` و `flow monitor` را اجرا نمی‌کند (برای تمرین زندهٔ همگرایی ۱۵۰ms و ارسال NetFlow به Collector از CML یا EVE-NG استفاده کنید). در اینجا رفتار واقعی قطع/وصل شدن لینک `Gi0/0` و پایداری `Loopback0` (منبع Export در NetFlow) را آزمایش می‌کنیم.",
+      "۲. با `enable` وارد شوید و با `show ip interface brief` و `ping 10.10.0.2` و `ping 10.255.0.2` وضعیت `Gi0/0` و `Loopback0` را تایید کنید.",
+      "۳. با `configure terminal` -> `interface Gi0/0` -> `description BFD-50MS-NETFLOW-IN` -> `interface Loopback0` -> `description NETFLOW-EXPORTER-SRC` -> `end` پورت‌ها را برچسب بزنید.",
+      "۴. دستور `show running-config` و `traceroute 10.255.0.2` را اجرا کنید و مطمئن شوید `Loopback0` (`10.255.0.1`) و لینک `Gi0/0` (`10.10.0.1`) آمادهٔ میزبانی سیاست‌های BFD و Flexible NetFlow هستند."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show ip interface brief",
+      "show running-config",
+      "traceroute 10.255.0.2"
+    ]
+  },
+  "troubleshooting": {
+    "fault": "ادمین روی `Gi0/0` دستور `bfd interval 50 min_rx 50 multiplier 3` را نوشته و زیر `router bgp 65100` هم `neighbor 10.10.0.2 fall-over bfd` را زده است؛ اما وقتی در مسیر همسایه اختلال لحظه‌ای رخ می‌دهد هیچ جلسهٔ BFD در `show bfd neighbors` دیده نمی‌شود یا در روتر مقابل کار نمی‌کند.",
+    "analysis": "یک خطای کلاسیک در پیاده‌سازی BFD این است که BFD دو طرفه است و **سمت مقابل (`10.10.0.2`) نیز حتماً باید هم BFD را روی اینترفیسش تنظیم کرده و هم در BGP/OSPF عضو کرده باشد**؛ علاوه بر این، برخی پلتفرم‌ها برای تنظیم BFD بر روی اینترفیس نیازمند فعال بودن **CEF (`ip cef`)** هستند و در وجود ACL روی لینک، باید پورت‌های **`UDP 3784` و `3785`** مجاز شده باشند.",
+    "fix": "روی هر دو سر لینک (`R1` و `R2`) `ip cef` را فعال، پورت‌های UDP 3784/3785 را در ACL باز، و هر دو فرمان `bfd interval ...` روی اینترفیس و `fall-over bfd` / `ip ospf bfd` را در پروتکل روتینگ تنظیم کنید."
+  },
+  "misconceptions": [
+    {
+      "myth": "با زدن دستور `bfd interval 50 min_rx 50 multiplier 3` روی اینترفیس، پروتکل‌های OSPF و BGP به‌طور خودکار از BFD استفاده می‌کنند.",
+      "reality": "تنظیم زیر اینترفیس تنها تایمرهای BFD را آماده می‌کند؛ تا زمانی که خود پروتکل روتینگ (مثل `ip ospf bfd` یا `neighbor ... fall-over bfd`) را به BFD متصل نکنید، هیچ جلسهٔ BFDای برقرار نمی‌شود!",
+      "howToSpot": "با `show bfd neighbors details` مطمئن شوید زیر خط `Registered protocols` نام پروتکل (`OSPF`, `BGP`) چاپ شده باشد."
+    },
+    {
+      "myth": "برای داشتن آمار کامل ترافیک در `Flexible NetFlow` باید روی *هر* اینترفیس روتر هم `input` و هم `output` را هم‌زمان بزنیم.",
+      "reality": "اعمال هم‌زمان `input` و `output` روی تمام اینترفیس‌های یک روتر باعث می‌شود هر بستهٔ عبوری **دو بار** (یک بار هنگام ورود به `Gi0/1` و یک بار هنگام خروج از `Gi0/0`) در گزارش‌ها شمرده شود؛ معمولاً `input` روی همهٔ اینترفیس‌ها کافی است.",
+      "howToSpot": "اگر حجم گزارش Collector دقیقاً دو برابر شمارندهٔ واقعی ترافیک بود، تداخل جهت `input/output` رخ داده است."
+    }
+  ],
+  "exercise": "پیکربندی کامل **BFD** (`interval 50`, `min_rx 50`, `multiplier 3`) متصل به `OSPF 1` روی لینک `Gi0/0` و همچنین یک **Flexible NetFlow** کامل (با `flow record R1-REC` برای IPv4 src/dst/protocol/ports + شمارنده bytes/packets، `flow exporter EXP1` به مقصد `10.99.0.50` پورت `2055` از مبدأ `Loopback0`، و `flow monitor MON1` با `cache timeout active 60` در جهت `input` روی `Gi0/0`) را بنویسید.",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "در حالت **BFD Asynchronous (RFC 5880)**، اگر روتر A دارای `bfd interval 50 min_rx 100 multiplier 4` (`Desired_Min_TX=50, Required_Min_RX=100, Detect_Mult=4`) و روتر B دارای `bfd interval 50 min_rx 50 multiplier 3` باشد، نرخ ارسال در هر جهت و زمان تشخیص قطعی از دید روتر A و از دید روتر B چقدر است؟",
+      "hint": "نرخ هر جهت = `max(TX_فرستنده, RX_گیرنده)`؛ و زمان تشخیص یک روتر = نرخِ دریافتی از همسایه × **`multiplier` طرف مقابل (همسایه)**!",
+      "solution": "۱) از A به B: نرخ ارسال A به B برابر `max(TX_A=50, RX_B=50) = 50 ms` است؛ چون A ضریب `Detect_Mult = 4` به B اعلام کرده، **از دید روتر B** زمان تشخیص قطع A برابر `50 ms × 4 = 200 ms` است.\n۲) از B به A: نرخ ارسال B به A برابر `max(TX_B=50, RX_A=100) = 100 ms` است؛ چون B ضریب `Detect_Mult = 3` به A اعلام کرده، **از دید روتر A** زمان تشخیص قطع B برابر `100 ms × 3 = 300 ms` است."
+    },
+    {
+      "level": "متوسط",
+      "task": "پیکربندی کامل BFD + OSPF و سه مرحلهٔ Flexible NetFlow را برای سناریوی بخش `exercise` بالا بنویسید.",
+      "hint": "ترتیب: `flow record` (با `match` و `collect`) -> `flow exporter` -> `flow monitor` -> اعمال زیر `interface Gi0/0` همراه با `bfd` و `ip ospf bfd`.",
+      "solution": "`flow record R1-REC`\n` match ipv4 source address`\n` match ipv4 destination address`\n` match ipv4 protocol`\n` match transport source-port`\n` match transport destination-port`\n` collect counter bytes`\n` collect counter packets`\n`flow exporter EXP1`\n` destination 10.99.0.50`\n` source Loopback0`\n` transport udp 2055`\n` export-protocol netflow-v9`\n`flow monitor MON1`\n` record R1-REC`\n` exporter EXP1`\n` cache timeout active 60`\n`interface Gi0/0`\n` bfd interval 50 min_rx 50 multiplier 3`\n` ip ospf bfd`\n` ip flow monitor MON1 input`"
+    },
+    {
+      "level": "چالشی",
+      "task": "در یک شبکهٔ مرکزی، لینک فیزیکی بین روتر `R1` و `R2` از طریق یک سوئیچ لایه ۲ میانی می‌گذرد و BFD با `50ms × 3` روی آن برقرار است تا خرابی لینک سوئیچ در ۱۵۰ms کشف شود. حالا ادمین برای جمع‌آوری آمار، ترافیک `Gi0/0` را در حالت شلوغی CPU روتر می‌سنجد و می‌بیند در لحظات بار سنگین CPU، نشست BFD مدام هر چند دقیقه یک‌بار برای ۲۰۰ میلی‌ثانیه قطع و دوباره وصل (`Flap`) می‌شود، با اینکه کابل و سوئیچ ۱۰۰٪ سالمند! چرا این پدیده رخ می‌دهد و در کنار تنظیم تایمرها چه اقداماتی باید انجام داد؟",
+      "hint": "به تفاوت BFD سخت‌افزاری (Offloaded) در برابر نرم‌افزاری (CPU-based) و اولویت QoS بسته‌های BFD در صف فکر کنید.",
+      "solution": "اگر روی آن مدل روتر BFD به صورت **نرم‌افزاری در CPU** اجرا شود و در لحظات اوج ترافیک (مثلاً تغییر جدول BGP یا کپی سنگین) CPU فرصت پاسخ به پالس `50ms` را پیدا نکند (یا در سوئیچ میانی ترافیک صف شده و ۳ بستهٔ BFD در ۱۵۰ms تاخیر/Drop بخورد)، BFD اشتباهاً قطعی کاذب (**False Positive**) اعلام می‌کند و کل پروتکل‌های بالا را هم تکان می‌دهد! راه‌حل‌ها: ۱) فعال‌سازی **BFD Echo Mode** یا بررسی پشتیبانی **Hardware Offload**؛ ۲) قرار دادن ترافیک BFD/کنترلی در صف اولویت QoS روی سوئیچ میانی؛ ۳) استفاده از تایمر واقع‌بینانه‌تر مثل `interval 150 min_rx 150 multiplier 3` (`450ms`) یا `300ms × 3` روی پلتفرم‌های CPU-bound به‌جای `50ms` بدون Offload."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "مزیت بنیادین استفاده از **BFD** به جای کم کردن تایمر Hello/Dead خود پروتکل‌های OSPF و BGP تا زیر یک ثانیه چیست؟",
+      "opts": [
+        "BFD پهنای باند فیبر را ۱۰ برابر می‌کند",
+        "BFD به جای IP از آدرس MAC استفاده می‌کند",
+        "BFD یک پروتکل سبک و تک‌وظیفه است که خارج از سربار سنگین Control Plane روتینگ خرابی مسیر را در حد میلی‌ثانیه کشف و به همه پروتکل‌ها اطلاع می‌دهد",
+        "BFD نیازی به تنظیم روی دو سمت لینک ندارد"
+      ],
+      "ans": 2,
+      "exp": "کاهش مستقیم تایمر OSPF/BGP در روترهای شلوغ به CPU فشار می‌آورد و ناپایداری می‌سازد؛ BFD این پایش سریع را سبک و یکپارچه برای همهٔ پروتکل‌ها انجام می‌دهد."
+    },
+    {
+      "q": "در **Flexible NetFlow** چرا تعیین دستور `cache timeout active 60` در `flow monitor` بسیار مهم است؟",
+      "opts": [
+        "تا بسته‌های IPv6 حذف شوند",
+        "تا پورت ۲۰۵۵ بسته شود",
+        "تا رمزنگاری SSH فعال گردد",
+        "تا جریان‌های طولانی (مثل دانلود یا بکاپ ۲۵ دقیقه‌ای) هر ۶۰ ثانیه به‌صورت منظم به Collector گزارش شوند و تا پایان اتصال در کش حبس نمانند"
+      ],
+      "ans": 3,
+      "exp": "بدون تنظیم `active timeout` کوتاه‌تر (مثل ۶۰ ثانیه)، یک جریان طولانی تا ۳۰ دقیقه (مقدار پیش‌فرض) ارسال نمی‌شود و نمودارهای مانیتورینگ دچار جهش ناگهانی و تاخیر می‌شوند."
+    },
+    {
+      "q": "اگر در `Flexible NetFlow` سه جزء تعریف شوند، کدام بخش تعیین می‌کند *چه فیلدهایی* از بسته استخراج و *چه آمارهایی* شمرده شوند؟",
+      "opts": [
+        "`flow record`",
+        "`flow monitor`",
+        "`flow exporter`",
+        "`bfd interval`"
+      ],
+      "ans": 0,
+      "exp": "`flow record` شامل کلیدهای `match` و جمع‌آوری‌های `collect` است؛ `flow exporter` مقصد Collector را مشخص می‌کند و `flow monitor` آن دو را روی اینترفیس به هم پیوند می‌دهد."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "BFD برای همگرایی زیرثانیه‌ای در شبکه‌های مالی/اپراتوری و Flexible NetFlow در تمام مراکز عملیات شبکه (NOC) و امنیت (SOC) کاربرد کلیدی دارند.",
+    "nextQuestion": "اکنون کل ابزارهای پیشرفتهٔ لایه ۲، لایه ۳، QoS، Multicast و پایش را در اختیار دارید؛ اما در دنیای واقعی یک عیب پیچیده همیشه خودش را با نشانه‌های گول‌زننده نشان می‌دهد—مثل «پینگ هست اما صفحهٔ وب باز نمی‌شود»! در آخرین درس دانشکدهٔ ۲ یاد می‌گیرید چطور با تفکیک **Control Plane vs Data Plane**، کشف تلهٔ **MTU/MSS** و حل **Asymmetric Routing** هر خطای پیچیده‌ای را مهندسی عیب‌یابی کنید.",
+    "nextId": "adv_04"
+  }
+}

@@ -1,0 +1,227 @@
+{
+  "id": "ccnp_enc_auto",
+  "faculty": "دانشکده ۳ · CCNP Enterprise",
+  "title": "ENCOR حوزه ۶: اتوماسیون در CCNP (JSON، YANG، NETCONF/RESTCONF، EEM و Python/Ansible)",
+  "lead": "هر بار که یکی از لینک‌های WAN شعبه قطع می‌شود، تیم پشتیبانی باید با دست اسکریپتی بزند که ترافیک را با یک لاگ هشدار ثبت و مسیر جایگزین را آماده کند، و هم‌زمان باید روی ۸۰ روتر تغییر VLAN/Interface اعمال شود بدون اینکه اسکریپت‌های سادهٔ Screen-Scraping به خاطر تغییر یک کلمه در خروجی متنی `show` بشکنند! چطور با **Cisco IOS EEM** واکنش آنی داخل خودِ روتر بسازیم و با **YANG، NETCONF/RESTCONF و Python/Ansible** اتوماسیون ساختاریافته و Idempotent پیاده کنیم؟",
+  "goal": "تحلیل و نگارش داده‌های **JSON/XML**، درک نقش **YANG** و مقایسهٔ دقیق **NETCONF** و **RESTCONF**، خواندن و نوشتن اسکریپت‌های سادهٔ **Python** (`requests` / `ncclient`)، پیکربندی عملی **Cisco IOS EEM Applets** و مقایسهٔ ابزارهای ارکستراسیون (**Ansible** در برابر **Puppet/Chef**).",
+  "prereq": "آشنایی با مفاهیم اولیهٔ SDN، API و JSON (درس‌های `ccna_06` و `ccnp_enc_sec`).",
+  "sections": [
+    {
+      "h": "۱. چرا Screen Scraping می‌شکند و مثلث YANG + NETCONF + RESTCONF چیست؟",
+      "p": [
+        "روش سنتیِ اتوماسیون یعنی وصل شدن با SSH (مثلاً با کتابخانهٔ `Netmiko`) و خواندن متنِ `show ip interface brief` شکننده است؛ چون خروجی CLI برای چشم انسان ساخته شده و با یک آپدیت IOS ممکن است فاصله‌ها یا ترتیب ستون‌ها عوض شود و اسکریپت از کار بیفتد! راه‌حل مدرن **Model-Driven Programmability** است:"
+      ],
+      "bullets": [
+        "**YANG (Yet Another Next Generation — RFC 6020/7950):** زبانِ مدل‌سازی داده است؛ دقیقاً مثل یک نقشهٔ مهندسی (Schema) مشخص می‌کند نام دقیق متغیر، نوع داده‌اش (عدد، رشته، آدرس IP)، محدودیت‌های مجاز و اینکه قابل تغییر (`config true`) هست یا فقط خواندنی (`config false`) چیست. *(نکته: YANG خودش پروتکل ارسال نیست؛ فقط زبان توصیف ساختار داده است!)*",
+        "**NETCONF (`SSH / TCP 830` با فرمت `XML`):** پروتکل قدرتمند برای تغییرات تراکنشی! دارای پایگاه‌های دادهٔ جداگانهٔ **`running`**، **`startup`** و **`candidate`** است، قابلیت **`<lock>`** دارد تا دو نفر هم‌زمان تغییر ندهند، و تغییرات چندمرحله‌ای را با **`<commit>`** یکجا یا با **`confirmed-commit`** به صورت برگشت‌خودکار (Rollback) اعمال می‌کند.",
+        "**RESTCONF (`HTTPS / TCP 443` با `JSON` یا `XML`):** سبک‌تر و هم‌زبان با وب (HTTP Verbs: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`)؛ یادگیری‌اش با `requests` پایتون و `Postman` بسیار سریع است، ولی به‌صورت بومی تراکنش چندتایی یا قفل دیتاستور مثل NETCONF را ندارد."
+      ]
+    },
+    {
+      "h": "۲. خودکارسازی واکنش آنی داخل خود روتر با Cisco IOS EEM",
+      "p": [
+        "**EEM (Embedded Event Manager)** مثل داشتن یک نگهبان برنامه‌پذیر درون خودِ روتر است که حتی اگر ارتباط روتر با سرور Ansible و اینترنت قطع شد، می‌تواند رویدادها را رصد کرده و بلافاصله واکنش نشان دهد. ساختار یک **EEM Applet** بسیار ساده است:"
+      ],
+      "steps": [
+        "**`event manager applet <NAME>`**: نام اسکریپت محلی.",
+        "**`event ...`**: مشخص کردن ماشه (Trigger)؛ مثلاً `event syslog pattern \"Interface GigabitEthernet0/0, changed state to down\"` یا `event timer watchdog time 60` یا حتی `event cli pattern \"reload\" sync yes skip yes` (جلوگیری از reload تصادفی!).",
+        "**`action <num> ...`**: گام‌های متوالی با شماره‌هایی مثل `1.0`, `2.0`, `3.0`؛ مثل تغییر به حالت `enable` (`action 1.0 cli command \"enable\"`)، اجرای دستورات IOS، چاپ لاگ سفارشی (`action 2.0 syslog msg \"WAN DOWN DETECTED!\"`) یا ارسال ایمیل/تغییر مسیر."
+      ],
+      "think": {
+        "q": "سناریوی خطا: مهندسی یک EEM Applet با ماشهٔ `event syslog pattern \"UPDOWN\"` می‌نویسد و در بخش `action` دستور `no shutdown` را روی یک پورت می‌زند که با بالا آمدنش خودش دوباره یک پیام Syslog با کلمهٔ `UPDOWN` تولید می‌کند! چه اتفاقی در روتر می‌افتد؟",
+        "a": "در صورت تولید مکرر رویداد (مانند پورتی که مدام Flap می‌کند یا تغییراتی که دوباره پیام Syslog منطبق با الگوی کلی `UPDOWN` تولید می‌کنند)، **خطر حلقهٔ مکرر EEM (EEM Loop)** و اشباع شدید CPU وجود دارد! *(تذکر: صرف اجرای `no shutdown` روی پورتی که از قبل کاملاً `up/up` است الزاماً هر بار پیام تغییر وضعیت و Syslog تازه نمی‌سازد، اما با الگوی عمومی مثل `UPDOWN` هنگام Flap یا بازتولید رویدادها، حلقهٔ تکرارشونده رخ می‌دهد.)* پارامتر `maxrun` نیز تنها **حداکثر زمان اجرای یک نوبت از Applet** را محدود می‌کند و جلوی تکرار اجرا یا قفل هم‌زمانی در رخدادهای پی‌درپی را نمی‌گیرد. بنابراین الگوی Syslog باید دقیق و غیرمتداخل باشد و تغییرات پورت کنترل تایید/نگهبان داشته باشند."
+      },
+      "bullets": []
+    },
+    {
+      "h": "۳. مقایسهٔ Python (`requests`/`ncclient`)، Ansible، Puppet و Chef",
+      "p": [
+        "در سطح ENCOR باید دقیقاً بدانید کدام ابزار برای کدام سناریو مناسب است و خروجی `JSON` را تحلیل کنید: در پایتون از **`requests`** برای صحبت با RESTCONF/REST API (یا تبدیل پاسخ با `response.json()`) و از **`ncclient`** برای ارسال XML به NETCONF (`TCP 830`) استفاده می‌شود. اما در مقیاس ده‌ها یا صدها سوئیچ به جای نوشتن حلقه‌های Imperative در پایتون، سراغ ابزارهای مدیریت پیکربندی می‌رویم:"
+      ],
+      "bullets": [
+        "**Ansible (Agentless — Push):** روی دستگاه شبکه هیچ نرم‌افزاری (Agent) نصب نمی‌کند؛ از طریق SSH/NETCONF/HTTP با فایل‌های YAML (**Playbook** و **Inventory**) وضعیت مطلوب را **Idempotent** اعمال می‌کند.",
+        "**Puppet / Chef (عمدتاً Agent-Based — Pull):** روی کلاینت‌ها/سرورها یک Agent نصب می‌شود که به صورت دوره‌ای وضعیت مطلوب را از سرور مرکزی (`Master`) می‌کشد؛ روی تجهیزات شبکهٔ بسته که امکان نصب Agent ندارند کمتر کاربرد دارد (یا با Proxy Agent کار می‌کند) و در ENCOR دانستن تفاوت معماری Push/Agentless در برابر Pull/Agent-Based جزو سرفصل قطعی است."
+      ],
+      "think": {
+        "q": "در JSON و Python: یک RESTCONF GET از لیست اینترفیس‌ها برمی‌گردد: `{\"ietf-interfaces:interface\": [{\"name\": \"Gi0/0\", \"enabled\": true}]}`. اگر این پاسخ در متغیر `data` ذخیره شود، در پایتون دقیقاً با چه عبارتی مقدار `\"Gi0/0\"` را می‌خوانید؟",
+        "a": "`data[\"ietf-interfaces:interface\"][0][\"name\"]`! توجه کنید که کلید اول دیکشنری یک **لیست (`[...]`)** است؛ پس حتماً اندیس `[0]` پیش از کلید `[\"name\"]` لازم است."
+      }
+    }
+  ],
+  "analogy": "**YANG** مثل «دفترچهٔ استانداردِ نقشه‌های فنی ساختمان و لیست مجاز قطعات» است، در حالی که **NETCONF** و **RESTCONF** مثل «دو سرویس پیک مختلف» هستند که با آن نقشه کار می‌کنند: NETCONF مثل پیمانکاری با قرارداد محضری است که تمام مصالح را آماده (`candidate`)، ساختمان را قفل (`<lock>`) و یکجا تایید (`<commit>`) می‌کند تا ساختمان نیمه‌کاره نماند؛ اما RESTCONF مثل پیک موتوری سریع وب است که خیلی راحت یک تغییر جزئی (`PATCH`) یا استعلام (`GET`) را با زبان JSON به سرعت انجام می‌دهد! محل شکست تشبیه اینجاست: برخی دستگاه‌های قدیمی‌تر IOS-XE از دیتاستور `candidate` در NETCONF پشتیبانی نمی‌کنند و مستقیماً روی `running` می‌نویسند؛ همیشه پیش از اتکا به Rollback باید Capabilityهای روتر را در پیام `<hello>` ابتدای نشست NETCONF چک کرد!",
+  "table": {
+    "title": "مقایسهٔ ابزارهای برنامه‌پذیری و اتوماسیون در ENCOR",
+    "headers": [
+      "ابزار / پروتکل",
+      "پروتکل انتقال / فرمت",
+      "نیاز به Agent؟",
+      "ویژگی متمایز در شبکه"
+    ],
+    "rows": [
+      [
+        "YANG",
+        "فقط مدل داده (Schema)",
+        "خیر",
+        "توصیف درختی استاندارد داده‌های کانفیگ و عملیات"
+      ],
+      [
+        "NETCONF",
+        "SSH (TCP 830) / XML",
+        "خیر (بومی در IOS-XE)",
+        "پشتیبانی از `<lock>`، `candidate` و `<commit>` تراکنشی"
+      ],
+      [
+        "RESTCONF",
+        "HTTPS (TCP 443) / JSON یا XML",
+        "خیر (بومی در IOS-XE)",
+        "ساده، مبتنی بر متدهای HTTP و محبوب برای REST API"
+      ],
+      [
+        "Ansible",
+        "SSH / NETCONF / HTTPS (YAML)",
+        "خیر (Agentless / Push)",
+        "اجرای Idempotent روی صدها تجهیز با Playbook"
+      ],
+      [
+        "Puppet / Chef",
+        "TCP (SSL) / DSL یا Ruby",
+        "معمولاً بله (Agent / Pull)",
+        "معماری Pull دوره‌ای؛ مناسب‌تر برای سرورها تا سوئیچ بسته"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "در کتابخانهٔ `EEM` اگر دستور `action 1.0 cli command \"enable\"` را ننویسیم، آیا دستورات بعدی در حالت `configure terminal` اجرا می‌شوند؟",
+      "a": "در بسیاری از نسخه‌های IOS وقتی EEM یک جلسهٔ CLI مجازی باز می‌کند در مد کاربر (`>`) شروع می‌شود؛ بنابراین همیشه اولین گام قرار دادن `action 1.0 cli command \"enable\"` و سپس `action 2.0 cli command \"configure terminal\"` است (و اگر احراز هویت AAA باشد، باید `event manager session cli username <user>` نیز تعریف شود!)."
+    },
+    {
+      "q": "تفاوت `PUT` و `PATCH` در RESTCONF هنگام کار با پایتون چیست؟",
+      "a": "**`PUT`** کل منبع/اینترفیس مشخص‌شده در URL را **جایگزین کامل** می‌کند (اگر فیلدی را نفرستید پاک یا پیش‌فرض می‌شود)، اما **`PATCH`** فقط همان فیلدهای ارسال‌شده (مثلاً فقط `description`) را به صورت جزئی به‌روزرسانی می‌کند."
+    }
+  ],
+  "summary": "اتوماسیون در حوزهٔ ۶ ENCOR روی چهار ستون می‌چرخد: مدل‌سازی **YANG** (قرارداد داده)، پروتکل‌های **NETCONF** (`TCP 830`/XML با قفل و تراکنش) و **RESTCONF** (`TCP 443`/JSON)، اسکریپت‌های **Python** (`requests` و `ncclient`)، خودکارسازی محلی رویدادها با **Cisco IOS EEM**، و مدیریت انبوه Agentless و Idempotent با **Ansible** (در برابر مدل‌های Agent-based مانند Puppet/Chef).",
+  "ciscoRef": "Cisco CCNP ENCOR 350-401 Official Cert Guide — Ch 25–28 (Network Programmability, YANG/NETCONF/RESTCONF, EEM, Ansible/Puppet/Chef)",
+  "protocolAnalysis": [
+    "در ابتدای هر اتصال **NETCONF (`TCP 830`)**، کلاینت و سرور هر دو پیام XML با تگ `<hello>` می‌فرستند و لیست `<capabilities>` (نسخهٔ NETCONF، پشتیبانی از `candidate`, `writable-running`, `rollback-on-error` و مدل‌های YANG نصب‌شده) را مبادله می‌کنند.",
+    "در **RESTCONF (`TCP 443`)** ریشهٔ همهٔ مسیرهای استاندارد با `/restconf/data/...` شروع می‌شود و هدرهای `Accept: application/yang-data+json` و `Content-Type: application/yang-data+json` فرمت JSON را تعیین می‌کنند."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show event manager policy registered",
+      "out": "No.  Class     Type    Event Type          Trap  Time Registered           Name\n1    applet    user    syslog              Off   Mon Nov 23 09:12:04 2026  WAN_DOWN_ALERT",
+      "note": "نمایش Appletهای ثبت‌شدهٔ EEM. [نکتهٔ شبیه‌ساز: دستورات `event manager applet`، `netconf-yang` و `restconf` در شبیه‌ساز سبک داخلی اجرا نمی‌شوند و خروجی بالا نمونهٔ مرجع آموزشی است؛ برای تمرین زندهٔ EEM و NETCONF/RESTCONF از CML، EVE-NG یا Cisco DevNet Always-On Sandbox استفاده کنید.]",
+      "why": "برای اطمینان از اینکه EEM Applet با نوع رویداد درست ثبت شده و با دستور `show event manager statistics policy` تعداد اجراهای آن رصد شود.",
+      "anatomy": "شماره، نوع (`applet`)، رویداد ماشه (`syslog`/`timer`/`cli`) و نام پالیسی را نمایش می‌دهد.",
+      "lookFor": "حضور نام Applet مورد نظر و فعال بودن ماشهٔ صحیح.",
+      "ifUnexpected": "اگر Applet اجرا شد ولی دستورات CLI اعمال نشدند، فقدان `enable` یا `event manager session cli username` در سیستم دارای AAA را چک کنید.",
+      "executable": false
+    },
+    {
+      "cmd": "show running-config",
+      "out": "Building configuration...\nhostname R1\n...",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای مشاهدهٔ خروجی ساختاریافتهٔ تنظیمات فعلی (در اتوماسیون واقعی به عنوان مقایسهٔ State پیش و پس از تغییر استفاده می‌شود).",
+      "why": "تایید وضعیت نهایی دستگاه پس از اجرای یک اسکریپت یا تغییر دستی و ثبت تطابق با استاندارد.",
+      "anatomy": "تنظیمات فعال VLANها و پورت‌ها در فرمت متنی IOS.",
+      "lookFor": "تطابق کامل تنظیمات مورد انتظار بدون تنظیمات زائد.",
+      "ifUnexpected": "در صورت مغایرت با Source of Truth، تنظیمات اصلاح یا در ابزارهایی مثل Ansible همگام‌سازی (`Idempotent`) می‌شوند.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه تطابق تنظیمات پورت با الگوی JSON/Playbook و بررسی Idempotency",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی سرویس‌های واقعی `netconf-yang`، `restconf` و `EEM` ندارد (برای تست با Python `requests`/`ncclient` از Cisco DevNet Sandbox یا CML استفاده کنید). اما اینجا رفتار واقعیِ تطابق وضعیت با یک الگوی استاندارد (Intent) و تست واقعی **Idempotency** را روی ترمینال اجرا می‌کنیم.",
+      "۲. با `enable` و `show interfaces status` و `show vlan brief` وضعیت اولیه (`Current State`) را بررسی کنید.",
+      "۳. فرض کنید یک اسکریپت اتوماسیون باید `VLAN 65 (AUTO_ENFORCE)` را بسازد و پورت `Gi0/7` را با `description ENCOR-NETCONF-PORT` به آن متصل کند: `configure terminal` -> `vlan 65` -> `name AUTO_ENFORCE` -> `exit` -> `interface Gi0/7` -> `description ENCOR-NETCONF-PORT` -> `switchport mode access` -> `switchport access vlan 65` -> `no shutdown` -> `end`.",
+      "۴. با `show running-config` خروجی اولیه را ثبت کنید (Post-Check). سپس برای **تست Idempotency** در شبیه‌ساز، عیناً مرحلهٔ ۳ را برای بار دوم تکرار کنید و بررسی نمایید خروجی `show running-config` تغییری نکرده است (سرویس‌های واقعی `netconf-yang`, `restconf` و `EEM` در این شبیه‌ساز اجرا نمی‌شوند).",
+      "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (RESTCONF RFC 8040 و EEM — پلتفرم مرجع: Cisco IOS-XE 17.x):** **فرمان‌ها و درخواست نمونه:** فعال‌سازی روی روتر (`ip http secure-server`, `restconf`) و درخواست پایتون: `requests.get('https://192.0.2.10/restconf/data/ietf-interfaces:interfaces/interface=GigabitEthernet1', headers={'Accept': 'application/yang-data+json'}, auth=('admin','Pass'), verify='/etc/ssl/corp-ca.pem')`؛ و برای EEM در CLI: `show event manager statistics policy`. **خروجی مرجع و نشانهٔ موفقیت:** کد `200 OK` همراه JSON ساختاریافتهٔ `ietf-interfaces:interface` (و در EEM، اجرای تک‌نوبت با `Trigger Count` مطابق رخداد). **نشانهٔ شکست:** کد **`406 Not Acceptable`** وقتی در هدر `Accept` فرمتی درخواست شود که سرور پشتیبانی نمی‌کند (مثل `Accept: text/plain`؛ توجه: مطابق RFC 8040 در نبودِ کل هدر `Accept` سرور می‌تواند قالب پیش‌فرض خود را بدهد)، کد `401` (خطای احراز هویت)، یا جهش مداوم `Trigger Count` در EEM هنگام Flap پیاپی پورت. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی تنها تکرارپذیری تنظیم CLI را نشان داد و رفتار واقعی XML/JSON و EEM نیازمند DevNet Sandbox یا CML است."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show vlan brief",
+      "show interfaces status",
+      "show running-config"
+    ],
+    "labType": "Reference"
+  },
+  "troubleshooting": {
+    "fault": "اسکریپت پایتون با کتابخانهٔ `requests` درخواست `GET` به روتر `IOS-XE` از طریق `RESTCONF` می‌فرستد تا اطلاعات اینترفیس `Gi0/0` را بگیرد؛ آدرس `https://192.0.2.10/restconf/data/ietf-interfaces:interfaces` درست است و دسترسی SSH هم برقرار است، اما روتر کد خطای **`406 Not Acceptable`** (یا در حالت دیگر `401 Unauthorized` / اتصال `Connection Refused` روی ۴۴۳) برمی‌گرداند!",
+    "analysis": "۱) خطای **`406 Not Acceptable`** مطابق **RFC 8040** زمانی رخ می‌دهد که کلاینت در هدر `Accept` قالب(هایی) را درخواست کرده باشد که سرور در آن endpoint پشتیبانی نمی‌کند (مثلاً ارسال `Accept: text/plain` یا قالب نامعتبر به‌جای `application/yang-data+json` یا `application/yang-data+xml`؛ توجه کنید اگر هدر `Accept` اصلاً فرستاده نشود سرور طبق RFC 8040 می‌تواند یکی از قالب‌های پشتیبانی‌شده را برگرداند).\n۲) خطای `Connection Refused` روی ۴۴۳ یعنی سرویس‌های `ip http secure-server` و `restconf` روی IOS-XE فعال نیستند.",
+    "fix": "روی روتر `ip http secure-server` و `restconf` را فعال کنید و در کد پایتون هدرهای `Accept` و `Content-Type` را دقیقاً به قالب پشتیبانی‌شده یعنی **`application/yang-data+json`** (یا `application/yang-data+xml`) تنظیم نمایید."
+  },
+  "misconceptions": [
+    {
+      "myth": "YANG یک پروتکل شبکهٔ جایگزین برای SNMP و SSH است که روی پورت خاصی ارسال می‌شود.",
+      "reality": "**YANG یک زبان مدل‌سازی داده (Data Modeling Language)** است که فقط ساختار داده‌ها را تعریف می‌کند؛ پروتکل‌هایی که این داده را حمل می‌کنند **NETCONF** (`SSH 830`) و **RESTCONF** (`HTTPS 443`) هستند.",
+      "howToSpot": "برای YANG هیچ پورت TCP/UDP وجود ندارد؛ پورت `830` متعلق به NETCONF و `443` متعلق به RESTCONF است."
+    },
+    {
+      "myth": "در کتابخانهٔ `requests` پایتون برای راحتی کار در شبکهٔ عملیاتی همیشه باید `verify=False` گذاشت.",
+      "reality": "گذاشتن `verify=False` بررسی گواهی TLS سرور را غیرفعال می‌کند و راه را برای حملهٔ **Man-in-the-Middle** باز می‌گذارد؛ در آزمایشگاه موقتاً کاربرد دارد اما در محیط تولیدی باید مسیر CA سازمان را به `verify='/path/to/ca.pem'` داد.",
+      "howToSpot": "بررسی کدهای CI/CD و جستجوی عبارت `verify=False` در مخازن عملیاتی."
+    }
+  ],
+  "exercise": "در یک **محیط آزمایشگاهی کنترل‌شده (نه شبکهٔ تولیدی!)**، یک EEM Applet به نام `LAB_WATCH_INT` بنویسید که هنگام دریافت پیام Syslogِ `administratively down` روی `Gi0/0`، صرفاً یک پیام هشدار Syslog با شناسهٔ ویژه ثبت و یک فلشِ وضعیت/نمایشی اجرا کند (و توضیح دهید چرا باز کردن خودکار پورت با `no shutdown` در شبکهٔ تولیدی خطرناک است و فقط با محدودیت دامنه، شرط تایید و کلید توقف اضطراری قابل بررسی است).",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "در پاسخ JSON زیر از RESTCONF، مقدار عددی `mtu` اولین اینترفیس را با یک عبارت تک‌خطی پایتون از دیکشنری `res` استخراج کنید:\n`res = {\"ietf-interfaces:interfaces\": {\"interface\": [{\"name\": \"Gi0/0\", \"mtu\": 1500}]}}`",
+      "hint": "دقت کنید دو لایه دیکشنری تا کلید `interface` و سپس اندیس `[0]` قرار دارد.",
+      "solution": "`res[\"ietf-interfaces:interfaces\"][\"interface\"][0][\"mtu\"]` (که مقدار `1500` را برمی‌گرداند)."
+    },
+    {
+      "level": "متوسط",
+      "task": "کد تمیز پایتون با کتابخانهٔ `requests` بنویسید که با احراز هویت Basic و هدرهای استاندارد **RESTCONF**، وضعیت اینترفیس‌های روتر `192.0.2.10` را در فرمت JSON بخواند و در صورت موفقیت (`status_code == 200`) نام تک‌تک آن‌ها را چاپ کند.",
+      "hint": "URL استاندارد: `https://192.0.2.10/restconf/data/ietf-interfaces:interfaces` و هدر `Accept: application/yang-data+json`.",
+      "solution": "`import requests`\n`url = \"https://192.0.2.10/restconf/data/ietf-interfaces:interfaces\"`\n`headers = {\"Accept\": \"application/yang-data+json\"}`\n`resp = requests.get(url, auth=(\"admin\", \"Pass123\"), headers=headers, verify=\"/etc/ssl/corp-ca.pem\", timeout=10)`\n`if resp.status_code == 200:`\n`    for iface in resp.json()[\"ietf-interfaces:interfaces\"][\"interface\"]:`\n`        print(iface[\"name\"])`"
+    },
+    {
+      "level": "چالشی",
+      "task": "نمونهٔ **آزمایشگاهی** EEM Applet در بخش `exercise` بالا را بنویسید (ثبت هشدار و بررسی شرط) و **دو دلیل عملی** ذکر کنید که چرا در شبکهٔ تولیدی باز کردن خودکار یک پورت `administratively down` با `no shutdown` خطرناک است و نقش دقیق `maxrun` در EEM چیست.",
+      "hint": "تیم امنیت یا تعمیرات عمداً پورتی را برای مهار حمله یا کار روی کابل `shutdown` کرده‌اند! و `maxrun` فقط تایم‌اوتِ یک اجراست نه قفل هم‌زمانی.",
+      "solution": "`event manager session cli username automation`\n`event manager applet LAB_WATCH_INT`\n` event syslog pattern \"Interface GigabitEthernet0/0, changed state to administratively down\" maxrun 30`\n` action 1.0 syslog priority alerts msg \"EEM-ALERT: Gi0/0 was administratively shut down; manual NOC approval required before no shut!\"`\n` action 2.0 cli command \"enable\"`\n` action 3.0 cli command \"show interfaces Gi0/0 | append bootflash:eem_audit.txt\"`\n\n**چرا `no shutdown` خودکار در تولید خطرناک است:** ۱) ممکن است تیم امنیت یا NOC عمداً پورت را برای مهار یک حمله، حلقه یا عملیات نگهداری کابل `shutdown` کرده باشد و EEM کار آن‌ها را خنثی کند؛ ۲) با تریگر اشتباه می‌تواند حلقهٔ اجرا بسازد. در آزمایشگاه هم اگر دستوری اجرایی بنویسید باید محدوده، شرط تایید و مکانیسم توقف اضطراری (`no event manager applet ...`) لحاظ شود. نکته: **`maxrun 30`** فقط حداکثر مدت اجرای یک نوبت Applet (۳۰ ثانیه) را تعیین می‌کند و جلوی تکرار تریگر یا اجرای هم‌زمان را نمی‌گیرد."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "پروتکل **NETCONF** به‌صورت استاندارد از کدام لایهٔ انتقال، پورت و فرمت داده استفاده می‌کند؟",
+      "opts": [
+        "SSH پورت TCP 830 با فرمت XML",
+        "HTTPS 443 با فرمت YAML",
+        "UDP 161 با ASN.1",
+        "Telnet پورت 23 با متن ساده"
+      ],
+      "ans": 0,
+      "exp": "پورت استاندارد NETCONF برابر `TCP 830` روی بستر امن SSH است و پیام‌هایش در ساختار XML بر پایهٔ مدل YANG ردوبدل می‌شوند."
+    },
+    {
+      "q": "مزیت اصلی **Ansible** در مقایسه با **Puppet** و **Chef** در اتوماسیون سوئیچ‌ها و روترهای سیسکو چیست؟",
+      "opts": [
+        "Ansible فقط روی ویندوز کار می‌کند",
+        "Ansible هیچ Agentای روی روتر/سوئیچ نصب نمی‌کند (Agentless) و مستقیم از طریق SSH/NETCONF/HTTP کار می‌کند",
+        "Ansible نیازی به شبکهٔ IP ندارد",
+        "Ansible مستقیماً سخت‌افزار فیبر نوری را ارتقا می‌دهد"
+      ],
+      "ans": 1,
+      "exp": "از آنجا که بسیاری از تجهیزات شبکهٔ قدیمی یا بسته اجازهٔ نصب Agent ندارند، مدل Agentless و Push در Ansible محبوب‌ترین گزینه در شبکه است."
+    },
+    {
+      "q": "اگر در یک اسکریپت EEM در ماشهٔ `syslog` الگوی بسیار کلی مثل `\"%LINK\"` بگذاریم و در `action` وضعیت پورت را تغییر دهیم، چه خطری پیش می‌آید؟",
+      "opts": [
+        "تبدیل پورت به Trunk",
+        "پاک شدن NVRAM",
+        "خطر حلقهٔ مکرر اجرای EEM (در صورت تولید مکرر پیام تغییر وضعیت / Flap) و مصرف شدید CPU روتر",
+        "بسته شدن پورت ۲۲"
+      ],
+      "ans": 2,
+      "exp": "در صورتی که تغییر پورت یا Flap باعث تولید مکرر پیام منطبق با `%LINK` شود، EEM پی‌درپی تحریک شده و می‌تواند CPU روتر را تحت فشار شدید یا قفل بگذارد."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "مفاهیم این درس هم در آزمون 350-401 ENCOR و هم پایهٔ مستقیم تخصص اتوماسیون 300-435 ENAUTO هستند.",
+    "nextQuestion": "با پایان مباحث اصلی ENCOR، اکنون وارد تخصص مسیریابی پیشرفته یعنی **300-410 ENARSI** می‌شویم! جایی که یک دستور مسیر معمولی کافی نیست و باید یاد بگیریم چطور مسیر بسته‌ها را بر اساس مبدأ یا اپلیکیشن با **PBR** منحرف کنیم، صدها شعبه را روی اینترنت با **DMVPN** به هم بدوزیم، و در قلب شبکهٔ مخابراتی ببینیم **MPLS L3VPN** چطور برچسب دوگانه می‌زند تا شبکه‌های ده‌ها مشتری روی یک زیرساخت مشترک هرگز قاطی نشوند!",
+    "nextId": "ccnp_02"
+  }
+}

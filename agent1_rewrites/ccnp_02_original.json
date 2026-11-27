@@ -1,0 +1,219 @@
+{
+  "id": "ccnp_02",
+  "faculty": "دانشکده ۳ · CCNP Enterprise",
+  "title": "300-410 ENARSI: مسیریابی سیاستی (PBR)، DMVPN و MPLS L3VPN",
+  "lead": "شرکت صد شعبه دارد که باید از روی اینترنت به‌صورت رمزنگاری‌شده هم به مرکز وصل شوند و هم بدون عبور از روتر مرکزی، مستقیم با هم تماس صوتی VoIP برقرار کنند؛ ساخت دستی صدها تونل GRE نقطه‌به‌نقطه عملاً غیرممکن است! در سمت دیگر، یک اپراتور مخابراتی باید شبکهٔ دو بانک مجزا را که هر دو از آدرس `10.10.0.0/16` استفاده می‌کنند از روی یک ستون فقرات مشترک بدون هیچ تداخلی عبور دهد. چگونه **DMVPN**، **PBR**، **MPLS L3VPN** و **uRPF** این چالش‌های پیشرفتهٔ ENARSI را حل می‌کنند؟",
+  "goal": "طراحی و عیب‌یابی **Policy-Based Routing (PBR)** و `ip local policy`، تسلط بر معماری **DMVPN** (`mGRE + NHRP + IPsec`) و تفاوت Phase 1، 2 و 3، درک دقیق مکانیسم **MPLS L3VPN** (تفاوت `RD` و `RT`، برچسب‌های دوگانهٔ `LDP` + `MP-BGP`) و پیاده‌سازی **uRPF** در لبه‌های شبکه.",
+  "prereq": "آشنایی کامل با VRF-Lite، GRE/IPsec، OSPF/EIGRP و BGP (درس‌های `adv_03`، `adv_bgp` و `ccnp_01`).",
+  "sections": [
+    {
+      "h": "۱. دور زدن جدول مسیریابی با Policy-Based Routing (PBR) و PBR محلی",
+      "p": [
+        "روتینگ عادی فقط به **آدرس IP مقصد** نگاه می‌کند؛ اما گاهی لازم است ترافیکِ یک زیرشبکه یا یک پورت خاص (مثلاً بخش مهمان یا ترافیک ویدئو) را بر خلاف جدول `show ip route` از یک لینک ISP دیگر بفرستیم. این کار با **PBR** انجام می‌شود:",
+        "یک `route-map` می‌سازیم (`match ip address <ACL>` و `set ip next-hop <IP>`) و با دستور **`ip policy route-map <NAME>`** روی **اینترفیس ورودی (`Ingress`)** بسته‌های کاربران اعمال می‌کنیم. *(دو نکتهٔ حیاتی ENARSI: ۱) PBR به طور پیش‌فرض روی بسته‌هایی که خودِ روتر تولید می‌کند مثل `ping` از روتر اثر ندارد، مگر اینکه در مد گلوبال بزنید **`ip local policy route-map <NAME>`**؛ ۲) در استفاده از `set ip next-hop` اگر خط قطع شود بهتر است از **`verify-availability`** در کنار Track/IP SLA استفاده کنید تا ترافیک سیاهچاله نشود!)*"
+      ],
+      "bullets": []
+    },
+    {
+      "h": "۲. DMVPN (Dynamic Multipoint VPN): تکامل از Phase 1 تا Phase 3",
+      "p": [
+        "**DMVPN** برای اتصال ده تا هزار شعبه بدون نیاز به نوشتن هزاران تونل دستی ساخته شده و از سه رکن استفاده می‌کند: **mGRE (Multipoint GRE)** یک اینترفیس تونل تک است که به صدها همسایه وصل می‌شود؛ **NHRP (Next Hop Resolution Protocol)** آدرس IP داخلی تونل را به IP عمومیِ واقعی (`NBMA`) آن شعبه نگاشت می‌کند؛ و **IPsec Profile** کل ترافیک را رمزنگاری می‌کند. تکامل ۳ فاز DMVPN در ENARSI یک مفهوم کلیدی است:"
+      ],
+      "steps": [
+        "**Phase 1:** فقط Hub دارای `mGRE` است و Spokeها تونل نقطه‌به‌نقطه به Hub دارند؛ **تمام ترافیک Spoke-to-Spoke مجبور است از Hub عبور کند** (Hairpinning).",
+        "**Phase 2:** هم Hub و هم Spoke دارای `mGRE` هستند؛ پس Spokeها می‌توانند **تونل مستقیم (Dynamic Spoke-to-Spoke)** بزنند! اما یک قید سخت دارد: در Hub نباید مسیرها را خلاصه (`Summarize`) کنید و باید **`no ip next-hop-self`** (در EIGRP) و **`next-hop-unchanged`** (در BGP) بزنید تا هر Spoke بفهمد Next-Hop واقعی یک پیشوند کدام Spoke دیگر است.",
+        "**Phase 3 (مدرن و پیشنهادی):** مشکل Phase 2 را حل می‌کند! با فعال‌سازی **`ip nhrp redirect`** روی Hub و **`ip nhrp shortcut`** روی Spokeها، می‌توانیم در Hub کاملاً خلاصه‌سازی مسیر (`Summary / Default Route`) داشته باشیم و باز هم وقتی دو Spoke حرف می‌زنند، Hub به آن‌ها پیغام `NHRP Redirect` می‌فرستد تا مسیر مستقیم میان خودشان بسازند!"
+      ],
+      "think": {
+        "q": "سناریوی خطا: مهندسی یک شبکهٔ DMVPN را برای برقراری تماس صوتی مستقیم بین شعبه A و شعبه B راه‌اندازی کرده، اما در عیب‌یابی می‌بیند تمام تماس‌های A و B همچنان از طریق روتر مرکزی تهران (Hub) دور می‌زنند! وقتی کانفیگ را می‌بیند، متوجه می‌شود Spokeها با `tunnel destination <Hub_Public_IP>` تنظیم شده‌اند به جای `tunnel mode gre multipoint`! این شبکه در کدام فاز قرار دارد و چه چیزهایی باید عوض شوند؟",
+        "a": "به دلیل وجود `tunnel destination` روی Spokeها، این شبکه در **Phase 1** گیر افتاده است و تونل پویا بین Spokeها هرگز شکل نمی‌گیرد! برای رسیدن به ارتباط مستقیم با پشتیبانی از Summarization (Phase 3)، روی Spokeها باید `tunnel destination` را حذف و **`tunnel mode gre multipoint`** را گذاشت، و `ip nhrp redirect` روی Hub به همراه `ip nhrp shortcut` روی Spokeها را اضافه کرد."
+      },
+      "bullets": []
+    },
+    {
+      "h": "۳. معماری MPLS L3VPN (تفاوت RD با RT و برچسب‌های دوگانه) + uRPF",
+      "p": [
+        "در شبکهٔ یک Service Provider با **MPLS L3VPN**، روترهای داخلی هسته (**P — Provider**) اصلاً جدول مسیریابی مشتریان را نمی‌شناسند؛ فقط روترهای لبه (**PE — Provider Edge**) برای هر مشتری یک **VRF** جدا می‌سازند و با یکدیگر از طریق **MP-BGP (VPNv4)** صحبت می‌کنند. در اینجا دو عدد متفاوت وجود دارد که اغلب با هم اشتباه می‌شوند:"
+      ],
+      "bullets": [
+        "**RD (Route Distinguisher — `65100:10`):** تنها یک هدف دارد: چسباندن یک پیشوند ۶۴-بیتی به IPv4 (`10.10.0.0/16`) تا یک آدرس ۹۶-بیتی **`VPNv4`** یکتا بسازد؛ یعنی اگر بانک الف و بانک ب هر دو `10.10.0.0/16` دارند، MP-BGP آن‌ها را با هم قاطی نکند! **RD تعیین نمی‌کند کدام VRF به کدام VRF راه دارد!**",
+        "**RT (Route Target — `export` / `import`):** این همان **سیاست کنترل دسترسی و اشتراک مسیر** در BGP Extended Community است! یک VRF با `route-target export 65100:100` برچسب می‌دهد و هر VRF دیگری که `route-target import 65100:100` داشته باشد آن مسیر را دریافت می‌کند (پایهٔ ساخت توپولوژی‌های Hub-and-Spoke و Shared Services).",
+        "**پشتهٔ دو برچسب (Two-Label Stack) روی بسته در هستهٔ MPLS:** برچسب بیرونی (**Transport Label** از **LDP**) بسته را بدون نیاز به داشتن جدول مشتریان از روترهای `P` عبور داده تا به روتر `PE` مقصد برساند (و یک هاپ قبل با **PHP — Penultimate Hop Popping** برداشته می‌شود)؛ برچسب درونی (**VPN Label** از **MP-BGP**) به `PE` مقصد می‌گوید این بسته به کدام **VRF** تحویل داده شود!",
+        "**uRPF (Unicast Reverse Path Forwarding):** مکانیزم ضد-IP Spoofing در لبهٔ شبکه؛ در حالت **`Strict`** (`ip verify unicast source reachable-via rx`) بسته تنها زمانی پذیرفته می‌شود که بهترین مسیر جدول روتینگ به مبدأ از *همان* اینترفیس ورودی باشد (برای مشتریان تک‌مسیره)؛ در حالت **`Loose`** (`... via any`) کافی است مبدأ اصلاً در جدول مسیر وجود داشته باشد (برای اینترنت و مسیرهای نامتقارن)."
+      ],
+      "think": {
+        "q": "در MPLS L3VPN بین `PE1` و `PE2`، مهندسی روی `VRF BANK_A` در `PE1` مقدار `rd 65100:10` و در `PE2` مقدار `rd 65100:20` گذاشته است، اما در هر دو سمت `route-target both 65100:100` تنظیم کرده است. آیا این دو شعبهٔ بانک A مسیرهای یکدیگر را یاد می‌گیرند؟ چرا؟",
+        "a": "**بله، یاد می‌گیرند!** عدد **RD** صرفاً برای یکتاسازی پیشوند داخل MP-BGP است و برای کارکرد VRF اجباری نیست که بین دو PE حتماً یکسان باشد (اگرچه یکسان گذاشتنش برای نظم مدیریتی خوب است)؛ آنچه تصمیم می‌گیرد مسیر وارد VRF مقصد بشود یا نه، تطابق **`Route Target (export -> import)`** است که اینجا هر دو `65100:100` هستند!"
+      }
+    }
+  ],
+  "analogy": "پشتهٔ دو برچسب در **MPLS L3VPN** مثل ارسال دو نامهٔ محرمانه از دو شرکت رقیب از طریق یک شرکت پستی سراسری است: **برچسب بیرونی (`LDP Label`)** مثل کد پستی «ادارهٔ پست شهر مقصد (`PE2`)» روی پاکت بیرونی است—رانندگان کامیون میان‌شهری (`P Routers`) فقط همین کد شهر را می‌خوانند و اصلاً حق ندارند و نیازی ندارند بدانند داخل کامیون مال کدام شرکت است! وقتی بسته به ادارهٔ پست مقصد می‌رسد، برچسب بیرونی کنده می‌شود و **برچسب درونی (`VPN Label`)** نشان می‌دهد این بسته به صندوق پست خصوصیِ کدام شرکت (`VRF`) تحویل شود. محل شکست تشبیه اینجاست: اگر حتی روی یکی از روترهای مسیرِ بین دو `PE` پروتکل LDP یا MPLS خاموش بماند (یا برچسب اشتباه بخورد)، کل زنجیرهٔ Label-Switching سیاهچاله (`LSP Break`) می‌شود—حتی اگر `ping` عادیِ خودِ PEها بدون VRF کاملاً برقرار باشد!",
+  "table": {
+    "title": "مقایسهٔ سه فاز DMVPN و اجزای MPLS L3VPN در ENARSI",
+    "headers": [
+      "مفهوم / فاز",
+      "مکانیسم کلیدی",
+      "نکتهٔ حیاتی و خطای رایج"
+    ],
+    "rows": [
+      [
+        "DMVPN Phase 1",
+        "Spokeها GRE نقطه‌به‌نقطه به Hub",
+        "عدم پشتیبانی از ارتباط مستقیم Spoke-to-Spoke"
+      ],
+      [
+        "DMVPN Phase 2",
+        "mGRE در Hub و Spoke؛ NHRP مستقیم",
+        "خلاصه‌سازی مسیر (Summarization) روی Hub تونل مستقیم را می‌شکند"
+      ],
+      [
+        "DMVPN Phase 3",
+        "`ip nhrp redirect` روی Hub + `shortcut` روی Spoke",
+        "هم تونل مستقیم Spoke-to-Spoke و هم Summarization روی Hub را پشتیبانی می‌کند"
+      ],
+      [
+        "MPLS: `RD` vs `RT`",
+        "RD = یکتاسازی VPNv4؛ RT = سیاست Import/Export",
+        "اشتباه رایج: یکسان بودن RD بدون RT صحیح مسیر را به VRF نمی‌آورد!"
+      ],
+      [
+        "uRPF: `Strict` vs `Loose`",
+        "تایید مبدأ روی همان پورت ورودی vs وجود در RIB",
+        "اعمال Strict روی مسیر نامتقارن باعث Drop بسته‌های سالم می‌شود!"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "چرا یک هاپ قبل از `PE` مقصد در MPLS معمولاً عمل **PHP (Penultimate Hop Popping)** انجام می‌شود؟",
+      "a": "اگر `PE` مقصد مجبور باشد دو بار در جدول‌ها جستجو کند (یک بار کندن برچسب LDP و بار دوم خواندن برچسب VPN)، سربار می‌گیرد؛ با PHP آخرین روتر `P` پیش از `PE` برچسب بیرونی را با دستور `Implicit Null (Label 3)` برمی‌دارد تا `PE` مستقیم با یک نگاه به برچسب درونی بسته را به VRF بفرستد."
+    },
+    {
+      "q": "در **PBR** اگر بخواهیم ترافیکی که با `route-map` تطابق دارد از مسیر خاص برود اما وقتی همسایه قطع شد به جدول عادی برگردد، چه می‌کنیم؟",
+      "a": "از دستور `set ip next-hop verify-availability <ip> <seq> track <object>` همراه یک SLA/Track استفاده می‌کنیم؛ اگر آبجکت Down شود خط `set` نادیده گرفته شده و بسته به مسیریابی استاندارد تحویل می‌شود."
+    }
+  ],
+  "summary": "در ENARSI، **PBR** (با `ip local policy` برای ترافیک خود روتر) اجازهٔ مسیریابی مبتنی بر مبدأ/پورت را می‌دهد؛ **DMVPN Phase 3** با `mGRE`، `NHRP redirect/shortcut` و `IPsec` تونل مستقیم بین شعب همراه با خلاصه‌سازی را میسر می‌کند؛ **MPLS L3VPN** با `RD` هم‌پوشانی آدرس‌ها را جدا، با `RT` اشتراک VRF را کنترل، و با دو برچسب (`LDP + MP-BGP`) هستهٔ P را از جدول مشتریان بی‌نیاز می‌سازد؛ و **uRPF** جلوی Spoofing را می‌گیرد.",
+  "ciscoRef": "Cisco CCNP ENARSI 300-410 Official Cert Guide — Ch 12 (PBR), Ch 13–14 (DMVPN & NHRP), Ch 15–17 (MPLS L3VPN) & Ch 21 (uRPF)",
+  "protocolAnalysis": [
+    "یک بستهٔ **MPLS L3VPN** در میان هسته دارای **دو هدر ۴ بایتی MPLS** پیش از هدر IP است (`8` بایت سربار MPLS؛ یعنی در هستهٔ MPLS باید MTU لینک‌ها حداقل `1508` بایت یا برای چند برچسب بیشتر تا `1524+` باشد تا بسته‌های `1500` بایتی Drop نشوند!).",
+    "در **DMVPN Phase 3**, اولین بسته‌های بین Spoke1 و Spoke2 ابتدا از Hub می‌گذرند؛ Hub بلافاصله یک `NHRP Traffic Indication (Redirect)` می‌فرستد تا Spoke1 با `NHRP Resolution Request` آدرس NBMA واقعی Spoke2 را بگیرد و بقیهٔ جریان مستقیم برقرار شود."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show dmvpn",
+      "out": "Interface: Tunnel0, IPv4 NHRP Details\nType:Hub, NHRP Peers:2, \n # Ent  Peer NBMA Addr Peer Tunnel Add State  UpDn Tm Attrb\n ----- --------------- --------------- ----- -------- -----\n     1 198.51.100.11   172.16.0.11        UP 01:42:10     D\n     1 198.51.100.12   172.16.0.12        UP 00:58:02     D",
+      "note": "بررسی وضعیت همتایان DMVPN. [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا نمونهٔ مرجع آموزشی است؛ تمرین زندهٔ DMVPN، PBR و MPLS L3VPN نیازمند CML یا EVE-NG است.]",
+      "why": "مشاهدهٔ نگاشت `Tunnel IP` به `NBMA (Public) IP`، وضعیت تونل (`UP`) و اینکه همسایه استاتیک (`S`) یا پویا (`D` یعنی Spoke-to-Spoke پویا!) است.",
+      "anatomy": "تعداد پیوندهای NHRP، آدرس‌های NBMA عمومی و داخلی تونل و وضعیت `UP/NHRP` را نشان می‌دهد.",
+      "lookFor": "وضعیت `UP` و هنگام ارتباط مستقیم Spoke-to-Spoke ظاهر شدن رکورد پویا با پرچم `D` (Dynamic).",
+      "ifUnexpected": "اگر وضعیت `NHRP` یا `IKE` گیر کرده، معمولاً یا `nhrp network-id`، کلید IPsec یا دسترسی NBMA مسدود است.",
+      "executable": false
+    },
+    {
+      "cmd": "traceroute 10.255.0.2",
+      "out": "Type escape sequence to abort.\nTracing the route to 10.255.0.2\n  1 10.10.0.2 2 msec 1 msec 2 msec",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای ردیابی گام‌های لایه ۳ (در شبکهٔ واقعی MPLS یا DMVPN تغییر مسیر از Hub به مستقیم، یا برچسب‌های `[MPLS: Labels 18/29 Exp 0]` در خروجی traceroute دیده می‌شوند).",
+      "why": "تأیید عملیِ مسیر حرکت بسته (آیا بسته واقعاً از مسیر مورد نظر PBR/DMVPN می‌رود یا هنوز از مسیر قدیمی عبور می‌کند).",
+      "anatomy": "آدرس IP هر گام میانی (Hop) و زمان رفت‌وبرگشت به میلی‌ثانیه.",
+      "lookFor": "تغییر اولین گام به مسیر سیاست‌گذاری‌شده در PBR یا حذف گامِ Hub پس از شکل‌گیری تونل مستقیم DMVPN.",
+      "ifUnexpected": "اگر گام اول همچنان مسیر پیش‌فرض قبلی است، یعنی ACL یا `ip policy` روی اینترفیس ورودی درست منطبق نشده است.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه آماده‌سازی لینک‌های Underlay و VRF لایه ۲ برای سناریوهای PBR/DMVPN/MPLS",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `ip policy route-map`، `ip nhrp` و `mpls ip` را اجرا نمی‌کند (برای آزمایش زنده از CML یا EVE-NG استفاده کنید). در اینجا سلامت مسیر NBMA/Underlay (`Gi0/0`, `Lo0`) و تفکیک دو مشتری ایزوله در لایه ۲ (`VLAN 110` و `VLAN 120` مشابه دو VRF مجزا) را در ترمینال زنده آزمایش می‌کنیم.",
+      "۲. با `enable` وارد شوید و با `show ip interface brief` و `ping 10.255.0.2` دسترسی به گره مقابل (مثلاً Hub یا PE همسایه) را تایید کنید.",
+      "۳. دو VLAN مجزا برای دو مشتری فرضی بسازید، پورت‌های `Gi0/6` و `Gi0/7` را به آن‌ها اختصاص دهید و لینک‌های بالادستی `Gi0/0` و `Gi0/1` را مستند کنید: `configure terminal` -> `vlan 110` -> `name CUST_A_VRF` -> `vlan 120` -> `name CUST_B_VRF` -> `exit` -> `interface Gi0/6` -> `description CUST-A-CE` -> `switchport mode access` -> `switchport access vlan 110` -> `interface Gi0/7` -> `description CUST-B-CE` -> `switchport mode access` -> `switchport access vlan 120` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 110,120` -> `interface Gi0/0` -> `description MPLS-NBMA-CORE` -> `end`.",
+      "۴. با `show vlan brief`، `show interfaces trunk`، `show running-config` و `traceroute 10.255.0.2` بررسی کنید تفکیک تمرینی `VLAN 110/120` روی `Gi0/6`/`Gi0/7`/`Gi0/1` و مسیر پایهٔ شبیه‌ساز برقرار است (PBR، DMVPN/NHRP و MPLS L3VPN در شبیه‌ساز داخلی اجرا نمی‌شوند).",
+      "۵. **سناریوی مرجع غیرشبیه‌سازی‌شده (DMVPN Phase 3 و VRF — پلتفرم مرجع: Cisco IOS-XE):** **توپولوژی و فرمان‌ها:** روی Spoke در `interface Tunnel0`: `ip nhrp shortcut` و روی Hub: `ip nhrp redirect`؛ سپس پینگ از Spoke1 (`10.1.1.1`) به Spoke2 (`10.1.1.2`) و اجرای `show dmvpn` و `show ip route vrf CUST_A`. **خروجی مرجع و نشانهٔ موفقیت:** در `show dmvpn` ظاهر شدن تونل پویا به آدرس NBMA همتای Spoke2 با وضعیت `UP` و ستون `Attrb = D`، و در `show ip route vrf CUST_A` نمایش مسیرهای مجزای مشتری A با کد `N` (`NHRP`) یا `B`. **نشانهٔ شکست:** ماندن تونل در وضعیت `NHRP` بدون شکل‌گیری مسیر مستقیم (نبود `redirect/shortcut`) یا نشت پیشوندها بین جداول VRF. **مرز نتیجه‌گیری:** شبیه‌ساز داخلی تنها جداسازی لایه ۲ VLANهای تمرینی را اجرا می‌کند و ترافیک Data Plane تونل‌ها را نمی‌سازد."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show vlan brief",
+      "show interfaces trunk",
+      "traceroute 10.255.0.2"
+    ]
+  },
+  "troubleshooting": {
+    "fault": "در یک شبکهٔ MPLS L3VPN، پینگ بین دو روتر `PE1` و `PE2` روی Loopbackها کاملاً برقرار است، اما هیچ بسته‌ای از داخل VRF مشتری بین `CE1` و `CE2` عبور نمی‌کند و `traceroute` در وسط هسته متوقف می‌شود (یا بسته‌های بزرگ ICMP با سایز ۱۵۰۰ با DF=1 رد نمی‌شوند).",
+    "analysis": "دو خطای کلاسیک در ENARSI: ۱) روی یکی از روترهای `P` میانی، **LDP (`mpls ip`)** روی اینترفیس لینک یا بین PEها قطع شده است (در نتیجه هسته فقط روتینگ IP عادی دارد اما زنجیرهٔ Label-Switching شکسته که به آن **LSP Blackhole** می‌گویند؛ چون Pها جدول VRF ندارند بسته را رها می‌کنند!)؛ ۲) اگر پینگ کوچک رد می‌شود ولی پینگ `1500 df-bit` می‌افتد، `mpls mtu` در هسته برای دو برچسب (`+8` بایت) افزایش نیافته است.",
+    "fix": "تایید `show mpls ldp neighbor` و `show mpls forwarding-table <PE2_Loopback>` روی تک‌تک روترهای مسیر از PE1 تا PE2 (نبود کلمهٔ `untagged` در میانهٔ مسیر به جز PHP)، و افزایش `mpls mtu` / `mtu 1524` روی اینترفیس‌های هسته."
+  },
+  "misconceptions": [
+    {
+      "myth": "در MPLS L3VPN اگر `Route Distinguisher (RD)` دو VRF مختلف روی دو PE برابر باشد، آن دو VRF خودکار مسیرهای یکدیگر را دریافت می‌کنند.",
+      "reality": "RD فقط برای یکتاسازی آدرس‌های هم‌پوشان در MP-BGP است؛ تبادل مسیر بین VRFها تنها از طریق تطابق **`Route Target (export` به `import)`** انجام می‌شود.",
+      "howToSpot": "بررسی `show ip bgp vpnv4 all` برای وجود مسیرها و مقایسهٔ `Extended Community: RT:...` در خروجی `show ip bgp vpnv4 all <prefix>`."
+    },
+    {
+      "myth": "اعمال `ip policy route-map` روی یک اینترفیس باعث می‌شود دستور `ping` که از خودِ همان روتر می‌زنیم هم تابع PBR شود.",
+      "reality": "ترافیک تولیدشده توسط خودِ روتر (`Locally Generated`) از مسیر ورودی یک اینترفیس وارد نشده که مشمول `ip policy` شود؛ برای اعمال PBR بر ترافیک خودِ روتر باید دستور **`ip local policy route-map <NAME>`** در مد گلوبال تنظیم شود.",
+      "howToSpot": "هنگام تست با `ping` از روتر مسیر عوض نمی‌شود ولی ترافیکِ عبوری از PC پشت روتر دقیقاً تغییر مسیر می‌دهد."
+    }
+  ],
+  "exercise": "در یک سناریوی **PBR + DMVPN** بنویسید: الف) دستورات اعمال PBR روی اینترفیس ورودی `Gi0/1` به‌طوری که ترافیک وب (`TCP 80/443`) از ساب‌نت `10.10.10.0/24` به Next-Hop `203.0.113.2` هدایت شود (در حالی که بقیهٔ ترافیک تابع جدول روتینگ عادی بماند)؛ ب) دو دستور اختصاصی **DMVPN Phase 3** روی اینترفیس `Tunnel0` روتر Hub و Spoke.",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "در MPLS L3VPN کدام دو پروتکل دو برچسب روی یک بستهٔ مشتری می‌گذارند و هر کدام چه نقشی دارند؟",
+      "hint": "یکی بین روترهای P و PE (لایهٔ Transport)، و دیگری فقط بین PEها (سطح سرویس VRF).",
+      "solution": "۱) **برچسب بیرونی (Transport Label)** توسط **LDP** (یا RSVP-TE) توزیع می‌شود تا بسته را در هستهٔ `P` تا `PE` مقصد هدایت کند.\n۲) **برچسب درونی (VPN Label)** توسط **MP-BGP (VPNv4)** تخصیص می‌یابد تا `PE` مقصد بداند بسته متعلق به کدام `VRF` است."
+    },
+    {
+      "level": "متوسط",
+      "task": "یک لینک اینترنت به نام `ISP-Backup` داریم که سرعت پایین‌تری دارد، و مسیرهای ورودی/خروجی ما نامتقارن هستند (بسته‌ها ممکن است از ISP1 بروند و از ISP2 برگردند). برای جلوگیری از IP Spoofing روی پورت‌های WAN، باید از **`uRPF Strict`** استفاده کنیم یا **`uRPF Loose`**؟ چرا؟",
+      "hint": "تفاوت `reachable-via rx` در برابر `reachable-via any` در مسیرهای نامتقارن اینترنت.",
+      "solution": "حتماً باید از **`uRPF Loose` (`ip verify unicast source reachable-via any`)** استفاده کرد! زیرا در مسیرهای نامتقارن، بسته ممکن است از ISP2 وارد شود در حالی که بهترین مسیرِ جدول روتینگ به آن مبدأ از سمت ISP1 است؛ در این حالت `uRPF Strict` آن بستهٔ سالم را به اشتباه Drop می‌کند."
+    },
+    {
+      "level": "چالشی",
+      "task": "دستورات کامل بخش `exercise` بالا (PBR برای هدایت ترافیک وب `10.10.10.0/24` به `203.0.113.2` بدون خراب کردن بقیهٔ ترافیک، و دو دستور متمایزکنندهٔ DMVPN Phase 3 روی Hub و Spoke) را بنویسید.",
+      "hint": "در PBR فراموش نکنید فقط خط `permit` برای ترافیک هدف در `route-map` لازم است (بسته‌های منطبق‌نشده به روتینگ عادی می‌روند).",
+      "solution": "الف) PBR:\n`ip access-list extended ACL_WEB`\n` permit tcp 10.10.10.0 0.0.0.255 any eq 80`\n` permit tcp 10.10.10.0 0.0.0.255 any eq 443`\n`route-map PBR_WEB permit 10`\n` match ip address ACL_WEB`\n` set ip next-hop 203.0.113.2`\n`interface Gi0/1`\n` ip policy route-map PBR_WEB`\n\nب) DMVPN Phase 3:\n- روی **Hub (`Tunnel0`)**: `ip nhrp redirect`\n- روی **Spoke (`Tunnel0`)**: `ip nhrp shortcut`"
+    }
+  ],
+  "quiz": [
+    {
+      "q": "مزیت اصلی **DMVPN Phase 3** نسبت به Phase 2 چیست؟",
+      "opts": [
+        "حذف نیاز به پروتکل NHRP",
+        "غیرفعال کردن کامل IPsec",
+        "کاهش اندازهٔ هدر IPv4 به ۱۰ بایت",
+        "امکان خلاصه‌سازی مسیرها (Summarization) در Hub و همچنان برقراری تونل مستقیم Spoke-to-Spoke با `redirect/shortcut`"
+      ],
+      "ans": 3,
+      "exp": "در Phase 2 خلاصه‌سازی مسیر در Hub مانع دانستن Next-Hop واقعی Spokeها می‌شد؛ Phase 3 با `ip nhrp redirect` و `ip nhrp shortcut` هر دو مزیت را هم‌زمان می‌دهد."
+    },
+    {
+      "q": "در **MPLS L3VPN**، کدام فیلد واقعاً مشخص می‌کند مسیرهای صادرشده از یک VRF اجازه دارند وارد کدام VRFهای دیگر شوند؟",
+      "opts": [
+        "Route Target (`export` / `import`)",
+        "OSPF Process ID",
+        "VLAN Native ID",
+        "Route Distinguisher (RD)"
+      ],
+      "ans": 0,
+      "exp": "RD فقط برای یکتا کردن پیشوندهای هم‌پوشان در جدول MP-BGP است؛ سیاست اشتراک و جداسازی میان VRFها منحصراً با `Route Target` انجام می‌شود."
+    },
+    {
+      "q": "اگر در **PBR** بخواهیم بسته‌هایی که *خودِ روتر* تولید می‌کند (مانند `ping` یا ترافیک مدیریتی از روتر) نیز از قوانین `route-map` پیروی کنند، کدام دستور لازم است؟",
+      "opts": [
+        "`ip route 0.0.0.0 0.0.0.0 Null0`",
+        "`ip local policy route-map <NAME>` در مد گلوبال",
+        "`ip nat inside`",
+        "`switchport mode trunk`"
+      ],
+      "ans": 1,
+      "exp": "دستور `ip policy` زیر اینترفیس تنها روی ترافیک عبوری (Transit) اثر دارد؛ ترافیک تولیدی خود روتر نیازمند `ip local policy route-map` است."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "PBR، DMVPN، MPLS L3VPN و uRPF هستهٔ اصلی شبکه‌های بانکی، مخابراتی و آزمون 300-410 ENARSI هستند.",
+    "nextQuestion": "اکنون وارد مسیرهای تخصصی CCNP در دنیایی که دیگر همهٔ کنترل در دست CLIهای تکی نیست می‌شویم! در **تخصص 300-415 ENSDWI (Cisco Catalyst SD-WAN)** می‌بینیم چطور سیسکو تمام پیچیدگی‌های DMVPN و PBR را با جداسازی ۴ صفحه (`vBond`، `vManage`، `vSmart` و `WAN Edge`) و مسیریابی هوشمندِ برنامه‌محور جایگزین می‌کند.",
+    "nextId": "ccnp_ensdwi"
+  }
+}

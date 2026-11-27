@@ -1,0 +1,234 @@
+{
+  "id": "ccna_05",
+  "faculty": "دانشکده ۱ · CCNA 200-301",
+  "title": "امنیت شبکه سیسکو: ACL، Port Security، DHCP Snooping و DAI",
+  "lead": "در یک شبکهٔ شرکتی، پورت دیواری یک اتاق کنفرانس آزاد است؛ فردی با لپ‌تاپ یک سوئیچ رومیزی وصل می‌کند، سرور DHCP جعلی بالا می‌آورد و با دستکاری ARP ترافیک بخش مالی را از لپ‌تاپ خود عبور می‌دهد. در لایه ۳ هم باید فقط کاربران فنی به پورت ۲۲ سرور برسند نه بقیه. چطور این ۵ سپر دفاعی سیسکو را زنجیره‌ای کنار هم بچینیم؟",
+  "goal": "تسلط بر طراحی و جایگذاری Standard/Extended ACL (پردازش بالا-به-پایین و Implicit Deny)، پیاده‌سازی Port Security (حالت‌های Violation)، راه‌اندازی زنجیرهٔ DHCP Snooping + Dynamic ARP Inspection (DAI) و کاربرد BPDU Guard / Root Guard در STP.",
+  "prereq": "شناخت ARP (درس s02)، سوئیچینگ و پورت‌های TCP/UDP (درس s03)، VLAN/STP (درس‌های ccna_02_vlan و ccna_02) و DHCP (درس ccna_dhcp).",
+  "sections": [
+    {
+      "h": "۱. فیلتر ترافیک لایه ۳ و ۴ با Access Control Lists (ACL)",
+      "p": [
+        "**ACL** لیستی ترتیبی از قوانین `permit` و `deny` است که روی ترافیک ورودی (`in`) یا خروجی (`out`) یک اینترفیس اعمال می‌شود. روتر هر بسته را **از خط اول به سمت پایین** مقایسه می‌کند؛ به محض اولین تطابق، همان اقدام انجام و بقیهٔ لیست اصلاً خوانده نمی‌شود (**First Match**). و در انتهای هر ACL یک قانون نامرئی **`deny any`** وجود دارد (**Implicit Deny**): اگر هیچ خطی با بسته نخواند، بسته Drop می‌شود!",
+        "تفاوت بنیادین دو نوع ACL و قاعدهٔ جایگذاری مهندسی آن‌ها:"
+      ],
+      "bullets": [
+        "**Standard ACL (شماره `1–99` و `1300–1999` یا Named Standard):** فقط و فقط **IP مبدأ** را بررسی می‌کند؛ چون نمی‌تواند مقصد یا پورت را بفهمد، باید **نزدیک‌ترین جا به مقصد** اعمال شود تا دسترسی کاربر به بقیهٔ سرورها به‌اشتباه بسته نشود.",
+        "**Extended ACL (شماره `100–199` و `2000–2699` یا Named Extended):** هم IP مبدأ، هم IP مقصد، هم پروتکل (`tcp/udp/icmp/ip`) و هم شماره پورت مقصد/مبدأ را چک می‌کند؛ بنابراین باید **نزدیک‌ترین جا به مبدأ** بسته شود تا ترافیک غیرمجاز اصلاً پهنای باند مسیر را اشغال نکند.",
+        "**تلهٔ رایج Wildcard Mask:** برعکس Subnet Mask است (`0` یعنی «باید دقیقاً منطبق باشد» و `1` یعنی «مهم نیست»). برای یک IP تکی به جای نوشتن ماسک صفر، می‌توان از کلمهٔ کلیدی `host 10.10.0.5` استفاده کرد و برای همه آدرس‌ها از `any`."
+      ],
+      "think": {
+        "q": "مدیری یک Extended ACL فقط با یک خط `access-list 101 deny tcp 192.168.10.0 0.0.0.255 host 10.50.0.10 eq 22` می‌نویسد و آن را در جهت `in` روی دروازهٔ کاربران اعمال می‌کند تا فقط SSH به آن سرور بسته شود. چه اتفاقی برای بقیهٔ ترافیک کاربران (مثل وب و DNS) می‌افتد؟",
+        "a": "تمام ترافیک کاربران **قطع می‌شود**! چون بعد از خط `deny` هیچ خط `permit ip any any` نوشته نشده و قانون نامرئی انتهای ACL (`Implicit Deny`) همهٔ بسته‌های دیگر را هم Drop می‌کند."
+      }
+    },
+    {
+      "h": "۲. حفاظت لایه ۲ پورت‌های دسترسی با Port Security",
+      "p": [
+        "**Port Security** روی پورت‌های ایستا (`static access` و همچنین `trunk`؛ اما نه روی پورت‌های `dynamic` با مذاکرهٔ DTP) محدود می‌کند حداکثر چند آدرس MAC مجاز روی یک پورت متصل شوند و چگونه یاد گرفته شوند (`Static` دستی یا **`Sticky`** که MAC یادگرفته‌شدهٔ پویا را مستقیم در `running-config` ثبت می‌کند). اگر دستگاهی با MAC غیرمجاز وصل شود، سه حالت واکنش (**Violation Mode**) داریم:"
+      ],
+      "bullets": [
+        "**`Shutdown` (پیش‌فرض):** بلافاصله پورت را در وضعیت **`err-disabled`** خاموش می‌کند، لاگ Syslog و شمارنده افزایش می‌یابد و تا دخالت مدیر (`shutdown` و سپس `no shutdown` یا `errdisable recovery`) پورت بالا نمی‌آید.",
+        "**`Restrict`:** ترافیک MAC غیرمجاز را Drop می‌کند، **لاگ Syslog می‌فرستد و شمارندهٔ Violation را بالا می‌برد**، اما پورت برای MAC مجاز قبلی همچنان روشن می‌ماند.",
+        "**`Protect`:** بی‌سروصدا فریم‌های MAC غیرمجاز را Drop می‌کند، **نه لاگ می‌فرستد و نه شمارنده بالا می‌رود** (کم‌ترین دیده‌پذیری امنیتی)."
+      ]
+    },
+    {
+      "h": "۳. زنجیرهٔ دفاعی DHCP Snooping + Dynamic ARP Inspection (DAI) + STP Guards",
+      "p": [
+        "یکی از هوشمندانه‌ترین بخش‌های امنیت لایه ۲ سیسکو وابستگی مستقیم **DAI** به **DHCP Snooping** است. اگر یک مهاجم سرور DHCP جعلی بگذارد (Rogue DHCP Server) یا بستهٔ ARP جعلی بفرستد (ARP Spoofing)، این دو قابلیت جلوی آن را می‌گیرند:"
+      ],
+      "steps": [
+        "گام ۱ (**DHCP Snooping**): به‌صورت پیش‌فرض تمام پورت‌های سوئیچ پس از فعال‌سازی Snooping روی یک VLAN، **`Untrusted`** می‌شوند. فقط پورت رو به سرور واقعی DHCP (یا Uplink منتهی به آن) را **`ip dhcp snooping trust`** می‌کنیم. پورت‌های Untrusted پیام‌های سرور DHCP (`Offer`, `Ack`) را Drop می‌کنند (و با `limit rate` جلوی حملهٔ DHCP Starvation را می‌گیرند).",
+        "گام ۲ (**ساخت جدول Binding معتبر**): سوئیچ از روی مبادلات سالم DHCP یک جدول امانت‌داری دقیق به نام **DHCP Snooping Binding Database** می‌سازد (`MAC + IP + VLAN + Port + Lease`).",
+        "گام ۳ (**Dynamic ARP Inspection — DAI**): وقتی `ip arp inspection vlan 10` فعال شد، تمام پورت‌های کاربر Untrusted هستند؛ به محض رسیدن هر بستهٔ ARP، سوئیچ آن را باز کرده و با جدول Binding می‌سنجد. اگر کلاینتی بخواهد برای IP همسایه یا Gateway بستهٔ ARP جعلی بفرستد، سوئیچ آن را Drop و ثبت می‌کند! *(نکته: برای دستگاه‌های دارای IP ثابت که از DHCP نگرفته‌اند باید `ARP ACL` دستی نوشت تا DAI مسدودشان نکند.)*",
+        "گام ۴ (**حفاظت از درخت پوشا — BPDU Guard و Root Guard**): روی پورت‌های کاربرِ دارای `PortFast` با **`BPDU Guard`** مطمئن می‌شویم اگر کسی یک سوئیچ مزاحم وصل کرد، پورت به محض دریافت BPDU وارد `err-disabled` شود؛ و روی پورت‌های توزیع که نباید Root Bridge جدیدی پشتشان ظاهر شود از **`Root Guard`** استفاده می‌کنیم."
+      ],
+      "think": {
+        "q": "سناریوی خطا: ادمینی برای جلوگیری از حملهٔ ARP Spoofing فقط `ip arp inspection vlan 10` را روی سوئیچ فعال می‌کند، اما `ip dhcp snooping` را روی آن VLAN روشن نکرده (و پورت Uplink به روتر را هم `trust` نکرده است)! چه مشکلی پیش می‌آید؟",
+        "a": "تقریباً **کل ارتباط کاربران VLAN 10 قطع می‌شود**! چون DAI برای تأیید بسته‌های ARP به جدول Bindingِ DHCP Snooping تکیه دارد؛ وقتی Snooping روشن نباشد جدول Binding خالی است و DAI تمام درخواست‌ها و پاسخ‌های ARP روی پورت‌های Untrusted (از جمله Uplink به روتر!) را جعلی تشخیص داده و Drop می‌کند."
+      },
+      "bullets": []
+    }
+  ],
+  "analogy": "زنجیرهٔ Port Security، DHCP Snooping و DAI دقیقاً مثل کنترل امنیتی یک نمایشگاه است: Port Security پلاک خودروها در پارکینگ هر غرفه را محدود به ۱ یا ۲ خودروی ثبت‌شده می‌کند؛ DHCP Snooping مثل باجهٔ رسمی صدور کارت شناسایی است که اجازه نمی‌دهد هر کس در سالن کارت جعلی پخش کند و همزمان لیست «نام + شماره صندلی + کد ملی» (Binding Table) را می‌نویسد؛ و DAI نگهبان درِ سالن است که هر بار کسی ادعا کند «من صاحب صندلی شماره ۱ هستم (ARP Reply)»، ادعایش را با همان لیست رسمی تطبیق می‌دهد. محل شکست تشبیه اینجاست: برای مهمانان ویژه که از قبل کارت ثابت دارند (سرورهای با Static IP)، نامشان در لیست باجهٔ صدور نیست؛ پس نگهبان DAI بدون ثبت نامشان در یک لیست استثنای دستی (`ARP ACL`) جلوی ورودشان را می‌گیرد!",
+  "table": {
+    "title": "مقایسهٔ سه حالت Violation در Port Security و جایگذاری ACL",
+    "headers": [
+      "ویژگی / ابزار",
+      "رفتار هنگام نقض یا تطابق",
+      "قید مهم اجرایی"
+    ],
+    "rows": [
+      [
+        "Port Security: `shutdown`",
+        "پورت `err-disabled` می‌شود + لاگ + شمارنده",
+        "نیاز به بازگردانی دستی (`shut`/`no shut`) یا Recovery Timer؛ روی پورت‌های ایستا (`static access` یا `trunk`، نه `dynamic`)"
+      ],
+      [
+        "Port Security: `restrict`",
+        "فریم غیرمجاز Drop + لاگ + شمارنده؛ پورت باز می‌ماند",
+        "مناسب وقتی یک پورت نباید به کل از کار بیفتد اما هشدار امنیتی لازم است"
+      ],
+      [
+        "Port Security: `protect`",
+        "فریم غیرمجاز Drop بدون هیچ لاگ یا شمارنده",
+        "کم‌ترین دیده‌پذیری برای تیم امنیت؛ معمولاً توصیه نمی‌شود"
+      ],
+      [
+        "Standard ACL (`1–99`)",
+        "فقط بررسی Source IP",
+        "جایگذاری نزدیک به **مقصد**"
+      ],
+      [
+        "Extended ACL (`100–199`)",
+        "بررسی Source/Dest IP + Protocol + Port",
+        "جایگذاری نزدیک به **مبدأ** + همیشه نیاز به خط `permit` برای بقیه ترافیک در صورت ضرورت"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "آیا برای هر خط `permit` یا `deny` که فراموش شود می‌توان وسط یک ACL شماره‌دار خط جدید اضافه کرد؟",
+      "a": "بله، در IOS مدرن هنگام استفاده از Named ACL (یا `ip access-list extended <num/name>`) هر خط شماره ترتیب (`Sequence Number` مثل 10، 20، 30) دارد و می‌توان با نوشتن شماره `15` یک قانون را دقیقاً بین `10` و `20` درج کرد."
+    },
+    {
+      "q": "روی یک پورت سوئیچ که هم تلفن IP دارد و هم کامپیوتر پشت تلفن وصل است، حداقل `maximum` در Port Security چقدر باید باشد؟",
+      "a": "حداقل ۲ (یا ۳ در هنگام تغییر/روشن شدن): یک MAC برای خودِ تلفن در Voice VLAN، یک MAC برای کامپیوتر در Access VLAN (و گاهی خودِ تلفن یک MAC در Access VLAN هم موقتاً ارسال می‌کند که در عمل `maximum 2` یا `3` تنظیم می‌کنند)."
+    }
+  ],
+  "summary": "دفاع شبکه نیازمند هم‌افزایی لایه ۳ و لایه ۲ است: Extended ACLها ترافیک را بر اساس IP و پورت نزدیک مبدأ پالایش می‌کنند و در انتها `Implicit Deny` دارند؛ Port Security از پر شدن جدول MAC و اتصال دستگاه غیرمجاز جلوگیری می‌کند؛ و فعال‌سازی هم‌زمان DHCP Snooping و DAI (با پورت Uplink در حالت `trust` و تعریف ARP ACL برای IPهای ثابت) از حملات DHCP و ARP Spoofing پیشگیری می‌کند.",
+  "ciscoRef": "Cisco CCNA 200-301 Official Cert Guide — Vol 2, Ch 2–3 (ACLs) & Ch 6–8 (Layer 2 Security: Port Security, DHCP Snooping, DAI)",
+  "protocolAnalysis": [
+    "در `DHCP Snooping` پورت‌های `Untrusted` پیام‌های `DHCP Offer / ACK / NAK` را به کلی Drop می‌کنند تا تنها سرور مجاز پشت پورت `Trusted` بتواند آدرس واگذار کند.",
+    "یک پورت در وضعیت `err-disabled` هم در `show interfaces status` وضعیت `err-disabled` دارد و هم خطای وقوع را می‌توان در لاگ Syslog (`%PM-4-ERR_DISABLE`) دید."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show access-lists",
+      "out": "Extended IP access list 110\n    10 deny tcp 192.168.10.0 0.0.0.255 host 10.50.0.10 eq 22 (14 matches)\n    20 permit ip any any (382 matches)",
+      "note": "نمایش قوانین ACL و شمارندهٔ تطابق (`matches`). [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی به‌صورت زنده اجرا نمی‌شود و خروجی بالا صرفاً نمونهٔ مرجع آموزشی است؛ تمرین زندهٔ ACL و Port Security/DAI نیازمند Packet Tracer، EVE-NG یا CML است.]",
+      "why": "برای بررسی ترتیب قوانین (Sequence Number) و اطمینان از اینکه بسته‌ها واقعاً به خط مورد نظر برخورد می‌کنند (`matches`).",
+      "anatomy": "عدد ابتدای هر سطر شمارهٔ توالی (`10`, `20`) و عبارت انتهایی `(14 matches)` تعداد دفعات اعمال آن قانون را نشان می‌دهد.",
+      "lookFor": "قرار گرفتن قوانین جزئی/محدودتر قبل از قوانین عمومی‌تر و وجود سطر `permit` قبل از `Implicit Deny` در صورت نیاز.",
+      "ifUnexpected": "اگر `matches` همیشه `0` است، یا ACL اصلاً روی اینترفیس (`ip access-group ... in/out`) اعمال نشده یا ترافیک قبلاً به یک خط بالاتر برخورد کرده است.",
+      "executable": false
+    },
+    {
+      "cmd": "show interfaces Gi0/2 switchport",
+      "out": "Name: Gi0/2\nSwitchport: Enabled\nAdministrative Mode: static access",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای بررسی وضعیت `Access/Trunk` و خاموش بودن مذاکرهٔ DTP (`Negotiation of Trunking: Off`) روی پورت کاربر.",
+      "why": "پیش‌نیاز اول `Port Security` این است که پورت حتماً در حالت ایستا (`static access` یا `trunk`، نه `dynamic auto/desirable`) قرار داشته باشد. تنظیم `switchport mode access` پورت را در مد static access قرار می‌دهد و در پلتفرم‌هایی مانند Catalyst 2960 دستور `switchport nonegotiate` هم در مد `static access` و هم در مد `trunk` معتبر است (و فقط روی مدهای پویا رد می‌شود؛ هرچند برخی سیستم‌عامل‌ها/نسخه‌های دیگر روی پورت access خودکار DTP را غیرفعال می‌شمارند و بسته به پلتفرم رفتار متفاوتی دارند).",
+      "anatomy": "وضعیت اداری و عملیاتی Access/Trunk و خاموش یا روشن بودن مذاکرهٔ DTP روی پورت انتخابی.",
+      "lookFor": "`Administrative Mode: static access` و `Negotiation of Trunking: Off`.",
+      "ifUnexpected": "اگر پورت کاربر روی `dynamic` یا `trunk` بود، با `switchport mode access` آن را روی access قفل کنید و در پلتفرم‌های پشتیبان از `switchport nonegotiate` روی `static access` یا `trunk` برای اطمینان از `Negotiation of Trunking: Off` استفاده کنید.",
+      "executable": true
+    },
+    {
+      "cmd": "show vlan brief",
+      "out": "VLAN Name                             Status    Ports\n---- -------------------------------- --------- -------------------------------\n1    default                          active    Gi0/2, Gi0/3, Gi0/4, Gi0/5",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای بررسی عضویت پورت‌های کاربر و حصول اطمینان از قرار نداشتن آن‌ها در `VLAN 1` پیش‌فرض.",
+      "why": "جدا کردن کاربران از `VLAN 1` و انتقال پورت‌های بلااستفاده به یک VLAN پارک‌شدهٔ خاموش یکی از پایه‌های امنیت لایه ۲ است.",
+      "anatomy": "لیست VLANهای فعال و پورت‌های عضو هر VLAN.",
+      "lookFor": "عدم رها شدن پورت‌های فعال یا بلااستفاده در `VLAN 1`.",
+      "ifUnexpected": "پورت‌های استفاده نشده را با `shutdown` و انتقال به یک VLAN ایزوله امن کنید.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه ایمن‌سازی پورت Access، غیرفعال‌سازی DTP و ایزوله‌سازی پورت‌های بلااستفاده",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `access-list`، `switchport port-security`، `ip dhcp snooping` و `ip arp inspection` را به‌صورت زنده اجرا نمی‌کند (برای تست زندهٔ این‌ها از Packet Tracer، EVE-NG یا CML استفاده کنید). اما قفل کردن پورت کاربر روی `static access`، غیرفعال‌سازی DTP (`switchport nonegotiate` روی ترانک یا access در پلتفرم‌های پشتیبان مانند Catalyst 2960) و ایزوله‌سازی پورت‌های آزاد در یک VLAN پارک در ترمینال داخلی شبیه‌سازی می‌شوند.",
+      "۲. وارد مد امتیازی (`enable`) شوید و با `show interfaces status` پورت‌های دسترسی را بررسی کنید.",
+      "۳. پورت `Gi0/2` را به‌عنوان پورت کاربر در VLAN 10 ایمن کنید و DTP را روی `Gi0/2` و ترانک `Gi0/1` با `switchport nonegotiate` ببندید (نکته: این رفتار مطابق سری‌هایی مانند Catalyst 2960 است؛ در برخی سوئیچ‌های دیگر صرف `switchport mode access` کفایت می‌کند): `configure terminal` -> `vlan 10` -> `name USERS` -> `exit` -> `interface Gi0/2` -> `switchport mode access` -> `switchport access vlan 10` -> `switchport nonegotiate` -> `no shutdown` -> `interface Gi0/1` -> `switchport nonegotiate` -> `exit`.",
+      "۴. پورت بلااستفادهٔ `Gi0/5` را به `VLAN 999` (پارک‌شده) منتقل و `shutdown` کنید: `vlan 999` -> `name UNUSED_PARK` -> `exit` -> `interface Gi0/5` -> `switchport mode access` -> `switchport access vlan 999` -> `shutdown` -> `end`.",
+      "۵. با `show interfaces Gi0/2 switchport`، `show interfaces Gi0/1 switchport`، `show vlan brief` و `show running-config` زنده تایید کنید هر دو پورت `Negotiation of Trunking: Off` دارند و `Gi0/5` در وضعیت `disabled` داخل `VLAN 999` است."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show interfaces Gi0/2 switchport",
+      "show vlan brief",
+      "show running-config"
+    ],
+    "labType": "Reference"
+  },
+  "troubleshooting": {
+    "fault": "کارمند جدید لپ‌تاپ خود را به پورت دیواری میز همکار قبلی وصل کرده است؛ چراغ پورت سوئیچ بلافاصله خاموش شده و در لاگ پیام `%PM-4-ERR_DISABLE: psecure-violation error detected` دیده می‌شود.",
+    "analysis": "روی این پورت قبلاً `Port Security` با حداکثر ۱ MAC (و یا Sticky/Static MAC متعلق به کامپیوتر همکار قبلی) در مد پیش‌فرض `shutdown` تنظیم شده بوده است. به محض ارسال اولین فریم با MAC لپ‌تاپ جدید، سوئیچ نقض امنیتی را تشخیص داده و پورت را برای محافظت در حالت `err-disabled` قفل کرده است.",
+    "fix": "ابتدا هویت کاربر و مجوز اتصال لپ‌تاپ جدید را تایید کنید؛ سپس اگر MAC قبلی به‌صورت `sticky` در کانفیگ ذخیره شده بود آن را پاک کرده، و با اجرای `shutdown` و بلافاصله `no shutdown` زیر همان اینترفیس پورت را از حالت `err-disabled` خارج کنید."
+  },
+  "misconceptions": [
+    {
+      "myth": "در `Extended ACL` اگر فقط دو خط `deny` بنویسیم، بقیه ترافیک خودبه‌خود اجازهٔ عبور دارد.",
+      "reality": "در انتهای هر ACL یک خط نامرئی **`deny any`** وجود دارد؛ اگر بعد از `deny`ها یک خط `permit` (مثل `permit ip any any`) نگذارید، کل ترافیک آن جهت قطع می‌شود.",
+      "howToSpot": "قبل از اعمال `ip access-group` روی اینترفیس روتر از راه دور، همیشه وجود حداقل یک خط `permit` صریح را در `show access-lists` چک کنید."
+    },
+    {
+      "myth": "دستور `ip dhcp snooping trust` باید روی پورت‌های همهٔ کاربران زده شود تا IP بگیرند.",
+      "reality": "دقیقاً برعکس! پورت‌های کاربران باید **`Untrusted`** (پیش‌فرض) بمانند و فقط پورت منتهی به **سرور مجاز DHCP** باید `trust` شود تا هیچ کاربری نتواند پیام `DHCP Offer` جعلی به شبکه بفرستد.",
+      "howToSpot": "با `show ip dhcp snooping` لیست `Trusted` را ببینید که فقط شامل Uplinkهای مجاز و پورت سرور اصلی باشد."
+    }
+  ],
+  "exercise": "یک Extended Named ACL به نام `BLOCK_HR_SSH` بنویسید که دسترسی SSH (`TCP 22`) از شبکهٔ `192.168.30.0/24` به سرور `10.80.0.50` را ببندد، اما سایر ارتباطات این شبکه (از جمله وب و پینگ) آزاد بمانند؛ سپس جایگذاری صحیح (`in`/`out` و مبدأ/مقصد) را مشخص کنید.",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "معادل Wildcard Mask برای هر یک از موارد زیر را بنویسید: ۱) شبکه `192.168.15.0/24`، ۲) شبکه `172.16.0.0/16`، ۳) زیرشبکه `10.10.4.64/26`، ۴) فقط یک آدرس IP `10.20.30.40`.",
+      "hint": "برای محاسبهٔ Wildcard از `255.255.255.255 - SubnetMask` استفاده کنید.",
+      "solution": "۱) `0.0.0.255`؛ ۲) `0.0.255.255`؛ ۳) ماسک `/26` یعنی `255.255.255.192` پس Wildcard برابر `0.0.0.63`؛ ۴) `0.0.0.0` (یا کوتاه‌تر: `host 10.20.30.40`)."
+    },
+    {
+      "level": "متوسط",
+      "task": "تنظیمات کامل Port Security برای پورت کاربر `Gi0/2` در VLAN 10 (در حالت `static access`) و غیرفعال کردن DTP روی ترانک بالادستی `Gi0/1` را بنویسید به‌طوری که روی `Gi0/2` حداکثر ۲ آدرس MAC به‌صورت `sticky` یاد گرفته شود و در صورت نقض به‌جای خاموش شدن، فریم اضافه را با ثبت لاگ Drop کند (`restrict`).",
+      "hint": "پیش از `switchport port-security` پورت باید ایستا باشد (`static access` یا `trunk`)؛ روی Catalyst 2960 و بسیاری از پلتفرم‌ها دستور `switchport nonegotiate` هم روی `static access` و هم روی `trunk` قابل تنظیم است (و روی `dynamic` رد می‌شود).",
+      "solution": "`interface Gi0/2`\n` switchport mode access`\n` switchport access vlan 10`\n` switchport nonegotiate`\n` switchport port-security`\n` switchport port-security maximum 2`\n` switchport port-security mac-address sticky`\n` switchport port-security violation restrict`\n`interface Gi0/1`\n` switchport trunk encapsulation dot1q`\n` switchport mode trunk`\n` switchport nonegotiate`"
+    },
+    {
+      "level": "چالشی",
+      "task": "در یک سوئیچ دسترسی در VLAN 10 هم‌زمان `DHCP Snooping` و `DAI` فعال است (`Gi0/1` به روتر دروازه و سرور DHCP وصل است). یک چاپگر شبکه با IP استاتیک `10.10.10.200` (`MAC: 02:00:00:00:aa:bb`) به `Gi0/4` وصل می‌شود اما پس از چند ثانیه هیچ‌کس نمی‌تواند به آن متصل شود و سوئیچ لاگ `%SW_DAI-4-DHCP_SNOOPING_DENY` روی `Gi0/4` چاپ می‌کند! علت دقیق چیست و دو راه‌حل استاندارد آن کدامند؟",
+      "hint": "چاپگر آدرسش را از DHCP نگرفته؛ پس آیا رکوردی در DHCP Snooping Binding Database دارد؟",
+      "solution": "چون چاپگر IP ثابت دارد و مبادلهٔ DHCP انجام نداده، هیچ رکوردی در جدول Binding ثبت نشده؛ بنابراین DAI بسته‌های ARP چاپگر روی پورت Untrusted `Gi0/4` را جعلی می‌شمارد و Drop می‌کند. راه‌حل‌های استاندارد: ۱) تعریف یک **ARP ACL** و اعمال استاتیک آن به DAI (`arp access-list PRINTER_ARP` -> `permit ip host 10.10.10.200 mac host 0200.0000.aabb` و `ip arp inspection filter PRINTER_ARP vlan 10`)؛ یا ۲) بهتر از آن، دادن **DHCP Reservation** روی سرور DHCP به MAC چاپگر تا IP همیشه ثابت بماند اما از چرخهٔ DHCP رد شده و در Binding ثبت شود."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "در زمان پیاده‌سازی Extended ACL روی شبکه، قاعدهٔ طراحی استاندارد این است که آن را کجا قرار دهیم؟",
+      "opts": [
+        "نزدیک‌ترین مکان به مبدأ ترافیک تا بسته‌های غیرمجاز پهنای باند مسیر را اشغال نکنند",
+        "نزدیک‌ترین مکان به مقصد تا همه دسترسی‌ها آزمایش شوند",
+        "فقط روی سرور DNS",
+        "فقط روی اینترفیس Loopback0"
+      ],
+      "ans": 0,
+      "exp": "Extended ACL هم IP و هم پورت مبدأ/مقصد را تشخیص می‌دهد؛ بنابراین با قرار دادن آن نزدیک به مبدأ، ترافیک غیرمجاز همان ابتدا Drop می‌شود (برخلاف Standard ACL که نزدیک مقصد گذاشته می‌شود)."
+    },
+    {
+      "q": "کدام حالت واکنش در Port Security علاوه بر مسدود کردن فریم‌های MAC غیرمجاز، پیام لاگ Syslog هم ارسال می‌کند ولی پورت را برای دستگاه مجاز قبلی همچنان روشن نگه می‌دارد؟",
+      "opts": [
+        "shutdown",
+        "protect",
+        "restrict",
+        "sticky"
+      ],
+      "ans": 2,
+      "exp": "`shutdown` پورت را `err-disabled` می‌کند؛ `protect` بی‌سروصدا Drop می‌کند؛ و `restrict` با ارسال لاگ و افزایش شمارنده بدون خاموش کردن پورت فریم غیرمجاز را Drop می‌کند."
+    },
+    {
+      "q": "چرا فعال‌سازی Dynamic ARP Inspection (DAI) بدون داشتن جدول DHCP Snooping Binding (یا ARP ACL) روی همان VLAN باعث قطع شدن ترافیک کلاینت‌ها می‌شود؟",
+      "opts": [
+        "چون DAI سرعت پورت را به ۱۰ مگابیت کم می‌کند",
+        "چون DAI برای اعتبارسنجی بسته‌های ARP به جدول Binding تکیه دارد و در نبود آن بسته‌های ARP روی پورت‌های Untrusted را جعلی تلقی و Drop می‌کند",
+        "چون DAI به جای لایه ۲ در لایه ۷ کار می‌کند",
+        "چون DAI فقط در IPv6 کار می‌کند"
+      ],
+      "ans": 1,
+      "exp": "DAI هر بستهٔ ARP ورودی از پورت‌های Untrusted را با جدول DHCP Snooping Binding (یا ARP ACL دستی) مقایسه می‌کند؛ در نبود این پایگاه داده همهٔ بسته‌های ARP رد می‌شوند."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "ACL، Port Security، DHCP Snooping، DAI و STP Guards لایهٔ دفاع محیطی و دسترسی در تمام شبکه‌های استاندارد سازمانی را تشکیل می‌دهند.",
+    "nextQuestion": "تا اینجا ترافیک روی سیم را فیلتر و پورت‌های سوئیچ را ایمن کردیم؛ اما پسوردهای محلی روی تک‌تک روترها هنوز مرکزی نیستند، ترافیک بین دو شعبه روی اینترنت عمومی بدون رمزنگاری عبور می‌کند و خودِ سیستم‌عامل روتر هم نیاز به مستحکم‌سازی (Hardening) دارد. چطور احراز هویت متمرکز (AAA)، تونل رمزنگاری VPN و Hardening تجهیزات را پیاده کنیم؟",
+    "nextId": "ccna_acl"
+  }
+}

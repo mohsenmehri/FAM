@@ -1,0 +1,229 @@
+{
+  "id": "adv_pvl",
+  "faculty": "دانشکده ۲ · مهندسی پیشرفته",
+  "title": "Private VLAN، Voice VLAN و بهینه‌سازی VLAN Pruning",
+  "lead": "چطور می‌توانیم ۵۰ سرور در یک کلود میزبانی یا ۸۰ اتاق یک هتل را داخل یک زیرشبکهٔ واحد (`198.51.100.0/24`) بگذاریم تا هیچ IPی برای Gatewayهای متعدد هدر نرود، اما نگذاریم سرور ۱ بتواند مستقیم به سرور ۲ فریم لایه ۲ (یا حملهٔ ARP/اسکن محلی) بفرستد؟",
+  "goal": "طراحی و پیکربندی کامل Private VLAN (شامل Primary، Isolated و Community VLAN و نقش پورت‌های Promiscuous و Host)، درک دقیق جداسازی ترافیک در Voice VLAN و بهینه‌سازی ترافیک ترانک با VLAN Pruning.",
+  "prereq": "تسلط بر VLAN، Trunk 802.1Q، Voice VLAN پایه و VTP (درس‌های ccna_02_vlan و ccna_qos_ssh).",
+  "sections": [
+    {
+      "h": "۱. مسئلهٔ هدررفت IP در ایزوله‌سازی مشتریان و راه‌حل Private VLAN (PVLAN)",
+      "p": [
+        "در شبکه‌های اشتراکی (مثل DMZ سرورها، اتاق‌های هتل یا دیتاسنتر چندمستأجری)، اگر بخواهیم هر مشتری از بقیه در لایه ۲ ایزوله باشد، روش سنتی یعنی ساختن ۵۰ VLAN مجزا با ۵۰ زیرشبکهٔ `/30` یا `/29`: هر سابنت آدرس Network، Broadcast و یک Gateway هدر می‌دهد و مدیریت ده‌ها SVI و ACL را پیچیده می‌کند!",
+        "**Private VLAN (PVLAN)** یک Domain لایه ۲ را به دو لایه می‌شکند: یک **Primary VLAN** (مثلاً `VLAN 100`) که تمام سرورها و روتر دروازه متعلق به آن هستند، و چندین **Secondary VLAN** زیر مجموعهٔ آن که قوانین دسترسی بین پورت‌ها را تعیین می‌کنند:"
+      ],
+      "bullets": [
+        "**Isolated VLAN (مثلاً `VLAN 101`):** سخت‌گیرانه‌ترین حالت—ترافیک پورت‌های `Host` داخل یک Isolated VLAN **به هیچ وجه نمی‌تواند به هیچ پورت دیگر حتی در همان VLAN 101 برود**؛ تنها اجازه دارد با پورت **`Promiscuous`** (مثل روتر دروازه یا فایروال) صحبت کند.",
+        "**Community VLAN (مثلاً `VLAN 102`):** اعضای یک Community خاص (مثلاً دو سرور یک مشتری واحد: وب‌سرور و دیتابیس او) **می‌توانند با هم** و با پورت **`Promiscuous`** صحبت کنند، اما کاملاً از بقیهٔ Communityها و پورت‌های Isolated جدا هستند.",
+        "**Promiscuous Port (پورت آزاد مثل روتر یا فایروال):** می‌تواند با **همهٔ** پورت‌ها (چه Isolated و چه تمام Communityها) درون آن PVLAN ارتباط بگیرد. در تنظیمات اینترفیس با `switchport mode private-vlan promiscuous` و `mapping` تعریف می‌شود."
+      ],
+      "think": {
+        "q": "دو سرور `S1` و `S2` هر دو در `Isolated VLAN 101` (زیرمجموعهٔ Primary `100`) قرار دارند و به پورت‌های Host وصلند. اگر یک روتر با `Proxy ARP` روشن به‌عنوان پورت `Promiscuous` متصل باشد، آیا `S1` ممکن است بتواند از طریق لایه ۳ به `S2` برسد؟",
+        "a": "بله! **PVLAN در لایه ۲** ارتباط مستقیم سوئیچی بین `S1` و `S2` را کاملاً مسدود می‌کند؛ اما اگر `Proxy ARP` روی روترِ Promiscuous روشن باشد یا ترافیک با ACL اجازه یابد، بسته به روتر رفته و از طریق روتر برمی‌گردد! بنابراین برای ایزولاسیون کامل در لایه ۳ هم باید `no ip proxy-arp` و ACL/Firewall مناسب روی دروازه اعمال کرد."
+      }
+    },
+    {
+      "h": "۲. شرط VTP برای Private VLAN و تفاوت با Protected Port",
+      "p": [
+        "برای تعریف PVLAN روی سوئیچ‌های Catalyst سیسکو یک پیش‌نیاز اجباری وجود دارد: در **VTPv1 و VTPv2**، سوئیچ حتماً باید در حالت **`vtp mode transparent`** (یا `off`) باشد چون VTP نسخه‌های ۱ و ۲ نگاشت PVLAN را نمی‌شناسند (در **VTPv3** پشتیبانی کامل توزیع PVLAN اضافه شده است).",
+        "همچنین اگر فقط روی **یک سوئیچ تکی** نیاز به ایزولاسیون ساده دارید و نمی‌خواهید وارد پیچیدگی PVLAN شوید، ویژگی سبک‌تر **`switchport protected`** (Protected Port) وجود دارد: دو پورت `protected` روی یک سوئیچ نمی‌توانند مستقیم با هم حرف بزنند، ولی هر دو با پورت‌های عادی (Non-Protected مثل روتر) ارتباط دارند. تفاوتش با PVLAN این است که `Protected Port` از ترانک بین چند سوئیچ عبور نمی‌کند و فقط محلی در همان یک سوئیچ است."
+      ],
+      "bullets": []
+    },
+    {
+      "h": "۳. Voice VLAN در جزئیات و بهینه‌سازی ترافیک با VLAN Pruning",
+      "p": [
+        "در کنار ایزولاسیون سرورها، در دفاتر کاری پورت تلفن IP به‌طور هوشمند هم‌زمان دو VLAN را بدون اینکه کامپیوتر پشت تلفن نیاز به درایور 802.1Q داشته باشد جدا می‌کند: سوئیچ از طریق **CDP یا LLDP-MED** به تلفن IP می‌فهماند شماره **Voice VLAN** (مثلاً `VLAN 50`) چیست؛ تلفن فریم‌های صدای خودش را با تگ 802.1Q و **CoS = 5** می‌فرستد، در حالی که فریم‌های کامپیوترِ متصل به پورت پشت تلفن را **بدون تگ (Untagged)** عبور می‌دهد تا در `Access VLAN` (مثلاً `VLAN 10`) بیفتند.",
+        "در سطح ترانک‌های میان سوئیچ‌ها نیز، اگر VLAN 30 فقط در ساختمان B کاربر دارد، فرستادن Broadcastهای آن به ۲۰ سوئیچ دیگر هدررفت پهنای باند است. دو راه برای **VLAN Pruning (هرس کردن ترافیک اضافه)** داریم: ۱) **دستی (توصیه‌شده و امن‌ترین روش):** استفاده از `switchport trunk allowed vlan ...` روی هر ترانک؛ ۲) **خودکار با VTP Pruning (`vtp pruning`):** سوئیچ‌ها با پیام‌های VTP Join اعلام می‌کنند کدام VLAN را لازم ندارند تا Broadcast آن برایشان نفرستاده شود (توجه: VLAN 1 به‌طور پیش‌فرض هرگز هرس نمی‌شود!)."
+      ],
+      "think": {
+        "q": "سناریوی خطا: مهندسی تمام مراحل PVLAN (Primary 100 و Isolated 101) را روی `SW1` می‌نویسد و پورت‌های سرور را هم `private-vlan host` می‌کند، اما هنگام زدن دستور `private-vlan primary` روی VLAN 100 با پیام خطای `% Private VLANs can only be configured when VTP is in transparent/off mode` (در VTPv1/v2) مواجه می‌شود، و پس از رفع آن یادش می‌رود ترانک بین `SW1` و `SW2` را برای هر دو VLAN `100` و `101` باز بگذارد! نتیجه چیست؟",
+        "a": "در غیاب `vtp mode transparent` (یا VTPv3) اصلاً دستور PVLAN پذیرفته نمی‌شود. در بخش دوم نیز توجه کنید: هرچند پورت‌های `Host` روی کابل دسترسیِ سرور فریم را **بدون تگ (Untagged)** مبادله می‌کنند و سوئیچ داخل خودش آن را به Secondary VLAN (`101`) نگاشت می‌دهد، هنگام عبور از **لینک Trunk بین `SW1` و `SW2`** ترافیکِ ارسالی از Host با تگ `101` و پاسخ برگشتی از Promiscuous با تگ Primary (`100`) می‌رود؛ بنابراین اگر در ترانک هر دو VLAN (`100` و `101`) مجاز نباشند ارتباط یک‌طرفه قطع می‌شود!"
+      },
+      "bullets": []
+    }
+  ],
+  "analogy": "Private VLAN شبیه یک خوابگاه دانشجویی با یک راهروی مشترک (Primary VLAN 100) است: در بخش اتاق‌های تک‌نفره (Isolated VLAN 101)، درِ اتاق‌ها هیچ ارتباطی به اتاق کناری ندارد و فقط به سرپرست خوابگاه در پذیرش (Promiscuous Port) راه دارد؛ در بخش سوئیت‌های گروهی (Community VLAN 102)، هم‌اتاقی‌های یک سوئیت داخل سوئیت خودشان با هم حرف می‌زنند اما حق ورود به سوئیت‌های دیگر را ندارند. محل شکست تشبیه اینجاست: در سطح پورت دسترسی سرور، فریم روی سیم معمولاً بدون تگ (Untagged) است، ولی هنگام عبور بین دو سوئیچ روی ترانکِ بین‌سوئیچی، رفت با تگ Secondary و برگشت با تگ Primary حمل می‌شود؛ بنابراین حذف تصادفی VLAN اصلی یا فرعی از ترانک ارتباط را یک‌طرفه می‌بندد.",
+  "table": {
+    "title": "ماتریس ارتباط لایه ۲ در معماری Private VLAN",
+    "headers": [
+      "نوع پورت مبدأ / مقصد",
+      "Promiscuous",
+      "Isolated",
+      "Community A",
+      "Community B"
+    ],
+    "rows": [
+      [
+        "Promiscuous (روتر / فایروال)",
+        "بله",
+        "بله",
+        "بله",
+        "بله"
+      ],
+      [
+        "Isolated (سرورهای ایزوله)",
+        "بله",
+        "خیر (هرگز)",
+        "خیر",
+        "خیر"
+      ],
+      [
+        "Community A",
+        "بله",
+        "خیر",
+        "بله (فقط درون A)",
+        "خیر"
+      ],
+      [
+        "Community B",
+        "بله",
+        "خیر",
+        "خیر",
+        "بله (فقط درون B)"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "چرا هنگام تعریف یک سوئیچ به عنوان `Isolated` و افزودن آن به ترانک‌های معمولی، آیا فریم می‌تواند بین دو پورت Isolated روی دو سوئیچ مختلف از روی ترانک رد شود؟",
+      "a": "خیر! چون روی ترانک معمولی بین دو سوئیچِ آگاه به PVLAN، تگ `Isolated VLAN` حفظ می‌شود و سوئیچ دریافت‌کننده می‌داند هر فریمی که از ترانک با تگ Isolated برسد فقط حق رفتن به پورت `Promiscuous` را دارد نه به پورت‌های Host دیگر (و روی ترانک‌های `Promiscuous PVLAN Trunk` یا `Isolated PVLAN Trunk` سیسکو برای سوئیچ‌های قدیمی‌تر هم پشتیبانی وجود دارد)."
+    },
+    {
+      "q": "آیا برای یک کارمند که تلفن IP را پشت میز جابه‌جا می‌کند، `Port Security` روی پورت دارای `Voice VLAN` نیاز به تنظیم خاصی دارد؟",
+      "a": "بله؛ به دلیل اینکه روی یک پورت هم MAC تلفن در Voice VLAN و هم MAC کامپیوتر در Access VLAN می‌آید، حداقل `maximum 2` (و در عمل گاهی `3`) در تنظیمات Port Security لازم است تا پورت `err-disabled` نشود."
+    }
+  ],
+  "summary": "Private VLAN با تفکیک یک سابنت واحد به Primary VLAN و Secondary VLANهای `Isolated` و `Community`، ایزولاسیون لایه ۲ را بدون هدررفت IP و SVI پیاده می‌کند (با پیش‌نیاز VTP Transparent/VTPv3 و `no ip proxy-arp` در روتر). در کنار آن، `Voice VLAN` ترافیک صدا را به‌صورت تگ‌دار با CoS 5 از دیتای Untagged جدا می‌کند و `VLAN Pruning` (دستی یا VTP) از انتشار Broadcastهای غیرضروری روی ترانک‌ها می‌کاهد.",
+  "ciscoRef": "Cisco Catalyst Switching Configuration Guide — Private VLANs (RFC 5517), Voice VLAN & VTP Pruning",
+  "protocolAnalysis": [
+    "در پورت دارای `Voice VLAN`، سوئیچ با پیام TLV اختصاصی در **CDP** (یا **LLDP-MED** در تجهیزات غیردستی/چندبرندی) شماره Voice VLAN را به تلفن اعلام می‌کند و خود پورت در عمل مانند یک مینی-ترانکِ کنترل‌شده با یک VLAN تگ‌دار (صدا) و یک VLAN بدون تگ (داده) رفتار می‌کند.",
+    "در معماری RFC 5517، یک پورت Host معمولی روی سیم دسترسی با سرور به‌صورت **بدون تگ (Untagged)** ارتباط دارد و سوئیچ در داخل خودش فریم را به Secondary VLAN (`Isolated`/`Community`) نگاشت می‌دهد؛ اما روی لینک‌های Trunk میان سوئیچ‌ها، فریم‌های سمت Host با تگ Secondary و فریم‌های خروجی از Promiscuous با تگ Primary منتقل می‌شوند."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show interfaces Gi0/2 switchport",
+      "out": "Name: Gi0/2\nSwitchport: Enabled\nAdministrative Mode: static access\nVoice VLAN: 50",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای تأیید شماره `Access VLAN` و `Voice VLAN` و همچنین حالت لایه ۲ پورت.",
+      "why": "برای بررسی اینکه آیا `Voice VLAN` دقیقاً با شماره صحیح (مثلاً `50`) روی پورت تنظیم شده و پورت در چه مد Access/Trunk است.",
+      "anatomy": "خط پایانی `Voice VLAN` مقدار تنظیم‌شده را نمایش می‌دهد و خط `Access Mode VLAN` VLAN دیتای کامپیوتر را نشان می‌دهد.",
+      "lookFor": "جدا بودن شماره `Access Mode VLAN` و `Voice VLAN` و فعال بودن پورت.",
+      "ifUnexpected": "اگر `Voice VLAN: none` بود، با `switchport voice vlan <id>` آن را تنظیم کنید. توجه: خروجی دستور تخصصی `show vlan private-vlan` در شبیه‌ساز سبک داخلی پیاده‌سازی نشده و نیازمند سوئیچ Catalyst یا EVE-NG/CML است.",
+      "executable": true
+    },
+    {
+      "cmd": "show interfaces trunk",
+      "out": "Port        Mode             Encapsulation  Status        Native vlan\nGi0/1       on               802.1q         trunking      1\n\nPort        Vlans allowed on trunk\nGi0/1       1,10,20",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای اجرای **Manual VLAN Pruning** و بررسی VLANهای مجاز روی ترانک `Gi0/1`.",
+      "why": "بهترین و امن‌ترین روش هرس کردن ترافیک اضافه روی ترانک، محدود کردن لیست `Vlans allowed on trunk` فقط به VLANهای مورد نیاز آن سمت است (به‌علاوه در PVLAN باید هر دو VLAN Primary و Secondary در لیست ترانک باشند).",
+      "anatomy": "بخش دوم خروجی دقیقاً فهرست VLANهای مجاز عبور روی ترانک را چاپ می‌کند.",
+      "lookFor": "نبود VLANهای غیرمرتبط در ترانک‌های شعبه‌ای و حضور هر دو Primary و Secondary در ترانک‌های PVLAN.",
+      "ifUnexpected": "برای اصلاح لیست مجاز، با `switchport trunk allowed vlan` لیست را دقیق بنویسید.",
+      "executable": true
+    },
+    {
+      "cmd": "show vlan private-vlan",
+      "out": "Primary Secondary Type              Ports\n------- --------- ----------------- ------------------------------------------\n100     101       isolated          Gi0/1, Gi0/4\n100     102       community         Gi0/1, Gi0/5",
+      "note": "نمایش نگاشت Primary به Secondary در PVLAN. [نکتهٔ شبیه‌ساز: این دستور در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و خروجی بالا صرفاً یک نمونهٔ آموزشی مرجع است؛ تمرین زندهٔ PVLAN نیازمند سوئیچ واقعی Catalyst یا EVE-NG/CML است (بسیاری ایمیج‌های سبک فاقد پشتیبانی کامل PVLAN هستند).]",
+      "why": "تأیید اینکه ارتباط بین VLAN Primary و Secondaryها برقرار شده و پورت‌های Promiscuous و Host صحیح متصلند.",
+      "anatomy": "ستون `Primary` (`100`), `Secondary` (`101`, `102`), نوع (`isolated` یا `community`) و لیست پورت‌های درگیر را نشان می‌دهد.",
+      "lookFor": "دیده شدن پورت `Promiscuous` (`Gi0/1`) در *همه* سطرها و پورت‌های سرور در سطر متناسب.",
+      "ifUnexpected": "اگر پورتی دیده نمی‌شود، دستور `switchport private-vlan host-association` یا `mapping` روی پورت فراموش شده است.",
+      "executable": false
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه Voice VLAN، قفل پورت و Manual VLAN Pruning روی ترانک",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `switchport mode private-vlan` و `vtp pruning` را اجرا نمی‌کند (برای تمرین زندهٔ PVLAN از سوئیچ Catalyst یا CML/EVE-NG با ایمیج L2 مناسب استفاده کنید). در اینجا پیکربندی زندهٔ `Voice VLAN` روی پورت کاربر و `Manual VLAN Pruning` روی ترانک `Gi0/1` را انجام می‌دهیم.",
+      "۲. با `enable` وارد شوید و ابتدا `show interfaces trunk` و `show interfaces status` را بزنید تا وضعیت ترانک `Gi0/1` (`1,10,20`) و پورت خاموش `Gi0/2` را ببینید.",
+      "۳. برای پورت `Gi0/2`، یک `VLAN 50` (`VOICE`) بسازید، پورت را در حالت `Access VLAN 10` و `Voice VLAN 50` بگذارید و روشنش کنید؛ سپس روی ترانک `Gi0/1` با Manual Pruning فقط VLANهای مورد نیاز `10,20,50` را اجازه دهید (`VLAN 1` را از لیست ترافیک کاربر حذف کنید): `configure terminal` -> `vlan 50` -> `name VOICE` -> `exit` -> `interface Gi0/2` -> `switchport mode access` -> `switchport access vlan 10` -> `switchport voice vlan 50` -> `no shutdown` -> `interface Gi0/1` -> `switchport trunk allowed vlan 10,20,50` -> `end`.",
+      "۴. با `show interfaces Gi0/2 switchport`، `show interfaces trunk` و `show running-config` زنده تایید کنید `Voice VLAN 50` روی `Gi0/2` فعال و ترانک `Gi0/1` به `10,20,50` هرس (Prune) شده است."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show interfaces Gi0/2 switchport",
+      "show interfaces trunk",
+      "show running-config"
+    ]
+  },
+  "troubleshooting": {
+    "fault": "در یک شبکهٔ میزبانی، PVLAN (با Primary `100` و Isolated `101`) روی سوئیچ دسترسی تنظیم شده و سرورهای `S1` و `S2` به درستی نمی‌توانند مستقیم هم را پینگ کنند—اما به محض اینکه ادمین می‌خواهد یک ارتباط کنترلی از طریق روترِ دروازه برقرار کند یا برعکس ترافیک یک مشتری بدون بازگشت می‌ماند، متوجه می‌شود فریم‌ها بین سوئیچ دسترسی و سوئیچ توزیع (که روتر به آن وصل است) قطع هستند.",
+    "analysis": "در ترانک میان سوئیچ دسترسی و سوئیچ توزیع، فقط `VLAN 100` (Primary) مجاز شده و `VLAN 101` (Isolated) از لیست `allowed vlan` جا افتاده است (یا روی سوئیچ توزیع اصلاً VLAN 101 و Association آن ساخته نشده بود). هنگام عبور از ترانک، ترافیک خروجی از سرور با تگ `101` و ترافیک برگشتی از پورت Promiscuous با تگ `100` حمل می‌شود؛ نبود هر کدام روی ترانک ارتباط را یک‌طرفه قطع می‌کند.",
+    "fix": "روی هر دو سوئیچ وضعیت VTP را روی Transparent/VTPv3 قرار داده، هر دو VLAN `100` و `101` و `association` آن‌ها را بسازید و روی ترانک میانی دستور `switchport trunk allowed vlan add 100,101` را اعمال کنید."
+  },
+  "misconceptions": [
+    {
+      "myth": "در `Private VLAN` اگر پورت‌های سرور در `Isolated VLAN` باشند، حتی از طریق روترِ Gateway هم هرگز نمی‌توانند به هم برسند.",
+      "reality": "PVLAN فقط **ارتباط مستقیم لایه ۲ در سوئیچ** را مسدود می‌کند. اگر روتر دروازه `Proxy ARP` فعال داشته باشد یا روتینگ بین آن دو IP مجاز باشد، بسته تا روتر Promiscuous رفته و به سرور دیگر برگردانده می‌شود؛ بنابراین برای ایزولاسیون کامل در لایه ۳ نیز باید `no ip proxy-arp` و ACL/Firewall تنظیم شود.",
+      "howToSpot": "اگر بین دو سرور Isolated `ping` برقرار شد ولی `arp -a` روی هر دو آدرس MAC **روتر** را به جای MAC سرور دیگر نشان داد، یعنی ترافیک از روتر دور زده است."
+    },
+    {
+      "myth": "در `Voice VLAN` حتماً باید پورت سوئیچ را دستی روی `switchport mode trunk` قرار دهیم تا صدای تگ‌دار و دیتای بدون تگ هم‌زمان رد شوند.",
+      "reality": "برای پورت تلفن IP روی سوئیچ سیسکو، پورت حتماً باید در مد `switchport mode access` با دستور `switchport voice vlan <id>` تنظیم شود (نه `trunk` کامل، که تمام VLANها را باز بگذارد و امنیت را به خطر بیندازد).",
+      "howToSpot": "با `show interfaces Gi0/x switchport` ببینید `Administrative Mode: static access` است و هم‌زمان `Voice VLAN` مقدار دارد."
+    }
+  ],
+  "exercise": "تنظیمات کامل یک سوئیچ (VTP Transparent) را برای ساخت Primary VLAN `200`، Isolated VLAN `201` و Community VLAN `202` بنویسید به‌طوری که `Gi0/1` پورت Promiscuous (متصل به فایروال)، `Gi0/3` عضو Isolated و `Gi0/4` عضو Community باشند.",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "در یک شبکهٔ PVLAN، پورت‌های `P1`, `P2` در Isolated `101`، پورت‌های `C1`, `C2` در Community `102`، پورت `C3` در Community `103` و پورت `FW` در حالت Promiscuous هستند. مشخص کنید کدام جفت‌ها می‌توانند مستقیماً در لایه ۲ با هم ارتباط بگیرند: الف) `P1` با `P2`، ب) `C1` با `C2`، ج) `C1` با `C3`، د) `P1` با `FW`.",
+      "hint": "جدول ماتریس PVLAN را مرور کنید: Isolated هیچ هم‌نوعی نمی‌بیند، Community فقط هم‌گروه خودش را می‌بیند، و Promiscuous همه را می‌بیند.",
+      "solution": "الف) `P1` با `P2`: خیر (هر دو Isolated)؛ ب) `C1` با `C2`: بله (یک Community مشترک)؛ ج) `C1` با `C3`: خیر (دو Community مجزا)؛ د) `P1` با `FW`: بله (ارتباط با Promiscuous)."
+    },
+    {
+      "level": "متوسط",
+      "task": "دستورات کامل IOS را برای ساخت Primary `200`، Isolated `201`، Community `202` و اتصال پورت `Gi0/1` (Promiscuous)، `Gi0/3` (Isolated) و `Gi0/4` (Community) بنویسید.",
+      "hint": "نخست `vtp mode transparent`، سپس ساخت VLANهای Secondary، بعد Primary با `private-vlan association 201,202` و در آخر تنظیم پورت‌ها.",
+      "solution": "`vtp mode transparent`\n`vlan 201`\n` private-vlan isolated`\n`vlan 202`\n` private-vlan community`\n`vlan 200`\n` private-vlan primary`\n` private-vlan association 201,202`\n`interface Gi0/1`\n` switchport mode private-vlan promiscuous`\n` switchport private-vlan mapping 200 201,202`\n`interface Gi0/3`\n` switchport mode private-vlan host`\n` switchport private-vlan host-association 200 201`\n`interface Gi0/4`\n` switchport mode private-vlan host`\n` switchport private-vlan host-association 200 202`"
+    },
+    {
+      "level": "چالشی",
+      "task": "چرا هنگام استفاده از `Manual VLAN Pruning` (دستور `switchport trunk allowed vlan ...`) به جای `VTP Pruning`، در شبکه‌های تولیدی باید حواسمان به `Native VLAN` و VLANهای مدیریتی باشد و در صورت نیاز به افزودن یک VLAN جدید از چه کلمه‌ای استفاده می‌کنیم تا ترافیک کل شرکت قطع نشود؟",
+      "hint": "اشتباه تایپی در `allowed vlan` یکی از رایج‌ترین علت‌های قطعی در شبکهٔ عملیاتی است.",
+      "solution": "۱) در برخی قابلیت‌ها یا توپولوژی‌ها، حذف تصادفی `Native VLAN` یا VLAN مدیریتی (`SVI`) و یا فراموش کردن `VLAN` مربوط به روتینگ باعث قطع دسترسی از راه دور به سوئیچ می‌شود (همیشه `VLAN`های کنترلی را نگه دارید). ۲) هنگام افزودن یک VLAN تازه به ترانکِ از قبل هرس‌شده، حتماً باید از کلمهٔ کلیدی **`add`** (`switchport trunk allowed vlan add <id>`) استفاده کرد؛ اگر `add` فراموش شود کل لیست قبلی پاک و فقط همان VLAN جدید جایگزین می‌گردد."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "برای پیاده‌سازی Private VLAN روی سوئیچی که با VTP نسخه ۱ یا ۲ کار می‌کند، چه پیش‌نیازی الزامی است؟",
+      "opts": [
+        "VTP باید حتماً روی Server نسخه ۱ قفل شود",
+        "تمام پورت‌ها باید Half-Duplex شوند",
+        "باید حتماً BGP فعال باشد",
+        "سوئیچ باید در حالت `vtp mode transparent` (یا `off`) باشد"
+      ],
+      "ans": 3,
+      "exp": "VTPv1 و VTPv2 پیکربندی PVLAN را پشتیبانی نمی‌کنند و برای تعریف PVLAN مد VTP باید `transparent` (یا `off`) باشد؛ تنها VTPv3 از انتشار PVLAN پشتیبانی می‌کند."
+    },
+    {
+      "q": "در یک Private VLAN، پورت `Gi0/3` به یک سرور در `Community VLAN 102` متصل است. کدام یک از ارتباطات لایه ۲ زیر برای `Gi0/3` مجاز است؟",
+      "opts": [
+        "ارتباط مستقیم با سایر پورت‌های داخل همین `Community 102` و با پورت `Promiscuous`",
+        "فقط ارتباط با پورت‌های Isolated و هیچ پورت دیگری",
+        "ارتباط مستقیم با تمام Communityهای دیگر و تمام Isolatedها",
+        "هیچ ارتباطی حتی با روتر Promiscuous"
+      ],
+      "ans": 0,
+      "exp": "اعضای یک Community VLAN می‌توانند با هم‌گروهی‌های همان Community و با پورت Promiscuous ارتباط لایه ۲ بگیرند، اما از بقیهٔ Communityها و Isolatedها جدا هستند."
+    },
+    {
+      "q": "در پورت دارای `Voice VLAN`، فریم‌های صدای تلفن IP و فریم‌های دیتای کامپیوتر متصل به پشت تلفن چگونه از روی همان یک کابل به سوئیچ می‌رسند؟",
+      "opts": [
+        "هر دو بدون تگ و روی VLAN 1 ارسال می‌شوند",
+        "فریم‌های تلفن با تگ 802.1Q (و اولویت CoS 5) در Voice VLAN و فریم‌های کامپیوتر به‌صورت بدون تگ (Untagged) در Access VLAN ارسال می‌شوند",
+        "تلفن IP تمام داده‌های کامپیوتر را در IPsec رمزنگاری می‌کند",
+        "کامپیوتر باید همیشه دو کارت شبکه مجزا داشته باشد"
+      ],
+      "ans": 1,
+      "exp": "تلفن IP شماره Voice VLAN را از طریق CDP/LLDP-MED از سوئیچ گرفته و بسته‌های صدا را با تگ 802.1Q می‌فرستد، در حالی که فریم‌های کامپیوتر را بدون تگ عبور می‌دهد."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "Private VLAN در دیتاسنترها و شبکه‌های اشتراکی DMZ/هتلداری، Voice VLAN در دفاتر سازمانی و Manual Pruning در تمام ترانک‌های هسته-توزیع کاربرد دارند.",
+    "nextQuestion": "اکنون پورت‌های لایه ۲ را هم امن و هم هرس کردیم؛ اما اگر بین دو سوئیچ توزیع یک EtherChannel چهارکابلی ببندیم و ببینیم عملاً همهٔ ترافیک فقط از روی ۱ کابل رد می‌شود، یا در لبهٔ VLANها بخواهیم به‌جای بیکار ماندن روتر Standby در HSRP هر دو روتر هم‌زمان ترافیک کاربران را حمل کنند، چطور الگوریتم Hash و پروتکل‌های VRRP/GLBP را تنظیم کنیم؟",
+    "nextId": "adv_ec"
+  }
+}
