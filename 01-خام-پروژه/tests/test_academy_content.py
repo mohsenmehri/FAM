@@ -9,6 +9,8 @@ import json
 from html.parser import HTMLParser
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import unittest
 import xml.etree.ElementTree as ET
 
@@ -54,6 +56,17 @@ class AcademyContentTests(unittest.TestCase):
             for course in path.get("courses", []):
                 for lesson in course.get("lessons", []):
                     cls.records.append((path, course, lesson))
+
+    def test_progress_bridge_and_engines_behavior_in_node(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required for the JavaScript behavior test")
+        result = subprocess.run(
+            [node, str(PACKAGE_ROOT / "tests" / "academy_progress_behavior.js")],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("progress behavior passed", result.stdout)
 
     def test_catalog_has_unique_ids_and_resolvable_prerequisites(self):
         lesson_ids = [lesson["id"] for _, _, lesson in self.records]

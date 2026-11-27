@@ -9,8 +9,9 @@
       const arr = raw ? JSON.parse(raw) : [];
       if (Array.isArray(arr)) local = arr;
     } catch {}
-    const server = window.FamAcademyBridge?.progress?.completed;
-    return new Set([...(Array.isArray(server) ? server : []), ...local]);
+    const bridge = window.FamAcademyBridge;
+    const server = bridge?.progress?.completed;
+    return new Set(bridge ? (Array.isArray(server) ? server : []) : local);
   }
   function lessonIcon() {
     // Generic academy glyph; the catalog no longer carries per-lesson icons.

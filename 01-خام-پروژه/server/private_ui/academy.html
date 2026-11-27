@@ -28,6 +28,13 @@
         }
         return { completed: [], labs: {} };
       }
+      // Serialize writes so a slow earlier request cannot overwrite a newer state.
+      let saveQueue = Promise.resolve();
+      let saveSequence = 0;
+      function saveStatus(message) {
+        const node = document.getElementById('academy-save-status');
+        if (node) node.textContent = message;
+      }
       window.FamAcademyBridge = {
         user: boot.user || (boot.userName ? { username: boot.userName } : null),
         progress: readProgress(),
@@ -45,22 +52,32 @@
               daysPerWeek: Number.isFinite(Number(payload.profile.daysPerWeek)) ? Number(payload.profile.daysPerWeek) : 5
             } : undefined
           };
-          try {
-            localStorage.setItem('fam_academy_progress_v1', JSON.stringify(safe.completed));
-          } catch (_) {}
-          try {
-            const response = await fetch('/api/academy/progress', {
-              method: 'POST',
-              credentials: 'same-origin',
-              headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
-              body: JSON.stringify({ changes: { 'fam4.learn.v1': JSON.stringify(safe) } })
-            });
-            if (!response.ok) return false;
-            this.progress = safe;
-            return true;
-          } catch (e) {
-            return false;
+          // Keep the latest snapshot visible immediately, including removals.
+          // It is only durable on the server after a successful response.
+          const serialized = JSON.stringify(safe);
+          this.progress = JSON.parse(serialized);
+          const sequence = ++saveSequence;
+          saveStatus('در حال ذخیرهٔ پیشرفت…');
+          const save = async () => {
+            try {
+              const response = await fetch('/api/academy/progress', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+                body: JSON.stringify({ changes: { 'fam4.learn.v1': serialized } })
+              });
+              return response.ok;
+            } catch (_) {
+              return false;
+            }
+          };
+          const result = saveQueue.then(save, save);
+          saveQueue = result;
+          const ok = await result;
+          if (sequence === saveSequence) {
+            saveStatus(ok ? 'پیشرفت ذخیره شد.' : 'ذخیره نشد؛ اتصال را بررسی کنید. برای تلاش دوباره تغییری ثبت کنید.');
           }
+          return ok;
         }
       };
     })();
@@ -220,6 +237,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   </div>
 </header>
 
+  <div id="academy-save-status" role="status" aria-live="polite" style="padding:0 20px;color:var(--warn)"></div>
   <main class="container" id="app-root"></main>
 
   <script src="/academy-assets/lesson-engine.js?v=20261123c"></script>

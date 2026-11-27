@@ -11,9 +11,15 @@
       const obj = raw ? JSON.parse(raw) : {};
       if (obj && typeof obj === 'object' && !Array.isArray(obj)) local = obj;
     } catch {}
-    const remote = window.FamAcademyBridge?.progress?.labs?.sections;
-    return remote && typeof remote === 'object' && !Array.isArray(remote)
-      ? { ...remote, ...local } : local;
+    // Authenticated progress is account-specific; browser-wide legacy keys
+    // may belong to a different user on the same device.
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      const remote = bridge.progress?.labs?.sections;
+      return remote && typeof remote === 'object' && !Array.isArray(remote)
+        ? { ...remote } : {};
+    }
+    return local;
   }
 
   function persistProgress(completed, labsOverride) {
@@ -53,8 +59,9 @@
       const arr = raw ? JSON.parse(raw) : [];
       if (Array.isArray(arr)) local = arr;
     } catch {}
-    const remote = window.FamAcademyBridge?.progress?.completed;
-    return [...new Set([...(Array.isArray(remote) ? remote : []), ...local])];
+    const bridge = window.FamAcademyBridge;
+    const remote = bridge?.progress?.completed;
+    return [...new Set(bridge ? (Array.isArray(remote) ? remote : []) : local)];
   }
 
   function isLessonDone(lessonId) {
