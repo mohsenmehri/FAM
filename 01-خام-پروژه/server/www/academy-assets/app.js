@@ -597,7 +597,9 @@
         reply = `Tracing the route to ${ip}\n  1 * * *\n  2 * * * (مقصد در دسترس نیست یا پورت خروجی خاموش است)`;
       }
     } else if (ACADEMY && ACADEMY.cliResponses && ACADEMY.cliResponses[low]) {
-      reply = ACADEMY.cliResponses[low] + '\n\n[یادداشت شبیه‌ساز: این خروجی یک نمونهٔ ثابت آموزشی است و به تغییرات فعلی شما واکنش نشان نمی‌دهد.]';
+      const cr = ACADEMY.cliResponses[low];
+      const tag = cr.executable ? '' : '[فرمان مرجع غیر قابل اجرا - خروجی نمونهٔ ثابت]\n';
+      reply = tag + cr.output;
     } else {
       reply = `% دستور "${cmd}" در این شبیه‌ساز پشتیبانی نمی‌شود. برای دیدن دستورات پشتیبانی‌شده عبارت help را بزنید.`;
     }
@@ -1086,6 +1088,20 @@
       });
   }
 
+  /* helper: آیا دستور در شبیه‌ساز légère اجرا می‌شود؟ */
+  function is_native_cmd(cmdStr) {
+    const c = String(cmdStr || '').trim().toLowerCase();
+    const nativeExact = ['help','enable','en','configure terminal','conf t','exit','end','clear','reset lab'];
+    const nativeStarts = ['do ','interface ','int ','vlan ','name ','description ','shutdown','no shutdown',
+      'switchport mode access','switchport mode trunk','switchport access vlan','switchport voice vlan',
+      'switchport trunk native vlan','switchport trunk allowed vlan','switchport nonegotiate','no switchport nonegotiate',
+      'show running-config','sh run','show ip interface brief','sh ip int br','show interfaces status','sh int status',
+      'show vlan brief','sh vlan br','show interfaces trunk','sh int trunk','show interfaces ','ping ','traceroute ','show ip route static'];
+    if (nativeExact.includes(c)) return true;
+    for (const p of nativeStarts) if (c.startsWith(p)) return true;
+    return false;
+  }
+
   function renderLessonArticle(lessonObj) {
     const host = $('#lessonArticle');
     if (!host || !lessonObj) return;
@@ -1259,7 +1275,10 @@
     lessonObj.iosCommands.forEach(c => {
       const box = el('div', 'mini-info');
       box.style.marginBottom = '10px';
+      const exeBadge = el('span', '', c.executable ? '✓ قابل اجرا' : '✕ مرجع غیر قابل اجرا');
+      exeBadge.style = 'font-size:10px;padding:2px 6px;border-radius:3px;background:' + (c.executable ? '#d1fae5' : '#fecaca') + ';color:' + (c.executable ? '#065f46' : '#991b1b') + ';margin-left:8px;vertical-align:middle;';
       box.appendChild(el('b', '', c.cmd));
+      box.appendChild(exeBadge);
       const pre = el('pre', 'cli-out', c.out);
       pre.style.margin = '6px 0';
       box.appendChild(pre);
@@ -1314,6 +1333,11 @@
     const qRow = el('div', 'cli-quick');
     (lessonObj.lab.verifyCmds || ['show ip interface brief']).forEach(cmdStr => {
       const qb = el('button', 'cli-qbtn', cmdStr);
+      const cr = ACADEMY && ACADEMY.cliResponses ? ACADEMY.cliResponses[cmdStr] : null;
+      const isExe = cr ? cr.executable : is_native_cmd(cmdStr);
+      const exeBadge = el('span', '', isExe ? '✓' : '✕');
+      exeBadge.style = 'font-size:10px;padding:1px 5px;border-radius:3px;background:' + (isExe ? '#d1fae5' : '#fecaca') + ';color:' + (isExe ? '#065f46' : '#991b1b') + ';margin-left:6px;vertical-align:middle;';
+      qb.appendChild(exeBadge);
       qb.addEventListener('click', () => runIosCommand(cmdStr, cliOut, cliPrompt));
       qRow.appendChild(qb);
     });
