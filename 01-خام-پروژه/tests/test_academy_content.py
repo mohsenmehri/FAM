@@ -168,7 +168,7 @@ class AcademyContentTests(unittest.TestCase):
                 if path["id"] == "fam-c5":
                     self.assertTrue(lesson["id"].startswith(("ccna-v11-", "ccna-v20-", "academy-stage-zero-")) or lesson["id"] in {"s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "ccna_01", "ccna_02"})
                 else:
-                    self.assertEqual(lesson["id"], "academy-automation-terraform")
+                    self.assertIn(lesson["id"], {"academy-automation-terraform", "auto_05"})
                 self.assertTrue(lesson["blueprint"].startswith("/academy-assets/v5/blueprints/"))
 
     def test_terraform_blueprint_embeds_the_actual_mock_source(self):
@@ -196,7 +196,11 @@ class AcademyContentTests(unittest.TestCase):
             blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
             with self.subTest(lesson=lesson["id"]):
                 self.assertGreaterEqual(len(blueprint.get("sections", [])), 14, lesson["id"])
-                self.assertEqual(blueprint.get("evidence"), "Designed — Not Run", lesson["id"])
+                if lesson["id"] == "auto_05":
+                    self.assertIn("پارس JSON و XML محلی", blueprint.get("evidence", ""))
+                    self.assertIn("روی تجهیز اجرا نشده", blueprint["evidence"])
+                else:
+                    self.assertEqual(blueprint.get("evidence"), "Designed — Not Run", lesson["id"])
                 self.assertGreaterEqual(len(blueprint.get("glossary", [])), 15, lesson["id"])
                 quiz = blueprint.get("interactiveQuiz", [])
                 self.assertEqual(len(quiz), 12, lesson["id"])
