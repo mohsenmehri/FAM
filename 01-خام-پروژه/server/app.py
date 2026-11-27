@@ -869,6 +869,76 @@ def create_app(config=None):
         response.headers['Content-Disposition'] = 'attachment; filename="fam-academy-progress.json"'
         return response
 
+    @app.get('/api/academy/progress/legacy-preview')
+    def preview_academy_legacy():
+        with connect() as db:
+            user, session = user_and_session(db)
+            if not hmac.compare_digest(request.headers.get('X-FAM-CSRF', ''), session['csrf']):
+                fail(403, 'توکن نشست برای بررسی پیشرفت لازم است.')
+            row=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
+        if not row:
+            fail(404, 'پیشرفت ذخیره‌شده‌ای وجود ندارد.')
+        def unique_object(pairs):
+            result={}
+            for key,value in pairs:
+                if key in result: raise ValueError('duplicate key')
+                result[key]=value
+            return result
+        def reject_constant(_): raise ValueError('non-finite number')
+        try:
+            outer=json.loads(row['payload'], object_pairs_hook=unique_object, parse_constant=reject_constant)
+            raw=outer.get('fam4.learn.v1') if isinstance(outer,dict) else None
+            legacy=json.loads(raw, object_pairs_hook=unique_object, parse_constant=reject_constant) if isinstance(raw,str) else None
+            if (not isinstance(legacy,dict) or 'completed' in legacy or
+                not isinstance(legacy.get('completedLessons'),list) or
+                not all(isinstance(x,str) for x in legacy['completedLessons'])):
+                raise ValueError('unknown or mixed schema')
+        except (ValueError,TypeError,RecursionError):
+            fail(409, 'قالب قدیمی قابل تشخیص نیست؛ هیچ تبدیلی انجام نشده است.')
+        return jsonify(revision=row['revision'], completedCount=len(legacy['completedLessons']),
+                       uniqueCompletedCount=len(set(legacy['completedLessons'])),
+                       retainedFields=[k for k in ('activeLesson','quizScores','notes','missions','examScore') if k in legacy],
+                       mappedCount=0, migrationAvailable=False)
+
+    @app.get('/api/academy/progress/backups')
+    def list_academy_progress_backups():
+        with connect() as db:
+            user, session = user_and_session(db)
+            if not hmac.compare_digest(request.headers.get('X-FAM-CSRF', ''), session['csrf']):
+                fail(403, 'توکن نشست برای مشاهده نسخه‌ها لازم است.')
+            current = db.execute('SELECT revision FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
+            rows = db.execute('''SELECT revision,saved_at FROM academy_progress_backups
+                                 WHERE user_id=? ORDER BY revision DESC LIMIT 50''', (user['id'],)).fetchall()
+        return jsonify(currentRevision=current['revision'] if current else 0,
+                       backups=[dict(row) for row in rows], limit=50)
+
+    @app.post('/api/academy/progress/restore')
+    def restore_academy_progress():
+        body=data()
+        if (not isinstance(body,dict) or set(body)!={'backupRevision','expectedRevision'} or
+            any(type(body[k]) is not int or not 0 <= body[k] <= 2**63-1 for k in body)):
+            fail(400, 'شناسه نسخه و نسخه فعلی معتبر لازم است.')
+        with transaction() as db:
+            user,_=user_and_session(db)
+            current=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
+            if not current or current['revision'] != body['expectedRevision']:
+                fail(409, 'پیشرفت تغییر کرده است؛ فهرست نسخه‌ها را دوباره دریافت کنید.')
+            if current['revision'] >= 2**63-1:
+                fail(409, 'نسخه پیشرفت به سقف رسیده است؛ با مدیر سامانه تماس بگیرید.')
+            saved=db.execute('SELECT payload FROM academy_progress_backups WHERE user_id=? AND revision=?',
+                             (user['id'],body['backupRevision'])).fetchone()
+            if not saved:
+                fail(404, 'نسخه پشتیبان این حساب یافت نشد.')
+            # Save even an unknown current payload verbatim before replacing it.
+            # A historical/unknown restored value remains locked by normal writes.
+            now=int(time.time()*1000)
+            db.execute('INSERT INTO academy_progress_backups(user_id,revision,payload,saved_at) VALUES(?,?,?,?)',
+                       (user['id'],current['revision'],current['payload'],now))
+            new_revision=current['revision']+1
+            db.execute('UPDATE academy_progress SET payload=?,revision=?,updated_at=? WHERE user_id=?',
+                       (saved['payload'],new_revision,now,user['id']))
+        return jsonify(ok=True, revision=new_revision)
+
     @app.get('/api/real/status')
     def real_device_status():
         # The Academy real-device bridge is intentionally disabled in this

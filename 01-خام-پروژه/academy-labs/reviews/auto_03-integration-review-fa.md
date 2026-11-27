@@ -1,0 +1,5 @@
+# auto_03 — بازبینی و ادغام انتخابی
+
+منبع `53aa6addf8df5e230384723cf2008be7403e0859`؛ ۱۴ بخش، نمودار، ۱۵ واژه، ۱۲ پرسش و همه گزینه‌ها و مدل مرور شد، بازبینی مستقل انسانی نیست. پاسخ‌ها: fallback مشروط، context، pilot و dry-run وابسته به task، شکنندگی sleep، نقش Nornir، ذخیره مشروط IOS-XE، محدودیت worker، اسرار، قابلیت Scrapli وابسته به نسخه، SimpleInventory، timeout و مرز Mock. مهم‌ترین اصلاح: صرف `dry_run=True` تضمین عدم تغییر در هر task/plugin یا `send_config_set` نیست. سنجش سلامت، host-key و rollback و احراز نتیجه مستقل لازم است. سرعت، template fallback، پایداری و پشتیبانی platform/transport مشروط شد. مستندات [خطای task در Nornir](https://nornir.readthedocs.io/en/latest/tutorial/failed_tasks.html) و [Scrapli و تغییر معماری نسخه‌ها](https://carlmontanari.github.io/scrapli/) مبنای مرزها هستند.
+
+Python Mock صرفاً داده مصنوعی در حافظه را شبیه‌سازی می‌کند؛ مقدار applied تنها نتیجه مدل است. تأیید نوع commands و تست بستن context با استثنا، fallback مدل، pilot، flags و worker انجام شد. هیچ Netmiko/Nornir، SSH، router یا آزمایش تولیدی اجرا نشد؛ تکه کد مرجع نیز اجرا نشده است. مهاجرت پیشرفت انجام نشده.
