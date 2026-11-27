@@ -8,6 +8,7 @@ import json
 import xml.etree.ElementTree as ET
 
 SAMPLE_JSON = '{"hostname": "edge-01", "vlans": [10, 20], "active": true}'
+INVALID_JSON_RFC8259 = "{'hostname': 'edge-01', 'active': True,}"
 
 SAMPLE_NETCONF_XML = """
 <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces">
@@ -24,6 +25,15 @@ YAML_11_BOOL_LITERALS = frozenset({"yes", "no", "on", "off", "true", "false", "y
 def parse_json_strict(raw_json: str) -> dict[str, object]:
     """Parse strict RFC 8259 JSON (double quotes, lowercase true/false, no trailing commas)."""
     return json.loads(raw_json)
+
+
+def check_invalid_json_rejected(raw_json: str) -> dict[str, object]:
+    """Verify non-RFC 8259 input (single quotes, True, trailing comma) raises JSONDecodeError."""
+    try:
+        json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        return {"invalid_rfc8259_json_rejected": True, "error": exc.msg}
+    return {"invalid_rfc8259_json_rejected": False, "error": ""}
 
 
 def detect_yaml_11_norway_trap(unquoted_scalar: str) -> dict[str, object]:
@@ -55,6 +65,9 @@ def parse_xml_with_namespace(xml_text: str) -> list[dict[str, str]]:
 def main() -> None:
     print("Local Python serialization lab only — no real RESTCONF/NETCONF device is contacted.")
     print("Parsed JSON:", parse_json_strict(SAMPLE_JSON))
+    invalid_check = check_invalid_json_rejected(INVALID_JSON_RFC8259)
+    assert invalid_check["invalid_rfc8259_json_rejected"] is True
+    print("Invalid RFC 8259 JSON check:", invalid_check)
     print("YAML 1.1 Norway trap ('NO'):", detect_yaml_11_norway_trap("NO"))
     print("YAML 1.1 safe string ('IR'):", detect_yaml_11_norway_trap("IR"))
     print("Parsed XML with Namespace:", parse_xml_with_namespace(SAMPLE_NETCONF_XML))

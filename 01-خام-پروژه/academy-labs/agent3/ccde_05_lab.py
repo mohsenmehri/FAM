@@ -1,24 +1,40 @@
 #!/usr/bin/env python3
 """
-Local Mock Lab — ccde_05 (CCDE Data Center Architecture: Speed-of-Light DCI RTT, Sync vs Async & Active/Active)
-Calculates fiber speed-of-light RTT (~1 ms per 100 km round-trip), determines Synchronous vs Asynchronous
-storage replication feasibility, and evaluates Active/Active DCI vs L3-only DCI with GSLB.
-No real DWDM optical equipment or data center fabrics are connected.
+Local Mock Lab — ccde_05 (CCDE Data Center Architecture: Speed-of-Light DCI RTT, Product-Conditioned Sync vs Async & L3 DCI)
+Calculates ideal fiber speed-of-light RTT (~0.01 ms/km) and realistic routed-fiber RTT (with path stretch),
+evaluates Synchronous vs Asynchronous replication against product-specific RTT limits (e.g., VMware vSAN <=5ms
+vs NetApp MetroCluster / VMware vMSC / Dell Metro Node <=10ms), and models L3-only DCI with GSLB.
+No real DWDM optical equipment, storage arrays, or data center fabrics are connected.
 """
 
 import json
 
+PRODUCT_SYNC_LIMITS_MS = {
+    "vmware_vsan_stretched": 5.0,
+    "netapp_metrocluster_or_vmsc": 10.0,
+}
 
-def evaluate_dci_distance(city_pair: str, fiber_km: float) -> dict:
-    # Light in single-mode fiber travels ~200,000 km/s => 5 us/km one-way => 10 us/km RTT (1 ms per 100 km)
-    rtt_ms = round(fiber_km * 0.01, 2)
-    sync_replication_ok = rtt_ms <= 5.0
+
+def evaluate_dci_distance(city_pair: str, straight_km: float, route_stretch: float = 1.35) -> dict:
+    # Ideal silica fiber (~200,000 km/s) => ~0.01 ms/km RTT; real terrestrial routes add stretch + DWDM delay
+    theoretical_rtt_ms = round(straight_km * 0.01, 2)
+    routed_rtt_ms = round(theoretical_rtt_ms * route_stretch, 2)
+    product_feasibility = {
+        name: (routed_rtt_ms <= limit_ms)
+        for name, limit_ms in PRODUCT_SYNC_LIMITS_MS.items()
+    }
+    any_sync_feasible = any(product_feasibility.values())
     return {
         "pair": city_pair,
-        "fiber_distance_km": fiber_km,
-        "physics_min_rtt_ms": rtt_ms,
-        "synchronous_storage_rpo0_feasible": sync_replication_ok,
-        "recommended_replication": "Synchronous Replication (RPO = 0 possible)" if sync_replication_ok else "Asynchronous Replication (RPO > 0) — fiber physics exceeds 5ms sync write limit",
+        "straight_distance_km": straight_km,
+        "theoretical_min_rtt_ms": theoretical_rtt_ms,
+        "estimated_routed_rtt_ms": routed_rtt_ms,
+        "sync_feasible_by_product": product_feasibility,
+        "recommended_replication": (
+            "Synchronous Replication feasible (subject to product RTT limit & app write-latency SLA)"
+            if any_sync_feasible
+            else "Asynchronous Replication required — routed fiber RTT exceeds standard 5-10 ms product sync limits"
+        ),
     }
 
 
@@ -27,7 +43,7 @@ def evaluate_dci_l2_stretch(app_hardcodes_ip_on_failover: bool, budget_for_evpn_
         return {
             "dci_model": "L3-Only DCI + DNS GSLB / Anycast BGP",
             "l2_stretched": False,
-            "reason": "Gold-standard CCDE choice: zero shared L2 broadcast/STP fate between data centers",
+            "reason": "Preferred CCDE choice: zero shared L2 broadcast/STP fate between data centers",
         }
     if budget_for_evpn_multisite:
         return {
@@ -55,6 +71,13 @@ def main() -> None:
             "legacy_erp_fixed_ip": evaluate_dci_l2_stretch(True, True),
         },
     }
+    # At 450 km (~6.08 ms routed): fails vSAN 5ms limit, still under 10ms MetroCluster limit (with write penalty!)
+    isfahan = report["fiber_physics_dci_checks"][1]
+    assert isfahan["sync_feasible_by_product"]["vmware_vsan_stretched"] is False
+    assert isfahan["sync_feasible_by_product"]["netapp_metrocluster_or_vmsc"] is True
+    # At 5,000 km (~67.5 ms routed): fails BOTH 5ms and 10ms product limits!
+    dubai = report["fiber_physics_dci_checks"][2]
+    assert all(v is False for v in dubai["sync_feasible_by_product"].values())
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
 

@@ -26,6 +26,7 @@ def fspl_db(distance_m: float, freq_mhz: float) -> float:
 
 
 def evaluate_rf_cell(ap_tx_dbm: float, ap_gain_dbi: float, distance_m: float, freq_mhz: float, walls: list[str], noise_floor_dbm: float = -95.0) -> dict:
+    # Conservative predictive assumption: 0 dBi isotropic client Rx antenna gain (Ekahau baseline convention)
     wall_loss = sum(WALL_ATTENUATION_DB[w] for w in walls)
     path_loss = fspl_db(distance_m, freq_mhz) + wall_loss
     rssi = round(ap_tx_dbm + ap_gain_dbi - path_loss, 2)

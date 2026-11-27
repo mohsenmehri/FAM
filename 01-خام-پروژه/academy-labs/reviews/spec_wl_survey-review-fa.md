@@ -4,3 +4,10 @@
 
 - همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش و شبیه‌ساز `01-خام-پروژه/academy-labs/agent3/spec_wl_survey_lab.py` بررسی و اجرا شدند.
 - هیچ ابزار Ekahau یا AP فیزیکی واقعی متصل نشده است.
+
+## بازبینی فنی و معنایی مرحله ۲ (۲۰۲۶-۱۱-۲۷)
+
+- وضعیت بازبینی: همچنان **بازبینی نویسنده (author-agent-self-review-not-independent)** است و **بازبینی مستقل انسانی انجام نشده است**.
+- مسئله: عبارت مطلق «باید منحصراً از کانال‌های ۱، ۶ و ۱۱» در پرسش ۱ بدون اشاره به مقررات منطقه‌ای (ETSI) و عدم ذکر فرض ۰ dBi آنتن کلاینت در `spec_wl_survey_lab.py`.
+- منبع: IEEE 802.11-2020 و Cisco Enterprise Wireless Design Guide.
+- آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions` + اجرای زنده `spec_wl_survey_lab.py`).

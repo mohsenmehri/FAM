@@ -1,339 +1,342 @@
 {
-  "schema": "fam-app-blueprint-v1",
-  "lessonId": "ccde_08",
-  "objectiveId": "ccde_08",
-  "kind": "lesson",
-  "track": "CCDE",
-  "course": "ccde-design",
-  "title": "۹.۸ CCDE — معماری سگمنتاسیون شبکه: کلان‌جداسازی (VRF)، ریزجداسازی (SGT/EPG) و تله Over-Segmentation",
-  "titleEn": "CCDE Topic 8: Network Segmentation Architecture — Macro (VRF) vs Micro (SGT/EPG) & Over-Segmentation Trap",
-  "domain": "Security & Segmentation Architecture",
-  "source": "Legacy ccde_08 rewritten, typo-cleaned, and expanded",
-  "evidence": "Designed — Not Run",
-  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
-  "estimatedMinutes": 50,
-  "prerequisites": [
-    "ccde_01",
-    "spec_sec_ise"
-  ],
-  "sections": [
-    {
-      "id": "ccde_08-section-1",
-      "title": "مسئله واقعی: چرا بسیاری از باج‌افزارها ظرف ۲۰ دقیقه از یک دوربین مدار‌بسته یا دستگاه تهویه وارد سرورهای مالی سازمان می‌شوند؟",
-      "html": "<p>در یک شبکه تخت (Flat Network)، اگر تنها یک پرینتر یا دوربین IoT هک شود، مهاجم بدون هیچ مانعی به‌صورت افقی (<strong>Lateral Movement</strong>) به سرورهای دیتابیس و Active Directory می‌رسد! از سوی دیگر، اگر تیم امنیت دچار افراط شود و برای هر واحد کوچک یک VRF و زون فایروال مجزا بسازد (مثلاً ۴۵ VRF برای یک تیم عملیات ۴نفره)، مدیریت Route Leaking و هزاران قانون فایروال سازمان را فلج می‌کند (تله <strong>Over-Segmentation</strong>)! هنر معمار CCDE ترکیب هوشمندانه <strong>کلان‌جداسازی کم‌تعداد (Macro VRF)</strong> با <strong>ریزجداسازی پویا (Micro SGT/EPG)</strong> است.</p>"
-    },
-    {
-      "id": "ccde_08-section-2",
-      "title": "هدف یادگیری و پیش‌نیازها",
-      "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code>، <code>spec_sec_ise</code> و <code>ccie_sec</code>.</p><ul><li>تفکیک دقیق <strong>کلان‌جداسازی (Macro-Segmentation: VRF / MPLS VPN / VXLAN VN / Firewall Zones)</strong> از <strong>ریزجداسازی (Micro-Segmentation: SGT / ACI EPG / Host-Based Agent)</strong>.</li><li>طراحی <strong>سگمنتاسیون سرتاسری (End-to-End Segmentation)</strong> از پورت کاربر (Campus) تا روی WAN (SD-WAN VPNs) و دیتاسنتر (ACI/EVPN/Cloud).</li><li>مقابله با <strong>تله Over-Segmentation</strong> و نگه داشتن تعداد Macro VRFها در محدوده بهینه عملیاتی (معمولاً ۳ تا ۶ VRF کلان).</li><li>طراحی امن <strong>نقطه ادغام بین‌VRF (Inter-VRF Fusion Firewall)</strong> و دسترسی به <strong>Shared Services (DNS/AD/DHCP)</strong> بدون باز کردن حفره امنیتی.</li></ul>"
-    },
-    {
-      "id": "ccde_08-section-3",
-      "title": "تفکیک دو لایه مکمل: Macro-Segmentation در برابر Micro-Segmentation",
-      "html": "<table><thead><tr><th>ویژگی</th><th>Macro-Segmentation (VRF / Zones)</th><th>Micro-Segmentation (SGT / EPG / Host FW)</th></tr></thead><tbody><tr><td>مکانیزم</td><td>جداسازی کامل جدول مسیریابی (VRF-Lite، MPLS VPN، SD-WAN VPN، VXLAN VNI)</td><td>جداسازی درون یک VRF/ساب‌نت با برچسب هویتی (<strong>Cisco SGT</strong>، <strong>ACI EPG</strong>، NSX/Host Agent)</td></tr><tr><td>کاربرد اصلی</td><td>جداسازی کلان برای Compliance (مثلاً <code>PCI-DSS</code>، <code>Corp</code>، <code>IoT</code>، <code>Guest</code>)</td><td>مهار حرکت افقی (Lateral Movement) حتی بین دو سرور در یک VLAN واحد!</td></tr><tr><td>مقیاس‌پذیری</td><td>تعداد کم توصیه می‌شود (معمولاً ۳ تا ۶ VRF کلان)</td><td>مقیاس عالی و <strong>مستقل از آدرس IP</strong> (IP-Agnostic Policy Matrix)</td></tr></tbody></table>"
-    },
-    {
-      "id": "ccde_08-section-4",
-      "title": "نمودار معماری سگمنتاسیون دوگانه: Macro VRF + Micro SGT/EPG و مهار Over-Segmentation",
-      "html": "<p>نمودار زیر ترکیب ۳ تا ۶ VRF کلان با ماتریس ریزجداسازی SGT و هشدار تله Over-Segmentation را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Network Segmentation Architecture: Macro VRF Isolation vs Micro SGT/EPG Policy and Over-Segmentation Guard\"><rect x=\"14\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"190\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Macro-Segmentation (3-6 Compact VRFs)</text><text x=\"190\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">VRF_Corp | VRF_PCI_Cardholder | VRF_IoT | VRF_Guest</text><text x=\"190\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Separate Routing Tables (MPLS / VXLAN / VRF-Lite)</text><text x=\"190\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Inter-VRF Fusion ONLY Through Stateful Firewall!</text><rect x=\"394\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"570\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Micro-Segmentation (SGT / EPG / Host FW)</text><text x=\"570\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Inside Each VRF: Stop East-West Lateral Movement!</text><text x=\"570\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Policy Matrix: Src SGT -&gt; Dst SGT (IP-Agnostic!)</text><text x=\"570\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">IoT_Cameras -&gt; PCI_POS = DENY_DEFAULT</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">CCDE Over-Segmentation Trap: Creating 45 VRFs for a 4-Person Ops Team Breaks Operations &amp; Route-Leaking!</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Golden Formula: Keep Macro VRFs Minimal (3-6) for Compliance + Enforce Granular Zero-Trust via Micro SGT/EPG</text></svg>"
-    },
-    {
-      "id": "ccde_08-section-5",
-      "title": "چرا «تله Over-Segmentation» یکی از اشتباهات مرگبار پروژه‌های امنیتی است؟",
-      "html": "<p>فرض کنید معماری برای هر یک از ۴۵ واحد سازمانی یک VRF مجزا می‌سازد! به زودی همه ۴۵ VRF نیاز به DNS، AD، ایمیل، چاپگر و ERP پیدا می‌کنند؛ تیم عملیات مجبور به نوشتن صدها قانون پیچیده <strong>BGP Route-Leaking</strong> و هزاران قانون فایروال می‌شود و بعد از ۶ ماه کسی نمی‌تواند شبکه را عیب‌یابی کند — و در نهایت تیم زیر فشار مدیران مجبور به نوشتن قانون <code>permit ip any any</code> شده و کل امنیت نابود می‌شود! <strong>قاعده طلایی CCDE:</strong> تعداد Macro VRFها را کم (۳ تا ۶ مورد هم‌راستا با Compliance و ریسک) نگه دارید و تفکیک ریز نقش‌ها را به Micro-Segmentation (SGT/EPG) بسپارید.</p>"
-    },
-    {
-      "id": "ccde_08-section-6",
-      "title": "سگمنتاسیون سرتاسری (End-to-End): حفظ هویت از Campus تا WAN و دیتاسنتر",
-      "html": "<p>جداسازی که فقط در Campus برقرار باشد اما در WAN همه VRFها دوباره در یک جدول ادغام شوند، بی‌ارزش است! در معماری End-to-End CCDE، هر VRF کلان (مثلاً <code>VRF_PCI</code> و <code>VRF_IoT</code>) در Campus روی SD-Access/VRF-Lite تعریف می‌شود، در WAN مستقیم به <strong>Service VPN متناظر در SD-WAN (یا MPLS VRF)</strong> نگاشت می‌گردد، و در دیتاسنتر وارد <strong>VRF/Tenant متناظر در EVPN/ACI</strong> می‌شود؛ و برچسب <strong>SGT</strong> نیز از طریق Inline Tagging یا SXP سرتاسر حفظ می‌گردد!</p>"
-    },
-    {
-      "id": "ccde_08-section-7",
-      "title": "طراحی امن نقطه ادغام (Fusion Firewall) و دسترسی به Shared Services",
-      "html": "<p>تمام VRFهای سازمانی (حتی IoT و PCI) به برخی سرویس‌های مشترک مثل DNS، NTP و Active Directory نیاز دارند. <strong>خطای خطرناک:</strong> استفاده از Route-Leaking مستقیم روی روتر بدون فایروال (که ترافیک را بدون بازرسی لایه ۷ عبور می‌دهد و ممکن است به مسیر غیرمستقیم بین دو VRF تبدیل شود!). <strong>طراحی درست CCDE:</strong> تمام ارتباطات بین‌VRF و دسترسی به <code>VRF_Shared_Services</code> از طریق یک جفت <strong>Fusion NGFW (فایروال Stateful/L7)</strong> با سیاست دقیق پورت/اپلیکیشن عبور کند.</p>"
-    },
-    {
-      "id": "ccde_08-section-8",
-      "title": "نقش سگمنتاسیون در کاهش دامنه ممیزی قانونی (PCI-DSS / HIPAA Scope Reduction)",
-      "html": "<p>در استاندارد کارت‌های بانکی <strong>PCI-DSS</strong>، هر سروری که بدون جداسازی قوی به محیط داده دارنده کارت (CDE) دسترسی مستقیم داشته باشد، <em>داخل دامنه ممیزی PCI</em> قرار می‌گیرد که هزینه ممیزی سالانه را میلیون‌ها دلار بالا می‌برد! ایجاد یک <code>VRF_PCI</code> کاملاً ایزوله با فایروال سخت‌گیرانه در لبه، ۹۵٪ شبکه سازمان را از دامنه پرهزینه PCI خارج می‌کند (بزرگ‌ترین توجیه ROI سگمنتاسیون نزد CFO!).</p>"
-    },
-    {
-      "id": "ccde_08-section-9",
-      "title": "سگمنتاسیون در محیط‌های OT/ICS (کارخانه، نیروگاه و بیمارستان): مدل Purdue",
-      "html": "<p>تجهیزات صنعتی (PLC/SCADA) و پزشکی (MRI) اغلب سیستم‌عامل قدیمی بدون امکان نصب آنتی‌ویروس دارند! در معماری <strong>Purdue Model / IEC 62443</strong>، شبکه کارخانه (OT) با یک <strong>IDMZ (Industrial DMZ)</strong> کاملاً از شبکه اداری (IT) جدا می‌شود و هیچ اتصال مستقیمی از IT به PLCها مجاز نیست؛ همه تبادل داده‌ها فقط از طریق Jump Host / Historian درون IDMZ انجام می‌گیرد.</p>"
-    },
-    {
-      "id": "ccde_08-section-10",
-      "title": "ارزیابی گزینه‌های ریزجداسازی: مبتنی بر شبکه (SGT/ACI) در برابر مبتنی بر میزبان (Host Agent / eBPF)",
-      "html": "<p>ریزجداسازی مبتنی بر شبکه (<strong>Cisco SGT / ACI EPG</strong>) برای دستگاه‌هایی که امکان نصب Agent ندارند (دوربین IoT، پرینتر، دستگاه پزشکی) بی‌رقیب است؛ اما برای سرورهای دیتاسنتر، کانتینرها و ابر عمومی (AWS/Azure)، ریزجداسازی مبتنی بر میزبان (<strong>Host Agent / Illumio / Cilium eBPF / Security Groups</strong>) دید دقیق در سطح پردازش (Process-Level) می‌دهد. بسیاری از سازمان‌های بزرگ ترکیبی از هر دو را به کار می‌برند.</p>"
-    },
-    {
-      "id": "ccde_08-section-11",
-      "title": "کژفهمی‌های رایج درباره Network Segmentation",
-      "html": "<ul><li><strong>کژفهمی ۱: «VLAN، VRF و SGT هر سه دقیقاً یک کار انجام می‌دهند.»</strong> واقعیت: VLAN فقط جداسازی لایه ۲ (Broadcast Domain) است؛ VRF جداسازی کامل جدول مسیریابی لایه ۳ (Macro) است؛ و SGT برچسب هویتی مستقل از IP برای ریزجداسازی (Micro) حتی درون یک VLAN واحد است!</li><li><strong>کژفهمی ۲: «هرچه تعداد VRFها بیشتر باشد (مثلاً ۵۰ VRF)، امنیت بالاتر می‌رود.»</strong> واقعیت: Over-Segmentation پیچیدگی عملیاتی را منفجر کرده و در نهایت تیم را به سمت قوانین باز و ناامن سوق می‌دهد.</li><li><strong>کژفهمی ۳: «وقتی VRF ساختیم دیگر نیازی به فایروال بین VRFها نیست و Route-Leaking ساده کافی است.»</strong> واقعیت: Route-Leaking بدون فایروال هیچ بازرسی لایه ۷ و کنترل Stateful انجام نمی‌دهد؛ عبور ترافیک بین VRFها باید از Fusion Firewall بگذرد.</li></ul>"
-    },
-    {
-      "id": "ccde_08-section-12",
-      "title": "اصلاح خطای نسخه قدیمی و چک‌لیست طراحی سگمنتاسیون",
-      "html": "<p><strong>یادداشت ممیزی:</strong> عبارت غلط و درهم‌ریخته نسخه قدیمی به فارسی صحیح و دقیق فنی اصلاح شد.</p><p><strong>چک‌لیست سگمنتاسیون CCDE:</strong> (۱) سقف ۳ تا ۶ Macro VRF هم‌راستا با Compliance، (۲) Micro-Segmentation (SGT/EPG/Host) علیه Lateral Movement، (۳) حفظ End-to-End روی WAN و DC، (۴) Fusion Firewall برای Shared Services.</p>"
-    },
-    {
-      "id": "ccde_08-section-13",
-      "title": "تمرین تحلیلی با پاسخ تشریحی",
-      "html": "<p><strong>تمرین ۱:</strong> تیم عملیات ۴نفره سازمانی پیشنهاد ساخت ۴۵ VRF بدون SGT را داده است. ایراد این طرح چیست و جایگزین CCDE کدام است؟ <strong>پاسخ:</strong> مصداق کلاسیک <strong>Over-Segmentation</strong> با انفجار پیچیدگی Route-Leaking و هم‌زمان نبود Micro-Segmentation درون هر VRF! جایگزین: <strong>۴ Macro VRF کلان</strong> (Corp، PCI، IoT، Guest) + <strong>۱۲ گروه Micro SGT/EPG</strong> با سیاست پیش‌فرض Deny.</p><p><strong>تمرین ۲:</strong> چرا مدیر مالی (CFO) معمولاً با اشتیاق بودجه ایجاد <code>VRF_PCI</code> جداگانه را تصویب می‌کند؟ <strong>پاسخ:</strong> به دلیل <strong>PCI-DSS Scope Reduction</strong> — خارج کردن ۹۵٪ شبکه از دامنه ممیزی سالانه پرهزینه کارت‌های بانکی.</p>"
-    },
-    {
-      "id": "ccde_08-section-14",
-      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.nist.gov/publications/zero-trust-architecture\" target=\"_blank\" rel=\"noopener\">استاندارد NIST SP 800-207 (Zero Trust Architecture &amp; Micro-Segmentation)</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/solutions/CVD/Campus/cisco-sda-design-guide.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی Cisco End-to-End Segmentation Design</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای ممیزی Macro/Micro Segmentation است و به هیچ سرور Cisco ISE یا فایروال زنده متصل نیست.</p>"
-    }
-  ],
-  "glossary": [
-    {
-      "term": "Macro-Segmentation (VRF)",
-      "fa": "کلان‌جداسازی جدول مسیریابی",
-      "simple": "تفکیک کامل دامنه‌های لایه ۳ با VRF/MPLS/VXLAN VN برای ایزوله‌سازی کلان (Corp، PCI، IoT، Guest)."
-    },
-    {
-      "term": "Micro-Segmentation (SGT/EPG)",
-      "fa": "ریزجداسازی مبتنی بر هویت/نقش",
-      "simple": "اعمال سیاست امنیتی دقیق درون یک VRF یا حتی یک ساب‌نت جهت مهار حرکت افقی (Lateral Movement)."
-    },
-    {
-      "term": "Over-Segmentation Trap",
-      "fa": "تله افراط در قطعه‌بندی شبکه",
-      "simple": "ساخت ده‌ها VRF/زون بی‌رویه که پیچیدگی Route-Leaking و فایروال را از توان تیم عملیات خارج می‌کند."
-    },
-    {
-      "term": "Lateral Movement",
-      "fa": "حرکت افقی مهاجم درون شبکه",
-      "simple": "گسترش باج‌افزار یا نفوذگر از یک دستگاه کم‌ارزش (مثل دوربین IoT) به سرورهای حیاتی داخلی."
-    },
-    {
-      "term": "End-to-End Segmentation",
-      "fa": "سگمنتاسیون پیوسته سرتاسری",
-      "simple": "حفظ یکپارچه مرز VRFها و برچسب‌های SGT از پورت Campus تا WAN (SD-WAN) و دیتاسنتر/ابر."
-    },
-    {
-      "term": "Fusion Firewall",
-      "fa": "فایروال نقطه ادغام بین‌VRF",
-      "simple": "فایروال Stateful/L7 کنترل‌کننده ترافیک مجاز میان VRFهای جداگانه و دسترسی به Shared Services."
-    },
-    {
-      "term": "PCI-DSS Scope Reduction",
-      "fa": "کاهش دامنه ممیزی بانکی PCI",
-      "simple": "ایزوله‌سازی کامل محیط داده کارت بانکی (CDE) برای حذف بقیه شبکه از هزینه‌های سنگین ممیزی."
-    },
-    {
-      "term": "SGT (Scalable Group Tag)",
-      "fa": "برچسب گروه هویتی مستقل از IP",
-      "simple": "برچسب ۱۶بیتی اختصاص‌یافته توسط ISE که سیاست دسترسی را مستقل از تغییر آدرس IP اعمال می‌کند."
-    },
-    {
-      "term": "Route-Leaking Risk",
-      "fa": "ریسک نشت مسیر بدون بازرسی",
-      "simple": "تزریق مستقیم مسیر میان دو VRF روی روتر بدون عبور از فایروال که ایزوله‌سازی امنیتی را تضعیف می‌کند."
-    },
-    {
-      "term": "Purdue Model / IDMZ",
-      "fa": "مدل جداسازی شبکه صنعتی OT/IT",
-      "simple": "جداسازی سخت‌گیرانه شبکه اداری IT از سیستم‌های کنترل صنعتی PLC/SCADA از طریق Industrial DMZ."
-    },
-    {
-      "term": "Host-Based Micro-Segmentation",
-      "fa": "ریزجداسازی مبتنی بر Agent میزبان",
-      "simple": "اعمال فایروال توزیع‌شده روی سیستم‌عامل/کرنل (eBPF/Agent) ایده‌آل برای سرورها، کانتینرها و ابر."
-    },
-    {
-      "term": "Default-Deny Policy Matrix",
-      "fa": "ماتریس سیاست مسدودسازی پیش‌فرض",
-      "simple": "رد خودکار هر ترافیک بین گروه‌ها مگر آنکه قانون صریح و حداقل‌دسترسی (Least Privilege) تعریف شده باشد."
-    },
-    {
-      "term": "VRF-Lite",
-      "fa": "VRF بدون نیاز به MPLS",
-      "simple": "تفکیک جدول مسیریابی در لبه Campus/DC که نیازمند تگ‌گذاری VLAN/Subinterface در هر هاپ است."
-    },
-    {
-      "term": "Inline Tagging / SXP",
-      "fa": "انتقال برچسب SGT در شبکه",
-      "simple": "حمل SGT درون فریم اترنت/VXLAN (Inline) یا انتشار نگاشت IP-to-SGT از طریق پروتکل TCP SXP."
-    },
-    {
-      "term": "Broadcast Domain vs Routing Domain",
-      "fa": "تفاوت دامنه انتشار لایه ۲ و مسیریابی لایه ۳",
-      "simple": "VLAN دامنه Broadcast لایه ۲ را جدا می‌کند اما VRF جدول مسیریابی لایه ۳ را کاملاً تفکیک می‌سازد."
-    }
-  ],
-  "stages": {
-    "lab": {
-      "title": "آزمایشگاه شبیه‌سازی محلی Python (ممیز توازن Macro VRF در برابر Micro SGT و هشداردهنده تله Over-Segmentation) — بدون ISE واقعی",
-      "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سرور Cisco ISE یا فایروال سازمانی زنده متصل نشده است.",
-      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور Cisco ISE، فابریک SD-Access یا فایروال زنده در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو طرح سگمنتاسیون را ممیزی می‌کند: طرح افراطی <code>45 VRF بدون SGT</code> (که هشدار <code>OVER-SEGMENTATION TRAP</code> می‌دهد) در برابر طرح متوازن <strong>۴ Macro VRF + ۱۲ Micro SGT</strong>، و سپس ماتریس سیاست SGT (مسدودسازی خودکار <code>IoT_Cameras -&gt; PCI_POS</code>) را می‌سنجد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_08_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_08_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_08 (CCDE Network Segmentation: Macro VRF vs Micro SGT &amp; Over-Segmentation Guard)\nModels Macro-Segmentation (VRF-Lite / MPLS VPN) vs Micro-Segmentation (SGT / EPG Policy Matrix),\nand warns when excessive VRF/Zone proliferation triggers the CCDE Over-Segmentation operational trap.\nNo real Cisco ISE, SD-Access fabric, or enterprise firewalls are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef evaluate_segmentation_plan(vrfs: int, sgts: int, ops_engineers: int) -&gt; dict:\n    # Rule of thumb: keep Macro VRFs compact (3-6); handle fine-grained isolation with Micro SGT/EPG\n    warnings = []\n    if vrfs &gt; 8:\n        warnings.append(f&quot;OVER-SEGMENTATION TRAP: {vrfs} Macro VRFs create massive route-leaking/firewall complexity for {ops_engineers} engineers!&quot;)\n    if sgts == 0:\n        warnings.append(&quot;Missing Micro-Segmentation (SGT/EPG): lateral movement inside a VRF remains unrestricted.&quot;)\n    verdict = &quot;BALANCED_MACRO_PLUS_MICRO&quot; if not warnings else &quot;NEEDS_REDESIGN&quot;\n    return {&quot;macro_vrfs&quot;: vrfs, &quot;micro_sgt_groups&quot;: sgts, &quot;ops_team_size&quot;: ops_engineers, &quot;verdict&quot;: verdict, &quot;warnings&quot;: warnings}\n\n\ndef check_sgt_matrix(src_sgt: str, dst_sgt: str, policy: dict[tuple[str, str], str]) -&gt; dict:\n    action = policy.get((src_sgt, dst_sgt), &quot;DENY_DEFAULT&quot;)\n    return {&quot;src_sgt&quot;: src_sgt, &quot;dst_sgt&quot;: dst_sgt, &quot;action&quot;: action}\n\n\ndef main() -&gt; None:\n    sgt_policy = {\n        (&quot;Employees&quot;, &quot;Shared_Services&quot;): &quot;PERMIT_DNS_AD_HTTPS&quot;,\n        (&quot;IoT_Cameras&quot;, &quot;NVR_Servers&quot;): &quot;PERMIT_RTSP_ONLY&quot;,\n        (&quot;PCI_POS&quot;, &quot;Payment_Gateway&quot;): &quot;PERMIT_TLS_1_3_ONLY&quot;,\n    }\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_SEGMENTATION_MODELER&quot;,\n        &quot;architecture_audits&quot;: {\n            &quot;over_segmented_45_vrfs&quot;: evaluate_segmentation_plan(vrfs=45, sgts=0, ops_engineers=4),\n            &quot;recommended_4_macro_vrfs_plus_sgts&quot;: evaluate_segmentation_plan(vrfs=4, sgts=12, ops_engineers=4),\n        },\n        &quot;micro_segmentation_decisions&quot;: [\n            check_sgt_matrix(&quot;Employees&quot;, &quot;Shared_Services&quot;, sgt_policy),\n            check_sgt_matrix(&quot;IoT_Cameras&quot;, &quot;PCI_POS&quot;, sgt_policy),\n            check_sgt_matrix(&quot;PCI_POS&quot;, &quot;Payment_Gateway&quot;, sgt_policy),\n        ],\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> وضعیت <code>NEEDS_REDESIGN</code> برای طرح ۴۵-VRF، وضعیت <code>BALANCED_MACRO_PLUS_MICRO</code> برای طرح ۴-VRF+۱۲-SGT، و نتیجه <code>DENY_DEFAULT</code> برای دسترسی دوربین IoT به دستگاه POS.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع سگمنتاسیون دوگانه در سند HLD (اجرا نشده روی تجهیزات زنده):</strong></p><pre dir=\"ltr\"><code># Reference CCDE End-to-End Segmentation Map (HLD)\nMacro VRFs (4) : VRF_Corp | VRF_PCI_CDE | VRF_IoT_OT | VRF_Guest\nMicro SGTs (12): Inside VRF_Corp -&gt; Employees, Finance, Admins, Printers, VoIP\nInter-VRF Rule : ALL Inter-VRF &amp; Shared-Services traffic MUST traverse HA Fusion NGFW</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-    },
-    "quiz": {
-      "title": "آزمون درس معماری سگمنتاسیون شبکه CCDE (Macro VRF، Micro SGT و Over-Segmentation)",
-      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-    }
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "ccde_08",
+ "objectiveId": "ccde_08",
+ "kind": "lesson",
+ "track": "CCDE",
+ "course": "ccde-design",
+ "title": "۹.۸ CCDE — معماری سگمنتاسیون شبکه: کلان‌جداسازی (VRF)، ریزجداسازی (SGT/EPG) و تله Over-Segmentation",
+ "titleEn": "CCDE Topic 8: Network Segmentation Architecture — Macro (VRF) vs Micro (SGT/EPG) & Over-Segmentation Trap",
+ "domain": "Security & Segmentation Architecture",
+ "source": "Legacy ccde_08 rewritten, typo-cleaned, and expanded",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 50,
+ "prerequisites": [
+  "ccde_01",
+  "spec_sec_ise"
+ ],
+ "sections": [
+  {
+   "id": "ccde_08-section-1",
+   "title": "مسئله واقعی: چرا بسیاری از باج‌افزارها ظرف ۲۰ دقیقه از یک دوربین مدار‌بسته یا دستگاه تهویه وارد سرورهای مالی سازمان می‌شوند؟",
+   "html": "<p>در یک شبکه تخت (Flat Network)، اگر تنها یک پرینتر یا دوربین IoT هک شود، مهاجم بدون هیچ مانعی به‌صورت افقی (<strong>Lateral Movement</strong>) به سرورهای دیتابیس و Active Directory می‌رسد! از سوی دیگر، اگر تیم امنیت دچار افراط شود و برای هر واحد کوچک یک VRF و زون فایروال مجزا بسازد (مثلاً ۴۵ VRF برای یک تیم عملیات ۴نفره)، مدیریت Route Leaking و هزاران قانون فایروال سازمان را فلج می‌کند (تله <strong>Over-Segmentation</strong>)! هنر معمار CCDE ترکیب هوشمندانه <strong>کلان‌جداسازی کم‌تعداد (Macro VRF)</strong> با <strong>ریزجداسازی پویا (Micro SGT/EPG)</strong> است.</p>"
   },
-  "interactiveQuiz": [
-    {
-      "title": "کدام گزینه تفاوت دقیق VLAN، VRF و SGT را در معماری سگمنتاسیون CCDE درست بیان می‌کند؟",
-      "options": [
-        "هر سه دقیقاً یک کار انجام می‌دهند",
-        "VLAN جداسازی Broadcast لایه ۲ است، VRF جداسازی جدول مسیریابی لایه ۳ (Macro) است، و SGT برچسب هویتی مستقل از IP برای ریزجداسازی (Micro) حتی درون یک VLAN واحد است",
-        "SGT فقط روی کابل سریال کار می‌کند",
-        "VRF جایگزین کامل رمزنگاری TLS است"
-      ],
-      "correctIndex": 1,
-      "explanationHtml": "<p>شناخت دقیق لایه و کاربرد هر یک از این سه ابزار پایه طراحی سگمنتاسیون مقیاس‌پذیر است.</p>"
-    },
-    {
-      "title": "تله «Over-Segmentation» در طراحی شبکه‌های سازمانی چگونه رخ می‌دهد و چه پیآمدی دارد؟",
-      "options": [
-        "ساخت ده‌ها VRF/زون بی‌رویه (مثلاً ۴۵ VRF برای تیم ۴نفره) که پیچیدگی Route-Leaking و مدیریت فایروال را غیرقابل کنترل کرده و در نهایت تیم را به قوانین باز ناامن سوق می‌دهد",
-        "استفاده از ۴ VRF کلان در کنار SGT",
-        "ایزوله کردن شبکه مهمان از شبکه کارمندان",
-        "کاهش تعداد قوانین فایروال"
-      ],
-      "correctIndex": 0,
-      "explanationHtml": "<p>بهترین الگوی CCDE نگه داشتن Macro VRFها در تعداد کم (۳–۶) و انجام تفکیک ظریف‌تر با Micro-Segmentation است.</p>"
-    },
-    {
-      "title": "هدف اصلی Micro-Segmentation (مانند SGT، ACI EPG یا Host Agent) چیست؟",
-      "options": [
-        "افزایش اندازه دامنه Broadcast",
-        "مهار حرکت افقی (Lateral Movement) مهاجم یا باج‌افزار حتی میان دو دستگاه درون یک VRF یا یک ساب‌نت واحد",
-        "حذف کامل VRFها در لبه WAN",
-        "باز گذاشتن ترافیک East-West"
-      ],
-      "correctIndex": 1,
-      "explanationHtml": "<p>فایروال محیطی جلوی حرکت افقی داخل یک ساب‌نت را نمی‌گیرد؛ این دقیقاً وظیفه Micro-Segmentation است.</p>"
-    },
-    {
-      "title": "چرا ارتباط میان VRFهای جداگانه و دسترسی آن‌ها به بلوک Shared Services باید از طریق Fusion Firewall عبور کند نه Route-Leaking ساده روی روتر؟",
-      "options": [
-        "زیرا Route-Leaking ساده روی روتر هیچ بازرسی Stateful/L7 انجام نمی‌دهد و ممکن است مسیرهای غیرمجاز بین VRFها باز کند، اما Fusion Firewall سیاست دقیق لایه ۴/۷ اعمال می‌کند",
-        "زیرا روترها از VRF پشتیبانی نمی‌کنند",
-        "برای کند کردن DNS",
-        "هیچ فرقی ندارند"
-      ],
-      "correctIndex": 0,
-      "explanationHtml": "<p>تضمین بازرسی Stateful/L7 در نقطه ادغام VRFها مرز واقعی امنیت کلان را حفظ می‌کند.</p>"
-    },
-    {
-      "title": "سگمنتاسیون قوی با ایجاد VRF_PCI مجزا چه سود مالی مستقیمی (ROI) برای سازمان‌های درگیر استاندارد PCI-DSS دارد؟",
-      "options": [
-        "حذف نیاز به کارت بانکی",
-        "کاهش شدید دامنه ممیزی (PCI Scope Reduction) با خارج کردن ۹۵٪ شبکه اداری از ممیزی پرهزینه سالانه",
-        "رایگان شدن لینک MPLS",
-        "افزایش هزینه ممیزی"
-      ],
-      "correctIndex": 1,
-      "explanationHtml": "<p>کاهش دامنه ممیزی PCI-DSS یکی از قوی‌ترین توجیهات تجاری سگمنتاسیون در جلسات هیئت‌مدیره است.</p>"
-    },
-    {
-      "title": "مفهوم «End-to-End Segmentation» در یک سازمان چندشعبه‌ای با دیتاسنتر و ابر به چه معناست؟",
-      "options": [
-        "جداسازی فقط در سوئیچ‌های طبقه اول",
-        "حفظ پیوسته مرز VRFها (مثلاً VRF_IoT -> SD-WAN VPN IoT -> DC VRF_IoT) و برچسب‌های SGT از پورت کاربر تا WAN و دیتاسنتر بدون ادغام در میانه راه",
-        "حذف VRF در روترهای WAN",
-        "استفاده از یک VLAN واحد در کل کشور"
-      ],
-      "correctIndex": 1,
-      "explanationHtml": "<p>اگر سگمنتاسیون در مرز WAN شکسته شود، زحمت جداسازی در Campus و دیتاسنتر بی‌نتیجه می‌ماند.</p>"
-    },
-    {
-      "title": "در محیط‌های صنعتی و نیروگاهی (OT/ICS — مدل Purdue)، بهترین الگوی جداسازی شبکه اداری IT از تجهیزات کنترلی PLC/SCADA چیست؟",
-      "options": [
-        "قرار دادن PLCها در همان VLAN اینترنت کارمندان",
-        "ایجاد یک ناحیه میانی Industrial DMZ (IDMZ) با فایروال‌های دوطرفه تا هیچ اتصال مستقیمی از IT به لایه کنترل OT مجاز نباشد",
-        "باز گذاشتن RDP مستقیم از اینترنت به SCADA",
-        "حذف فایروال برای کاهش تاخیر"
-      ],
-      "correctIndex": 1,
-      "explanationHtml": "<p>IDMZ ستون اصلی استاندارد IEC 62443 و مدل Purdue برای محافظت از زیرساخت‌های حیاتی صنعتی است.</p>"
-    },
-    {
-      "title": "چرا ریزجداسازی مبتنی بر شبکه (Cisco SGT / ACI EPG) برای دوربین‌های IoT و دستگاه‌های پزشکی بر ریزجداسازی مبتنی بر Host Agent برتری دارد؟",
-      "options": [
-        "زیرا روی دوربین‌های مدار‌بسته، پرینترها و تجهیزات پزشکی امکان نصب نرم‌افزار Host Agent وجود ندارد و سیاست باید توسط زیرساخت شبکه اعمال شود",
-        "زیرا Host Agent روی لینوکس کار نمی‌کند",
-        "زیرا SGT فقط برای ابر است",
-        "هیچ برتری ندارد"
-      ],
-      "correctIndex": 0,
-      "explanationHtml": "<p>دستگاه‌های Headless/IoT/OT بدون Agent هستند؛ بنابراین ترکیب Network-Based (SGT) و Host-Based (برای سرور/ابر) کامل‌ترین پوشش را می‌دهد.</p>"
-    },
-    {
-      "title": "مهم‌ترین مزیت عملیاتی سیاست‌های مبتنی بر برچسب هویتی (SGT / EPG) نسبت به ACLهای سنتی مبتنی بر IP چیست؟",
-      "options": [
-        "نیازی به آدرس IP در لایه ۳ نیست",
-        "استقلال سیاست امنیتی از آدرس IP (IP-Agnostic): با جابه‌جایی کاربر یا تغییر ساب‌نت، قوانین ماتریس امنیتی نیازی به بازنویسی ندارند",
-        "سرعت لینک را ده برابر می‌کند",
-        "جایگزین DNS می‌شود"
-      ],
-      "correctIndex": 1,
-      "explanationHtml": "<p>حذف وابستگی قوانین امنیتی به آدرس‌های IP تغییرپذیر، اندازه ACLها و خطای انسانی را به شدت کاهش می‌دهد.</p>"
-    },
-    {
-      "title": "در ماتریس سیاست پیش‌فرض مسدود (Default-Deny) آزمایشگاه، اگر قانون صریحی برای ترافیک IoT_Cameras به PCI_POS تعریف نشده باشد چه اتفاقی می‌افتد؟",
-      "options": [
-        "ترافیک به‌طور خودکار مجاز می‌شود",
-        "ترافیک به‌طور خودکار مسدود (DENY_DEFAULT) می‌شود",
-        "فقط ترافیک HTTPS عبور می‌کند",
-        "کل شبکه ریست می‌شود"
-      ],
-      "correctIndex": 1,
-      "explanationHtml": "<p>اصل Least Privilege و Default-Deny پایه معماری Zero Trust و Micro-Segmentation است.</p>"
-    },
-    {
-      "title": "محدودیت کلیدی استفاده از VRF-Lite در یک شبکه بزرگ چندهاپه نسبت به MPLS VPN یا VXLAN EVPN چیست؟",
-      "options": [
-        "VRF-Lite نیازمند ساخت دستی Subinterface/VLAN مجزا به ازای هر VRF روی تک‌تک لینک‌های میانی است که در مقیاس بزرگ مدیریت آن را بسیار سخت می‌کند",
-        "VRF-Lite از OSPF پشتیبانی نمی‌کند",
-        "VRF-Lite لایه ۲ است",
-        "محدودیتی ندارد"
-      ],
-      "correctIndex": 0,
-      "explanationHtml": "<p>در مقیاس بزرگ، MPLS L3VPN یا VXLAN EVPN / SD-Access بار کانفیگ Hop-by-Hop VRF-Lite را از دوش تیم برمی‌دارند.</p>"
-    },
-    {
-      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-      "options": [
-        "اعمال زنده سیاست SGT روی سرور Cisco ISE تولیدی",
-        "تغییر VRFهای شبکه بانکی واقعی",
-        "فقط متن نظری بدون کد",
-        "مدل‌سازی محلی (Local Mock) در Python 3 برای ممیزی توازن Macro VRF در برابر Micro SGT، کشف تله Over-Segmentation و آزمون ماتریس SGT"
-      ],
-      "correctIndex": 3,
-      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و به هیچ سرور ISE یا فایروال زنده متصل نیست.</p>"
-    }
-  ],
-  "meta": {
-    "version": "reviewed.1",
-    "legacyId": "ccde_08",
-    "sources": [
-      "https://www.nist.gov/publications/zero-trust-architecture",
-      "https://www.cisco.com/c/en/us/td/docs/solutions/CVD/Campus/cisco-sda-design-guide.html"
-    ],
-    "limitations": [
-      "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ سرور Cisco ISE یا فایروال زنده متصل نیست."
-    ],
-    "legacyAuditFixes": [
-      "اصلاح عبارت غلط تایپی نسخه قدیمی («سه تاقا یکسان هستند») و گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، PCI Scope Reduction، Purdue/IDMZ و مدل‌ساز Over-Segmentation."
-    ],
-    "semanticReview": {
-      "date": "2026-11-27",
-      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-      "reviewer": "author-agent-self-review-not-independent",
-      "evidence": "academy-labs/reviews/ccde_08-review-fa.md"
-    },
-    "integration": {
-      "recommendedPath": "fam-ccde",
-      "recommendedCourse": "ccde-design",
-      "blueprint": "/academy-assets/v5/blueprints/ccde_08.json",
-      "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_08_lab.py"
-    }
+  {
+   "id": "ccde_08-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code>، <code>spec_sec_ise</code> و <code>ccie_sec</code>.</p><ul><li>تفکیک دقیق <strong>کلان‌جداسازی (Macro-Segmentation: VRF / MPLS VPN / VXLAN VN / Firewall Zones)</strong> از <strong>ریزجداسازی (Micro-Segmentation: SGT / ACI EPG / Host-Based Agent)</strong>.</li><li>طراحی <strong>سگمنتاسیون سرتاسری (End-to-End Segmentation)</strong> از پورت کاربر (Campus) تا روی WAN (SD-WAN VPNs) و دیتاسنتر (ACI/EVPN/Cloud).</li><li>مقابله با <strong>تله Over-Segmentation</strong> و نگه داشتن تعداد Macro VRFها در محدوده بهینه عملیاتی (معمولاً ۳ تا ۶ VRF کلان).</li><li>طراحی امن <strong>نقطه ادغام بین‌VRF (Inter-VRF Fusion Firewall)</strong> و دسترسی به <strong>Shared Services (DNS/AD/DHCP)</strong> بدون باز کردن حفره امنیتی.</li></ul>"
+  },
+  {
+   "id": "ccde_08-section-3",
+   "title": "تفکیک دو لایه مکمل: Macro-Segmentation در برابر Micro-Segmentation",
+   "html": "<table><thead><tr><th>ویژگی</th><th>Macro-Segmentation (VRF / Zones)</th><th>Micro-Segmentation (SGT / EPG / Host FW)</th></tr></thead><tbody><tr><td>مکانیزم</td><td>جداسازی کامل جدول مسیریابی (VRF-Lite، MPLS VPN، SD-WAN VPN، VXLAN VNI)</td><td>جداسازی درون یک VRF/ساب‌نت با برچسب هویتی (<strong>Cisco SGT</strong>، <strong>ACI EPG</strong>، NSX/Host Agent)</td></tr><tr><td>کاربرد اصلی</td><td>جداسازی کلان برای Compliance (مثلاً <code>PCI-DSS</code>، <code>Corp</code>، <code>IoT</code>، <code>Guest</code>)</td><td>مهار حرکت افقی (Lateral Movement) حتی بین دو سرور در یک VLAN واحد!</td></tr><tr><td>مقیاس‌پذیری</td><td>تعداد کم توصیه می‌شود (معمولاً ۳ تا ۶ VRF کلان)</td><td>مقیاس عالی و <strong>مستقل از آدرس IP</strong> (IP-Agnostic Policy Matrix)</td></tr></tbody></table>"
+  },
+  {
+   "id": "ccde_08-section-4",
+   "title": "نمودار معماری سگمنتاسیون دوگانه: Macro VRF + Micro SGT/EPG و مهار Over-Segmentation",
+   "html": "<p>نمودار زیر ترکیب ۳ تا ۶ VRF کلان با ماتریس ریزجداسازی SGT و هشدار تله Over-Segmentation را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Network Segmentation Architecture: Macro VRF Isolation vs Micro SGT/EPG Policy and Over-Segmentation Guard\"><rect x=\"14\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"190\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Macro-Segmentation (3-6 Compact VRFs)</text><text x=\"190\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">VRF_Corp | VRF_PCI_Cardholder | VRF_IoT | VRF_Guest</text><text x=\"190\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Separate Routing Tables (MPLS / VXLAN / VRF-Lite)</text><text x=\"190\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Inter-VRF Fusion ONLY Through Stateful Firewall!</text><rect x=\"394\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"570\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Micro-Segmentation (SGT / EPG / Host FW)</text><text x=\"570\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Inside Each VRF: Stop East-West Lateral Movement!</text><text x=\"570\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Policy Matrix: Src SGT -&gt; Dst SGT (IP-Agnostic!)</text><text x=\"570\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">IoT_Cameras -&gt; PCI_POS = DENY_DEFAULT</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">CCDE Over-Segmentation Trap: Creating 45 VRFs for a 4-Person Ops Team Breaks Operations &amp; Route-Leaking!</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Golden Formula: Keep Macro VRFs Minimal (3-6) for Compliance + Enforce Granular Zero-Trust via Micro SGT/EPG</text></svg>"
+  },
+  {
+   "id": "ccde_08-section-5",
+   "title": "چرا «تله Over-Segmentation» یکی از اشتباهات مرگبار پروژه‌های امنیتی است؟",
+   "html": "<p>فرض کنید معماری برای هر یک از ۴۵ واحد سازمانی یک VRF مجزا می‌سازد! به زودی همه ۴۵ VRF نیاز به DNS، AD، ایمیل، چاپگر و ERP پیدا می‌کنند؛ تیم عملیات مجبور به نوشتن صدها قانون پیچیده <strong>BGP Route-Leaking</strong> و هزاران قانون فایروال می‌شود و بعد از ۶ ماه کسی نمی‌تواند شبکه را عیب‌یابی کند — و در نهایت تیم زیر فشار مدیران مجبور به نوشتن قانون <code>permit ip any any</code> شده و کل امنیت نابود می‌شود! <strong>قاعده طلایی CCDE:</strong> تعداد Macro VRFها را کم (۳ تا ۶ مورد هم‌راستا با Compliance و ریسک) نگه دارید و تفکیک ریز نقش‌ها را به Micro-Segmentation (SGT/EPG) بسپارید.</p>"
+  },
+  {
+   "id": "ccde_08-section-6",
+   "title": "سگمنتاسیون سرتاسری (End-to-End): حفظ هویت از Campus تا WAN و دیتاسنتر",
+   "html": "<p>جداسازی که فقط در Campus برقرار باشد اما در WAN همه VRFها دوباره در یک جدول ادغام شوند، بی‌ارزش است! در معماری End-to-End CCDE، هر VRF کلان (مثلاً <code>VRF_PCI</code> و <code>VRF_IoT</code>) در Campus روی SD-Access/VRF-Lite تعریف می‌شود، در WAN مستقیم به <strong>Service VPN متناظر در SD-WAN (یا MPLS VRF)</strong> نگاشت می‌گردد، و در دیتاسنتر وارد <strong>VRF/Tenant متناظر در EVPN/ACI</strong> می‌شود؛ و برچسب <strong>SGT</strong> نیز از طریق Inline Tagging یا SXP سرتاسر حفظ می‌گردد!</p>"
+  },
+  {
+   "id": "ccde_08-section-7",
+   "title": "طراحی امن نقطه ادغام (Fusion Firewall) و دسترسی به Shared Services",
+   "html": "<p>تمام VRFهای سازمانی (حتی IoT و PCI) به برخی سرویس‌های مشترک مثل DNS، NTP و Active Directory نیاز دارند. <strong>خطای خطرناک:</strong> استفاده از Route-Leaking مستقیم روی روتر بدون فایروال (که ترافیک را بدون بازرسی لایه ۷ عبور می‌دهد و ممکن است به مسیر غیرمستقیم بین دو VRF تبدیل شود!). <strong>طراحی درست CCDE:</strong> تمام ارتباطات بین‌VRF و دسترسی به <code>VRF_Shared_Services</code> از طریق یک جفت <strong>Fusion NGFW (فایروال Stateful/L7)</strong> با سیاست دقیق پورت/اپلیکیشن عبور کند.</p>"
+  },
+  {
+   "id": "ccde_08-section-8",
+   "title": "نقش سگمنتاسیون در کاهش دامنه ممیزی قانونی (PCI-DSS / HIPAA Scope Reduction)",
+   "html": "<p>در استاندارد کارت‌های بانکی <strong>PCI-DSS</strong>، هر سروری که بدون جداسازی قوی به محیط داده دارنده کارت (CDE) دسترسی مستقیم داشته باشد، <em>داخل دامنه ممیزی PCI</em> قرار می‌گیرد که هزینه ممیزی سالانه را میلیون‌ها دلار بالا می‌برد! ایجاد یک <code>VRF_PCI</code> کاملاً ایزوله با فایروال سخت‌گیرانه در لبه، می‌تواند بخش عمده‌ای از شبکه سازمان (در سناریوهای معمول سازمانی اغلب ۸۰ تا ۹۵٪، مشروط به جداسازی معتبر و تأیید رسمی ممیز QSA طبق PCI-DSS) را از دامنه پرهزینه PCI خارج کند (بزرگ‌ترین توجیه ROI سگمنتاسیون نزد CFO!).</p>"
+  },
+  {
+   "id": "ccde_08-section-9",
+   "title": "سگمنتاسیون در محیط‌های OT/ICS (کارخانه، نیروگاه و بیمارستان): مدل Purdue",
+   "html": "<p>تجهیزات صنعتی (PLC/SCADA) و پزشکی (MRI) اغلب سیستم‌عامل قدیمی بدون امکان نصب آنتی‌ویروس دارند! در معماری <strong>Purdue Model / IEC 62443</strong>، شبکه کارخانه (OT) با یک <strong>IDMZ (Industrial DMZ)</strong> کاملاً از شبکه اداری (IT) جدا می‌شود و هیچ اتصال مستقیمی از IT به PLCها مجاز نیست؛ همه تبادل داده‌ها فقط از طریق Jump Host / Historian درون IDMZ انجام می‌گیرد.</p>"
+  },
+  {
+   "id": "ccde_08-section-10",
+   "title": "ارزیابی گزینه‌های ریزجداسازی: مبتنی بر شبکه (SGT/ACI) در برابر مبتنی بر میزبان (Host Agent / eBPF)",
+   "html": "<p>ریزجداسازی مبتنی بر شبکه (<strong>Cisco SGT / ACI EPG</strong>) برای دستگاه‌هایی که امکان نصب Agent ندارند (دوربین IoT، پرینتر، دستگاه پزشکی) بی‌رقیب است؛ اما برای سرورهای دیتاسنتر، کانتینرها و ابر عمومی (AWS/Azure)، ریزجداسازی مبتنی بر میزبان (<strong>Host Agent / Illumio / Cilium eBPF / Security Groups</strong>) دید دقیق در سطح پردازش (Process-Level) می‌دهد. بسیاری از سازمان‌های بزرگ ترکیبی از هر دو را به کار می‌برند.</p>"
+  },
+  {
+   "id": "ccde_08-section-11",
+   "title": "کژفهمی‌های رایج درباره Network Segmentation",
+   "html": "<ul><li><strong>کژفهمی ۱: «VLAN، VRF و SGT هر سه دقیقاً یک کار انجام می‌دهند.»</strong> واقعیت: VLAN فقط جداسازی لایه ۲ (Broadcast Domain) است؛ VRF جداسازی کامل جدول مسیریابی لایه ۳ (Macro) است؛ و SGT برچسب هویتی مستقل از IP برای ریزجداسازی (Micro) حتی درون یک VLAN واحد است!</li><li><strong>کژفهمی ۲: «هرچه تعداد VRFها بیشتر باشد (مثلاً ۵۰ VRF)، امنیت بالاتر می‌رود.»</strong> واقعیت: Over-Segmentation پیچیدگی عملیاتی را منفجر کرده و در نهایت تیم را به سمت قوانین باز و ناامن سوق می‌دهد.</li><li><strong>کژفهمی ۳: «وقتی VRF ساختیم دیگر نیازی به فایروال بین VRFها نیست و Route-Leaking ساده کافی است.»</strong> واقعیت: Route-Leaking بدون فایروال هیچ بازرسی لایه ۷ و کنترل Stateful انجام نمی‌دهد؛ عبور ترافیک بین VRFها باید از Fusion Firewall بگذرد.</li></ul>"
+  },
+  {
+   "id": "ccde_08-section-12",
+   "title": "اصلاح خطای نسخه قدیمی و چک‌لیست طراحی سگمنتاسیون",
+   "html": "<p><strong>یادداشت ممیزی:</strong> عبارت غلط و درهم‌ریخته نسخه قدیمی به فارسی صحیح و دقیق فنی اصلاح شد.</p><p><strong>چک‌لیست سگمنتاسیون CCDE:</strong> (۱) سقف ۳ تا ۶ Macro VRF هم‌راستا با Compliance، (۲) Micro-Segmentation (SGT/EPG/Host) علیه Lateral Movement، (۳) حفظ End-to-End روی WAN و DC، (۴) Fusion Firewall برای Shared Services.</p>"
+  },
+  {
+   "id": "ccde_08-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> تیم عملیات ۴نفره سازمانی پیشنهاد ساخت ۴۵ VRF بدون SGT را داده است. ایراد این طرح چیست و جایگزین CCDE کدام است؟ <strong>پاسخ:</strong> مصداق کلاسیک <strong>Over-Segmentation</strong> با انفجار پیچیدگی Route-Leaking و هم‌زمان نبود Micro-Segmentation درون هر VRF! جایگزین: <strong>۴ Macro VRF کلان</strong> (Corp، PCI، IoT، Guest) + <strong>۱۲ گروه Micro SGT/EPG</strong> با سیاست پیش‌فرض Deny.</p><p><strong>تمرین ۲:</strong> چرا مدیر مالی (CFO) معمولاً با اشتیاق بودجه ایجاد <code>VRF_PCI</code> جداگانه را تصویب می‌کند؟ <strong>پاسخ:</strong> به دلیل <strong>PCI-DSS Scope Reduction</strong> — خارج کردن بخش عمده شبکه اداری از دامنه ممیزی سالانه پرهزینه کارت‌های بانکی (در سناریوهای استاندارد و پس از تأیید جداسازی توسط QSA).</p>"
+  },
+  {
+   "id": "ccde_08-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.nist.gov/publications/zero-trust-architecture\" target=\"_blank\" rel=\"noopener\">استاندارد NIST SP 800-207 (Zero Trust Architecture &amp; Micro-Segmentation)</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/solutions/CVD/Campus/cisco-sda-design-guide.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی Cisco End-to-End Segmentation Design</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای ممیزی Macro/Micro Segmentation است و به هیچ سرور Cisco ISE یا فایروال زنده متصل نیست.</p>"
   }
+ ],
+ "glossary": [
+  {
+   "term": "Macro-Segmentation (VRF)",
+   "fa": "کلان‌جداسازی جدول مسیریابی",
+   "simple": "تفکیک کامل دامنه‌های لایه ۳ با VRF/MPLS/VXLAN VN برای ایزوله‌سازی کلان (Corp، PCI، IoT، Guest)."
+  },
+  {
+   "term": "Micro-Segmentation (SGT/EPG)",
+   "fa": "ریزجداسازی مبتنی بر هویت/نقش",
+   "simple": "اعمال سیاست امنیتی دقیق درون یک VRF یا حتی یک ساب‌نت جهت مهار حرکت افقی (Lateral Movement)."
+  },
+  {
+   "term": "Over-Segmentation Trap",
+   "fa": "تله افراط در قطعه‌بندی شبکه",
+   "simple": "ساخت ده‌ها VRF/زون بی‌رویه که پیچیدگی Route-Leaking و فایروال را از توان تیم عملیات خارج می‌کند."
+  },
+  {
+   "term": "Lateral Movement",
+   "fa": "حرکت افقی مهاجم درون شبکه",
+   "simple": "گسترش باج‌افزار یا نفوذگر از یک دستگاه کم‌ارزش (مثل دوربین IoT) به سرورهای حیاتی داخلی."
+  },
+  {
+   "term": "End-to-End Segmentation",
+   "fa": "سگمنتاسیون پیوسته سرتاسری",
+   "simple": "حفظ یکپارچه مرز VRFها و برچسب‌های SGT از پورت Campus تا WAN (SD-WAN) و دیتاسنتر/ابر."
+  },
+  {
+   "term": "Fusion Firewall",
+   "fa": "فایروال نقطه ادغام بین‌VRF",
+   "simple": "فایروال Stateful/L7 کنترل‌کننده ترافیک مجاز میان VRFهای جداگانه و دسترسی به Shared Services."
+  },
+  {
+   "term": "PCI-DSS Scope Reduction",
+   "fa": "کاهش دامنه ممیزی بانکی PCI",
+   "simple": "ایزوله‌سازی کامل محیط داده کارت بانکی (CDE) برای حذف بقیه شبکه از هزینه‌های سنگین ممیزی."
+  },
+  {
+   "term": "SGT (Scalable Group Tag)",
+   "fa": "برچسب گروه هویتی مستقل از IP",
+   "simple": "برچسب ۱۶بیتی اختصاص‌یافته توسط ISE که سیاست دسترسی را مستقل از تغییر آدرس IP اعمال می‌کند."
+  },
+  {
+   "term": "Route-Leaking Risk",
+   "fa": "ریسک نشت مسیر بدون بازرسی",
+   "simple": "تزریق مستقیم مسیر میان دو VRF روی روتر بدون عبور از فایروال که ایزوله‌سازی امنیتی را تضعیف می‌کند."
+  },
+  {
+   "term": "Purdue Model / IDMZ",
+   "fa": "مدل جداسازی شبکه صنعتی OT/IT",
+   "simple": "جداسازی سخت‌گیرانه شبکه اداری IT از سیستم‌های کنترل صنعتی PLC/SCADA از طریق Industrial DMZ."
+  },
+  {
+   "term": "Host-Based Micro-Segmentation",
+   "fa": "ریزجداسازی مبتنی بر Agent میزبان",
+   "simple": "اعمال فایروال توزیع‌شده روی سیستم‌عامل/کرنل (eBPF/Agent) ایده‌آل برای سرورها، کانتینرها و ابر."
+  },
+  {
+   "term": "Default-Deny Policy Matrix",
+   "fa": "ماتریس سیاست مسدودسازی پیش‌فرض",
+   "simple": "رد خودکار هر ترافیک بین گروه‌ها مگر آنکه قانون صریح و حداقل‌دسترسی (Least Privilege) تعریف شده باشد."
+  },
+  {
+   "term": "VRF-Lite",
+   "fa": "VRF بدون نیاز به MPLS",
+   "simple": "تفکیک جدول مسیریابی در لبه Campus/DC که نیازمند تگ‌گذاری VLAN/Subinterface در هر هاپ است."
+  },
+  {
+   "term": "Inline Tagging / SXP",
+   "fa": "انتقال برچسب SGT در شبکه",
+   "simple": "حمل SGT درون فریم اترنت/VXLAN (Inline) یا انتشار نگاشت IP-to-SGT از طریق پروتکل TCP SXP."
+  },
+  {
+   "term": "Broadcast Domain vs Routing Domain",
+   "fa": "تفاوت دامنه انتشار لایه ۲ و مسیریابی لایه ۳",
+   "simple": "VLAN دامنه Broadcast لایه ۲ را جدا می‌کند اما VRF جدول مسیریابی لایه ۳ را کاملاً تفکیک می‌سازد."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (ممیز توازن Macro VRF در برابر Micro SGT و هشداردهنده تله Over-Segmentation) — بدون ISE واقعی",
+   "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سرور Cisco ISE یا فایروال سازمانی زنده متصل نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور Cisco ISE، فابریک SD-Access یا فایروال زنده در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو طرح سگمنتاسیون را ممیزی می‌کند: طرح افراطی <code>45 VRF بدون SGT</code> (که هشدار <code>OVER-SEGMENTATION TRAP</code> می‌دهد) در برابر طرح متوازن <strong>۴ Macro VRF + ۱۲ Micro SGT</strong>، و سپس ماتریس سیاست SGT (مسدودسازی خودکار <code>IoT_Cameras -&gt; PCI_POS</code>) را می‌سنجد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_08_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_08_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_08 (CCDE Network Segmentation: Macro VRF vs Micro SGT &amp; Over-Segmentation Guard)\nModels Macro-Segmentation (VRF-Lite / MPLS VPN) vs Micro-Segmentation (SGT / EPG Policy Matrix),\nand warns when excessive VRF/Zone proliferation triggers the CCDE Over-Segmentation operational trap.\nNo real Cisco ISE, SD-Access fabric, or enterprise firewalls are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef evaluate_segmentation_plan(vrfs: int, sgts: int, ops_engineers: int) -&gt; dict:\n    # Rule of thumb: keep Macro VRFs compact (3-6); handle fine-grained isolation with Micro SGT/EPG\n    warnings = []\n    if vrfs &gt; 8:\n        warnings.append(f&quot;OVER-SEGMENTATION TRAP: {vrfs} Macro VRFs create massive route-leaking/firewall complexity for {ops_engineers} engineers!&quot;)\n    if sgts == 0:\n        warnings.append(&quot;Missing Micro-Segmentation (SGT/EPG): lateral movement inside a VRF remains unrestricted.&quot;)\n    verdict = &quot;BALANCED_MACRO_PLUS_MICRO&quot; if not warnings else &quot;NEEDS_REDESIGN&quot;\n    return {&quot;macro_vrfs&quot;: vrfs, &quot;micro_sgt_groups&quot;: sgts, &quot;ops_team_size&quot;: ops_engineers, &quot;verdict&quot;: verdict, &quot;warnings&quot;: warnings}\n\n\ndef check_sgt_matrix(src_sgt: str, dst_sgt: str, policy: dict[tuple[str, str], str]) -&gt; dict:\n    action = policy.get((src_sgt, dst_sgt), &quot;DENY_DEFAULT&quot;)\n    return {&quot;src_sgt&quot;: src_sgt, &quot;dst_sgt&quot;: dst_sgt, &quot;action&quot;: action}\n\n\ndef main() -&gt; None:\n    sgt_policy = {\n        (&quot;Employees&quot;, &quot;Shared_Services&quot;): &quot;PERMIT_DNS_AD_HTTPS&quot;,\n        (&quot;IoT_Cameras&quot;, &quot;NVR_Servers&quot;): &quot;PERMIT_RTSP_ONLY&quot;,\n        (&quot;PCI_POS&quot;, &quot;Payment_Gateway&quot;): &quot;PERMIT_TLS_1_3_ONLY&quot;,\n    }\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_SEGMENTATION_MODELER&quot;,\n        &quot;architecture_audits&quot;: {\n            &quot;over_segmented_45_vrfs&quot;: evaluate_segmentation_plan(vrfs=45, sgts=0, ops_engineers=4),\n            &quot;recommended_4_macro_vrfs_plus_sgts&quot;: evaluate_segmentation_plan(vrfs=4, sgts=12, ops_engineers=4),\n        },\n        &quot;micro_segmentation_decisions&quot;: [\n            check_sgt_matrix(&quot;Employees&quot;, &quot;Shared_Services&quot;, sgt_policy),\n            check_sgt_matrix(&quot;IoT_Cameras&quot;, &quot;PCI_POS&quot;, sgt_policy),\n            check_sgt_matrix(&quot;PCI_POS&quot;, &quot;Payment_Gateway&quot;, sgt_policy),\n        ],\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> وضعیت <code>NEEDS_REDESIGN</code> برای طرح ۴۵-VRF، وضعیت <code>BALANCED_MACRO_PLUS_MICRO</code> برای طرح ۴-VRF+۱۲-SGT، و نتیجه <code>DENY_DEFAULT</code> برای دسترسی دوربین IoT به دستگاه POS.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع سگمنتاسیون دوگانه در سند HLD (اجرا نشده روی تجهیزات زنده):</strong></p><pre dir=\"ltr\"><code># Reference CCDE End-to-End Segmentation Map (HLD)\nMacro VRFs (4) : VRF_Corp | VRF_PCI_CDE | VRF_IoT_OT | VRF_Guest\nMicro SGTs (12): Inside VRF_Corp -&gt; Employees, Finance, Admins, Printers, VoIP\nInter-VRF Rule : ALL Inter-VRF &amp; Shared-Services traffic MUST traverse HA Fusion NGFW</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس معماری سگمنتاسیون شبکه CCDE (Macro VRF، Micro SGT و Over-Segmentation)",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "کدام گزینه تفاوت دقیق VLAN، VRF و SGT را در معماری سگمنتاسیون CCDE درست بیان می‌کند؟",
+   "options": [
+    "هر سه دقیقاً یک کار انجام می‌دهند",
+    "VLAN جداسازی Broadcast لایه ۲ است، VRF جداسازی جدول مسیریابی لایه ۳ (Macro) است، و SGT برچسب هویتی مستقل از IP برای ریزجداسازی (Micro) حتی درون یک VLAN واحد است",
+    "SGT فقط روی کابل سریال کار می‌کند",
+    "VRF جایگزین کامل رمزنگاری TLS است"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>شناخت دقیق لایه و کاربرد هر یک از این سه ابزار پایه طراحی سگمنتاسیون مقیاس‌پذیر است.</p>"
+  },
+  {
+   "title": "تله «Over-Segmentation» در طراحی شبکه‌های سازمانی چگونه رخ می‌دهد و چه پیآمدی دارد؟",
+   "options": [
+    "ساخت ده‌ها VRF/زون بی‌رویه (مثلاً ۴۵ VRF برای تیم ۴نفره) که پیچیدگی Route-Leaking و مدیریت فایروال را غیرقابل کنترل کرده و در نهایت تیم را به قوانین باز ناامن سوق می‌دهد",
+    "استفاده از ۴ VRF کلان در کنار SGT",
+    "ایزوله کردن شبکه مهمان از شبکه کارمندان",
+    "کاهش تعداد قوانین فایروال"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>بهترین الگوی CCDE نگه داشتن Macro VRFها در تعداد کم (۳–۶) و انجام تفکیک ظریف‌تر با Micro-Segmentation است.</p>"
+  },
+  {
+   "title": "هدف اصلی Micro-Segmentation (مانند SGT، ACI EPG یا Host Agent) چیست؟",
+   "options": [
+    "افزایش اندازه دامنه Broadcast",
+    "مهار حرکت افقی (Lateral Movement) مهاجم یا باج‌افزار حتی میان دو دستگاه درون یک VRF یا یک ساب‌نت واحد",
+    "حذف کامل VRFها در لبه WAN",
+    "باز گذاشتن ترافیک East-West"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>فایروال محیطی جلوی حرکت افقی داخل یک ساب‌نت را نمی‌گیرد؛ این دقیقاً وظیفه Micro-Segmentation است.</p>"
+  },
+  {
+   "title": "چرا ارتباط میان VRFهای جداگانه و دسترسی آن‌ها به بلوک Shared Services باید از طریق Fusion Firewall عبور کند نه Route-Leaking ساده روی روتر؟",
+   "options": [
+    "زیرا Route-Leaking ساده روی روتر هیچ بازرسی Stateful/L7 انجام نمی‌دهد و ممکن است مسیرهای غیرمجاز بین VRFها باز کند، اما Fusion Firewall سیاست دقیق لایه ۴/۷ اعمال می‌کند",
+    "زیرا روترها از VRF پشتیبانی نمی‌کنند",
+    "برای کند کردن DNS",
+    "هیچ فرقی ندارند"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>تضمین بازرسی Stateful/L7 در نقطه ادغام VRFها مرز واقعی امنیت کلان را حفظ می‌کند.</p>"
+  },
+  {
+   "title": "سگمنتاسیون قوی با ایجاد VRF_PCI مجزا چه سود مالی مستقیمی (ROI) برای سازمان‌های درگیر استاندارد PCI-DSS دارد؟",
+   "options": [
+    "حذف نیاز به کارت بانکی",
+    "کاهش چشمگیر دامنه ممیزی (PCI Scope Reduction) با خارج کردن بخش عمده شبکه اداری از ممیزی سالانه (مشروط به جداسازی معتبر و تأیید QSA)",
+    "رایگان شدن لینک MPLS",
+    "افزایش هزینه ممیزی"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>کاهش دامنه ممیزی PCI-DSS یکی از قوی‌ترین توجیهات تجاری سگمنتاسیون در جلسات هیئت‌مدیره است.</p>"
+  },
+  {
+   "title": "مفهوم «End-to-End Segmentation» در یک سازمان چندشعبه‌ای با دیتاسنتر و ابر به چه معناست؟",
+   "options": [
+    "جداسازی فقط در سوئیچ‌های طبقه اول",
+    "حفظ پیوسته مرز VRFها (مثلاً VRF_IoT -> SD-WAN VPN IoT -> DC VRF_IoT) و برچسب‌های SGT از پورت کاربر تا WAN و دیتاسنتر بدون ادغام در میانه راه",
+    "حذف VRF در روترهای WAN",
+    "استفاده از یک VLAN واحد در کل کشور"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>اگر سگمنتاسیون در مرز WAN شکسته شود، زحمت جداسازی در Campus و دیتاسنتر بی‌نتیجه می‌ماند.</p>"
+  },
+  {
+   "title": "در محیط‌های صنعتی و نیروگاهی (OT/ICS — مدل Purdue)، بهترین الگوی جداسازی شبکه اداری IT از تجهیزات کنترلی PLC/SCADA چیست؟",
+   "options": [
+    "قرار دادن PLCها در همان VLAN اینترنت کارمندان",
+    "ایجاد یک ناحیه میانی Industrial DMZ (IDMZ) با فایروال‌های دوطرفه تا هیچ اتصال مستقیمی از IT به لایه کنترل OT مجاز نباشد",
+    "باز گذاشتن RDP مستقیم از اینترنت به SCADA",
+    "حذف فایروال برای کاهش تاخیر"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>IDMZ ستون اصلی استاندارد IEC 62443 و مدل Purdue برای محافظت از زیرساخت‌های حیاتی صنعتی است.</p>"
+  },
+  {
+   "title": "چرا ریزجداسازی مبتنی بر شبکه (Cisco SGT / ACI EPG) برای دوربین‌های IoT و دستگاه‌های پزشکی بر ریزجداسازی مبتنی بر Host Agent برتری دارد؟",
+   "options": [
+    "زیرا روی دوربین‌های مدار‌بسته، پرینترها و تجهیزات پزشکی امکان نصب نرم‌افزار Host Agent وجود ندارد و سیاست باید توسط زیرساخت شبکه اعمال شود",
+    "زیرا Host Agent روی لینوکس کار نمی‌کند",
+    "زیرا SGT فقط برای ابر است",
+    "هیچ برتری ندارد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>دستگاه‌های Headless/IoT/OT بدون Agent هستند؛ بنابراین ترکیب Network-Based (SGT) و Host-Based (برای سرور/ابر) کامل‌ترین پوشش را می‌دهد.</p>"
+  },
+  {
+   "title": "مهم‌ترین مزیت عملیاتی سیاست‌های مبتنی بر برچسب هویتی (SGT / EPG) نسبت به ACLهای سنتی مبتنی بر IP چیست؟",
+   "options": [
+    "نیازی به آدرس IP در لایه ۳ نیست",
+    "استقلال سیاست امنیتی از آدرس IP (IP-Agnostic): با جابه‌جایی کاربر یا تغییر ساب‌نت، قوانین ماتریس امنیتی نیازی به بازنویسی ندارند",
+    "سرعت لینک را ده برابر می‌کند",
+    "جایگزین DNS می‌شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>حذف وابستگی قوانین امنیتی به آدرس‌های IP تغییرپذیر، اندازه ACLها و خطای انسانی را به شدت کاهش می‌دهد.</p>"
+  },
+  {
+   "title": "در ماتریس سیاست پیش‌فرض مسدود (Default-Deny) آزمایشگاه، اگر قانون صریحی برای ترافیک IoT_Cameras به PCI_POS تعریف نشده باشد چه اتفاقی می‌افتد؟",
+   "options": [
+    "ترافیک به‌طور خودکار مجاز می‌شود",
+    "ترافیک به‌طور خودکار مسدود (DENY_DEFAULT) می‌شود",
+    "فقط ترافیک HTTPS عبور می‌کند",
+    "کل شبکه ریست می‌شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>اصل Least Privilege و Default-Deny پایه معماری Zero Trust و Micro-Segmentation است.</p>"
+  },
+  {
+   "title": "محدودیت کلیدی استفاده از VRF-Lite در یک شبکه بزرگ چندهاپه نسبت به MPLS VPN یا VXLAN EVPN چیست؟",
+   "options": [
+    "VRF-Lite نیازمند ساخت دستی Subinterface/VLAN مجزا به ازای هر VRF روی تک‌تک لینک‌های میانی است که در مقیاس بزرگ مدیریت آن را بسیار سخت می‌کند",
+    "VRF-Lite از OSPF پشتیبانی نمی‌کند",
+    "VRF-Lite لایه ۲ است",
+    "محدودیتی ندارد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>در مقیاس بزرگ، MPLS L3VPN یا VXLAN EVPN / SD-Access بار کانفیگ Hop-by-Hop VRF-Lite را از دوش تیم برمی‌دارند.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "اعمال زنده سیاست SGT روی سرور Cisco ISE تولیدی",
+    "تغییر VRFهای شبکه بانکی واقعی",
+    "فقط متن نظری بدون کد",
+    "مدل‌سازی محلی (Local Mock) در Python 3 برای ممیزی توازن Macro VRF در برابر Micro SGT، کشف تله Over-Segmentation و آزمون ماتریس SGT"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و به هیچ سرور ISE یا فایروال زنده متصل نیست.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.2",
+  "legacyId": "ccde_08",
+  "sources": [
+   "https://www.nist.gov/publications/zero-trust-architecture",
+   "https://www.cisco.com/c/en/us/td/docs/solutions/CVD/Campus/cisco-sda-design-guide.html"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ سرور Cisco ISE یا فایروال زنده متصل نیست."
+  ],
+  "legacyAuditFixes": [
+   "اصلاح عبارت غلط تایپی نسخه قدیمی («سه تاقا یکسان هستند») و گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، PCI Scope Reduction، Purdue/IDMZ و مدل‌ساز Over-Segmentation."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/ccde_08-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-ccde",
+   "recommendedCourse": "ccde-design",
+   "blueprint": "/academy-assets/v5/blueprints/ccde_08.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_08_lab.py"
+  },
+  "technicalAuditFixes": [
+   "شرط‌دار کردن عدد «۹۵٪ کاهش دامنه PCI» در بخش‌های ۸، ۱۳ و پرسش ۵ به بازه وابسته به توپولوژی و تأیید رسمی ممیز QSA طبق راهنمای سگمنتاسیون PCI-DSS."
+  ]
+ }
 }

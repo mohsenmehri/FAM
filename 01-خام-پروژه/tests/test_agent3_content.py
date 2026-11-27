@@ -43,6 +43,8 @@ FORBIDDEN_LEGACY_TYPOS = (
     "یک الشيء",
     "مبتنی بر یتیک",
     "n preservation",
+    "inicialmente",
+    "diferencia",
 )
 
 UNEXECUTED_MARKERS = (
@@ -83,6 +85,96 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         guide_text = guide_path.read_text(encoding="utf-8")
         for lesson_id in sorted(AGENT3_ALLOWED_IDS):
             self.assertIn(f"`{lesson_id}`", guide_text, f"{lesson_id} missing from AGENT3-INTEGRATION-GUIDE-fa.md")
+
+    def test_technical_audit_regressions(self):
+        """Regression assertions for technical & semantic audit fixes (Phase 2)."""
+        audit_log = ROOT / "AGENT3-TECHNICAL-AUDIT-LOG-fa.md"
+        self.assertTrue(audit_log.exists(), "Missing AGENT3-TECHNICAL-AUDIT-LOG-fa.md")
+        audit_text = audit_log.read_text(encoding="utf-8")
+        self.assertIn("author-agent-self-review-not-independent", audit_text)
+        self.assertIn("بازبینی مستقل", audit_text)
+
+        def load_student_text(lid: str) -> tuple[dict, str]:
+            data = json.loads((BLUEPRINT_DIR / f"{lid}.json").read_text(encoding="utf-8"))
+            txt = json.dumps(
+                {
+                    "sections": data["sections"],
+                    "glossary": data["glossary"],
+                    "quiz": data["interactiveQuiz"],
+                    "lab": data["stages"]["lab"],
+                },
+                ensure_ascii=False,
+            )
+            return data, txt
+
+        # 1. ccde_18 & ccde_05: synchronous replication RTT ceiling must be product-conditioned, not universal 5ms
+        for lid in ("ccde_18", "ccde_05"):
+            data, txt = load_student_text(lid)
+            self.assertNotIn("سقف ۵ms", txt, f"{lid} still has unconditional 5ms ceiling")
+            self.assertNotIn("سقف ~۵ms", txt, f"{lid} still has unconditional ~5ms ceiling")
+            self.assertNotIn("(~500km)", txt, f"{lid} still has contradictory ~500km SVG claim")
+            self.assertIn("vSAN", txt, f"{lid} must cite product-specific vSAN <=5ms threshold")
+            self.assertIn("MetroCluster", txt, f"{lid} must cite product-specific MetroCluster/vMSC <=10ms threshold")
+            self.assertEqual(data["meta"]["semanticReview"]["reviewer"], "author-agent-self-review-not-independent")
+
+        # 2. spec_dc_aci: Multi-Site data-plane vs NDO/APIC (500ms) & ND cluster (50ms / legacy MSO 150ms)
+        _, aci_txt = load_student_text("spec_dc_aci")
+        self.assertNotIn("تا ~۱۵۰ میلی‌ثانیه بین سایت‌ها", aci_txt)
+        self.assertIn("۵۰۰ms", aci_txt)
+
+        # 3. ccde_07: AWS Direct Connect 99.9% (2x2) vs 99.99% (4+ connections across 2+ locations) & Azure 99.95%
+        _, c07_txt = load_student_text("ccde_07")
+        self.assertNotIn("SLA بالای ۹۹٫۹۹٪", c07_txt)
+        self.assertIn("۴ اتصال", c07_txt)
+        self.assertIn("۹۹٫۹۵٪", c07_txt)
+
+        # 4. spec_sp_sr & ccde_19: TI-LFA conditioned on 2-connected topology & hardware MSD
+        for lid in ("spec_sp_sr", "ccde_19"):
+            _, sr_txt = load_student_text(lid)
+            self.assertNotIn("در هر توپولوژی دلخواه", sr_txt)
+            self.assertIn("۲-همبند", sr_txt)
+            self.assertIn("MSD", sr_txt)
+
+        # 5. ccde_14: distinguish HTTPS/TLS (1.2 + 1.3) from TLS 1.3-only
+        _, c14_txt = load_student_text("ccde_14")
+        self.assertNotIn("بیش از ۹۵٪ ترافیک وب و بدافزارها رمزنگاری TLS 1.3 دارند", c14_txt)
+        self.assertIn("TLS 1.2", c14_txt)
+
+        # 6. ccde_08 & ccde_15 & ccde_18: PCI scope reduction must be QSA-conditioned, not guaranteed 95%
+        for lid in ("ccde_08", "ccde_15", "ccde_18"):
+            _, pci_txt = load_student_text(lid)
+            self.assertIn("QSA", pci_txt)
+
+        # 7. ccde_11: Microburst detection not sole method
+        _, c11_txt = load_student_text("ccde_11")
+        self.assertNotIn("تنها راه شکار واقعی Microburst", c11_txt)
+
+        # 8. spec_sec_ise: Kerberos 5-min skew explicitly marked as AD default
+        _, ise_txt = load_student_text("spec_sec_ise")
+        self.assertIn("MaxClockSkew", ise_txt)
+
+        # 9. auto_02, auto_08, spec_collab_gw: no unconditional 'همیشه باید' in quiz explanations
+        for lid in ("auto_02", "auto_08", "spec_collab_gw"):
+            _, t = load_student_text(lid)
+            self.assertNotIn("همیشه باید", t)
+
+        # 10. Upgraded lab mocks must exercise both negative and positive assertions
+        for lid, expected_tokens in (
+            ("ccde_18", ["rejected_sync_l2_proposal", "approved_hld_validation", "vmware_vsan_stretched"]),
+            ("ccde_05", ["vmware_vsan_stretched", "netapp_metrocluster_or_vmsc"]),
+            ("spec_sp_sr", ["ti_lfa_blocked_by_low_msd", "ti_lfa_singly_homed_cut_edge"]),
+            ("ccde_19", ["rejected_flat_forklift_proposal", "approved_hld_validation"]),
+            ("auto_05", ["invalid_rfc8259_json_rejected"]),
+        ):
+            proc = subprocess.run(
+                [sys.executable, str(AGENT3_LAB_DIR / f"{lid}_lab.py")],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            for tok in expected_tokens:
+                self.assertIn(tok, proc.stdout, f"{lid}_lab.py missing expected output token {tok!r}")
 
     def test_blueprints_schema_svg_quiz_lab_and_review_integrity(self):
         discovered = discover_agent3_blueprints()

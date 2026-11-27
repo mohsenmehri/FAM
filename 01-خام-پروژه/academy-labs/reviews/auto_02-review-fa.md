@@ -4,3 +4,10 @@
 
 - همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش و کد `01-خام-پروژه/academy-labs/agent3/auto_02_lab.py` بررسی و با Python 3.11 اجرا شدند.
 - تله عملی پارس `administratively down` و اعتبارسنجی محدوده 802.1Q (1..4094) اضافه و آزمون شدند. هیچ روتر واقعی متصل نشده است.
+
+## بازبینی فنی و معنایی مرحله ۲ (۲۰۲۶-۱۱-۲۷)
+
+- وضعیت بازبینی: همچنان **بازبینی نویسنده (author-agent-self-review-not-independent)** است و **بازبینی مستقل انسانی انجام نشده است**.
+- مسئله: عبارت مطلق «همیشه باید» در توضیح پرسش ۱ بدون اشاره به الگوی مجاز ثبت خطا و re-raise در مرز بیرونی برنامه.
+- منبع: Python 3 Official Documentation — Errors and Exceptions.
+- آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions`).
