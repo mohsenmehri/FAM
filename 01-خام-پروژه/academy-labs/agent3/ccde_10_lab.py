@@ -7,25 +7,45 @@ No real chassis routers, power feeds, or live clusters are connected.
 """
 
 import json
+import math
+
+
+def _require_prob(val: object, name: str) -> float:
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise ValueError(f"{name} must be a finite probability in [0.0, 1.0] (not bool), got {val!r}")
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval) or not (0.0 <= fval <= 1.0):
+        raise ValueError(f"{name} must be in [0.0, 1.0], got {val!r}")
+    return fval
 
 
 def series_availability(components: list[float]) -> float:
+    if not isinstance(components, (list, tuple)) or not components:
+        raise ValueError("components must be a non-empty list/tuple of probabilities in [0.0, 1.0]")
     a = 1.0
-    for c in components:
-        a *= c
+    for i, c in enumerate(components):
+        a *= _require_prob(c, f"components[{i}]")
     return a
 
 
 def parallel_availability(components: list[float]) -> float:
+    if not isinstance(components, (list, tuple)) or not components:
+        raise ValueError("components must be a non-empty list/tuple of probabilities in [0.0, 1.0]")
     unavail = 1.0
-    for c in components:
-        unavail *= (1.0 - c)
+    for i, c in enumerate(components):
+        unavail *= (1.0 - _require_prob(c, f"components[{i}]"))
     return 1.0 - unavail
 
 
 def summarize_availability(label: str, avail: float) -> dict:
-    downtime_min_yr = round(365.25 * 24 * 60 * (1.0 - avail), 2)
-    return {"topology": label, "availability_pct": round(avail * 100.0, 5), "expected_downtime_min_per_year": downtime_min_yr}
+    if not isinstance(label, str) or not label.strip():
+        raise ValueError(f"label must be a non-empty str, got {label!r}")
+    p = _require_prob(avail, "avail")
+    downtime_min_yr = round(365.25 * 24 * 60 * (1.0 - p), 2)
+    return {"topology": label, "availability_pct": round(p * 100.0, 5), "expected_downtime_min_per_year": downtime_min_yr}
 
 
 def main() -> None:

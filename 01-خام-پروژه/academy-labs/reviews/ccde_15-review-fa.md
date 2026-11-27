@@ -18,3 +18,7 @@
 - **اصلاح انجام‌شده:** تفکیک دقیق فصل ۵ GDPR (اجازه انتقال با Adequacy Decision یا SCC + TIA) از قوانین ملی Data Localization و سیاست‌های شرکتی اقامت داده در بخش ۶ و پرسش ۵، همراه با افزودن لینک مرجع EDPB به `meta.sources`.
 - **تست مرتبط:** `test_phase4_ccde_18_ccde_19_dynamic_labs_and_regressions` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** متن آموزشی جایگزین مشاوره حقوقی DPO/وکیل نیست و بازبینی مستقل انجام نشده است.
+
+## به‌روزرسانی فاز ۱۰D — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن `_require_non_neg_finite` و محافظت `OverflowError -> ValueError` در `rto_financial_justification` با مقایسه گردنشده ROI.
+- **وضعیت اجرا:** آزمایشگاه شبیه‌ساز/Mock محلی Python بدون تجهیز شبکه زنده؛ تطابق دقیق بایتی کد HTML با `ccde_15_lab.py` تأیید شد.

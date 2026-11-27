@@ -8,15 +8,39 @@ No real AWS/Azure/GCP accounts or Equinix Colocation exchanges are connected.
 
 import ipaddress
 import json
+import math
+
+
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
+def _require_non_neg_finite(val: object, name: str) -> float:
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise ValueError(f"{name} must be a non-negative finite number (not bool), got {val!r}")
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval) or fval < 0:
+        raise ValueError(f"{name} must be a non-negative finite number, got {val!r}")
+    return fval
 
 
 def select_cloud_interconnect(bandwidth_gbps: float, needs_deterministic_latency: bool, multi_cloud: bool) -> dict:
-    if multi_cloud and bandwidth_gbps >= 5.0:
+    bw = _require_non_neg_finite(bandwidth_gbps, "bandwidth_gbps")
+    if bw <= 0:
+        raise ValueError(f"bandwidth_gbps must be > 0, got {bw!r}")
+    det_lat = _require_bool(needs_deterministic_latency, "needs_deterministic_latency")
+    mcloud = _require_bool(multi_cloud, "multi_cloud")
+    if mcloud and bw >= 5.0:
         return {
             "recommended": "Colocation Cloud Exchange Hub (e.g. Equinix Fabric) -> Private Virtual Cross-Connects to AWS/Azure/GCP",
             "reason": "Single high-speed aggregation hub avoids hairpinned cloud-to-cloud traffic and lowers Direct Connect egress fees",
         }
-    if needs_deterministic_latency or bandwidth_gbps > 1.25:
+    if det_lat or bw > 1.25:
         return {
             "recommended": "Redundant Dedicated Direct Connect / ExpressRoute (Dual Diversely Routed Locations) + IPsec Backup",
             "reason": "Bypasses public internet jitter, exceeds classic 1.25Gbps single-tunnel IPsec throughput (without ECMP/higher SKUs), and typically lowers cloud egress rates (provider/region/tier-dependent)",
@@ -28,7 +52,13 @@ def select_cloud_interconnect(bandwidth_gbps: float, needs_deterministic_latency
 
 
 def detect_cidr_overlaps(allocations: dict[str, str]) -> list[dict]:
-    items = [(name, ipaddress.ip_network(cidr)) for name, cidr in allocations.items()]
+    if not isinstance(allocations, dict):
+        raise ValueError(f"allocations must be a dict of site -> CIDR, got {type(allocations).__name__}")
+    items = []
+    for name, cidr in allocations.items():
+        if not isinstance(name, str) or not isinstance(cidr, str):
+            raise ValueError(f"allocation keys and CIDRs must be strings, got {name!r}: {cidr!r}")
+        items.append((name, ipaddress.ip_network(cidr, strict=True)))
     overlaps = []
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
@@ -38,9 +68,19 @@ def detect_cidr_overlaps(allocations: dict[str, str]) -> list[dict]:
 
 
 def cloud_egress_annual_cost(monthly_tb: float, internet_per_gb: float = 0.09, direct_connect_per_gb: float = 0.02) -> dict:
-    inet_yr = round(monthly_tb * 1024 * internet_per_gb * 12, 2)
-    dx_yr = round(monthly_tb * 1024 * direct_connect_per_gb * 12, 2)
-    return {"monthly_egress_tb": monthly_tb, "internet_egress_annual_usd": inet_yr, "direct_connect_egress_annual_usd": dx_yr, "annual_egress_savings_usd": round(inet_yr - dx_yr, 2)}
+    tb = _require_non_neg_finite(monthly_tb, "monthly_tb")
+    inet_rate = _require_non_neg_finite(internet_per_gb, "internet_per_gb")
+    dx_rate = _require_non_neg_finite(direct_connect_per_gb, "direct_connect_per_gb")
+    inet_exact = tb * 1024.0 * inet_rate * 12.0
+    dx_exact = tb * 1024.0 * dx_rate * 12.0
+    if not (math.isfinite(inet_exact) and math.isfinite(dx_exact)):
+        raise ValueError("egress cost calculation overflowed IEEE-754 finite float range")
+    return {
+        "monthly_egress_tb": tb,
+        "internet_egress_annual_usd": round(inet_exact, 2),
+        "direct_connect_egress_annual_usd": round(dx_exact, 2),
+        "annual_egress_savings_usd": round(inet_exact - dx_exact, 2),
+    }
 
 
 def main() -> None:

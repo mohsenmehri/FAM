@@ -20,3 +20,7 @@
 ` پایانی.
 - **تست مرتبط:** `test_phase4_ccde_18_ccde_19_dynamic_labs_and_regressions` و `test_blueprints_schema_svg_quiz_lab_and_review_integrity` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** آزمایشگاه مدل محلی بدون اتصال به روترهای مخابراتی یا 5G RAN است و بازبینی مستقل انجام نشده است.
+
+## به‌روزرسانی فاز ۱۰D — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن `_require_bool` fail-closed روی هر ۳ کلید بولی کاپستون Aria-Telecom، اعتبارسنجی بازه `[0,100]` برای `ixp_cdn_offload_pct` و اعداد صحیح/رشته‌های اجباری.
+- **وضعیت اجرا:** آزمایشگاه شبیه‌ساز/Mock محلی Python بدون تجهیز شبکه زنده؛ تطابق دقیق بایتی کد HTML با `ccde_19_lab.py` تأیید شد.

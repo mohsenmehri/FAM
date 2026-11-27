@@ -11,3 +11,7 @@
 - **اصلاح انجام‌شده:** اصلاح به «مهاجرت مرحله‌ای با هم‌زیستی، هدف کمینه‌سازی قطعی و Rollback» در بلوپرینت و آزمایشگاه همراه با assertها.
 - **تست مرتبط:** `test_phase5_remaining_tracks_labs_and_regressions` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** ممیزی آموزشی محلی؛ بازبینی مستقل انجام نشده است.
+
+## به‌روزرسانی فاز ۱۰D — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن `_require_bool` و `_require_dict_bool` fail-closed در `audit_hld_completeness` و `detect_exam_400_007_traps`.
+- **وضعیت اجرا:** آزمایشگاه شبیه‌ساز/Mock محلی Python بدون تجهیز شبکه زنده؛ تطابق دقیق بایتی کد HTML با `ccde_20_lab.py` تأیید شد.

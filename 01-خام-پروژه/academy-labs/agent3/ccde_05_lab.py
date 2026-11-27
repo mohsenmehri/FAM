@@ -8,6 +8,7 @@ No real DWDM optical equipment, storage arrays, or data center fabrics are conne
 """
 
 import json
+import math
 
 PRODUCT_SYNC_LIMITS_MS = {
     "vmware_vsan_stretched": 5.0,
@@ -15,18 +16,46 @@ PRODUCT_SYNC_LIMITS_MS = {
 }
 
 
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
+def _require_pos_finite(val: object, name: str) -> float:
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise ValueError(f"{name} must be a positive finite number (not bool), got {val!r}")
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval) or fval <= 0:
+        raise ValueError(f"{name} must be a positive finite number, got {val!r}")
+    return fval
+
+
 def evaluate_dci_distance(city_pair: str, straight_km: float, route_stretch: float = 1.35) -> dict:
+    if not isinstance(city_pair, str) or not city_pair.strip():
+        raise ValueError(f"city_pair must be a non-empty str, got {city_pair!r}")
+    km = _require_pos_finite(straight_km, "straight_km")
+    stretch = _require_pos_finite(route_stretch, "route_stretch")
+    if stretch < 1.0:
+        raise ValueError(f"route_stretch must be >= 1.0, got {stretch!r}")
     # Ideal silica fiber (~200,000 km/s) => ~0.01 ms/km RTT; real terrestrial routes add stretch + DWDM delay
-    theoretical_rtt_ms = round(straight_km * 0.01, 2)
-    routed_rtt_ms = round(theoretical_rtt_ms * route_stretch, 2)
+    theoretical_exact = km * 0.01
+    routed_exact = theoretical_exact * stretch
+    if not (math.isfinite(theoretical_exact) and math.isfinite(routed_exact)):
+        raise ValueError("RTT calculation overflowed IEEE-754 finite float range")
+    theoretical_rtt_ms = round(theoretical_exact, 2)
+    routed_rtt_ms = round(routed_exact, 2)
     product_feasibility = {
-        name: (routed_rtt_ms <= limit_ms)
+        name: (routed_exact <= limit_ms)
         for name, limit_ms in PRODUCT_SYNC_LIMITS_MS.items()
     }
     any_sync_feasible = any(product_feasibility.values())
     return {
         "pair": city_pair,
-        "straight_distance_km": straight_km,
+        "straight_distance_km": km,
         "theoretical_min_rtt_ms": theoretical_rtt_ms,
         "estimated_routed_rtt_ms": routed_rtt_ms,
         "sync_feasible_by_product": product_feasibility,
@@ -39,13 +68,15 @@ def evaluate_dci_distance(city_pair: str, straight_km: float, route_stretch: flo
 
 
 def evaluate_dci_l2_stretch(app_hardcodes_ip_on_failover: bool, budget_for_evpn_multisite: bool) -> dict:
-    if not app_hardcodes_ip_on_failover:
+    hardcoded = _require_bool(app_hardcodes_ip_on_failover, "app_hardcodes_ip_on_failover")
+    has_budget = _require_bool(budget_for_evpn_multisite, "budget_for_evpn_multisite")
+    if not hardcoded:
         return {
             "dci_model": "L3-Only DCI + DNS GSLB / Anycast BGP",
             "l2_stretched": False,
             "reason": "Preferred CCDE choice: zero shared L2 broadcast/STP fate between data centers",
         }
-    if budget_for_evpn_multisite:
+    if has_budget:
         return {
             "dci_model": "Contained Overlay DCI (EVPN Multi-Site / ACI Multi-Site) with BUM Storm Control + Host-Route Injection",
             "l2_stretched": True,

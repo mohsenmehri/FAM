@@ -9,14 +9,64 @@ No real telecom core or 5G RAN infrastructure is connected.
 """
 
 import json
+import math
+
+
+def _require_bool(design: dict, key: str) -> bool:
+    if key not in design:
+        raise ValueError(f"Missing required boolean key '{key}'")
+    val = design[key]
+    if not isinstance(val, bool):
+        raise ValueError(f"{key} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
+def _require_str(design: dict, key: str) -> str:
+    if key not in design:
+        raise ValueError(f"Missing required string key '{key}'")
+    val = design[key]
+    if not isinstance(val, str) or not val.strip():
+        raise ValueError(f"{key} must be a non-empty str, got {val!r}")
+    return val
+
+
+def _require_pct(design: dict, key: str) -> float:
+    if key not in design:
+        raise ValueError(f"Missing required numeric key '{key}'")
+    val = design[key]
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise ValueError(f"{key} must be a finite percentage in [0, 100], got {val!r}")
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{key} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval) or not (0.0 <= fval <= 100.0):
+        raise ValueError(f"{key} must be in [0, 100], got {val!r}")
+    return fval
 
 
 def validate_aria_telecom_hld(design: dict) -> dict:
-    igp_ok = design["max_routers_per_igp_domain"] <= 300 and design["inter_domain_stitching"] == "bgp_lu_unified_sr"
-    slice_ok = design["flex_algo_slices"] >= 2 and design["tilfa_enabled"] and design["rings_two_connected_within_msd"]
-    service_ok = design["service_plane"] == "evpn_plus_l3vpn_bgp_free_core"
-    migration_ok = design["migration_mechanism"] == "phased_srms_coexistence"
-    sec_peering_ok = design["rpki_and_flowspec"] and design["ixp_cdn_offload_pct"] >= 60
+    if not isinstance(design, dict):
+        raise ValueError(f"design must be a dict, got {type(design).__name__}")
+    max_igp = design.get("max_routers_per_igp_domain")
+    if isinstance(max_igp, bool) or not isinstance(max_igp, int) or max_igp <= 0:
+        raise ValueError(f"max_routers_per_igp_domain must be a positive int (not bool), got {max_igp!r}")
+    slices = design.get("flex_algo_slices")
+    if isinstance(slices, bool) or not isinstance(slices, int) or slices < 0:
+        raise ValueError(f"flex_algo_slices must be a non-negative int (not bool), got {slices!r}")
+    stitching = _require_str(design, "inter_domain_stitching")
+    service_plane = _require_str(design, "service_plane")
+    migration_mech = _require_str(design, "migration_mechanism")
+    tilfa = _require_bool(design, "tilfa_enabled")
+    rings_ok = _require_bool(design, "rings_two_connected_within_msd")
+    rpki_ok = _require_bool(design, "rpki_and_flowspec")
+    offload_pct = _require_pct(design, "ixp_cdn_offload_pct")
+
+    igp_ok = max_igp <= 300 and stitching == "bgp_lu_unified_sr"
+    slice_ok = slices >= 2 and tilfa and rings_ok
+    service_ok = service_plane == "evpn_plus_l3vpn_bgp_free_core"
+    migration_ok = migration_mech == "phased_srms_coexistence"
+    sec_peering_ok = rpki_ok and offload_pct >= 60.0
 
     checks = [
         {

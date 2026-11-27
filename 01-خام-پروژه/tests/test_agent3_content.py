@@ -1525,6 +1525,113 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 m.detect_beaconing([0, 10, 20, bad_ts])
 
+    def test_phase10d_ccde_complete_strict_validation_sweep(self):
+        """Phase 10D: complete 100% CCDE strict bool/numeric/range/overflow validation (9 remaining labs)."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        bad_bools = ("False", "True", "", 0, 1, None, [], {})
+        bad_nums = (-1, float("nan"), float("inf"), 10**500, True)
+
+        # 1. ccde_03
+        m = load_module(AGENT3_LAB_DIR / "ccde_03_lab.py", "ccde_03_p10d")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.select_sp_transport(bv, True)
+        for bn in bad_nums:
+            with self.assertRaises(ValueError):
+                m.model_sp_peering_economics(bn, 0.65, 18000, 0.5)
+        with self.assertRaises(ValueError):
+            m.model_sp_peering_economics(100, 0.65, 18000, 1.5)
+
+        # 2. ccde_05
+        m = load_module(AGENT3_LAB_DIR / "ccde_05_lab.py", "ccde_05_p10d")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.evaluate_dci_l2_stretch(bv, True)
+        for bn in (0, -5, float("nan"), float("inf"), 10**500, True):
+            with self.assertRaises(ValueError):
+                m.evaluate_dci_distance("A-B", bn)
+
+        # 3. ccde_06
+        m = load_module(AGENT3_LAB_DIR / "ccde_06_lab.py", "ccde_06_p10d")
+        for bn in bad_nums:
+            with self.assertRaises(ValueError):
+                m.compare_wan_tco(10, bn, 350, 150)
+        with self.assertRaises(ValueError):
+            m.aar_select_path("VoIP", {"max_rtt": 100, "max_jitter": 15, "max_loss": 0.5}, [])
+
+        # 4. ccde_07
+        m = load_module(AGENT3_LAB_DIR / "ccde_07_lab.py", "ccde_07_p10d")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.select_cloud_interconnect(10.0, bv, True)
+        with self.assertRaises(ValueError):
+            m.detect_cidr_overlaps({"A": "10.0.0.1/24"})  # host bits set
+
+        # 5. ccde_10
+        m = load_module(AGENT3_LAB_DIR / "ccde_10_lab.py", "ccde_10_p10d")
+        for bad_p in (-0.1, 1.1, float("nan"), float("inf"), 10**500, True):
+            with self.assertRaises(ValueError):
+                m.series_availability([0.99, bad_p])
+            with self.assertRaises(ValueError):
+                m.parallel_availability([0.99, bad_p])
+        with self.assertRaises(ValueError):
+            m.series_availability([])
+
+        # 6. ccde_15
+        m = load_module(AGENT3_LAB_DIR / "ccde_15_lab.py", "ccde_15_p10d")
+        for bn in bad_nums:
+            with self.assertRaises(ValueError):
+                m.rto_financial_justification(bn, 2.0, 4.0, 0.25, 250000.0)
+
+        # 7. ccde_16
+        m = load_module(AGENT3_LAB_DIR / "ccde_16_lab.py", "ccde_16_p10d")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.select_migration_strategy(5, bv)
+            with self.assertRaises(ValueError):
+                m.evaluate_mop_gate(bv, {"bgp": True}, 10, 60)
+            with self.assertRaises(ValueError):
+                m.evaluate_mop_gate(True, {"bgp": bv}, 10, 60)
+
+        # 8. ccde_19
+        m = load_module(AGENT3_LAB_DIR / "ccde_19_lab.py", "ccde_19_p10d")
+        ok19 = {
+            "max_routers_per_igp_domain": 200, "inter_domain_stitching": "bgp_lu_unified_sr",
+            "flex_algo_slices": 2, "tilfa_enabled": True, "rings_two_connected_within_msd": True,
+            "service_plane": "evpn_plus_l3vpn_bgp_free_core", "migration_mechanism": "phased_srms_coexistence",
+            "rpki_and_flowspec": True, "ixp_cdn_offload_pct": 65,
+        }
+        for key in ("tilfa_enabled", "rings_two_connected_within_msd", "rpki_and_flowspec"):
+            for bv in bad_bools:
+                with self.assertRaises(ValueError):
+                    m.validate_aria_telecom_hld({**ok19, key: bv})
+            missing = ok19.copy()
+            del missing[key]
+            with self.assertRaises(ValueError):
+                m.validate_aria_telecom_hld(missing)
+        for bad_pct in (-1, 101, float("nan"), 10**500, True):
+            with self.assertRaises(ValueError):
+                m.validate_aria_telecom_hld({**ok19, "ixp_cdn_offload_pct": bad_pct})
+
+        # 9. ccde_20
+        m = load_module(AGENT3_LAB_DIR / "ccde_20_lab.py", "ccde_20_p10d")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.audit_hld_completeness(m.REQUIRED_HLD_SECTIONS, bv)
+            with self.assertRaises(ValueError):
+                m.detect_exam_400_007_traps({
+                    "ignores_budget_or_ops_skill_constraint": bv,
+                    "chooses_most_complex_tech_without_driver": False,
+                    "skips_migration_coexistence": False,
+                })
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

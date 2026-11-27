@@ -20,11 +20,26 @@ REQUIRED_HLD_SECTIONS = [
 ]
 
 
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
+def _require_dict_bool(d: dict, key: str) -> bool:
+    if key not in d:
+        raise ValueError(f"Missing required boolean key '{key}'")
+    return _require_bool(d[key], key)
+
+
 def audit_hld_completeness(present_sections: list[str], includes_raw_cli_configs: bool) -> dict:
+    if not isinstance(present_sections, list) or not all(isinstance(s, str) for s in present_sections):
+        raise ValueError("present_sections must be a list of section name strings")
+    has_raw_cli = _require_bool(includes_raw_cli_configs, "includes_raw_cli_configs")
     present_set = set(present_sections)
     missing = [s for s in REQUIRED_HLD_SECTIONS if s not in present_set]
     warnings = []
-    if includes_raw_cli_configs:
+    if has_raw_cli:
         warnings.append("HLD_SCOPE_TRAP: Raw CLI configs and per-port IP tables belong in LLD, NOT HLD!")
     return {
         "hld_ready_for_architecture_board": (len(missing) == 0 and not warnings),
@@ -34,12 +49,17 @@ def audit_hld_completeness(present_sections: list[str], includes_raw_cli_configs
 
 
 def detect_exam_400_007_traps(answer_choice: dict) -> list[str]:
+    if not isinstance(answer_choice, dict):
+        raise ValueError(f"answer_choice must be a dict, got {type(answer_choice).__name__}")
+    ignores_constraint = _require_dict_bool(answer_choice, "ignores_budget_or_ops_skill_constraint")
+    over_engineers = _require_dict_bool(answer_choice, "chooses_most_complex_tech_without_driver")
+    skips_migration = _require_dict_bool(answer_choice, "skips_migration_coexistence")
     traps = []
-    if answer_choice["ignores_budget_or_ops_skill_constraint"]:
+    if ignores_constraint:
         traps.append("TRAP_1: Ignored a hidden Constraint in stakeholder emails (budget / small Ops team)!")
-    if answer_choice["chooses_most_complex_tech_without_driver"]:
+    if over_engineers:
         traps.append("TRAP_2: Over-Engineering — picked complex tech (e.g. ACI/RSVP-TE) with no business driver!")
-    if answer_choice["skips_migration_coexistence"]:
+    if skips_migration:
         traps.append("TRAP_3: Designed a pretty Greenfield picture but ignored Brownfield coexistence, minimal-downtime migration & rollback!")
     return traps
 
