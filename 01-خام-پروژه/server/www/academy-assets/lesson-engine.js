@@ -5,21 +5,20 @@
   const SEC_STORAGE_KEY = 'fam_academy_sections_v1';
 
   function getSectionsMap() {
-    let local = {};
-    try {
-      const raw = localStorage.getItem(SEC_STORAGE_KEY);
-      const obj = raw ? JSON.parse(raw) : {};
-      if (obj && typeof obj === 'object' && !Array.isArray(obj)) local = obj;
-    } catch {}
-    // Authenticated progress is account-specific; browser-wide legacy keys
-    // may belong to a different user on the same device.
+    // A bridge identifies the authenticated account. Never read or write
+    // the browser-wide standalone keys during that session.
     const bridge = window.FamAcademyBridge;
     if (bridge) {
       const remote = bridge.progress?.labs?.sections;
       return remote && typeof remote === 'object' && !Array.isArray(remote)
         ? { ...remote } : {};
     }
-    return local;
+    try {
+      const raw = localStorage.getItem(SEC_STORAGE_KEY);
+      const obj = raw ? JSON.parse(raw) : {};
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj;
+    } catch {}
+    return {};
   }
 
   function persistProgress(completed, labsOverride) {
@@ -46,22 +45,28 @@
     if (idx >= 0) list.splice(idx, 1);
     else list.push(secId);
     map[lessonId] = list;
-    try { localStorage.setItem(SEC_STORAGE_KEY, JSON.stringify(map)); } catch {}
+    // The signed-in bridge is account-specific; never put its progress in
+    // the browser-wide standalone key, even as a fallback on save failure.
+    if (!window.FamAcademyBridge) {
+      try { localStorage.setItem(SEC_STORAGE_KEY, JSON.stringify(map)); } catch {}
+    }
     const labs = { ...(window.FamAcademyBridge?.progress?.labs || {}), sections: map };
     persistProgress(getCompletedList(), labs);
     return idx < 0;
   }
 
   function getCompletedList() {
-    let local = [];
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      const remote = bridge.progress?.completed;
+      return [...new Set(Array.isArray(remote) ? remote : [])];
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const arr = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(arr)) local = arr;
+      if (Array.isArray(arr)) return [...new Set(arr)];
     } catch {}
-    const bridge = window.FamAcademyBridge;
-    const remote = bridge?.progress?.completed;
-    return [...new Set(bridge ? (Array.isArray(remote) ? remote : []) : local)];
+    return [];
   }
 
   function isLessonDone(lessonId) {
@@ -73,7 +78,9 @@
     const idx = list.indexOf(lessonId);
     if (idx >= 0) list.splice(idx, 1);
     else list.push(lessonId);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+    if (!window.FamAcademyBridge) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+    }
     persistProgress(list);
     return idx < 0;
   }

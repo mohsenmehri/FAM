@@ -16,10 +16,12 @@ const storage = new Map([
   ['fam_academy_sections_v1', JSON.stringify({remote: ['other-account-section']})]
 ]);
 const requests = [];
+const storageReads = [];
+const storageWrites = [];
 const status = {textContent: ""};
 const ctx = {
   window: {}, document: {documentElement: {dataset: {}}, addEventListener() {}, getElementById(id) {return id === "academy-save-status" ? status : null;}},
-  localStorage: {getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value)},
+  localStorage: {getItem: key => {storageReads.push(key); return storage.get(key) || null;}, setItem: (key, value) => {storageWrites.push(key); storage.set(key, value);}},
   fetch: (url, options) => new Promise(resolve => requests.push({url, options, resolve})),
   console, setTimeout, clearTimeout
 };
@@ -82,12 +84,23 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   requests[5].resolve({ok: true});
   await tick();
 
+  // The account session did not read, overwrite or clear standalone progress,
+  // including after a failed server save; sign-out leaves those keys intact.
+  const sharedKeys = ['fam_academy_progress_v1', 'fam_academy_sections_v1'];
+  assert(!storageReads.some(key => sharedKeys.includes(key)));
+  assert(!storageWrites.some(key => sharedKeys.includes(key)));
   // Without a bridge, standalone callers retain their existing local fallback.
   const offline = {window: {}, document: {addEventListener() {}}, localStorage: ctx.localStorage, console};
   vm.createContext(offline);
   vm.runInContext(engine, offline);
   vm.runInContext(catalog, offline);
-  assert(offline.window.FamLessonEngine.isLessonDone('new'));
-  assert(offline.window.FamAcademyCatalog.getCompletedSet().has('new'));
+  assert(offline.window.FamLessonEngine.isLessonDone('other-account'));
+  assert(!offline.window.FamLessonEngine.isLessonDone('new'));
+  assert(offline.window.FamAcademyCatalog.getCompletedSet().has('other-account'));
+  assert(offline.window.FamLessonEngine.isSectionDone('remote', 'other-account-section'));
+  assert(!offline.window.FamLessonEngine.isSectionDone('retry', 'x'));
+  offline.window.FamLessonEngine.toggleLessonDone('standalone');
+  assert(offline.window.FamAcademyCatalog.getCompletedSet().has('standalone'));
+  assert(!lessons.isLessonDone('standalone'));
   console.log('progress behavior passed');
 })().catch(err => {console.error(err); process.exitCode = 1;});
