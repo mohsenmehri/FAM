@@ -181,6 +181,16 @@ class AcademyContentTests(unittest.TestCase):
         self.assertIn("اجرا نشده", lab)
         self.assertEqual(len(blueprint["interactiveQuiz"]), 12)
 
+    def test_osi_blueprint_embeds_executable_mock_not_ios(self):
+        from html import unescape
+        blueprint = json.loads((ASSET_ROOT / "v5/blueprints/academy-stage-zero-osi-fa.json").read_text(encoding="utf-8"))
+        lab = unescape(blueprint["stages"]["lab"]["html"])
+        source = (PACKAGE_ROOT / "academy-labs/osi_hop_mock.py").read_text(encoding="utf-8")
+        self.assertIn(source, lab)
+        self.assertIn("هیچ بسته یا فرمان IOS ارسال نمی‌کند", lab)
+        self.assertEqual(blueprint["objectiveId"], "s01")
+        self.assertEqual(len(blueprint["interactiveQuiz"]), 12)
+
     def test_every_lesson_carries_the_sixteen_section_contract(self):
         for _, _, lesson in self.records:
             blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))

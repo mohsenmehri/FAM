@@ -79,3 +79,12 @@ w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), unsafe);
 assert.equal(w.document.querySelector('.lesson-review-status img'), null);
 assert.match(w.document.querySelector('.lesson-review-status').textContent, /<img/);
 console.log('jsdom: review and execution status visible for all current lessons; unknown and escaping passed');
+// Exercise score handling for the rewritten OSI lesson as well as Terraform.
+const osi = JSON.parse(fs.readFileSync(path.join(root,'server/www/academy-assets/v5/blueprints/academy-stage-zero-osi-fa.json'),'utf8'));
+w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), osi);
+const oq=w.document.querySelector('[data-lesson-quiz]');
+assert.equal(oq.querySelectorAll('fieldset').length, 12);
+osi.interactiveQuiz.forEach((question,i) => oq.querySelector(`input[name="lesson-question-${i}"][value="${question.correctIndex}"]`).click());
+oq.querySelector('[data-quiz-grade]').click();
+assert.match(oq.querySelector('.lesson-quiz-result').textContent, /نمره: 10 از ۱۰/);
+console.log('jsdom: OSI quiz full-score interaction passed');

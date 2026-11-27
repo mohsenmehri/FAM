@@ -266,6 +266,15 @@ class FamAppApiTests(unittest.TestCase):
         self.assertEqual(out.status_code, 200)
         self.assertEqual(self.client.get(path, environ_base=self.https_env).status_code, 401)
 
+    def test_osi_lesson_is_resolvable_and_auth_gated(self):
+        path = "/academy-assets/v5/blueprints/academy-stage-zero-osi-fa.json"
+        self.assertEqual(self.client.get(path, environ_base=self.https_env).status_code, 401)
+        self.assertEqual(self._login_admin().status_code, 200)
+        response = self.client.get(path, environ_base=self.https_env)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["lessonId"], "academy-stage-zero-osi-fa")
+        response.close()
+
     def test_login_rate_limit_blocks_after_ten_failures(self):
         for attempt in range(10):
             res = self.client.post(
