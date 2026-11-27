@@ -503,6 +503,122 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertIn("EDPB", c15_txt)
         self.assertIn("فصل ۵", c15_txt)
 
+    def test_phase5_remaining_tracks_labs_and_regressions(self):
+        """Phase 5 unit & negative-case tests across Specialist, CCIE, CCDE, and Automation remaining lessons."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+
+        def student_text(lid: str) -> str:
+            d = json.loads((BLUEPRINT_DIR / f"{lid}.json").read_text(encoding="utf-8"))
+            return json.dumps(
+                {k: d.get(k) for k in ("title", "sections", "glossary", "stages", "interactiveQuiz")},
+                ensure_ascii=False,
+            )
+
+        # --- Category 1: Specialist ---
+        # spec_ent_campus: identical C9200/C9300 pairs MUST be rejected for SVL
+        svl = load_module(AGENT3_LAB_DIR / "spec_ent_campus_lab.py", "spec_ent_campus_testmod")
+        c9200_pair = svl.validate_svl_pair(
+            {"model": "C9200-48P", "ios_xe": "17.9.4a", "license": "network-advantage"},
+            {"model": "C9200-48P", "ios_xe": "17.9.4a", "license": "network-advantage"},
+        )
+        self.assertEqual(len(c9200_pair), 1)
+        self.assertIn("C9200/C9300", c9200_pair[0])
+        self.assertNotIn("ارتقای بدون قطعی (Graceful Shutdown یک گره)", student_text("spec_ent_campus"))
+
+        # spec_dc_nx: dual-homed vPC upgrade must explicitly qualify Orphan Ports
+        dc_nx_txt = student_text("spec_dc_nx")
+        self.assertNotIn("(بدون قطعی سرورهای Dual-Homed)", dc_nx_txt)
+        self.assertIn("Orphan Port", dc_nx_txt)
+
+        # spec_sec_vpn: reverse-only asymmetry & negative counters must NOT report healthy
+        vpn = load_module(AGENT3_LAB_DIR / "spec_sec_vpn_lab.py", "spec_sec_vpn_testmod")
+        self.assertEqual(vpn.diagnose_ipsec_counters(0, 180), "ONE_WAY_OUTBOUND_MISSING_CHECK_LOCAL_ROUTE_OR_CRYPTO_ACL")
+        with self.assertRaises(ValueError):
+            vpn.diagnose_ipsec_counters(-1, 10)
+
+        # spec_dc_stor: multi-initiator detection works across arbitrary HBA OUIs (not hardcoded 20:00:00:11)
+        stor = load_module(AGENT3_LAB_DIR / "spec_dc_stor_lab.py", "spec_dc_stor_testmod")
+        init_a = {"vsan": 100, "wwpn": "21:00:00:24:ff:01:00:01"}
+        init_b = {"vsan": 100, "wwpn": "10:00:00:90:fa:02:00:02"}
+        tgt = {"vsan": 100, "wwpn": "50:00:09:70:00:01:00:01"}
+        res_multi = stor.evaluate_fc_access(
+            init_a,
+            tgt,
+            [{"name": "Z_BAD", "vsan": 100, "members": [init_a["wwpn"], init_b["wwpn"], tgt["wwpn"]]}],
+            known_initiator_wwpns={init_a["wwpn"], init_b["wwpn"]},
+        )
+        self.assertFalse(res_multi["single_initiator_best_practice"])
+        self.assertEqual(res_multi["initiators_in_zone"], 2)
+
+        # spec_sp_xr: strict CIDR validation rejects non-CIDR /21 with host bits and overly specific /28
+        xr = load_module(AGENT3_LAB_DIR / "spec_sp_xr_lab.py", "spec_sp_xr_testmod")
+        self.assertEqual(xr.eval_rpl_policy("RPL_CUST_IN", "198.51.100.0", 21)["action"], "DROP")
+        self.assertEqual(xr.eval_rpl_policy("RPL_CUST_IN", "198.51.100.0", 28)["action"], "DROP")
+        self.assertEqual(xr.eval_rpl_policy("RPL_CUST_IN", "198.51.100.128", 25)["action"], "PASS")
+
+        # spec_cyber_hunt: unsorted beacon logs detected; <4 samples never false-positive
+        hunt = load_module(AGENT3_LAB_DIR / "spec_cyber_hunt_lab.py", "spec_cyber_hunt_testmod")
+        self.assertTrue(hunt.detect_beaconing([240, 0, 180, 60, 120])["beaconing_suspected"])
+        self.assertFalse(hunt.detect_beaconing([0, 60])["beaconing_suspected"])
+        self.assertFalse(hunt.detect_beaconing([10, 10, 10, 10])["beaconing_suspected"])
+
+        # --- Category 2: CCIE ---
+        # ccie_collab: detects 172.16.0.0/12 & 100.64.0.0/10 private SDP leaks; rejects unknown codecs
+        collab = load_module(AGENT3_LAB_DIR / "ccie_collab_lab.py", "ccie_collab_testmod")
+        self.assertIn("One-Way", collab.diagnose_sip_trace(["INVITE", "200 OK", "ACK"], "172.16.50.12")["symptom"])
+        self.assertIn("One-Way", collab.diagnose_sip_trace(["INVITE", "200 OK", "ACK"], "100.64.1.5")["symptom"])
+        with self.assertRaises(ValueError):
+            collab.evaluate_cucm_call(["PT_WAN"], "PT_WAN", "UNKNOWN_CODEC", 100)
+        self.assertIn("بی‌ارتباط با قانون حریم خصوصی GDPR اروپا", student_text("ccie_collab"))
+
+        # ccie_sec: distinguishes 45s NTP ops warning from 300s RFC 4120 Kerberos hard failure & TLS decrypt gate
+        csec = load_module(AGENT3_LAB_DIR / "ccie_sec_lab.py", "ccie_sec_testmod")
+        pf_45 = csec.audit_ntp_dns_preflight([{"name": "N1", "clock_skew_sec": 45, "dns_forward_reverse_ok": True}])
+        self.assertTrue(pf_45["preflight_passed"])
+        self.assertEqual(len(pf_45["warnings"]), 1)
+        pf_350 = csec.audit_ntp_dns_preflight([{"name": "N1", "clock_skew_sec": 350, "dns_forward_reverse_ok": True}])
+        self.assertFalse(pf_350["preflight_passed"])
+        blind = csec.ftd_packet_tracer(
+            {"src_ip": "10.10.20.15", "dst_ip": "10.20.50.10", "dst_port": 443, "dst_zone": "DC", "tls_decrypted": False, "contains_exploit_sig": True},
+            {"10.10.20.15": 10},
+        )
+        self.assertEqual(blind["result"], "ALLOW_UNINSPECTED_TLS")
+
+        # --- Category 3: CCDE ---
+        # ccde_01: rejects invalid SLA/weights/domains and removes absolute "بدون قطعی" wording
+        c01 = load_module(AGENT3_LAB_DIR / "ccde_01_lab.py", "ccde_01_testmod")
+        with self.assertRaises(ValueError):
+            c01.sla_downtime_budget(101.0)
+        with self.assertRaises(ValueError):
+            c01.blast_radius(1000, 0)
+        with self.assertRaises(ValueError):
+            c01.weighted_tradeoff({"a": 0.5, "b": 0.2}, {"opt": {"a": 5, "b": 5}})
+        self.assertNotIn("ارتقای بدون قطعی", student_text("ccde_01"))
+        self.assertNotIn("برنامه Rollback بدون قطعی", student_text("ccde_01"))
+
+        # ccde_20: removes absolute "مهاجرت بدون قطعی" / "zero-downtime" wording
+        c20_txt = student_text("ccde_20")
+        self.assertNotIn("مهاجرت بدون قطعی", c20_txt)
+        self.assertNotIn("zero-downtime", c20_txt)
+
+        # --- Category 4: Automation ---
+        # auto_16: rejects Python bool True as VLAN ID & tab YAML
+        a16 = load_module(AGENT3_LAB_DIR / "auto_16_lab.py", "auto_16_testmod")
+        self.assertEqual(a16.run_pipeline({"raw_yaml": "vlan: true\n", "vlan_id": True})["status"], "blocked_at_test")
+        self.assertEqual(a16.run_pipeline({"raw_yaml": "vlan:\t30\n", "vlan_id": 30})["status"], "blocked_at_lint")
+
+        # auto_17: catches USER 0, final-USER escalation back to root/0, and ENV TOKEN=
+        a17 = load_module(AGENT3_LAB_DIR / "auto_17_lab.py", "auto_17_testmod")
+        self.assertTrue(len(a17.audit_dockerfile(["FROM python:3.11-slim", "USER 0"])) >= 1)
+        self.assertTrue(len(a17.audit_dockerfile(["FROM python:3.11-slim", "USER appuser", "USER root"])) >= 1)
+        self.assertTrue(len(a17.audit_dockerfile(["FROM python:3.11-slim", "USER appuser", "ENV API_TOKEN=xyz"])) >= 1)
+        self.assertEqual(a17.audit_dockerfile(["FROM python:3.11-slim", "USER appuser"]), [])
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

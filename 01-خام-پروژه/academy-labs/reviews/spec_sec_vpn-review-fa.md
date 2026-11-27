@@ -4,3 +4,10 @@
 
 - همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش و شبیه‌ساز `01-خام-پروژه/academy-labs/agent3/spec_sec_vpn_lab.py` مطابق RFC 7296 / 4303 / 3948 بررسی و اجرا شدند.
 - هیچ تجهیز واقعی متصل نشده است.
+
+## بازبینی فنی فاز ۵ (2026-11-27 — ممیزی موضوعی درس‌ها و آزمایشگاه‌های باقی‌مانده با آزمون‌های منفی)
+- **ایراد:** در `diagnose_ipsec_counters` حالت نامتقارن `pkts_encaps==0, pkts_decaps>0` به اشتباه `BIDIRECTIONAL_TUNNEL_HEALTHY` برمی‌گرداند و مقادیر منفی رد نمی‌شدند.
+- **منبع معتبر:** RFC 7296 (IKEv2)، RFC 3948 (NAT-T)، Cisco IOS-XE IPsec Troubleshooting
+- **اصلاح انجام‌شده:** افزودن تشخیص هر دو جهت نامتقارن (`ONE_WAY_OUTBOUND_MISSING_...`) و `ValueError` روی شمارنده منفی با تست‌های منفی.
+- **تست مرتبط:** `test_phase5_remaining_tracks_labs_and_regressions` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** مدل محلی بدون سوکت رمزنگاری یا روتر IPsec واقعی؛ بازبینی مستقل انجام نشده است.

@@ -1,18 +1,30 @@
 #!/usr/bin/env python3
 """
 FAM Academy Lab — spec_ent_campus: StackWise Virtual (SVL), MEC & DAD Local Mock.
-Execution boundary: Pure Python 3 stdlib simulation of Catalyst 9500/9600 SVL
-prerequisite checks, MEC STP loop-free forwarding, and Dual-Active Detection
-preventing Split-Brain. No live Catalyst hardware connected.
+Execution boundary: Pure Python 3 stdlib simulation of Catalyst 9400/9500/9600 SVL
+prerequisite checks (including supported platform family validation), MEC STP
+loop-free forwarding, and Dual-Active Detection preventing Split-Brain.
+No live Catalyst hardware connected.
 """
 
 from __future__ import annotations
 
 import json
 
+SUPPORTED_SVL_FAMILIES = ("C9400", "C9500", "C9600")
+
+
+def is_svl_supported_model(model: str) -> bool:
+    upper = model.strip().upper()
+    return any(upper.startswith(prefix) for prefix in SUPPORTED_SVL_FAMILIES)
+
 
 def validate_svl_pair(sw1: dict, sw2: dict) -> list[str]:
     errs = []
+    if not is_svl_supported_model(sw1["model"]) or not is_svl_supported_model(sw2["model"]):
+        errs.append(
+            f"SVL is only supported on Catalyst 9400/9500/9600 families (got {sw1['model']} & {sw2['model']}; C9200/C9300 use hardware StackWise)"
+        )
     if sw1["model"] != sw2["model"]:
         errs.append("SVL requires identical switch models")
     if sw1["ios_xe"] != sw2["ios_xe"]:
@@ -37,11 +49,18 @@ def main() -> None:
         {"model": "C9500-48Y4C", "ios_xe": "17.9.4a", "license": "network-advantage"},
         {"model": "C9500-48Y4C", "ios_xe": "17.9.4a", "license": "network-advantage"},
     )
-    bad_errs = validate_svl_pair(
+    bad_mixed_errs = validate_svl_pair(
         {"model": "C9200-48P", "ios_xe": "17.9.4a", "license": "network-essentials"},
         {"model": "C9500-48Y4C", "ios_xe": "17.12.1", "license": "network-advantage"},
     )
-    assert good_errs == [] and len(bad_errs) == 3
+    # Negative test: identical C9200 pair with matching IOS-XE and Advantage license STILL cannot run SVL!
+    unsupported_same_model_errs = validate_svl_pair(
+        {"model": "C9200-48P", "ios_xe": "17.9.4a", "license": "network-advantage"},
+        {"model": "C9200-48P", "ios_xe": "17.9.4a", "license": "network-advantage"},
+    )
+    assert good_errs == []
+    assert len(bad_mixed_errs) == 4
+    assert len(unsupported_same_model_errs) == 1 and "C9200/C9300" in unsupported_same_model_errs[0]
 
     normal = simulate_svl_failure(svl_up=True, dad_up=True)
     split_brain = simulate_svl_failure(svl_up=False, dad_up=False)
@@ -53,7 +72,8 @@ def main() -> None:
     print("=== spec_ent_campus SVL & DAD Local Mock ===")
     print(json.dumps({
         "valid_pair_errors": good_errs,
-        "invalid_pair_errors": bad_errs,
+        "invalid_mixed_pair_errors": bad_mixed_errs,
+        "unsupported_identical_c9200_pair_errors": unsupported_same_model_errs,
         "normal_operation": normal,
         "svl_cut_without_dad": split_brain,
         "svl_cut_with_dad_protected": dad_protected,

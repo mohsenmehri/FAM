@@ -3,8 +3,8 @@
 FAM Academy Lab — spec_sec_vpn: IKEv2 NAT-T, VTI vs Crypto Map & IPsec SA
 Counter Diagnostics Local Mock.
 Execution boundary: Pure Python 3 stdlib simulation of NAT-D hash mismatch
-triggering UDP 4500 encapsulation, VTI dynamic routing readiness, and asymmetric
-encaps/decaps troubleshooting. No live IPsec routers or real crypto sockets.
+triggering UDP 4500 encapsulation, VTI dynamic routing readiness, and both
+asymmetric encaps/decaps failure directions. No live IPsec routers or real crypto sockets.
 """
 
 from __future__ import annotations
@@ -28,10 +28,14 @@ def negotiate_transport(local_ip: str, seen_ip: str, local_port: int, seen_port:
 
 
 def diagnose_ipsec_counters(pkts_encaps: int, pkts_decaps: int) -> str:
+    if pkts_encaps < 0 or pkts_decaps < 0:
+        raise ValueError("IPsec packet counters cannot be negative")
     if pkts_encaps == 0 and pkts_decaps == 0:
         return "NO_INTERESTING_TRAFFIC_OR_ROUTE_NOT_POINTING_TO_VTI"
     if pkts_encaps > 0 and pkts_decaps == 0:
         return "ONE_WAY_RETURN_BLOCKED_CHECK_ESP_OR_UDP4500_AND_RETURN_ROUTE"
+    if pkts_encaps == 0 and pkts_decaps > 0:
+        return "ONE_WAY_OUTBOUND_MISSING_CHECK_LOCAL_ROUTE_OR_CRYPTO_ACL"
     return "BIDIRECTIONAL_TUNNEL_HEALTHY"
 
 
@@ -41,14 +45,22 @@ def main() -> None:
     assert direct["nat_detected"] is False
     assert behind_nat["nat_detected"] is True and "4500" in behind_nat["ike_auth_and_esp_port"]
 
-    diag = diagnose_ipsec_counters(pkts_encaps=420, pkts_decaps=0)
-    assert diag == "ONE_WAY_RETURN_BLOCKED_CHECK_ESP_OR_UDP4500_AND_RETURN_ROUTE"
+    diag_ret_blocked = diagnose_ipsec_counters(pkts_encaps=420, pkts_decaps=0)
+    diag_out_missing = diagnose_ipsec_counters(pkts_encaps=0, pkts_decaps=180)
+    diag_idle = diagnose_ipsec_counters(pkts_encaps=0, pkts_decaps=0)
+    diag_healthy = diagnose_ipsec_counters(pkts_encaps=420, pkts_decaps=418)
+    assert diag_ret_blocked == "ONE_WAY_RETURN_BLOCKED_CHECK_ESP_OR_UDP4500_AND_RETURN_ROUTE"
+    assert diag_out_missing == "ONE_WAY_OUTBOUND_MISSING_CHECK_LOCAL_ROUTE_OR_CRYPTO_ACL"
+    assert diag_idle == "NO_INTERESTING_TRAFFIC_OR_ROUTE_NOT_POINTING_TO_VTI"
+    assert diag_healthy == "BIDIRECTIONAL_TUNNEL_HEALTHY"
 
     print("=== spec_sec_vpn IKEv2 NAT-T & Counter Diagnostics Mock ===")
     print(json.dumps({
         "direct_public_peers": direct,
         "peer_behind_nat_pat": behind_nat,
-        "counter_diagnosis_enc420_dec0": diag,
+        "counter_diagnosis_enc420_dec0": diag_ret_blocked,
+        "counter_diagnosis_enc0_dec180": diag_out_missing,
+        "counter_diagnosis_healthy": diag_healthy,
     }, indent=2, ensure_ascii=False))
 
 

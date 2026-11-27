@@ -21,7 +21,8 @@ REQUIRED_HLD_SECTIONS = [
 
 
 def audit_hld_completeness(present_sections: list[str], includes_raw_cli_configs: bool) -> dict:
-    missing = [s for s in REQUIRED_HLD_SECTIONS if s not in present_sections]
+    present_set = set(present_sections)
+    missing = [s for s in REQUIRED_HLD_SECTIONS if s not in present_set]
     warnings = []
     if includes_raw_cli_configs:
         warnings.append("HLD_SCOPE_TRAP: Raw CLI configs and per-port IP tables belong in LLD, NOT HLD!")
@@ -39,26 +40,35 @@ def detect_exam_400_007_traps(answer_choice: dict) -> list[str]:
     if answer_choice["chooses_most_complex_tech_without_driver"]:
         traps.append("TRAP_2: Over-Engineering — picked complex tech (e.g. ACI/RSVP-TE) with no business driver!")
     if answer_choice["skips_migration_coexistence"]:
-        traps.append("TRAP_3: Designed a pretty Greenfield picture but ignored Brownfield zero-downtime migration!")
+        traps.append("TRAP_3: Designed a pretty Greenfield picture but ignored Brownfield coexistence, minimal-downtime migration & rollback!")
     return traps
 
 
 def main() -> None:
+    complete_audit = audit_hld_completeness(REQUIRED_HLD_SECTIONS, includes_raw_cli_configs=False)
+    flawed_audit = audit_hld_completeness(REQUIRED_HLD_SECTIONS[:4], includes_raw_cli_configs=True)
+    bad_traps = detect_exam_400_007_traps({
+        "ignores_budget_or_ops_skill_constraint": True,
+        "chooses_most_complex_tech_without_driver": True,
+        "skips_migration_coexistence": True,
+    })
+    good_traps = detect_exam_400_007_traps({
+        "ignores_budget_or_ops_skill_constraint": False,
+        "chooses_most_complex_tech_without_driver": False,
+        "skips_migration_coexistence": False,
+    })
+
+    assert complete_audit["hld_ready_for_architecture_board"] is True
+    assert flawed_audit["hld_ready_for_architecture_board"] is False and len(flawed_audit["missing_hld_sections"]) == 3
+    assert len(bad_traps) == 3 and good_traps == []
+
     report = {
         "mode": "LOCAL_MOCK_CCDE_HLD_DEFENSE_AND_EXAM_AUDITOR",
-        "hld_audit_complete_draft": audit_hld_completeness(REQUIRED_HLD_SECTIONS, includes_raw_cli_configs=False),
-        "hld_audit_flawed_draft": audit_hld_completeness(REQUIRED_HLD_SECTIONS[:4], includes_raw_cli_configs=True),
+        "hld_audit_complete_draft": complete_audit,
+        "hld_audit_flawed_draft": flawed_audit,
         "exam_400_007_trap_checks": {
-            "over_engineered_answer": detect_exam_400_007_traps({
-                "ignores_budget_or_ops_skill_constraint": True,
-                "chooses_most_complex_tech_without_driver": True,
-                "skips_migration_coexistence": True,
-            }),
-            "ccde_master_answer": detect_exam_400_007_traps({
-                "ignores_budget_or_ops_skill_constraint": False,
-                "chooses_most_complex_tech_without_driver": False,
-                "skips_migration_coexistence": False,
-            }),
+            "over_engineered_answer": bad_traps,
+            "ccde_master_answer": good_traps,
         },
     }
     print(json.dumps(report, indent=2, ensure_ascii=False))
