@@ -768,6 +768,121 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertEqual(a15.validate_sot_prefixes(["10.0.0.0/24", "2001:db8:1::/48"]), [])
         self.assertEqual(len(a15.validate_sot_prefixes(["10.0.0.0/24", "2001:db8::/32", "2001:db8:1::/48"])), 1)
 
+    def test_phase7_strict_boolean_typing_and_remaining_labs(self):
+        """Phase 7 strict bool validation ("False"/"True"/0/1/None rejected) across ccde_18 and 6 remaining labs."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        bad_bools = ("False", "True", 0, 1, None)
+
+        # 1. ccde_18_lab: EVERY boolean field MUST reject "False", "True", 0, 1, None + expose rpo_scope_note
+        c18 = load_module(AGENT3_LAB_DIR / "ccde_18_lab.py", "ccde_18_phase7_testmod")
+        valid_c18 = {
+            "dc_distance_km": 5000,
+            "storage_replication": "asynchronous",
+            "target_rpo_minutes": 15,
+            "dci_l2_stretched": False,
+            "gslb_enabled": True,
+            "wan_model": "hybrid_sdwan_regional_hubs_plus_sase",
+            "cloud_hub": "dual_colo_cloud_exchange_direct_connect",
+            "macro_vrfs": 4,
+            "micro_sgt_enabled": True,
+            "eu_residency_policy_enforced": True,
+            "eu_personal_data_transferred_outside_eea": False,
+            "chapter_v_transfer_safeguard": None,
+            "encryption_in_transit_assumed": True,
+        }
+        bool_keys = (
+            "dci_l2_stretched",
+            "gslb_enabled",
+            "micro_sgt_enabled",
+            "eu_residency_policy_enforced",
+            "eu_personal_data_transferred_outside_eea",
+            "encryption_in_transit_assumed",
+        )
+        for key in bool_keys:
+            for bad_val in bad_bools:
+                with self.subTest(ccde_18_bool_key=key, bad_val=bad_val):
+                    with self.assertRaises(ValueError):
+                        c18.validate_pars_global_hld({**valid_c18, key: bad_val})
+            with self.subTest(ccde_18_missing_key=key):
+                missing_copy = {k: v for k, v in valid_c18.items() if k != key}
+                with self.assertRaises(ValueError):
+                    c18.validate_pars_global_hld(missing_copy)
+
+        res_c18 = c18.validate_pars_global_hld(valid_c18)
+        self.assertTrue(res_c18["all_architectural_checks_passed"])
+        self.assertIn("does NOT prove real achieved RPO", res_c18["domain_validations"][0]["rpo_scope_note"])
+
+        # 2. spec_sec_lab: reject truthy string "False" on authenticated & decrypt_enabled
+        ssec = load_module(AGENT3_LAB_DIR / "spec_sec_lab.py", "spec_sec_phase7_testmod")
+        for bad_val in bad_bools:
+            with self.assertRaises(ValueError):
+                ssec.evaluate_8021x_port("multi-domain", "closed", [{"mac": "aa", "domain": "DATA", "authenticated": bad_val}])
+            with self.assertRaises(ValueError):
+                ssec.evaluate_ftd_tls_and_ips(ssec.TlsFlow("a.example", "web", False, True), decrypt_enabled=bad_val)
+
+        # 3. spec_ent_sd_lab: reject non-bool sudi_valid/tloc_ext_enabled & invalid PnP IP/port
+        ssd = load_module(AGENT3_LAB_DIR / "spec_ent_sd_lab.py", "spec_ent_sd_phase7_testmod")
+        for bad_val in bad_bools:
+            with self.assertRaises(ValueError):
+                ssd.verify_sdwan_ztp("C8300-BR001", sudi_valid=bad_val, allowed_serials={"C8300-BR001"})
+            with self.assertRaises(ValueError):
+                ssd.tloc_available_transports(["mpls"], ["dia"], tloc_ext_enabled=bad_val)
+        with self.assertRaises(ValueError):
+            ssd.parse_pnp_option43("5A1D;K4;I999.1.1.1;J443")
+        with self.assertRaises(ValueError):
+            ssd.parse_pnp_option43("5A1D;K4;I10.10.10.5;J99999")
+
+        # 4. ccie_sec_lab: reject non-bool tls_decrypted / dns_forward_reverse_ok
+        csec = load_module(AGENT3_LAB_DIR / "ccie_sec_lab.py", "ccie_sec_phase7_testmod")
+        for bad_val in bad_bools:
+            with self.assertRaises(ValueError):
+                csec.ftd_packet_tracer(
+                    {"src_ip": "10.10.20.15", "dst_ip": "10.20.50.10", "dst_port": 443, "dst_zone": "DC", "tls_decrypted": bad_val},
+                    {"10.10.20.15": 10},
+                )
+            with self.assertRaises(ValueError):
+                csec.audit_ntp_dns_preflight([{"name": "N1", "clock_skew_sec": 0, "dns_forward_reverse_ok": bad_val}])
+
+        # 5. ccde_02_lab: reject non-bool flags, users<=0, empty/mixed subnets
+        c02 = load_module(AGENT3_LAB_DIR / "ccde_02_lab.py", "ccde_02_phase7_testmod")
+        for bad_val in bad_bools:
+            with self.assertRaises(ValueError):
+                c02.classify_branch_profile(12, revenue_critical=bad_val)
+            with self.assertRaises(ValueError):
+                c02.recommend_campus_access(bad_val, False, 150)
+        with self.assertRaises(ValueError):
+            c02.classify_branch_profile(0, False)
+        with self.assertRaises(ValueError):
+            c02.verify_block_summarization([])
+        with self.assertRaises(ValueError):
+            c02.verify_block_summarization(["10.0.0.0/24", "2001:db8::/48"])
+
+        # 6. ccde_17_lab: reject negative and all-zero costs (prevents ZeroDivisionError)
+        c17 = load_module(AGENT3_LAB_DIR / "ccde_17_lab.py", "ccde_17_phase7_testmod")
+        with self.assertRaises(ValueError):
+            c17.compute_5yr_tco("ZeroCost", 0, 0, 0, 0)
+        with self.assertRaises(ValueError):
+            c17.compute_5yr_tco("NegCost", -100, 10, 10, 10)
+
+        # 7. auto_20_lab: reject human_approved="False"/"True"/0/1/None & invalid z_score/confidence
+        a20 = load_module(AGENT3_LAB_DIR / "auto_20_lab.py", "auto_20_phase7_testmod")
+        for bad_val in bad_bools:
+            with self.assertRaises(ValueError):
+                a20.remediation_decision("failover_regional_hub", 125, 0.96, human_approved=bad_val)
+        with self.assertRaises(ValueError):
+            a20.z_score(68.0, [])
+        with self.assertRaises(ValueError):
+            a20.z_score(68.0, [22.0, 22.0, 22.0])
+        with self.assertRaises(ValueError):
+            a20.remediation_decision("shift", 1, 1.5, False)
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

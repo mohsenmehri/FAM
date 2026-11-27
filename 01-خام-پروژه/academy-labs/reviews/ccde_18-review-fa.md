@@ -28,3 +28,10 @@
 - **اصلاح انجام‌شده:** بازنویسی کامل `ccde_18_lab.py` با اعتبارسنجی فاصله مثبت متناهی، رد صریح mode نامعتبر، مدل‌سازی صریح `gslb_enabled` و `target_rpo_minutes`، تفکیک شفاف مدل فرضی تأخیر (50ms / 70ms / ~105ms در بازه ~95-130ms)، تفکیک سیاست اقامت EU از وضعیت انتقال خارج EEA و تضمین فصل ۵ + disclaimer فرض بودن بولین‌ها؛ اصلاح Q9، Q10، Q11 و بخش‌های ۳، ۵، ۷، ۸، ۹، ۱۲ و ۱۳ در `ccde_18.json`.
 - **تست مرتبط:** `test_phase6_ccde_18_remediation_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** اعتبارسنج محلی Python 3؛ اعداد تأخیر و هزینه صرفاً فرضی هستند و بولین‌های انطباق جایگزین DPO/QSA نیستند؛ بازبینی مستقل انجام نشده است.
+
+## بازبینی فنی فاز ۷ (2026-11-27 — اعتبارسنجی سخت‌گیرانه نوع `bool` و مرزهای ورودی)
+- **ایراد:** استفاده از `bool()` روی ورودی‌های بولی (`gslb_enabled` و ۵ فیلد بولی دیگر) باعث تبدیل رشته `"False"` به `True` می‌شد؛ همچنین نیاز بود صریح‌تر ثبت شود که سازگاری فرضی RPO در مدل اثبات تحقق واقعی RPO نیست.
+- **منبع معتبر:** Python Data Model (truthiness of non-empty `str`) و اصول مهندسی RPO/DR (وابستگی RPO واقعی به پهنای باند WAN، نرخ تغییر داده و آزمون زنده DR).
+- **اصلاح انجام‌شده:** اعمال `_require_bool` سخت‌گیرانه روی هر ۶ فیلد بولی (`dci_l2_stretched`، `gslb_enabled`، `micro_sgt_enabled`، `eu_residency_policy_enforced`، `eu_personal_data_transferred_outside_eea`، `encryption_in_transit_assumed`) با رد `"False"`، `"True"`، `0`، `1` و `None`؛ اعتبارسنجی `str` روی فیلدهای رشته‌ای؛ افزودن `rpo_scope_note` صریح در خروجی و متن آزمایشگاه.
+- **تست مرتبط:** `test_phase7_strict_boolean_typing_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** اعتبارسنج محلی Python 3؛ جایگزین اندازه‌گیری واقعی RPO/RTT یا تأیید حقوقی DPO/QSA نیست و بازبینی مستقل انجام نشده است.

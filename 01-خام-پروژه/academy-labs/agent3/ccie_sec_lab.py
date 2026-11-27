@@ -2,12 +2,19 @@
 """
 Local Mock Lab — ccie_sec (CCIE Security v6.1: NTP/PKI/pxGrid Pre-Flight Audit & FTD Packet-Tracer Pipeline)
 Simulates (1) Pre-flight NTP clock-skew (distinguishing operational NTP warning >30s from RFC 4120 / AD
-Kerberos default MaxClockSkew >300s failure) and DNS A/PTR checks across ISE/FMC/FTD/AD, and
-(2) Multi-phase Cisco Secure Firewall (FTD) packet-tracer evaluation (Route -> NAT -> ACP/SGT -> TLS Decrypt -> Snort IPS).
+Kerberos default MaxClockSkew >300s failure) and strict-boolean DNS A/PTR checks across ISE/FMC/FTD/AD, and
+(2) Multi-phase Cisco Secure Firewall (FTD) packet-tracer evaluation (Route -> NAT -> ACP/SGT -> TLS Decrypt -> Snort IPS)
+with strict Python bool validation on all security control flags.
 No real Cisco ISE, FMC/FTD, ASA, or Active Directory server is connected.
 """
 
 import json
+
+
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
 
 
 def audit_ntp_dns_preflight(
@@ -18,24 +25,32 @@ def audit_ntp_dns_preflight(
     failures = []
     warnings = []
     for n in nodes:
-        skew = abs(n["clock_skew_sec"])
+        skew_raw = n["clock_skew_sec"]
+        if isinstance(skew_raw, bool) or not isinstance(skew_raw, (int, float)):
+            raise ValueError(f"{n['name']}: clock_skew_sec must be numeric, got {skew_raw!r}")
+        skew = abs(skew_raw)
+        dns_ok = _require_bool(n.get("dns_forward_reverse_ok"), f"{n['name']}.dns_forward_reverse_ok")
         if skew > kerberos_max_skew_sec:
             failures.append(
-                f"{n['name']}: skew {n['clock_skew_sec']}s exceeds RFC 4120 / AD Kerberos default 300s (5-min) tolerance (KRB_AP_ERR_SKEW)"
+                f"{n['name']}: skew {skew_raw}s exceeds RFC 4120 / AD Kerberos default 300s (5-min) tolerance (KRB_AP_ERR_SKEW)"
             )
         elif skew > ops_warning_skew_sec:
             warnings.append(
-                f"{n['name']}: skew {n['clock_skew_sec']}s exceeds {ops_warning_skew_sec}s operational NTP target (within 300s Kerberos default, fix NTP)"
+                f"{n['name']}: skew {skew_raw}s exceeds {ops_warning_skew_sec}s operational NTP target (within 300s Kerberos default, fix NTP)"
             )
-        if not n["dns_forward_reverse_ok"]:
+        if not dns_ok:
             failures.append(f"{n['name']}: DNS A/PTR mismatch breaks ISE AD join & EST/SCEP certs")
     return {"preflight_passed": len(failures) == 0, "failures": failures, "warnings": warnings}
 
 
 def ftd_packet_tracer(flow: dict, sgt_table: dict[str, int]) -> dict:
+    route_exists = _require_bool(flow.get("route_exists", True), "flow['route_exists']")
+    tls_decrypted = _require_bool(flow.get("tls_decrypted", True), "flow['tls_decrypted']")
+    has_exploit = _require_bool(flow.get("contains_exploit_sig", False), "flow['contains_exploit_sig']")
+
     phases = []
     # Phase 1: Route lookup
-    if not flow.get("route_exists", True):
+    if not route_exists:
         return {"flow": flow, "result": "DROP", "drop_phase": "ROUTE-LOOKUP"}
     phases.append({"phase": "ROUTE-LOOKUP", "action": "ALLOW", "egress_zone": flow["dst_zone"]})
 
@@ -52,7 +67,6 @@ def ftd_packet_tracer(flow: dict, sgt_table: dict[str, int]) -> dict:
 
     # Phase 4: TLS Decryption visibility gate for encrypted HTTPS (443)
     encrypted_tls = flow.get("dst_port") == 443
-    tls_decrypted = bool(flow.get("tls_decrypted", True))
     if encrypted_tls and not tls_decrypted:
         phases.append({
             "phase": "TLS-DECRYPT",
@@ -65,7 +79,7 @@ def ftd_packet_tracer(flow: dict, sgt_table: dict[str, int]) -> dict:
         phases.append({"phase": "TLS-DECRYPT", "action": "DECRYPT-RESIGN"})
 
     # Phase 5: Snort IPS Inspection
-    if flow.get("contains_exploit_sig"):
+    if has_exploit:
         phases.append({"phase": "SNORT-IPS", "action": "DROP", "reason": "Snort Inline Drop (CVE signature matched)"})
         return {"flow": flow, "src_sgt": src_sgt, "result": "DROP", "phases": phases}
     phases.append({"phase": "SNORT-IPS", "action": "ALLOW"})
