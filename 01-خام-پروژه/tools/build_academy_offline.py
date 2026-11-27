@@ -34,7 +34,7 @@ def build():
         resources[ref] = json.loads(path.read_text(encoding='utf-8'))
     page = PAGE.read_text(encoding='utf-8')
     assert page.count('__FAM_ACADEMY_BOOTSTRAP__') == 1
-    page = page.replace('__FAM_ACADEMY_BOOTSTRAP__', "(() => { try { return { userName: 'آفلاین', progress: { 'fam4.learn.v1': localStorage.getItem('fam.academy.offline.v2') || '{}' } }; } catch (_) { return {userName:'آفلاین', progress:{}}; } })()")
+    page = page.replace('__FAM_ACADEMY_BOOTSTRAP__', "(() => { try { return { offline: true, userName: 'آفلاین', progress: { 'fam4.learn.v1': localStorage.getItem('fam.academy.offline.v2') || '{}' } }; } catch (_) { return {offline:true, userName:'آفلاین', progress:{}}; } })()")
     page = page.replace(' nonce="__FAM_CSP_NONCE__"', '')
     hook = '''
 <script>

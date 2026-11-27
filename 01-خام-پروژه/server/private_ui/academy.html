@@ -17,6 +17,21 @@
       const boot = window.FAM_ACADEMY_BOOTSTRAP || {};
       const csrf = boot.csrf || '';
       const stored = boot.progress || {};
+      // The historic academy used this same server key for a different schema.
+      // Never overwrite a legacy, mixed, malformed, or unrecognized value.
+      function unsafeSharedProgress() {
+        // Offline uses its own isolated storage key and has no server write.
+        if (boot.offline === true) return false;
+        if (!Object.prototype.hasOwnProperty.call(stored, 'fam4.learn.v1')) return false;
+        try {
+          const value = stored['fam4.learn.v1'];
+          const parsed = typeof value === 'string' ? JSON.parse(value) : null;
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return true;
+          const legacyKeys = ['completedLessons', 'quizScores', 'notes', 'missions', 'examScore', 'activeLesson'];
+          return legacyKeys.some(key => Object.prototype.hasOwnProperty.call(parsed, key)) || !Array.isArray(parsed.completed);
+        } catch (_) { return true; }
+      }
+      const sharedProgressLocked = unsafeSharedProgress();
       function readProgress() {
         if (Array.isArray(stored.completed)) return stored;
         for (const key of ['fam4.learn.v1', 'fam3.progress.v1']) {
@@ -35,10 +50,17 @@
         const node = document.getElementById('academy-save-status');
         if (node) node.textContent = message;
       }
+      const lockedMessage = 'پیشرفت قدیمی یا ناشناخته شناسایی شد؛ برای جلوگیری از بازنویسی، ذخیره غیرفعال است. مهاجرت هنوز انجام نشده است.';
+      if (sharedProgressLocked) document.addEventListener('DOMContentLoaded', () => saveStatus(lockedMessage));
       window.FamAcademyBridge = {
         user: boot.user || (boot.userName ? { username: boot.userName } : null),
         progress: readProgress(),
+        sharedProgressLocked,
         async saveProgress(payload) {
+          if (sharedProgressLocked) {
+            saveStatus(lockedMessage);
+            return false;
+          }
           const safe = {
             completed: Array.isArray(payload?.completed) ? payload.completed.filter(x => typeof x === 'string') : [],
             labs: payload?.labs && typeof payload.labs === 'object' && !Array.isArray(payload.labs) ? payload.labs : {},

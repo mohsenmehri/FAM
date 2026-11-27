@@ -102,5 +102,27 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   offline.window.FamLessonEngine.toggleLessonDone('standalone');
   assert(offline.window.FamAcademyCatalog.getCompletedSet().has('standalone'));
   assert(!lessons.isLessonDone('standalone'));
+  // Historic, mixed and malformed values must not be overwritten. No automatic
+  // ownership claim or conversion is made: recovery needs an explicit policy.
+  const legacyValues = [
+    JSON.stringify({completedLessons: ['s01'], quizScores: {s01: 100}, notes: {s01:'private'}}),
+    JSON.stringify({completed:['new'], completedLessons:['s01']}),
+    '{bad json', JSON.stringify({}), JSON.stringify(null)
+  ];
+  for (const value of legacyValues) {
+    const savedStatus = {textContent: ''}; const sent = []; const handlers = {};
+    const isolated = {window:{}, document:{documentElement:{dataset:{}},
+      addEventListener(name, cb){handlers[name]=cb;}, getElementById(){return savedStatus;}},
+      localStorage:ctx.localStorage, fetch(...args){sent.push(args);return Promise.resolve({ok:true});}, console};
+    vm.createContext(isolated);
+    const legacyBoot = {csrf:'token', progress:{'fam4.learn.v1':value}};
+    vm.runInContext(bridgeScript.replace('__FAM_ACADEMY_BOOTSTRAP__', JSON.stringify(legacyBoot)), isolated);
+    assert.strictEqual(isolated.window.FamAcademyBridge.sharedProgressLocked, true);
+    handlers.DOMContentLoaded();
+    assert.match(savedStatus.textContent, /ذخیره غیرفعال است/);
+    assert.strictEqual(await isolated.window.FamAcademyBridge.saveProgress({completed:['s02'],labs:{}}), false);
+    assert.strictEqual(sent.length, 0, 'must not overwrite historical or unknown data');
+    assert.strictEqual(legacyBoot.progress['fam4.learn.v1'], value);
+  }
   console.log('progress behavior passed');
 })().catch(err => {console.error(err); process.exitCode = 1;});

@@ -1,0 +1,7 @@
+# بازبینی و ادغام انتخابی auto_02
+
+منبع `d0fdaa06fbd0898901a1b43c153ad9182567f928`؛ بازبینی توسط ایجنت یکپارچه‌ساز و نه انسان مستقل. ۱۴ بخش، واژه‌نامه، مثال و تمرین، هر ۱۲ پرسش و همه گزینه‌ها و کد بررسی شد. پاسخ‌ها به ترتیب دام bare except، with، venv، تفاضل مجموعه، پارس نمونه، راز، dict.get، JSON، venv، tuple، splitlines و ماهیت اجرا بررسی شدند. در متن، ادعای نبود خطای انسانی و آمار بی‌منبع، کامل بودن نتیجه parser و تضمین کامل بودن نوشتن با with اصلاح شد؛ توضیح hashability tuple و محدودیت محرمانگی environment اضافه شد. این‌ها گواه امنیت کامل نیستند.
+
+[ساختارهای داده پایتون](https://docs.python.org/3/tutorial/datastructures.html)، [venv](https://docs.python.org/3/library/venv.html)، [getpass](https://docs.python.org/3/library/getpass.html) و [context manager](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement) مبنای بررسی‌اند. parser تنها جدول نمونه با header معلوم را می‌پذیرد؛ به جای حذف خاموش سطر خراب اکنون خطا می‌دهد. ورودی‌های غیراین قالب نیاز به parser و تست دیگری دارند؛ VLAN مدل ۱ تا ۴۰۹۴، به معنی پشتیبانی همه تجهیزات نیست.
+
+آزمایشگاه Python واقعی محلی روی متن مصنوعی و فایل موقت است؛ سناریوی دوم مرجع است. تست `tests/test_auto_02_integration.py` جدول نمونه، header و سطر خراب، تفاضل، محدوده VLAN و انطباق کد با HTML را بررسی می‌کند. هیچ روتر، سوئیچ یا اتصال شبکه واقعی آزمایش نشده است. status در UI و آزمون jsdom آفلاین و کاتالوگ ثبت شده؛ داده پیشرفت قدیمی مهاجرت نشده است.
