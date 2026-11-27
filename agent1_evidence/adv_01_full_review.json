@@ -1,0 +1,226 @@
+{
+  "id": "adv_01",
+  "faculty": "دانشکده ۲ · مهندسی پیشرفته",
+  "title": "Advanced Switching: MST، Guardهای STP، UDLD و StackWise",
+  "lead": "در یک شبکهٔ پردیسی با ۴۰۰ VLAN، اجرای PVST+ یعنی پردازندهٔ سوئیچ‌ها باید ۴۰۰ نمونهٔ جداگانهٔ Spanning Tree و هزاران پیام BPDU را در ثانیه پردازش کند؛ از آن بدتر، قطع یک رشتهٔ تکی از جفت فیبر می‌تواند توپولوژی را به حلقهٔ لایه ۲ بکشاند! چطور با MST، محافظ‌های STP، UDLD و StackWise لایهٔ ۲ را مقیاس‌پذیر و ضدلرزش کنیم؟",
+  "goal": "طراحی و پیکربندی Multiple Spanning Tree (MST — IEEE 802.1s)، تفکیک دقیق Root Guard، BPDU Guard، BPDU Filter و Loop Guard، جلوگیری از لینک یک‌طرفه با UDLD و درک معماری تجمیع فیزیکی StackWise.",
+  "prereq": "تسلط بر VLAN، Trunk 802.1Q و RSTP/PVST+ پایه (درس‌های دانشکده ۱ به‌ویژه ccna_02_vlan و ccna_02).",
+  "sections": [
+    {
+      "h": "۱. چرا PVST+ در مقیاس صدها VLAN می‌شکند و MST چگونه حلش می‌کند؟",
+      "p": [
+        "در **Rapid PVST+** سیسکو، برای هر VLAN یک درخت STP مستقل ساخته می‌شود. اگر ۳۰۰ VLAN داشته باشید و هر سوئیچ ۱۰ پورت ترانک داشته باشد، سوئیچ باید در هر دو ثانیه برای ۳۰۰۰ جفت پورت-VLAN ترافیک کنترلی BPDU بفرستد و محاسبه کند. بسیاری از این VLANها دقیقاً مسیرهای فیزیکی یکسانی را طی می‌کنند و نیازی به ۳۰۰ محاسبهٔ تکراری ندارند.",
+        "استاندارد **MST (Multiple Spanning Tree — IEEE 802.1s)** (که از RSTP برای همگرایی سریع زیر یک ثانیه ارث می‌برد) اجازه می‌دهد صدها VLAN را به تعداد محدودی **Instance** نگاشت کنیم؛ مثلاً **Instance 1** برای VLANهای `1..100` (با Root روی سوئیچ توزیع A) و **Instance 2** برای VLANهای `101..200` (با Root روی سوئیچ توزیع B). همچنین **Instance 0 (IST — Internal Spanning Tree)** همیشه وجود دارد و به‌طور پیش‌فرض تمام VLANهای نگاشت‌نشده در آن می‌مانند و تنها Instanceای است که با دنیای بیرون از Region MST ارتباط برقرار می‌کند."
+      ],
+      "bullets": [
+        "**شرط سخت عضویت در یک MST Region:** دو سوئیچ فقط زمانی در یک Region مشترک قرار می‌گیرند که هر سه مقدار زیر عیناً یکی باشند: ۱) **Region Name**، ۲) **Revision Number**، ۳) **جدول نگاشت VLAN-to-Instance**. حتی یک رقم اختلاف باعث می‌شود سوئیچ‌ها یکدیگر را در دو Region مجزا ببینند و به مرز CST/IST سقوط کنند!"
+      ],
+      "think": {
+        "q": "مهندسی روی سوئیچ SW1 نگاشت `instance 1 vlan 10-20` و روی SW2 نگاشت `instance 1 vlan 10-21` را تنظیم کرده (Name و Revision هر دو یکسان است). چه رخ می‌دهد؟",
+        "a": "چون جدول نگاشت VLAN-to-Instance در هر دو طرف دقیقاً یکسان نیست (در واقع یک Hash ۱۶ بایتی MD5 از جدول نگاشت در BPDU مقایسه می‌شود)، SW1 و SW2 در **دو MST Region متفاوت** قرار می‌گیرند و تمام VLANها در مرز این دو سوئیچ به ریشهٔ مشترک `IST (Instance 0)` برمی‌گردند و Load Balancing بین Instance 1 و 2 از دست می‌رود."
+      }
+    },
+    {
+      "h": "۲. جعبه‌ابزار محافظت از توپولوژی: Root Guard، BPDU Guard، BPDU Filter و Loop Guard",
+      "p": [
+        "دانستن STP بدون فعال کردن مکانیزم‌های Guard در شبکهٔ واقعی خطرناک است؛ زیرا یک سوئیچ رومیزی ارزان‌قیمت یا یک باگ نرم‌افزاری می‌تواند کل ترافیک شرکت را منحرف کند یا حلقه بسازد:"
+      ],
+      "bullets": [
+        "**BPDU Guard (روی پورت‌های PortFast کاربر):** اگر روی پورت کاربر یک سوئیچ غیرمجاز وصل شود و اولین BPDU برسد، پورت فوراً به وضعیت `err-disabled` می‌رود تا حلقه نسازد.",
+        "**Root Guard (روی پورت‌های توزیع رو به دسترسی/مشتری):** مانع می‌شود سوئیچی در پایین‌دست با Priority پایین‌تر ادعای Root Bridge بودن کند؛ به محض دریافت BPDU برتر، پورت به وضعیت موقت **`root-inconsistent` (Blocking)** می‌رود و به محض قطع شدن BPDUهای مهاجم خودش خودکار برمی‌گردد.",
+        "**Loop Guard (روی پورت‌های Non-Designated / Root و Alternate):** اگر به دلیل خرابی یک‌طرفهٔ لینک یا مصرف شدید CPU، سوئیچ در یک پورتِ در حال مسدود شدن ناگهان دیگر BPDU نگیرد، بدون Loop Guard پس از MaxAge پورت را Forwarding می‌کند و حلقه می‌سازد؛ Loop Guard پورت را به **`loop-inconsistent`** می‌برد تا حلقه تشکیل نشود.",
+        "**هشدار مهم دربارهٔ BPDU Filter:** اگر در مد **Global** فعال شود، روی پورت‌های PortFast در صورت دریافت BPDU فیلتر خاموش و پورت عادی به STP برمی‌گردد؛ اما اگر مستقیماً زیر یک **Interface** (`spanning-tree bpdufilter enable`) فعال شود، سوئیچ نه‌تنها BPDU نمی‌فرستد بلکه BPDUهای ورودی را هم **نادیده می‌گیرد**—یعنی عملاً STP روی آن پورت خاموش شده و در صورت حلقهٔ فیزیکی کل شبکه را از کار می‌اندازد!"
+      ]
+    },
+    {
+      "h": "۳. تشخیص لینک یک‌طرفه (UDLD) و تجمیع فیزیکی StackWise",
+      "p": [
+        "در لینک‌های فیبر نوری دو رشته (یک رشته ارسال TX و یک رشته دریافت RX) ممکن است رشتهٔ RX قطع شود در حالی که TX هنوز سالم است؛ در این حالت **Unidirectional Link** رخ می‌دهد: یک سمت لینک را بالا می‌بیند، BPDU نمی‌شنود و حلقهٔ لایه ۲ می‌سازد. پروتکل اختصاصی سیسکو **UDLD (Unidirectional Link Detection)** هر چند ثانیه بسته‌های لایه ۲ می‌فرستد و منتظر Echo از طرف مقابل می‌ماند: در مد **Normal** فقط پیام لاگ می‌دهد (و در نبود برخی شواهد سخت‌افزاری پورت را باز می‌گذارد)، اما در مد **Aggressive** پس از ۸ بار تلاش ناموفق پورت را در وضعیت `err-disabled` قفل می‌کند.",
+        "در لایهٔ دسترسی و توزیع، به‌جای اتصال چند سوئیچ با ترانک و درگیر شدن با STP بین آن‌ها، فناوری **Cisco StackWise** چند سوئیچ فیزیکی را از طریق کابل‌های پرسرعت پشت‌پنل (Backplane Ring) به **یک سوئیچ منطقی واحد** با یک IP مدیریتی، یک Control Plane (سوئیچ Active/Master و Standby) و یک جدول MAC مشترک تبدیل می‌کند؛ در نتیجه می‌توان یک EtherChannel را بین دو سوئیچ فیزیکی مختلف پشته (Cross-Stack EtherChannel) تقسیم کرد تا بدون هیچ پورت مسدودشدهٔ STP از کل پهنای باند استفاده شود."
+      ],
+      "think": {
+        "q": "سناریوی خطا: مهندسی برای جلوگیری از حلقهٔ لایه ۲ ناشی از قطع یک رشتهٔ فیبر بین دو سوئیچ توزیع، روی هر دو پورت هم‌زمان `Loop Guard` و `Root Guard` را با هم فعال می‌کند؛ یا برای لینک Access دارای `PortFast` به اشتباه دستور `spanning-tree bpdufilter enable` را روی خود پورت می‌زند! مشکل هر دو مورد چیست؟",
+        "a": "۱) `Root Guard` و `Loop Guard` هر دو نمی‌توانند هم‌زمان روی یک پورت کار کنند (روی یک پورت سیسکو فعال کردن یکی دیگری را غیرفعال می‌کند؛ `Root Guard` برای پورت‌های Designated رو به پایین‌دست است و `Loop Guard` برای پورت‌های Root/Alternate رو به بالادست). ۲) زدن `bpdufilter enable` روی پورت Access جلوی `BPDU Guard` را هم می‌گیرد و در صورت اتصال سوئیچ حلقه‌دار، حلقهٔ واقعی لایه ۲ ایجاد می‌کند."
+      },
+      "bullets": []
+    }
+  ],
+  "analogy": "PVST+ در برابر MST مثل این است که برای ۴۰۰ مسافر یک تور مسافرتی، ۴۰۰ راهنمای جداگانه بفرستید با اینکه همه یا سوار اتوبوس مسیر شمال می‌شوند یا مسیر جنوب؛ MST فقط ۲ اتوبوس (Instance 1 و 2) می‌سازد و همه را در این دو گروه دسته‌بندی می‌کند. و StackWise مثل چسباندن دو کمد کشویی کنار هم به یک بدنهٔ واحد با یک قفل مرکزی است. محل شکست تشبیه MST اینجاست: در زندگی واقعی اگر اسم اتوبوس در دو ایستگاه یکی نباشد مسافر کمی معطل می‌شود، اما در MST اگر حتی نگاشت یک VLAN بین دو سوئیچ اختلاف داشته باشد، دو سوئیچ وارد Region جدا شده و همهٔ Instanceها به کل به ریشهٔ مشترک IST (Instance 0) سقوط می‌کنند.",
+  "table": {
+    "title": "راهنمای انتخاب و جایگذاری ۴ محافظ STP و UDLD",
+    "headers": [
+      "قابلیت",
+      "محل صحیح اعمال",
+      "عامل تحریک‌کننده",
+      "وضعیت پورت پس از تریگر"
+    ],
+    "rows": [
+      [
+        "BPDU Guard",
+        "پورت‌های کاربر (PortFast / Edge)",
+        "دریافت حتی یک BPDU",
+        "`err-disabled` (نیاز به بازیابی)"
+      ],
+      [
+        "Root Guard",
+        "پورت‌های Designated رو به دسترسی/مشتری",
+        "دریافت BPDU برتر از Root فعلی",
+        "`root-inconsistent` (خودکار بازمی‌گردد)"
+      ],
+      [
+        "Loop Guard",
+        "پورت‌های Root / Alternate (Non-Designated)",
+        "ناپدید شدن ناگهانی BPDU در پورت Blocking",
+        "`loop-inconsistent` (خودکار با بازگشت BPDU برمی‌گردد)"
+      ],
+      [
+        "UDLD Aggressive",
+        "لینک‌های فیبر نوری (و پورت‌های حساس)",
+        "توقف پاسخ Echo لایه ۲ پس از ۸ تلاش",
+        "`err-disabled`"
+      ]
+    ]
+  },
+  "faq": [
+    {
+      "q": "تفاوت `Loop Guard` و `UDLD Aggressive` چیست؟ آیا یکی جایگزین دیگری می‌شود؟",
+      "a": "خیر، مکمل هم هستند! `Loop Guard` یک مکانیزم مبتنی بر **عدم دریافت BPDU در سطح STP** است (مثلاً حتی اگر لینک دوطرفه باشد ولی CPU سوئیچ همسایه به قدری شلوغ شود که BPDU نفرستد نیز عمل می‌کند)، اما روی پورت‌های `Designated` فعال نیست. در مقابل، `UDLD` سلامت فیزیکی/لایه ۲ انتقال فریم بین دو پورت را با پیام Echo مستقل از STP (حتی روی لینک‌های EtherChannel بدون STP) می‌سنجد."
+    },
+    {
+      "q": "در StackWise اگر کابل پشتی پشته قطع شود یا یک سوئیچ خاموش گردد و دو تکه مستقل شوند چه خطری پیش می‌آید؟",
+      "a": "پدیدهٔ **Split-Brain (Dual-Active)**: هر دو نیمه فکر می‌کنند خودشان Master هستند و با یک IP مدیریتی و MAC یکسان کار می‌کنند؛ برای پیشگیری، از مکانیزم‌های Dual-Active Detection (مانند Enhanced PAgP یا BFD روی لینک مجزا) استفاده می‌کنند."
+    }
+  ],
+  "summary": "MST با گروه‌بندی صدها VLAN در چند Instance (به‌شرط تطابق دقیق Name، Revision و Mapping در کل Region) بار CPU و BPDU را به شدت کاهش می‌دهد. حفاظت از توپولوژی با جایگذاری درست `BPDU Guard` روی Access، `Root Guard` روی Designated پایین‌دست، `Loop Guard` روی Root/Alternate و `UDLD Aggressive` روی فیبر کامل می‌شود، و `StackWise` با یکپارچه‌سازی Control Plane نیاز به STP در حلقهٔ دسترسی/توزیع را از میان می‌برد.",
+  "ciscoRef": "Cisco CCNP/CCIE Enterprise Design & IEEE 802.1s (MST), Cisco Catalyst STP Toolkit",
+  "protocolAnalysis": [
+    "سوئیچ‌ها در BPDUهای MST کل جدول نگاشت ۴۰۹۴ VLAN را ارسال نمی‌کنند، بلکه یک **Configuration Digest (MD5 Hash 16 بایتی)** از نگاشت می‌فرستند؛ به همین دلیل کوچک‌ترین اختلاف در `instance <id> vlan ...` باعث شکست هم‌گروهی Region می‌شود.",
+    "در StackWise، معمولاً پس از انتخاب Active Switch بالاترین Priority (`switch <num> priority 15`) و سپس کمترین MAC برنده می‌شود و یک سوئیچ Standby برای Failover آنی در کمتر از چند ثانیه آماده می‌ماند."
+  ],
+  "iosCommands": [
+    {
+      "cmd": "show spanning-tree",
+      "out": "VLAN0001\n  Spanning tree enabled protocol rstp\n  Root ID    Priority    24577\n             Address     0050.56ab.1100",
+      "note": "نمایش وضعیت STP. [نکتهٔ شبیه‌ساز: خروجی `show spanning-tree` در شبیه‌ساز سبک داخلی پشتیبانی نمی‌شود و صرفاً به‌عنوان نمونهٔ مرجع آموزشی آمده است؛ تمرین زندهٔ MST، Root/Loop Guard و UDLD نیازمند CML، EVE-NG یا تجهیزات واقعی Catalyst است (برخی مدل‌ها حتی در Packet Tracer به‌طور محدود شبیه‌سازی می‌شوند).]",
+      "why": "بررسی سریع Root Bridge، نقش هر پورت (`Root`/`Designated`/`Alternate`) و وضعیت‌های `root-inconsistent` یا `loop-inconsistent`.",
+      "anatomy": "در مد MST خروجی بر اساس شماره `MST0`, `MST1` (به‌جای تک‌تک VLANها) نمایش داده می‌شود و نشان می‌دهد هر پورت در هر Instance چه نقشی دارد.",
+      "lookFor": "هم‌خوانی Root ID مورد نظر شما با پورت‌های `Root` و نبود حالت ناخواستهٔ `BLK` یا `Inconsistent`.",
+      "ifUnexpected": "اگر دو سوئیچ مجاور در دو MST Region جدا افتاده‌اند (`Bound(PVST)` یا `Bound(RSTP)` در خروجی)، دستور `show spanning-tree mst configuration` را در هر دو طرف مقایسه کنید.",
+      "executable": false
+    },
+    {
+      "cmd": "show interfaces trunk",
+      "out": "Port        Mode             Encapsulation  Status        Native vlan\nGi0/1       on               802.1q         trunking      1\n\nPort        Vlans allowed on trunk\nGi0/1       1,10,20",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای تأیید لینک‌های ترانک بین سوئیچ‌ها که Instanceهای MST و بسته‌های BPDU از روی آن‌ها عبور می‌کنند.",
+      "why": "در طراحی MST، لیست VLANهای مجاز ترانک و Native VLAN باید بین دو سر لینک کاملاً هم‌تراز باشند تا خطای PVID/Type Mismatch رخ ندهد.",
+      "anatomy": "پورت‌های فعال ترانک و VLANهای مجاز عبور روی هر لینک را نمایش می‌دهد.",
+      "lookFor": "قرار داشتن تمام VLANهای نگاشت‌شده به MST روی ترانک‌های بالادستی (`Gi0/1`).",
+      "ifUnexpected": "اگر VLANای از لیست ترانک حذف شده باشد، ترافیک آن VLAN روی لینک بسته می‌ماند.",
+      "executable": true
+    },
+    {
+      "cmd": "show interfaces Gi0/3 switchport",
+      "out": "Name: Gi0/3\nSwitchport: Enabled\nAdministrative Mode: static access",
+      "note": "دستور زنده در شبیه‌ساز داخلی برای اطمینان از `static access` و `Negotiation of Trunking: Off` بودن پورت کاربر پیش از اعمال PortFast و BPDU Guard.",
+      "why": "اعمال PortFast/BPDU Guard روی پورتی که به اشتباه حالت ترانک یا `dynamic` دارد خطرناک است؛ این دستور لایه ۲ پورت را تایید می‌کند.",
+      "anatomy": "مد اداری/عملیاتی و وضعیت مذاکرهٔ DTP را نشان می‌دهد.",
+      "lookFor": "`static access` و `Negotiation of Trunking: Off` روی پورت کاربر.",
+      "ifUnexpected": "با `switchport mode access` (و در پلتفرم‌های پشتیبان `switchport nonegotiate` روی static access یا trunk) پورت را پیش از PortFast قفل کنید.",
+      "executable": true
+    }
+  ],
+  "diagramSvg": "topo",
+  "lab": {
+    "title": "آزمایشگاه آماده‌سازی ترانک‌های چند-VLANی برای MST و قفل پورت‌های لبه پیش از BPDU Guard",
+    "steps": [
+      "۱. مرز شبیه‌ساز: شبیه‌ساز سبک داخلی دستورات `spanning-tree mode mst`، `spanning-tree guard` و `udld` را اجرا نمی‌کند (برای تمرین زندهٔ MST و Guardها از CML، EVE-NG یا سوئیچ Catalyst استفاده کنید). در اینجا زیرساخت پورت‌های ترانکِ چند-VLANی و قفل لایه ۲ پورت‌های Access پیش از فعال‌سازی BPDU Guard را به‌صورت زنده اجرا می‌کنیم.",
+      "۲. با `enable` وارد شوید و با `show interfaces trunk` و `show interfaces status` ببینید `Gi0/1` ترانک بالادستی و `Gi0/3` پورت کاربر در VLAN 10 است.",
+      "۳. فرض کنید یک گروه جدید VLANهای `30, 40` به نام `MST_G2` قرار است روی ترانک `Gi0/1` اضافه شوند و هم‌زمان DTP روی ترانک `Gi0/1` بسته شده و `Gi0/3` به‌صورت `static access` تایید شود: `configure terminal` -> `vlan 30` -> `name MST_G2_A` -> `vlan 40` -> `name MST_G2_B` -> `exit` -> `interface Gi0/1` -> `switchport trunk allowed vlan add 30,40` -> `switchport nonegotiate` -> `interface Gi0/3` -> `switchport mode access` -> `end`.",
+      "۴. با `show interfaces trunk`، `show interfaces Gi0/1 switchport`، `show interfaces Gi0/3 switchport` و `show running-config` زنده تایید کنید که VLANهای `30,40` به ترانک `Gi0/1` اضافه شده و هر دو پورت `Negotiation of Trunking: Off` دارند."
+    ],
+    "verifyCmds": [
+      "enable",
+      "show interfaces trunk",
+      "show interfaces Gi0/3 switchport",
+      "show running-config"
+    ]
+  },
+  "troubleshooting": {
+    "fault": "پس از مهاجرت شبکهٔ توزیع/دسترسی از Rapid PVST+ به MST (با دو Instance)، در خروجی `show spanning-tree mst` روی سوئیچ دسترسی می‌بینیم همهٔ VLANها پشت یک پورتِ Root مربوط به سوئیچ A مسدود یا هم‌مسیر شده‌اند و ترافیک `Instance 2` به سوئیچ B توزیع نمی‌شود، و در پورت بالادست پیام `Bound(MST)` یا `Boundary` دیده می‌شود.",
+    "analysis": "ظاهر شدن حالت Boundary در مرز دو سوئیچ به این معنی است که دو سوئیچ یکدیگر را در یک MST Region مشترک نمی‌شناسند. به محض اینکه Name، Revision Number یا حتی نگاشت یک تک-VLAN بین سوئیچ دسترسی و توزیع متفاوت باشد، Hash جدول نگاشت فرق کرده و سوئیچ‌ها ارتباطشان را به `IST (Instance 0)` محدود می‌کنند.",
+    "fix": "دستور `show spanning-tree mst configuration` را روی هر دو سوئیچ اجرا و مقایسه کنید؛ نام Region، عدد Revision و تمام خطوط `instance <n> vlan ...` را با هم یکسان (یا از VTPv3 برای انتشار خودکار تنظیمات MST) کنید."
+  },
+  "misconceptions": [
+    {
+      "myth": "در `MST` اگر اسم Region و Revision را در دو سوئیچ یکسان بگذاریم، نگاشت VLANها خودکار همگام می‌شود.",
+      "reality": "MST خودش نگاشت VLAN را منتشر نمی‌کند (مگر اینکه از VTPv3 استفاده کنید)؛ باید روی تمام سوئیچ‌های Region نگاشت `instance <id> vlan ...` را دقیقاً یکسان بنویسید، وگرنه Region شکسته می‌شود.",
+      "howToSpot": "تطابق Digest جدول در `show spanning-tree mst configuration` را بین همهٔ سوئیچ‌ها چک کنید."
+    },
+    {
+      "myth": "دستور `spanning-tree bpdufilter enable` روی پورت کاربر امنیت بیشتری نسبت به `bpduguard` ایجاد می‌کند.",
+      "reality": "برعکس! اعمال `bpdufilter` در سطح اینترفیس، BPDUهای ورودی و خروجی را بی‌سروصدا حذف می‌کند و اگر کاربری دو پورت را با یک سوئیچ رومیزی به هم وصل کند، `BPDU Guard` هرگز خبر نمی‌شود و حلقهٔ لایه ۲ شبکه را از کار می‌اندازد.",
+      "howToSpot": "در `show running-config` زیر پورت‌های دسترسی دنبال `bpduguard enable` باشید نه `bpdufilter enable`."
+    }
+  ],
+  "exercise": "تنظیمات کامل MST Region به نام `CAMPUS` با `revision 1` را طوری بنویسید که VLANهای `10,20,30` در Instance 1 (با SW1 به عنوان Root Primary) و VLANهای `40,50,60` در Instance 2 (با SW2 به عنوان Root Primary) قرار بگیرند؛ همچنین روی پورت دسترسی `Gi0/3` از SW1 محافظ مناسب کاربر را فعال کنید.",
+  "exercises": [
+    {
+      "level": "ساده",
+      "task": "برای هر یک از پورت‌های زیر مشخص کنید کدام محافظ STP یا لایه ۲ (`BPDU Guard`, `Root Guard`, `Loop Guard`, `UDLD Aggressive`) مناسب‌ترین انتخاب است و چرا:\n۱) پورت کاربر در اتاق جلسه با `PortFast`، ۲) پورت فیبر آپلینک `Blocking (Alternate)` رو به هسته، ۳) پورت توزیع متصل به یک سوئیچ تیم شریک که نباید هرگز Root شبکه شود.",
+      "hint": "محل پورت را در درخت (به سمت پایین یا بالا) و ریسک آن را بسنجید.",
+      "solution": "۱) `BPDU Guard` (اگر سوئیچ غیرمجاز وصل شد فوراً `err-disabled` شود)؛ ۲) `Loop Guard` + `UDLD Aggressive` (اگر فیبر یک‌طرفه قطع یا BPDU متوقف شد، پورت Alternate به Forwarding نرود و حلقه نسازد)؛ ۳) `Root Guard` (اگر سوئیچ شریک BPDU با Priority پایین‌تر فرستاد، پورت را موقتاً `root-inconsistent` کند تا Root جابه‌جا نشود)."
+    },
+    {
+      "level": "متوسط",
+      "task": "دستورات کامل `SW1` (در نقش Root Primary برای `MST 1` و Root Secondary برای `MST 2`) در Region `CAMPUS` با `revision 1` (شامل VLANهای `10,20,30` در Instance 1 و `40,50,60` در Instance 2) را بنویسید.",
+      "hint": "ابتدا `spanning-tree mode mst` و سپس وارد `spanning-tree mst configuration` شوید.",
+      "solution": "`spanning-tree mode mst`\n`spanning-tree mst configuration`\n` name CAMPUS`\n` revision 1`\n` instance 1 vlan 10, 20, 30`\n` instance 2 vlan 40, 50, 60`\n` exit`\n`spanning-tree mst 1 root primary`\n`spanning-tree mst 2 root secondary`"
+    },
+    {
+      "level": "چالشی",
+      "task": "روی یک سوئیچ توزیع، `Root Guard` روی پورت ترانک `Gi0/1` فعال است. ناگهان VLAN 99 را روی یک سوئیچ جدید که با `priority 0` پیکربندی شده به این پورت وصل می‌کنند (شبکه از PVST+ یا MST استفاده می‌کند). پورت به وضعیت `root-inconsistent` می‌رود. پس از ۱۵ دقیقه ادمین سوئیچ جدید را برمی‌دارد و یا Priority آن را به `32768` برمی‌گرداند؛ آیا مثل `BPDU Guard` لازم است ادمین با `shut / no shut` پورت را برگرداند؟ و در `MST` اگر آن BPDU مهاجم فقط در VLAN 99 (متعلق به `IST 0`) باشد آیا ترافیک Instance 1 هم متوقف می‌شود؟",
+      "hint": "تفاوت `err-disabled` (دائمی) با `inconsistent` (موقت) را در یاد بیاورید و اینکه در MST تمام VLANهای داخل یک پورت با هم یک BPDU می‌سازند.",
+      "solution": "۱) خیر؛ `Root Guard` پورت را وارد `root-inconsistent` (معادل Blocking موقت) می‌کند و به محض متوقف شدن دریافت BPDU برتر (پس از انقضای MaxAge/تایمر STP) **خودکار** به حالت عادی برمی‌گردد و نیازی به `shut / no shut` نیست. ۲) در MST، تمامی اطلاعات Instanceها داخل یک فریم BPDU واحد (در قالب MRecordهای متصل به IST) ارسال می‌شوند؛ بنابراین ورود پورت در سطح `IST 0` به `root-inconsistent` عملاً کل پورت را در هم‌گروهی MST دچار اختلال و مسدودسازی می‌کند (در PVST+ فقط همان VLAN مسدود می‌شد)."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "برای اینکه دو سوئیچ سیسکو در یک **MST Region** مشترک قرار بگیرند، کدام سه پارامتر باید در هر دو دقیقاً یکسان باشند؟",
+      "opts": [
+        "Region Name، Revision Number و جدول نگاشت VLAN-to-Instance",
+        "فقط Region Name و IP مدیریتی SVI",
+        "مدل سخت‌افزاری سوئیچ، نسخه IOS و نام هاست",
+        "تعداد پورت‌های Access و سرعت کابل"
+      ],
+      "ans": 0,
+      "exp": "در استاندارد 802.1s، حتی تغییر یک VLAN در نگاشت Instanceها Hash مقایسهٔ BPDU را عوض کرده و دو سوئیچ را از هم جدا می‌کند."
+    },
+    {
+      "q": "اگر روی پورت `Gi0/3` (متصل به کاربر) به‌جای `BPDU Guard` دستور `spanning-tree bpdufilter enable` در سطح اینترفیس اجرا شود و کاربری دو پورت سوئیچ را با یک سوئیچ کوچک به هم متصل کند، نتیجه چیست؟",
+      "opts": [
+        "پورت فوراً `err-disabled` می‌شود",
+        "پورت پیام‌های BPDU ورودی/خروجی را نادیده می‌گیرد و حلقهٔ لایه ۲ ایجاد می‌شود",
+        "پروتکل OSPF به‌صورت خودکار حلقه را قطع می‌کند",
+        "سوئیچ تمام پورت‌ها را به Root Bridge تبدیل می‌کند"
+      ],
+      "ans": 1,
+      "exp": "فعال کردن `bpdufilter` زیر خود اینترفیس عملاً STP را روی آن پورت غیرفعال می‌کند؛ بنابراین در صورت حلقهٔ فیزیکی Broadcast Storm رخ می‌دهد."
+    },
+    {
+      "q": "کدام ابزار برای جلوگیری از تبدیل شدن یک لینک فیبر یک‌طرفه‌قطع‌شده (TX سالم، RX قطع) به حلقهٔ لایه ۲ حتی روی لینک‌های فاقد STP (مثل EtherChannel) طراحی شده است؟",
+      "opts": [
+        "VTP Pruning",
+        "PortFast",
+        "UDLD (به‌ویژه در مد Aggressive)",
+        "DHCP Snooping"
+      ],
+      "ans": 2,
+      "exp": "UDLD با پیام Echo لایه ۲ سلامت دوطرفهٔ فیزیکی لینک را بررسی می‌کند و در مد Aggressive در صورت قطع یک رشته، پورت را `err-disabled` می‌سازد."
+    }
+  ],
+  "bridge": {
+    "whereUsed": "MST، Guardهای STP، UDLD و StackWise پایهٔ پایداری لایه ۲ در شبکه‌های پردیسی متوسط تا بزرگ هستند.",
+    "nextQuestion": "اکنون که کل درخت لایه ۲ امن و سریع شده است، فرض کنید ۲۰ سرور یا ۲۰ اتاق هتل داریم که همگی باید در یک Subnet واحد باشند (تا IPها هدر نروند)، اما نباید هیچ ارتباط مستقیم لایه ۲ بینشان مجاز باشد! چطور درون یک VLAN واحد، دیوارکشی ایزوله بسازیم؟",
+    "nextId": "adv_pvl"
+  }
+}
