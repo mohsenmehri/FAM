@@ -1961,6 +1961,54 @@ class RegressionTests(unittest.TestCase):
                     self.assertNotIn("acadenmی", full_text, f"{lid} quiz[{qi}]: typo 'acadenmی'")
                     self.assertNotIn("زیرساكت", full_text, f"{lid} quiz[{qi}]: typo 'زیرساكت'")
 
+    def test_auto05_quiz_answers_evidence_based(self):
+        """auto_05 پاسخ‌های بازبینی‌شده Q0 و Q1 باید با شواهد فنی مطابقت داشته باشند.
+        Q0: ans=1 (YAML قابل-read月より، کامنت، JSONstrict) نه ans=2 ('فقط YAML برای API' که غلط است).
+        Q1: ans=1 (safe_load اجرای کد Python را مسدود می‌کند) نه ans=3 ('safe_load فقط برای JSON' که غلط است).
+        """
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        a5 = data["lessons"]["auto_05"]
+        self.assertEqual(len(a5["quiz"]), 3, "auto_05 must have 3 quiz questions")
+        q0 = a5["quiz"][0]
+        q1 = a5["quiz"][1]
+        self.assertEqual(q0["ans"], 1, "auto_05 Q0: correct ans must be 1 (YAML human-readable + comments)")
+        self.assertIn("فقط YAML برای APIها", q0["opts"][2], "auto_05 Q0: option 2 must be the wrong distractor")
+        self.assertNotEqual(q0["ans"], 2, "auto_05 Q0: ans must NOT be 2 (wrong: 'YAML only for APIs')")
+        self.assertEqual(q1["ans"], 1, "auto_05 Q1: correct ans must be 1 (safe_load prevents code execution)")
+        self.assertIn("safe_load فقط برای JSON", q1["opts"][3], "auto_05 Q1: option 3 must be the wrong distractor")
+        self.assertNotEqual(q1["ans"], 3, "auto_05 Q1: ans must NOT be 3 (wrong: 'safe_load only for JSON')")
+        # exp must be meaningful (not empty, not truncated)
+        self.assertGreater(len(q0["exp"]), 20, "auto_05 Q0: exp must be meaningful")
+        self.assertGreater(len(q1["exp"]), 20, "auto_05 Q1: exp must be meaningful")
+
+    def test_auto05_q2_yaml11_boolean_aliases(self):
+        """auto_05 Q2: YAML 1.1 boolean aliases yes/on/true all evaluate to true."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        a5 = data["lessons"]["auto_05"]
+        q2 = a5["quiz"][2]
+        self.assertEqual(q2["ans"], 0, "auto_05 Q2: ans must be 0 (yes/on/true all true in YAML 1.1)")
+        self.assertIn("yes/on/true", q2["opts"][0], "auto_05 Q2: option 0 must mention boolean aliases")
+        self.assertIn("YAML 1.1", q2["exp"], "auto_05 Q2: exp must reference YAML 1.1")
+
+    def test_no_german_italian_loanwords_in_exp(self):
+        """حاشیه‌نویسی توضیحی (exp) نباید حاوی کلمات غیرفارسی (آلمانی/ایتالین/بخware) باشد."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        bad = ["roaning", "Übergang", "sceneggi", "sc写ning", "Аutomatizacia", "ORkesト", "Mafia", "IZulle", "teachvisot"]
+        for lid, lesson in data["lessons"].items():
+            for qi, q in enumerate(lesson.get("quiz", [])):
+                full_text = q.get("q", "") + " " + " ".join(q.get("opts", [])) + " " + q.get("exp", "")
+                with self.subTest(lesson=lid, quiz=qi):
+                    for word in bad:
+                        self.assertNotIn(word, full_text, f"{lid} quiz[{qi}]: non-Persian loanword '{word}'")
+
+    def test_duplicate_quiz_questions_prohibited(self):
+        """دùsؤال تکراری در یک lesson مجاز نیست (ccie_wl, ccie_auto قبلاً دゥplicate داشتند)."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        for lid, lesson in data["lessons"].items():
+            questions = [q.get("q", "") for q in lesson.get("quiz", [])]
+            with self.subTest(lesson=lid):
+                self.assertEqual(len(questions), len(set(questions)), f"{lid}: duplicate quiz questions found")
+
     def test_entrance_exam_questions_array_structure(self):
         """آزمون ورودی باید questions آرایه داشته باشد (در هر دو نسخه)."""
         data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
