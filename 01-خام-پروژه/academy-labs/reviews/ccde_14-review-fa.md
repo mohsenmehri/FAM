@@ -11,3 +11,10 @@
 - مسئله: بخش ۶ بیش از ۹۵٪ ترافیک وب را منحصراً به TLS 1.3 نسبت داده و افت توان فایروال را عدد ثابت ۷۰٪ ذکر کرده بود.
 - منبع: RFC 8446 و آمارهای پذیرش HTTPS (ترکیب TLS 1.2 + TLS 1.3) و دیتاشیت‌های NGFW.
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions`).
+
+## بازبینی فنی فاز ۸D (2026-11-27)
+- **ایراد:** در `audit_zero_trust_pillars` مقدار رشته‌ای `"False"` به‌دلیل truthiness باعث گزارش نادرست `ZERO_TRUST_ALIGNED` می‌شد؛ `offload > 1.0` ترافیک منفی می‌ساخت؛ عبارت مطلق «تضمین می‌کند» در بخش ۹.
+- **منبع معتبر:** NIST SP 800-207 (Zero Trust Architecture) و Python Data Model.
+- **اصلاح انجام‌شده:** اعمال بررسی سخت‌گیرانه `isinstance(val, bool)` در `audit_zero_trust_pillars`، بازه `[0.0, 1.0]` برای offload و تعدیل بخش ۹.
+- **تست مرتبط:** `test_phase8d_remaining_ccde_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** مدل محلی بدون NGFW/SIEM زنده؛ بازبینی نویسنده (نه مستقل).

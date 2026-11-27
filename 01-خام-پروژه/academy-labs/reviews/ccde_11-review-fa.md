@@ -11,3 +11,10 @@
 - مسئله: عبارت مطلق «تنها راه شکار واقعی Microburst» در توضیح پرسش ۳ و ذکر بازه ۷۰–۸۰٪ افت TLS بدون قید وابستگی به سخت‌افزار/ASIC.
 - منبع: مستندات پایش Buffer/Microburst سیسکو و RFC 6985 (IMIX).
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions`).
+
+## بازبینی فنی فاز ۸D (2026-11-27)
+- **ایراد:** `ZeroDivisionError` روی `failover_utilization_cap=0` یا ظرفیت صفر، برچسب ثابت `50pct` حتی برای سقف‌های دیگر، و پذیرش مقادیر منفی/`bool`/`NaN`.
+- **منبع معتبر:** مدل‌سازی رشد مرکب ظرفیت ۵ساله و ارزیابی ۵بعدی تجهیزات (Gbps/PPS/FIB/TLS/Power).
+- **اصلاح انجام‌شده:** اعتبارسنجی `failover_utilization_cap in (0, 1]`، ظرفیت مثبت، پویاسازی کلید خروجی `failover_utilization_cap_pct` + assertها.
+- **تست مرتبط:** `test_phase8d_remaining_ccde_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** مدل محلی بدون تله‌متری تولیدی؛ بازبینی نویسنده (نه مستقل).

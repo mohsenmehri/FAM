@@ -1143,6 +1143,44 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             a19.encode_compact_metric(1000, 1, 100, 105.0)
 
+    def test_phase8d_remaining_ccde_labs(self):
+        """Phase 8D: complete 100% of CCDE track (ccde_08, ccde_11, ccde_14) -> 0 lessons left at reviewed.1."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. ccde_08: vrfs<=0, bool, empty SGT rejected
+        c08 = load_module(AGENT3_LAB_DIR / "ccde_08_lab.py", "ccde_08_phase8d_testmod")
+        with self.assertRaises(ValueError):
+            c08.evaluate_segmentation_plan(0, 10, 4)
+        with self.assertRaises(ValueError):
+            c08.evaluate_segmentation_plan(True, 10, 4)
+        with self.assertRaises(ValueError):
+            c08.check_sgt_matrix("", "PCI_POS", {})
+
+        # 2. ccde_11: cap<=0 / capacity<=0 / missing dimension rejected (prevents ZeroDivisionError)
+        c11 = load_module(AGENT3_LAB_DIR / "ccde_11_lab.py", "ccde_11_phase8d_testmod")
+        with self.assertRaises(ValueError):
+            c11.forecast_5yr_capacity(10.0, 0.2, failover_utilization_cap=0.0)
+        with self.assertRaises(ValueError):
+            c11.forecast_5yr_capacity(10.0, 0.2, failover_utilization_cap=1.5)
+        with self.assertRaises(ValueError):
+            c11.audit_five_dimensions({"throughput_gbps": 5.0}, {"throughput_gbps": 0.0})
+
+        # 3. ccde_14: Zero Trust strict bool ("False" must NOT pass!) + offload bounds
+        c14 = load_module(AGENT3_LAB_DIR / "ccde_14_lab.py", "ccde_14_phase8d_testmod")
+        for bad in ("False", "True", 0, 1, None):
+            with self.assertRaises(ValueError):
+                c14.audit_zero_trust_pillars({"mfa": True, "siem": bad})
+        with self.assertRaises(ValueError):
+            c14.model_east_west_firewall_bottleneck(100.0, 40.0, 1.2)
+        with self.assertRaises(ValueError):
+            c14.model_east_west_firewall_bottleneck(100.0, 0.0, 0.5)
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

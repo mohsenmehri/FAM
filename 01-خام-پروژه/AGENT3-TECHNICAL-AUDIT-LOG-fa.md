@@ -202,4 +202,16 @@
 | Automation | `auto_18` | کرش `AttributeError` روی ورودی غیر-dict/خالی در توابع Dq و Batfish. | pyATS/Genie و Batfish | اعتبارسنجی نوع `dict`/`str` با `ValueError`. | `test_phase8c2_remaining_automation_labs` | شبیه‌ساز محلی؛ بازبینی نویسنده. |
 | Automation | `auto_19` | نبود شرط `clear_thresh < high_thresh`، بازه `cpu_pct` و عبارات مطلق بخش ۱/۷/Q3. | gNMI/MDT و Hysteresis | شرط `clear_thresh < high_thresh`، بازه `0..100` و تعدیل متن. | `test_phase8c2_remaining_automation_labs` | مدل محلی Python 3؛ بازبینی نویسنده. |
 
+---
+
+## بخش ۸D: بازبینی فنی فاز ۸D (2026-11-27 — تکمیل ۱۰۰٪ مسیر CCDE و رسیدن به پوشش ۶۴/۶۴ ممیزی عمیق)
+
+با اتمام این دسته، **همه ۶۴ درس محدوده Agent 3** (۱۸ Specialist، ۷ CCIE، ۲۰ CCDE و ۱۹ Automation به‌جز `auto_12` = ۶۴ درس) بدون باقی‌ماندن هیچ درسی در `reviewed.1` به‌طور کامل بازبینی عمیق شدند:
+
+| دسته | شناسه درس | ایراد شناسایی‌شده | منبع معتبر | اصلاح انجام‌شده | تست مرتبط | محدودیت |
+|---|---|---|---|---|---|---|
+| CCDE | `ccde_08` | پذیرش `vrfs=0` (خروجی غلط BALANCED)، مقادیر منفی/`bool` و SGT خالی. | Macro/Micro Segmentation | `_require_int` با حداقل مجاز + اعتبارسنجی SGT و assertها. | `test_phase8d_remaining_ccde_labs` | مدل محلی؛ بازبینی نویسنده. |
+| CCDE | `ccde_11` | `ZeroDivisionError` روی cap/capacity صفر و برچسب ثابت `50pct`. | Capacity Planning 5D | بازه `(0, 1]` برای cap، ظرفیت مثبت و پویاسازی کلید خروجی. | `test_phase8d_remaining_ccde_labs` | مدل محلی؛ بازبینی نویسنده. |
+| CCDE | `ccde_14` | عبور `"False"` در `audit_zero_trust_pillars` (گزارش غلط ZERO_TRUST_ALIGNED)، `offload > 1.0` و «تضمین می‌کند» در بخش ۹. | NIST SP 800-207 | بررسی سخت‌گیرانه `bool`، بازه `[0.0, 1.0]` و تعدیل بخش ۹. | `test_phase8d_remaining_ccde_labs` | مدل محلی؛ بازبینی نویسنده. |
+
 > **یادآوری پایانی:** با وجود این ممیزی فنی و معنایی عمیق و آزمون‌های رگرسیون خودکار، این گزارش همچنان **بازبینی نویسنده** است و پیش از انتشار رسمی عمومی، **بازبینی مستقل توسط متخصص شبکه/امنیت انسانی (Independent Human SME Review)** توصیه می‌شود.
