@@ -7,16 +7,17 @@ def outer_ip_size(inner_ip_size, *, inner_vlan_tags=0, outer_ip_version=4):
     excluding outer Ethernet header, VLAN tags, FCS, and physical overhead.
     No IP options, IPv6 extensions, security encapsulation or fragmentation.
     """
-    if not isinstance(inner_ip_size, int) or inner_ip_size <= 0:
+    if type(inner_ip_size) is not int or inner_ip_size <= 0:
         raise ValueError('inner IP size must be a positive integer')
-    if inner_vlan_tags not in (0, 1, 2) or outer_ip_version not in (4, 6):
+    if (type(inner_vlan_tags) is not int or inner_vlan_tags not in (0, 1, 2)
+            or type(outer_ip_version) is not int or outer_ip_version not in (4, 6)):
         raise ValueError('unsupported VLAN tag count or outer IP version')
     outer_ip = 20 if outer_ip_version == 4 else 40
     return inner_ip_size + 14 + 4 * inner_vlan_tags + 8 + 8 + outer_ip
 
 
 def fits(inner_ip_size, underlay_ip_mtu, **kwargs):
-    if not isinstance(underlay_ip_mtu, int) or underlay_ip_mtu <= 0:
+    if type(underlay_ip_mtu) is not int or underlay_ip_mtu <= 0:
         raise ValueError('underlay IP MTU must be positive')
     size = outer_ip_size(inner_ip_size, **kwargs)
     return size, size <= underlay_ip_mtu

@@ -10,7 +10,7 @@
  "domain": "Network fundamentals",
  "source": "Legacy s11 rewritten",
  "evidence": "Designed — Not Run",
- "reviewStatus": "Draft — Pending Technical Review",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
  "estimatedMinutes": 45,
  "prerequisites": [],
  "sections": [
@@ -57,7 +57,7 @@
   {
    "id": "s11-section-9",
    "title": "IPv6 و tag",
-   "html": "<p>در فرض مشابه با outer IPv6 بدون extension، اندازه outer IP برابر 1570 است؛ یک tag داخلی چهار بایت می‌افزاید. حد MTU پورت ممکن است برحسب IP packet یا Ethernet frame مستند شده باشد؛ پیش از مقایسه دقیقاً واحد و سربارها را مشخص کنید.</p>"
+   "html": "<p>در فرض مشابه با outer IPv6 بدون extension، اندازه outer IP برابر 1570 است؛ اگر پیاده‌سازی tag داخلی را نگه دارد، هر tag داخلی چهار بایت می‌افزاید؛ نگهداری یا حذف آن و پشتیبانی از چند tag به پیاده‌سازی و تنظیمات وابسته است. حد MTU پورت ممکن است برحسب IP packet یا Ethernet frame مستند شده باشد؛ پیش از مقایسه دقیقاً واحد و سربارها را مشخص کنید.</p>"
   },
   {
    "id": "s11-section-10",
@@ -171,7 +171,7 @@
   "lab": {
    "title": "کاربرگ Python Mock — تجهیز واقعی اجرا نشده",
    "executionStatus": "Designed — Not Run — تجهیز واقعی اجرا نشده است.",
-   "html": "<p><strong>Python Mock / محاسبه محلی:</strong> تجهیز واقعی و ترافیک شبکه اجرا نشده است. برای IP داخلی 1500 بایت و IP MTU بیرونی 1550، اندازه outer IPv4 برابر 1550 و جا می‌شود؛ IPv6 برابر 1570 است و جا نمی‌شود. این محاسبه فقط IP packet است؛ فریم بیرونی محاسبه نمی‌شود.</p><p>Python 3 لازم است؛ کد زیر را در پوشه آزمایشی به نام <code>vxlan_mtu_mock.py</code> ذخیره و اجرا کنید.</p><pre dir=\"ltr\"><code>python3 vxlan_mtu_mock.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;VXLAN size arithmetic only; no network, BGP, tunnels or packets.&quot;&quot;&quot;\n\ndef outer_ip_size(inner_ip_size, *, inner_vlan_tags=0, outer_ip_version=4):\n    &quot;&quot;&quot;Inner IPv4/IPv6 packet in Ethernet frame, excluding inner FCS.\n\n    Returns outer IP packet bytes, including outer IP/UDP/VXLAN headers,\n    excluding outer Ethernet header, VLAN tags, FCS, and physical overhead.\n    No IP options, IPv6 extensions, security encapsulation or fragmentation.\n    &quot;&quot;&quot;\n    if not isinstance(inner_ip_size, int) or inner_ip_size &lt;= 0:\n        raise ValueError(&#x27;inner IP size must be a positive integer&#x27;)\n    if inner_vlan_tags not in (0, 1, 2) or outer_ip_version not in (4, 6):\n        raise ValueError(&#x27;unsupported VLAN tag count or outer IP version&#x27;)\n    outer_ip = 20 if outer_ip_version == 4 else 40\n    return inner_ip_size + 14 + 4 * inner_vlan_tags + 8 + 8 + outer_ip\n\n\ndef fits(inner_ip_size, underlay_ip_mtu, **kwargs):\n    if not isinstance(underlay_ip_mtu, int) or underlay_ip_mtu &lt;= 0:\n        raise ValueError(&#x27;underlay IP MTU must be positive&#x27;)\n    size = outer_ip_size(inner_ip_size, **kwargs)\n    return size, size &lt;= underlay_ip_mtu\n\n\nif __name__ == &#x27;__main__&#x27;:\n    for version in (4, 6):\n        size, ok = fits(1500, 1550, outer_ip_version=version)\n        print(f&#x27;Outer IPv{version}: {size} IP bytes; fits 1550 IP MTU: {ok}&#x27;)\n    print(&#x27;Arithmetic only; no encapsulation or network traffic&#x27;)\n</code></pre><p>اگر خروجی متفاوت بود، ورودی و نسخه Python را بررسی کنید. خروجی شاهد اجرای تجهیز یا packet capture نیست.</p>"
+   "html": "<p><strong>Python Mock / محاسبه محلی:</strong> تجهیز واقعی و ترافیک شبکه اجرا نشده است. برای IP داخلی 1500 بایت و IP MTU بیرونی 1550، اندازه outer IPv4 برابر 1550 و جا می‌شود؛ IPv6 برابر 1570 است و جا نمی‌شود. این محاسبه فقط IP packet است؛ فریم بیرونی محاسبه نمی‌شود.</p><p>Python 3 لازم است؛ کد زیر را در پوشه آزمایشی به نام <code>vxlan_mtu_mock.py</code> ذخیره و اجرا کنید.</p><pre dir=\"ltr\"><code>python3 vxlan_mtu_mock.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;VXLAN size arithmetic only; no network, BGP, tunnels or packets.&quot;&quot;&quot;\n\ndef outer_ip_size(inner_ip_size, *, inner_vlan_tags=0, outer_ip_version=4):\n    &quot;&quot;&quot;Inner IPv4/IPv6 packet in Ethernet frame, excluding inner FCS.\n\n    Returns outer IP packet bytes, including outer IP/UDP/VXLAN headers,\n    excluding outer Ethernet header, VLAN tags, FCS, and physical overhead.\n    No IP options, IPv6 extensions, security encapsulation or fragmentation.\n    &quot;&quot;&quot;\n    if type(inner_ip_size) is not int or inner_ip_size &lt;= 0:\n        raise ValueError(&#x27;inner IP size must be a positive integer&#x27;)\n    if (type(inner_vlan_tags) is not int or inner_vlan_tags not in (0, 1, 2)\n            or type(outer_ip_version) is not int or outer_ip_version not in (4, 6)):\n        raise ValueError(&#x27;unsupported VLAN tag count or outer IP version&#x27;)\n    outer_ip = 20 if outer_ip_version == 4 else 40\n    return inner_ip_size + 14 + 4 * inner_vlan_tags + 8 + 8 + outer_ip\n\n\ndef fits(inner_ip_size, underlay_ip_mtu, **kwargs):\n    if type(underlay_ip_mtu) is not int or underlay_ip_mtu &lt;= 0:\n        raise ValueError(&#x27;underlay IP MTU must be positive&#x27;)\n    size = outer_ip_size(inner_ip_size, **kwargs)\n    return size, size &lt;= underlay_ip_mtu\n\n\nif __name__ == &#x27;__main__&#x27;:\n    for version in (4, 6):\n        size, ok = fits(1500, 1550, outer_ip_version=version)\n        print(f&#x27;Outer IPv{version}: {size} IP bytes; fits 1550 IP MTU: {ok}&#x27;)\n    print(&#x27;Arithmetic only; no encapsulation or network traffic&#x27;)\n</code></pre><p>اگر خروجی متفاوت بود، ورودی و نسخه Python را بررسی کنید. خروجی شاهد اجرای تجهیز یا packet capture نیست.</p>"
   },
   "quiz": {
    "title": "آزمون درس",
@@ -319,6 +319,7 @@
    "https://www.rfc-editor.org/rfc/rfc7432",
    "https://www.rfc-editor.org/rfc/rfc8365",
    "https://www.rfc-editor.org/rfc/rfc9136"
-  ]
+  ],
+  "evidence": "academy-labs/reviews/s11-review-fa.md"
  }
 }

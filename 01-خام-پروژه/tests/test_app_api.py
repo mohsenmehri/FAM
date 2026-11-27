@@ -266,6 +266,26 @@ class FamAppApiTests(unittest.TestCase):
         self.assertEqual(out.status_code, 200)
         self.assertEqual(self.client.get(path, environ_base=self.https_env).status_code, 401)
 
+    def test_academy_progress_existing_database_schema_upgrade_preserves_payload(self):
+        # Model the pre-revision database schema. This tests schema upgrade,
+        # not migration of the historic learning data inside the payload.
+        raw=json.dumps({'fam4.learn.v1':json.dumps({'completedLessons':['s01'], 'notes':{'s01':'private'}})})
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+            db.execute('DROP TABLE academy_progress')
+            db.execute('CREATE TABLE academy_progress(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)')
+            db.execute('INSERT INTO academy_progress VALUES(?,?,?)',(uid,raw,123))
+        for _ in range(2):
+            fam_app_module.create_app({'TESTING':True,'DB_PATH':str(self.db_path),'PUBLIC_ORIGIN':self.ORIGIN})
+            with sqlite3.connect(self.db_path) as db:
+                self.assertEqual(db.execute('SELECT payload,updated_at,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,123,0))
+        csrf=self._login_admin().get_json()['csrf']
+        response=self.client.post('/api/academy/progress',json={'expectedRevision':0,'changes':{'fam4.learn.v1':json.dumps({'completed':[]})}},
+            headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf},environ_base=self.https_env)
+        self.assertEqual(response.status_code,409)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,0))
+
     def test_academy_progress_cas_concurrency_and_atomic_backup(self):
         clients = []
         for _ in range(8):

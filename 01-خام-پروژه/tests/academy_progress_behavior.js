@@ -85,6 +85,21 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   requests[5].resolve({ok: true, json: async () => ({revision: 5})});
   await tick();
 
+  // A concurrent tab won: reject this snapshot and block already queued and
+  // later writes rather than retrying with a new revision blindly.
+  const conflict = ctx.window.FamAcademyBridge.saveProgress({completed:['loser'], labs:{}});
+  const queued = ctx.window.FamAcademyBridge.saveProgress({completed:['also-unsaved'], labs:{}});
+  await tick();
+  assert.strictEqual(requests.length, 7);
+  assert.strictEqual(JSON.parse(requests[6].options.body).expectedRevision, 5);
+  requests[6].resolve({ok:false, status:409});
+  assert.strictEqual(await conflict, false);
+  assert.strictEqual(await queued, false);
+  assert.strictEqual(requests.length, 7);
+  assert.match(status.textContent, /تعارض نسخه/);
+  assert.strictEqual(await ctx.window.FamAcademyBridge.saveProgress({completed:[], labs:{}}), false);
+  assert.strictEqual(requests.length, 7);
+
   // The account session did not read, overwrite or clear standalone progress,
   // including after a failed server save; sign-out leaves those keys intact.
   const sharedKeys = ['fam_academy_progress_v1', 'fam_academy_sections_v1', 'fam_academy_quiz_v1'];
