@@ -1036,6 +1036,54 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             sr.compute_ti_lfa_backup(("P1", "P2"), "PE2", ("P1", "P3"), hardware_msd=0)
 
+    def test_phase8c1_automation_core_labs(self):
+        """Phase 8C-1: auto_01 log-injection guard, auto_03 strict bool, auto_06 400/409, auto_08 RFC 6242, auto_10 YANG."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. auto_01: username containing 'from' does NOT spoof IP; malformed line raises ValueError
+        a01 = load_module(AGENT3_LAB_DIR / "auto_01_lab.py", "auto_01_phase8c1_testmod")
+        tricky_log = "Nov 27 02:10:01 h sshd[1]: Failed password for invalid user from evil from 198.51.100.99 port 2222 ssh2\n"
+        self.assertEqual(a01.parse_failed_ssh_counts(tricky_log), [("198.51.100.99", 1)])
+        with self.assertRaises(ValueError):
+            a01.parse_failed_ssh_counts("Nov 27 sshd: Failed password for root without_from_clause\n")
+
+        # 2. auto_03: strict bools & max_workers
+        a03 = load_module(AGENT3_LAB_DIR / "auto_03_lab.py", "auto_03_phase8c1_testmod")
+        for bad in ("False", "True", 0, 1, None):
+            with self.assertRaises(ValueError):
+                a03.run_nornir_style_pilot([{"host": "192.0.2.1", "role": "pilot"}], "pilot", ["cmd"], dry_run=bad)
+        with self.assertRaises(ValueError):
+            a03.run_nornir_style_pilot([], "pilot", [], max_workers=0)
+
+        # 3. auto_06: real loopback HTTP server returns 400 on bad JSON & 409 on duplicate POST
+        a06 = load_module(AGENT3_LAB_DIR / "auto_06_lab.py", "auto_06_phase8c1_testmod")
+        rest = a06.run_local_rest_lab()
+        self.assertEqual(rest["bad_post_status"], 400)
+        self.assertEqual(rest["duplicate_post_status"], 409)
+        self.assertTrue(rest["put_idempotent_same_result"])
+
+        # 4. auto_08: multi-chunk RFC 6242 + ValueError/RuntimeError instead of assert
+        a08 = load_module(AGENT3_LAB_DIR / "auto_08_lab.py", "auto_08_phase8c1_testmod")
+        xml = "<rpc><msg>]]>]]> multi-chunk test</msg></rpc>"
+        self.assertEqual(a08.parse_netconf_1_1_chunked(a08.frame_netconf_1_1_chunked(xml, chunk_size=10)), xml)
+        with self.assertRaises(ValueError):
+            a08.parse_netconf_1_1_chunked("\n#999\ntruncated\n##\n")
+        ds = a08.NetconfDatastoreMock()
+        with self.assertRaises(RuntimeError):
+            ds.edit_candidate("sess-unlocked", ["permit any"])
+
+        # 5. auto_10: non-dict payload & non-bool YANG dhcp leaf
+        a10 = load_module(AGENT3_LAB_DIR / "auto_10_lab.py", "auto_10_phase8c1_testmod")
+        self.assertTrue(len(a10.validate_vlan_payload("not-a-dict")) == 1)
+        errs = a10.validate_vlan_payload({"vlans": [{"vlan-id": 10, "name": "CORP", "dhcp": "False"}]})
+        self.assertTrue(any("boolean" in e for e in errs))
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

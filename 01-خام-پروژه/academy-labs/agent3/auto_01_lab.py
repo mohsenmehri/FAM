@@ -1,12 +1,16 @@
 """Local Linux & Log-Processing Lab for auto_01 (runs locally in a temporary directory).
 
 No production Linux server, root privilege, or real Cisco/network device is modified.
+Uses anchored regex + ipaddress.ip_address validation to avoid SSH username log-injection bugs
+(e.g. a username containing the word 'from').
 """
 from __future__ import annotations
 
 from collections import Counter
+import ipaddress
 import os
 from pathlib import Path
+import re
 import stat
 import tempfile
 
@@ -17,17 +21,26 @@ Nov 27 02:10:07 bastion sshd[104]: Failed password for root from 203.0.113.77 po
 Nov 27 02:10:09 bastion sshd[105]: Failed password for invalid user test from 198.51.100.10 port 51239 ssh2
 """
 
+SSH_FAILED_IP_RE = re.compile(r"Failed password .*? from (\S+) port \d+\b")
+
 
 def parse_failed_ssh_counts(log_text: str) -> list[tuple[str, int]]:
-    """Python equivalent of: grep 'Failed password' | awk '{print $(NF-3)}' | sort | uniq -c | sort -nr."""
+    """Extract validated source IPs from sshd 'Failed password' lines, immune to 'from' in usernames."""
+    if not isinstance(log_text, str):
+        raise ValueError(f"log_text must be str, got {type(log_text).__name__}")
     ips = []
     for line in log_text.splitlines():
-        if "Failed password" in line:
-            tokens = line.split()
-            if "from" in tokens:
-                idx = tokens.index("from")
-                if idx + 1 < len(tokens):
-                    ips.append(tokens[idx + 1])
+        if "Failed password" not in line:
+            continue
+        match = SSH_FAILED_IP_RE.search(line)
+        if not match:
+            raise ValueError(f"Malformed 'Failed password' log line: {line!r}")
+        candidate = match.group(1)
+        try:
+            normalized = str(ipaddress.ip_address(candidate))
+        except ValueError as exc:
+            raise ValueError(f"Invalid IP address in SSH log line: {candidate!r}") from exc
+        ips.append(normalized)
     return sorted(Counter(ips).items(), key=lambda item: (-item[1], item[0]))
 
 
@@ -47,9 +60,12 @@ def verify_ssh_key_permissions(temp_dir: Path) -> dict[str, object]:
 def main() -> None:
     print("Local temporary-directory Linux lab only — no production server or router is modified.")
     counts = parse_failed_ssh_counts(SAMPLE_AUTH_LOG)
+    assert counts == [("198.51.100.10", 3), ("203.0.113.77", 1)]
     print("Top failed SSH source IPs:", counts)
     with tempfile.TemporaryDirectory() as tmp:
-        print("SSH key permission check:", verify_ssh_key_permissions(Path(tmp)))
+        perm = verify_ssh_key_permissions(Path(tmp))
+        assert perm["safe_for_openssh"] is True
+        print("SSH key permission check:", perm)
 
 
 if __name__ == "__main__":

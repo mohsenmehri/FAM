@@ -4,3 +4,10 @@
 
 - همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش و اسکریپت `01-خام-پروژه/academy-labs/agent3/auto_10_lab.py` مطابق RFC 7950 و RFC 8340 بررسی و اجرا شدند.
 - مرز میان اعتبارسنج آموزشی پایتون و کامپایلر کامل `pyang/libyang` صریحاً مستند شد.
+
+## بازبینی فنی فاز ۸C-1 (2026-11-27)
+- **ایراد:** کرش `AttributeError` روی ورودی غیر-dict در `validate_vlan_payload` و عدم بررسی نوع `boolean` برای `dhcp` (مثلاً `"False"`).
+- **منبع معتبر:** RFC 7950 (YANG 1.1 built-in types & choice semantics).
+- **اصلاح انجام‌شده:** افزودن بررسی نوع dict برای ریشه/عناصر لیست و بررسی `isinstance(..., bool)` روی `dhcp`.
+- **تست مرتبط:** `test_phase8c1_automation_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** اعتبارسنج آموزشی Python 3؛ جایگزین `pyang`/`libyang` نیست؛ بازبینی نویسنده (نه مستقل).

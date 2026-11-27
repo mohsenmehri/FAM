@@ -178,4 +178,16 @@
 | Specialist | `spec_sec_ise` | `av_updated="False"` وضعیت Compliant می‌داد؛ دور زدن TACACS با `' reload'`. | Cisco ISE Posture/TACACS+ | `_require_bool` و نرمال‌سازی `.strip().lower()` در TACACS+. | `test_phase8b_ccie_and_remaining_specialist_labs` | مدل محلی؛ بازبینی نویسنده (نه مستقل). |
 | Specialist | `spec_sp_sr` | پذیرش `mode` ناشناخته، `IndexError` مسیر کوتاه، نبود نگهبان `hardware_msd` و عبارات مطلق بخش ۳/۹. | RFC 8660، MSD/TI-LFA | اعتبارسنجی کامل `mode`/مسیر/MSD + تعدیل بخش ۳/۹. | `test_phase8b_ccie_and_remaining_specialist_labs` | مدل محلی؛ بازبینی نویسنده (نه مستقل). |
 
+---
+
+## بخش ۸C-1: بازبینی فنی فاز ۸C-1 (2026-11-27 — ۵ درس هسته‌ای Automation)
+
+| دسته | شناسه درس | ایراد شناسایی‌شده | منبع معتبر | اصلاح انجام‌شده | تست مرتبط | محدودیت |
+|---|---|---|---|---|---|---|
+| Automation | `auto_01` | آسیب‌پذیری تزریق `from` در نام کاربری لاگ SSH و رد خاموش سطر خراب. | OpenSSH log format و `ipaddress` | regex متصل به `port` + `ipaddress.ip_address` + خطا روی سطر خراب. | `test_phase8c1_automation_core_labs` | Python محلی در پوشه موقت؛ بازبینی نویسنده. |
+| Automation | `auto_03` | نبود `_require_bool` روی `use_textfsm`/`dry_run` و `max_workers<=0` + «تضمین می‌کند» در Q2. | Python Data Model و `with` | `_require_bool`، `max_workers > 0` + تعدیل Q2. | `test_phase8c1_automation_core_labs` | شبیه‌ساز محلی؛ بازبینی نویسنده. |
+| Automation | `auto_06` | کرش سرور محلی روی JSON ناقص و بازنویسی خاموش POST تکراری. | RFC 9110 (400/409/201/204) | پاسخ 400 روی JSON ناقص و 409 روی POST تکراری + assertها. | `test_phase8c1_automation_core_labs` | سرور محلی `127.0.0.1`؛ بازبینی نویسنده. |
+| Automation | `auto_08` | استفاده از `assert` در منطق پروتکل/قفل (آسیب‌پذیر در `python -O`) و تک‌تکه بودن RFC 6242. | RFC 6241 / RFC 6242 §4.2 | جایگزینی با `ValueError`/`RuntimeError` + پشتیبانی چندتکه‌ای RFC 6242. | `test_phase8c1_automation_core_labs` | شبیه‌ساز محلی؛ بازبینی نویسنده. |
+| Automation | `auto_10` | کرش روی ورودی غیر-dict و پذیرش `dhcp="False"` در اعتبارسنج YANG. | RFC 7950 | بررسی نوع dict و بررسی سخت‌گیرانه `bool` برای `dhcp`. | `test_phase8c1_automation_core_labs` | اعتبارسنج محلی (جایگزین `pyang` نیست)؛ بازبینی نویسنده. |
+
 > **یادآوری پایانی:** با وجود این ممیزی فنی و معنایی عمیق و آزمون‌های رگرسیون خودکار، این گزارش همچنان **بازبینی نویسنده** است و پیش از انتشار رسمی عمومی، **بازبینی مستقل توسط متخصص شبکه/امنیت انسانی (Independent Human SME Review)** توصیه می‌شود.

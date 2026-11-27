@@ -11,3 +11,10 @@
 - مسئله: عبارت مطلق «همیشه باید» در توضیح پرسش ۹ بدون استثنای پشتیبان‌گیری کامل (`<get-config>`).
 - منبع: RFC 6241 (NETCONF Protocol).
 - آزمون مرتبط: `test_agent3_content.py` (`test_technical_audit_regressions`).
+
+## بازبینی فنی فاز ۸C-1 (2026-11-27)
+- **ایراد:** استفاده از `assert` برای کنترل‌های پروتکلی/قفل (که با `python -O` غیرفعال می‌شود) و عدم پشتیبانی از فریم چندتکه‌ای RFC 6242.
+- **منبع معتبر:** RFC 6241 (NETCONF) و RFC 6242 Section 4.2 (Chunked Framing).
+- **اصلاح انجام‌شده:** جایگزینی `assert` با `ValueError`/`RuntimeError` و پیاده‌سازی کامل پارس چندتکه‌ای RFC 6242.
+- **تست مرتبط:** `test_phase8c1_automation_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** شبیه‌ساز محلی بدون روتر/SSH-830؛ بازبینی نویسنده (نه مستقل).

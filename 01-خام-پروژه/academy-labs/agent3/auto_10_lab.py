@@ -2,9 +2,9 @@
 """
 FAM Academy Lab — auto_10: YANG (RFC 7950) Local Data-Model Validator.
 Execution boundary: Pure Python 3 stdlib educational validator checking
-YANG leaf types, string length/pattern, uint16 range, list key uniqueness,
-config false immutability, and choice mandatory=false/true semantics.
-Does NOT replace a full YANG 1.1 compiler such as pyang or libyang.
+YANG leaf types (including strict boolean for dhcp), string length/pattern,
+uint16 range, list key uniqueness, config false immutability, and choice
+mandatory=false/true semantics. Does NOT replace pyang or libyang.
 """
 
 from __future__ import annotations
@@ -15,6 +15,8 @@ import re
 
 def validate_vlan_payload(payload: dict) -> list[str]:
     """Validate an instance against a simplified YANG module contract."""
+    if not isinstance(payload, dict):
+        return ["root payload must be a JSON object/dict"]
     errors: list[str] = []
     seen_keys: set[int] = set()
     vlans = payload.get("vlans", [])
@@ -22,6 +24,10 @@ def validate_vlan_payload(payload: dict) -> list[str]:
         return ["vlans must be a YANG list"]
 
     for idx, item in enumerate(vlans):
+        if not isinstance(item, dict):
+            errors.append(f"vlans[{idx}] must be a YANG list entry object")
+            continue
+
         # leaf vlan-id { type uint16 { range "1..4094"; } } (list key)
         vid = item.get("vlan-id")
         if not isinstance(vid, int) or isinstance(vid, bool) or not (1 <= vid <= 4094):
@@ -45,6 +51,8 @@ def validate_vlan_payload(payload: dict) -> list[str]:
         # choice addressing { mandatory false; case static-ip; case dhcp; }
         has_static = "static-ip" in item
         has_dhcp = "dhcp" in item
+        if has_dhcp and not isinstance(item["dhcp"], bool):
+            errors.append(f"vlans[{idx}].dhcp={item['dhcp']!r} violates YANG boolean type")
         if has_static and has_dhcp:
             errors.append(f"vlans[{idx}] violates YANG choice mutual exclusion (both static-ip and dhcp set)")
         # Note: neither set is valid because choice default is mandatory=false!
