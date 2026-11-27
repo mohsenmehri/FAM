@@ -47,14 +47,14 @@ class FoundationModelsTests(unittest.TestCase):
 
     def test_blueprints_embed_model_and_pending_status(self):
         assets = LABS.parent / "server/www/academy-assets/v5/blueprints"
-        for lesson, name in (("s02", "ethernet_arp_mock"), ("s03", "switch_learning_mock"), ("s04", "ipv4_subnet_lab")):
+        for lesson, name in (("s02", "ethernet_arp_mock"), ("s03", "switch_learning_mock"), ("s04", "ipv4_subnet_lab"), ("s05", "route_summary_mock"), ("s06", "ipv6_tcp_mock"), ("s07", "services_mock"), ("s08", "ios_modes_mock"), ("s09", "route_selection_mock"), ("s10", "vlan_trunk_mock")):
             with self.subTest(lesson=lesson):
                 bp = json.loads((assets / f"{lesson}.json").read_text())
                 self.assertIn("Pending", bp["reviewStatus"])
                 self.assertIn((LABS / f"{name}.py").read_text(), html.unescape(bp["stages"]["lab"]["html"]))
 
     def test_examples_run_locally(self):
-        for name in ('ethernet_arp_mock', 'switch_learning_mock', 'ipv4_subnet_lab'):
+        for name in ('ethernet_arp_mock', 'switch_learning_mock', 'ipv4_subnet_lab', 'route_summary_mock', 'ipv6_tcp_mock', 'services_mock', 'ios_modes_mock', 'route_selection_mock', 'vlan_trunk_mock'):
             with self.subTest(name=name):
                 r = subprocess.run([sys.executable, str(LABS / f'{name}.py')], text=True, capture_output=True, check=True, timeout=5)
                 self.assertTrue(r.stdout)

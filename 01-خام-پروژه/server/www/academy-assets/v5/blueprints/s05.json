@@ -1,0 +1,318 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "s05",
+ "objectiveId": "s05",
+ "kind": "lesson",
+ "track": "FAM Curriculum 5.0",
+ "course": "c5-stage-zero",
+ "title": "خلاصه‌سازی مسیر و طراحی سلسله‌مراتبی IP",
+ "titleEn": "CIDR route aggregation and IP planning",
+ "domain": "Network fundamentals",
+ "source": "Legacy s05 rewritten",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "Draft — Pending Technical Review",
+ "estimatedMinutes": 45,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "s05-section-1",
+   "title": "مسئله",
+   "html": "<p>دو شعبه از بلوک‌های 192.0.2.0/26 و 192.0.2.64/26 استفاده می‌کنند. آیا می‌توان آن‌ها را در یک مسیر خلاصه کرد بدون اینکه نشانی اضافی تبلیغ شود؟ پاسخ را با مرز بیتی و جدول مسیر بررسی می‌کنیم.</p>"
+  },
+  {
+   "id": "s05-section-2",
+   "title": "هدف",
+   "html": "<p>پیشوند مشترک را محاسبه کنید، پوشش کامل را از پوشش دارای حفره تشخیص دهید و اثر خلاصه‌سازی بر انتخاب مسیر و خطر blackhole را توضیح دهید. نشانی‌های مثال برای مستندسازی هستند، نه تخصیص اینترنتی سازمان.</p>"
+  },
+  {
+   "id": "s05-section-3",
+   "title": "CIDR و انگیزه",
+   "html": "<p>CIDR از پیشوندهای با طول متغیر استفاده می‌کند. تجمیع می‌تواند تعداد مسیرهایی را که باید در بخشی از شبکه اعلان و نگهداری شوند کاهش دهد، ولی امکان خلاصه‌سازی به توپولوژی، تخصیص و سیاست مسیر وابسته است.</p>"
+  },
+  {
+   "id": "s05-section-4",
+   "title": "تعریف پوشش",
+   "html": "<p>یک summary باید همه نشانی‌های پیشوندهای مورد نظر را شامل شود. کوچک‌ترین بلوک پوشاننده لزوماً برابر اجتماع دقیق آن‌ها نیست؛ ممکن است محدوده‌هایی را نیز بپوشاند که هیچ مسیری به آن‌ها وجود ندارد.</p>"
+  },
+  {
+   "id": "s05-section-5",
+   "title": "محاسبه نمونه",
+   "html": "<p>بازه 192.0.2.0/26 از .0 تا .63 و 192.0.2.64/26 از .64 تا .127 است. کنار هم تمام بازه 192.0.2.0/25 را پر می‌کنند؛ این خلاصه در سطح مجموعه نشانی دقیق است.</p>"
+  },
+  {
+   "id": "s05-section-6",
+   "title": "مرز و هم‌ترازی",
+   "html": "<p>یک /25 در octet آخر در .0 یا .128 آغاز می‌شود. دو بلوک /26 مجاور همیشه یک /25 دقیق نیستند: .64/26 و .128/26 از دو سمت مرز /25 هستند و کوچک‌ترین پوشششان /24 خواهد بود.</p>"
+  },
+  {
+   "id": "s05-section-7",
+   "title": "حفره در پوشش",
+   "html": "<p>برای .0/26 و .128/26 کمترین پوشش .0/24 است، اما .64–.127 و .192–.255 در این دو مسیر نیستند. اعلان summary می‌تواند ترافیک این حفره‌ها را به سمت خلاصه‌کننده جذب کند.</p>"
+  },
+  {
+   "id": "s05-section-8",
+   "title": "خطر blackhole و حلقه",
+   "html": "<p>اگر درون summary مقصدی دسترس‌پذیر نباشد، جذب ترافیک می‌تواند به drop منجر شود؛ مسیر پیش‌فرض یا مسیر بازگشتی نامناسب نیز ممکن است حلقه ایجاد کند. یک route discard برای بخش ناموجود می‌تواند از برخی حلقه‌ها جلوگیری کند ولی خود ترافیک آن بخش را عمداً دور می‌ریزد.</p>"
+  },
+  {
+   "id": "s05-section-9",
+   "title": "Longest prefix match",
+   "html": "<p>در تصمیم forwarding بین مسیرهای نصب‌شده که مقصد را پوشش می‌دهند، پیشوند طولانی‌تر برنده است. مثلاً برای .150، مسیر 192.0.2.128/25 بر 192.0.2.0/24 ترجیح دارد؛ این قاعده را با انتخاب منبع مسیر برای یک prefix یکسان اشتباه نگیرید.</p>"
+  },
+  {
+   "id": "s05-section-10",
+   "title": "انتخاب مسیر در برابر forwarding",
+   "html": "<p>پروتکل مسیریابی و سیستم‌عامل یا پلتفرم برای یک prefix ممکن است معیارهایی مانند اولویت منبع و metric داشته باشند. ترتیب و جزئیات vendor-specific است؛ پس از نصب FIB، lookup مقصد عموماً longest prefix match است.</p>"
+  },
+  {
+   "id": "s05-section-11",
+   "title": "طراحی آدرس",
+   "html": "<p>بلوک‌ها را بر اساس مکان یا مرز مسیریابی گروه‌بندی و ظرفیت آینده را با نیاز واقعی و سیاست سازمان تنظیم کنید. پیش از اعلان خلاصه، حفره‌ها، مسیر بازگشت، استقلال شعب و سناریوی خرابی را تحلیل کنید.</p>"
+  },
+  {
+   "id": "s05-section-12",
+   "title": "چند اتصال و خرابی",
+   "html": "<p>خلاصه‌ای که پشت چند خروجی یا چند شعبه توزیع شده ممکن است هنگام خرابی بخشی از شبکه همچنان اعلام شود. کنترل وضعیت مسیرهای جزئی، طراحی failover و سیاست اعلان برای جلوگیری از جذب نادرست ضروری است.</p>"
+  },
+  {
+   "id": "s05-section-13",
+   "title": "تمرین پاسخ‌دار",
+   "html": "<p>آیا 192.0.2.64/26 و 192.0.2.128/26 دقیقاً 192.0.2.0/25 می‌شوند؟ خیر؛ دومی خارج از /25 اول است و پوشش کمینه /24 حفره دارد. آزمایشگاه exact=False را برای مثال حفره‌دار نشان می‌دهد.</p>"
+  },
+  {
+   "id": "s05-section-14",
+   "title": "روش بررسی و مرز اجرا",
+   "html": "<p>قبل از تغییر واقعی، جدول RIB/FIB، همسایگان، اعلان‌ها و مسیرهای برگشت را در محیط آزمایشی و طبق راهنمای نسخه تجهیز بررسی کنید. کد Python صرفاً مجموعه آدرس و longest match را مدل می‌کند؛ هیچ route یا پروتکل واقعی تنظیم نمی‌شود.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "CIDR",
+   "fa": "CIDR",
+   "simple": "نشانی‌دهی و مسیریابی مبتنی بر prefix با طول متغیر."
+  },
+  {
+   "term": "Prefix",
+   "fa": "Prefix",
+   "simple": "تعداد بیت‌های ثابت آغازین نشانی."
+  },
+  {
+   "term": "Summary",
+   "fa": "Summary",
+   "simple": "پیشوندی که تعدادی مسیر را می‌پوشاند."
+  },
+  {
+   "term": "Aggregation",
+   "fa": "Aggregation",
+   "simple": "ترکیب اعلان‌های مسیر در پیشوند کلی‌تر."
+  },
+  {
+   "term": "Supernet",
+   "fa": "Supernet",
+   "simple": "شبکه کلی‌تر پوشاننده چند شبکه کوچک‌تر."
+  },
+  {
+   "term": "Alignment",
+   "fa": "Alignment",
+   "simple": "انطباق شبکه با مرز اندازه prefix."
+  },
+  {
+   "term": "Hole",
+   "fa": "Hole",
+   "simple": "محدوده درون summary که در مسیرهای جزء نیست."
+  },
+  {
+   "term": "Blackhole",
+   "fa": "Blackhole",
+   "simple": "از دست رفتن ترافیک در مسیر بدون تحویل."
+  },
+  {
+   "term": "Discard",
+   "fa": "Discard",
+   "simple": "دور ریختن عمدی بسته منطبق با یک مسیر."
+  },
+  {
+   "term": "RIB",
+   "fa": "RIB",
+   "simple": "پایگاه اطلاعات مسیر در کنترل‌پلین."
+  },
+  {
+   "term": "FIB",
+   "fa": "FIB",
+   "simple": "ساختار مورد استفاده برای forwarding."
+  },
+  {
+   "term": "Longest match",
+   "fa": "Longest match",
+   "simple": "انتخاب طولانی‌ترین prefix منطبق."
+  },
+  {
+   "term": "Metric",
+   "fa": "Metric",
+   "simple": "معیار مقایسه مسیرها طبق پروتکل."
+  },
+  {
+   "term": "Failover",
+   "fa": "Failover",
+   "simple": "تغییر مسیر یا سرویس هنگام خرابی."
+  },
+  {
+   "term": "IP plan",
+   "fa": "IP plan",
+   "simple": "نقشه تخصیص و مدیریت نشانی‌ها."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ Python Mock — تجهیز واقعی اجرا نشده",
+   "executionStatus": "Designed — Not Run — تجهیز واقعی اجرا نشده است.",
+   "html": "<p><strong>Python Mock / محاسبه محلی:</strong> تجهیز واقعی و ترافیک شبکه اجرا نشده است. برای دو /26 هم‌تراز نتیجه 192.0.2.0/25 و exact=True است؛ مثال دارای حفره 192.0.2.0/24 و exact=False می‌دهد. هیچ route واقعی تنظیم نمی‌شود.</p><p>Python 3 لازم است؛ کد زیر را در پوشه آزمایشی به نام <code>route_summary_mock.py</code> ذخیره و اجرا کنید.</p><pre dir=\"ltr\"><code>python3 route_summary_mock.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;IPv4 route summarization calculations only; does not configure a router.&quot;&quot;&quot;\nfrom ipaddress import IPv4Address, IPv4Network, collapse_addresses\n\n\ndef cover(routes):\n    networks = [IPv4Network(route, strict=True) for route in routes]\n    if not networks:\n        raise ValueError(&#x27;at least one route is required&#x27;)\n    first = min(int(n.network_address) for n in networks)\n    last = max(int(n.broadcast_address) for n in networks)\n    prefix = 32 - (first ^ last).bit_length()\n    summary = IPv4Network((first, prefix), strict=False)\n    exact = list(collapse_addresses(networks)) == [summary]\n    return str(summary), exact\n\n\ndef longest_match(routes, destination):\n    address = IPv4Address(destination)\n    matches = [IPv4Network(route) for route in routes if address in IPv4Network(route)]\n    return str(max(matches, key=lambda n: n.prefixlen)) if matches else None\n\n\nif __name__ == &#x27;__main__&#x27;:\n    for routes in ([&#x27;192.0.2.0/26&#x27;, &#x27;192.0.2.64/26&#x27;],\n                   [&#x27;192.0.2.0/26&#x27;, &#x27;192.0.2.128/26&#x27;]):\n        print(f&#x27;{routes} -&gt; summary, exact = {cover(routes)}&#x27;)\n    print(&#x27;more specific wins:&#x27;, longest_match([&#x27;192.0.2.0/24&#x27;, &#x27;192.0.2.128/25&#x27;], &#x27;192.0.2.150&#x27;))\n</code></pre><p>اگر خروجی متفاوت بود، ورودی و نسخه Python را بررسی کنید. خروجی شاهد اجرای تجهیز یا packet capture نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس",
+   "instructions": "پاسخ‌ها و توضیحات را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "خلاصه دقیق .0/26 و .64/26 کدام است؟",
+   "options": [
+    "192.0.2.0/25",
+    "192.0.2.0/26",
+    "192.0.2.128/25",
+    "192.0.2.0/24"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>این دو بازه مجاور مجموعاً .0 تا .127 را پوشش می‌دهند.</p>"
+  },
+  {
+   "title": "پوشش کمینه .0/26 و .128/26 چیست؟",
+   "options": [
+    "192.0.2.0/25",
+    "192.0.2.0/24",
+    "192.0.2.128/25",
+    "192.0.2.0/26"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>اولی و دومی در دو نیمه /24 هستند و پوشش حفره دارد.</p>"
+  },
+  {
+   "title": "وجود summary برای همه مقصدهای پوشیده چه چیزی را ثابت می‌کند؟",
+   "options": [
+    "همه میزبان‌ها روشن‌اند",
+    "همه مسیرهای برگشت درست‌اند",
+    "به‌تنهایی دسترس‌پذیری هیچ مقصدی را ثابت نمی‌کند",
+    "همه اعلان‌ها معتبرند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>summary فقط پوشش prefix را بیان می‌کند.</p>"
+  },
+  {
+   "title": "برای مقصد .150 بین .0/24 و .128/25 کدام مسیر نصب‌شده انتخاب می‌شود؟",
+   "options": [
+    ".0/24 چون کوتاه‌تر است",
+    "بستگی به DNS دارد",
+    "هیچ‌کدام",
+    " .128/25 چون طولانی‌تر است"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>longest prefix match بین مسیرهای منطبق اعمال می‌شود.</p>"
+  },
+  {
+   "title": "چه چیزی می‌تواند از حلقه برای بخش استفاده‌نشده summary جلوگیری کند؟",
+   "options": [
+    "مسیر discard با طراحی مناسب",
+    "حذف همه routeها",
+    "تغییر DNS",
+    "افزایش MTU"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>discard می‌تواند ترافیک مقصدهای ناموجود را دور بریزد و از برخی حلقه‌ها جلوگیری کند.</p>"
+  },
+  {
+   "title": "آیا دو /26 مجاور همیشه یک /25 دقیق می‌سازند؟",
+   "options": [
+    "بله بدون توجه به مرز",
+    "خیر، هم‌ترازی prefix ضروری است",
+    "بله اگر هر دو مستند باشند",
+    "فقط وقتی DNS مشترک داشته باشند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>دو بازه می‌توانند از دو سمت مرز /25 باشند.</p>"
+  },
+  {
+   "title": "علت blackhole در summary چیست؟",
+   "options": [
+    "حتماً خطای کابل",
+    "همیشه metric پایین",
+    "جذب ترافیک مقصدی که مسیر داخلی مؤثر ندارد",
+    "نبود NAT در همه موارد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>پوشش مقصد الزاما مسیر داخلی قابل استفاده ایجاد نمی‌کند.</p>"
+  },
+  {
+   "title": "اولویت منبع و metric در مقابل longest match چه جایگاهی دارند؟",
+   "options": [
+    "همیشه قبل از prefix مقصد در lookup",
+    "DNS آن‌ها را تعیین می‌کند",
+    "مستقل از routing هستند",
+    "انتخاب مسیر یک prefix و lookup مقصد دو مسئله متمایزند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>قواعد انتخاب منبع برای prefix یکسان به پلتفرم و پروتکل بستگی دارد.</p>"
+  },
+  {
+   "title": "کدام روش طراحی خلاصه‌سازی را تسهیل می‌کند؟",
+   "options": [
+    "تخصیص سلسله‌مراتبی متناسب با توپولوژی",
+    "تخصیص تصادفی بدون ثبت",
+    "اعلان تمام IPv4",
+    "حذف برنامه رشد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>هم‌جواری جغرافیایی/توپولوژیک و طرح آدرس مناسب می‌تواند تجمیع را آسان کند.</p>"
+  },
+  {
+   "title": "192.0.2.0/24 در مثال چه کاربردی دارد؟",
+   "options": [
+    "آدرس production تضمینی",
+    "محدوده مستندسازی",
+    "multicast IPv4",
+    "loopback"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>RFC 5737 آن را برای مثال مستندات رزرو کرده است.</p>"
+  },
+  {
+   "title": "آیا summary اعلام‌شده هنگام خرابی بخشی از شبکه می‌تواند مشکل‌ساز شود؟",
+   "options": [
+    "خیر هرگز",
+    "فقط در IPv6",
+    "بله ممکن است ترافیک مقصد خراب را جذب کند",
+    "خیر چون حتماً خودکار حذف می‌شود"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>رفتار اعلان به طراحی، پروتکل و سیاست مربوط است.</p>"
+  },
+  {
+   "title": "مدل Python این درس چه کاری انجام می‌دهد؟",
+   "options": [
+    "پیکربندی BGP",
+    "تغییر FIB سیستم",
+    "ارسال packet آزمایشی",
+    "محاسبه پوشش و longest match در حافظه"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>هیچ ارتباط شبکه یا پیکربندی تجهیز وجود ندارد.</p>"
+  }
+ ],
+ "meta": {
+  "version": "draft.1",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc4632",
+   "https://www.rfc-editor.org/rfc/rfc1812",
+   "https://www.rfc-editor.org/rfc/rfc5737"
+  ]
+ }
+}
