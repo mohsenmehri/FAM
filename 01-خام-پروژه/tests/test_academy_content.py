@@ -1871,67 +1871,6 @@ if (findNodes(liXss, n => n.tagName === 'SCRIPT' || n.tagName === 'IMG').length 
         self.assertTrue(stages["deploy"].skipped, "deploy should be skipped without approval")
 
 
-class CommandExecutionTests(unittest.TestCase):
-    """اجرای دستورها: native vs مرجع، آنلاین و آفلاین، خروجی و برچسب."""
-
-    def test_cli_responses_object_format(self):
-        """cliResponses هر ورودی باید شیء با output و executable باشد."""
-        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
-        cli = data.get("cliResponses", {})
-        self.assertIsInstance(cli, dict)
-        self.assertGreater(len(cli), 0)
-        for cmd, entry in cli.items():
-            self.assertIsInstance(entry, dict, f"{cmd}: entry is not object")
-            self.assertIn("output", entry, f"{cmd}: missing output")
-            self.assertIn("executable", entry, f"{cmd}: missing executable")
-            self.assertIsInstance(entry["executable"], bool, f"{cmd}: executable is not bool")
-
-    def test_reference_commands_marked_non_executable(self):
-        """فرمان‌های مرجع (show wireless summary, show ap summary, show ip ssh, terraform plan)
-        باید executable=False داشته باشند."""
-        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
-        cli = data.get("cliResponses", {})
-        for cmd in ["show wireless summary", "show ap summary", "show ip ssh", "terraform plan"]:
-            self.assertIn(cmd, cli, f"{cmd}: missing from cliResponses")
-            self.assertIs(cli[cmd]["executable"], False, f"{cmd}: should be non-executable reference")
-            self.assertIsInstance(cli[cmd]["output"], str)
-            self.assertGreater(len(cli[cmd]["output"]), 0, f"{cmd}: output should not be empty")
-
-    def test_native_commands_marked_executable_in_ioscommands(self):
-        """فرمان‌هایnative شبیه‌ساز (show ip interface brief, show vlan brief, show interfaces status)
-        در iosCommands باید executable=True داشته باشند."""
-        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
-        native_cmds = ["show ip interface brief", "show vlan brief", "show interfaces status"]
-        found = set()
-        for lid, les in data["lessons"].items():
-            for c in les.get("iosCommands", []):
-                if c.get("cmd") in native_cmds:
-                    self.assertIs(c.get("executable"), True, f"{c['cmd']}: should be executable")
-                    found.add(c["cmd"])
-        for cmd in native_cmds:
-            self.assertIn(cmd, found, f"{cmd}: not found in any lesson iosCommands")
-
-    def test_offline_html_cli_responses_object_handling(self):
-        """HTML آفلاین نباید رشته را از cliResponses Concat کند (Fix [object Object])."""
-        html = (PACKAGE_ROOT.parent / "FAM-Academy-Offline.html").read_text(encoding="utf-8")
-        self.assertNotIn("ACADEMY.cliResponses[low] + '", html,
-                         "Offline HTML still concatenates cliResponses as string")
-        self.assertIn("const cr = ACADEMY.cliResponses[low]", html,
-                      "Offline HTML missing object destructuring for cliResponses")
-        self.assertIn("cr.output", html,
-                      "Offline HTML missing cr.output access")
-
-    def test_online_appjs_cli_responses_object_handling(self):
-        """app.js آنلاین نباید رشته را از cliResponses Concat کند (Fix [object Object])."""
-        appjs = (ASSET_ROOT / "app.js").read_text(encoding="utf-8")
-        self.assertNotIn("ACADEMY.cliResponses[low] + '", appjs,
-                         "Online app.js still concatenates cliResponses as string")
-        self.assertIn("const cr = ACADEMY.cliResponses[low]", appjs,
-                      "Online app.js missing object destructuring for cliResponses")
-        self.assertIn("cr.output", appjs,
-                      "Online app.js missing cr.output access")
-
-
 class RegressionTests(unittest.TestCase):
     """회귀 테스트: 퀴즈 구조, 그룹화, 저장, HTML 구문, 패리티, 모크 실행 안전성."""
 
@@ -2480,6 +2419,118 @@ console.log(JSON.stringify({
             print('WARNING: Peak exceeded max_concurrent - requires investigation of EquipmentGuard race condition')
         else:
             print('PASS: Peak never exceeded max_concurrent in all runs')
+
+class CommandExecutionTests(unittest.TestCase):
+    """اجرای دستورها: native، مرجع و پشتیبانی‌نشده — آنلاین و آفلاین."""
+
+    def _load_cli_responses(self):
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        return data.get("cliResponses", {})
+
+    def _load_offline_cli_responses(self):
+        """استخراج cliResponses از HTML آفلاین (Embedded JSON)."""
+        html = (PACKAGE_ROOT.parent / "FAM-Academy-Offline.html").read_text(encoding="utf-8")
+        start = html.find('"cliResponses": {')
+        self.assertGreater(start, 0, "cliResponses not found in offline HTML")
+        # The slice already includes outer braces { ... }; do NOT wrap again
+        depth = 1
+        pos = start + len('"cliResponses": {')
+        while depth > 0 and pos < len(html):
+            if html[pos] == '{':
+                depth += 1
+            elif html[pos] == '}':
+                depth -= 1
+            pos += 1
+        cli_json = html[start + len('"cliResponses": '):pos]
+        return json.loads(cli_json)
+
+    def test_cli_responses_object_format_online_and_offline(self):
+        """cliResponses هر ورودی باید شیء {output, executable} باشد (آنلاین و آفلاین)."""
+        for label, cli in [("آنلاین", self._load_cli_responses()),
+                            ("آفلاین", self._load_offline_cli_responses())]:
+            self.assertIsInstance(cli, dict, f"{label}: cliResponses is not dict")
+            self.assertGreater(len(cli), 0, f"{label}: cliResponses is empty")
+            for cmd, entry in cli.items():
+                self.assertIsInstance(entry, dict, f"{label} {cmd}: entry is not object")
+                self.assertIn("output", entry, f"{label} {cmd}: missing output")
+                self.assertIn("executable", entry, f"{label} {cmd}: missing executable")
+                self.assertIsInstance(entry["executable"], bool,
+                                      f"{label} {cmd}: executable is not bool")
+
+    def test_reference_commands_non_executable_with_output(self):
+        """فرمان‌های مرجع باید executable=False و خروجی غیرخالی داشته باشند."""
+        for label, cli in [("آنلاین", self._load_cli_responses()),
+                            ("آفلاین", self._load_offline_cli_responses())]:
+            for cmd in ["show wireless summary", "show ap summary", "show ip ssh",
+                        "terraform plan", "show interfaces Tunnel0"]:
+                self.assertIn(cmd, cli, f"{label} {cmd}: missing from cliResponses")
+                entry = cli[cmd]
+                self.assertIs(entry["executable"], False,
+                              f"{label} {cmd}: should be non-executable reference")
+                self.assertIsInstance(entry["output"], str)
+                self.assertGreater(len(entry["output"]), 0,
+                                   f"{label} {cmd}: output should not be empty")
+
+    def test_native_commands_executable(self):
+        """فرمان‌های.native شبیه‌ساز باید executable=True داشته باشند."""
+        cli = self._load_cli_responses()
+        native_cmds = ["show ip interface brief", "show vlan brief", "show running-config",
+                       "show interfaces status", "ping 10.10.0.2"]
+        for cmd in native_cmds:
+            self.assertIn(cmd, cli, f"{cmd}: missing from cliResponses")
+            self.assertIs(cli[cmd]["executable"], True,
+                          f"{cmd}: should be executable native")
+
+    def test_truly_unsupported_command_not_in_cli_responses(self):
+        """فرمان‌های کاملاً پشتیبانی‌نشده نباید در cliResponses باشند."""
+        cli = self._load_cli_responses()
+        # A command that is neither native nor has a reference entry
+        self.assertNotIn("mpls ldp neighbors", cli,
+                         "mpls ldp neighbors should not be a reference command")
+        self.assertNotIn("show ip sla", cli,
+                         "show ip sla should not be a reference command")
+
+    def test_labels_match_actual_ioscommand_executable(self):
+        """برچسب executable در iosCommands باید با cliResponses تطابق داشته باشد."""
+        data = json.loads((ASSET_ROOT / "academy-data.json").read_text(encoding="utf-8"))
+        cli = self._load_cli_responses()
+        mismatches = []
+        for lid, les in data["lessons"].items():
+            for c in les.get("iosCommands", []):
+                cmd = c.get("cmd", "").strip()
+                if not cmd:
+                    continue
+                exe_in_cmd = c.get("executable")
+                if cmd in cli:
+                    exe_in_cli = cli[cmd]["executable"]
+                    if exe_in_cmd != exe_in_cli:
+                        mismatches.append(f"{lid} {cmd}: iosCommand={exe_in_cmd} cliResponses={exe_in_cli}")
+                else:
+                    # Not in cliResponses → simulator treats as unsupported
+                    if exe_in_cmd is True:
+                        mismatches.append(f"{lid} {cmd}: not in cliResponses but executable=True")
+        self.assertEqual(len(mismatches), 0,
+                         "Label mismatches:\\n" + "\\n".join(mismatches[:20]))
+
+    def test_offline_html_object_handling_no_string_concat(self):
+        """HTML آفلاین نباید رشته را از cliResponses Concat کند ([object Object] fix)."""
+        html = (PACKAGE_ROOT.parent / "FAM-Academy-Offline.html").read_text(encoding="utf-8")
+        self.assertNotIn("ACADEMY.cliResponses[low] + '", html,
+                         "Offline HTML still concatenates cliResponses as string")
+        self.assertIn("const cr = ACADEMY.cliResponses[low]", html)
+        self.assertIn("cr.output", html)
+
+    def test_online_appjs_object_handling_no_string_concat(self):
+        """app.js آنلاین نباید رشته را از cliResponses ConCat کند ([object Object] fix)."""
+        appjs = (ASSET_ROOT / "app.js").read_text(encoding="utf-8")
+        self.assertNotIn("ACADEMY.cliResponses[low] + '", appjs,
+                         "Online app.js still concatenates cliResponses as string")
+        self.assertIn("const cr = ACADEMY.cliResponses[low]", appjs)
+        self.assertIn("cr.output", appjs)
+
+
+if __name__ == "__main__":
+    unittest.main()
 
 if __name__ == "__main__":
     unittest.main()
