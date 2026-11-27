@@ -5,9 +5,13 @@ Validates HLD design assumptions for Pars-Global (3 continents, Frankfurt & Duba
 apart, 100 branches, Multi-Cloud AWS/Azure, PCI-DSS & Pars-Global corporate EU data-residency policy).
 
 Key modeling boundaries:
-- Strict input typing: all boolean inputs MUST be strict Python bool (True/False) — strings like "False"/"True",
-  integers 0/1, and None are explicitly rejected with ValueError so truthy-coercion bugs (e.g. bool("False") == True)
-  cannot silently pass a check. Distances must be positive finite numbers; replication modes and profiles are validated.
+- Strict input typing: all boolean inputs MUST be strict Python bool (True/False) — strings like "False"/"True"/"",
+  integers 0/1, None, lists, and dicts are explicitly rejected with ValueError. Huge integers (e.g. 10**500) that
+  overflow IEEE-754 float are caught and rejected with ValueError (never OverflowError).
+- Named product sync RTT profiles (not generalized across different storage products):
+  * vmware_vsan_stretched: <= 5.0 ms RTT (VMware vSAN Stretched Cluster data-site guideline, version dependent)
+  * netapp_vmsc_snapmirror_active_sync: < 10.0 ms RTT strictly (NetApp vMSC with SnapMirror active sync)
+  * netapp_ontap_select_metrocluster_sds: <= 5.0 ms RTT (+ <= 5.0 ms jitter requirement; ONTAP Select MetroCluster SDS)
 - Latency figures separate ideal straight-line silica fiber propagation (~0.01 ms/km => ~50 ms at 5,000 km),
   illustrative routed-fiber propagation (default 1.4x => ~70 ms), and optional illustrative equipment/path
   overhead (+35 ms default => ~105 ms inside the ~95-130 ms assumed total RTT range) — all explicitly marked as
@@ -15,18 +19,38 @@ Key modeling boundaries:
 - RPO checking in this local model verifies ONLY high-level mode/target compatibility (e.g., async cannot meet RPO=0);
   it does NOT prove real achieved RPO (which depends on WAN bandwidth, write change rate, replication queue depth,
   snapshot cadence, and live DR failover drills).
-- GSLB, L2 blast-radius policy, corporate EU residency policy, and GDPR Chapter V transfer safeguards are modeled
-  as explicit separate inputs. Boolean compliance inputs are unverified HLD assumptions, NOT legal opinions,
-  DPO sign-off, or PCI-DSS QSA audit evidence.
+- Boolean compliance inputs are unverified HLD assumptions, NOT legal opinions, DPO sign-off, or PCI-DSS QSA evidence.
 No real international circuits, storage arrays, or enterprise sites are connected.
 """
 
 import json
 import math
 
-PRODUCT_SYNC_RTT_LIMITS_MS = {
-    "vmware_vsan_stretched": 5.0,
-    "vmware_vmsc_netapp_metrocluster": 10.0,
+PRODUCT_SYNC_PROFILES = {
+    "vmware_vsan_stretched": {
+        "max_rtt_ms": 5.0,
+        "strict_lt": False,
+        "comparator_text": "<= 5.0 ms",
+        "source_note": "VMware vSAN Stretched Cluster data-site RTT ceiling (<= 5 ms; verify exact vSAN release).",
+    },
+    "netapp_vmsc_snapmirror_active_sync": {
+        "max_rtt_ms": 10.0,
+        "strict_lt": True,
+        "comparator_text": "< 10.0 ms",
+        "source_note": (
+            "NetApp vMSC with SnapMirror active sync requires strictly < 10 ms RTT "
+            "(https://docs.netapp.com/us-en/netapp-solutions-virtualization/vmware/vmw-vmsc-with-smas.html)."
+        ),
+    },
+    "netapp_ontap_select_metrocluster_sds": {
+        "max_rtt_ms": 5.0,
+        "strict_lt": False,
+        "comparator_text": "<= 5.0 ms (plus <= 5.0 ms jitter)",
+        "source_note": (
+            "NetApp ONTAP Select MetroCluster SDS requires <= 5 ms RTT and <= 5 ms jitter "
+            "(https://docs.netapp.com/us-en/ontap-select/concept_ha_config.html)."
+        ),
+    },
 }
 
 VALID_REPLICATION_MODES = ("synchronous", "asynchronous")
@@ -58,16 +82,30 @@ def _require_str(design: dict, key: str) -> str:
     return val
 
 
+def _to_finite_float(value: object, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a finite number (not bool), got {value!r}")
+    try:
+        fval = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {value!r}") from exc
+    if not math.isfinite(fval):
+        raise ValueError(f"{name} must be a finite number, got {value!r}")
+    return fval
+
+
 def _require_positive_finite(value: object, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+    fval = _to_finite_float(value, name)
+    if fval <= 0:
         raise ValueError(f"{name} must be a positive finite number, got {value!r}")
-    return float(value)
+    return fval
 
 
 def _require_non_negative_finite(value: object, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+    fval = _to_finite_float(value, name)
+    if fval < 0:
         raise ValueError(f"{name} must be a non-negative finite number, got {value!r}")
-    return float(value)
+    return fval
 
 
 def estimate_fiber_rtt_ms(
@@ -102,13 +140,17 @@ def estimate_fiber_rtt_ms(
     }
 
 
-def validate_pars_global_hld(design: dict, sync_product_profile: str = "vmware_vmsc_netapp_metrocluster") -> dict:
-    if sync_product_profile not in PRODUCT_SYNC_RTT_LIMITS_MS:
+def validate_pars_global_hld(design: dict, sync_product_profile: str = "netapp_vmsc_snapmirror_active_sync") -> dict:
+    if not isinstance(design, dict):
+        raise ValueError(f"design must be a dict, got {type(design).__name__}")
+    if sync_product_profile not in PRODUCT_SYNC_PROFILES:
         raise ValueError(
             f"Unknown sync_product_profile {sync_product_profile!r}; "
-            f"expected one of {sorted(PRODUCT_SYNC_RTT_LIMITS_MS)}"
+            f"expected one of {sorted(PRODUCT_SYNC_PROFILES)}"
         )
 
+    if "dc_distance_km" not in design:
+        raise ValueError("Missing required numeric input 'dc_distance_km'")
     dist_km = _require_positive_finite(design["dc_distance_km"], "dc_distance_km")
     overhead_ms = _require_non_negative_finite(
         design.get("assumed_equipment_and_detour_overhead_ms", 35.0 if dist_km >= 1000 else 1.0),
@@ -116,6 +158,8 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "vmware_v
     )
     target_rpo_min = _require_non_negative_finite(design.get("target_rpo_minutes", 15.0), "target_rpo_minutes")
 
+    if "macro_vrfs" not in design:
+        raise ValueError("Missing required integer input 'macro_vrfs'")
     macro_vrfs = design["macro_vrfs"]
     if isinstance(macro_vrfs, bool) or not isinstance(macro_vrfs, int) or macro_vrfs < 0:
         raise ValueError(f"macro_vrfs must be a non-negative integer, got {macro_vrfs!r}")
@@ -139,9 +183,13 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "vmware_v
 
     checks = []
     rtt_info = estimate_fiber_rtt_ms(dist_km, assumed_equipment_and_detour_overhead_ms=overhead_ms)
-    max_sync_ms = PRODUCT_SYNC_RTT_LIMITS_MS[sync_product_profile]
-    # Evaluate sync product feasibility against assumed total end-to-end RTT
-    sync_feasible_for_profile = rtt_info["assumed_total_end_to_end_rtt_ms"] <= max_sync_ms
+    profile = PRODUCT_SYNC_PROFILES[sync_product_profile]
+    max_sync_ms = profile["max_rtt_ms"]
+    assumed_rtt = rtt_info["assumed_total_end_to_end_rtt_ms"]
+    if profile["strict_lt"]:
+        sync_feasible_for_profile = assumed_rtt < max_sync_ms
+    else:
+        sync_feasible_for_profile = assumed_rtt <= max_sync_ms
 
     rep_mode_valid = rep_mode in VALID_REPLICATION_MODES
     if not rep_mode_valid:
@@ -165,20 +213,20 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "vmware_v
         )
     elif sync_feasible_for_profile:
         dci_reasons.append(
-            f"Assumed total RTT (~{rtt_info['assumed_total_end_to_end_rtt_ms']} ms; propagation min "
-            f"{rtt_info['propagation_only_min_rtt_ms']} ms) is within {sync_product_profile} ceiling "
-            f"({max_sync_ms} ms); selected mode '{rep_mode}' is supported for this profile."
+            f"Assumed total RTT (~{assumed_rtt} ms; propagation min "
+            f"{rtt_info['propagation_only_min_rtt_ms']} ms) satisfies {sync_product_profile} limit "
+            f"({profile['comparator_text']}); selected mode '{rep_mode}' is supported for this profile."
         )
     elif replication_ok:
         dci_reasons.append(
-            f"Assumed total RTT (~{rtt_info['assumed_total_end_to_end_rtt_ms']} ms; routed propagation "
-            f"~{rtt_info['routed_propagation_only_rtt_ms']} ms) exceeds {sync_product_profile} ceiling "
-            f"({max_sync_ms} ms); asynchronous replication appropriately selected."
+            f"Assumed total RTT (~{assumed_rtt} ms; routed propagation "
+            f"~{rtt_info['routed_propagation_only_rtt_ms']} ms) violates {sync_product_profile} limit "
+            f"({profile['comparator_text']}); asynchronous replication appropriately selected."
         )
     else:
         dci_reasons.append(
-            f"REJECTED: assumed total RTT (~{rtt_info['assumed_total_end_to_end_rtt_ms']} ms) exceeds "
-            f"{sync_product_profile} sync ceiling ({max_sync_ms} ms); switch to asynchronous replication."
+            f"REJECTED: assumed total RTT (~{assumed_rtt} ms) violates "
+            f"{sync_product_profile} sync limit ({profile['comparator_text']}); switch to asynchronous replication."
         )
 
     if rep_mode_valid:
@@ -205,6 +253,8 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "vmware_v
     checks.append({
         "domain": f"DCI, Storage Profile, RPO & GSLB ({dist_km:g} km great-circle)",
         "product_sync_profile": sync_product_profile,
+        "product_sync_limit": profile["comparator_text"],
+        "product_sync_source_note": profile["source_note"],
         "product_max_sync_rtt_ms": max_sync_ms,
         **rtt_info,
         "storage_replication": rep_mode,
@@ -291,6 +341,7 @@ def validate_pars_global_hld(design: dict, sync_product_profile: str = "vmware_v
 
     checks.append({
         "domain": "Segmentation, Encryption & EU Data-Governance Assumptions (PCI-DSS + GDPR Chapter V)",
+        "macro_vrfs": macro_vrfs,
         "macro_vrfs_ok": 3 <= macro_vrfs <= 6,
         "micro_sgt_enabled": micro_sgt_enabled,
         "eu_residency_policy_enforced": eu_policy_enforced,
@@ -350,7 +401,7 @@ def main() -> None:
     }
 
     res_rejected = validate_pars_global_hld(rejected_initial_proposal, "vmware_vsan_stretched")
-    res_approved = validate_pars_global_hld(approved_pars_global_hld, "vmware_vmsc_netapp_metrocluster")
+    res_approved = validate_pars_global_hld(approved_pars_global_hld, "netapp_vmsc_snapmirror_active_sync")
     res_metro = validate_pars_global_hld(metro_sync_feasible_example, "vmware_vsan_stretched")
     res_bad_mode = validate_pars_global_hld(invalid_mode_example, "vmware_vsan_stretched")
 
@@ -358,17 +409,21 @@ def main() -> None:
     assert res_approved["all_architectural_checks_passed"] is True
     assert res_metro["all_architectural_checks_passed"] is True
     assert res_metro["domain_validations"][0]["sync_feasible_for_profile"] is True
-    assert "exceeds" not in res_metro["domain_validations"][0]["note"]
+    assert "violates" not in res_metro["domain_validations"][0]["note"]
     assert res_bad_mode["all_architectural_checks_passed"] is False
     assert "unsupported storage_replication mode" in res_bad_mode["domain_validations"][0]["note"]
     assert "is supported" not in res_bad_mode["domain_validations"][0]["note"]
 
-    # Negative check: non-bool string "False" MUST raise ValueError (never silently coerce via bool("False") == True!)
-    try:
-        validate_pars_global_hld({**approved_pars_global_hld, "gslb_enabled": "False"})
-        raise AssertionError("gslb_enabled='False' should have raised ValueError")
-    except ValueError:
-        pass
+    # Negative check: non-bool string "False" and huge int 10**500 MUST raise ValueError
+    for bad_input in (
+        {**approved_pars_global_hld, "gslb_enabled": "False"},
+        {**approved_pars_global_hld, "dc_distance_km": 10**500},
+    ):
+        try:
+            validate_pars_global_hld(bad_input)
+            raise AssertionError(f"Expected ValueError for {bad_input!r}")
+        except ValueError:
+            pass
 
     report = {
         "mode": "LOCAL_MOCK_CCDE_CAPSTONE_PARS_GLOBAL",

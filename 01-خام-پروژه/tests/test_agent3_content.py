@@ -431,7 +431,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             "chapter_v_transfer_safeguard": None,
             "encryption_in_transit_assumed": True,
         }
-        res_ok = c18_mod.validate_pars_global_hld(base_ok, "vmware_vmsc_netapp_metrocluster")
+        res_ok = c18_mod.validate_pars_global_hld(base_ok, "netapp_vmsc_snapmirror_active_sync")
         self.assertTrue(res_ok["all_architectural_checks_passed"])
         self.assertIn("unverified HLD design assumptions", res_ok["domain_validations"][3]["assumption_disclaimer"])
         self.assertIn("not legal opinions", res_ok["domain_validations"][3]["assumption_disclaimer"])
@@ -446,7 +446,8 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertTrue(dci_metro["sync_feasible_for_profile"])
         self.assertTrue(dci_metro["replication_ok"])
         self.assertTrue(dci_metro["l2_stretch_policy_ok"])
-        self.assertIn("within", dci_metro["note"])
+        self.assertIn("satisfies", dci_metro["note"])
+        self.assertNotIn("violates", dci_metro["note"])
         self.assertNotIn("exceeds", dci_metro["note"])
 
         # Metro distance with L2 stretched: replication_ok is True, l2_stretch_policy_ok is False
@@ -881,7 +882,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             a20.z_score(68.0, [22.0, 22.0, 22.0])
         with self.assertRaises(ValueError):
-            a20.remediation_decision("shift", 1, 1.5, False)
+            a20.remediation_decision("shift_single_branch_sdwan_path", 1, 1.5, False)
 
     def test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs(self):
         """Phase 8A: ccde_18 dynamic macro_vrfs + empty/container bool rejections + 5 Specialist Core labs."""
@@ -1180,6 +1181,94 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             c14.model_east_west_firewall_bottleneck(100.0, 40.0, 1.2)
         with self.assertRaises(ValueError):
             c14.model_east_west_firewall_bottleneck(100.0, 0.0, 0.5)
+
+    def test_phase9_agent_handoff_ccde18_and_auto20_fixes(self):
+        """Phase 9: verify all AGENT-HANDOFF-fa.md @ 53871318 items on ccde_18 and auto_20."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. ccde_18: 10**500 -> ValueError (NOT OverflowError), exact NetApp profiles & strict < 10 ms boundary
+        c18 = load_module(AGENT3_LAB_DIR / "ccde_18_lab.py", "ccde_18_phase9_testmod")
+        base_c18 = {
+            "dc_distance_km": 5000,
+            "storage_replication": "asynchronous",
+            "target_rpo_minutes": 15,
+            "dci_l2_stretched": False,
+            "gslb_enabled": True,
+            "wan_model": "hybrid_sdwan_regional_hubs_plus_sase",
+            "cloud_hub": "dual_colo_cloud_exchange_direct_connect",
+            "macro_vrfs": 4,
+            "micro_sgt_enabled": True,
+            "eu_residency_policy_enforced": True,
+            "eu_personal_data_transferred_outside_eea": False,
+            "chapter_v_transfer_safeguard": None,
+            "encryption_in_transit_assumed": True,
+        }
+        with self.assertRaises(ValueError):
+            c18.validate_pars_global_hld({**base_c18, "dc_distance_km": 10**500})
+        with self.assertRaises(ValueError):
+            c18.validate_pars_global_hld({**base_c18, "target_rpo_minutes": 10**500})
+        with self.assertRaises(ValueError):
+            c18.validate_pars_global_hld(base_c18, "vmware_vmsc_netapp_metrocluster")
+
+        # Strict < 10.0 ms on netapp_vmsc_snapmirror_active_sync: 10.0 ms exact is NOT feasible, 9.9 ms IS feasible
+        exact_10ms = {
+            **base_c18,
+            "dc_distance_km": 500,  # 500 * 0.01 * 1.4 = 7.0 ms routed prop + 3.0 ms overhead = 10.0 ms exact
+            "assumed_equipment_and_detour_overhead_ms": 3.0,
+            "storage_replication": "synchronous",
+            "target_rpo_minutes": 0,
+        }
+        r_10 = c18.validate_pars_global_hld(exact_10ms, "netapp_vmsc_snapmirror_active_sync")
+        self.assertEqual(r_10["domain_validations"][0]["assumed_total_end_to_end_rtt_ms"], 10.0)
+        self.assertFalse(r_10["domain_validations"][0]["sync_feasible_for_profile"])
+        self.assertFalse(r_10["all_architectural_checks_passed"])
+
+        under_10ms = {**exact_10ms, "assumed_equipment_and_detour_overhead_ms": 2.9}
+        r_99 = c18.validate_pars_global_hld(under_10ms, "netapp_vmsc_snapmirror_active_sync")
+        self.assertEqual(r_99["domain_validations"][0]["assumed_total_end_to_end_rtt_ms"], 9.9)
+        self.assertTrue(r_99["domain_validations"][0]["sync_feasible_for_profile"])
+        self.assertTrue(r_99["all_architectural_checks_passed"])
+
+        # ONTAP Select MetroCluster SDS: <= 5.0 ms feasible, > 5.0 ms rejected
+        at_5ms = {**exact_10ms, "dc_distance_km": 200, "assumed_equipment_and_detour_overhead_ms": 2.2}  # 2.8 + 2.2 = 5.0
+        r_sds_ok = c18.validate_pars_global_hld(at_5ms, "netapp_ontap_select_metrocluster_sds")
+        self.assertTrue(r_sds_ok["domain_validations"][0]["sync_feasible_for_profile"])
+        over_5ms = {**at_5ms, "assumed_equipment_and_detour_overhead_ms": 2.3}
+        r_sds_fail = c18.validate_pars_global_hld(over_5ms, "netapp_ontap_select_metrocluster_sds")
+        self.assertFalse(r_sds_fail["domain_validations"][0]["sync_feasible_for_profile"])
+
+        # 2. auto_20: z_score rejects NaN/Inf/bool/10**500; remediation_decision allowlist + simulation_only + causal_caveat
+        a20 = load_module(AGENT3_LAB_DIR / "auto_20_lab.py", "auto_20_phase9_testmod")
+        for bad_base in (
+            [10.0, float("nan"), 12.0],
+            [10.0, float("inf"), 12.0],
+            [10.0, float("-inf"), 12.0],
+            [10.0, True, 12.0],
+            [10.0, False, 12.0],
+            [10.0, 10**500, 12.0],
+        ):
+            with self.assertRaises(ValueError):
+                a20.z_score(20.0, bad_base)
+        with self.assertRaises(ValueError):
+            a20.z_score(10**500, [10.0, 12.0])
+
+        for bad_action in ("destroy_everything", "", None, 123, "drop_database"):
+            with self.assertRaises(ValueError):
+                a20.remediation_decision(bad_action, 0, 0.95, False)
+
+        sim_ok = a20.remediation_decision("shift_single_branch_sdwan_path", 1, 0.95, False)
+        self.assertTrue(sim_ok["simulation_only"])
+        self.assertTrue(sim_ok["simulated_execution_allowed"])
+        self.assertNotIn("executed", sim_ok)
+
+        rca = a20.correlate_root_cause({"HUB-WEST"}, [{"branch_id": "BR-1", "hub": "HUB-WEST"}])
+        self.assertIn("heuristic", rca["causal_caveat"].lower())
 
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))

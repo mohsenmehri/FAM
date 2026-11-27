@@ -214,4 +214,15 @@
 | CCDE | `ccde_11` | `ZeroDivisionError` روی cap/capacity صفر و برچسب ثابت `50pct`. | Capacity Planning 5D | بازه `(0, 1]` برای cap، ظرفیت مثبت و پویاسازی کلید خروجی. | `test_phase8d_remaining_ccde_labs` | مدل محلی؛ بازبینی نویسنده. |
 | CCDE | `ccde_14` | عبور `"False"` در `audit_zero_trust_pillars` (گزارش غلط ZERO_TRUST_ALIGNED)، `offload > 1.0` و «تضمین می‌کند» در بخش ۹. | NIST SP 800-207 | بررسی سخت‌گیرانه `bool`، بازه `[0.0, 1.0]` و تعدیل بخش ۹. | `test_phase8d_remaining_ccde_labs` | مدل محلی؛ بازبینی نویسنده. |
 
+---
+
+## بخش ۹: بازبینی فنی فاز ۹ (2026-11-27 — پیگیری کامل یافته‌های `AGENT-HANDOFF-fa.md` @ `53871318` برای `ccde_18` و `auto_20`)
+
+در پی انتشار دفتر هماهنگی `01-خام-پروژه/academy-labs/reviews/AGENT-HANDOFF-fa.md` روی شاخه Agent 2 (`arena/ab96c97c-fam` @ `538713183a39314a16f0308f63be1ff489fd4522`)، هر دو مجموعه ایراد اختصاصی ثبت‌شده برای ایجنت سوم بی‌درنگ رفع شدند:
+
+| دسته | شناسه درس | ایراد ثبت‌شده در `AGENT-HANDOFF-fa.md` | منبع معتبر | اصلاح انجام‌شده | تست مرتبط | محدودیت |
+|---|---|---|---|---|---|---|
+| پیگیری Handoff | `ccde_18` | ۱) تعمیم نام و مرز `<= 10ms` به‌جای سند دقیق محصول؛ ۲) پرتاب `OverflowError` روی `10**500` به‌جای `ValueError`. (پیام پویا برای `macro_vrfs` در فاز ۸A رفع شده بود.) | NetApp vMSC with SnapMirror active sync (`< 10ms`) و ONTAP Select MetroCluster SDS (`<= 5ms` RTT/jitter) | تفکیک ۳ پروفایل دقیق محصولی با مقایسه اکید `< 10.0` برای SnapMirror active sync، تبدیل `OverflowError` به `ValueError` و هم‌ترازی متن و Q1. | `test_phase9_agent_handoff_ccde18_and_auto20_fixes` | اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل). |
+| پیگیری Handoff | `auto_20` | ۱) پذیرش `NaN`/`Infinity`/`bool` در `baseline` تابع `z_score`؛ ۲) پذیرش اقدام دلخواه/خالی/`None` مثل `'destroy_everything'` با `executed: true`؛ ۳) شفاف‌سازی شبیه‌سازی و همبستگی در برابر علیت. | `AGENT-HANDOFF-fa.md`، IEEE-754 و AIOps Allowlist | `_require_finite_num` روی کل `baseline`، اعمال `ALLOWED_REMEDIATION_ACTIONS`، خروجی `simulation_only=True`/`simulated_execution_allowed` و افزودن `causal_caveat`. | `test_phase9_agent_handoff_ccde18_and_auto20_fixes` | شبیه‌ساز محلی بدون کنترلر/ML زنده؛ بازبینی نویسنده (نه مستقل). |
+
 > **یادآوری پایانی:** با وجود این ممیزی فنی و معنایی عمیق و آزمون‌های رگرسیون خودکار، این گزارش همچنان **بازبینی نویسنده** است و پیش از انتشار رسمی عمومی، **بازبینی مستقل توسط متخصص شبکه/امنیت انسانی (Independent Human SME Review)** توصیه می‌شود.

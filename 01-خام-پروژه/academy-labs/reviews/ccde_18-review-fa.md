@@ -42,3 +42,10 @@
 - **اصلاح انجام‌شده:** پویاسازی پیام به `{macro_vrfs} Macro VRFs` و افزودن زیرتست‌های `''`، `[]` و `{}` روی هر ۶ ورودی بولی.
 - **تست مرتبط:** `test_phase8a_ccde18_dynamic_vrf_and_specialist_core_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل) و جایگزین تست زنده DR یا DPO/QSA نیست.
+
+## بازبینی فنی فاز ۹ (2026-11-27 — پاسخ به `AGENT-HANDOFF-fa.md` @ `53871318`)
+- **ایراد:** تعمیم نام پروفایل `vmware_vmsc_netapp_metrocluster=10ms` و مقایسه `<=` به‌جای مرز دقیق سند محصول؛ و پرتاب `OverflowError` به‌جای `ValueError` روی عدد صحیح بسیار بزرگ (`10**500`) در `math.isfinite`.
+- **منابع معتبر:** [NetApp vMSC with SnapMirror active sync](https://docs.netapp.com/us-en/netapp-solutions-virtualization/vmware/vmw-vmsc-with-smas.html) (`< 10 ms` اکید) و [NetApp ONTAP Select MetroCluster SDS](https://docs.netapp.com/us-en/ontap-select/concept_ha_config.html) (`<= 5 ms` RTT و `<= 5 ms` jitter).
+- **اصلاح انجام‌شده:** جایگزینی با سه پروفایل دقیق و مستند (`vmware_vsan_stretched`, `netapp_vmsc_snapmirror_active_sync` با `< 10.0`, `netapp_ontap_select_metrocluster_sds` با `<= 5.0`)، تبدیل `OverflowError` به `ValueError` و هم‌ترازی متن `ccde_18.json` (بخش و Q1).
+- **تست مرتبط:** `test_phase9_agent_handoff_ccde18_and_auto20_fixes` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** اعتبارسنج محلی Python 3؛ بازبینی نویسنده (نه مستقل) و منتظر بازبینی مستقل Agent 2 روی کل متن و ۱۲ سؤال.

@@ -11,3 +11,10 @@
 - **اصلاح انجام‌شده:** اعمال `_require_bool` روی `human_approved`، اعتبارسنجی بازه `confidence in [0,1]` و `impacted_branches >= 0`، و نگهبان `len(baseline) >= 2` / واریانس صفر در `z_score`.
 - **تست مرتبط:** `test_phase7_strict_boolean_typing_and_remaining_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** شبیه‌ساز محلی ۵۰۰ شعبه بدون کنترلر یا کلاستر ML زنده؛ بازبینی نویسنده (نه مستقل).
+
+## بازبینی فنی فاز ۹ (2026-11-27 — پاسخ به `AGENT-HANDOFF-fa.md` @ `53871318`)
+- **ایراد:** `z_score` مقادیر `NaN`/`Infinity`/`bool` در `baseline` را رد نمی‌کرد؛ `remediation_decision` اقدام‌های دلخواه/خالی/`None` مثل `'destroy_everything'` را با `executed: true` می‌پذیرفت؛ و لازم بود شبیه‌سازی‌بودن دروازه و اکتشافی‌بودن همبستگی هاب/شعبه صریح شود.
+- **منبع معتبر:** `AGENT-HANDOFF-fa.md` (شاخه Agent 2 @ `53871318`)، Python Data Model / IEEE-754 و اصول ایمنی AIOps Allowlist.
+- **اصلاح انجام‌شده:** اعمال `_require_finite_num` روی `value` و تک‌تک اعضای `baseline` (رد `NaN`/`Inf`/`bool`/`10**500`)، اعمال `ALLOWED_REMEDIATION_ACTIONS`، خروجی صریح `simulation_only=True`/`simulated_execution_allowed` و افزودن `causal_caveat` در `correlate_root_cause`.
+- **تست مرتبط:** `test_phase9_agent_handoff_ccde18_and_auto20_fixes` در `01-خام-پروژه/tests/test_agent3_content.py`.
+- **محدودیت:** شبیه‌ساز محلی بدون کنترلر SD-WAN یا کلاستر ML زنده؛ بازبینی نویسنده (نه مستقل).
