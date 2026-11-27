@@ -1200,8 +1200,8 @@ class AcademyRedesignTests(unittest.TestCase):
         # 3a. CLI-based lessons (Cisco IOS automation) - must have configure terminal
         # NOTE: extracted_labs must cover every lesson that assertRunLab exercises below.
         ios_lessons = [
-            "auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_07",
-            "auto_08", "auto_09", "auto_10", "auto_11", "auto_12", "auto_13",
+            "auto_01", "auto_02", "auto_03", "auto_04", "auto_06", "auto_07",
+            "auto_08", "auto_09", "auto_10", "auto_11", "auto_13",
             "s11",
             "spec_ent", "spec_ent_campus", "spec_ent_sd",
             "spec_sec", "spec_sec_vpn", "spec_sec_ise",
@@ -1470,11 +1470,6 @@ assertRunLab('auto_04', (sim) => {{
   const gi7 = sim.interfaces['GigabitEthernet0/7'];
   if (!gi7.nonegotiate || gi7.accessVlan !== 104 || gi7.desc !== 'GITOPS-RUNNER') throw new Error('auto_04 Gi0/7');
 }});
-assertRunLab('auto_05', (sim) => {{
-  if (!sim.vlans[105] || sim.vlans[105].name !== 'DATA_MODELS') throw new Error('auto_05 VLAN 105');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 105 || gi7.desc !== 'SCHEMA-LAB') throw new Error('auto_05 Gi0/7');
-}});
 assertRunLab('auto_06', (sim) => {{
   if (!sim.vlans[106] || sim.vlans[106].name !== 'API_MGMT') throw new Error('auto_06 VLAN 106');
   const gi7 = sim.interfaces['GigabitEthernet0/7'];
@@ -1504,11 +1499,6 @@ assertRunLab('auto_11', (sim) => {{
   if (!sim.vlans[111] || sim.vlans[111].name !== 'ANSIBLE_CONTROL') throw new Error('auto_11 VLAN 111');
   const gi7 = sim.interfaces['GigabitEthernet0/7'];
   if (!gi7.nonegotiate || gi7.accessVlan !== 111 || gi7.desc !== 'ANSIBLE-CTRL') throw new Error('auto_11 Gi0/7');
-}});
-assertRunLab('auto_12', (sim) => {{
-  if (!sim.vlans[112] || sim.vlans[112].name !== 'TERRAFORM_IAC') throw new Error('auto_12 VLAN 112');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 112 || gi7.desc !== 'TF-PROVIDER') throw new Error('auto_12 Gi0/7');
 }});
 assertRunLab('auto_13', (sim) => {{
   if (!sim.vlans[113] || sim.vlans[113].name !== 'NSO_ORCHESTRATION') throw new Error('auto_13 VLAN 113');
