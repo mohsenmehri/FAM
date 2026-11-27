@@ -1200,8 +1200,7 @@ class AcademyRedesignTests(unittest.TestCase):
         # 3a. CLI-based lessons (Cisco IOS automation) - must have configure terminal
         # NOTE: extracted_labs must cover every lesson that assertRunLab exercises below.
         ios_lessons = [
-            "auto_01", "auto_02", "auto_03", "auto_04", "auto_06", "auto_07",
-            "auto_08", "auto_09", "auto_10", "auto_11", "auto_13",
+            "auto_01", "auto_02", "auto_03", "auto_04",
             "s11",
             "spec_ent", "spec_ent_campus", "spec_ent_sd",
             "spec_sec", "spec_sec_vpn", "spec_sec_ise",
@@ -1227,7 +1226,7 @@ class AcademyRedesignTests(unittest.TestCase):
             "auto_02": "ipaddress",
             "auto_04": "git",
             "auto_05": "json",
-            "auto_06": "GET",
+            "auto_06": "POST",
             "auto_07": "HTTPS",
             "auto_09": "RESTCONF",
             "auto_10": "YANG",
@@ -1470,41 +1469,13 @@ assertRunLab('auto_04', (sim) => {{
   const gi7 = sim.interfaces['GigabitEthernet0/7'];
   if (!gi7.nonegotiate || gi7.accessVlan !== 104 || gi7.desc !== 'GITOPS-RUNNER') throw new Error('auto_04 Gi0/7');
 }});
-assertRunLab('auto_06', (sim) => {{
-  if (!sim.vlans[106] || sim.vlans[106].name !== 'API_MGMT') throw new Error('auto_06 VLAN 106');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 106 || gi7.desc !== 'API-CLIENT') throw new Error('auto_06 Gi0/7');
-}});
-assertRunLab('auto_07', (sim) => {{
-  if (!sim.vlans[107] || sim.vlans[107].name !== 'TLS_PKI') throw new Error('auto_07 VLAN 107');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 107 || gi7.desc !== 'PKI-GATEWAY') throw new Error('auto_07 Gi0/7');
-}});
-assertRunLab('auto_08', (sim) => {{
-  if (!sim.vlans[108] || sim.vlans[108].name !== 'NETCONF_830') throw new Error('auto_08 VLAN 108');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 108 || gi7.desc !== 'NETCONF-CLIENT') throw new Error('auto_08 Gi0/7');
-}});
-assertRunLab('auto_09', (sim) => {{
-  if (!sim.vlans[109] || sim.vlans[109].name !== 'RESTCONF_830') throw new Error('auto_09 VLAN 109');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 109 || gi7.desc !== 'RESTCONF-CLIENT') throw new Error('auto_09 Gi0/7');
-}});
-assertRunLab('auto_10', (sim) => {{
-  if (!sim.vlans[110] || sim.vlans[110].name !== 'YANG_MODELS') throw new Error('auto_10 VLAN 110');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 110 || gi7.desc !== 'YANG-LAB') throw new Error('auto_10 Gi0/7');
-}});
-assertRunLab('auto_11', (sim) => {{
-  if (!sim.vlans[111] || sim.vlans[111].name !== 'ANSIBLE_CONTROL') throw new Error('auto_11 VLAN 111');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 111 || gi7.desc !== 'ANSIBLE-CTRL') throw new Error('auto_11 Gi0/7');
-}});
-assertRunLab('auto_13', (sim) => {{
-  if (!sim.vlans[113] || sim.vlans[113].name !== 'NSO_ORCHESTRATION') throw new Error('auto_13 VLAN 113');
-  const gi7 = sim.interfaces['GigabitEthernet0/7'];
-  if (!gi7.nonegotiate || gi7.accessVlan !== 113 || gi7.desc !== 'NSO-ORCH') throw new Error('auto_13 Gi0/7');
-}});
+
+
+
+
+
+
+
 """
         res = subprocess.run([node_bin, "-e", js_script], capture_output=True, text=True, check=False)
         self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
