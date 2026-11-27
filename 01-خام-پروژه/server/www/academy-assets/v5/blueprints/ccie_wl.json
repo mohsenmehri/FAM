@@ -1,343 +1,343 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "ccie_wl",
- "objectiveId": "ccie_wl",
- "kind": "lesson",
- "track": "CCIE",
- "course": "ccie-wireless",
- "title": "۸.۵ CCIE Enterprise Wireless: معماری ۳تگی Catalyst 9800، RadioActive Tracing و QoS بی‌سیم",
- "titleEn": "CCIE Enterprise Wireless (350-101 WLCOR + 8-Hour Lab v1.1): Catalyst 9800 3-Tag Model, RadioActive Trace & WMM",
- "domain": "Wireless Expert",
- "source": "Legacy ccie_wl rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 60,
- "prerequisites": [
-  "spec_wl",
-  "spec_wl_survey"
- ],
- "sections": [
-  {
-   "id": "ccie_wl-section-1",
-   "title": "مسئله واقعی: چرا مهندسان باتجربه AireOS هنگام مواجهه با کنترلر Catalyst 9800 (IOS-XE) در لب CCIE Wireless غافلگیر می‌شوند؟",
-   "html": "<p>در آزمون عملی <strong>CCIE Wireless v1.1</strong> (نام سابق: CCIE Enterprise Wireless؛ با آزمون کتبی جدید <code>350-101 WLCOR</code> که از مارس ۲۰۲۶ جایگزین <code>350-401 ENCOR</code> شد)، کنترلر کلاسیک AireOS کاملاً جای خود را به <strong>Cisco Catalyst 9800 (مبتنی بر IOS-XE)</strong> همراه با <strong>Catalyst Center (DNAC)</strong>، <strong>Cisco ISE</strong> و اکسس‌پوینت‌های Wi-Fi 6/6E داده است! در Catalyst 9800 دیگر AP Group قدیمی وجود ندارد و همه چیز بر پایه <strong>مدل ماژولار ۳تگی (Policy Tag، Site Tag و RF Tag)</strong> کار می‌کند — و یکی از پرتکرارترین علل «پخش نشدن SSID» در روز آزمون، فراموش کردن اتصال صحیح همین ۳ تگ به AP است!</p>"
-  },
-  {
-   "id": "ccie_wl-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر WLC/CAPWAP، 802.11ax و RF Site Survey در درس‌های <code>spec_wl</code> و <code>spec_wl_survey</code>.</p><ul><li>تسلط کامل بر ساختار ماژولار ۳تگی <strong>Cisco Catalyst 9800 (Policy Tag، Site Tag و RF Tag)</strong> و استقرارهای Local، FlexConnect و Fabric-Enabled (SD-Access Wireless).</li><li>عیب‌یابی فوق‌سریع چرخه اتصال کلاینت با <strong>RadioActive Tracing</strong> (<code>debug wireless mac &lt;MAC&gt; internal</code>) و تحلیل 802.1X/ISE/DHCP.</li><li>طراحی و تایید <strong>QoS بی‌سیم (802.11e WMM و نگاشت RFC 8325 DSCP-to-UP)</strong>، <strong>Fast Roaming (802.11r/k/v)</strong> و <strong>Multicast-to-Unicast</strong>.</li><li>تبیین اصل طلایی <strong>حذف خطای لایه ۱ RF پیش از دست‌کاری تنظیمات WLC</strong> و خودکارسازی Catalyst 9800 با NETCONF/RESTCONF/YANG.</li></ul>"
-  },
-  {
-   "id": "ccie_wl-section-3",
-   "title": "معماری ۳تگی Catalyst 9800 (IOS-XE): قلب تپنده بخش Deploy لب CCIE Wireless",
-   "html": "<p>در Catalyst 9800، هر تنظیم به دو لایه <strong>Profile</strong> و <strong>Tag</strong> جدا شده است تا استفاده مجدد (Reusability) حداکثر شود:</p><ol><li><strong>Policy Tag:</strong> هر <code>WLAN Profile</code> (نام SSID و امنیت WPA2/WPA3/802.1X) را به یک <code>Policy Profile</code> (VLAN کلاینت، Central در برابر Local Switching، QoS و Session Timeout) متصل می‌کند.</li><li><strong>Site Tag:</strong> وضعیت <code>Local Site</code> (حالت Local Mode) در برابر <code>FlexConnect</code> (همراه <code>Flex Profile</code> برای نگاشت VLAN محلی شعبه) و <code>AP Join Profile</code> (تایمرهای CAPWAP، SSH و LED) را تعیین می‌کند.</li><li><strong>RF Tag:</strong> پروفایل‌های رادیویی <code>2.4 GHz</code>، <code>5 GHz</code> و <code>6 GHz</code> (کانال‌های مجاز DCA، توان TPC و نرخ‌های پایه) را به AP می‌بندد.</li></ol><p><strong>نکته طلایی:</strong> تغییر Site Tag باعث ریستارت شدن CAPWAP روی AP می‌شود، اما تغییر Policy Tag و RF Tag بدون قطع CAPWAP اعمال می‌گردد! همچنین می‌توان اتصال تگ‌ها را با <strong>Policy/Site/RF Tag Filter (Regex بر اساس نام AP)</strong> خودکار کرد.</p>"
-  },
-  {
-   "id": "ccie_wl-section-4",
-   "title": "نمودار معماری ۳تگی Catalyst 9800، RadioActive Tracing و QoS بی‌سیم",
-   "html": "<p>نمودار زیر ساختار ماژولار سه تگ Catalyst 9800، ابزار RadioActive Tracing و اولویت لایه ۱ RF در دیباگ را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCIE Enterprise Wireless v1.1: Catalyst 9800 3-Tag Modular Architecture, RadioActive Tracing and WMM QoS\"><rect x=\"14\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"130\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">1. Policy Tag</text><text x=\"130\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Maps WLAN Profile (SSID/Sec)</text><text x=\"130\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">-&gt; Policy Profile (VLAN/QoS/ACL)</text><text x=\"130\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Central vs Local Switching</text><rect x=\"264\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">2. Site Tag</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Local Mode vs FlexConnect Site</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">+ AP Join Profile (CAPWAP/LED)</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">+ Flex Profile (VLAN Mapping)</text><rect x=\"514\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"630\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">3. RF Tag</text><text x=\"630\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">5 GHz &amp; 2.4 GHz RF Profiles</text><text x=\"630\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">RRM DCA / TPC / Min Data Rates</text><text x=\"630\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">6 GHz Profile (Wi-Fi 6E)</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"64\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">Bound to Every AP -&gt; RadioActive Tracing (debug wireless mac &lt;MAC&gt; internal) + WMM QoS (EF-&gt;UP 6)</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Always Verify RF Layer 1 First (SNR/Interference), Then 3-Tag Binding, Then 802.1X/DHCP Trace!</text></svg>"
-  },
-  {
-   "id": "ccie_wl-section-5",
-   "title": "اسلحه مخفی دیباگ در لب CCIE Wireless: ابزار RadioActive Tracing",
-   "html": "<p>در کنترلر قدیمی AireOS، دیباگ کردن یک کلاینت با <code>debug client &lt;MAC&gt;</code> روی CLI پر از متن‌های پراکنده و گمراه‌کننده بود. در <strong>Catalyst 9800 (IOS-XE)</strong> فرمان جادویی <strong>RadioActive Tracing</strong> (<code>debug wireless mac &lt;aaaa.bbbb.cccc&gt; internal</code> یا از منوی <code>Troubleshooting -&gt; Radioactive Trace</code> در GUI) تمام لاگ‌های همه فرآیندهای داخلی WLC (از 802.11 Auth/Assoc تا 802.1X EAP با ISE، دریافت IP از DHCP و اختصاص SGT) را <em>فقط برای همان MAC</em> در یک فایل متنی واحد و تمیز جمع می‌کند و دقیقاً خطای مرحله شکست (مثلاً <code>IP_LEARN_TIMEOUT</code> یا <code>EAP_FAILURE</code>) را با دلیل آن نشان می‌دهد!</p>"
-  },
-  {
-   "id": "ccie_wl-section-6",
-   "title": "قانون طلایی دیباگ بی‌سیم: چرا همیشه ابتدا لایه ۱ RF را قبل از WLC بررسی می‌کنیم؟",
-   "html": "<p>بسیاری از مشکلات ظاهراً نرم‌افزاری (مثل شکست 802.1X Timeout، قطع شدن Roaming، یا افت صدای تماس) در واقع ریشه در <strong>لایه ۱ RF</strong> دارند: تداخل شدید ACI/CCI، نویز غیروای‌فایی (CleanAir)، توان نامتقارن AP یا ضعف سیگنال (RSSI پایین‌تر از <code>-75 dBm</code>). اگر پیش از بررسی RF ساعت‌ها تنظیمات WLC و ISE را دست‌کاری کنید، نه تنها مشکل حل نمی‌شود بلکه تنظیمات سالم را هم خراب می‌کنید!</p>"
-  },
-  {
-   "id": "ccie_wl-section-7",
-   "title": "QoS بی‌سیم سرتاسری: 802.11e WMM، نگاشت RFC 8325 (DSCP-to-UP) و Call Admission Control",
-   "html": "<p>برای تضمین کیفیت صوت و ویدیو روی هوا (Voice/Video over Wi-Fi)، تگ‌های لایه ۳ سیمی (DSCP) باید دقیقاً به ۴ صف دسترسی بی‌سیم <strong>802.11e WMM</strong> (<code>AC_VO</code>، <code>AC_VI</code>، <code>AC_BE</code>، <code>AC_BK</code>) نگاشت شوند (استاندارد <strong>RFC 8325</strong>): ترافیک صوت <strong><code>EF (DSCP 46) -&gt; UP 6 (AC_VO)</code></strong>، ترافیک ویدیو <strong><code>AF41 (DSCP 34) -&gt; UP 4 (AC_VI)</code></strong> و سیگنالینگ تماس <strong><code>CS3 (DSCP 24) -&gt; UP 3</code></strong>. همچنین در Policy Profile روی Catalyst 9800 باید پروفایل QoS/Platinum، اعتماد به DSCP روی پورت‌های سوئیچ Access و در صورت نیاز <strong>SIP/TSPEC Call Admission Control</strong> تنظیم شود.</p>"
-  },
-  {
-   "id": "ccie_wl-section-8",
-   "title": "معماری‌های پیشرفته لب: FlexConnect، Fabric-Enabled Wireless (SD-Access) و HA SSO",
-   "html": "<ul><li><strong>FlexConnect (Local Switching + Local Auth):</strong> در شعب دارای WAN محدود، ترافیک داده محلی به VLAN شعبه سوییچ می‌شود (بدون تونل به WLC مرکز)؛ فراموش نکردن تعریف دقیق <strong>Native VLAN</strong> و <strong>VLAN-to-ACL/SSID mapping</strong> در <code>Flex Profile</code> کلید موفقیت است!</li><li><strong>SD-Access Fabric-Enabled Wireless:</strong> AP به کنترلر 9800 (فقط Control Plane) وصل است اما Data Plane کلاینت‌ها مستقیم با VXLAN روی سوئیچ Fabric Edge قرار می‌گیرد و SGT توسط ISE اعمال می‌شود.</li><li><strong>High Availability SSO (Stateful Switchover):</strong> جفت Active/Standby کنترلر Catalyst 9800 با لینک RP جهت حفظ نشست CAPWAP و کلاینت‌ها هنگام Failover زیر یک ثانیه.</li></ul>"
-  },
-  {
-   "id": "ccie_wl-section-9",
-   "title": "امنیت بی‌سیم پیشرفته در لب: WPA3-Enterprise/SAE، 802.11w (PMF)، Guest CWA و wIPS",
-   "html": "<p>در لب CCIE Wireless باید علاوه بر 802.1X EAP-TLS با ISE، بر <strong>WPA3 (SAE با مقاومت در برابر حمله دیکشنری آفلاین + اجباری بودن 802.11w Protected Management Frames علیه Deauth Flood)</strong>، <strong>Central Web Auth (CWA)</strong> برای مهمانان (Redirect URL + Pre-Auth dACL روی Catalyst 9800 بدون نیاز به Anchor یا همراه Anchor در DMZ) و کشف <strong>Rogue AP / Honeypot</strong> مسلط باشید.</p>"
-  },
-  {
-   "id": "ccie_wl-section-10",
-   "title": "اتوماسیون Catalyst 9800 و Catalyst Center (YANG / RESTCONF / Telemetry)",
-   "html": "<p>از آنجا که Catalyst 9800 مبتنی بر <strong>IOS-XE</strong> است، دقیقاً همانند روترهای Catalyst از مدل‌های استاندارد <strong>YANG</strong> روی <strong>NETCONF/RESTCONF</strong>، <strong>Model-Driven Telemetry</strong> (پایش زنده تعداد کلاینت‌ها، استفاده کانال و خطاهای EAP) و <strong>REST API کنترلر Catalyst Center</strong> (ساخت سایت، Provisioning خودکار APها و Assurance Client Health) پشتیبانی کامل دارد.</p>"
-  },
-  {
-   "id": "ccie_wl-section-11",
-   "title": "کژفهمی‌های رایج درباره CCIE Enterprise Wireless",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای حل مشکل آنتن‌دهی کافی است تعداد APها را دو برابر کنیم و SSID را مخفی کنیم.»</strong> واقعیت: افزودن AP بدون طراحی ظرفیت/کانال باعث تداخل CCI شدید می‌شود، و مخفی کردن SSID نه امنیت واقعی می‌دهد و نه مشکلی از Roaming حل می‌کند!</li><li><strong>کژفهمی ۲: «وقتی WLAN جدیدی روی Catalyst 9800 می‌سازیم، خودکار روی همه APها پخش می‌شود.»</strong> واقعیت: خیر! تا زمانی که WLAN درون یک <code>Policy Tag</code> به <code>Policy Profile</code> نگاشت نشود و آن <code>Policy Tag</code> به APها متصل نگردد، هیچ SSID جدیدی پخش نمی‌شود.</li><li><strong>کژفهمی ۳: «در صورت بروز خطای قطع تماس، اول تنظیمات WLC را ریست می‌کنیم.»</strong> واقعیت: ابتدا باید لایه ۱ RF (پوشش، SNR، تداخل و Roaming Overlap) و سپس RadioActive Trace و WMM QoS بررسی شود.</li></ul>"
-  },
-  {
-   "id": "ccie_wl-section-12",
-   "title": "تله‌های پرتکرار روز لب Catalyst 9800",
-   "html": "<p><strong>تله ۱ — کلاینت 802.1X قبول می‌شود اما در وضعیت <code>IP_LEARN_TIMEOUT</code> گیر می‌کند:</strong> علت کلاسیک: نبود VLAN مربوطه روی پورت Trunk سوئیچ متصل به WLC (در Central Switching) یا روی پورت سوئیچ متصل به AP (در FlexConnect Local Switching)، یا فراموش کردن <code>ip helper-address</code> روی SVI!</p><p><strong>تله ۲ — فعال نبودن Fast Transition (802.11r) یا ناسازگاری کلاینت Legacy با PMF Required:</strong> برای کلاینت‌های مخلوط، حالت <code>Adaptive 11r</code> و <code>PMF Optional</code> (در WPA2/WPA3 Transition) از رد شدن دستگاه‌های قدیمی‌تر جلوگیری می‌کند.</p>"
-  },
-  {
-   "id": "ccie_wl-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> روی کنترلر Catalyst 9800 یک AP تازه Join شده هنوز SSID سازمانی <code>CORP-8021X</code> را پخش نمی‌کند و <code>Policy Tag</code> آن روی <code>default-policy-tag</code> مانده است. علت و راه‌حل چیست؟ <strong>پاسخ:</strong> <code>default-policy-tag</code> به پروفایل سفارشی شما متصل نیست؛ باید <code>PT-CORP-8021X</code> (به‌همراه <code>Site Tag</code> و <code>RF Tag</code> صحیح) مستقیم یا با Tag Filter به آن AP منتسب شود.</p><p><strong>تمرین ۲:</strong> در خروجی RadioActive Trace، مراحل <code>802.11 Assoc</code> و <code>EAP-TLS</code> با موفقیت گذشته‌اند اما کلاینت در مرحله <code>3_DHCP_IP_LEARN</code> با خطای Timeout قطع می‌شود. مشکل کجاست؟ <strong>پاسخ:</strong> مشکل در لایه سیمی/VLAN یا DHCP Relay (<code>ip helper-address</code>) برای VLAN تعریف‌شده در Policy Profile است، نه در 802.1X یا ISE!</p>"
-  },
-  {
-   "id": "ccie_wl-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://learningnetwork.cisco.com/s/ccie-enterprise-wireless-exam-topics\" target=\"_blank\" rel=\"noopener\">سرفصل‌های رسمی آزمون عملی CCIE Enterprise Wireless v1.1 (Cisco Learning Network)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8325\" target=\"_blank\" rel=\"noopener\">RFC 8325 (Mapping DiffServ to IEEE 802.11 / WMM)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی Cisco Catalyst 9800، Catalyst Center یا اکسس‌پوینت فیزیکی در این محیط متصل نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "CCIE Enterprise Wireless v1.1",
-   "fa": "گواهینامه خبره شبکه بی‌سیم سیسکو",
-   "simple": "بالاترین سطح اجرایی بی‌سیم سیسکو بر پایه Catalyst 9800، Catalyst Center، ISE و RF."
-  },
-  {
-   "term": "Policy Tag (C9800)",
-   "fa": "تگ سیاست کنترلر 9800",
-   "simple": "نگاشت WLAN Profile (SSID/امنیت) به Policy Profile (VLAN/QoS/Switching) روی Catalyst 9800."
-  },
-  {
-   "term": "Site Tag (C9800)",
-   "fa": "تگ سایت کنترلر 9800",
-   "simple": "تعیین حالت Local در برابر FlexConnect همراه AP Join Profile و Flex Profile."
-  },
-  {
-   "term": "RF Tag (C9800)",
-   "fa": "تگ رادیویی کنترلر 9800",
-   "simple": "اتصال پروفایل‌های ۲٫۴، ۵ و ۶ گیگاهرتز (کانال، توان، نرخ پایه) به اکسس‌پوینت‌ها."
-  },
-  {
-   "term": "RadioActive Tracing",
-   "fa": "ردیابی متمرکز کلاینت در C9800",
-   "simple": "ابزار عیب‌یابی یک‌دست IOS-XE برای ثبت کل چرخه Assoc/EAP/DHCP/SGT یک MAC در یک فایل."
-  },
-  {
-   "term": "802.11e WMM",
-   "fa": "کیفیت سرویس بی‌سیم",
-   "simple": "استاندارد چهار صف دسترسی بی‌سیم (AC_VO، AC_VI، AC_BE، AC_BK) با نگاشت RFC 8325 از DSCP."
-  },
-  {
-   "term": "RFC 8325 (DSCP-to-UP)",
-   "fa": "نگاشت استاندارد DSCP به WMM",
-   "simple": "تبدیل دقیق EF (46) به UP 6 (صوت) و AF41 (34) به UP 4 (ویدیو) در مرز سیمی-بی‌سیم."
-  },
-  {
-   "term": "FlexConnect Local Switching",
-   "fa": "سوییچینگ محلی شعب",
-   "simple": "عبور ترافیک داده کلاینت‌های شعبه مستقیم از سوئیچ محلی بدون ارسال به WLC دفتر مرکزی."
-  },
-  {
-   "term": "Fabric-Enabled Wireless",
-   "fa": "بی‌سیم یکپارچه با SD-Access",
-   "simple": "نگهداری Control Plane روی C9800 و عبور مستقیم Data Plane کلاینت با VXLAN روی Fabric Edge."
-  },
-  {
-   "term": "CWA (Central Web Auth)",
-   "fa": "پورتال مهمان مرکزی با ISE",
-   "simple": "هدایت کلاینت مهمان به پورتال ISE با Pre-Auth dACL و اعطای دسترسی پویا با CoA."
-  },
-  {
-   "term": "WPA3-SAE & 802.11w PMF",
-   "fa": "امنیت نسل جدید وای‌فای",
-   "simple": "احراز مقاوم در برابر حمله دیکشنری آفلاین همراه رمزنگاری فریم‌های مدیریتی علیه Deauth Flood."
-  },
-  {
-   "term": "802.11r / k / v",
-   "fa": "مجموعه جابه‌جایی سریع",
-   "simple": "Fast BSS Transition (11r)، گزارش همسایه‌ها (11k) و مدیریت بهینه Roaming کلاینت (11v)."
-  },
-  {
-   "term": "HA SSO (C9800)",
-   "fa": "افزونگی بدون قطعی WLC",
-   "simple": "همگام‌سازی لحظه‌ای نشست‌های CAPWAP و کلاینت بین WLC Active و Standby."
-  },
-  {
-   "term": "Tag Filter (Regex)",
-   "fa": "تخصیص خودکار ۳ تگ به AP",
-   "simple": "انتساب خودکار Policy/Site/RF Tag به اکسس‌پوینت‌های تازه متصل‌شده بر اساس الگوی نام AP."
-  },
-  {
-   "term": "IP_LEARN_TIMEOUT",
-   "fa": "خطای دریافت نکردن IP پس از EAP",
-   "simple": "توقف کلاینت پس از احراز هویت موفق به دلیل نقص VLAN سیمی یا نبود ip helper-address."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (ممیزی ۳ تگ Catalyst 9800، شبیه‌ساز RadioActive Tracing و نگاشت WMM DSCP-to-UP) — کنترلر 9800 واقعی اجرا نشده",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ کنترلر واقعی Cisco Catalyst 9800 یا اکسس‌پوینت فیزیکی متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ کنترلر واقعی Cisco Catalyst 9800، Catalyst Center یا اکسس‌پوینت فیزیکی در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی سه بررسی کلیدی لب CCIE Enterprise Wireless را اجرا می‌کند: (۱) ممیزی اتصال <strong>Policy / Site / RF Tag</strong> به اکسس‌پوینت‌ها در Catalyst 9800، (۲) ردیابی <strong>RadioActive Trace</strong> برای تفکیک خطای <code>IP_LEARN_TIMEOUT</code> از حالت سالم <code>RUN (SGT=10)</code>، و (۳) نمایش جدول نگاشت استاندارد <strong>RFC 8325 DSCP-to-WMM</strong>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccie_wl_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccie_wl_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccie_wl (CCIE Enterprise Wireless v1.1: Catalyst 9800 3-Tag Audit, RadioActive Trace &amp; WMM QoS)\nSimulates (1) Catalyst 9800 IOS-XE modular Policy/Site/RF Tag AP binding validation,\n(2) RadioActive client onboarding trace (802.11 Assoc -&gt; 802.1X EAP -&gt; DHCP -&gt; SGT),\nand (3) RFC 8325 / Cisco DSCP-to-802.11e WMM User Priority mapping verification.\nNo real Cisco Catalyst 9800 WLC, Catalyst Center, or physical AP is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\nDSCP_TO_WMM_UP = {\n    &quot;EF (46) Voice&quot;: {&quot;up&quot;: 6, &quot;ac&quot;: &quot;AC_VO (Voice)&quot;},\n    &quot;AF41 (34) Video&quot;: {&quot;up&quot;: 4, &quot;ac&quot;: &quot;AC_VI (Video)&quot;},\n    &quot;CS3 (24) Signaling&quot;: {&quot;up&quot;: 3, &quot;ac&quot;: &quot;AC_BE / Call-Signaling&quot;},\n    &quot;BE (0) Default&quot;: {&quot;up&quot;: 0, &quot;ac&quot;: &quot;AC_BE (Best Effort)&quot;},\n}\n\n\ndef audit_c9800_ap_tags(ap: dict) -&gt; dict:\n    missing = []\n    if not ap.get(&quot;policy_tag&quot;) or ap[&quot;policy_tag&quot;] == &quot;default-policy-tag&quot;:\n        missing.append(&quot;Custom Policy Tag missing (WLAN not mapped to Policy Profile)&quot;)\n    if not ap.get(&quot;site_tag&quot;):\n        missing.append(&quot;Site Tag missing (Local vs FlexConnect mode undefined)&quot;)\n    if not ap.get(&quot;rf_tag&quot;):\n        missing.append(&quot;RF Tag missing (5 GHz / 2.4 GHz RF Profiles not bound)&quot;)\n    return {&quot;ap&quot;: ap[&quot;name&quot;], &quot;ssid_broadcasting&quot;: len(missing) == 0, &quot;issues&quot;: missing}\n\n\ndef radioactive_client_trace(mac: str, eap_ok: bool, dhcp_ok: bool, sgt: int | None) -&gt; dict:\n    timeline = [\n        {&quot;stage&quot;: &quot;1_80211_AUTH_ASSOC&quot;, &quot;status&quot;: &quot;SUCCESS&quot;},\n        {&quot;stage&quot;: &quot;2_8021X_EAP_TLS&quot;, &quot;status&quot;: &quot;SUCCESS&quot; if eap_ok else &quot;FAILED_CERT_OR_ISE_TIMEOUT&quot;},\n    ]\n    if not eap_ok:\n        return {&quot;client_mac&quot;: mac, &quot;final_state&quot;: &quot;DEAUTHENTICATED&quot;, &quot;timeline&quot;: timeline}\n    timeline.append({&quot;stage&quot;: &quot;3_DHCP_IP_LEARN&quot;, &quot;status&quot;: &quot;SUCCESS&quot; if dhcp_ok else &quot;FAILED_VLAN_OR_HELPER&quot;})\n    if not dhcp_ok:\n        return {&quot;client_mac&quot;: mac, &quot;final_state&quot;: &quot;IP_LEARN_TIMEOUT&quot;, &quot;timeline&quot;: timeline}\n    timeline.append({&quot;stage&quot;: &quot;4_RUN_STATE_SGT&quot;, &quot;status&quot;: f&quot;RUN (SGT={sgt})&quot;})\n    return {&quot;client_mac&quot;: mac, &quot;final_state&quot;: &quot;RUN&quot;, &quot;timeline&quot;: timeline}\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_C9800_WLC_OR_AP_HARDWARE&quot;,\n        &quot;c9800_tag_audits&quot;: [\n            audit_c9800_ap_tags({&quot;name&quot;: &quot;AP-FL1-01&quot;, &quot;policy_tag&quot;: &quot;default-policy-tag&quot;, &quot;site_tag&quot;: &quot;SITE-HQ&quot;, &quot;rf_tag&quot;: None}),\n            audit_c9800_ap_tags({&quot;name&quot;: &quot;AP-FL1-02&quot;, &quot;policy_tag&quot;: &quot;PT-CORP-8021X&quot;, &quot;site_tag&quot;: &quot;ST-HQ-LOCAL&quot;, &quot;rf_tag&quot;: &quot;RT-HIGHDENSITY&quot;}),\n        ],\n        &quot;radioactive_traces&quot;: {\n            &quot;dhcp_failure_case&quot;: radioactive_client_trace(&quot;aa:bb:cc:11:22:33&quot;, eap_ok=True, dhcp_ok=False, sgt=None),\n            &quot;healthy_run_state&quot;: radioactive_client_trace(&quot;aa:bb:cc:11:22:44&quot;, eap_ok=True, dhcp_ok=True, sgt=10),\n        },\n        &quot;wmm_qos_dscp_mapping&quot;: DSCP_TO_WMM_UP,\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف نقص تگ روی <code>AP-FL1-01</code> در برابر پخش موفق <code>AP-FL1-02</code>، و جداسازی خطای DHCP پس از عبور موفق <code>EAP-TLS</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع دستورات RadioActive Tracing و بررسی تگ AP روی Catalyst 9800 (اجرا نشده روی WLC زنده):</strong></p><pre dir=\"ltr\"><code># Reference Catalyst 9800 IOS-XE CLI (NOT executed on live WLC)\nshow ap tag summary\ndebug wireless mac aaaa.bbbb.cccc internal\nshow wireless client mac-address aaaa.bbbb.cccc detail</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس CCIE Enterprise Wireless v1.1 (Catalyst 9800، RadioActive Trace و WMM)",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "در کنترلر Cisco Catalyst 9800 (مبتنی بر IOS-XE)، کدام سه تگ ماژولار جایگزین AP Group قدیمی شده‌اند و باید به هر AP متصل شوند؟",
-   "options": [
-    "Policy Tag، Site Tag و RF Tag",
-    "فقط VLAN Tag",
-    "فقط SSID Tag",
-    "فقط MAC Tag"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در Catalyst 9800، سه تگ Policy (WLAN/VLAN)، Site (Local/Flex) و RF (رادیوها) معماری ماژولار کامل AP را تشکیل می‌دهند.</p>"
-  },
-  {
-   "title": "چرا در عیب‌یابی شبکه‌های بی‌سیم سطح CCIE، بررسی لایه ۱ RF (پوشش، SNR، تداخل و نویز) باید پیش از دست‌کاری تنظیمات WLC انجام شود؟",
-   "options": [
-    "برای افزایش سرعت DHCP",
-    "زیرا مشکلات لایه ۱ RF (تداخل، ضعف سیگنال، نویز غیروای‌فایی) دقیقاً شبیه خطاهای نرم‌افزاری WLC/802.1X جلوه می‌کنند و ابتدا باید حذف شوند",
-    "برای کاهش بار حافظه سوئیچ Core",
-    "زیرا WLC تنظیمات CLI ندارد"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>بررسی لایه ۱ RF به عنوان گام اول مانع از هدر رفتن ساعت‌ها وقت روی دیباگ اشتباه WLC و ISE می‌شود.</p>"
-  },
-  {
-   "title": "معیارهای کلیدی مهندسی برای طراحی یک شبکه WLAN سازمانی در سطح CCIE Wireless چیست؟",
-   "options": [
-    "فقط خرید بیشترین تعداد AP ممکن",
-    "فقط مخفی کردن نام SSID",
-    "توازن مهندسی میان پوشش (Coverage)، ظرفیت (Capacity)، جابه‌جایی سریع (Fast Roaming)، مدیریت کانال/تداخل و امنیت سرتاسری",
-    "استفاده صرف از کانال ۱ در ۲٫۴ گیگاهرتز"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>طراحی بی‌سیم حرفه‌ای هم‌زمان ظرفیت، پوشش، Roaming، مدیریت طیف و امنیت را در یک کل یکپارچه می‌سنجد.</p>"
-  },
-  {
-   "title": "ابزار RadioActive Tracing روی Catalyst 9800 (debug wireless mac <MAC> internal) چه مزیت کلیدی در روز آزمون عملی دارد؟",
-   "options": [
-    "تغییر خودکار کانال‌های ۵ گیگاهرتز",
-    "حذف خودکار کلاینت‌های مهمان",
-    "خاموش کردن رادیوهای ۲٫۴ گیگاهرتز",
-    "جمع‌آوری یکپارچه تمام لاگ‌های چرخه اتصال یک کلاینت (Assoc، 802.1X EAP، DHCP و SGT) از همه فرآیندهای WLC در یک فایل متنی دقیق"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>RadioActive Tracing سریع‌ترین ابزار تشخیص علت دقیق قطع یا عدم اتصال کلاینت روی Catalyst 9800 است.</p>"
-  },
-  {
-   "title": "در خروجی RadioActive Trace، کلاینتی مرحله 802.1X EAP-TLS را با موفقیت پشت سر گذاشته اما در مرحله IP_LEARN_TIMEOUT گیر کرده است. محتمل‌ترین علت چیست؟",
-   "options": [
-    "نقص در VLAN سیمی (فراموش شدن VLAN روی Trunk) یا نبود ip helper-address برای سرور DHCP در VLAN مربوط به Policy Profile",
-    "اشتباه بودن رمز عبور کاربر در Active Directory",
-    "خرابی آنتن ۵ گیگاهرتز AP",
-    "خاموش بودن SNMP"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>عبور موفق از EAP-TLS نشان می‌دهد ISE کار خود را انجام داده و خطا در تحویل آدرس IP روی لایه شبکه/DHCP است.</p>"
-  },
-  {
-   "title": "بر اساس استاندارد RFC 8325 و 802.11e WMM، ترافیک صوتی با علامت DSCP EF (46) باید به کدام User Priority و صف دسترسی بی‌سیم نگاشت شود؟",
-   "options": [
-    "UP 0 (AC_BE — Best Effort)",
-    "UP 6 (AC_VO — Voice)",
-    "UP 1 (AC_BK — Background)",
-    "Drop شود"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>نگاشت <code>EF (46) -&gt; UP 6 (AC_VO)</code> بالاترین اولویت دسترسی به رسانه بی‌سیم را برای بسته‌های صوتی تضمین می‌کند.</p>"
-  },
-  {
-   "title": "تغییر کدام یک از سه تگ روی یک AP در Catalyst 9800 باعث ریستارت شدن نشست CAPWAP اکسس‌پوینت می‌شود؟",
-   "options": [
-    "Policy Tag",
-    "RF Tag",
-    "Site Tag (زیرا ممکن است حالت کاری AP بین Local و FlexConnect تغییر کند)",
-    "هیچ‌کدام"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>دانستن اینکه تغییر <code>Site Tag</code> باعث ریست CAPWAP می‌شود در مدیریت زمان لب و نگهداری تولیدی بسیار مهم است.</p>"
-  },
-  {
-   "title": "در استقرار Fabric-Enabled Wireless (یکپارچه با Cisco SD-Access)، جریان Control Plane و Data Plane کلاینت چگونه تفکیک می‌شود؟",
-   "options": [
-    "هر دو در یک سوئیچ لایه ۲ متوقف می‌شوند",
-    "هیچ کنترلر WLC وجود ندارد",
-    "همه ترافیک داده به WLC مرکزی تونل می‌شود",
-    "Control Plane AP همچنان با Catalyst 9800 است، اما Data Plane کلاینت‌ها مستقیم روی سوئیچ Fabric Edge به VXLAN وارد شده و سیاست SGT اعمال می‌شود"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>تفکیک Control Plane (روی C9800) و Data Plane (روی Fabric Edge) مقیاس‌پذیری و امنیت یکپارچه سیمی و بی‌سیم را فراهم می‌کند.</p>"
-  },
-  {
-   "title": "چرا استاندارد 802.11w (Protected Management Frames — PMF) در شبکه‌های WPA3 الزامی شده است؟",
-   "options": [
-    "برای جلوگیری از حملات جعل فریم‌های مدیریتی مانند Deauthentication و Disassociation Flood علیه کلاینت‌ها",
-    "برای افزایش توان آنتن به ۳۰ dBm",
-    "برای حذف نیاز به DHCP",
-    "برای غیرفعال کردن ۵ گیگاهرتز"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>PMF فریم‌های مدیریتی کلیدی را محافظت و احراز اصالت می‌کند تا مهاجمان نتوانند با فریم جعلی Deauth کاربران را قطع کنند.</p>"
-  },
-  {
-   "title": "در طراحی FlexConnect Local Switching برای شعب، کدام نکته پیکربندی درون Flex Profile حیاتی است؟",
-   "options": [
-    "خاموش کردن همه VLANها روی سوئیچ شعبه",
-    "تعریف دقیق نگاشت VLANهای محلی شعبه (VLAN-to-SSID / ACL) و تطابق Native VLAN پورت Trunk متصل به AP",
-    "تبدیل AP به روتر BGP",
-    "حذف CAPWAP"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>در FlexConnect Local Switching ترافیک داده محلی به VLANهای شعبه تحویل می‌شود و ناهماهنگی Native/Trunk VLAN ارتباط کلاینت را می‌اندازد.</p>"
-  },
-  {
-   "title": "برای تخصیص خودکار Policy Tag، Site Tag و RF Tag به ده‌ها AP تازه متصل‌شده در Catalyst 9800 بدون ویرایش دستی تک‌تک آن‌ها چه قابلیتی وجود دارد؟",
-   "options": [
-    "Telnet دستی هر شب",
-    "تغییر نام SSID به شماره سریال",
-    "Tag Filters (قوانین Regex بر اساس الگوی نام‌گذاری APها یا Location)",
-    "خاموش کردن RRM"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>استفاده از Tag Filters با نام‌گذاری استاندارد APها (مثلاً <code>AP-TEH-FL2-*</code>) استقرار سریع و بدون خطا را تضمین می‌کند.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "اتصال زنده به Catalyst 9800-80 دیتاسنتر",
-    "تست واقعی کلاینت آیفون روی WLC تولیدی",
-    "فقط متن نظری بدون کد",
-    "شبیه‌سازی محلی (Local Mock) در Python 3 برای ممیزی ۳تگی Catalyst 9800، ردیابی RadioActive Trace و جدول نگاشت WMM RFC 8325"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ کنترلر Catalyst 9800 یا AP واقعی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.3",
-  "legacyId": "ccie_wl",
-  "sources": [
-   "https://learningnetwork.cisco.com/s/ccie-enterprise-wireless-exam-topics",
-   "https://www.rfc-editor.org/rfc/rfc8325",
-   "https://learningnetwork.cisco.com/s/article/ccie-practical-exam-format"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccie_wl",
+  "objectiveId": "ccie_wl",
+  "kind": "lesson",
+  "track": "CCIE",
+  "course": "ccie-wireless",
+  "title": "۸.۵ CCIE Enterprise Wireless: معماری ۳تگی Catalyst 9800، RadioActive Tracing و QoS بی‌سیم",
+  "titleEn": "CCIE Enterprise Wireless (350-101 WLCOR + 8-Hour Lab v1.1): Catalyst 9800 3-Tag Model, RadioActive Trace & WMM",
+  "domain": "Wireless Expert",
+  "source": "Legacy ccie_wl rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 60,
+  "prerequisites": [
+    "spec_wl",
+    "spec_wl_survey"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی Cisco Catalyst 9800، Catalyst Center یا AP فیزیکی متصل نشده است."
+  "sections": [
+    {
+      "id": "ccie_wl-section-1",
+      "title": "مسئله واقعی: چرا مهندسان باتجربه AireOS هنگام مواجهه با کنترلر Catalyst 9800 (IOS-XE) در لب CCIE Wireless غافلگیر می‌شوند؟",
+      "html": "<p>در آزمون عملی <strong>CCIE Wireless v1.1</strong> (نام سابق: CCIE Enterprise Wireless؛ با آزمون کتبی جدید <code>350-101 WLCOR</code> که از مارس ۲۰۲۶ جایگزین <code>350-401 ENCOR</code> شد)، کنترلر کلاسیک AireOS کاملاً جای خود را به <strong>Cisco Catalyst 9800 (مبتنی بر IOS-XE)</strong> همراه با <strong>Catalyst Center (DNAC)</strong>، <strong>Cisco ISE</strong> و اکسس‌پوینت‌های Wi-Fi 6/6E داده است! در Catalyst 9800 دیگر AP Group قدیمی وجود ندارد و همه چیز بر پایه <strong>مدل ماژولار ۳تگی (Policy Tag، Site Tag و RF Tag)</strong> کار می‌کند — و یکی از پرتکرارترین علل «پخش نشدن SSID» در روز آزمون، فراموش کردن اتصال صحیح همین ۳ تگ به AP است!</p>"
+    },
+    {
+      "id": "ccie_wl-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر WLC/CAPWAP، 802.11ax و RF Site Survey در درس‌های <code>spec_wl</code> و <code>spec_wl_survey</code>.</p><ul><li>تسلط کامل بر ساختار ماژولار ۳تگی <strong>Cisco Catalyst 9800 (Policy Tag، Site Tag و RF Tag)</strong> و استقرارهای Local، FlexConnect و Fabric-Enabled (SD-Access Wireless).</li><li>عیب‌یابی فوق‌سریع چرخه اتصال کلاینت با <strong>RadioActive Tracing</strong> (<code>debug wireless mac &lt;MAC&gt; internal</code>) و تحلیل 802.1X/ISE/DHCP.</li><li>طراحی و تایید <strong>QoS بی‌سیم (802.11e WMM و نگاشت RFC 8325 DSCP-to-UP)</strong>، <strong>Fast Roaming (802.11r/k/v)</strong> و <strong>Multicast-to-Unicast</strong>.</li><li>تبیین اصل طلایی <strong>حذف خطای لایه ۱ RF پیش از دست‌کاری تنظیمات WLC</strong> و خودکارسازی Catalyst 9800 با NETCONF/RESTCONF/YANG.</li></ul>"
+    },
+    {
+      "id": "ccie_wl-section-3",
+      "title": "معماری ۳تگی Catalyst 9800 (IOS-XE): قلب تپنده بخش Deploy لب CCIE Wireless",
+      "html": "<p>در Catalyst 9800، هر تنظیم به دو لایه <strong>Profile</strong> و <strong>Tag</strong> جدا شده است تا استفاده مجدد (Reusability) حداکثر شود:</p><ol><li><strong>Policy Tag:</strong> هر <code>WLAN Profile</code> (نام SSID و امنیت WPA2/WPA3/802.1X) را به یک <code>Policy Profile</code> (VLAN کلاینت، Central در برابر Local Switching، QoS و Session Timeout) متصل می‌کند.</li><li><strong>Site Tag:</strong> وضعیت <code>Local Site</code> (حالت Local Mode) در برابر <code>FlexConnect</code> (همراه <code>Flex Profile</code> برای نگاشت VLAN محلی شعبه) و <code>AP Join Profile</code> (تایمرهای CAPWAP، SSH و LED) را تعیین می‌کند.</li><li><strong>RF Tag:</strong> پروفایل‌های رادیویی <code>2.4 GHz</code>، <code>5 GHz</code> و <code>6 GHz</code> (کانال‌های مجاز DCA، توان TPC و نرخ‌های پایه) را به AP می‌بندد.</li></ol><p><strong>نکته طلایی:</strong> تغییر Site Tag باعث ریستارت شدن CAPWAP روی AP می‌شود، اما تغییر Policy Tag و RF Tag بدون قطع CAPWAP اعمال می‌گردد! همچنین می‌توان اتصال تگ‌ها را با <strong>Policy/Site/RF Tag Filter (Regex بر اساس نام AP)</strong> خودکار کرد.</p>"
+    },
+    {
+      "id": "ccie_wl-section-4",
+      "title": "نمودار معماری ۳تگی Catalyst 9800، RadioActive Tracing و QoS بی‌سیم",
+      "html": "<p>نمودار زیر ساختار ماژولار سه تگ Catalyst 9800، ابزار RadioActive Tracing و اولویت لایه ۱ RF در دیباگ را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCIE Enterprise Wireless v1.1: Catalyst 9800 3-Tag Modular Architecture, RadioActive Tracing and WMM QoS\"><rect x=\"14\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"130\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">1. Policy Tag</text><text x=\"130\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Maps WLAN Profile (SSID/Sec)</text><text x=\"130\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">-&gt; Policy Profile (VLAN/QoS/ACL)</text><text x=\"130\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Central vs Local Switching</text><rect x=\"264\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">2. Site Tag</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Local Mode vs FlexConnect Site</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">+ AP Join Profile (CAPWAP/LED)</text><text x=\"380\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">+ Flex Profile (VLAN Mapping)</text><rect x=\"514\" y=\"14\" width=\"232\" height=\"114\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"630\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">3. RF Tag</text><text x=\"630\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">5 GHz &amp; 2.4 GHz RF Profiles</text><text x=\"630\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">RRM DCA / TPC / Min Data Rates</text><text x=\"630\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">6 GHz Profile (Wi-Fi 6E)</text><rect x=\"14\" y=\"146\" width=\"732\" height=\"64\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"380\" y=\"170\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">Bound to Every AP -&gt; RadioActive Tracing (debug wireless mac &lt;MAC&gt; internal) + WMM QoS (EF-&gt;UP 6)</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Always Verify RF Layer 1 First (SNR/Interference), Then 3-Tag Binding, Then 802.1X/DHCP Trace!</text></svg>"
+    },
+    {
+      "id": "ccie_wl-section-5",
+      "title": "اسلحه مخفی دیباگ در لب CCIE Wireless: ابزار RadioActive Tracing",
+      "html": "<p>در کنترلر قدیمی AireOS، دیباگ کردن یک کلاینت با <code>debug client &lt;MAC&gt;</code> روی CLI پر از متن‌های پراکنده و گمراه‌کننده بود. در <strong>Catalyst 9800 (IOS-XE)</strong> فرمان جادویی <strong>RadioActive Tracing</strong> (<code>debug wireless mac &lt;aaaa.bbbb.cccc&gt; internal</code> یا از منوی <code>Troubleshooting -&gt; Radioactive Trace</code> در GUI) تمام لاگ‌های همه فرآیندهای داخلی WLC (از 802.11 Auth/Assoc تا 802.1X EAP با ISE، دریافت IP از DHCP و اختصاص SGT) را <em>فقط برای همان MAC</em> در یک فایل متنی واحد و تمیز جمع می‌کند و دقیقاً خطای مرحله شکست (مثلاً <code>IP_LEARN_TIMEOUT</code> یا <code>EAP_FAILURE</code>) را با دلیل آن نشان می‌دهد!</p>"
+    },
+    {
+      "id": "ccie_wl-section-6",
+      "title": "قانون طلایی دیباگ بی‌سیم: چرا همیشه ابتدا لایه ۱ RF را قبل از WLC بررسی می‌کنیم؟",
+      "html": "<p>بسیاری از مشکلات ظاهراً نرم‌افزاری (مثل شکست 802.1X Timeout، قطع شدن Roaming، یا افت صدای تماس) در واقع ریشه در <strong>لایه ۱ RF</strong> دارند: تداخل شدید ACI/CCI، نویز غیروای‌فایی (CleanAir)، توان نامتقارن AP یا ضعف سیگنال (RSSI پایین‌تر از <code>-75 dBm</code>). اگر پیش از بررسی RF ساعت‌ها تنظیمات WLC و ISE را دست‌کاری کنید، نه تنها مشکل حل نمی‌شود بلکه تنظیمات سالم را هم خراب می‌کنید!</p>"
+    },
+    {
+      "id": "ccie_wl-section-7",
+      "title": "QoS بی‌سیم سرتاسری: 802.11e WMM، نگاشت RFC 8325 (DSCP-to-UP) و Call Admission Control",
+      "html": "<p>برای تضمین کیفیت صوت و ویدیو روی هوا (Voice/Video over Wi-Fi)، تگ‌های لایه ۳ سیمی (DSCP) باید دقیقاً به ۴ صف دسترسی بی‌سیم <strong>802.11e WMM</strong> (<code>AC_VO</code>، <code>AC_VI</code>، <code>AC_BE</code>، <code>AC_BK</code>) نگاشت شوند (استاندارد <strong>RFC 8325</strong>): ترافیک صوت <strong><code>EF (DSCP 46) -&gt; UP 6 (AC_VO)</code></strong>، ترافیک ویدیو <strong><code>AF41 (DSCP 34) -&gt; UP 4 (AC_VI)</code></strong> و سیگنالینگ تماس <strong><code>CS3 (DSCP 24) -&gt; UP 3</code></strong>. همچنین در Policy Profile روی Catalyst 9800 باید پروفایل QoS/Platinum، اعتماد به DSCP روی پورت‌های سوئیچ Access و در صورت نیاز <strong>SIP/TSPEC Call Admission Control</strong> تنظیم شود.</p>"
+    },
+    {
+      "id": "ccie_wl-section-8",
+      "title": "معماری‌های پیشرفته لب: FlexConnect، Fabric-Enabled Wireless (SD-Access) و HA SSO",
+      "html": "<ul><li><strong>FlexConnect (Local Switching + Local Auth):</strong> در شعب دارای WAN محدود، ترافیک داده محلی به VLAN شعبه سوییچ می‌شود (بدون تونل به WLC مرکز)؛ فراموش نکردن تعریف دقیق <strong>Native VLAN</strong> و <strong>VLAN-to-ACL/SSID mapping</strong> در <code>Flex Profile</code> کلید موفقیت است!</li><li><strong>SD-Access Fabric-Enabled Wireless:</strong> AP به کنترلر 9800 (فقط Control Plane) وصل است اما Data Plane کلاینت‌ها مستقیم با VXLAN روی سوئیچ Fabric Edge قرار می‌گیرد و SGT توسط ISE اعمال می‌شود.</li><li><strong>High Availability SSO (Stateful Switchover):</strong> جفت Active/Standby کنترلر Catalyst 9800 با لینک RP جهت حفظ نشست CAPWAP و کلاینت‌ها هنگام Failover زیر یک ثانیه.</li></ul>"
+    },
+    {
+      "id": "ccie_wl-section-9",
+      "title": "امنیت بی‌سیم پیشرفته در لب: WPA3-Enterprise/SAE، 802.11w (PMF)، Guest CWA و wIPS",
+      "html": "<p>در لب CCIE Wireless باید علاوه بر 802.1X EAP-TLS با ISE، بر <strong>WPA3 (SAE با مقاومت در برابر حمله دیکشنری آفلاین + اجباری بودن 802.11w Protected Management Frames علیه Deauth Flood)</strong>، <strong>Central Web Auth (CWA)</strong> برای مهمانان (Redirect URL + Pre-Auth dACL روی Catalyst 9800 بدون نیاز به Anchor یا همراه Anchor در DMZ) و کشف <strong>Rogue AP / Honeypot</strong> مسلط باشید.</p>"
+    },
+    {
+      "id": "ccie_wl-section-10",
+      "title": "اتوماسیون Catalyst 9800 و Catalyst Center (YANG / RESTCONF / Telemetry)",
+      "html": "<p>از آنجا که Catalyst 9800 مبتنی بر <strong>IOS-XE</strong> است، دقیقاً همانند روترهای Catalyst از مدل‌های استاندارد <strong>YANG</strong> روی <strong>NETCONF/RESTCONF</strong>، <strong>Model-Driven Telemetry</strong> (پایش زنده تعداد کلاینت‌ها، استفاده کانال و خطاهای EAP) و <strong>REST API کنترلر Catalyst Center</strong> (ساخت سایت، Provisioning خودکار APها و Assurance Client Health) پشتیبانی کامل دارد.</p>"
+    },
+    {
+      "id": "ccie_wl-section-11",
+      "title": "کژفهمی‌های رایج درباره CCIE Enterprise Wireless",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای حل مشکل آنتن‌دهی کافی است تعداد APها را دو برابر کنیم و SSID را مخفی کنیم.»</strong> واقعیت: افزودن AP بدون طراحی ظرفیت/کانال باعث تداخل CCI شدید می‌شود، و مخفی کردن SSID نه امنیت واقعی می‌دهد و نه مشکلی از Roaming حل می‌کند!</li><li><strong>کژفهمی ۲: «وقتی WLAN جدیدی روی Catalyst 9800 می‌سازیم، خودکار روی همه APها پخش می‌شود.»</strong> واقعیت: خیر! تا زمانی که WLAN درون یک <code>Policy Tag</code> به <code>Policy Profile</code> نگاشت نشود و آن <code>Policy Tag</code> به APها متصل نگردد، هیچ SSID جدیدی پخش نمی‌شود.</li><li><strong>کژفهمی ۳: «در صورت بروز خطای قطع تماس، اول تنظیمات WLC را ریست می‌کنیم.»</strong> واقعیت: ابتدا باید لایه ۱ RF (پوشش، SNR، تداخل و Roaming Overlap) و سپس RadioActive Trace و WMM QoS بررسی شود.</li></ul>"
+    },
+    {
+      "id": "ccie_wl-section-12",
+      "title": "تله‌های پرتکرار روز لب Catalyst 9800",
+      "html": "<p><strong>تله ۱ — کلاینت 802.1X قبول می‌شود اما در وضعیت <code>IP_LEARN_TIMEOUT</code> گیر می‌کند:</strong> علت کلاسیک: نبود VLAN مربوطه روی پورت Trunk سوئیچ متصل به WLC (در Central Switching) یا روی پورت سوئیچ متصل به AP (در FlexConnect Local Switching)، یا فراموش کردن <code>ip helper-address</code> روی SVI!</p><p><strong>تله ۲ — فعال نبودن Fast Transition (802.11r) یا ناسازگاری کلاینت Legacy با PMF Required:</strong> برای کلاینت‌های مخلوط، حالت <code>Adaptive 11r</code> و <code>PMF Optional</code> (در WPA2/WPA3 Transition) از رد شدن دستگاه‌های قدیمی‌تر جلوگیری می‌کند.</p>"
+    },
+    {
+      "id": "ccie_wl-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> روی کنترلر Catalyst 9800 یک AP تازه Join شده هنوز SSID سازمانی <code>CORP-8021X</code> را پخش نمی‌کند و <code>Policy Tag</code> آن روی <code>default-policy-tag</code> مانده است. علت و راه‌حل چیست؟ <strong>پاسخ:</strong> <code>default-policy-tag</code> به پروفایل سفارشی شما متصل نیست؛ باید <code>PT-CORP-8021X</code> (به‌همراه <code>Site Tag</code> و <code>RF Tag</code> صحیح) مستقیم یا با Tag Filter به آن AP منتسب شود.</p><p><strong>تمرین ۲:</strong> در خروجی RadioActive Trace، مراحل <code>802.11 Assoc</code> و <code>EAP-TLS</code> با موفقیت گذشته‌اند اما کلاینت در مرحله <code>3_DHCP_IP_LEARN</code> با خطای Timeout قطع می‌شود. مشکل کجاست؟ <strong>پاسخ:</strong> مشکل در لایه سیمی/VLAN یا DHCP Relay (<code>ip helper-address</code>) برای VLAN تعریف‌شده در Policy Profile است، نه در 802.1X یا ISE!</p>"
+    },
+    {
+      "id": "ccie_wl-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://learningnetwork.cisco.com/s/ccie-enterprise-wireless-exam-topics\" target=\"_blank\" rel=\"noopener\">سرفصل‌های رسمی آزمون عملی CCIE Enterprise Wireless v1.1 (Cisco Learning Network)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8325\" target=\"_blank\" rel=\"noopener\">RFC 8325 (Mapping DiffServ to IEEE 802.11 / WMM)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی Cisco Catalyst 9800، Catalyst Center یا اکسس‌پوینت فیزیکی در این محیط متصل نشده است.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Tag Filters، Fabric-Enabled Wireless، WPA3/802.11w PMF، RFC 8325 WMM و شبیه‌ساز ۳تگی/RadioActive Trace."
+  "glossary": [
+    {
+      "term": "CCIE Enterprise Wireless v1.1",
+      "fa": "گواهینامه خبره شبکه بی‌سیم سیسکو",
+      "simple": "بالاترین سطح اجرایی بی‌سیم سیسکو بر پایه Catalyst 9800، Catalyst Center، ISE و RF."
+    },
+    {
+      "term": "Policy Tag (C9800)",
+      "fa": "تگ سیاست کنترلر 9800",
+      "simple": "نگاشت WLAN Profile (SSID/امنیت) به Policy Profile (VLAN/QoS/Switching) روی Catalyst 9800."
+    },
+    {
+      "term": "Site Tag (C9800)",
+      "fa": "تگ سایت کنترلر 9800",
+      "simple": "تعیین حالت Local در برابر FlexConnect همراه AP Join Profile و Flex Profile."
+    },
+    {
+      "term": "RF Tag (C9800)",
+      "fa": "تگ رادیویی کنترلر 9800",
+      "simple": "اتصال پروفایل‌های ۲٫۴، ۵ و ۶ گیگاهرتز (کانال، توان، نرخ پایه) به اکسس‌پوینت‌ها."
+    },
+    {
+      "term": "RadioActive Tracing",
+      "fa": "ردیابی متمرکز کلاینت در C9800",
+      "simple": "ابزار عیب‌یابی یک‌دست IOS-XE برای ثبت کل چرخه Assoc/EAP/DHCP/SGT یک MAC در یک فایل."
+    },
+    {
+      "term": "802.11e WMM",
+      "fa": "کیفیت سرویس بی‌سیم",
+      "simple": "استاندارد چهار صف دسترسی بی‌سیم (AC_VO، AC_VI، AC_BE، AC_BK) با نگاشت RFC 8325 از DSCP."
+    },
+    {
+      "term": "RFC 8325 (DSCP-to-UP)",
+      "fa": "نگاشت استاندارد DSCP به WMM",
+      "simple": "تبدیل دقیق EF (46) به UP 6 (صوت) و AF41 (34) به UP 4 (ویدیو) در مرز سیمی-بی‌سیم."
+    },
+    {
+      "term": "FlexConnect Local Switching",
+      "fa": "سوییچینگ محلی شعب",
+      "simple": "عبور ترافیک داده کلاینت‌های شعبه مستقیم از سوئیچ محلی بدون ارسال به WLC دفتر مرکزی."
+    },
+    {
+      "term": "Fabric-Enabled Wireless",
+      "fa": "بی‌سیم یکپارچه با SD-Access",
+      "simple": "نگهداری Control Plane روی C9800 و عبور مستقیم Data Plane کلاینت با VXLAN روی Fabric Edge."
+    },
+    {
+      "term": "CWA (Central Web Auth)",
+      "fa": "پورتال مهمان مرکزی با ISE",
+      "simple": "هدایت کلاینت مهمان به پورتال ISE با Pre-Auth dACL و اعطای دسترسی پویا با CoA."
+    },
+    {
+      "term": "WPA3-SAE & 802.11w PMF",
+      "fa": "امنیت نسل جدید وای‌فای",
+      "simple": "احراز مقاوم در برابر حمله دیکشنری آفلاین همراه رمزنگاری فریم‌های مدیریتی علیه Deauth Flood."
+    },
+    {
+      "term": "802.11r / k / v",
+      "fa": "مجموعه جابه‌جایی سریع",
+      "simple": "Fast BSS Transition (11r)، گزارش همسایه‌ها (11k) و مدیریت بهینه Roaming کلاینت (11v)."
+    },
+    {
+      "term": "HA SSO (C9800)",
+      "fa": "افزونگی بدون قطعی WLC",
+      "simple": "همگام‌سازی لحظه‌ای نشست‌های CAPWAP و کلاینت بین WLC Active و Standby."
+    },
+    {
+      "term": "Tag Filter (Regex)",
+      "fa": "تخصیص خودکار ۳ تگ به AP",
+      "simple": "انتساب خودکار Policy/Site/RF Tag به اکسس‌پوینت‌های تازه متصل‌شده بر اساس الگوی نام AP."
+    },
+    {
+      "term": "IP_LEARN_TIMEOUT",
+      "fa": "خطای دریافت نکردن IP پس از EAP",
+      "simple": "توقف کلاینت پس از احراز هویت موفق به دلیل نقص VLAN سیمی یا نبود ip helper-address."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/ccie_wl-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (ممیزی ۳ تگ Catalyst 9800، شبیه‌ساز RadioActive Tracing و نگاشت WMM DSCP-to-UP) — کنترلر 9800 واقعی اجرا نشده",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ کنترلر واقعی Cisco Catalyst 9800 یا اکسس‌پوینت فیزیکی متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ کنترلر واقعی Cisco Catalyst 9800، Catalyst Center یا اکسس‌پوینت فیزیکی در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی سه بررسی کلیدی لب CCIE Enterprise Wireless را اجرا می‌کند: (۱) ممیزی اتصال <strong>Policy / Site / RF Tag</strong> به اکسس‌پوینت‌ها در Catalyst 9800، (۲) ردیابی <strong>RadioActive Trace</strong> برای تفکیک خطای <code>IP_LEARN_TIMEOUT</code> از حالت سالم <code>RUN (SGT=10)</code>، و (۳) نمایش جدول نگاشت استاندارد <strong>RFC 8325 DSCP-to-WMM</strong>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccie_wl_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccie_wl_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccie_wl (CCIE Enterprise Wireless v1.1: Catalyst 9800 3-Tag Audit, RadioActive Trace &amp; WMM QoS)\nSimulates (1) Catalyst 9800 IOS-XE modular Policy/Site/RF Tag AP binding validation,\n(2) RadioActive client onboarding trace (802.11 Assoc -&gt; 802.1X EAP -&gt; DHCP -&gt; SGT),\nand (3) RFC 8325 / Cisco DSCP-to-802.11e WMM User Priority mapping verification.\nNo real Cisco Catalyst 9800 WLC, Catalyst Center, or physical AP is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\nDSCP_TO_WMM_UP = {\n    &quot;EF (46) Voice&quot;: {&quot;up&quot;: 6, &quot;ac&quot;: &quot;AC_VO (Voice)&quot;},\n    &quot;AF41 (34) Video&quot;: {&quot;up&quot;: 4, &quot;ac&quot;: &quot;AC_VI (Video)&quot;},\n    &quot;CS3 (24) Signaling&quot;: {&quot;up&quot;: 3, &quot;ac&quot;: &quot;AC_BE / Call-Signaling&quot;},\n    &quot;BE (0) Default&quot;: {&quot;up&quot;: 0, &quot;ac&quot;: &quot;AC_BE (Best Effort)&quot;},\n}\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef audit_c9800_ap_tags(ap: dict) -&gt; dict:\n    if not isinstance(ap, dict) or not isinstance(ap.get(&quot;name&quot;), str) or not ap[&quot;name&quot;].strip():\n        raise ValueError(&quot;ap must be a dict with a non-empty string &#x27;name&#x27;&quot;)\n    for tag_key in (&quot;policy_tag&quot;, &quot;site_tag&quot;, &quot;rf_tag&quot;):\n        val = ap.get(tag_key)\n        if val is not None and not isinstance(val, str):\n            raise ValueError(f&quot;{tag_key} must be str or None, got {val!r} ({type(val).__name__})&quot;)\n    missing = []\n    if not (ap.get(&quot;policy_tag&quot;) or &quot;&quot;).strip() or ap[&quot;policy_tag&quot;] == &quot;default-policy-tag&quot;:\n        missing.append(&quot;Custom Policy Tag missing (WLAN not mapped to Policy Profile)&quot;)\n    if not (ap.get(&quot;site_tag&quot;) or &quot;&quot;).strip():\n        missing.append(&quot;Site Tag missing (Local vs FlexConnect mode undefined)&quot;)\n    if not (ap.get(&quot;rf_tag&quot;) or &quot;&quot;).strip():\n        missing.append(&quot;RF Tag missing (5 GHz / 2.4 GHz RF Profiles not bound)&quot;)\n    return {&quot;ap&quot;: ap[&quot;name&quot;], &quot;ssid_broadcasting&quot;: len(missing) == 0, &quot;issues&quot;: missing}\n\n\ndef radioactive_client_trace(mac: str, eap_ok: bool, dhcp_ok: bool, sgt: int | None) -&gt; dict:\n    if not isinstance(mac, str) or not mac.strip():\n        raise ValueError(f&quot;mac must be a non-empty str, got {mac!r}&quot;)\n    eap = _require_bool(eap_ok, &quot;eap_ok&quot;)\n    dhcp = _require_bool(dhcp_ok, &quot;dhcp_ok&quot;)\n    if sgt is not None and (isinstance(sgt, bool) or not isinstance(sgt, int) or not (0 &lt;= sgt &lt;= 65535)):\n        raise ValueError(f&quot;sgt must be None or int in [0, 65535] (not bool), got {sgt!r}&quot;)\n    timeline = [\n        {&quot;stage&quot;: &quot;1_80211_AUTH_ASSOC&quot;, &quot;status&quot;: &quot;SUCCESS&quot;},\n        {&quot;stage&quot;: &quot;2_8021X_EAP_TLS&quot;, &quot;status&quot;: &quot;SUCCESS&quot; if eap else &quot;FAILED_CERT_OR_ISE_TIMEOUT&quot;},\n    ]\n    if not eap:\n        return {&quot;client_mac&quot;: mac, &quot;final_state&quot;: &quot;DEAUTHENTICATED&quot;, &quot;timeline&quot;: timeline}\n    timeline.append({&quot;stage&quot;: &quot;3_DHCP_IP_LEARN&quot;, &quot;status&quot;: &quot;SUCCESS&quot; if dhcp else &quot;FAILED_VLAN_OR_HELPER&quot;})\n    if not dhcp:\n        return {&quot;client_mac&quot;: mac, &quot;final_state&quot;: &quot;IP_LEARN_TIMEOUT&quot;, &quot;timeline&quot;: timeline}\n    timeline.append({&quot;stage&quot;: &quot;4_RUN_STATE_SGT&quot;, &quot;status&quot;: f&quot;RUN (SGT={sgt})&quot;})\n    return {&quot;client_mac&quot;: mac, &quot;final_state&quot;: &quot;RUN&quot;, &quot;timeline&quot;: timeline}\n\n\ndef main() -&gt; None:\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_C9800_WLC_OR_AP_HARDWARE&quot;,\n        &quot;c9800_tag_audits&quot;: [\n            audit_c9800_ap_tags({&quot;name&quot;: &quot;AP-FL1-01&quot;, &quot;policy_tag&quot;: &quot;default-policy-tag&quot;, &quot;site_tag&quot;: &quot;SITE-HQ&quot;, &quot;rf_tag&quot;: None}),\n            audit_c9800_ap_tags({&quot;name&quot;: &quot;AP-FL1-02&quot;, &quot;policy_tag&quot;: &quot;PT-CORP-8021X&quot;, &quot;site_tag&quot;: &quot;ST-HQ-LOCAL&quot;, &quot;rf_tag&quot;: &quot;RT-HIGHDENSITY&quot;}),\n        ],\n        &quot;radioactive_traces&quot;: {\n            &quot;dhcp_failure_case&quot;: radioactive_client_trace(&quot;aa:bb:cc:11:22:33&quot;, eap_ok=True, dhcp_ok=False, sgt=None),\n            &quot;healthy_run_state&quot;: radioactive_client_trace(&quot;aa:bb:cc:11:22:44&quot;, eap_ok=True, dhcp_ok=True, sgt=10),\n        },\n        &quot;wmm_qos_dscp_mapping&quot;: DSCP_TO_WMM_UP,\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف نقص تگ روی <code>AP-FL1-01</code> در برابر پخش موفق <code>AP-FL1-02</code>، و جداسازی خطای DHCP پس از عبور موفق <code>EAP-TLS</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع دستورات RadioActive Tracing و بررسی تگ AP روی Catalyst 9800 (اجرا نشده روی WLC زنده):</strong></p><pre dir=\"ltr\"><code># Reference Catalyst 9800 IOS-XE CLI (NOT executed on live WLC)\nshow ap tag summary\ndebug wireless mac aaaa.bbbb.cccc internal\nshow wireless client mac-address aaaa.bbbb.cccc detail</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس CCIE Enterprise Wireless v1.1 (Catalyst 9800، RadioActive Trace و WMM)",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-ccie",
-   "recommendedCourse": "ccie-wireless",
-   "blueprint": "/academy-assets/v5/blueprints/ccie_wl.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/ccie_wl_lab.py"
-  },
-  "technicalAuditFixes": [
-   "حذف عدد غیرمستند «۹۰٪» در بخش ۱ و دقیق‌سازی تغییر نام رسمی سیسکو به CCIE Wireless v1.1 با آزمون کتبی 350-101 WLCOR (جایگزین ENCOR از ۱۹ مارس ۲۰۲۶)."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "در کنترلر Cisco Catalyst 9800 (مبتنی بر IOS-XE)، کدام سه تگ ماژولار جایگزین AP Group قدیمی شده‌اند و باید به هر AP متصل شوند؟",
+      "options": [
+        "Policy Tag، Site Tag و RF Tag",
+        "فقط VLAN Tag",
+        "فقط SSID Tag",
+        "فقط MAC Tag"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در Catalyst 9800، سه تگ Policy (WLAN/VLAN)، Site (Local/Flex) و RF (رادیوها) معماری ماژولار کامل AP را تشکیل می‌دهند.</p>"
+    },
+    {
+      "title": "چرا در عیب‌یابی شبکه‌های بی‌سیم سطح CCIE، بررسی لایه ۱ RF (پوشش، SNR، تداخل و نویز) باید پیش از دست‌کاری تنظیمات WLC انجام شود؟",
+      "options": [
+        "برای افزایش سرعت DHCP",
+        "زیرا مشکلات لایه ۱ RF (تداخل، ضعف سیگنال، نویز غیروای‌فایی) دقیقاً شبیه خطاهای نرم‌افزاری WLC/802.1X جلوه می‌کنند و ابتدا باید حذف شوند",
+        "برای کاهش بار حافظه سوئیچ Core",
+        "زیرا WLC تنظیمات CLI ندارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بررسی لایه ۱ RF به عنوان گام اول مانع از هدر رفتن ساعت‌ها وقت روی دیباگ اشتباه WLC و ISE می‌شود.</p>"
+    },
+    {
+      "title": "معیارهای کلیدی مهندسی برای طراحی یک شبکه WLAN سازمانی در سطح CCIE Wireless چیست؟",
+      "options": [
+        "فقط خرید بیشترین تعداد AP ممکن",
+        "فقط مخفی کردن نام SSID",
+        "توازن مهندسی میان پوشش (Coverage)، ظرفیت (Capacity)، جابه‌جایی سریع (Fast Roaming)، مدیریت کانال/تداخل و امنیت سرتاسری",
+        "استفاده صرف از کانال ۱ در ۲٫۴ گیگاهرتز"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>طراحی بی‌سیم حرفه‌ای هم‌زمان ظرفیت، پوشش، Roaming، مدیریت طیف و امنیت را در یک کل یکپارچه می‌سنجد.</p>"
+    },
+    {
+      "title": "ابزار RadioActive Tracing روی Catalyst 9800 (debug wireless mac <MAC> internal) چه مزیت کلیدی در روز آزمون عملی دارد؟",
+      "options": [
+        "تغییر خودکار کانال‌های ۵ گیگاهرتز",
+        "حذف خودکار کلاینت‌های مهمان",
+        "خاموش کردن رادیوهای ۲٫۴ گیگاهرتز",
+        "جمع‌آوری یکپارچه تمام لاگ‌های چرخه اتصال یک کلاینت (Assoc، 802.1X EAP، DHCP و SGT) از همه فرآیندهای WLC در یک فایل متنی دقیق"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>RadioActive Tracing سریع‌ترین ابزار تشخیص علت دقیق قطع یا عدم اتصال کلاینت روی Catalyst 9800 است.</p>"
+    },
+    {
+      "title": "در خروجی RadioActive Trace، کلاینتی مرحله 802.1X EAP-TLS را با موفقیت پشت سر گذاشته اما در مرحله IP_LEARN_TIMEOUT گیر کرده است. محتمل‌ترین علت چیست؟",
+      "options": [
+        "نقص در VLAN سیمی (فراموش شدن VLAN روی Trunk) یا نبود ip helper-address برای سرور DHCP در VLAN مربوط به Policy Profile",
+        "اشتباه بودن رمز عبور کاربر در Active Directory",
+        "خرابی آنتن ۵ گیگاهرتز AP",
+        "خاموش بودن SNMP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>عبور موفق از EAP-TLS نشان می‌دهد ISE کار خود را انجام داده و خطا در تحویل آدرس IP روی لایه شبکه/DHCP است.</p>"
+    },
+    {
+      "title": "بر اساس استاندارد RFC 8325 و 802.11e WMM، ترافیک صوتی با علامت DSCP EF (46) باید به کدام User Priority و صف دسترسی بی‌سیم نگاشت شود؟",
+      "options": [
+        "UP 0 (AC_BE — Best Effort)",
+        "UP 6 (AC_VO — Voice)",
+        "UP 1 (AC_BK — Background)",
+        "Drop شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>نگاشت <code>EF (46) -&gt; UP 6 (AC_VO)</code> بالاترین اولویت دسترسی به رسانه بی‌سیم را برای بسته‌های صوتی تضمین می‌کند.</p>"
+    },
+    {
+      "title": "تغییر کدام یک از سه تگ روی یک AP در Catalyst 9800 باعث ریستارت شدن نشست CAPWAP اکسس‌پوینت می‌شود؟",
+      "options": [
+        "Policy Tag",
+        "RF Tag",
+        "Site Tag (زیرا ممکن است حالت کاری AP بین Local و FlexConnect تغییر کند)",
+        "هیچ‌کدام"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>دانستن اینکه تغییر <code>Site Tag</code> باعث ریست CAPWAP می‌شود در مدیریت زمان لب و نگهداری تولیدی بسیار مهم است.</p>"
+    },
+    {
+      "title": "در استقرار Fabric-Enabled Wireless (یکپارچه با Cisco SD-Access)، جریان Control Plane و Data Plane کلاینت چگونه تفکیک می‌شود؟",
+      "options": [
+        "هر دو در یک سوئیچ لایه ۲ متوقف می‌شوند",
+        "هیچ کنترلر WLC وجود ندارد",
+        "همه ترافیک داده به WLC مرکزی تونل می‌شود",
+        "Control Plane AP همچنان با Catalyst 9800 است، اما Data Plane کلاینت‌ها مستقیم روی سوئیچ Fabric Edge به VXLAN وارد شده و سیاست SGT اعمال می‌شود"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>تفکیک Control Plane (روی C9800) و Data Plane (روی Fabric Edge) مقیاس‌پذیری و امنیت یکپارچه سیمی و بی‌سیم را فراهم می‌کند.</p>"
+    },
+    {
+      "title": "چرا استاندارد 802.11w (Protected Management Frames — PMF) در شبکه‌های WPA3 الزامی شده است؟",
+      "options": [
+        "برای جلوگیری از حملات جعل فریم‌های مدیریتی مانند Deauthentication و Disassociation Flood علیه کلاینت‌ها",
+        "برای افزایش توان آنتن به ۳۰ dBm",
+        "برای حذف نیاز به DHCP",
+        "برای غیرفعال کردن ۵ گیگاهرتز"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>PMF فریم‌های مدیریتی کلیدی را محافظت و احراز اصالت می‌کند تا مهاجمان نتوانند با فریم جعلی Deauth کاربران را قطع کنند.</p>"
+    },
+    {
+      "title": "در طراحی FlexConnect Local Switching برای شعب، کدام نکته پیکربندی درون Flex Profile حیاتی است؟",
+      "options": [
+        "خاموش کردن همه VLANها روی سوئیچ شعبه",
+        "تعریف دقیق نگاشت VLANهای محلی شعبه (VLAN-to-SSID / ACL) و تطابق Native VLAN پورت Trunk متصل به AP",
+        "تبدیل AP به روتر BGP",
+        "حذف CAPWAP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در FlexConnect Local Switching ترافیک داده محلی به VLANهای شعبه تحویل می‌شود و ناهماهنگی Native/Trunk VLAN ارتباط کلاینت را می‌اندازد.</p>"
+    },
+    {
+      "title": "برای تخصیص خودکار Policy Tag، Site Tag و RF Tag به ده‌ها AP تازه متصل‌شده در Catalyst 9800 بدون ویرایش دستی تک‌تک آن‌ها چه قابلیتی وجود دارد؟",
+      "options": [
+        "Telnet دستی هر شب",
+        "تغییر نام SSID به شماره سریال",
+        "Tag Filters (قوانین Regex بر اساس الگوی نام‌گذاری APها یا Location)",
+        "خاموش کردن RRM"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>استفاده از Tag Filters با نام‌گذاری استاندارد APها (مثلاً <code>AP-TEH-FL2-*</code>) استقرار سریع و بدون خطا را تضمین می‌کند.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "اتصال زنده به Catalyst 9800-80 دیتاسنتر",
+        "تست واقعی کلاینت آیفون روی WLC تولیدی",
+        "فقط متن نظری بدون کد",
+        "شبیه‌سازی محلی (Local Mock) در Python 3 برای ممیزی ۳تگی Catalyst 9800، ردیابی RadioActive Trace و جدول نگاشت WMM RFC 8325"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ کنترلر Catalyst 9800 یا AP واقعی متصل نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "ccie_wl",
+    "sources": [
+      "https://learningnetwork.cisco.com/s/ccie-enterprise-wireless-exam-topics",
+      "https://www.rfc-editor.org/rfc/rfc8325",
+      "https://learningnetwork.cisco.com/s/article/ccie-practical-exam-format"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی Cisco Catalyst 9800، Catalyst Center یا AP فیزیکی متصل نشده است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Tag Filters، Fabric-Enabled Wireless، WPA3/802.11w PMF، RFC 8325 WMM و شبیه‌ساز ۳تگی/RadioActive Trace."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccie_wl-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-ccie",
+      "recommendedCourse": "ccie-wireless",
+      "blueprint": "/academy-assets/v5/blueprints/ccie_wl.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccie_wl_lab.py"
+    },
+    "technicalAuditFixes": [
+      "حذف عدد غیرمستند «۹۰٪» در بخش ۱ و دقیق‌سازی تغییر نام رسمی سیسکو به CCIE Wireless v1.1 با آزمون کتبی 350-101 WLCOR (جایگزین ENCOR از ۱۹ مارس ۲۰۲۶)."
+    ]
+  }
 }

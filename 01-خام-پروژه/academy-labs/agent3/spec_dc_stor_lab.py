@@ -9,22 +9,36 @@ No real Cisco MDS SAN switch or storage array is connected.
 import json
 
 
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
+def _require_vsan(val: object, name: str) -> int:
+    if isinstance(val, bool) or not isinstance(val, int) or not (1 <= val <= 4093):
+        raise ValueError(f"{name} must be a Fibre Channel VSAN int in [1, 4093] (not bool), got {val!r}")
+    return val
+
+
 def evaluate_fc_access(
     initiator: dict,
     target: dict,
     zones: list[dict],
     known_initiator_wwpns: set[str] | None = None,
 ) -> dict:
-    if initiator["vsan"] != target["vsan"]:
+    init_vsan = _require_vsan(initiator.get("vsan"), "initiator.vsan")
+    tgt_vsan = _require_vsan(target.get("vsan"), "target.vsan")
+    if init_vsan != tgt_vsan:
         return {
             "allowed": False,
-            "reason": f"VSAN mismatch ({initiator['vsan']} != {target['vsan']}) — hard L2 fabric isolation",
+            "reason": f"VSAN mismatch ({init_vsan} != {tgt_vsan}) — hard L2 fabric isolation",
         }
     initiator_registry = set(known_initiator_wwpns) if known_initiator_wwpns is not None else {initiator["wwpn"]}
     initiator_registry.add(initiator["wwpn"])
 
     for zone in zones:
-        if zone["vsan"] != initiator["vsan"]:
+        if _require_vsan(zone.get("vsan"), "zone.vsan") != init_vsan:
             continue
         members = set(zone["members"])
         if initiator["wwpn"] in members and target["wwpn"] in members:
@@ -41,13 +55,23 @@ def evaluate_fc_access(
 
 
 def check_fcoe_dcb_readiness(link: dict) -> dict:
+    if not isinstance(link, dict) or not isinstance(link.get("name"), str) or not link["name"].strip():
+        raise ValueError("link must be a dict with a non-empty string 'name'")
+    for key in ("pfc_cos3_enabled", "ets_enabled"):
+        if key not in link:
+            raise ValueError(f"link missing required boolean key '{key}'")
+    pfc = _require_bool(link["pfc_cos3_enabled"], "link['pfc_cos3_enabled']")
+    ets = _require_bool(link["ets_enabled"], "link['ets_enabled']")
+    mtu = link.get("mtu", 1500)
+    if isinstance(mtu, bool) or not isinstance(mtu, int) or mtu <= 0:
+        raise ValueError(f"link['mtu'] must be a positive int (not bool), got {mtu!r}")
     issues = []
-    if not link.get("pfc_cos3_enabled"):
+    if not pfc:
         issues.append("PFC (802.1Qbb) missing on CoS 3 — frames will drop under congestion")
-    if not link.get("ets_enabled"):
+    if not ets:
         issues.append("ETS (802.1Qaz) missing — storage bandwidth not guaranteed")
-    if link.get("mtu", 1500) < 2240:
-        issues.append(f"MTU {link.get('mtu')} too small for 2112B FC payload + FCoE headers (need >=2240 / 9216)")
+    if mtu < 2240:
+        issues.append(f"MTU {mtu} too small for 2112B FC payload + FCoE headers (need >=2240 / 9216)")
     return {"link": link["name"], "lossless_ready": len(issues) == 0, "issues": issues}
 
 

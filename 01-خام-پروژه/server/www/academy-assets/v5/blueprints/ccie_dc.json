@@ -1,342 +1,342 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "ccie_dc",
- "objectiveId": "ccie_dc",
- "kind": "lesson",
- "track": "CCIE",
- "course": "ccie-dc",
- "title": "۸.۳ CCIE Data Center: پنج ستون لب ۸ساعته v3.1 (ACI، VXLAN EVPN، MDS SAN، UCS و اتوماسیون)",
- "titleEn": "CCIE Data Center (350-601 DCCOR + 8-Hour Lab v3.1): ACI 5-Link Debug, VXLAN EVPN, SAN & UCS",
- "domain": "Data Center Expert",
- "source": "Legacy ccie_dc rewritten, typo-cleaned, and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 60,
- "prerequisites": [
-  "spec_dc_nx",
-  "spec_dc_aci",
-  "spec_dc_stor"
- ],
- "sections": [
-  {
-   "id": "ccie_dc-section-1",
-   "title": "مسئله واقعی: چرا CCIE Data Center صرفاً آزمون سوئیچ Nexus نیست، بلکه آزمون یکپارچه‌سازی ۵ دنیای مجزاست؟",
-   "html": "<p>در آزمون عملی <strong>CCIE Data Center (v3.1)</strong> (پس از قبولی در <code>350-601 DCCOR</code>)، داوطلب در ۵ ساعت بخش عملی باید پنج حوزه کاملاً متفاوت را بدون یک باگ کوچک به هم وصل کند: <strong>فابریک Cisco ACI</strong>، <strong>فابریک NX-OS VXLAN EVPN</strong>، <strong>محاسبات Cisco UCS / Intersight</strong>، <strong>شبکه ذخیره‌سازی MDS FC/FCoE</strong> و <strong>اتوماسیون APIC/NX-API با Python/Ansible/Terraform</strong>. تنها یک حلقه گمشده (مثلاً فراموش کردن تیک Unicast Routing در ACI یا فعال نکردن Zoneset در MDS) کل سرویس را می‌خواباند!</p>"
-  },
-  {
-   "id": "ccie_dc-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر NX-OS vPC، Cisco ACI و SAN در درس‌های <code>spec_dc_nx</code>، <code>spec_dc_aci</code> و <code>spec_dc_stor</code>.</p><ul><li>تسلط بر پنج ستون اصلی لب ۸ساعته <strong>CCIE Data Center v3.1</strong> و نحوه اتصال سرتاسری آن‌ها.</li><li>اجرای <strong>زنجیره ۵ حلقه‌ای عیب‌یابی Cisco ACI</strong> برای تشخیص ساختاریافته و سریع بخش بزرگی از مشکلات رایج اتصال بین EPGها.</li><li>عیب‌یابی سریع فابریک <strong>NX-OS VXLAN EVPN</strong> با سه دستور طلایی <code>show bgp l2vpn evpn</code>، <code>show nve peers</code> و <code>show l2route evpn mac</code>.</li><li>همگام‌سازی <strong>Cisco UCS / Intersight</strong> با شبکه و SAN (<code>FLOGI / VSAN / Zoneset</code>) و اجرای سریع تسک‌های اتوماسیون DC.</li></ul>"
-  },
-  {
-   "id": "ccie_dc-section-3",
-   "title": "زنجیره طلایی ۵ حلقه‌ای عیب‌یابی در Cisco ACI (بزرگ‌ترین سهم امتیاز لب)",
-   "html": "<p>اگر دو سرور در دو EPG مختلف درون فابریک ACI یکدیگر را پینگ نمی‌کنند، به جای کلیک تصادفی در UI APIC، دقیقاً این ۵ حلقه را به ترتیب ممیزی کنید:</p><ol><li><strong>اتصال فیزیکی تا Domain:</strong> آیا Interface Policy Group به <strong>AAEP</strong> و AAEP به <strong>Physical/VMM Domain</strong> صحیح وصل شده است؟</li><li><strong>تطابق VLAN Pool و Static Encap:</strong> آیا شماره VLAN استفاده‌شده در Static Path Binding درون <strong>VLAN Pool</strong> همان Domain قرار دارد؟</li><li><strong>تنظیمات Bridge Domain (BD):</strong> آیا EPG به BD صحیح وصل است، آیا <strong>Unicast Routing</strong> تیک خورده و <strong>Subnet</strong> تعریف شده است؟</li><li><strong>اتصال BD به VRF:</strong> آیا BD به VRF درست وصل است (و اگر بین دو VRF است، آیا Scope ساب‌نت روی <code>Shared between VRFs</code> و Scope قرارداد روی <code>Tenant/Global</code> تنظیم شده است)؟</li><li><strong>Contract با جهت صحیح:</strong> آیا یک سمت <code>Provider</code> و سمت دیگر <code>Consumer</code> با Filter و گزینه <code>Apply Both Directions</code> پیکربندی شده است؟</li></ol>"
-  },
-  {
-   "id": "ccie_dc-section-4",
-   "title": "نمودار پنج ستون CCIE Data Center v3.1 و چک‌لیست‌های دیباگ سریع",
-   "html": "<p>نمودار زیر پنج ستون اصلی لب CCIE Data Center v3.1 و مهم‌ترین دستورات عیب‌یابی هر بخش را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCIE Data Center v3.1 Five Pillars and Fast Debugging Checklists: ACI, NX-OS EVPN, SAN, UCS and Automation\"><rect x=\"14\" y=\"14\" width=\"234\" height=\"122\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"131\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">1. ACI Fabric (Infra 15% + Conn 15%)</text><text x=\"131\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">5-Link Debug Chain:</text><text x=\"131\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">AAEP -&gt; VLAN Pool -&gt; BD Subnet</text><text x=\"131\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">-&gt; VRF -&gt; Contract (Prov/Cons)</text><text x=\"131\" y=\"116\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">L3Out + VMM + Multi-Site</text><rect x=\"264\" y=\"14\" width=\"232\" height=\"122\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">2. L2/L3 (20%) + Sec/Svc (10%)</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Spine-Leaf + ECMP East-West</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">show bgp l2vpn evpn summary</text><text x=\"380\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">show nve peers / l2route mac</text><text x=\"380\" y=\"116\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Anycast GW + vPC + NDFC</text><rect x=\"512\" y=\"14\" width=\"234\" height=\"122\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"629\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">3. Compute 15% / SAN 10% / Auto 15%</text><text x=\"629\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">UCS / Intersight Service Profiles</text><text x=\"629\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">MDS FC/FCoE: FLOGI + Zoneset</text><text x=\"629\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Terraform / Ansible / NX-API</text><text x=\"629\" y=\"116\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">APIC REST JSON + Python</text><rect x=\"14\" y=\"152\" width=\"732\" height=\"58\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"380\" y=\"176\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f172a\">CCIE DC v3.1 Exam Flow: 3h Design (No CLI) + 5h Deploy, Operate &amp; Optimize (Live DC Pod)</text><text x=\"380\" y=\"196\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Integrate Network + Storage + Compute + Automation End-to-End with Deterministic Verification</text></svg>"
-  },
-  {
-   "id": "ccie_dc-section-5",
-   "title": "ستون دوم: معماری Spine-Leaf مبتنی بر NX-OS VXLAN EVPN و سه دستور نجات‌بخش",
-   "html": "<p>برای مقیاس‌پذیری ترافیک شرق-غرب (East-West) دیتاسنتر در حالت NX-OS (خارج از ACI)، معماری استاندارد <strong>Spine-Leaf با ECMP در Underlay (OSPF/IS-IS/eBGP) و MP-BGP EVPN + VXLAN در Overlay</strong> همراه با <strong>Distributed Anycast Gateway</strong> است. اگر دو سرور روی دو Leaf مختلف ارتباط ندارند، دقیقاً از پایین به بالا این سه دستور را بزنید:</p><ol><li><code>show bgp l2vpn evpn summary</code>: تأیید برقراری همسایگی EVPN با Route Reflector روی Spineها.</li><li><code>show nve peers</code> و <code>show nve vni</code>: تأیید بالا آمدن اینترفیس تونل <code>nve1</code>، کشف VTEPهای همتا و نگاشت VLAN به L2VNI/L3VNI.</li><li><code>show l2route evpn mac all</code> (و <code>show bgp l2vpn evpn</code> برای Route Type-2 و Type-5): تأیید یادگیری و تبلیغ MAC/IP و پیشوندهای ساب‌نت.</li></ol>"
-  },
-  {
-   "id": "ccie_dc-section-6",
-   "title": "تله‌های کلیدی VXLAN EVPN در لب: MTU، Multicast Underlay/Ingress Replication و Anycast MAC",
-   "html": "<p>چهار اشتباه ریز که کل EVPN را در لب از کار می‌اندازد: (۱) فراموش کردن <strong>Jumbo MTU (9216)</strong> روی لینک‌های Leaf-Spine (به دلیل سربار ۵۰ بایتی هدر VXLAN)؛ (۲) ناهماهنگی <strong><code>fabric forwarding anycast-gateway-mac</code></strong> بین Leafها؛ (۳) نبود <code>send-community extended</code> روی همسایگی BGP EVPN (در نتیجه Route-Targetها حذف می‌شوند!)؛ و (۴) فراموش کردن <code>vn-segment</code> در تعریف VLAN یا اتصال L3VNI به VRF.</p>"
-  },
-  {
-   "id": "ccie_dc-section-7",
-   "title": "ستون سوم: یکپارچگی محاسبات Cisco UCS / Intersight (Service Profiles و Fabric Interconnect)",
-   "html": "<p>در بخش Compute، معماری <strong>Cisco UCS (یا Intersight Managed Mode — IMM)</strong> تمام هویت سرور تیغه‌ای (MACهای کارت vNIC، WWPNهای کارت vHBA، نسخه Firmware، ترتیب Boot و VLANها) را در یک <strong>Service Profile / Server Profile</strong> نرم‌افزاری جدا از سخت‌افزار تعریف می‌کند. نکته کلیدی روز لب: تطابق دقیق <strong>VLANها در Uplink</strong> و <strong>VSANها در FC Uplink (حالت End-Host / NPV)</strong> روی جفت <strong>Fabric Interconnect A و B</strong>!</p>"
-  },
-  {
-   "id": "ccie_dc-section-8",
-   "title": "ستون چهارم: عیب‌یابی ۲دقیقه‌ای SAN (MDS FC / FCoE) در روز لب",
-   "html": "<p>در بخش Storage Networking لب CCIE DC، بخش عمده مشکلات رایج دسترسی به دیسک با سه بررسی ساختاریافته آشکار می‌شود: (۱) <code>show flogi database</code> (آیا HBA سرور و پورت Storage اصلاً در VSAN صحیح لاگین کرده‌اند؟)، (۲) <code>show zoneset active vsan &lt;id&gt;</code> (آیا Zoneset واقعاً <strong>Activate</strong> شده و WWPNها دقیقاً در یک Zone هستند؟) و (۳) در FCoE بررسی بالا بودن <code>vfc</code>، تطابق <code>bind interface</code> و فعال بودن <code>PFC/ETS/MTU</code> در سیاست QoS.</p>"
-  },
-  {
-   "id": "ccie_dc-section-9",
-   "title": "ستون پنجم: اتوماسیون دیتاسنتر در CCIE DC (APIC REST / Terraform / Ansible / NX-API / NDFC)",
-   "html": "<p>در بخش Automation لب CCIE DC، ترفند طلایی صرفه‌جویی زمان این است: برای هر شیء پیچیده در ACI، ابتدا یک نمونه کوچک را در UI بسازید و با <strong>API Inspector</strong> یا <strong>Save As JSON</strong> ساختار دقیق MIT آن را ببینید؛ سپس همان الگو را در اسکریپت Python <code>requests</code> یا ماژول <code>cisco.aci</code> در Ansible تکرار کنید! روی Nexus نیز <strong>NX-API Sandbox</strong> (تولیدکننده خودکار JSON-RPC و کد Python) بهترین دوست شماست.</p>"
-  },
-  {
-   "id": "ccie_dc-section-10",
-   "title": "نگاه معماری در ماژول ۱ (Design ۳ساعته) CCIE Data Center",
-   "html": "<p>در ماژول Design باید تصمیم‌های کلان تجاری/فنی بگیرید: انتخاب بین <strong>ACI Multi-Pod</strong> (یک خوشه APIC، تاخیر کم) و <strong>ACI Multi-Site (NDO)</strong> (دو شهر مجزا، ایزوله‌سازی دامنه خرابی)، انتخاب بین <strong>Native FC</strong> و <strong>iSCSI/NVMe-oF</strong> بر اساس بودجه و SLA تاخیر، و محاسبه نسبت Oversubscription لینک‌های Leaf-Spine (مثلاً ۳:۱ در برابر ۱:۱ برای ترافیک AI/HPC).</p>"
-  },
-  {
-   "id": "ccie_dc-section-11",
-   "title": "کژفهمی‌های رایج درباره CCIE Data Center",
-   "html": "<ul><li><strong>کژفهمی ۱: «اگر در ACI فقط VLAN را روی پورت Leaf تنظیم کنیم، سرورها خودکار همدیگر را می‌بینند.»</strong> واقعیت: در ACI هر ۵ حلقه (AAEP/Domain، VLAN Pool، BD/Subnet، VRF و Contract) باید هم‌زمان سالم باشند.</li><li><strong>کژفهمی ۲: «VXLAN EVPN در همه معماری‌های دیتاسنتر اجباری است.»</strong> واقعیت: VXLAN EVPN با Spine-Leaf و ECMP استاندارد مدرن و بسیار متداول برای مقیاس‌پذیری ترافیک East-West است، اما در دیتاسنترهای بسیار کوچک ممکن است معماری‌های ساده‌تر انتخاب شوند — انتخاب معماری همیشه تابع نیازمندی است!</li><li><strong>کژفهمی ۳: «در NX-OS EVPN کافی است همسایگی BGP IPv4 برقرار باشد.»</strong> واقعیت: علاوه بر همسایگی <code>address-family l2vpn evpn</code>، ارسال <code>send-community extended</code> برای تبادل Route-Targetها کاملاً حیاتی است.</li></ul>"
-  },
-  {
-   "id": "ccie_dc-section-12",
-   "title": "اصلاح خطاهای نگارشی نسخه قدیمی و چک‌لیست ۳۰ دقیقه پایانی",
-   "html": "<p><strong>یادداشت ممیزی:</strong> عبارات معیوب نسخه قدیمی (غلط املایی نسخه قدیمی، «مساوی‌كلفة»، «آرخیتهکتور»، «Zend needهایت را بررسی کنید») به‌طور کامل به فارسی دقیق و علمی بازنویسی شدند.</p><p><strong>چک‌لیست پایانی لب CCIE DC:</strong> (۱) <code>copy running-config startup-config</code> روی تمام سوئیچ‌های Nexus و MDS، (۲) بررسی نبود Fault بحرانی تازه در APIC، (۳) تست نهایی پینگ بین EPGها، بین VTEPهای EVPN و تایید مشاهده LUN در سرور UCS.</p>"
-  },
-  {
-   "id": "ccie_dc-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> در زنجیره ۵ حلقه‌ای ACI، AAEP به Domain وصل است و BD/VRF سالم‌اند، اما Static Encap VLAN در VLAN Pool نیست و Contract فقط روی سمت Provider تنظیم شده است. چرا پینگ برقرار نمی‌شود؟ <strong>پاسخ:</strong> دو حلقه (حلقه ۲: کمبود VLAN در VLAN Pool و حلقه ۵: اعمال نشدن Contract در سمت Consumer) شکست خورده‌اند و هر دو باید اصلاح شوند.</p><p><strong>تمرین ۲:</strong> در فابریک NX-OS EVPN، همسایگی BGP EVPN در حالت <code>Established</code> است ولی جدول <code>show nve peers</code> خالی است. چه مواردی را بررسی می‌کنید؟ <strong>پاسخ:</strong> بررسی اتصال VNI به <code>interface nve1</code>، فعال بودن <code>host-reachability protocol bgp</code>، تنظیم <code>send-community extended</code> و دسترسی Underlay میان Loopbackهای VTEP.</p>"
-  },
-  {
-   "id": "ccie_dc-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://learningnetwork.cisco.com/s/ccie-data-center-exam-topics\" target=\"_blank\" rel=\"noopener\">سرفصل‌های رسمی آزمون عملی CCIE Data Center v3.1 (Cisco Learning Network)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی APIC، سوئیچ Nexus 9000، Cisco UCS یا MDS 9000 در این محیط متصل نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "CCIE Data Center v3.1",
-   "fa": "گواهینامه خبره دیتاسنتر سیسکو",
-   "simple": "بالاترین سطح اجرایی دیتاسنتر سیسکو شامل DCCOR (350-601) و لب ۸ساعته ۵ستونه."
-  },
-  {
-   "term": "ACI 5-Link Debug Chain",
-   "fa": "زنجیره ۵حلقه‌ای دیباگ ACI",
-   "simple": "بررسی ترتیبی AAEP/Domain، VLAN Pool، BD/Subnet، VRF و Contract برای حل سریع قطع ارتباط EPGها."
-  },
-  {
-   "term": "Spine-Leaf + ECMP",
-   "fa": "معماری ستون‌فقرات-برگ",
-   "simple": "توپولوژی مسطح با تاخیر یکنواخت و توزیع بار هم‌هزینه برای ترافیک شرق-غرب دیتاسنتر."
-  },
-  {
-   "term": "NX-OS VXLAN EVPN",
-   "fa": "فابریک لایه ۲/۳ مدرن Nexus",
-   "simple": "استفاده از MP-BGP EVPN به عنوان صفحه کنترل و VXLAN به عنوان کپسوله‌سازی داده روی Nexus 9000."
-  },
-  {
-   "term": "NVE Interface (nve1)",
-   "fa": "اینترفیس منطقی تونل VTEP",
-   "simple": "Network Virtualization Edge؛ اینترفیس سازنده تونل‌های VXLAN میان سوئیچ‌های Leaf."
-  },
-  {
-   "term": "L2VNI / L3VNI",
-   "fa": "شناسه سگمنت لایه ۲ و لایه ۳ VXLAN",
-   "simple": "L2VNI معادل سگمنت سوئیچینگ VLAN و L3VNI تونل روتینگ میان VLANهای یک VRF است."
-  },
-  {
-   "term": "Anycast Gateway MAC",
-   "fa": "مک یکسان دروازه توزیع‌شده",
-   "simple": "تنظیم MAC یکسان روی تمام Leafها تا VM هنگام vMotion بدون تغییر Gateway کار کند."
-  },
-  {
-   "term": "EVPN Route Type-2 / Type-5",
-   "fa": "مسیرهای MAC/IP و پیشوند در EVPN",
-   "simple": "Type-2 برای تبلیغ MAC/IP میزبان‌ها و Type-5 برای تبلیغ پیشوندهای لایه ۳ IP Subnet."
-  },
-  {
-   "term": "Cisco UCS / Intersight",
-   "fa": "زیرساخت محاسبات یکپارچه سیسکو",
-   "simple": "مدیریت متمرکز سرورها و هویت نرم‌افزاری vNIC/vHBA از طریق Service Profiles."
-  },
-  {
-   "term": "Fabric Interconnect (FI)",
-   "fa": "سوئیچ همگرای اتصال UCS",
-   "simple": "جفت سوئیچ اتصال سرورهای UCS به شبکه LAN و فابریک SAN (معمولاً در حالت End-Host/NPV)."
-  },
-  {
-   "term": "NDFC (Nexus Dashboard Fabric Controller)",
-   "fa": "کنترلر خودکارسازی فابریک NX-OS",
-   "simple": "نسل جدید DCNM برای طراحی، استقرار و پایش خودکار فابریک‌های VXLAN EVPN."
-  },
-  {
-   "term": "NX-API Sandbox",
-   "fa": "محیط تست API داخلی Nexus",
-   "simple": "رابط وب داخلی NX-OS که دستورات CLI را به JSON-RPC/REST و کد آماده Python تبدیل می‌کند."
-  },
-  {
-   "term": "East-West Traffic",
-   "fa": "ترافیک شرق-غرب دیتاسنتر",
-   "simple": "حجم عظیم ارتباط میان سرورها/میکروسرویس‌های داخل دیتاسنتر (بیش از ۷۰–۸۰٪ کل ترافیک)."
-  },
-  {
-   "term": "Oversubscription Ratio",
-   "fa": "نسبت هم‌رسانی پهنای باند",
-   "simple": "نسبت مجموع ظرفیت پورت‌های سرور روی Leaf به ظرفیت لینک‌های Uplink به Spine (مثلاً ۳:۱)."
-  },
-  {
-   "term": "send-community extended",
-   "fa": "ارسال Extended Community در BGP",
-   "simple": "تنظیم اجباری در همسایگی EVPN جهت انتقال Route-Targetها و جلوگیری از افت مسیرها."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (زنجیره ۵حلقه‌ای عیب‌یابی ACI، بررسی NX-OS VXLAN EVPN و سلامت MDS SAN) — تجهیزات دیتاسنتر واقعی اجرا نشده",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ کنترلر واقعی APIC، Nexus 9000 یا MDS متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ کنترلر واقعی APIC، سوئیچ Nexus 9000، UCS یا MDS 9000 در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی سه چک‌لیست حیاتی روز آزمون CCIE Data Center v3.1 را اجرا می‌کند: (۱) کشف دو حلقه معیوب در زنجیره ۵حلقه‌ای <strong>Cisco ACI</strong> (نقص VLAN Pool و Contract) و تایید پس از اصلاح، (۲) تایید <code>BGP EVPN + nve1 peers + l2route MAC</code> در NX-OS، و (۳) تایید <code>FLOGI + Active Zoneset</code> در MDS SAN.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccie_dc_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccie_dc_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccie_dc (CCIE Data Center v3.1: 5-Link ACI Debug Chain, NX-OS VXLAN EVPN &amp; MDS SAN Check)\nSimulates the 5-step Cisco ACI EPG-to-EPG troubleshooting chain, NX-OS BGP EVPN / NVE VTEP\ncontrol/data plane verification, and MDS Fibre Channel FLOGI + active zoneset health check.\nNo real Cisco APIC, Nexus 9000, UCS, or MDS 9000 hardware is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef verify_aci_5_link_chain(fabric: dict) -&gt; dict:\n    checks = [\n        (&quot;1_aaep_domain_binding&quot;, fabric[&quot;aaep_bound_to_domain&quot;], &quot;Bind AAEP to Physical/VMM Domain&quot;),\n        (&quot;2_vlan_pool_encap_match&quot;, fabric[&quot;vlan_in_domain_pool&quot;], &quot;Add static encap VLAN to Domain VLAN Pool&quot;),\n        (&quot;3_bd_unicast_and_subnet&quot;, fabric[&quot;bd_unicast_routing&quot;] and fabric[&quot;bd_has_subnet&quot;], &quot;Enable Unicast Routing and define Subnet on BD&quot;),\n        (&quot;4_bd_linked_to_vrf&quot;, fabric[&quot;bd_vrf_attached&quot;], &quot;Attach Bridge Domain to target VRF&quot;),\n        (&quot;5_contract_direction_scope&quot;, fabric[&quot;contract_applied_both_sides&quot;], &quot;Apply Contract as Provider/Consumer with matching Scope&quot;),\n    ]\n    failed = [{&quot;step&quot;: name, &quot;fix&quot;: fix} for name, ok, fix in checks if not ok]\n    return {&quot;epg_ping_ok&quot;: len(failed) == 0, &quot;failed_links&quot;: failed}\n\n\ndef verify_nxos_evpn_vxlan(bgp_evpn_up: bool, nve_peers: list[str], mac_in_l2route: bool, vni: int) -&gt; dict:\n    ok = bgp_evpn_up and len(nve_peers) &gt; 0 and mac_in_l2route\n    return {\n        &quot;vni&quot;: vni,\n        &quot;bgp_l2vpn_evpn&quot;: &quot;Established&quot; if bgp_evpn_up else &quot;Idle&quot;,\n        &quot;nve1_peers&quot;: nve_peers,\n        &quot;l2route_mac_learned&quot;: mac_in_l2route,\n        &quot;east_west_forwarding_ready&quot;: ok,\n    }\n\n\ndef main() -&gt; None:\n    broken_aci = {\n        &quot;aaep_bound_to_domain&quot;: True,\n        &quot;vlan_in_domain_pool&quot;: False,\n        &quot;bd_unicast_routing&quot;: True,\n        &quot;bd_has_subnet&quot;: True,\n        &quot;bd_vrf_attached&quot;: True,\n        &quot;contract_applied_both_sides&quot;: False,\n    }\n    fixed_aci = {k: True for k in broken_aci}\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_APIC_NEXUS_OR_MDS_HARDWARE&quot;,\n        &quot;aci_5_link_debug_before&quot;: verify_aci_5_link_chain(broken_aci),\n        &quot;aci_5_link_debug_after&quot;: verify_aci_5_link_chain(fixed_aci),\n        &quot;nxos_vxlan_evpn_check&quot;: verify_nxos_evpn_vxlan(\n            bgp_evpn_up=True,\n            nve_peers=[&quot;10.255.0.11&quot;, &quot;10.255.0.12&quot;],\n            mac_in_l2route=True,\n            vni=10010,\n        ),\n        &quot;mds_san_flogi_zoneset&quot;: {\n            &quot;vsan&quot;: 100,\n            &quot;flogi_entries&quot;: 2,\n            &quot;zoneset_activated&quot;: True,\n            &quot;status&quot;: &quot;READY&quot;,\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف دقیق <code>2_vlan_pool_encap_match</code> و <code>5_contract_direction_scope</code>، تایید <code>epg_ping_ok: True</code> پس از اصلاح و <code>east_west_forwarding_ready: True</code> در VNI <code>10010</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع سه دستور طلایی دیباگ VXLAN EVPN و MDS SAN (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference NX-OS EVPN &amp; MDS SAN verification CLI (NOT executed on live switches)\nshow bgp l2vpn evpn summary\nshow nve peers\nshow l2route evpn mac all\n# On Cisco MDS SAN:\nshow flogi database\nshow zoneset active vsan 100</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس CCIE Data Center v3.1 (ACI، VXLAN EVPN، SAN و UCS)",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "در طراحی دیتاسنتر مدرن (CCIE DC)، کدام ترکیب معماری برای مقیاس‌پذیری ترافیک شرق-غرب (East-West) بیشترین رواج و کارایی را دارد؟",
-   "options": [
-    "توپولوژی Hub-and-Spoke با یک روتر مرکزی",
-    "توپولوژی Spine-Leaf همراه با ECMP در Underlay و VXLAN/EVPN به عنوان Overlay لایه ۲/۳ پویا (متداول، متناسب با نیاز مقیاس)",
-    "فقط سوئیچ لایه ۲ با Spanning Tree روی کل دیتاسنتر",
-    "مسیرهای استاتیک دستی روی همه سرورها"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>Spine-Leaf با ECMP و VXLAN EVPN تاخیر یکنواخت و مقیاس‌پذیری افقی ترافیک شرق-غرب را بدون مسدودسازی STP فراهم می‌کند.</p>"
-  },
-  {
-   "title": "در زنجیره ۵ حلقه‌ای عیب‌یابی Cisco ACI، اگر دو سرور در دو EPG مختلف پینگ نشوند، کدام ۵ حلقه را باید به ترتیب بررسی کرد؟",
-   "options": [
-    "فقط نام سرور و رمز ادمین",
-    "فقط کابل برق سوئیچ Spine",
-    "۱) اتصال AAEP به Domain، ۲) وجود Encap VLAN در VLAN Pool، ۳) تیک Unicast Routing و Subnet روی BD، ۴) اتصال BD به VRF، و ۵) Contract با جهت صحیح Provider/Consumer",
-    "فقط ریست کردن هر سه سرور APIC"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>بررسی منظم همین ۵ حلقه بخش بزرگی از خطاهای رایج عدم ارتباط میان EPGها در لب CCIE Data Center را به‌سرعت آشکار می‌کند.</p>"
-  },
-  {
-   "title": "در عیب‌یابی فابریک NX-OS VXLAN EVPN، کدام سه دستور CLI به‌ترتیب همسایگی کنترل‌پلین، تونل VTEP و یادگیری MAC را تایید می‌کنند؟",
-   "options": [
-    "show version / show clock / show users",
-    "show spanning-tree / show vtp / show cdp",
-    "ping 127.0.0.1 / traceroute / telnet",
-    "show bgp l2vpn evpn summary و show nve peers و show l2route evpn mac all"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>این سه دستور لایه به لایه وضعیت MP-BGP EVPN، تشکیل تونل‌های VXLAN روی <code>nve1</code> و یادگیری MAC/IP را روشن می‌کنند.</p>"
-  },
-  {
-   "title": "در فابریک NX-OS VXLAN EVPN، فراموش کردن دستور send-community extended زیر همسایه BGP EVPN چه پیامدی دارد؟",
-   "options": [
-    "Route-Targetها (Extended Communities) منتقل نمی‌شوند و Leafهای مقصد مسیرهای EVPN را Import نمی‌کنند!",
-    "سرعت لینک دو برابر می‌شود",
-    "فقط SSH قطع می‌شود",
-    "تاثیری ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در MP-BGP EVPN (همانند MPLS L3VPN)، Route-Targetها درون Extended Community حمل می‌شوند و نبود آن کل Overlay را می‌خواباند.</p>"
-  },
-  {
-   "title": "چرا افزایش MTU لینک‌های Leaf-Spine به Jumbo Frame (معمولاً 9216 بایت) در فابریک VXLAN حیاتی است؟",
-   "options": [
-    "برای کاهش مصرف حافظه",
-    "زیرا کپسوله‌سازی VXLAN حدود ۵۰ بایت هدر به فریم اصلی اضافه می‌کند و روی لینک 1500 بایتی باعث Fragmentation یا Drop بسته‌های استاندارد می‌شود",
-    "زیرا BGP روی MTU 1500 بالا نمی‌آید",
-    "برای غیرفعال کردن ECMP"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>رعایت فضای کافی MTU در Underlay برای حمل بدون قطعی هدر VXLAN (50–54 بایت) الزامی است.</p>"
-  },
-  {
-   "title": "در بخش SAN (Cisco MDS) آزمون CCIE Data Center، کدام دو دستور CLI نقطه شروع استاندارد برای عیب‌یابی عدم مشاهده دیسک توسط سرور هستند؟",
-   "options": [
-    "show ip route و show arp",
-    "show vlan brief و show trunk",
-    "show flogi database (تأیید ورود HBA/Storage در VSAN) و show zoneset active vsan <id> (تأیید فعال بودن Zoning)",
-    "show bgp summary"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>تطابق FLOGI در VSAN صحیح و فعال‌سازی Zoneset (<code>zoneset activate</code>) دو گام نخست هر دیباگ SAN هستند.</p>"
-  },
-  {
-   "title": "نقش Service Profile / Server Profile در زیرساخت محاسباتی Cisco UCS و Intersight چیست؟",
-   "options": [
-    "تعویض فیزیکی پردازنده سرور",
-    "جایگزینی سوئیچ Spine",
-    "پاک کردن سیستم‌عامل ESXi",
-    "جداسازی کامل هویت منطقی سرور (MACهای vNIC، WWPNهای vHBA، تنظیمات BIOS/Firmware و VLAN/VSAN) از سخت‌افزار فیزیکی برای جابه‌جایی سریع و بدون خطا"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>مدل Stateless Computing در UCS/Intersight اجازه می‌دهد در صورت خرابی سخت‌افزار تیغه، کل هویت شبکه و SAN آن در چند دقیقه روی تیغه سالم اعمال شود.</p>"
-  },
-  {
-   "title": "تفاوت نقش EVPN Route Type-2 با Route Type-5 در فابریک VXLAN EVPN چیست؟",
-   "options": [
-    "Route Type-2 برای تبلیغ آدرس‌های MAC و Host IP (/32) میزبان‌ها و Route Type-5 برای تبلیغ پیشوندهای لایه ۳ (IP Subnet Prefix) به کار می‌رود",
-    "Type-2 فقط برای IPv6 است",
-    "Type-5 برای لایه ۲ است",
-    "هر دو دقیقاً یکسان هستند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>Route Type-5 ارتباط تمیز فابریک EVPN با شبکه‌های لایه ۳ بیرونی (مانند Border Leafها) را ممکن می‌سازد.</p>"
-  },
-  {
-   "title": "در بخش اتوماسیون CCIE Data Center، سریع‌ترین راه به دست آوردن ساختار دقیق JSON/API برای خودکارسازی Cisco ACI و NX-OS چیست؟",
-   "options": [
-    "حفظ کردن ۵۰۰۰ نام کلاس MIT از روی کتاب",
-    "استفاده از API Inspector / Save As JSON در APIC و ابزار داخلی NX-API Sandbox روی سوئیچ Nexus",
-    "تایپ تصادفی کلیدهای JSON تا خطا رفع شود",
-    "حذف REST API و استفاده از Telnet"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>API Inspector و NX-API Sandbox دقیقاً Payload و کد Python معتبر را در چند ثانیه در اختیار مهندس می‌گذارند.</p>"
-  },
-  {
-   "title": "کاربرد تنظیم fabric forwarding anycast-gateway-mac یکسان روی تمام Leafهای یک فابریک VXLAN EVPN چیست؟",
-   "options": [
-    "جلوگیری از همسایگی BGP",
-    "تغییر شماره VNI",
-    "تضمین اینکه ماشین مجازی پس از جابه‌جایی (vMotion) به Leaf دیگر، همان IP و MAC دروازه پیش‌فرض را محلی ببیند و بدون نیاز به ARP مجدد ترافیک را روت کند",
-    "خاموش کردن L3VNI"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>Distributed Anycast Gateway مسیریابی بهینه (Optimal Routing) را در سراسر فابریک دیتاسنتر تضمین می‌کند.</p>"
-  },
-  {
-   "title": "در Cisco UCS، حالت کاری پیش‌فرض و متداول Fabric Interconnectها نسبت به شبکه SAN (سوئیچ MDS Core) چیست؟",
-   "options": [
-    "Spanning Tree Root",
-    "OSPF Area 0",
-    "BGP Route Reflector",
-    "حالت End-Host / NPV (عدم مصرف Domain ID در فابریک SAN و پروکسی شفاف FLOGI به سمت MDS دارای NPIV)"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>حالت NPV روی Fabric Interconnect پیچیدگی مدیریت SAN را کاهش داده و یکپارچگی تمیزی با MDS Core ایجاد می‌کند.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "شبیه‌سازی محلی (Local Mock) در Python 3 برای زنجیره ۵حلقه‌ای دیباگ ACI، تایید NX-OS VXLAN EVPN و چک سلامت MDS SAN",
-    "اتصال زنده به خوشه تولیدی UCS و APIC",
-    "ویرایش واقعی Nexus 9508",
-    "فقط متن نظری بدون کد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ تجهیز APIC، Nexus یا MDS واقعی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.3",
-  "legacyId": "ccie_dc",
-  "sources": [
-   "https://learningnetwork.cisco.com/s/ccie-data-center-exam-topics"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccie_dc",
+  "objectiveId": "ccie_dc",
+  "kind": "lesson",
+  "track": "CCIE",
+  "course": "ccie-dc",
+  "title": "۸.۳ CCIE Data Center: پنج ستون لب ۸ساعته v3.1 (ACI، VXLAN EVPN، MDS SAN، UCS و اتوماسیون)",
+  "titleEn": "CCIE Data Center (350-601 DCCOR + 8-Hour Lab v3.1): ACI 5-Link Debug, VXLAN EVPN, SAN & UCS",
+  "domain": "Data Center Expert",
+  "source": "Legacy ccie_dc rewritten, typo-cleaned, and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 60,
+  "prerequisites": [
+    "spec_dc_nx",
+    "spec_dc_aci",
+    "spec_dc_stor"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی APIC، سوئیچ Nexus 9000، UCS یا MDS متصل نشده است."
+  "sections": [
+    {
+      "id": "ccie_dc-section-1",
+      "title": "مسئله واقعی: چرا CCIE Data Center صرفاً آزمون سوئیچ Nexus نیست، بلکه آزمون یکپارچه‌سازی ۵ دنیای مجزاست؟",
+      "html": "<p>در آزمون عملی <strong>CCIE Data Center (v3.1)</strong> (پس از قبولی در <code>350-601 DCCOR</code>)، داوطلب در ۵ ساعت بخش عملی باید پنج حوزه کاملاً متفاوت را بدون یک باگ کوچک به هم وصل کند: <strong>فابریک Cisco ACI</strong>، <strong>فابریک NX-OS VXLAN EVPN</strong>، <strong>محاسبات Cisco UCS / Intersight</strong>، <strong>شبکه ذخیره‌سازی MDS FC/FCoE</strong> و <strong>اتوماسیون APIC/NX-API با Python/Ansible/Terraform</strong>. تنها یک حلقه گمشده (مثلاً فراموش کردن تیک Unicast Routing در ACI یا فعال نکردن Zoneset در MDS) کل سرویس را می‌خواباند!</p>"
+    },
+    {
+      "id": "ccie_dc-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر NX-OS vPC، Cisco ACI و SAN در درس‌های <code>spec_dc_nx</code>، <code>spec_dc_aci</code> و <code>spec_dc_stor</code>.</p><ul><li>تسلط بر پنج ستون اصلی لب ۸ساعته <strong>CCIE Data Center v3.1</strong> و نحوه اتصال سرتاسری آن‌ها.</li><li>اجرای <strong>زنجیره ۵ حلقه‌ای عیب‌یابی Cisco ACI</strong> برای تشخیص ساختاریافته و سریع بخش بزرگی از مشکلات رایج اتصال بین EPGها.</li><li>عیب‌یابی سریع فابریک <strong>NX-OS VXLAN EVPN</strong> با سه دستور طلایی <code>show bgp l2vpn evpn</code>، <code>show nve peers</code> و <code>show l2route evpn mac</code>.</li><li>همگام‌سازی <strong>Cisco UCS / Intersight</strong> با شبکه و SAN (<code>FLOGI / VSAN / Zoneset</code>) و اجرای سریع تسک‌های اتوماسیون DC.</li></ul>"
+    },
+    {
+      "id": "ccie_dc-section-3",
+      "title": "زنجیره طلایی ۵ حلقه‌ای عیب‌یابی در Cisco ACI (بزرگ‌ترین سهم امتیاز لب)",
+      "html": "<p>اگر دو سرور در دو EPG مختلف درون فابریک ACI یکدیگر را پینگ نمی‌کنند، به جای کلیک تصادفی در UI APIC، دقیقاً این ۵ حلقه را به ترتیب ممیزی کنید:</p><ol><li><strong>اتصال فیزیکی تا Domain:</strong> آیا Interface Policy Group به <strong>AAEP</strong> و AAEP به <strong>Physical/VMM Domain</strong> صحیح وصل شده است؟</li><li><strong>تطابق VLAN Pool و Static Encap:</strong> آیا شماره VLAN استفاده‌شده در Static Path Binding درون <strong>VLAN Pool</strong> همان Domain قرار دارد؟</li><li><strong>تنظیمات Bridge Domain (BD):</strong> آیا EPG به BD صحیح وصل است، آیا <strong>Unicast Routing</strong> تیک خورده و <strong>Subnet</strong> تعریف شده است؟</li><li><strong>اتصال BD به VRF:</strong> آیا BD به VRF درست وصل است (و اگر بین دو VRF است، آیا Scope ساب‌نت روی <code>Shared between VRFs</code> و Scope قرارداد روی <code>Tenant/Global</code> تنظیم شده است)؟</li><li><strong>Contract با جهت صحیح:</strong> آیا یک سمت <code>Provider</code> و سمت دیگر <code>Consumer</code> با Filter و گزینه <code>Apply Both Directions</code> پیکربندی شده است؟</li></ol>"
+    },
+    {
+      "id": "ccie_dc-section-4",
+      "title": "نمودار پنج ستون CCIE Data Center v3.1 و چک‌لیست‌های دیباگ سریع",
+      "html": "<p>نمودار زیر پنج ستون اصلی لب CCIE Data Center v3.1 و مهم‌ترین دستورات عیب‌یابی هر بخش را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCIE Data Center v3.1 Five Pillars and Fast Debugging Checklists: ACI, NX-OS EVPN, SAN, UCS and Automation\"><rect x=\"14\" y=\"14\" width=\"234\" height=\"122\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"131\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">1. ACI Fabric (Infra 15% + Conn 15%)</text><text x=\"131\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">5-Link Debug Chain:</text><text x=\"131\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">AAEP -&gt; VLAN Pool -&gt; BD Subnet</text><text x=\"131\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">-&gt; VRF -&gt; Contract (Prov/Cons)</text><text x=\"131\" y=\"116\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">L3Out + VMM + Multi-Site</text><rect x=\"264\" y=\"14\" width=\"232\" height=\"122\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">2. L2/L3 (20%) + Sec/Svc (10%)</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Spine-Leaf + ECMP East-West</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">show bgp l2vpn evpn summary</text><text x=\"380\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">show nve peers / l2route mac</text><text x=\"380\" y=\"116\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Anycast GW + vPC + NDFC</text><rect x=\"512\" y=\"14\" width=\"234\" height=\"122\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"629\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">3. Compute 15% / SAN 10% / Auto 15%</text><text x=\"629\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">UCS / Intersight Service Profiles</text><text x=\"629\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">MDS FC/FCoE: FLOGI + Zoneset</text><text x=\"629\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Terraform / Ansible / NX-API</text><text x=\"629\" y=\"116\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">APIC REST JSON + Python</text><rect x=\"14\" y=\"152\" width=\"732\" height=\"58\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"380\" y=\"176\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f172a\">CCIE DC v3.1 Exam Flow: 3h Design (No CLI) + 5h Deploy, Operate &amp; Optimize (Live DC Pod)</text><text x=\"380\" y=\"196\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Integrate Network + Storage + Compute + Automation End-to-End with Deterministic Verification</text></svg>"
+    },
+    {
+      "id": "ccie_dc-section-5",
+      "title": "ستون دوم: معماری Spine-Leaf مبتنی بر NX-OS VXLAN EVPN و سه دستور نجات‌بخش",
+      "html": "<p>برای مقیاس‌پذیری ترافیک شرق-غرب (East-West) دیتاسنتر در حالت NX-OS (خارج از ACI)، معماری استاندارد <strong>Spine-Leaf با ECMP در Underlay (OSPF/IS-IS/eBGP) و MP-BGP EVPN + VXLAN در Overlay</strong> همراه با <strong>Distributed Anycast Gateway</strong> است. اگر دو سرور روی دو Leaf مختلف ارتباط ندارند، دقیقاً از پایین به بالا این سه دستور را بزنید:</p><ol><li><code>show bgp l2vpn evpn summary</code>: تأیید برقراری همسایگی EVPN با Route Reflector روی Spineها.</li><li><code>show nve peers</code> و <code>show nve vni</code>: تأیید بالا آمدن اینترفیس تونل <code>nve1</code>، کشف VTEPهای همتا و نگاشت VLAN به L2VNI/L3VNI.</li><li><code>show l2route evpn mac all</code> (و <code>show bgp l2vpn evpn</code> برای Route Type-2 و Type-5): تأیید یادگیری و تبلیغ MAC/IP و پیشوندهای ساب‌نت.</li></ol>"
+    },
+    {
+      "id": "ccie_dc-section-6",
+      "title": "تله‌های کلیدی VXLAN EVPN در لب: MTU، Multicast Underlay/Ingress Replication و Anycast MAC",
+      "html": "<p>چهار اشتباه ریز که کل EVPN را در لب از کار می‌اندازد: (۱) فراموش کردن <strong>Jumbo MTU (9216)</strong> روی لینک‌های Leaf-Spine (به دلیل سربار ۵۰ بایتی هدر VXLAN)؛ (۲) ناهماهنگی <strong><code>fabric forwarding anycast-gateway-mac</code></strong> بین Leafها؛ (۳) نبود <code>send-community extended</code> روی همسایگی BGP EVPN (در نتیجه Route-Targetها حذف می‌شوند!)؛ و (۴) فراموش کردن <code>vn-segment</code> در تعریف VLAN یا اتصال L3VNI به VRF.</p>"
+    },
+    {
+      "id": "ccie_dc-section-7",
+      "title": "ستون سوم: یکپارچگی محاسبات Cisco UCS / Intersight (Service Profiles و Fabric Interconnect)",
+      "html": "<p>در بخش Compute، معماری <strong>Cisco UCS (یا Intersight Managed Mode — IMM)</strong> تمام هویت سرور تیغه‌ای (MACهای کارت vNIC، WWPNهای کارت vHBA، نسخه Firmware، ترتیب Boot و VLANها) را در یک <strong>Service Profile / Server Profile</strong> نرم‌افزاری جدا از سخت‌افزار تعریف می‌کند. نکته کلیدی روز لب: تطابق دقیق <strong>VLANها در Uplink</strong> و <strong>VSANها در FC Uplink (حالت End-Host / NPV)</strong> روی جفت <strong>Fabric Interconnect A و B</strong>!</p>"
+    },
+    {
+      "id": "ccie_dc-section-8",
+      "title": "ستون چهارم: عیب‌یابی ۲دقیقه‌ای SAN (MDS FC / FCoE) در روز لب",
+      "html": "<p>در بخش Storage Networking لب CCIE DC، بخش عمده مشکلات رایج دسترسی به دیسک با سه بررسی ساختاریافته آشکار می‌شود: (۱) <code>show flogi database</code> (آیا HBA سرور و پورت Storage اصلاً در VSAN صحیح لاگین کرده‌اند؟)، (۲) <code>show zoneset active vsan &lt;id&gt;</code> (آیا Zoneset واقعاً <strong>Activate</strong> شده و WWPNها دقیقاً در یک Zone هستند؟) و (۳) در FCoE بررسی بالا بودن <code>vfc</code>، تطابق <code>bind interface</code> و فعال بودن <code>PFC/ETS/MTU</code> در سیاست QoS.</p>"
+    },
+    {
+      "id": "ccie_dc-section-9",
+      "title": "ستون پنجم: اتوماسیون دیتاسنتر در CCIE DC (APIC REST / Terraform / Ansible / NX-API / NDFC)",
+      "html": "<p>در بخش Automation لب CCIE DC، ترفند طلایی صرفه‌جویی زمان این است: برای هر شیء پیچیده در ACI، ابتدا یک نمونه کوچک را در UI بسازید و با <strong>API Inspector</strong> یا <strong>Save As JSON</strong> ساختار دقیق MIT آن را ببینید؛ سپس همان الگو را در اسکریپت Python <code>requests</code> یا ماژول <code>cisco.aci</code> در Ansible تکرار کنید! روی Nexus نیز <strong>NX-API Sandbox</strong> (تولیدکننده خودکار JSON-RPC و کد Python) بهترین دوست شماست.</p>"
+    },
+    {
+      "id": "ccie_dc-section-10",
+      "title": "نگاه معماری در ماژول ۱ (Design ۳ساعته) CCIE Data Center",
+      "html": "<p>در ماژول Design باید تصمیم‌های کلان تجاری/فنی بگیرید: انتخاب بین <strong>ACI Multi-Pod</strong> (یک خوشه APIC، تاخیر کم) و <strong>ACI Multi-Site (NDO)</strong> (دو شهر مجزا، ایزوله‌سازی دامنه خرابی)، انتخاب بین <strong>Native FC</strong> و <strong>iSCSI/NVMe-oF</strong> بر اساس بودجه و SLA تاخیر، و محاسبه نسبت Oversubscription لینک‌های Leaf-Spine (مثلاً ۳:۱ در برابر ۱:۱ برای ترافیک AI/HPC).</p>"
+    },
+    {
+      "id": "ccie_dc-section-11",
+      "title": "کژفهمی‌های رایج درباره CCIE Data Center",
+      "html": "<ul><li><strong>کژفهمی ۱: «اگر در ACI فقط VLAN را روی پورت Leaf تنظیم کنیم، سرورها خودکار همدیگر را می‌بینند.»</strong> واقعیت: در ACI هر ۵ حلقه (AAEP/Domain، VLAN Pool، BD/Subnet، VRF و Contract) باید هم‌زمان سالم باشند.</li><li><strong>کژفهمی ۲: «VXLAN EVPN در همه معماری‌های دیتاسنتر اجباری است.»</strong> واقعیت: VXLAN EVPN با Spine-Leaf و ECMP استاندارد مدرن و بسیار متداول برای مقیاس‌پذیری ترافیک East-West است، اما در دیتاسنترهای بسیار کوچک ممکن است معماری‌های ساده‌تر انتخاب شوند — انتخاب معماری همیشه تابع نیازمندی است!</li><li><strong>کژفهمی ۳: «در NX-OS EVPN کافی است همسایگی BGP IPv4 برقرار باشد.»</strong> واقعیت: علاوه بر همسایگی <code>address-family l2vpn evpn</code>، ارسال <code>send-community extended</code> برای تبادل Route-Targetها کاملاً حیاتی است.</li></ul>"
+    },
+    {
+      "id": "ccie_dc-section-12",
+      "title": "اصلاح خطاهای نگارشی نسخه قدیمی و چک‌لیست ۳۰ دقیقه پایانی",
+      "html": "<p><strong>یادداشت ممیزی:</strong> عبارات معیوب نسخه قدیمی (غلط املایی نسخه قدیمی، «مساوی‌كلفة»، «آرخیتهکتور»، «Zend needهایت را بررسی کنید») به‌طور کامل به فارسی دقیق و علمی بازنویسی شدند.</p><p><strong>چک‌لیست پایانی لب CCIE DC:</strong> (۱) <code>copy running-config startup-config</code> روی تمام سوئیچ‌های Nexus و MDS، (۲) بررسی نبود Fault بحرانی تازه در APIC، (۳) تست نهایی پینگ بین EPGها، بین VTEPهای EVPN و تایید مشاهده LUN در سرور UCS.</p>"
+    },
+    {
+      "id": "ccie_dc-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> در زنجیره ۵ حلقه‌ای ACI، AAEP به Domain وصل است و BD/VRF سالم‌اند، اما Static Encap VLAN در VLAN Pool نیست و Contract فقط روی سمت Provider تنظیم شده است. چرا پینگ برقرار نمی‌شود؟ <strong>پاسخ:</strong> دو حلقه (حلقه ۲: کمبود VLAN در VLAN Pool و حلقه ۵: اعمال نشدن Contract در سمت Consumer) شکست خورده‌اند و هر دو باید اصلاح شوند.</p><p><strong>تمرین ۲:</strong> در فابریک NX-OS EVPN، همسایگی BGP EVPN در حالت <code>Established</code> است ولی جدول <code>show nve peers</code> خالی است. چه مواردی را بررسی می‌کنید؟ <strong>پاسخ:</strong> بررسی اتصال VNI به <code>interface nve1</code>، فعال بودن <code>host-reachability protocol bgp</code>، تنظیم <code>send-community extended</code> و دسترسی Underlay میان Loopbackهای VTEP.</p>"
+    },
+    {
+      "id": "ccie_dc-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://learningnetwork.cisco.com/s/ccie-data-center-exam-topics\" target=\"_blank\" rel=\"noopener\">سرفصل‌های رسمی آزمون عملی CCIE Data Center v3.1 (Cisco Learning Network)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی APIC، سوئیچ Nexus 9000، Cisco UCS یا MDS 9000 در این محیط متصل نشده است.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "اصلاح کامل غلط‌های نگارشی نسخه قدیمی («سبین-لیف»، «مساوی‌كلفة»، «آرخیتهکتور»، «Zend needهایت را بررسی کنید») و حذف پرسش تکراری؛ بازنویسی جامع به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز ACI/EVPN/SAN."
+  "glossary": [
+    {
+      "term": "CCIE Data Center v3.1",
+      "fa": "گواهینامه خبره دیتاسنتر سیسکو",
+      "simple": "بالاترین سطح اجرایی دیتاسنتر سیسکو شامل DCCOR (350-601) و لب ۸ساعته ۵ستونه."
+    },
+    {
+      "term": "ACI 5-Link Debug Chain",
+      "fa": "زنجیره ۵حلقه‌ای دیباگ ACI",
+      "simple": "بررسی ترتیبی AAEP/Domain، VLAN Pool، BD/Subnet، VRF و Contract برای حل سریع قطع ارتباط EPGها."
+    },
+    {
+      "term": "Spine-Leaf + ECMP",
+      "fa": "معماری ستون‌فقرات-برگ",
+      "simple": "توپولوژی مسطح با تاخیر یکنواخت و توزیع بار هم‌هزینه برای ترافیک شرق-غرب دیتاسنتر."
+    },
+    {
+      "term": "NX-OS VXLAN EVPN",
+      "fa": "فابریک لایه ۲/۳ مدرن Nexus",
+      "simple": "استفاده از MP-BGP EVPN به عنوان صفحه کنترل و VXLAN به عنوان کپسوله‌سازی داده روی Nexus 9000."
+    },
+    {
+      "term": "NVE Interface (nve1)",
+      "fa": "اینترفیس منطقی تونل VTEP",
+      "simple": "Network Virtualization Edge؛ اینترفیس سازنده تونل‌های VXLAN میان سوئیچ‌های Leaf."
+    },
+    {
+      "term": "L2VNI / L3VNI",
+      "fa": "شناسه سگمنت لایه ۲ و لایه ۳ VXLAN",
+      "simple": "L2VNI معادل سگمنت سوئیچینگ VLAN و L3VNI تونل روتینگ میان VLANهای یک VRF است."
+    },
+    {
+      "term": "Anycast Gateway MAC",
+      "fa": "مک یکسان دروازه توزیع‌شده",
+      "simple": "تنظیم MAC یکسان روی تمام Leafها تا VM هنگام vMotion بدون تغییر Gateway کار کند."
+    },
+    {
+      "term": "EVPN Route Type-2 / Type-5",
+      "fa": "مسیرهای MAC/IP و پیشوند در EVPN",
+      "simple": "Type-2 برای تبلیغ MAC/IP میزبان‌ها و Type-5 برای تبلیغ پیشوندهای لایه ۳ IP Subnet."
+    },
+    {
+      "term": "Cisco UCS / Intersight",
+      "fa": "زیرساخت محاسبات یکپارچه سیسکو",
+      "simple": "مدیریت متمرکز سرورها و هویت نرم‌افزاری vNIC/vHBA از طریق Service Profiles."
+    },
+    {
+      "term": "Fabric Interconnect (FI)",
+      "fa": "سوئیچ همگرای اتصال UCS",
+      "simple": "جفت سوئیچ اتصال سرورهای UCS به شبکه LAN و فابریک SAN (معمولاً در حالت End-Host/NPV)."
+    },
+    {
+      "term": "NDFC (Nexus Dashboard Fabric Controller)",
+      "fa": "کنترلر خودکارسازی فابریک NX-OS",
+      "simple": "نسل جدید DCNM برای طراحی، استقرار و پایش خودکار فابریک‌های VXLAN EVPN."
+    },
+    {
+      "term": "NX-API Sandbox",
+      "fa": "محیط تست API داخلی Nexus",
+      "simple": "رابط وب داخلی NX-OS که دستورات CLI را به JSON-RPC/REST و کد آماده Python تبدیل می‌کند."
+    },
+    {
+      "term": "East-West Traffic",
+      "fa": "ترافیک شرق-غرب دیتاسنتر",
+      "simple": "حجم عظیم ارتباط میان سرورها/میکروسرویس‌های داخل دیتاسنتر (بیش از ۷۰–۸۰٪ کل ترافیک)."
+    },
+    {
+      "term": "Oversubscription Ratio",
+      "fa": "نسبت هم‌رسانی پهنای باند",
+      "simple": "نسبت مجموع ظرفیت پورت‌های سرور روی Leaf به ظرفیت لینک‌های Uplink به Spine (مثلاً ۳:۱)."
+    },
+    {
+      "term": "send-community extended",
+      "fa": "ارسال Extended Community در BGP",
+      "simple": "تنظیم اجباری در همسایگی EVPN جهت انتقال Route-Targetها و جلوگیری از افت مسیرها."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/ccie_dc-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (زنجیره ۵حلقه‌ای عیب‌یابی ACI، بررسی NX-OS VXLAN EVPN و سلامت MDS SAN) — تجهیزات دیتاسنتر واقعی اجرا نشده",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ کنترلر واقعی APIC، Nexus 9000 یا MDS متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ کنترلر واقعی APIC، سوئیچ Nexus 9000، UCS یا MDS 9000 در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی سه چک‌لیست حیاتی روز آزمون CCIE Data Center v3.1 را اجرا می‌کند: (۱) کشف دو حلقه معیوب در زنجیره ۵حلقه‌ای <strong>Cisco ACI</strong> (نقص VLAN Pool و Contract) و تایید پس از اصلاح، (۲) تایید <code>BGP EVPN + nve1 peers + l2route MAC</code> در NX-OS، و (۳) تایید <code>FLOGI + Active Zoneset</code> در MDS SAN.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccie_dc_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccie_dc_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccie_dc (CCIE Data Center v3.1: 5-Link ACI Debug Chain, NX-OS VXLAN EVPN &amp; MDS SAN Check)\nSimulates the 5-step Cisco ACI EPG-to-EPG troubleshooting chain, NX-OS BGP EVPN / NVE VTEP\ncontrol/data plane verification, and MDS Fibre Channel FLOGI + active zoneset health check.\nNo real Cisco APIC, Nexus 9000, UCS, or MDS 9000 hardware is connected.\n&quot;&quot;&quot;\n\nimport ipaddress\nimport json\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_dict_bool(d: dict, key: str) -&gt; bool:\n    if key not in d:\n        raise ValueError(f&quot;Missing required boolean key &#x27;{key}&#x27;&quot;)\n    return _require_bool(d[key], key)\n\n\ndef verify_aci_5_link_chain(fabric: dict) -&gt; dict:\n    if not isinstance(fabric, dict):\n        raise ValueError(f&quot;fabric must be a dict, got {type(fabric).__name__}&quot;)\n    aaep = _require_dict_bool(fabric, &quot;aaep_bound_to_domain&quot;)\n    vlan_ok = _require_dict_bool(fabric, &quot;vlan_in_domain_pool&quot;)\n    bd_uc = _require_dict_bool(fabric, &quot;bd_unicast_routing&quot;)\n    bd_sub = _require_dict_bool(fabric, &quot;bd_has_subnet&quot;)\n    bd_vrf = _require_dict_bool(fabric, &quot;bd_vrf_attached&quot;)\n    contract_ok = _require_dict_bool(fabric, &quot;contract_applied_both_sides&quot;)\n    checks = [\n        (&quot;1_aaep_domain_binding&quot;, aaep, &quot;Bind AAEP to Physical/VMM Domain&quot;),\n        (&quot;2_vlan_pool_encap_match&quot;, vlan_ok, &quot;Add static encap VLAN to Domain VLAN Pool&quot;),\n        (&quot;3_bd_unicast_and_subnet&quot;, bd_uc and bd_sub, &quot;Enable Unicast Routing and define Subnet on BD&quot;),\n        (&quot;4_bd_linked_to_vrf&quot;, bd_vrf, &quot;Attach Bridge Domain to target VRF&quot;),\n        (&quot;5_contract_direction_scope&quot;, contract_ok, &quot;Apply Contract as Provider/Consumer with matching Scope&quot;),\n    ]\n    failed = [{&quot;step&quot;: name, &quot;fix&quot;: fix} for name, ok, fix in checks if not ok]\n    return {&quot;epg_ping_ok&quot;: len(failed) == 0, &quot;failed_links&quot;: failed}\n\n\ndef verify_nxos_evpn_vxlan(bgp_evpn_up: bool, nve_peers: list[str], mac_in_l2route: bool, vni: int) -&gt; dict:\n    evpn_up = _require_bool(bgp_evpn_up, &quot;bgp_evpn_up&quot;)\n    mac_ok = _require_bool(mac_in_l2route, &quot;mac_in_l2route&quot;)\n    if isinstance(vni, bool) or not isinstance(vni, int) or not (1 &lt;= vni &lt;= 16_777_215):\n        raise ValueError(f&quot;vni must be a 24-bit VXLAN VNI int in [1, 16777215] (RFC 7348), got {vni!r}&quot;)\n    if not isinstance(nve_peers, list):\n        raise ValueError(f&quot;nve_peers must be a list of IP strings, got {type(nve_peers).__name__}&quot;)\n    validated_peers = []\n    for p in nve_peers:\n        if not isinstance(p, str):\n            raise ValueError(f&quot;nve_peer must be an IP string, got {p!r}&quot;)\n        validated_peers.append(str(ipaddress.ip_address(p)))\n    ok = evpn_up and len(validated_peers) &gt; 0 and mac_ok\n    return {\n        &quot;vni&quot;: vni,\n        &quot;bgp_l2vpn_evpn&quot;: &quot;Established&quot; if evpn_up else &quot;Idle&quot;,\n        &quot;nve1_peers&quot;: validated_peers,\n        &quot;l2route_mac_learned&quot;: mac_ok,\n        &quot;east_west_forwarding_ready&quot;: ok,\n    }\n\n\ndef main() -&gt; None:\n    broken_aci = {\n        &quot;aaep_bound_to_domain&quot;: True,\n        &quot;vlan_in_domain_pool&quot;: False,\n        &quot;bd_unicast_routing&quot;: True,\n        &quot;bd_has_subnet&quot;: True,\n        &quot;bd_vrf_attached&quot;: True,\n        &quot;contract_applied_both_sides&quot;: False,\n    }\n    fixed_aci = {k: True for k in broken_aci}\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_APIC_NEXUS_OR_MDS_HARDWARE&quot;,\n        &quot;aci_5_link_debug_before&quot;: verify_aci_5_link_chain(broken_aci),\n        &quot;aci_5_link_debug_after&quot;: verify_aci_5_link_chain(fixed_aci),\n        &quot;nxos_vxlan_evpn_check&quot;: verify_nxos_evpn_vxlan(\n            bgp_evpn_up=True,\n            nve_peers=[&quot;10.255.0.11&quot;, &quot;10.255.0.12&quot;],\n            mac_in_l2route=True,\n            vni=10010,\n        ),\n        &quot;mds_san_flogi_zoneset&quot;: {\n            &quot;vsan&quot;: 100,\n            &quot;flogi_entries&quot;: 2,\n            &quot;zoneset_activated&quot;: True,\n            &quot;status&quot;: &quot;READY&quot;,\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف دقیق <code>2_vlan_pool_encap_match</code> و <code>5_contract_direction_scope</code>، تایید <code>epg_ping_ok: True</code> پس از اصلاح و <code>east_west_forwarding_ready: True</code> در VNI <code>10010</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع سه دستور طلایی دیباگ VXLAN EVPN و MDS SAN (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference NX-OS EVPN &amp; MDS SAN verification CLI (NOT executed on live switches)\nshow bgp l2vpn evpn summary\nshow nve peers\nshow l2route evpn mac all\n# On Cisco MDS SAN:\nshow flogi database\nshow zoneset active vsan 100</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس CCIE Data Center v3.1 (ACI، VXLAN EVPN، SAN و UCS)",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-ccie",
-   "recommendedCourse": "ccie-dc",
-   "blueprint": "/academy-assets/v5/blueprints/ccie_dc.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/ccie_dc_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح وزن‌های نمودار بخش ۴ مطابق ۷ حوزه رسمی سرفصل CCIE Data Center v3.1 سیسکو (L2/L3 20%, Fabric Infra 15%, Fabric Conn 15%, Compute 15%, Storage 10%, Security & Services 10%, Automation 15%) و حذف ادعای اغراق‌آمیز «حل تضمینی در کمتر از ۳ دقیقه» و آمارهای غیرمستند ۹۰٪/۹۵٪."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "در طراحی دیتاسنتر مدرن (CCIE DC)، کدام ترکیب معماری برای مقیاس‌پذیری ترافیک شرق-غرب (East-West) بیشترین رواج و کارایی را دارد؟",
+      "options": [
+        "توپولوژی Hub-and-Spoke با یک روتر مرکزی",
+        "توپولوژی Spine-Leaf همراه با ECMP در Underlay و VXLAN/EVPN به عنوان Overlay لایه ۲/۳ پویا (متداول، متناسب با نیاز مقیاس)",
+        "فقط سوئیچ لایه ۲ با Spanning Tree روی کل دیتاسنتر",
+        "مسیرهای استاتیک دستی روی همه سرورها"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Spine-Leaf با ECMP و VXLAN EVPN تاخیر یکنواخت و مقیاس‌پذیری افقی ترافیک شرق-غرب را بدون مسدودسازی STP فراهم می‌کند.</p>"
+    },
+    {
+      "title": "در زنجیره ۵ حلقه‌ای عیب‌یابی Cisco ACI، اگر دو سرور در دو EPG مختلف پینگ نشوند، کدام ۵ حلقه را باید به ترتیب بررسی کرد؟",
+      "options": [
+        "فقط نام سرور و رمز ادمین",
+        "فقط کابل برق سوئیچ Spine",
+        "۱) اتصال AAEP به Domain، ۲) وجود Encap VLAN در VLAN Pool، ۳) تیک Unicast Routing و Subnet روی BD، ۴) اتصال BD به VRF، و ۵) Contract با جهت صحیح Provider/Consumer",
+        "فقط ریست کردن هر سه سرور APIC"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بررسی منظم همین ۵ حلقه بخش بزرگی از خطاهای رایج عدم ارتباط میان EPGها در لب CCIE Data Center را به‌سرعت آشکار می‌کند.</p>"
+    },
+    {
+      "title": "در عیب‌یابی فابریک NX-OS VXLAN EVPN، کدام سه دستور CLI به‌ترتیب همسایگی کنترل‌پلین، تونل VTEP و یادگیری MAC را تایید می‌کنند؟",
+      "options": [
+        "show version / show clock / show users",
+        "show spanning-tree / show vtp / show cdp",
+        "ping 127.0.0.1 / traceroute / telnet",
+        "show bgp l2vpn evpn summary و show nve peers و show l2route evpn mac all"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>این سه دستور لایه به لایه وضعیت MP-BGP EVPN، تشکیل تونل‌های VXLAN روی <code>nve1</code> و یادگیری MAC/IP را روشن می‌کنند.</p>"
+    },
+    {
+      "title": "در فابریک NX-OS VXLAN EVPN، فراموش کردن دستور send-community extended زیر همسایه BGP EVPN چه پیامدی دارد؟",
+      "options": [
+        "Route-Targetها (Extended Communities) منتقل نمی‌شوند و Leafهای مقصد مسیرهای EVPN را Import نمی‌کنند!",
+        "سرعت لینک دو برابر می‌شود",
+        "فقط SSH قطع می‌شود",
+        "تاثیری ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در MP-BGP EVPN (همانند MPLS L3VPN)، Route-Targetها درون Extended Community حمل می‌شوند و نبود آن کل Overlay را می‌خواباند.</p>"
+    },
+    {
+      "title": "چرا افزایش MTU لینک‌های Leaf-Spine به Jumbo Frame (معمولاً 9216 بایت) در فابریک VXLAN حیاتی است؟",
+      "options": [
+        "برای کاهش مصرف حافظه",
+        "زیرا کپسوله‌سازی VXLAN حدود ۵۰ بایت هدر به فریم اصلی اضافه می‌کند و روی لینک 1500 بایتی باعث Fragmentation یا Drop بسته‌های استاندارد می‌شود",
+        "زیرا BGP روی MTU 1500 بالا نمی‌آید",
+        "برای غیرفعال کردن ECMP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>رعایت فضای کافی MTU در Underlay برای حمل بدون قطعی هدر VXLAN (50–54 بایت) الزامی است.</p>"
+    },
+    {
+      "title": "در بخش SAN (Cisco MDS) آزمون CCIE Data Center، کدام دو دستور CLI نقطه شروع استاندارد برای عیب‌یابی عدم مشاهده دیسک توسط سرور هستند؟",
+      "options": [
+        "show ip route و show arp",
+        "show vlan brief و show trunk",
+        "show flogi database (تأیید ورود HBA/Storage در VSAN) و show zoneset active vsan <id> (تأیید فعال بودن Zoning)",
+        "show bgp summary"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>تطابق FLOGI در VSAN صحیح و فعال‌سازی Zoneset (<code>zoneset activate</code>) دو گام نخست هر دیباگ SAN هستند.</p>"
+    },
+    {
+      "title": "نقش Service Profile / Server Profile در زیرساخت محاسباتی Cisco UCS و Intersight چیست؟",
+      "options": [
+        "تعویض فیزیکی پردازنده سرور",
+        "جایگزینی سوئیچ Spine",
+        "پاک کردن سیستم‌عامل ESXi",
+        "جداسازی کامل هویت منطقی سرور (MACهای vNIC، WWPNهای vHBA، تنظیمات BIOS/Firmware و VLAN/VSAN) از سخت‌افزار فیزیکی برای جابه‌جایی سریع و بدون خطا"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>مدل Stateless Computing در UCS/Intersight اجازه می‌دهد در صورت خرابی سخت‌افزار تیغه، کل هویت شبکه و SAN آن در چند دقیقه روی تیغه سالم اعمال شود.</p>"
+    },
+    {
+      "title": "تفاوت نقش EVPN Route Type-2 با Route Type-5 در فابریک VXLAN EVPN چیست؟",
+      "options": [
+        "Route Type-2 برای تبلیغ آدرس‌های MAC و Host IP (/32) میزبان‌ها و Route Type-5 برای تبلیغ پیشوندهای لایه ۳ (IP Subnet Prefix) به کار می‌رود",
+        "Type-2 فقط برای IPv6 است",
+        "Type-5 برای لایه ۲ است",
+        "هر دو دقیقاً یکسان هستند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Route Type-5 ارتباط تمیز فابریک EVPN با شبکه‌های لایه ۳ بیرونی (مانند Border Leafها) را ممکن می‌سازد.</p>"
+    },
+    {
+      "title": "در بخش اتوماسیون CCIE Data Center، سریع‌ترین راه به دست آوردن ساختار دقیق JSON/API برای خودکارسازی Cisco ACI و NX-OS چیست؟",
+      "options": [
+        "حفظ کردن ۵۰۰۰ نام کلاس MIT از روی کتاب",
+        "استفاده از API Inspector / Save As JSON در APIC و ابزار داخلی NX-API Sandbox روی سوئیچ Nexus",
+        "تایپ تصادفی کلیدهای JSON تا خطا رفع شود",
+        "حذف REST API و استفاده از Telnet"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>API Inspector و NX-API Sandbox دقیقاً Payload و کد Python معتبر را در چند ثانیه در اختیار مهندس می‌گذارند.</p>"
+    },
+    {
+      "title": "کاربرد تنظیم fabric forwarding anycast-gateway-mac یکسان روی تمام Leafهای یک فابریک VXLAN EVPN چیست؟",
+      "options": [
+        "جلوگیری از همسایگی BGP",
+        "تغییر شماره VNI",
+        "تضمین اینکه ماشین مجازی پس از جابه‌جایی (vMotion) به Leaf دیگر، همان IP و MAC دروازه پیش‌فرض را محلی ببیند و بدون نیاز به ARP مجدد ترافیک را روت کند",
+        "خاموش کردن L3VNI"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Distributed Anycast Gateway مسیریابی بهینه (Optimal Routing) را در سراسر فابریک دیتاسنتر تضمین می‌کند.</p>"
+    },
+    {
+      "title": "در Cisco UCS، حالت کاری پیش‌فرض و متداول Fabric Interconnectها نسبت به شبکه SAN (سوئیچ MDS Core) چیست؟",
+      "options": [
+        "Spanning Tree Root",
+        "OSPF Area 0",
+        "BGP Route Reflector",
+        "حالت End-Host / NPV (عدم مصرف Domain ID در فابریک SAN و پروکسی شفاف FLOGI به سمت MDS دارای NPIV)"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>حالت NPV روی Fabric Interconnect پیچیدگی مدیریت SAN را کاهش داده و یکپارچگی تمیزی با MDS Core ایجاد می‌کند.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "شبیه‌سازی محلی (Local Mock) در Python 3 برای زنجیره ۵حلقه‌ای دیباگ ACI، تایید NX-OS VXLAN EVPN و چک سلامت MDS SAN",
+        "اتصال زنده به خوشه تولیدی UCS و APIC",
+        "ویرایش واقعی Nexus 9508",
+        "فقط متن نظری بدون کد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ تجهیز APIC، Nexus یا MDS واقعی متصل نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "ccie_dc",
+    "sources": [
+      "https://learningnetwork.cisco.com/s/ccie-data-center-exam-topics"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی APIC، سوئیچ Nexus 9000، UCS یا MDS متصل نشده است."
+    ],
+    "legacyAuditFixes": [
+      "اصلاح کامل غلط‌های نگارشی نسخه قدیمی («سبین-لیف»، «مساوی‌كلفة»، «آرخیتهکتور»، «Zend needهایت را بررسی کنید») و حذف پرسش تکراری؛ بازنویسی جامع به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز ACI/EVPN/SAN."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccie_dc-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-ccie",
+      "recommendedCourse": "ccie-dc",
+      "blueprint": "/academy-assets/v5/blueprints/ccie_dc.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccie_dc_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح وزن‌های نمودار بخش ۴ مطابق ۷ حوزه رسمی سرفصل CCIE Data Center v3.1 سیسکو (L2/L3 20%, Fabric Infra 15%, Fabric Conn 15%, Compute 15%, Storage 10%, Security & Services 10%, Automation 15%) و حذف ادعای اغراق‌آمیز «حل تضمینی در کمتر از ۳ دقیقه» و آمارهای غیرمستند ۹۰٪/۹۵٪."
+    ]
+  }
 }

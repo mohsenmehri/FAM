@@ -1422,6 +1422,109 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 csec.audit_ntp_dns_preflight([{"name": "ISE-1", "clock_skew_sec": bad_skew, "dns_forward_reverse_ok": True}])
 
+    def test_phase10c_ccie_and_specialist_strict_validation_sweep(self):
+        """Phase 10C: strict bool/numeric/range/overflow validation across 10 CCIE & Specialist labs."""
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        bad_bools = ("False", "True", "", 0, 1, None, [], {})
+
+        # 1. ccie_01
+        m = load_module(AGENT3_LAB_DIR / "ccie_01_lab.py", "ccie_01_p10c")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.check_sda_fusion_vrf("CORP", bv, True, True)
+            with self.assertRaises(ValueError):
+                m.simulate_redistribution("10.0.0.0/24", "EIGRP", 90, bv)
+        for bad_pct in (-1, 101, float("nan"), float("inf"), 10**500, True):
+            with self.assertRaises(ValueError):
+                m.evaluate_ccie_exam_gate(bad_pct, 80.0)
+        with self.assertRaises(ValueError):
+            m.simulate_redistribution("10.0.0.1/24", "EIGRP", 90, True)  # host bits set
+
+        # 2. ccie_dc
+        m = load_module(AGENT3_LAB_DIR / "ccie_dc_lab.py", "ccie_dc_p10c")
+        ok_aci = {k: True for k in ("aaep_bound_to_domain", "vlan_in_domain_pool", "bd_unicast_routing", "bd_has_subnet", "bd_vrf_attached", "contract_applied_both_sides")}
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.verify_aci_5_link_chain({**ok_aci, "contract_applied_both_sides": bv})
+            with self.assertRaises(ValueError):
+                m.verify_nxos_evpn_vxlan(bv, ["10.0.0.1"], True, 10010)
+        with self.assertRaises(ValueError):
+            m.verify_nxos_evpn_vxlan(True, ["999.999.1.1"], True, 10010)
+        with self.assertRaises(ValueError):
+            m.verify_nxos_evpn_vxlan(True, ["10.0.0.1"], True, 16_777_216)
+
+        # 3. ccie_wl
+        m = load_module(AGENT3_LAB_DIR / "ccie_wl_lab.py", "ccie_wl_p10c")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.radioactive_client_trace("aa:bb:cc:dd:ee:ff", bv, True, 10)
+        with self.assertRaises(ValueError):
+            m.radioactive_client_trace("aa:bb:cc:dd:ee:ff", True, True, 70000)
+
+        # 4. spec_dc_aci
+        m = load_module(AGENT3_LAB_DIR / "spec_dc_aci_lab.py", "spec_dc_aci_p10c")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.apic_offline_impact(bv)
+            with self.assertRaises(ValueError):
+                m.evaluate_aci_traffic("EPG-A", "EPG-B", 443, bv, [])
+        with self.assertRaises(ValueError):
+            m.evaluate_aci_traffic("EPG-A", "EPG-B", 0, True, [])
+
+        # 5. spec_dc_nx
+        m = load_module(AGENT3_LAB_DIR / "spec_dc_nx_lab.py", "spec_dc_nx_p10c")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.simulate_peer_link_failure(bv, True)
+        with self.assertRaises(ValueError):
+            m.check_vpc_type1({"mtu": 9216, "stp_mode": "rapid-pvst", "native_vlan": 4095}, {"mtu": 9216, "stp_mode": "rapid-pvst", "native_vlan": 1})
+
+        # 6. spec_dc_stor
+        m = load_module(AGENT3_LAB_DIR / "spec_dc_stor_lab.py", "spec_dc_stor_p10c")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.check_fcoe_dcb_readiness({"name": "Eth1/1", "pfc_cos3_enabled": bv, "ets_enabled": True, "mtu": 9216})
+        with self.assertRaises(ValueError):
+            m.check_fcoe_dcb_readiness({"name": "Eth1/1", "ets_enabled": True, "mtu": 9216})  # missing required bool
+
+        # 7. spec_ent_campus
+        m = load_module(AGENT3_LAB_DIR / "spec_ent_campus_lab.py", "spec_ent_campus_p10c")
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                m.simulate_svl_failure(bv, True)
+
+        # 8. spec_sp_xr
+        m = load_module(AGENT3_LAB_DIR / "spec_sp_xr_lab.py", "spec_sp_xr_p10c")
+        xr = m.MockIOSXRRouter()
+        for bv in bad_bools:
+            with self.assertRaises(ValueError):
+                xr.commit(confirmed_seconds=60, confirmed_by_operator=bv)
+        with self.assertRaises(ValueError):
+            xr.commit(confirmed_seconds=0, confirmed_by_operator=True)
+
+        # 9. spec_wl_survey
+        m = load_module(AGENT3_LAB_DIR / "spec_wl_survey_lab.py", "spec_wl_survey_p10c")
+        for bad_d in (0, -5, float("nan"), float("inf"), 10**500, True):
+            with self.assertRaises(ValueError):
+                m.fspl_db(bad_d, 5180.0)
+        with self.assertRaises(ValueError):
+            m.audit_24ghz_plan({"AP-1": 15})
+        with self.assertRaises(ValueError):
+            m.evaluate_rf_cell(14.0, 4.0, 10.0, 5180.0, ["unknown_wall"])
+
+        # 10. spec_cyber_hunt
+        m = load_module(AGENT3_LAB_DIR / "spec_cyber_hunt_lab.py", "spec_cyber_hunt_p10c")
+        for bad_ts in (float("nan"), float("inf"), 10**500, True):
+            with self.assertRaises(ValueError):
+                m.detect_beaconing([0, 10, 20, bad_ts])
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 64)

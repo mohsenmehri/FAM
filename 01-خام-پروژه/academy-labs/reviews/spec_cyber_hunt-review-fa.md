@@ -12,3 +12,7 @@
 - **اصلاح انجام‌شده:** مرتب‌سازی `timestamps_sec`، نگهبان `len < 4` و `mean_d <= 0` و افزودن تست‌های منفی لاگ نامرتب و نمونه ناکافی.
 - **تست مرتبط:** `test_phase5_remaining_tracks_labs_and_regressions` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** داده تله‌متری مصنوعی؛ جایگزین SIEM/EDR واقعی نیست و بازبینی مستقل انجام نشده است.
+
+## به‌روزرسانی فاز ۱۰C — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن `_require_finite_num` و محافظت `OverflowError -> ValueError` در `detect_beaconing`، مقایسه گردنشده `jitter_ratio` و اعتبارسنجی ساختار رویدادهای Sysmon.
+- **وضعیت اجرا:** آزمایشگاه شبیه‌ساز/Mock محلی Python بدون تجهیز شبکه زنده؛ تطابق دقیق بایتی کد HTML با `spec_cyber_hunt_lab.py` تأیید شد.

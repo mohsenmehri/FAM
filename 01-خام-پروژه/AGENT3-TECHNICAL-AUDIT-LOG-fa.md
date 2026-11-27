@@ -252,3 +252,10 @@
   - `spec_wl`: محافظت `OverflowError -> ValueError` در `_require_finite_num` و `dbm_to_mw` (مانند `dbm=10000` و `10**500`).
   - `ccie_sec`: افزودن `_require_finite_num` به `audit_ntp_dns_preflight` برای رد `NaN`/`Inf`/`10**500`/`bool` در `clock_skew_sec` و آستانه‌ها.
 - **وضعیت بازبینی و اجرا:** خودبازبینی نویسنده (بدون بازبینی مستقل انسانی)؛ هر ۹ آزمایشگاه محلی/Mock بدون تجهیز شبکه زنده هستند و تطابق بایتی ۶۴/۶۴ HTML تأیید شد.
+
+## ۱۰C. سخت‌سازی پیشگیرانه اعتبارسنجی ورودی (`bool`/عدد متناهی/بازه/سرریز) در ۱۰ آزمایشگاه CCIE و Specialist (`reviewed.9`)
+
+- **دامنه اصلاح:** تکمیل اعتبارسنجی سخت‌گیرانه بولی (رد `"False"`, `"True"`, `""`, `0`, `1`, `None`, `[]`, `{}` و غیبت کلیدهای اجباری)، بازه‌های پروتکلی (VNI ۲۴بیتی، پورت TCP، VLAN/VSAN، کانال ۲.۴GHz، CIDR سخت‌گیرانه)، مقایسه گردنشده و محافظت `OverflowError -> ValueError` در هر ۱۰ آزمایشگاه باقی‌مانده مسیرهای CCIE و Specialist:
+  - **CCIE (۳ درس):** `ccie_01`, `ccie_dc`, `ccie_wl` (در کنار `ccie_sec`, `ccie_sp`, `ccie_collab`, `ccie_auto` از فازهای قبل — اکنون **۱۰۰٪ CCIE** دارای اعتبارسنجی سخت‌گیرانه است).
+  - **Specialist (۷ درس):** `spec_dc_aci`, `spec_dc_nx`, `spec_dc_stor`, `spec_ent_campus`, `spec_sp_xr`, `spec_wl_survey`, `spec_cyber_hunt` (اکنون **۱۰۰٪ Specialist** دارای اعتبارسنجی سخت‌گیرانه است).
+- **وضعیت بازبینی و اجرا:** خودبازبینی نویسنده (بدون بازبینی مستقل انسانی)؛ هر ۱۰ آزمایشگاه شبیه‌ساز/Mock محلی Python بدون تجهیز شبکه زنده هستند و تطابق بایتی ۶۴/۶۴ HTML تأیید شد.

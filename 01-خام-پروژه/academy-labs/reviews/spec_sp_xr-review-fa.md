@@ -11,3 +11,7 @@
 - **اصلاح انجام‌شده:** جایگزینی با `ipaddress.ip_network(strict=True)` و شرط دقیق `subnet_of(198.51.100.0/24)` با `24..26` و تست منفی رد `/21` و `/28`.
 - **تست مرتبط:** `test_phase5_remaining_tracks_labs_and_regressions` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** مدل محلی بدون روتر IOS-XR؛ بازبینی مستقل انجام نشده است.
+
+## به‌روزرسانی فاز ۱۰C — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
+- **تغییرات:** افزودن `_require_bool` سخت‌گیرانه روی `confirmed_by_operator`، اعتبارسنجی `confirmed_seconds > 0` (غیربولی) و اعتبارسنجی `prefix_len`/`local_pref` در `eval_rpl_policy`.
+- **وضعیت اجرا:** آزمایشگاه شبیه‌ساز/Mock محلی Python بدون تجهیز شبکه زنده؛ تطابق دقیق بایتی کد HTML با `spec_sp_xr_lab.py` تأیید شد.

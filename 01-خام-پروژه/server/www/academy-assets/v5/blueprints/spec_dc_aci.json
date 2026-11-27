@@ -1,344 +1,344 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "spec_dc_aci",
- "objectiveId": "spec_dc_aci",
- "kind": "lesson",
- "track": "Specialist",
- "course": "spec-datacenter",
- "title": "۷.۳ Data Center: معماری Cisco ACI، کنترلر APIC، مدل EPG/Contract و Multi-Site",
- "titleEn": "Data Center Deep Dive: Cisco ACI Architecture, APIC, Tenant/VRF/BD/EPG/Contract & Multi-Site (NDO)",
- "domain": "Data Center Networking",
- "source": "Legacy spec_dc_aci rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [
-  "spec_dc_nx"
- ],
- "sections": [
-  {
-   "id": "spec_dc_aci-section-1",
-   "title": "مسئله واقعی: چگونه ۵۰ سوئیچ Leaf را بر اساس «نیاز امنیتی اپلیکیشن» به جای VLAN به VLAN مدیریت کنیم؟",
-   "html": "<p>در یک دیتاسنتر با ۵۰ سوئیچ Leaf و صدها اپلیکیشن چندلایه (Web/App/DB)، مدیریت دستی VLAN، VRF و ACL روی تک‌تک سوئیچ‌ها در NX-OS حتی با اسکریپت نیز مستعد خطا و ناهماهنگی است. <strong>Cisco ACI (Application Centric Infrastructure)</strong> روی همان سخت‌افزار <strong>Leaf-Spine سری Nexus 9000</strong> (در مد ACI) منطق شبکه را به یک مدل سیاست‌محور و لیست‌سفید (Whitelist) تبدیل می‌کند: <strong>Tenant -> VRF -> Bridge Domain -> EPG -> Contract</strong>.</p>"
-  },
-  {
-   "id": "spec_dc_aci-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با VXLAN، Leaf-Spine و درس <code>spec_dc_nx</code>.</p><ul><li>تبیین جایگاه خوشه کنترلر <strong>APIC</strong> (عدم حضور در Data Plane / Control Plane و قابلیت <strong>Headless Operation</strong>).</li><li>کالبدشکافی پروتکل‌های داخلی فابریک ACI: <strong>IS-IS</strong> (Underlay)، <strong>COOP</strong> (دیتابیس Endpoint روی Spine)، <strong>MP-BGP</strong> و <strong>VXLAN</strong>.</li><li>تسلط کامل بر سلسله‌مراتب منطقی <strong>Tenant / VRF (Enforced) / Bridge Domain / EPG / Contract / L3Out</strong>.</li><li>مقایسه دقیق معماری‌های اتصال چند دیتاسنتر: <strong>Multi-Pod</strong> در برابر <strong>Multi-Site (با NDO/MSO)</strong>.</li></ul>"
-  },
-  {
-   "id": "spec_dc_aci-section-3",
-   "title": "جایگاه خوشه APIC و چرایی ادامه کار فابریک در حالت Headless",
-   "html": "<p>یکی از مهم‌ترین ویژگی‌های معماری Cisco ACI جدایی کامل <strong>APIC (Application Policy Infrastructure Controller — معمولاً خوشه ۳ یا ۵ سروره)</strong> از صفحه داده و صفحه کنترل فابریک است! APIC صرفاً سیاست‌ها را از طریق API/UI می‌گیرد، به سوئیچ‌های Leaf/Spine (در قالب MIT/Object Model) دیکته می‌کند و وضعیت سلامت را می‌خواند.</p><p><strong>اگر هر سه سرور APIC هم‌زمان قطع شوند چه می‌شود؟</strong> تمام ترافیک و مسیریابی از پیش برنامه‌ریزی‌شده در سخت‌افزار ASIC سوئیچ‌های Leaf/Spine بدون هیچ وقفه‌ای به کار خود ادامه می‌دهد (<strong>Headless Operation</strong>) و تنها امکان اعمال تغییر سیاست جدید یا عملیات وابسته به APIC تا بازگشت کووروم متوقف می‌شود!</p>"
-  },
-  {
-   "id": "spec_dc_aci-section-4",
-   "title": "نمودار یکپارچه معماری ACI: APIC، سلسله‌مراتب EPG/Contract و Multi-Site",
-   "html": "<p>نمودار زیر جایگاه APIC، مدل سیاست‌محور Whitelist در ACI و تفاوت Multi-Pod با Multi-Site را نمایش می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco ACI Leaf-Spine Fabric, APIC Cluster, Logical Policy Model (Tenant->VRF->BD->EPG->Contract) and Multi-Site\"><rect x=\"12\" y=\"14\" width=\"234\" height=\"196\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"129\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">APIC Cluster (3+ Nodes)</text><text x=\"129\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Management &amp; Policy Engine ONLY</text><text x=\"129\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">NOT in Data/Control Plane!</text><text x=\"129\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">APIC Down =&gt; Headless Forwarding OK</text><rect x=\"26\" y=\"114\" width=\"206\" height=\"84\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#2563eb\"/><text x=\"129\" y=\"134\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1e3a8a\">Fabric Control Plane</text><text x=\"129\" y=\"154\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">IS-IS (Underlay) + COOP (Spine DB)</text><text x=\"129\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">MP-BGP EVPN + VXLAN (Overlay)</text><text x=\"129\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Hardware Leaf-Spine (Nexus 9000)</text><rect x=\"262\" y=\"14\" width=\"248\" height=\"196\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"386\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">ACI Logical Policy Hierarchy</text><text x=\"386\" y=\"60\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Tenant (Isolation Boundary)</text><text x=\"386\" y=\"82\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">  |-&gt; VRF (L3 Context: Enforced)</text><text x=\"386\" y=\"104\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">        |-&gt; Bridge Domain (L2 + Subnet)</text><text x=\"386\" y=\"128\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#9a3412\">EPG-WEB  --[Contract]--&gt;  EPG-APP</text><text x=\"386\" y=\"148\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">Default Whitelist: Different EPGs DROP</text><text x=\"386\" y=\"164\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">even in SAME BD without Contract!</text><text x=\"386\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">External L3 = L3Out (OSPF/BGP)</text><rect x=\"526\" y=\"14\" width=\"222\" height=\"196\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"637\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Multi-DC Expansion</text><text x=\"637\" y=\"66\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#14532d\">Multi-Pod</text><text x=\"637\" y=\"84\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Single APIC Cluster across Pods</text><text x=\"637\" y=\"100\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">(Shared APIC Fault Domain)</text><text x=\"637\" y=\"136\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Multi-Site (NDO / MSO)</text><text x=\"637\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Independent APIC per Site!</text><text x=\"637\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">ISN + Selective Policy Stretch</text><text x=\"637\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Best for Separate Cities/DR</text></svg>"
-  },
-  {
-   "id": "spec_dc_aci-section-5",
-   "title": "زیر کاپوت فابریک ACI: IS-IS، COOP، VXLAN و قانون فیزیکی Leaf-Spine",
-   "html": "<p>در توپولوژی سخت‌افزاری ACI، همه <strong>Leaf</strong>ها فقط به همه <strong>Spine</strong>ها وصل می‌شوند (هیچ دو Leaf به هم و هیچ دو Spine به هم وصل نمی‌شوند و تمام سرورها، فایروال‌ها، APICها و اتصالات L3Out معمولی صرفاً به <strong>Leaf</strong>ها متصل می‌گردند؛ تنها استثنای استاندارد معماری سیسکو، اتصال سوئیچ‌های <strong>Spine</strong> به شبکه <strong>IPN/ISN</strong> در سناریوهای Multi-Pod و Multi-Site است). داخل فابریک، <strong>IS-IS</strong> مسیرهای Underlay بین Leaf و Spine را می‌سازد، پروتکل <strong>COOP (Council of Oracles Protocol)</strong> جدول تمام Endpointهای متصل به Leafها را روی Spineها همگام نگه می‌دارد و داده‌ها با <strong>VXLAN</strong> (شامل برچسب امنیتی <code>Class ID / pcTag</code> درون هدر VXLAN!) جابه‌جا می‌شوند.</p>"
-  },
-  {
-   "id": "spec_dc_aci-section-6",
-   "title": "سلسله‌مراتب منطقی ACI: از Tenant و VRF تا Bridge Domain، EPG و Contract",
-   "html": "<ul><li><strong>Tenant:</strong> مرز ایزوله‌سازی منطقی برای یک واحد تجاری، مشتری یا محیط (علاوه بر سه Tenant پیش‌فرض <code>common</code>، <code>infra</code> و <code>mgmt</code>).</li><li><strong>VRF (Context):</strong> دامنه مسیریابی لایه ۳ (حالت پیش‌فرض <strong><code>Enforced</code></strong> یعنی مدل امنیتی Whitelist سخت‌گیرانه).</li><li><strong>Bridge Domain (BD):</strong> کانتینر لایه ۲ و محل تعریف <strong>Subnet / Anycast Gateway</strong> (برخلاف شبکه سنتی، BD لزوماً یک‌به‌یک با یک VLAN مساوی نیست و می‌تواند چند Subnet داشته باشد).</li><li><strong>EPG (Endpoint Group):</strong> گروهی از سرورها/VMها با نقش امنیتی مشترک (مثل <code>EPG-WEB</code>، <code>EPG-APP</code>، <code>EPG-DB</code>). درون یک EPG ترافیک به‌طور پیش‌فرض مجاز است.</li><li><strong>Contract (شامل Subject و Filter):</strong> در حالت <code>Enforced</code>، <strong>هیچ دو EPG متفاوتی — حتی اگر در یک Bridge Domain و یک ساب‌نت مشترک باشند! — بدون Contract نمی‌توانند با هم صحبت کنند</strong> (یک EPG نقش <code>Consumer</code> و دیگری <code>Provider</code> می‌گیرد).</li></ul>"
-  },
-  {
-   "id": "spec_dc_aci-section-7",
-   "title": "اتصال به دنیای بیرون: L3Out و یکپارچگی با مجازی‌سازها (VMM Integration)",
-   "html": "<p>برای اتصال فابریک ACI به شبکه Campus یا WAN از <strong>L3Out (External Routed Network)</strong> روی Border Leafها (با OSPF، BGP یا EIGRP) استفاده می‌شود که خود یک <code>External EPG</code> می‌سازد و برای ارتباط با EPGهای داخلی نیازمند Contract است. همچنین با <strong>VMM Integration</strong> (مثلاً با VMware vCenter)، APIC به‌طور خودکار Port Groupها را در vCenter می‌سازد و با vMotion ماشین مجازی، سیاست امنیتی EPG همراه آن جابه‌جا می‌شود!</p>"
-  },
-  {
-   "id": "spec_dc_aci-section-8",
-   "title": "مقایسه Multi-Pod در برابر Multi-Site (با NDO / MSO) برای اتصال دو دیتاسنتر",
-   "html": "<table><thead><tr><th>ویژگی</th><th>ACI Multi-Pod</th><th>ACI Multi-Site (با Nexus Dashboard Orchestrator)</th></tr></thead><tbody><tr><td>تعداد خوشه APIC</td><td><strong>یک خوشه APIC مشترک</strong> برای همه Podها</td><td><strong>خوشه APIC کاملاً مستقل در هر سایت</strong></td></tr><tr><td>دامنه خرابی کنترلر (Fault Domain)</td><td>مشترک (خطای APIC یا خطای سیاست روی همه Podها اثر می‌گذارد)</td><td><strong>ایزوله در هر سایت</strong> (سرایت نمی‌کند)</td></tr><tr><td>حداکثر تاخیر مجاز بین سایت‌ها</td><td>تا <strong>۵۰ میلی‌ثانیه RTT بین Podها</strong> (از ACI نسخه ۲٫۳ به بعد؛ در نسخه‌های قدیمی‌تر ۱۰ms)</td><td><strong>بدون سقف سخت ACI در لایه داده بین فابریک‌های سایت‌ها</strong>؛ محدودیت در لایه ارکستراسیون: بین نودهای خوشه Nexus Dashboard (NDO) تا <strong>۵۰ms RTT</strong> (در MSO قدیمی ۱۵۰ms) و بین NDO تا APIC هر سایت تا <strong>۵۰۰ms RTT</strong> (در MSO قدیمی تا ۱ ثانیه)</td></tr><tr><td>کاربرد ایده‌آل</td><td>دو سالن در یک پردیس یا دو دیتاسنتر بسیار نزدیک شهری</td><td><strong>دو دیتاسنتر در دو شهر مجزا / DR واقعی</strong></td></tr></tbody></table>"
-  },
-  {
-   "id": "spec_dc_aci-section-9",
-   "title": "اتوماسیون بومی در ACI: همه چیز شیء REST API است (MIT + Terraform/Ansible)",
-   "html": "<p>کل وضعیت Cisco ACI درون یک درخت شیء واحد به نام <strong>MIT (Management Information Tree)</strong> نگهداری می‌شود و هر کلیک در UI در واقع یک درخواست <strong>REST API (JSON/XML)</strong> به APIC است! ابزار <strong>API Inspector</strong> داخلی APIC دقیقاً JSON هر عملیات UI را نشان می‌دهد تا به سرعت به کد <strong>Terraform (provider <code>CiscoDevNet/aci</code>)</strong> یا <strong>Ansible (<code>cisco.aci</code>)</strong> تبدیل شود.</p>"
-  },
-  {
-   "id": "spec_dc_aci-section-10",
-   "title": "طراحی دسترسی فیزیکی در ACI: AEP، Domain و VLAN Pool",
-   "html": "<p>برخلاف سوئیچ معمولی که مستقیم روی پورت می‌نویسید <code>switchport access vlan 10</code>، در ACI اتصال پورت به EPG از طریق یک زنجیره ساختاریافته انجام می‌شود: <code>Interface Profile -> Interface Policy Group -> AAEP (Attachable Access Entity Profile) -> Physical/VMM Domain -> VLAN Pool</code>. درک این زنجیره کلید رفع سریع خطای معروف <code>fault: missing-target / invalid-vlan</code> در ACI است!</p>"
-  },
-  {
-   "id": "spec_dc_aci-section-11",
-   "title": "کژفهمی‌های رایج درباره Cisco ACI",
-   "html": "<ul><li><strong>کژفهمی ۱: «اگر هر سه سرور APIC از کار بیفتند، کل دیتاسنتر خاموش می‌شود.»</strong> واقعیت: خیر؛ APIC در Data Plane و Control Plane فابریک نیست و Leaf/Spine در حالت <strong>Headless</strong> به فوروارد ترافیک موجود ادامه می‌دهند.</li><li><strong>کژفهمی ۲: «دو سرور در یک ساب‌نت و یک Bridge Domain همیشه می‌توانند هم را پینگ کنند.»</strong> واقعیت: اگر در دو <strong>EPG مختلف</strong> درون یک VRF در حالت <code>Enforced</code> باشند، بدون <strong>Contract</strong> ترافیک آن‌ها در سخت‌افزار Leaf Drop می‌شود!</li><li><strong>کژفهمی ۳: «برای دو دیتاسنتر در دو شهر مجزا، Multi-Pod بهتر از Multi-Site است.»</strong> واقعیت: Multi-Pod خوشه APIC مشترک دارد و دامنه خرابی را میان دو شهر به هم گره می‌زند؛ برای دو شهر مجزا <strong>Multi-Site با NDO/MSO</strong> استاندارد است.</li></ul>"
-  },
-  {
-   "id": "spec_dc_aci-section-12",
-   "title": "عیب‌یابی پرتکرار در فابریک ACI",
-   "html": "<p><strong>تله ۱ — ترافیک بین <code>EPG-WEB</code> و <code>EPG-APP</code> با وجود Contract رد می‌شود:</strong> بررسی جهت <strong>Consumer و Provider</strong>، فعال بودن گزینه <code>Apply Both Directions</code> (در ترافیک برگشت)، نبود خطای کمبود حافظه TCAM (<code>Zoning-Rule</code>) و چک کردن <code>Contract</code> بین <code>vzBrCP</code> در ابزار <strong>Contract Viewer / Policy Drop Stats</strong>.</p><p><strong>تله ۲ — خطای <code>ARP Flooding</code> برای تجهیزات خاص:</strong> در Bridge Domain به‌طور پیش‌فرض Hardware Proxy فعال و ARP Flooding خاموش است؛ برای برخی کلاسترهای Legacy که نیازمند GARP/ARP Broadcast هستند، روشن کردن <code>ARP Flooding</code> در BD مشکل را حل می‌کند.</p>"
-  },
-  {
-   "id": "spec_dc_aci-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> سرور Web (در <code>EPG-WEB</code>) و سرور DB (در <code>EPG-DB</code>) هر دو در یک Bridge Domain با ساب‌نت <code>10.10.10.0/24</code> و VRF در حالت <code>Enforced</code> هستند؛ تنها یک Contract بین <code>EPG-WEB</code> و <code>EPG-APP</code> روی TCP/8443 وجود دارد. آیا <code>EPG-WEB</code> می‌تواند روی TCP/5432 به <code>EPG-DB</code> وصل شود؟ <strong>پاسخ:</strong> <strong>خیر (DROP)</strong>؛ در VRF Enforced مدل Whitelist حاکم است و بدون Contract بین <code>EPG-WEB</code> و <code>EPG-DB</code>، حتی درون یک ساب‌نت مشترک ترافیک مسدود می‌شود.</p><p><strong>تمرین ۲:</strong> هنگام ارتقای اشتباه، هر سه نود APIC به‌طور موقت از شبکه مدیریتی قطع می‌شوند. آیا ارتباط فعلی میان <code>EPG-WEB</code> و <code>EPG-APP</code> قطع می‌گردد؟ <strong>پاسخ:</strong> <strong>خیر</strong>؛ سوئیچ‌های Leaf/Spine در حالت <strong>Headless Operation</strong> ترافیک از پیش برنامه‌ریزی‌شده را بدون وقفه ادامه می‌دهند.</p>"
-  },
-  {
-   "id": "spec_dc_aci-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/solutions/data-center-virtualization/application-centric-infrastructure/white-paper-listing.html\" target=\"_blank\" rel=\"noopener\">مستندات معماری رسمی Cisco ACI و Multi-Site (NDO)</a>. و مقالات رسمی <a href=\"https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-737855.html\" target=\"_blank\" rel=\"noopener\">Cisco ACI Multi-Pod</a> و <a href=\"https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-739609.html\" target=\"_blank\" rel=\"noopener\">Cisco ACI Multi-Site Architecture</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی Cisco APIC، شبیه‌ساز ACI Simulator یا سوئیچ Nexus 9000 در مد ACI متصل نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "Cisco ACI",
-   "fa": "زیرساخت اپلیکیشن‌محور سیسکو",
-   "simple": "Application Centric Infrastructure؛ معماری SDN دیتاسنتر سیسکو روی Leaf-Spine Nexus 9000."
-  },
-  {
-   "term": "APIC",
-   "fa": "کنترلر سیاست ACI",
-   "simple": "خوشه ۳+ سروره برای تعریف سیاست و مدیریت فابریک که در Data Plane قرار ندارد."
-  },
-  {
-   "term": "Headless Operation",
-   "fa": "ادامه کار بدون APIC",
-   "simple": "تداوم کامل فوروارد ترافیک موجود در Leaf/Spine حتی در صورت قطع موقت کل خوشه APIC."
-  },
-  {
-   "term": "Tenant",
-   "fa": "واحد ایزوله‌سازی منطقی",
-   "simple": "بالاترین لایه تفکیک سیاست و شبکه برای یک مشتری، واحد تجاری یا محیط در ACI."
-  },
-  {
-   "term": "VRF (Enforced)",
-   "fa": "فضای مسیریابی سخت‌گیرانه",
-   "simple": "حالت پیش‌فرض Whitelist که ارتباط میان دو EPG متفاوت را بدون Contract مسدود می‌کند."
-  },
-  {
-   "term": "Bridge Domain (BD)",
-   "fa": "دامنه پل لایه ۲ در ACI",
-   "simple": "کانتینر لایه ۲ و محل تعریف Subnet / Anycast Gateway (مستقل از یک VLAN خاص)."
-  },
-  {
-   "term": "EPG",
-   "fa": "گروه نقاط پایانی",
-   "simple": "Endpoint Group؛ دسته‌ای از سرورها/VMها با سیاست امنیتی و ارتباطی مشترک."
-  },
-  {
-   "term": "Contract (Consumer/Provider)",
-   "fa": "قرارداد ارتباطی EPGها",
-   "simple": "قانون Whitelist شامل Filter پورت/پروتکل برای مجاز کردن ترافیک میان دو EPG."
-  },
-  {
-   "term": "L3Out",
-   "fa": "خروجی لایه ۳ فابریک",
-   "simple": "اتصال مسیریابی‌شده (OSPF/BGP) فابریک ACI به دنیای بیرون از طریق Border Leafها."
-  },
-  {
-   "term": "COOP",
-   "fa": "پروتکل دیتابیس Spine",
-   "simple": "Council of Oracles Protocol؛ همگام‌سازی اطلاعات Endpointهای متصل به Leafها روی Spineها."
-  },
-  {
-   "term": "ACI Multi-Pod",
-   "fa": "معماری چندپاد ACI",
-   "simple": "اتصال چند Pod با یک خوشه APIC مشترک (دامنه خرابی کنترلر مشترک)."
-  },
-  {
-   "term": "ACI Multi-Site (NDO/MSO)",
-   "fa": "معماری چندسایتی ACI",
-   "simple": "خوشه APIC مستقل در هر سایت با هماهنگی سیاست‌های انتخابی توسط NDO/MSO."
-  },
-  {
-   "term": "AAEP",
-   "fa": "پروفایل اتصال دسترسی",
-   "simple": "Attachable Access Entity Profile؛ پل میان پورت‌های فیزیکی Leaf و دامنه‌های VLAN/VMM."
-  },
-  {
-   "term": "VMM Integration",
-   "fa": "یکپارچگی مجازی‌ساز ACI",
-   "simple": "اتصال خودکار APIC به vCenter/Hyper-V برای ساخت Port Group و همراهی سیاست با vMotion."
-  },
-  {
-   "term": "MIT & API Inspector",
-   "fa": "درخت شیء و بازرس API",
-   "simple": "مدل شی‌محور کل تنظیمات ACI که با REST API (JSON/XML) کاملاً خودکارپذیر است."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (مدل Whitelist EPG/Contract در VRF Enforced و حالت Headless APIC) — کنترلر APIC واقعی اجرا نشده",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سرور واقعی Cisco APIC یا Nexus 9000 ACI متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور واقعی Cisco APIC، ACI Simulator یا سوئیچ Nexus 9000 در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی موتور ارزیابی Whitelist در VRF <code>Enforced</code> را آزمون می‌کند: نشان می‌دهد ترافیک <code>EPG-WEB -> EPG-DB</code> (بدون Contract) حتی در یک BD مشترک <strong>DROP</strong> می‌شود، ترافیک <code>EPG-WEB -> EPG-APP</code> روی پورت مجاز Contract (<code>8443</code>) <strong>PERMIT</strong> می‌گردد، و قطع شدن هر ۳ APIC ترافیک سخت‌افزاری موجود را متوقف نمی‌کند (<strong>Headless Operation</strong>).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_dc_aci_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_dc_aci_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — spec_dc_aci: Cisco ACI Policy Model (Tenant-&gt;VRF-&gt;BD-&gt;EPG-&gt;\nContract), Headless APIC Operation &amp; Multi-Site vs Multi-Pod Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of ACI VRF Enforced\nwhitelist policy evaluation and APIC control/data plane separation. No live APIC.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\n\ndef evaluate_aci_traffic(\n    src_epg: str,\n    dst_epg: str,\n    port: int,\n    vrf_enforced: bool,\n    contracts: list[dict],\n) -&gt; dict:\n    if src_epg == dst_epg:\n        return {&quot;action&quot;: &quot;PERMIT&quot;, &quot;reason&quot;: &quot;Intra-EPG traffic permitted by default&quot;}\n    if not vrf_enforced:\n        return {&quot;action&quot;: &quot;PERMIT&quot;, &quot;reason&quot;: &quot;VRF in Unenforced mode (no contract required)&quot;}\n    for c in contracts:\n        if c[&quot;consumer&quot;] == src_epg and c[&quot;provider&quot;] == dst_epg and port in c[&quot;tcp_ports&quot;]:\n            return {&quot;action&quot;: &quot;PERMIT&quot;, &quot;reason&quot;: f&quot;Matched Contract {c[&#x27;name&#x27;]} on TCP/{port}&quot;}\n    return {&quot;action&quot;: &quot;DROP&quot;, &quot;reason&quot;: &quot;VRF Enforced default whitelist: no matching Contract&quot;}\n\n\ndef apic_offline_impact(all_apics_down: bool) -&gt; dict:\n    if all_apics_down:\n        return {\n            &quot;existing_hardware_forwarding&quot;: &quot;CONTINUES (Headless Operation on Leaf/Spine)&quot;,\n            &quot;new_policy_changes&quot;: &quot;BLOCKED until APIC quorum restored&quot;,\n        }\n    return {&quot;existing_hardware_forwarding&quot;: &quot;NORMAL&quot;, &quot;new_policy_changes&quot;: &quot;ALLOWED&quot;}\n\n\ndef main() -&gt; None:\n    contracts = [{&quot;name&quot;: &quot;WEB_TO_APP&quot;, &quot;consumer&quot;: &quot;EPG-WEB&quot;, &quot;provider&quot;: &quot;EPG-APP&quot;, &quot;tcp_ports&quot;: [8443]}]\n    # Same BD/Subnet, different EPGs in Enforced VRF -&gt; DROP without matching contract!\n    drop_db = evaluate_aci_traffic(&quot;EPG-WEB&quot;, &quot;EPG-DB&quot;, 5432, vrf_enforced=True, contracts=contracts)\n    permit_app = evaluate_aci_traffic(&quot;EPG-WEB&quot;, &quot;EPG-APP&quot;, 8443, vrf_enforced=True, contracts=contracts)\n    headless = apic_offline_impact(all_apics_down=True)\n\n    assert drop_db[&quot;action&quot;] == &quot;DROP&quot;\n    assert permit_app[&quot;action&quot;] == &quot;PERMIT&quot;\n    assert &quot;Headless&quot; in headless[&quot;existing_hardware_forwarding&quot;]\n\n    print(&quot;=== spec_dc_aci ACI EPG/Contract &amp; Headless Operation Mock ===&quot;)\n    print(json.dumps({\n        &quot;web_to_db_no_contract&quot;: drop_db,\n        &quot;web_to_app_with_contract&quot;: permit_app,\n        &quot;all_3_apics_offline&quot;: headless,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>web_to_db_no_contract.action: 'DROP'</code>، <code>web_to_app_with_contract.action: 'PERMIT'</code> و تداوم فوروارد در <code>all_3_apics_offline</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع ساخت Tenant در Cisco ACI با REST API (اجرا نشده روی APIC زنده):</strong></p><pre dir=\"ltr\"><code># Reference APIC REST JSON payload (NOT executed against live APIC)\nPOST https://apic.example/api/mo/uni.json\n{\"fvTenant\": {\"attributes\": {\"name\": \"PROD_CORP\"}}}</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس معماری Cisco ACI، کنترلر APIC و Multi-Site",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "در Cisco ACI اگر هر سه سرور خوشه کنترلر APIC موقتاً ارتباطشان با Leaf و Spine قطع شود، چه اتفاقی برای ترافیک‌های موجود سرورها می‌افتد؟",
-   "options": [
-    "کل دیتاسنتر بلافاصله خاموش می‌شود",
-    "ترافیک و مسیریابی از قبل برنامه‌ریزی‌شده در سخت‌افزار به کار خود ادامه می‌دهند (Headless Operation) و فقط اعمال تغییرات سیاست جدید متوقف می‌شود",
-    "همه پورت‌ها به VLAN 1 برمی‌گردند",
-    "فابریک به پروتکل RIP تبدیل می‌شود"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>APIC در صفحه داده (Data Plane) و صفحه کنترل فابریک نیست؛ بنابراین قطع موقت آن باعث توقف ترافیک موجود نمی‌شود.</p>"
-  },
-  {
-   "title": "در حالت پیش‌فرض Enforced یک VRF در ACI، دو سرور درون دو EPG مختلف اما در یک Bridge Domain و یک ساب‌نت مشترک چگونه با هم ارتباط می‌گیرند؟",
-   "options": [
-    "فوراً بدون هیچ تنظیمی",
-    "فقط با فعال کردن HSRP",
-    "حتماً باید میان آن دو EPG یک Contract (شامل Consumer، Provider و Filter) برقرار شود؛ وگرنه ترافیک Drop می‌شود",
-    "فقط با تغییر نام سرورها"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>مدل امنیتی پیش‌فرض VRF Enforced در ACI لیست سفید (Whitelist) است و ارتباط بین دو EPG مختلف نیازمند Contract صریح است.</p>"
-  },
-  {
-   "title": "مزیت کلیدی ACI Multi-Site (با NDO/MSO) نسبت به ACI Multi-Pod برای دو دیتاسنتر در دو شهر مجزا چیست؟",
-   "options": [
-    "استفاده از یک خوشه APIC واحد برای هر دو شهر",
-    "استفاده از Spanning Tree روی WAN",
-    "حذف مسیریابی ISN",
-    "داشتن خوشه APIC مستقل در هر سایت (جداسازی دامنه خرابی کنترلر) و هماهنگی متمرکز سیاست‌های انتخابی توسط NDO/MSO"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>Multi-Site دامنه خرابی APIC را در هر شهر ایزوله نگه می‌دارد و انتخاب استاندارد برای DR بین‌شهری است.</p>"
-  },
-  {
-   "title": "در معماری سخت‌افزاری Leaf-Spine فابریک Cisco ACI، سرورها، فایروال‌ها، روترهای WAN و خود سرورهای APIC به کدام لایه متصل می‌شوند؟",
-   "options": [
-    "منحصراً به سوئیچ‌های Leaf (هیچ سرور یا APIC به Spine وصل نمی‌شود)",
-    "مستقیم به سوئیچ‌های Spine",
-    "نیمی به Leaf و نیمی به Spine",
-    "فقط به پورت کنسول"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در Cisco ACI تمام سرورها، فایروال‌ها، APICها و اتصالات L3Out روی Leaf (یا Border Leaf) قرار می‌گیرند؛ سوئیچ‌های Spine صرفاً ستون فقرات فابریک‌اند (به‌جز اتصال مستقیم Spine به روترهای IPN/ISN در معماری Multi-Pod و Multi-Site).</p>"
-  },
-  {
-   "title": "نقش پروتکل COOP (Council of Oracles Protocol) درون فابریک ACI چیست؟",
-   "options": [
-    "توزیع آدرس DHCP به کاربران",
-    "همگام‌سازی جدول اطلاعات Endpointهای متصل به Leafها روی سوئیچ‌های Spine",
-    "تأمین دسترسی SSH به APIC",
-    "جایگزینی VXLAN"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>COOP به Spineها اجازه می‌دهد نقش Proxy دیتابیس کل Endpointهای فابریک را ایفا کنند.</p>"
-  },
-  {
-   "title": "ترتیب صحیح سلسله‌مراتب منطقی در Cisco ACI از کلان به جزئی کدام است؟",
-   "options": [
-    "EPG -> BD -> VRF -> Tenant",
-    "Contract -> Spine -> Tenant -> VLAN",
-    "Tenant -> VRF -> Bridge Domain (BD) -> EPG (متصل به هم از طریق Contract)",
-    "VLAN -> STP -> HSRP -> APIC"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>شناخت دقیق سلسله‌مراتب <code>Tenant -> VRF -> BD -> EPG</code> اساس طراحی و عیب‌یابی ACI است.</p>"
-  },
-  {
-   "title": "سازه استاندارد اتصال فابریک Cisco ACI به شبکه Campus یا WAN با پروتکل‌های مسیریابی (OSPF/BGP) چه نام دارد؟",
-   "options": [
-    "vPC Peer-Link",
-    "Spanning Tree Root",
-    "DHCP Option 43",
-    "L3Out (External Routed Network) روی Border Leafها"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>L3Out ارتباط لایه ۳ فابریک با دنیای بیرون را فراهم کرده و از طریق External EPG و Contract کنترل می‌شود.</p>"
-  },
-  {
-   "title": "مزیت اصلی VMM Integration (یکپارچه‌سازی APIC با VMware vCenter) چیست؟",
-   "options": [
-    "ساخت خودکار Port Groupها در vCenter و جابه‌جایی خودکار سیاست امنیتی EPG همراه با vMotion ماشین مجازی",
-    "حذف کامل سوئیچ‌های فیزیکی Leaf",
-    "خاموش کردن رمزنگاری vCenter",
-    "تبدیل VMware به NX-OS"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>VMM Integration پل خودکار میان تیم شبکه و تیم مجازی‌سازی است و خطای ناهماهنگی VLAN هنگام vMotion را حذف می‌کند.</p>"
-  },
-  {
-   "title": "چرا اتوماسیون Cisco ACI با REST API، Terraform یا Ansible بسیار بومی و یکپارچه است؟",
-   "options": [
-    "زیرا ACI فقط با Telnet کار می‌کند",
-    "زیرا کل تنظیمات ACI در درخت شیء MIT نگهداری می‌شود و تمام عملیات UI در پس‌زمینه درخواست‌های REST API (قابل مشاهده در API Inspector) هستند",
-    "زیرا ACI فایل YAML ندارد",
-    "زیرا APIC فاقد رابط گرافیکی است"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>در ACI، ابزار API Inspector JSON دقیق هر تغییر UI را می‌دهد و تبدیل آن به Terraform/Ansible را بسیار سریع می‌کند.</p>"
-  },
-  {
-   "title": "در زنجیره دسترسی فیزیکی ACI، نقش AAEP (Attachable Access Entity Profile) چیست؟",
-   "options": [
-    "تنظیم رمز عبور کاربران AD",
-    "تعریف مسیر BGP اینترنت",
-    "ایجاد پیوند میان پروفایل/گروه پورت‌های فیزیکی Leaf و دامنه‌های (Physical/VMM Domains) متصل به VLAN Pool",
-    "جایگزینی VRF"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>AAEP حلقه وصل پورت‌های سخت‌افزاری Leaf به دامنه‌ها و استخر VLANهای مجاز است.</p>"
-  },
-  {
-   "title": "کدام پروتکل Underlay در داخل فابریک ACI مسیرهای لایه ۳ میان سوئیچ‌های Leaf و Spine را به‌طور خودکار می‌سازد؟",
-   "options": [
-    "RIPv2",
-    "EIGRP",
-    "Static Routes دستی",
-    "IS-IS (به‌صورت خودکار درون فابریک)"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>فابریک ACI به‌طور بومی و خودکار از IS-IS برای Underlay، از COOP برای دیتابیس Endpoint و از VXLAN برای Overlay استفاده می‌کند.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "شبیه‌سازی محلی (Local Mock) در Python 3 برای ارزیابی Whitelist مدل EPG/Contract در VRF Enforced و حالت Headless APIC بدون APIC واقعی",
-    "اتصال زنده به APIC تولیدی سازمان",
-    "ساخت L3Out واقعی روی Nexus 93180",
-    "فقط متن نظری بدون کد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ کنترلر APIC واقعی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.3",
-  "legacyId": "spec_dc_aci",
-  "sources": [
-   "https://www.cisco.com/c/en/us/solutions/data-center-virtualization/application-centric-infrastructure/white-paper-listing.html",
-   "https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-737855.html",
-   "https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-739609.html",
-   "https://www.cisco.com/c/en/us/td/docs/dcn/whitepapers/cisco-multi-site-deployment-guide-for-aci-fabrics.html"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "spec_dc_aci",
+  "objectiveId": "spec_dc_aci",
+  "kind": "lesson",
+  "track": "Specialist",
+  "course": "spec-datacenter",
+  "title": "۷.۳ Data Center: معماری Cisco ACI، کنترلر APIC، مدل EPG/Contract و Multi-Site",
+  "titleEn": "Data Center Deep Dive: Cisco ACI Architecture, APIC, Tenant/VRF/BD/EPG/Contract & Multi-Site (NDO)",
+  "domain": "Data Center Networking",
+  "source": "Legacy spec_dc_aci rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "spec_dc_nx"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی Cisco APIC یا سوئیچ Nexus 9000 ACI متصل نشده است."
+  "sections": [
+    {
+      "id": "spec_dc_aci-section-1",
+      "title": "مسئله واقعی: چگونه ۵۰ سوئیچ Leaf را بر اساس «نیاز امنیتی اپلیکیشن» به جای VLAN به VLAN مدیریت کنیم؟",
+      "html": "<p>در یک دیتاسنتر با ۵۰ سوئیچ Leaf و صدها اپلیکیشن چندلایه (Web/App/DB)، مدیریت دستی VLAN، VRF و ACL روی تک‌تک سوئیچ‌ها در NX-OS حتی با اسکریپت نیز مستعد خطا و ناهماهنگی است. <strong>Cisco ACI (Application Centric Infrastructure)</strong> روی همان سخت‌افزار <strong>Leaf-Spine سری Nexus 9000</strong> (در مد ACI) منطق شبکه را به یک مدل سیاست‌محور و لیست‌سفید (Whitelist) تبدیل می‌کند: <strong>Tenant -> VRF -> Bridge Domain -> EPG -> Contract</strong>.</p>"
+    },
+    {
+      "id": "spec_dc_aci-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با VXLAN، Leaf-Spine و درس <code>spec_dc_nx</code>.</p><ul><li>تبیین جایگاه خوشه کنترلر <strong>APIC</strong> (عدم حضور در Data Plane / Control Plane و قابلیت <strong>Headless Operation</strong>).</li><li>کالبدشکافی پروتکل‌های داخلی فابریک ACI: <strong>IS-IS</strong> (Underlay)، <strong>COOP</strong> (دیتابیس Endpoint روی Spine)، <strong>MP-BGP</strong> و <strong>VXLAN</strong>.</li><li>تسلط کامل بر سلسله‌مراتب منطقی <strong>Tenant / VRF (Enforced) / Bridge Domain / EPG / Contract / L3Out</strong>.</li><li>مقایسه دقیق معماری‌های اتصال چند دیتاسنتر: <strong>Multi-Pod</strong> در برابر <strong>Multi-Site (با NDO/MSO)</strong>.</li></ul>"
+    },
+    {
+      "id": "spec_dc_aci-section-3",
+      "title": "جایگاه خوشه APIC و چرایی ادامه کار فابریک در حالت Headless",
+      "html": "<p>یکی از مهم‌ترین ویژگی‌های معماری Cisco ACI جدایی کامل <strong>APIC (Application Policy Infrastructure Controller — معمولاً خوشه ۳ یا ۵ سروره)</strong> از صفحه داده و صفحه کنترل فابریک است! APIC صرفاً سیاست‌ها را از طریق API/UI می‌گیرد، به سوئیچ‌های Leaf/Spine (در قالب MIT/Object Model) دیکته می‌کند و وضعیت سلامت را می‌خواند.</p><p><strong>اگر هر سه سرور APIC هم‌زمان قطع شوند چه می‌شود؟</strong> تمام ترافیک و مسیریابی از پیش برنامه‌ریزی‌شده در سخت‌افزار ASIC سوئیچ‌های Leaf/Spine بدون هیچ وقفه‌ای به کار خود ادامه می‌دهد (<strong>Headless Operation</strong>) و تنها امکان اعمال تغییر سیاست جدید یا عملیات وابسته به APIC تا بازگشت کووروم متوقف می‌شود!</p>"
+    },
+    {
+      "id": "spec_dc_aci-section-4",
+      "title": "نمودار یکپارچه معماری ACI: APIC، سلسله‌مراتب EPG/Contract و Multi-Site",
+      "html": "<p>نمودار زیر جایگاه APIC، مدل سیاست‌محور Whitelist در ACI و تفاوت Multi-Pod با Multi-Site را نمایش می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco ACI Leaf-Spine Fabric, APIC Cluster, Logical Policy Model (Tenant->VRF->BD->EPG->Contract) and Multi-Site\"><rect x=\"12\" y=\"14\" width=\"234\" height=\"196\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"129\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">APIC Cluster (3+ Nodes)</text><text x=\"129\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Management &amp; Policy Engine ONLY</text><text x=\"129\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">NOT in Data/Control Plane!</text><text x=\"129\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">APIC Down =&gt; Headless Forwarding OK</text><rect x=\"26\" y=\"114\" width=\"206\" height=\"84\" rx=\"8\" fill=\"#dbeafe\" stroke=\"#2563eb\"/><text x=\"129\" y=\"134\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1e3a8a\">Fabric Control Plane</text><text x=\"129\" y=\"154\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">IS-IS (Underlay) + COOP (Spine DB)</text><text x=\"129\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">MP-BGP EVPN + VXLAN (Overlay)</text><text x=\"129\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Hardware Leaf-Spine (Nexus 9000)</text><rect x=\"262\" y=\"14\" width=\"248\" height=\"196\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"386\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">ACI Logical Policy Hierarchy</text><text x=\"386\" y=\"60\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Tenant (Isolation Boundary)</text><text x=\"386\" y=\"82\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">  |-&gt; VRF (L3 Context: Enforced)</text><text x=\"386\" y=\"104\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">        |-&gt; Bridge Domain (L2 + Subnet)</text><text x=\"386\" y=\"128\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#9a3412\">EPG-WEB  --[Contract]--&gt;  EPG-APP</text><text x=\"386\" y=\"148\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">Default Whitelist: Different EPGs DROP</text><text x=\"386\" y=\"164\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">even in SAME BD without Contract!</text><text x=\"386\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">External L3 = L3Out (OSPF/BGP)</text><rect x=\"526\" y=\"14\" width=\"222\" height=\"196\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"637\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Multi-DC Expansion</text><text x=\"637\" y=\"66\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#14532d\">Multi-Pod</text><text x=\"637\" y=\"84\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Single APIC Cluster across Pods</text><text x=\"637\" y=\"100\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">(Shared APIC Fault Domain)</text><text x=\"637\" y=\"136\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Multi-Site (NDO / MSO)</text><text x=\"637\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Independent APIC per Site!</text><text x=\"637\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">ISN + Selective Policy Stretch</text><text x=\"637\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Best for Separate Cities/DR</text></svg>"
+    },
+    {
+      "id": "spec_dc_aci-section-5",
+      "title": "زیر کاپوت فابریک ACI: IS-IS، COOP، VXLAN و قانون فیزیکی Leaf-Spine",
+      "html": "<p>در توپولوژی سخت‌افزاری ACI، همه <strong>Leaf</strong>ها فقط به همه <strong>Spine</strong>ها وصل می‌شوند (هیچ دو Leaf به هم و هیچ دو Spine به هم وصل نمی‌شوند و تمام سرورها، فایروال‌ها، APICها و اتصالات L3Out معمولی صرفاً به <strong>Leaf</strong>ها متصل می‌گردند؛ تنها استثنای استاندارد معماری سیسکو، اتصال سوئیچ‌های <strong>Spine</strong> به شبکه <strong>IPN/ISN</strong> در سناریوهای Multi-Pod و Multi-Site است). داخل فابریک، <strong>IS-IS</strong> مسیرهای Underlay بین Leaf و Spine را می‌سازد، پروتکل <strong>COOP (Council of Oracles Protocol)</strong> جدول تمام Endpointهای متصل به Leafها را روی Spineها همگام نگه می‌دارد و داده‌ها با <strong>VXLAN</strong> (شامل برچسب امنیتی <code>Class ID / pcTag</code> درون هدر VXLAN!) جابه‌جا می‌شوند.</p>"
+    },
+    {
+      "id": "spec_dc_aci-section-6",
+      "title": "سلسله‌مراتب منطقی ACI: از Tenant و VRF تا Bridge Domain، EPG و Contract",
+      "html": "<ul><li><strong>Tenant:</strong> مرز ایزوله‌سازی منطقی برای یک واحد تجاری، مشتری یا محیط (علاوه بر سه Tenant پیش‌فرض <code>common</code>، <code>infra</code> و <code>mgmt</code>).</li><li><strong>VRF (Context):</strong> دامنه مسیریابی لایه ۳ (حالت پیش‌فرض <strong><code>Enforced</code></strong> یعنی مدل امنیتی Whitelist سخت‌گیرانه).</li><li><strong>Bridge Domain (BD):</strong> کانتینر لایه ۲ و محل تعریف <strong>Subnet / Anycast Gateway</strong> (برخلاف شبکه سنتی، BD لزوماً یک‌به‌یک با یک VLAN مساوی نیست و می‌تواند چند Subnet داشته باشد).</li><li><strong>EPG (Endpoint Group):</strong> گروهی از سرورها/VMها با نقش امنیتی مشترک (مثل <code>EPG-WEB</code>، <code>EPG-APP</code>، <code>EPG-DB</code>). درون یک EPG ترافیک به‌طور پیش‌فرض مجاز است.</li><li><strong>Contract (شامل Subject و Filter):</strong> در حالت <code>Enforced</code>، <strong>هیچ دو EPG متفاوتی — حتی اگر در یک Bridge Domain و یک ساب‌نت مشترک باشند! — بدون Contract نمی‌توانند با هم صحبت کنند</strong> (یک EPG نقش <code>Consumer</code> و دیگری <code>Provider</code> می‌گیرد).</li></ul>"
+    },
+    {
+      "id": "spec_dc_aci-section-7",
+      "title": "اتصال به دنیای بیرون: L3Out و یکپارچگی با مجازی‌سازها (VMM Integration)",
+      "html": "<p>برای اتصال فابریک ACI به شبکه Campus یا WAN از <strong>L3Out (External Routed Network)</strong> روی Border Leafها (با OSPF، BGP یا EIGRP) استفاده می‌شود که خود یک <code>External EPG</code> می‌سازد و برای ارتباط با EPGهای داخلی نیازمند Contract است. همچنین با <strong>VMM Integration</strong> (مثلاً با VMware vCenter)، APIC به‌طور خودکار Port Groupها را در vCenter می‌سازد و با vMotion ماشین مجازی، سیاست امنیتی EPG همراه آن جابه‌جا می‌شود!</p>"
+    },
+    {
+      "id": "spec_dc_aci-section-8",
+      "title": "مقایسه Multi-Pod در برابر Multi-Site (با NDO / MSO) برای اتصال دو دیتاسنتر",
+      "html": "<table><thead><tr><th>ویژگی</th><th>ACI Multi-Pod</th><th>ACI Multi-Site (با Nexus Dashboard Orchestrator)</th></tr></thead><tbody><tr><td>تعداد خوشه APIC</td><td><strong>یک خوشه APIC مشترک</strong> برای همه Podها</td><td><strong>خوشه APIC کاملاً مستقل در هر سایت</strong></td></tr><tr><td>دامنه خرابی کنترلر (Fault Domain)</td><td>مشترک (خطای APIC یا خطای سیاست روی همه Podها اثر می‌گذارد)</td><td><strong>ایزوله در هر سایت</strong> (سرایت نمی‌کند)</td></tr><tr><td>حداکثر تاخیر مجاز بین سایت‌ها</td><td>تا <strong>۵۰ میلی‌ثانیه RTT بین Podها</strong> (از ACI نسخه ۲٫۳ به بعد؛ در نسخه‌های قدیمی‌تر ۱۰ms)</td><td><strong>بدون سقف سخت ACI در لایه داده بین فابریک‌های سایت‌ها</strong>؛ محدودیت در لایه ارکستراسیون: بین نودهای خوشه Nexus Dashboard (NDO) تا <strong>۵۰ms RTT</strong> (در MSO قدیمی ۱۵۰ms) و بین NDO تا APIC هر سایت تا <strong>۵۰۰ms RTT</strong> (در MSO قدیمی تا ۱ ثانیه)</td></tr><tr><td>کاربرد ایده‌آل</td><td>دو سالن در یک پردیس یا دو دیتاسنتر بسیار نزدیک شهری</td><td><strong>دو دیتاسنتر در دو شهر مجزا / DR واقعی</strong></td></tr></tbody></table>"
+    },
+    {
+      "id": "spec_dc_aci-section-9",
+      "title": "اتوماسیون بومی در ACI: همه چیز شیء REST API است (MIT + Terraform/Ansible)",
+      "html": "<p>کل وضعیت Cisco ACI درون یک درخت شیء واحد به نام <strong>MIT (Management Information Tree)</strong> نگهداری می‌شود و هر کلیک در UI در واقع یک درخواست <strong>REST API (JSON/XML)</strong> به APIC است! ابزار <strong>API Inspector</strong> داخلی APIC دقیقاً JSON هر عملیات UI را نشان می‌دهد تا به سرعت به کد <strong>Terraform (provider <code>CiscoDevNet/aci</code>)</strong> یا <strong>Ansible (<code>cisco.aci</code>)</strong> تبدیل شود.</p>"
+    },
+    {
+      "id": "spec_dc_aci-section-10",
+      "title": "طراحی دسترسی فیزیکی در ACI: AEP، Domain و VLAN Pool",
+      "html": "<p>برخلاف سوئیچ معمولی که مستقیم روی پورت می‌نویسید <code>switchport access vlan 10</code>، در ACI اتصال پورت به EPG از طریق یک زنجیره ساختاریافته انجام می‌شود: <code>Interface Profile -> Interface Policy Group -> AAEP (Attachable Access Entity Profile) -> Physical/VMM Domain -> VLAN Pool</code>. درک این زنجیره کلید رفع سریع خطای معروف <code>fault: missing-target / invalid-vlan</code> در ACI است!</p>"
+    },
+    {
+      "id": "spec_dc_aci-section-11",
+      "title": "کژفهمی‌های رایج درباره Cisco ACI",
+      "html": "<ul><li><strong>کژفهمی ۱: «اگر هر سه سرور APIC از کار بیفتند، کل دیتاسنتر خاموش می‌شود.»</strong> واقعیت: خیر؛ APIC در Data Plane و Control Plane فابریک نیست و Leaf/Spine در حالت <strong>Headless</strong> به فوروارد ترافیک موجود ادامه می‌دهند.</li><li><strong>کژفهمی ۲: «دو سرور در یک ساب‌نت و یک Bridge Domain همیشه می‌توانند هم را پینگ کنند.»</strong> واقعیت: اگر در دو <strong>EPG مختلف</strong> درون یک VRF در حالت <code>Enforced</code> باشند، بدون <strong>Contract</strong> ترافیک آن‌ها در سخت‌افزار Leaf Drop می‌شود!</li><li><strong>کژفهمی ۳: «برای دو دیتاسنتر در دو شهر مجزا، Multi-Pod بهتر از Multi-Site است.»</strong> واقعیت: Multi-Pod خوشه APIC مشترک دارد و دامنه خرابی را میان دو شهر به هم گره می‌زند؛ برای دو شهر مجزا <strong>Multi-Site با NDO/MSO</strong> استاندارد است.</li></ul>"
+    },
+    {
+      "id": "spec_dc_aci-section-12",
+      "title": "عیب‌یابی پرتکرار در فابریک ACI",
+      "html": "<p><strong>تله ۱ — ترافیک بین <code>EPG-WEB</code> و <code>EPG-APP</code> با وجود Contract رد می‌شود:</strong> بررسی جهت <strong>Consumer و Provider</strong>، فعال بودن گزینه <code>Apply Both Directions</code> (در ترافیک برگشت)، نبود خطای کمبود حافظه TCAM (<code>Zoning-Rule</code>) و چک کردن <code>Contract</code> بین <code>vzBrCP</code> در ابزار <strong>Contract Viewer / Policy Drop Stats</strong>.</p><p><strong>تله ۲ — خطای <code>ARP Flooding</code> برای تجهیزات خاص:</strong> در Bridge Domain به‌طور پیش‌فرض Hardware Proxy فعال و ARP Flooding خاموش است؛ برای برخی کلاسترهای Legacy که نیازمند GARP/ARP Broadcast هستند، روشن کردن <code>ARP Flooding</code> در BD مشکل را حل می‌کند.</p>"
+    },
+    {
+      "id": "spec_dc_aci-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> سرور Web (در <code>EPG-WEB</code>) و سرور DB (در <code>EPG-DB</code>) هر دو در یک Bridge Domain با ساب‌نت <code>10.10.10.0/24</code> و VRF در حالت <code>Enforced</code> هستند؛ تنها یک Contract بین <code>EPG-WEB</code> و <code>EPG-APP</code> روی TCP/8443 وجود دارد. آیا <code>EPG-WEB</code> می‌تواند روی TCP/5432 به <code>EPG-DB</code> وصل شود؟ <strong>پاسخ:</strong> <strong>خیر (DROP)</strong>؛ در VRF Enforced مدل Whitelist حاکم است و بدون Contract بین <code>EPG-WEB</code> و <code>EPG-DB</code>، حتی درون یک ساب‌نت مشترک ترافیک مسدود می‌شود.</p><p><strong>تمرین ۲:</strong> هنگام ارتقای اشتباه، هر سه نود APIC به‌طور موقت از شبکه مدیریتی قطع می‌شوند. آیا ارتباط فعلی میان <code>EPG-WEB</code> و <code>EPG-APP</code> قطع می‌گردد؟ <strong>پاسخ:</strong> <strong>خیر</strong>؛ سوئیچ‌های Leaf/Spine در حالت <strong>Headless Operation</strong> ترافیک از پیش برنامه‌ریزی‌شده را بدون وقفه ادامه می‌دهند.</p>"
+    },
+    {
+      "id": "spec_dc_aci-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/solutions/data-center-virtualization/application-centric-infrastructure/white-paper-listing.html\" target=\"_blank\" rel=\"noopener\">مستندات معماری رسمی Cisco ACI و Multi-Site (NDO)</a>. و مقالات رسمی <a href=\"https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-737855.html\" target=\"_blank\" rel=\"noopener\">Cisco ACI Multi-Pod</a> و <a href=\"https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-739609.html\" target=\"_blank\" rel=\"noopener\">Cisco ACI Multi-Site Architecture</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی Cisco APIC، شبیه‌ساز ACI Simulator یا سوئیچ Nexus 9000 در مد ACI متصل نشده است.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، زنجیره AAEP/Domain/VLAN Pool، VMM Integration، MIT/API Inspector و شبیه‌ساز EPG/Contract + Headless."
+  "glossary": [
+    {
+      "term": "Cisco ACI",
+      "fa": "زیرساخت اپلیکیشن‌محور سیسکو",
+      "simple": "Application Centric Infrastructure؛ معماری SDN دیتاسنتر سیسکو روی Leaf-Spine Nexus 9000."
+    },
+    {
+      "term": "APIC",
+      "fa": "کنترلر سیاست ACI",
+      "simple": "خوشه ۳+ سروره برای تعریف سیاست و مدیریت فابریک که در Data Plane قرار ندارد."
+    },
+    {
+      "term": "Headless Operation",
+      "fa": "ادامه کار بدون APIC",
+      "simple": "تداوم کامل فوروارد ترافیک موجود در Leaf/Spine حتی در صورت قطع موقت کل خوشه APIC."
+    },
+    {
+      "term": "Tenant",
+      "fa": "واحد ایزوله‌سازی منطقی",
+      "simple": "بالاترین لایه تفکیک سیاست و شبکه برای یک مشتری، واحد تجاری یا محیط در ACI."
+    },
+    {
+      "term": "VRF (Enforced)",
+      "fa": "فضای مسیریابی سخت‌گیرانه",
+      "simple": "حالت پیش‌فرض Whitelist که ارتباط میان دو EPG متفاوت را بدون Contract مسدود می‌کند."
+    },
+    {
+      "term": "Bridge Domain (BD)",
+      "fa": "دامنه پل لایه ۲ در ACI",
+      "simple": "کانتینر لایه ۲ و محل تعریف Subnet / Anycast Gateway (مستقل از یک VLAN خاص)."
+    },
+    {
+      "term": "EPG",
+      "fa": "گروه نقاط پایانی",
+      "simple": "Endpoint Group؛ دسته‌ای از سرورها/VMها با سیاست امنیتی و ارتباطی مشترک."
+    },
+    {
+      "term": "Contract (Consumer/Provider)",
+      "fa": "قرارداد ارتباطی EPGها",
+      "simple": "قانون Whitelist شامل Filter پورت/پروتکل برای مجاز کردن ترافیک میان دو EPG."
+    },
+    {
+      "term": "L3Out",
+      "fa": "خروجی لایه ۳ فابریک",
+      "simple": "اتصال مسیریابی‌شده (OSPF/BGP) فابریک ACI به دنیای بیرون از طریق Border Leafها."
+    },
+    {
+      "term": "COOP",
+      "fa": "پروتکل دیتابیس Spine",
+      "simple": "Council of Oracles Protocol؛ همگام‌سازی اطلاعات Endpointهای متصل به Leafها روی Spineها."
+    },
+    {
+      "term": "ACI Multi-Pod",
+      "fa": "معماری چندپاد ACI",
+      "simple": "اتصال چند Pod با یک خوشه APIC مشترک (دامنه خرابی کنترلر مشترک)."
+    },
+    {
+      "term": "ACI Multi-Site (NDO/MSO)",
+      "fa": "معماری چندسایتی ACI",
+      "simple": "خوشه APIC مستقل در هر سایت با هماهنگی سیاست‌های انتخابی توسط NDO/MSO."
+    },
+    {
+      "term": "AAEP",
+      "fa": "پروفایل اتصال دسترسی",
+      "simple": "Attachable Access Entity Profile؛ پل میان پورت‌های فیزیکی Leaf و دامنه‌های VLAN/VMM."
+    },
+    {
+      "term": "VMM Integration",
+      "fa": "یکپارچگی مجازی‌ساز ACI",
+      "simple": "اتصال خودکار APIC به vCenter/Hyper-V برای ساخت Port Group و همراهی سیاست با vMotion."
+    },
+    {
+      "term": "MIT & API Inspector",
+      "fa": "درخت شیء و بازرس API",
+      "simple": "مدل شی‌محور کل تنظیمات ACI که با REST API (JSON/XML) کاملاً خودکارپذیر است."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/spec_dc_aci-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (مدل Whitelist EPG/Contract در VRF Enforced و حالت Headless APIC) — کنترلر APIC واقعی اجرا نشده",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سرور واقعی Cisco APIC یا Nexus 9000 ACI متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور واقعی Cisco APIC، ACI Simulator یا سوئیچ Nexus 9000 در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی موتور ارزیابی Whitelist در VRF <code>Enforced</code> را آزمون می‌کند: نشان می‌دهد ترافیک <code>EPG-WEB -> EPG-DB</code> (بدون Contract) حتی در یک BD مشترک <strong>DROP</strong> می‌شود، ترافیک <code>EPG-WEB -> EPG-APP</code> روی پورت مجاز Contract (<code>8443</code>) <strong>PERMIT</strong> می‌گردد، و قطع شدن هر ۳ APIC ترافیک سخت‌افزاری موجود را متوقف نمی‌کند (<strong>Headless Operation</strong>).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_dc_aci_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_dc_aci_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — spec_dc_aci: Cisco ACI Policy Model (Tenant-&gt;VRF-&gt;BD-&gt;EPG-&gt;\nContract), Headless APIC Operation &amp; Multi-Site vs Multi-Pod Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of ACI VRF Enforced\nwhitelist policy evaluation and APIC control/data plane separation. No live APIC.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef evaluate_aci_traffic(\n    src_epg: str,\n    dst_epg: str,\n    port: int,\n    vrf_enforced: bool,\n    contracts: list[dict],\n) -&gt; dict:\n    if not isinstance(src_epg, str) or not src_epg.strip() or not isinstance(dst_epg, str) or not dst_epg.strip():\n        raise ValueError(&quot;src_epg and dst_epg must be non-empty strings&quot;)\n    if isinstance(port, bool) or not isinstance(port, int) or not (1 &lt;= port &lt;= 65535):\n        raise ValueError(f&quot;port must be an int in [1, 65535] (not bool), got {port!r}&quot;)\n    enforced = _require_bool(vrf_enforced, &quot;vrf_enforced&quot;)\n    if not isinstance(contracts, list):\n        raise ValueError(&quot;contracts must be a list of dicts&quot;)\n    if src_epg == dst_epg:\n        return {&quot;action&quot;: &quot;PERMIT&quot;, &quot;reason&quot;: &quot;Intra-EPG traffic permitted by default&quot;}\n    if not enforced:\n        return {&quot;action&quot;: &quot;PERMIT&quot;, &quot;reason&quot;: &quot;VRF in Unenforced mode (no contract required)&quot;}\n    for c in contracts:\n        if c[&quot;consumer&quot;] == src_epg and c[&quot;provider&quot;] == dst_epg and port in c[&quot;tcp_ports&quot;]:\n            return {&quot;action&quot;: &quot;PERMIT&quot;, &quot;reason&quot;: f&quot;Matched Contract {c[&#x27;name&#x27;]} on TCP/{port}&quot;}\n    return {&quot;action&quot;: &quot;DROP&quot;, &quot;reason&quot;: &quot;VRF Enforced default whitelist: no matching Contract&quot;}\n\n\ndef apic_offline_impact(all_apics_down: bool) -&gt; dict:\n    down = _require_bool(all_apics_down, &quot;all_apics_down&quot;)\n    if down:\n        return {\n            &quot;existing_hardware_forwarding&quot;: &quot;CONTINUES (Headless Operation on Leaf/Spine)&quot;,\n            &quot;new_policy_changes&quot;: &quot;BLOCKED until APIC quorum restored&quot;,\n        }\n    return {&quot;existing_hardware_forwarding&quot;: &quot;NORMAL&quot;, &quot;new_policy_changes&quot;: &quot;ALLOWED&quot;}\n\n\ndef main() -&gt; None:\n    contracts = [{&quot;name&quot;: &quot;WEB_TO_APP&quot;, &quot;consumer&quot;: &quot;EPG-WEB&quot;, &quot;provider&quot;: &quot;EPG-APP&quot;, &quot;tcp_ports&quot;: [8443]}]\n    # Same BD/Subnet, different EPGs in Enforced VRF -&gt; DROP without matching contract!\n    drop_db = evaluate_aci_traffic(&quot;EPG-WEB&quot;, &quot;EPG-DB&quot;, 5432, vrf_enforced=True, contracts=contracts)\n    permit_app = evaluate_aci_traffic(&quot;EPG-WEB&quot;, &quot;EPG-APP&quot;, 8443, vrf_enforced=True, contracts=contracts)\n    headless = apic_offline_impact(all_apics_down=True)\n\n    assert drop_db[&quot;action&quot;] == &quot;DROP&quot;\n    assert permit_app[&quot;action&quot;] == &quot;PERMIT&quot;\n    assert &quot;Headless&quot; in headless[&quot;existing_hardware_forwarding&quot;]\n\n    print(&quot;=== spec_dc_aci ACI EPG/Contract &amp; Headless Operation Mock ===&quot;)\n    print(json.dumps({\n        &quot;web_to_db_no_contract&quot;: drop_db,\n        &quot;web_to_app_with_contract&quot;: permit_app,\n        &quot;all_3_apics_offline&quot;: headless,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>web_to_db_no_contract.action: 'DROP'</code>، <code>web_to_app_with_contract.action: 'PERMIT'</code> و تداوم فوروارد در <code>all_3_apics_offline</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع ساخت Tenant در Cisco ACI با REST API (اجرا نشده روی APIC زنده):</strong></p><pre dir=\"ltr\"><code># Reference APIC REST JSON payload (NOT executed against live APIC)\nPOST https://apic.example/api/mo/uni.json\n{\"fvTenant\": {\"attributes\": {\"name\": \"PROD_CORP\"}}}</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس معماری Cisco ACI، کنترلر APIC و Multi-Site",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-specializations",
-   "recommendedCourse": "spec-datacenter",
-   "blueprint": "/academy-assets/v5/blueprints/spec_dc_aci.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_dc_aci_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح خطای دقیق فنی جدول بخش ۸ درباره سقف تأخیر ACI Multi-Site: تفکیک نبود سقف سخت لایه داده ACI بین سایت‌ها از محدودیت‌های لایه ارکستراسیون (NDO-to-APIC تا ۵۰۰ms RTT و بین نودهای خوشه ND تا ۵۰ms RTT در برابر ۱۵۰ms در MSO قدیمی)، و ذکر شرط نسخه ACI 2.3+ برای سقف ۵۰ms در Multi-Pod.",
-   "افزودن استثنای مستند Cisco ACI Multi-Pod / Multi-Site (اتصال Spine به شبکه IPN/ISN) در بخش ۵ و توضیح پرسش ۴ در کنار قاعده اتصال منحصربه‌فرد سرورها/APIC/فایروال‌ها به Leaf."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "در Cisco ACI اگر هر سه سرور خوشه کنترلر APIC موقتاً ارتباطشان با Leaf و Spine قطع شود، چه اتفاقی برای ترافیک‌های موجود سرورها می‌افتد؟",
+      "options": [
+        "کل دیتاسنتر بلافاصله خاموش می‌شود",
+        "ترافیک و مسیریابی از قبل برنامه‌ریزی‌شده در سخت‌افزار به کار خود ادامه می‌دهند (Headless Operation) و فقط اعمال تغییرات سیاست جدید متوقف می‌شود",
+        "همه پورت‌ها به VLAN 1 برمی‌گردند",
+        "فابریک به پروتکل RIP تبدیل می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>APIC در صفحه داده (Data Plane) و صفحه کنترل فابریک نیست؛ بنابراین قطع موقت آن باعث توقف ترافیک موجود نمی‌شود.</p>"
+    },
+    {
+      "title": "در حالت پیش‌فرض Enforced یک VRF در ACI، دو سرور درون دو EPG مختلف اما در یک Bridge Domain و یک ساب‌نت مشترک چگونه با هم ارتباط می‌گیرند؟",
+      "options": [
+        "فوراً بدون هیچ تنظیمی",
+        "فقط با فعال کردن HSRP",
+        "حتماً باید میان آن دو EPG یک Contract (شامل Consumer، Provider و Filter) برقرار شود؛ وگرنه ترافیک Drop می‌شود",
+        "فقط با تغییر نام سرورها"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>مدل امنیتی پیش‌فرض VRF Enforced در ACI لیست سفید (Whitelist) است و ارتباط بین دو EPG مختلف نیازمند Contract صریح است.</p>"
+    },
+    {
+      "title": "مزیت کلیدی ACI Multi-Site (با NDO/MSO) نسبت به ACI Multi-Pod برای دو دیتاسنتر در دو شهر مجزا چیست؟",
+      "options": [
+        "استفاده از یک خوشه APIC واحد برای هر دو شهر",
+        "استفاده از Spanning Tree روی WAN",
+        "حذف مسیریابی ISN",
+        "داشتن خوشه APIC مستقل در هر سایت (جداسازی دامنه خرابی کنترلر) و هماهنگی متمرکز سیاست‌های انتخابی توسط NDO/MSO"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Multi-Site دامنه خرابی APIC را در هر شهر ایزوله نگه می‌دارد و انتخاب استاندارد برای DR بین‌شهری است.</p>"
+    },
+    {
+      "title": "در معماری سخت‌افزاری Leaf-Spine فابریک Cisco ACI، سرورها، فایروال‌ها، روترهای WAN و خود سرورهای APIC به کدام لایه متصل می‌شوند؟",
+      "options": [
+        "منحصراً به سوئیچ‌های Leaf (هیچ سرور یا APIC به Spine وصل نمی‌شود)",
+        "مستقیم به سوئیچ‌های Spine",
+        "نیمی به Leaf و نیمی به Spine",
+        "فقط به پورت کنسول"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در Cisco ACI تمام سرورها، فایروال‌ها، APICها و اتصالات L3Out روی Leaf (یا Border Leaf) قرار می‌گیرند؛ سوئیچ‌های Spine صرفاً ستون فقرات فابریک‌اند (به‌جز اتصال مستقیم Spine به روترهای IPN/ISN در معماری Multi-Pod و Multi-Site).</p>"
+    },
+    {
+      "title": "نقش پروتکل COOP (Council of Oracles Protocol) درون فابریک ACI چیست؟",
+      "options": [
+        "توزیع آدرس DHCP به کاربران",
+        "همگام‌سازی جدول اطلاعات Endpointهای متصل به Leafها روی سوئیچ‌های Spine",
+        "تأمین دسترسی SSH به APIC",
+        "جایگزینی VXLAN"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>COOP به Spineها اجازه می‌دهد نقش Proxy دیتابیس کل Endpointهای فابریک را ایفا کنند.</p>"
+    },
+    {
+      "title": "ترتیب صحیح سلسله‌مراتب منطقی در Cisco ACI از کلان به جزئی کدام است؟",
+      "options": [
+        "EPG -> BD -> VRF -> Tenant",
+        "Contract -> Spine -> Tenant -> VLAN",
+        "Tenant -> VRF -> Bridge Domain (BD) -> EPG (متصل به هم از طریق Contract)",
+        "VLAN -> STP -> HSRP -> APIC"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>شناخت دقیق سلسله‌مراتب <code>Tenant -> VRF -> BD -> EPG</code> اساس طراحی و عیب‌یابی ACI است.</p>"
+    },
+    {
+      "title": "سازه استاندارد اتصال فابریک Cisco ACI به شبکه Campus یا WAN با پروتکل‌های مسیریابی (OSPF/BGP) چه نام دارد؟",
+      "options": [
+        "vPC Peer-Link",
+        "Spanning Tree Root",
+        "DHCP Option 43",
+        "L3Out (External Routed Network) روی Border Leafها"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>L3Out ارتباط لایه ۳ فابریک با دنیای بیرون را فراهم کرده و از طریق External EPG و Contract کنترل می‌شود.</p>"
+    },
+    {
+      "title": "مزیت اصلی VMM Integration (یکپارچه‌سازی APIC با VMware vCenter) چیست؟",
+      "options": [
+        "ساخت خودکار Port Groupها در vCenter و جابه‌جایی خودکار سیاست امنیتی EPG همراه با vMotion ماشین مجازی",
+        "حذف کامل سوئیچ‌های فیزیکی Leaf",
+        "خاموش کردن رمزنگاری vCenter",
+        "تبدیل VMware به NX-OS"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>VMM Integration پل خودکار میان تیم شبکه و تیم مجازی‌سازی است و خطای ناهماهنگی VLAN هنگام vMotion را حذف می‌کند.</p>"
+    },
+    {
+      "title": "چرا اتوماسیون Cisco ACI با REST API، Terraform یا Ansible بسیار بومی و یکپارچه است؟",
+      "options": [
+        "زیرا ACI فقط با Telnet کار می‌کند",
+        "زیرا کل تنظیمات ACI در درخت شیء MIT نگهداری می‌شود و تمام عملیات UI در پس‌زمینه درخواست‌های REST API (قابل مشاهده در API Inspector) هستند",
+        "زیرا ACI فایل YAML ندارد",
+        "زیرا APIC فاقد رابط گرافیکی است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در ACI، ابزار API Inspector JSON دقیق هر تغییر UI را می‌دهد و تبدیل آن به Terraform/Ansible را بسیار سریع می‌کند.</p>"
+    },
+    {
+      "title": "در زنجیره دسترسی فیزیکی ACI، نقش AAEP (Attachable Access Entity Profile) چیست؟",
+      "options": [
+        "تنظیم رمز عبور کاربران AD",
+        "تعریف مسیر BGP اینترنت",
+        "ایجاد پیوند میان پروفایل/گروه پورت‌های فیزیکی Leaf و دامنه‌های (Physical/VMM Domains) متصل به VLAN Pool",
+        "جایگزینی VRF"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>AAEP حلقه وصل پورت‌های سخت‌افزاری Leaf به دامنه‌ها و استخر VLANهای مجاز است.</p>"
+    },
+    {
+      "title": "کدام پروتکل Underlay در داخل فابریک ACI مسیرهای لایه ۳ میان سوئیچ‌های Leaf و Spine را به‌طور خودکار می‌سازد؟",
+      "options": [
+        "RIPv2",
+        "EIGRP",
+        "Static Routes دستی",
+        "IS-IS (به‌صورت خودکار درون فابریک)"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>فابریک ACI به‌طور بومی و خودکار از IS-IS برای Underlay، از COOP برای دیتابیس Endpoint و از VXLAN برای Overlay استفاده می‌کند.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "شبیه‌سازی محلی (Local Mock) در Python 3 برای ارزیابی Whitelist مدل EPG/Contract در VRF Enforced و حالت Headless APIC بدون APIC واقعی",
+        "اتصال زنده به APIC تولیدی سازمان",
+        "ساخت L3Out واقعی روی Nexus 93180",
+        "فقط متن نظری بدون کد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ کنترلر APIC واقعی متصل نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "spec_dc_aci",
+    "sources": [
+      "https://www.cisco.com/c/en/us/solutions/data-center-virtualization/application-centric-infrastructure/white-paper-listing.html",
+      "https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-737855.html",
+      "https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/white-paper-c11-739609.html",
+      "https://www.cisco.com/c/en/us/td/docs/dcn/whitepapers/cisco-multi-site-deployment-guide-for-aci-fabrics.html"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ کنترلر واقعی Cisco APIC یا سوئیچ Nexus 9000 ACI متصل نشده است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، زنجیره AAEP/Domain/VLAN Pool، VMM Integration، MIT/API Inspector و شبیه‌ساز EPG/Contract + Headless."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/spec_dc_aci-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-specializations",
+      "recommendedCourse": "spec-datacenter",
+      "blueprint": "/academy-assets/v5/blueprints/spec_dc_aci.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/spec_dc_aci_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح خطای دقیق فنی جدول بخش ۸ درباره سقف تأخیر ACI Multi-Site: تفکیک نبود سقف سخت لایه داده ACI بین سایت‌ها از محدودیت‌های لایه ارکستراسیون (NDO-to-APIC تا ۵۰۰ms RTT و بین نودهای خوشه ND تا ۵۰ms RTT در برابر ۱۵۰ms در MSO قدیمی)، و ذکر شرط نسخه ACI 2.3+ برای سقف ۵۰ms در Multi-Pod.",
+      "افزودن استثنای مستند Cisco ACI Multi-Pod / Multi-Site (اتصال Spine به شبکه IPN/ISN) در بخش ۵ و توضیح پرسش ۴ در کنار قاعده اتصال منحصربه‌فرد سرورها/APIC/فایروال‌ها به Leaf."
+    ]
+  }
 }

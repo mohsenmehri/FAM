@@ -1,341 +1,341 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "spec_dc_stor",
- "objectiveId": "spec_dc_stor",
- "kind": "lesson",
- "track": "Specialist",
- "course": "spec-datacenter",
- "title": "۷.۳ Data Center: شبکه ذخیره‌سازی (SAN)، Fibre Channel، VSAN/Zoning، NPIV و FCoE",
- "titleEn": "Data Center Deep Dive: Storage Area Networking (SAN), Fibre Channel, VSAN/Zoning, NPIV & FCoE/DCB",
- "domain": "Data Center Storage Networking",
- "source": "Legacy spec_dc_stor rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [
-  "spec_dc_nx"
- ],
- "sections": [
-  {
-   "id": "spec_dc_stor-section-1",
-   "title": "مسئله واقعی: چرا افت حتی یک فریم کوچک در شبکه ذخیره‌سازی دیتابیس می‌تواند کل سیستم را فلج کند؟",
-   "html": "<p>در شبکه اترنت معمولی (LAN)، اگر در لحظه ازدحام چند بسته TCP Drop شوند، فرستنده سرعت را کم می‌کند و بسته را دوباره می‌فرستد. اما در شبکه ذخیره‌سازی بلوکی (<strong>Block Storage / SAN</strong>) که دیسک‌های دیتابیس Oracle، SQL و VMware ESXi از طریق آن خوانده و نوشته می‌شوند، افت فریم به معنی تاخیرهای چندثانیه‌ای، Timeout شدن SCSI و حتی از کار افتادن دیتابیس است! برای همین معماری <strong>Fibre Channel (FC)</strong> با کنترل جریان بدون اتلاف (<strong>Lossless / BB_Credit</strong>) و <strong>FCoE روی اترنت همگرا (DCB)</strong> طراحی شده است.</p>"
-  },
-  {
-   "id": "spec_dc_stor-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> مبانی سوئیچینگ دیتاسنتر و درس <code>spec_dc_nx</code>.</p><ul><li>تبیین ساختار <strong>Fibre Channel SAN</strong>، دو فابریک مجزای فیزیکی (Fabric A و Fabric B)، ورود <code>FLOGI</code> و شناسه‌های <code>WWPN / WWNN / FCID</code>.</li><li>طراحی امن <strong>VSAN</strong> (ایزوله‌سازی فابریک) و <strong>Single-Initiator WWPN Zoning</strong> برای جلوگیری از طوفان <code>RSCN</code> و دسترسی غیرمجاز به LUNها.</li><li>تفاوت <strong>NPIV</strong> (اختصاص WWPN مجازی به هر VM) با <strong>NPV</strong> (حالت Edge ساده‌شده سوئیچ بدون مصرف Domain ID).</li><li>درک سه شرط <strong>FCoE روی Data Center Bridging (DCB)</strong>: کنترل جریان <code>PFC (802.1Qbb)</code>، تضمین پهنای باند <code>ETS (802.1Qaz)</code> و <code>Jumbo MTU</code>، و مقایسه FC با iSCSI و NVMe/TCP.</li></ul>"
-  },
-  {
-   "id": "spec_dc_stor-section-3",
-   "title": "آشنایی با شناسه‌ها و فرآیند ورود در Fibre Channel: WWNN، WWPN، FLOGI و FCID",
-   "html": "<ul><li><strong>WWNN / WWPN (64-bit World Wide Name):</strong> معادل MAC در Fibre Channel؛ <code>WWNN</code> شناسه کل کارت HBA/تجهیز و <code>WWPN</code> شناسه منحصربه‌فرد هر پورت فیزیکی (مبنای استاندارد Zoning).</li><li><strong>FLOGI (Fabric Login) و FCID (24-bit):</strong> به محض اتصال سرور (<code>N_Port</code>) به پورت سوئیچ SAN (<code>F_Port</code>)، فرآیند <code>FLOGI</code> اجرا شده و سوئیچ یک آدرس ۲۴بیتی پویا به نام <strong><code>FCID</code></strong> (معادل IP لایه ۳ در FC) به آن می‌دهد.</li><li><strong>BB_Credit (Buffer-to-Buffer Credit):</strong> پیش از ارسال هر فریم FC، فرستنده مطمئن می‌شود گیرنده بافر خالی (Credit) دارد؛ در نتیجه <strong>هیچ فریمی به دلیل پر شدن بافر Drop نمی‌شود (Lossless by design)</strong>!</li></ul>"
-  },
-  {
-   "id": "spec_dc_stor-section-4",
-   "title": "نمودار معماری Dual-Fabric SAN (Fabric A/B)، VSAN، Single-Initiator Zoning و FCoE",
-   "html": "<p>نمودار زیر جداسازی فیزیکی دو فابریک SAN (Fabric A در VSAN 100 و Fabric B در VSAN 200)، Multipathing و شرط‌های FCoE DCB را نمایش می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Dual-Fabric Fibre Channel SAN (Fabric A/B), VSAN Isolation, Single-Initiator Zoning, NPIV and FCoE DCB\"><rect x=\"18\" y=\"16\" width=\"210\" height=\"82\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"123\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">ESXi Server (Dual HBA)</text><text x=\"123\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">HBA0 WWPN -&gt; Fabric A</text><text x=\"123\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">NPIV: Virtual WWPN per VM</text><rect x=\"274\" y=\"14\" width=\"212\" height=\"86\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">MDS SAN Fabric A (VSAN 100)</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Single-Initiator WWPN Zoning</text><text x=\"380\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">FLOGI -&gt; FCID | BB_Credit Lossless</text><rect x=\"274\" y=\"118\" width=\"212\" height=\"86\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"140\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">MDS SAN Fabric B (VSAN 200)</text><text x=\"380\" y=\"162\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Air-Gapped Redundant Fabric</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">FCoE Link: PFC + ETS + MTU 9216</text><rect x=\"532\" y=\"64\" width=\"210\" height=\"88\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"637\" y=\"88\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">All-Flash SAN Array</text><text x=\"637\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Controller A (VSAN 100) + LUNs</text><text x=\"637\" y=\"128\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Controller B (VSAN 200) | Multipath</text><line x1=\"228\" y1=\"54\" x2=\"274\" y2=\"54\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"228\" y1=\"74\" x2=\"274\" y2=\"156\" stroke=\"#d97706\" stroke-width=\"3\"/><line x1=\"486\" y1=\"56\" x2=\"532\" y2=\"96\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"486\" y1=\"160\" x2=\"532\" y2=\"124\" stroke=\"#d97706\" stroke-width=\"3\"/></svg>"
-  },
-  {
-   "id": "spec_dc_stor-section-5",
-   "title": "VSAN و قانون طلایی Single-Initiator Zoning (چرا All-in-One Zone یک ضدالگوست؟)",
-   "html": "<p><strong>VSAN (Virtual SAN)</strong> در سوئیچ‌های <strong>Cisco MDS</strong> معادل VLAN اما بسیار سخت‌گیرانه‌تر است: هر VSAN سرویس نام‌گذاری (Name Server)، جدول مسیریابی <code>FSPF</code> و Zoneset کاملاً جدا دارد و خطا یا طوفان یک VSAN به VSAN دیگر سرایت نمی‌کند.</p><p>درون هر VSAN، <strong>Zoning</strong> مشخص می‌کند کدام Initiator (پورت HBA سرور) اجازه دیدن کدام Target (پورت Storage) را دارد. <strong>بهترین رویه جهانی: Single-Initiator Zoning (ترجیحاً Single-Initiator Single-Target یا با Smart Zoning سیسکو)</strong>. چرا نباید ۲۰ سرور را در یک Zone مشترک گذاشت؟ زیرا هر بار یک سرور ریبوت شود، پیام تغییر وضعیت <strong><code>RSCN (Registered State Change Notification)</code></strong> به ۱۹ سرور دیگر هم فرستاده می‌شود و حتی خطر خطای نوشتن هم‌زمان و Corrupt شدن دیسک وجود دارد!</p>"
-  },
-  {
-   "id": "spec_dc_stor-section-6",
-   "title": "تفاوت مهم NPIV و NPV در دیتاسنترهای مجازی‌سازی‌شده (VMware / Cisco UCS)",
-   "html": "<ul><li><strong>NPIV (N_Port ID Virtualization):</strong> قابلیت استاندارد FC که اجازه می‌دهد روی یک پورت فیزیکی HBA، چندین <code>WWPN</code> و <code>FCID</code> مجازی ثبت شود؛ در نتیجه هر ماشین مجازی (VM) می‌تواند مستقیم Zoning و LUN Masking اختصاصی خود را داشته باشد.</li><li><strong>NPV (N_Port Virtualizer):</strong> حالت کاری سوئیچ لبه (مثل Cisco UCS Fabric Interconnect یا Nexus Edge) که به جای گرفتن یک Domain ID کامل از فابریک و اجرای FSPF، مثل یک پروکسی شفاف <code>FLOGI</code> سرورها را از طریق <code>NP_Port</code> به سوئیچ Core MDS (با <code>NPIV</code> فعال) منتقل می‌کند!</li></ul>"
-  },
-  {
-   "id": "spec_dc_stor-section-7",
-   "title": "FCoE و سه ستون Data Center Bridging (DCB) برای تبدیل اترنت به شبکه بدون اتلاف",
-   "html": "<p><strong>FCoE (Fibre Channel over Ethernet)</strong> فریم‌های استاندارد FC را مستقیم در لایه ۲ اترنت (EtherType <code>0x8906</code>، بدون TCP/IP) کپسوله می‌کند تا سرور با یک جفت کابل <strong>CNA (Converged Network Adapter)</strong> هم شبکه LAN و هم SAN را حمل کند. اما اترنت عادی Lossy است؛ پس FCoE بدون سه قابلیت <strong>DCB</strong> کار نمی‌کند:</p><ol><li><strong>PFC (Priority-based Flow Control — IEEE 802.1Qbb):</strong> مکث (Pause) انتخابی <em>فقط روی کلاس ترافیک FCoE (معمولاً CoS 3)</em> بدون متوقف کردن بقیه ترافیک LAN روی همان کابل!</li><li><strong>ETS (Enhanced Transmission Selection — IEEE 802.1Qaz):</strong> تضمین درصد مشخصی از پهنای باند لینک (مثلاً ۵۰٪) برای ترافیک SAN هنگام ازدحام.</li><li><strong>Jumbo MTU (حداقل ~2240 بایت، استاندارد 9216):</strong> زیرا بار مفید استاندارد یک فریم FC برابر <strong>2112 بایت</strong> است و در اترنت 1500 بایتی جا نمی‌شود!</li></ol>"
-  },
-  {
-   "id": "spec_dc_stor-section-8",
-   "title": "مقایسه معماری‌های ذخیره‌سازی مدرن: FC SAN، FCoE، iSCSI و NVMe-oF (FC / TCP)",
-   "html": "<table><thead><tr><th>فناوری</th><th>لایه انتقال</th><th>مزایا</th><th>چالش / محدودیت</th></tr></thead><tbody><tr><td><strong>Native Fibre Channel (32G/64G)</strong></td><td>فابریک اختصاصی FC (Lossless)</td><td>کمترین تاخیر، پایداری بی‌رقیب، ایزوله‌سازی کامل</td><td>هزینه بالاتر سوئیچ MDS و کارت HBA</td></tr><tr><td><strong>FCoE</strong></td><td>لایه ۲ اترنت Lossless (DCB)</td><td>کاهش کابل‌کشی رک سرور (CNA)</td><td>غیرقابل مسیریابی در L3، پیچیدگی DCB (امروز رو به افول)</td></tr><tr><td><strong>iSCSI</strong></td><td>TCP/IP روی اترنت استاندارد</td><td>ارزان، قابل مسیریابی، راه‌اندازی ساده</td><td>سربار TCP/IP بیشتر نسبت به FC</td></tr><tr><td><strong>NVMe over Fabrics (NVMe/FC و NVMe/TCP)</strong></td><td>FC یا TCP/RDMA</td><td>عملکرد فوق‌العاده برای دیسک‌های All-Flash NVMe و صف‌های موازی</td><td>نیازمند آرایه و درایورهای مدرن</td></tr></tbody></table>"
-  },
-  {
-   "id": "spec_dc_stor-section-9",
-   "title": "طراحی افزونگی طلایی SAN: چرا هرگز Fabric A و Fabric B را به هم وصل نمی‌کنیم؟",
-   "html": "<p>در شبکه LAN سوئیچ‌های Core را با vPC یا لینک‌های بین‌سوئیچی به هم وصل می‌کنیم، اما در <strong>Fibre Channel SAN این کار یک اشتباه فاجعه‌بار است!</strong> Fabric A (مثلاً VSAN 100) و Fabric B (مثلاً VSAN 200) باید کاملاً <strong>Air-Gapped (از نظر فیزیکی و منطقی جدا)</strong> بمانند تا اگر یک خطای فابریک، باگ فیرم‌ویر یا اشتباه Zoning در Fabric A رخ داد، Fabric B بدون هیچ آسیبی I/O تمام دیتابیس‌ها را از طریق نرم‌افزار <strong>Multipathing (MPIO / VMware NMP / PowerPath)</strong> روی سرور ادامه دهد.</p>"
-  },
-  {
-   "id": "spec_dc_stor-section-10",
-   "title": "تفاوت Zoning در سوئیچ با LUN Masking در Storage Array",
-   "html": "<p>امنیت SAN دولایه است: (۱) <strong>Zoning روی سوئیچ SAN</strong> مشخص می‌کند کدام Initiator اصلاً اجازه دیدن و برقراری ارتباط در سطح فابریک با کدام پورت Target را دارد؛ و (۲) <strong>LUN Masking روی خود Storage Array</strong> تعیین می‌کند پس از رسیدن به آن پورت Target، آن WWPN دقیقاً کدام دیسک‌ها (LUNها) را ببیند. اجرای هم‌زمان هر دو لایه استاندارد دفاع در عمق دیتاسنتر است.</p>"
-  },
-  {
-   "id": "spec_dc_stor-section-11",
-   "title": "کژفهمی‌های رایج درباره شبکه ذخیره‌سازی (SAN)",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای افزونگی بهتر است یک کابل ISL بین سوئیچ MDS فابریک A و فابریک B بکشیم.»</strong> واقعیت: خیر! این کار دو فابریک را به یک دامنه خرابی واحد ادغام می‌کند و هدف طراحی Dual-Fabric SAN را نابود می‌سازد.</li><li><strong>کژفهمی ۲: «FCoE می‌تواند مثل iSCSI از میان روترهای لایه ۳ بین دو دیتاسنتر عبور کند.»</strong> واقعیت: خیر؛ FCoE یک پروتکل لایه ۲ (EtherType <code>0x8906</code>) و غیرقابل روت در L3 است (برای اتصال دو سایت FC از <strong>FCIP</strong> روی IP استفاده می‌شود).</li><li><strong>کژفهمی ۳: «NPIV و NPV دو نام برای یک ویژگی یکسان هستند.»</strong> واقعیت: NPIV روی سوئیچ Core فعال می‌شود تا چندین WWPN روی یک پورت بپذیرد؛ NPV روی سوئیچ لبه (Edge) فعال می‌شود تا به عنوان پروکسی به سمت سوئیچ دارای NPIV وصل گردد.</li></ul>"
-  },
-  {
-   "id": "spec_dc_stor-section-12",
-   "title": "عیب‌یابی پرتکرار در SAN و FCoE",
-   "html": "<p><strong>تله ۱ — فراموش کردن <code>zoneset activate</code>:</strong> در Cisco MDS پس از ویرایش Zone، تا زمانی که <code>zoneset activate name ... vsan ...</code> (و در حالت Enhanced دستور <code>zone commit</code>) را نزنید، تغییرات فقط در دیتابیس متنی می‌ماند و در سخت‌افزار اعمال نمی‌شود!</p><p><strong>تله ۲ — خطای <code>Slow Drain Device</code> در FC:</strong> اگر یک سرور معیوب نتواند فریم‌ها را به سرعت بخواند و <code>BB_Credit</code> را برنگرداند (Credit Starvation)، به دلیل ماهیت Lossless، تراکم به کل لینک ISL و سایر سرورها سرریز می‌شود (راه‌حل: قابلیت Slow Drain Detection و Timeout/Drop فریم‌های کهنه روی Cisco MDS).</p>"
-  },
-  {
-   "id": "spec_dc_stor-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> سرور ESXi-01 دارای HBA0 در VSAN 100 و HBA1 در VSAN 200 است؛ پورت Storage A در VSAN 100 قرار دارد. آیا HBA1 می‌تواند به پورت Storage A دسترسی بگیرد؟ <strong>پاسخ:</strong> <strong>خیر</strong>؛ VSANها مرز ایزوله‌سازی سخت لایه ۲ هستند و ارتباط بین VSANها (بدون IVR) مسدود است.</p><p><strong>تمرین ۲:</strong> لینک FCoE روی یک پورت اترنت با <code>MTU 1500</code> و بدون <code>PFC روی CoS 3</code> پیکربندی شده است. چه مشکلی رخ می‌دهد؟ <strong>پاسخ:</strong> فریم‌های FC با بار مفید ۲۱۱۲ بایت در MTU 1500 جا نمی‌شوند و در نبود PFC، هنگام کوچک‌ترین ازدحام Drop شده و ارتباط SAN فرو می‌پاشد.</p>"
-  },
-  {
-   "id": "spec_dc_stor-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/dcn/mds9000/sw/9x/configuration/fabric/cisco-mds-9000-nx-os-fabric-configuration-guide-9x.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی پیکربندی فابریک Cisco MDS 9000 SAN</a> و <a href=\"https://standards.ieee.org/ieee/802.1Qbb/4408/\" target=\"_blank\" rel=\"noopener\">استاندارد IEEE 802.1Qbb (PFC)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سوئیچ واقعی Cisco MDS، آرایه Storage یا لینک فیزیکی Fibre Channel/FCoE در این محیط اجرا نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "Fibre Channel (FC)",
-   "fa": "شبکه ذخیره‌سازی فایبر چنل",
-   "simple": "پروتکل پرسرعت و بدون اتلاف (Lossless) اختصاصی برای اتصال سرورها به آرایه‌های ذخیره‌سازی SAN."
-  },
-  {
-   "term": "VSAN",
-   "fa": "شبکه SAN مجازی",
-   "simple": "ایزوله‌سازی کامل فابریک، Name Server، FSPF و Zoneset درون سوئیچ‌های Cisco MDS."
-  },
-  {
-   "term": "WWPN / WWNN",
-   "fa": "شناسه جهانی پورت/گره",
-   "simple": "شناسه ۶۴بیتی یکتای پورت HBA یا پورت Storage (معادل MAC) که مبنای Zoning امن است."
-  },
-  {
-   "term": "FLOGI & FCID",
-   "fa": "ورود فابریک و شناسه ۲۴بیتی",
-   "simple": "فرآیند ثبت‌نام پورت N_Port روی سوئیچ SAN و دریافت آدرس ۲۴بیتی FCID."
-  },
-  {
-   "term": "Single-Initiator Zoning",
-   "fa": "زون‌بندی تک‌آغازگر",
-   "simple": "بهترین رویه قرار دادن تنها یک Initiator در هر Zone برای مهار طوفان RSCN و جداسازی خطا."
-  },
-  {
-   "term": "RSCN",
-   "fa": "اعلان تغییر وضعیت فابریک",
-   "simple": "پیامی که هنگام ورود/خروج یک عضو در Zone به سایر اعضای همان Zone ارسال می‌شود."
-  },
-  {
-   "term": "BB_Credit",
-   "fa": "اعتبار بافر-به-بافر",
-   "simple": "مکانیسم کنترل جریان لایه ۲ FC که بدون بافر خالی در گیرنده فریم نمی‌فرستد (Lossless)."
-  },
-  {
-   "term": "Slow Drain Device",
-   "fa": "تجهیز کند تخلیه‌کننده بافر",
-   "simple": "تجهیز معیوبی که BB_Credit برنمی‌گرداند و باعث پس‌زدگی تراکم در کل فابریک SAN می‌شود."
-  },
-  {
-   "term": "NPIV",
-   "fa": "مجازی‌سازی شناسه N_Port",
-   "simple": "ثبت چندین WWPN/FCID مجازی روی یک پورت فیزیکی HBA (مثلاً برای هر VM به‌طور مجزا)."
-  },
-  {
-   "term": "NPV",
-   "fa": "حالت پروکسی لبه SAN",
-   "simple": "N_Port Virtualizer؛ سوئیچ لبه بدون Domain ID که FLOGI سرورها را به سوئیچ Core دارای NPIV می‌فرستد."
-  },
-  {
-   "term": "FCoE",
-   "fa": "فایبر چنل روی اترنت",
-   "simple": "کپسوله‌سازی فریم FC در لایه ۲ اترنت (EtherType 0x8906) نیازمند DCB بدون اتلاف."
-  },
-  {
-   "term": "PFC (IEEE 802.1Qbb)",
-   "fa": "کنترل جریان مبتنی بر اولویت",
-   "simple": "مکث انتخابی ترافیک روی یک CoS خاص (مثل CoS 3 برای FCoE) بدون توقف سایر ترافیک اترنت."
-  },
-  {
-   "term": "ETS (IEEE 802.1Qaz)",
-   "fa": "تخصیص پهنای باند پیشرفته",
-   "simple": "تضمین حداقل درصد پهنای باند برای ترافیک ذخیره‌سازی روی لینک همگرای اترنت."
-  },
-  {
-   "term": "LUN Masking",
-   "fa": "ماسک کردن دیسک روی آرایه",
-   "simple": "تعیین دقیق دیسک‌های قابل مشاهده برای هر WWPN روی خود Storage Array (مکمل Zoning)."
-  },
-  {
-   "term": "NVMe-oF",
-   "fa": "NVMe روی فابریک شبکه",
-   "simple": "اجرای پروتکل پرسرعت NVMe روی FC یا TCP/RDMA برای آرایه‌های All-Flash مدرن."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (ایزوله‌سازی VSAN، Single-Initiator Zoning، NPIV و ممیزی FCoE DCB) — سوئیچ MDS واقعی اجرا نشده",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سوئیچ واقعی Cisco MDS یا آرایه SAN متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ واقعی Cisco MDS، کارت HBA یا آرایه ذخیره‌سازی SAN در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی چهار بررسی حیاتی SAN را اجرا می‌کند: (۱) پذیرش Single-Initiator Zoning در VSAN 100، (۲) مسدودسازی دسترسی بین VSAN 200 و VSAN 100، (۳) دسترسی مستقیم LUN برای یک VM با WWPN مجازی <code>NPIV</code>، و (۴) ممیزی آمادگی <code>FCoE DCB</code> (بررسی PFC روی CoS 3، ETS و MTU 9216).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_dc_stor_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_dc_stor_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — spec_dc_stor (Data Center Storage Networking: FC SAN, VSAN, Zoning, NPIV &amp; FCoE DCB)\nSimulates Fibre Channel Single-Initiator Zoning (using explicit role registry rather than hardcoded WWPN\nOUI prefixes), VSAN isolation, NPIV virtual WWPN login, and FCoE lossless Ethernet (DCB: PFC + ETS + Jumbo MTU).\nNo real Cisco MDS SAN switch or storage array is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef evaluate_fc_access(\n    initiator: dict,\n    target: dict,\n    zones: list[dict],\n    known_initiator_wwpns: set[str] | None = None,\n) -&gt; dict:\n    if initiator[&quot;vsan&quot;] != target[&quot;vsan&quot;]:\n        return {\n            &quot;allowed&quot;: False,\n            &quot;reason&quot;: f&quot;VSAN mismatch ({initiator[&#x27;vsan&#x27;]} != {target[&#x27;vsan&#x27;]}) — hard L2 fabric isolation&quot;,\n        }\n    initiator_registry = set(known_initiator_wwpns) if known_initiator_wwpns is not None else {initiator[&quot;wwpn&quot;]}\n    initiator_registry.add(initiator[&quot;wwpn&quot;])\n\n    for zone in zones:\n        if zone[&quot;vsan&quot;] != initiator[&quot;vsan&quot;]:\n            continue\n        members = set(zone[&quot;members&quot;])\n        if initiator[&quot;wwpn&quot;] in members and target[&quot;wwpn&quot;] in members:\n            init_count = sum(1 for m in members if m in initiator_registry)\n            best_practice = init_count == 1\n            return {\n                &quot;allowed&quot;: True,\n                &quot;zone&quot;: zone[&quot;name&quot;],\n                &quot;initiators_in_zone&quot;: init_count,\n                &quot;single_initiator_best_practice&quot;: best_practice,\n                &quot;warning&quot;: None if best_practice else f&quot;{init_count} initiators share one zone (RSCN blast risk)&quot;,\n            }\n    return {&quot;allowed&quot;: False, &quot;reason&quot;: &quot;No active zoneset entry pairs this initiator and target WWPN&quot;}\n\n\ndef check_fcoe_dcb_readiness(link: dict) -&gt; dict:\n    issues = []\n    if not link.get(&quot;pfc_cos3_enabled&quot;):\n        issues.append(&quot;PFC (802.1Qbb) missing on CoS 3 — frames will drop under congestion&quot;)\n    if not link.get(&quot;ets_enabled&quot;):\n        issues.append(&quot;ETS (802.1Qaz) missing — storage bandwidth not guaranteed&quot;)\n    if link.get(&quot;mtu&quot;, 1500) &lt; 2240:\n        issues.append(f&quot;MTU {link.get(&#x27;mtu&#x27;)} too small for 2112B FC payload + FCoE headers (need &gt;=2240 / 9216)&quot;)\n    return {&quot;link&quot;: link[&quot;name&quot;], &quot;lossless_ready&quot;: len(issues) == 0, &quot;issues&quot;: issues}\n\n\ndef main() -&gt; None:\n    esxi01_fabric_a = {&quot;name&quot;: &quot;ESXi-01-HBA0&quot;, &quot;vsan&quot;: 100, &quot;wwpn&quot;: &quot;20:00:00:11:aa:01:00:01&quot;}\n    esxi02_qlogic = {&quot;name&quot;: &quot;ESXi-02-QLogic-HBA0&quot;, &quot;vsan&quot;: 100, &quot;wwpn&quot;: &quot;21:00:00:24:ff:02:00:01&quot;}\n    esxi01_fabric_b = {&quot;name&quot;: &quot;ESXi-01-HBA1&quot;, &quot;vsan&quot;: 200, &quot;wwpn&quot;: &quot;20:00:00:11:aa:01:00:02&quot;}\n    vm_sql_npiv = {&quot;name&quot;: &quot;VM-SQL-vHBA (NPIV)&quot;, &quot;vsan&quot;: 100, &quot;wwpn&quot;: &quot;20:00:00:11:ff:99:00:01&quot;}\n    storage_a = {&quot;name&quot;: &quot;Storage-Array-PortA&quot;, &quot;vsan&quot;: 100, &quot;wwpn&quot;: &quot;50:00:09:70:00:01:00:01&quot;}\n\n    known_initiators = {\n        esxi01_fabric_a[&quot;wwpn&quot;],\n        esxi02_qlogic[&quot;wwpn&quot;],\n        esxi01_fabric_b[&quot;wwpn&quot;],\n        vm_sql_npiv[&quot;wwpn&quot;],\n    }\n\n    zones = [\n        {\n            &quot;name&quot;: &quot;Z_ESXI01_VMAX_P1&quot;,\n            &quot;vsan&quot;: 100,\n            &quot;members&quot;: [esxi01_fabric_a[&quot;wwpn&quot;], storage_a[&quot;wwpn&quot;]],\n        },\n        {\n            &quot;name&quot;: &quot;Z_VM_SQL_NPIV_VMAX_P1&quot;,\n            &quot;vsan&quot;: 100,\n            &quot;members&quot;: [vm_sql_npiv[&quot;wwpn&quot;], storage_a[&quot;wwpn&quot;]],\n        },\n    ]\n    bad_multi_init_zones = [\n        {\n            &quot;name&quot;: &quot;Z_LEGACY_ALL_ESXI_VMAX&quot;,\n            &quot;vsan&quot;: 100,\n            &quot;members&quot;: [esxi01_fabric_a[&quot;wwpn&quot;], esxi02_qlogic[&quot;wwpn&quot;], storage_a[&quot;wwpn&quot;]],\n        }\n    ]\n\n    ok_single = evaluate_fc_access(esxi01_fabric_a, storage_a, zones, known_initiators)\n    blocked_vsan = evaluate_fc_access(esxi01_fabric_b, storage_a, zones, known_initiators)\n    ok_npiv = evaluate_fc_access(vm_sql_npiv, storage_a, zones, known_initiators)\n    bad_multi_init = evaluate_fc_access(esxi02_qlogic, storage_a, bad_multi_init_zones, known_initiators)\n    dcb_bad = check_fcoe_dcb_readiness({&quot;name&quot;: &quot;Eth1/1-Bad&quot;, &quot;pfc_cos3_enabled&quot;: False, &quot;ets_enabled&quot;: True, &quot;mtu&quot;: 1500})\n    dcb_good = check_fcoe_dcb_readiness({&quot;name&quot;: &quot;Eth1/2-Good&quot;, &quot;pfc_cos3_enabled&quot;: True, &quot;ets_enabled&quot;: True, &quot;mtu&quot;: 9216})\n\n    assert ok_single[&quot;allowed&quot;] is True and ok_single[&quot;single_initiator_best_practice&quot;] is True\n    assert blocked_vsan[&quot;allowed&quot;] is False\n    assert ok_npiv[&quot;allowed&quot;] is True and ok_npiv[&quot;single_initiator_best_practice&quot;] is True\n    assert bad_multi_init[&quot;allowed&quot;] is True and bad_multi_init[&quot;single_initiator_best_practice&quot;] is False\n    assert dcb_bad[&quot;lossless_ready&quot;] is False and dcb_good[&quot;lossless_ready&quot;] is True\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_MDS_OR_SAN_HARDWARE&quot;,\n        &quot;fc_zoning_checks&quot;: {\n            &quot;fabric_a_single_initiator&quot;: ok_single,\n            &quot;cross_vsan_blocked&quot;: blocked_vsan,\n            &quot;npiv_vm_direct_lun&quot;: ok_npiv,\n            &quot;multi_initiator_antipattern_flagged&quot;: bad_multi_init,\n        },\n        &quot;fcoe_dcb_checks&quot;: [dcb_bad, dcb_good],\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> موفقیت <code>fabric_a_single_initiator</code> و <code>npiv_vm_direct_lun</code>، مسدودشدن <code>cross_vsan_blocked</code>، و شکست لینک <code>Eth1/1-Bad</code> در برابر قبولی <code>Eth1/2-Good</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع ساخت و فعال‌سازی Zone در Cisco MDS NX-OS (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference Cisco MDS Zoning snippet (NOT executed on live MDS)\nzone name Z_ESXI01_VMAX_P1 vsan 100\n member pwwn 20:00:00:11:aa:01:00:01\n member pwwn 50:00:09:70:00:01:00:01\nzoneset name ZS_PROD vsan 100\n member Z_ESXI01_VMAX_P1\nzoneset activate name ZS_PROD vsan 100</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس شبکه ذخیره‌سازی SAN، Fibre Channel، VSAN/Zoning و FCoE",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "چرا بهترین رویه استاندارد در طراحی Fibre Channel SAN، استفاده از Single-Initiator Zoning (به جای قرار دادن همه سرورها در یک Zone) است؟",
-   "options": [
-    "زیرا کاهش تعداد اعضا از ارسال پیام‌های تغییر وضعیت (RSCN) میان سرورها، اختلال متقابل و خطر دسترسی غیرمجاز به LUNها جلوگیری می‌کند",
-    "زیرا سوئیچ MDS بیش از دو عضو در Zone نمی‌پذیرد",
-    "برای کاهش سرعت لینک به ۱ گیگابیت",
-    "برای تبدیل FC به TCP/IP"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>Single-Initiator Zoning دامنه پیام‌های RSCN و ریسک خطای عملیاتی بین سرورهای مستقل را به حداقل می‌رساند.</p>"
-  },
-  {
-   "title": "در طراحی Dual-Fabric SAN (فابریک A در VSAN 100 و فابریک B در VSAN 200)، چرا نباید دو فابریک را با کابل ISL به هم متصل کرد؟",
-   "options": [
-    "زیرا کابل فیبر وجود ندارد",
-    "زیرا اتصال آن‌ها دو دامنه خرابی مجزا را به یک دامنه خرابی واحد تبدیل می‌کند و هدف اصلی افزونگی Air-Gapped SAN را از بین می‌برد",
-    "زیرا VSANها همیشه روی یک کابل کار می‌کنند",
-    "زیرا Multipathing سرور از کار می‌افتد اگر دو فابریک جدا باشند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>ایزوله‌سازی کامل Fabric A و Fabric B تضمین می‌کند خطای یک فابریک هیچ اثری بر فابریک دوم نداشته باشد.</p>"
-  },
-  {
-   "title": "کدام سه پیش‌نیاز Data Center Bridging (DCB) برای کارکرد بدون اتلاف (Lossless) پروتکل FCoE روی اترنت حیاتی است؟",
-   "options": [
-    "NAT، DHCP و RIP",
-    "STP، VTP و Telnet",
-    "PFC (IEEE 802.1Qbb) روی CoS مخصوص FCoE، ETS (802.1Qaz) برای تضمین پهنای باند و Jumbo MTU (حداقل ~2240 / 9216 بایت)",
-    "فقط تغییر نام VLAN"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>فریم FC بار مفید ۲۱۱۲ بایتی دارد و بدون PFC/ETS/Jumbo MTU روی اترنت دچار افت فریم و شکست SAN می‌شود.</p>"
-  },
-  {
-   "title": "مکانیسم کنترل جریان BB_Credit (Buffer-to-Buffer Credit) در Fibre Channel چه ویژگی‌ای را تضمین می‌کند؟",
-   "options": [
-    "رمزنگاری AES-256",
-    "تخصیص آدرس IPv6",
-    "مسیریابی روی اینترنت",
-    "انتقال بدون اتلاف (Lossless)؛ فرستنده تا زمانی که گیرنده بافر خالی (Credit) اعلام نکند فریم جدید ارسال نمی‌کند"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>BB_Credit پایه Lossless بودن بومی Fibre Channel است (اما در صورت خرابی یک گیرنده می‌تواند به پدیده Slow Drain منجر شود).</p>"
-  },
-  {
-   "title": "تفاوت دقیق میان NPIV و NPV در یک دیتاسنتر Cisco UCS / MDS چیست؟",
-   "options": [
-    "NPIV روی سوئیچ Core اجازه ثبت چند WWPN/FCID مجازی روی یک پورت را می‌دهد، و NPV روی سوئیچ لبه (Edge) بدون مصرف Domain ID ترافیک FLOGI را به سوئیچ دارای NPIV پروکسی می‌کند",
-    "هر دو دقیقاً یک معنی دارند",
-    "NPV فقط برای iSCSI است",
-    "NPIV پورت‌ها را خاموش می‌کند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در معماری UCS/Nexus معمولاً Edge در مد NPV و Core MDS با قابلیت NPIV فعال پیکربندی می‌شود.</p>"
-  },
-  {
-   "title": "پس از اتصال فیزیکی HBA سرور (N_Port) به پورت سوئیچ SAN (F_Port)، کدام فرآیند انجام می‌شود و چه شناسه‌ای اختصاص می‌یابد؟",
-   "options": [
-    "DHCP Discover و آدرس IPv4",
-    "FLOGI (Fabric Login) و تخصیص یک آدرس ۲۴بیتی FCID",
-    "ARP Request و MAC 48-bit",
-    "BGP Open و AS Number"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>FLOGI ورود اولیه به فابریک FC است که طی آن سوئیچ یک آدرس ۲۴بیتی FCID به N_Port می‌دهد.</p>"
-  },
-  {
-   "title": "چرا FCoE برعکس iSCSI نمی‌تواند مستقیماً از میان روترهای لایه ۳ بین دو دیتاسنتر عبور کند؟",
-   "options": [
-    "چون سرعتش پایین است",
-    "چون فقط روی کابل مسی کار می‌کند",
-    "چون FCoE یک پروتکل لایه ۲ اترنت (EtherType 0x8906) بدون هدر IP است و غیرقابل روت در لایه ۳ می‌باشد",
-    "چون رمز عبور ندارد"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>FCoE فقط در دامنه لایه ۲ Lossless (معمولاً بین سرور تا Top-of-Rack) کار می‌کند؛ برای گسترش FC روی WAN از FCIP استفاده می‌شود.</p>"
-  },
-  {
-   "title": "پدیده Slow Drain Device در شبکه Fibre Channel چگونه می‌تواند کل فابریک را تحت‌تأثیر قرار دهد؟",
-   "options": [
-    "با مصرف تمام آدرس‌های DHCP",
-    "با خاموش کردن برق سوئیچ",
-    "با حذف فایل‌های پیکربندی",
-    "دستگاه معیوب BB_Credit را به موقع برنمی‌گرداند و به دلیل ماهیت Lossless، تراکم به لینک‌های ISL و سایر سرورها پس می‌زند"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>تشخیص و مهار Slow Drain روی سوئیچ‌های MDS یکی از مهارت‌های کلیدی مهندسان SAN است.</p>"
-  },
-  {
-   "title": "در Cisco MDS پس از اضافه کردن یک عضو جدید به Zone و Zoneset، چرا سرور هنوز دیسک را نمی‌بیند؟",
-   "options": [
-    "تا زمانی که دستور zoneset activate (و در Enhanced Mode دستور zone commit) اجرا نشود، تغییر در سخت‌افزار فابریک فعال نمی‌گردد",
-    "زیرا باید کل سوئیچ MDS ریبوت شود",
-    "زیرا Zoning روی سرور اجرا می‌شود",
-    "زیرا VSAN 1 همیشه خاموش است"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>تغییرات Zoning در MDS دو مرحله‌ای است و بدون <code>zoneset activate</code> فقط در دیتابیس غیرفعال باقی می‌ماند.</p>"
-  },
-  {
-   "title": "تفاوت نقش Zoning (روی سوئیچ SAN) با LUN Masking (روی Storage Array) چیست؟",
-   "options": [
-    "هر دو روی کارت شبکه وای‌فای انجام می‌شوند",
-    "Zoning تعیین می‌کند کدام Initiator اجازه دیدن کدام پورت Target در فابریک را دارد، و LUN Masking روی آرایه تعیین می‌کند آن Initiator دقیقاً کدام دیسک‌ها (LUN) را ببیند",
-    "LUN Masking جایگزین کامل VSAN است",
-    "هیچ ارتباطی با امنیت ندارند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>استفاده هم‌زمان از Zoning و LUN Masking امنیت دولایه استاندارد SAN را تشکیل می‌دهد.</p>"
-  },
-  {
-   "title": "کدام فناوری مدرن ذخیره‌سازی برای بهره‌گیری حداکثری از صف‌های موازی و تاخیر فوق‌العاده پایین دیسک‌های All-Flash طراحی شده و هم روی FC و هم روی TCP قابل اجراست؟",
-   "options": [
-    "RIPv2",
-    "Token Ring",
-    "NVMe over Fabrics (NVMe/FC و NVMe/TCP)",
-    "Telnet SAN"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>NVMe-oF گلوگاه‌های پروتکل قدیمی SCSI را حذف کرده و کارایی بسیار بالاتری برای All-Flash فراهم می‌کند.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "اتصال زنده به Cisco MDS 9710 دیتاسنتر",
-    "تست تخریب LUN روی Storage واقعی",
-    "فقط متن نظری بدون کد",
-    "شبیه‌سازی محلی (Local Mock) در Python 3 برای بررسی ایزوله‌سازی VSAN، Single-Initiator Zoning، NPIV و ممیزی FCoE DCB"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سوئیچ MDS یا آرایه SAN واقعی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.5",
-  "legacyId": "spec_dc_stor",
-  "sources": [
-   "https://www.cisco.com/c/en/us/td/docs/dcn/mds9000/sw/9x/configuration/fabric/cisco-mds-9000-nx-os-fabric-configuration-guide-9x.html",
-   "https://standards.ieee.org/ieee/802.1Qbb/4408/"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "spec_dc_stor",
+  "objectiveId": "spec_dc_stor",
+  "kind": "lesson",
+  "track": "Specialist",
+  "course": "spec-datacenter",
+  "title": "۷.۳ Data Center: شبکه ذخیره‌سازی (SAN)، Fibre Channel، VSAN/Zoning، NPIV و FCoE",
+  "titleEn": "Data Center Deep Dive: Storage Area Networking (SAN), Fibre Channel, VSAN/Zoning, NPIV & FCoE/DCB",
+  "domain": "Data Center Storage Networking",
+  "source": "Legacy spec_dc_stor rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "spec_dc_nx"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سوئیچ واقعی Cisco MDS یا آرایه ذخیره‌سازی SAN متصل نشده است."
+  "sections": [
+    {
+      "id": "spec_dc_stor-section-1",
+      "title": "مسئله واقعی: چرا افت حتی یک فریم کوچک در شبکه ذخیره‌سازی دیتابیس می‌تواند کل سیستم را فلج کند؟",
+      "html": "<p>در شبکه اترنت معمولی (LAN)، اگر در لحظه ازدحام چند بسته TCP Drop شوند، فرستنده سرعت را کم می‌کند و بسته را دوباره می‌فرستد. اما در شبکه ذخیره‌سازی بلوکی (<strong>Block Storage / SAN</strong>) که دیسک‌های دیتابیس Oracle، SQL و VMware ESXi از طریق آن خوانده و نوشته می‌شوند، افت فریم به معنی تاخیرهای چندثانیه‌ای، Timeout شدن SCSI و حتی از کار افتادن دیتابیس است! برای همین معماری <strong>Fibre Channel (FC)</strong> با کنترل جریان بدون اتلاف (<strong>Lossless / BB_Credit</strong>) و <strong>FCoE روی اترنت همگرا (DCB)</strong> طراحی شده است.</p>"
+    },
+    {
+      "id": "spec_dc_stor-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> مبانی سوئیچینگ دیتاسنتر و درس <code>spec_dc_nx</code>.</p><ul><li>تبیین ساختار <strong>Fibre Channel SAN</strong>، دو فابریک مجزای فیزیکی (Fabric A و Fabric B)، ورود <code>FLOGI</code> و شناسه‌های <code>WWPN / WWNN / FCID</code>.</li><li>طراحی امن <strong>VSAN</strong> (ایزوله‌سازی فابریک) و <strong>Single-Initiator WWPN Zoning</strong> برای جلوگیری از طوفان <code>RSCN</code> و دسترسی غیرمجاز به LUNها.</li><li>تفاوت <strong>NPIV</strong> (اختصاص WWPN مجازی به هر VM) با <strong>NPV</strong> (حالت Edge ساده‌شده سوئیچ بدون مصرف Domain ID).</li><li>درک سه شرط <strong>FCoE روی Data Center Bridging (DCB)</strong>: کنترل جریان <code>PFC (802.1Qbb)</code>، تضمین پهنای باند <code>ETS (802.1Qaz)</code> و <code>Jumbo MTU</code>، و مقایسه FC با iSCSI و NVMe/TCP.</li></ul>"
+    },
+    {
+      "id": "spec_dc_stor-section-3",
+      "title": "آشنایی با شناسه‌ها و فرآیند ورود در Fibre Channel: WWNN، WWPN، FLOGI و FCID",
+      "html": "<ul><li><strong>WWNN / WWPN (64-bit World Wide Name):</strong> معادل MAC در Fibre Channel؛ <code>WWNN</code> شناسه کل کارت HBA/تجهیز و <code>WWPN</code> شناسه منحصربه‌فرد هر پورت فیزیکی (مبنای استاندارد Zoning).</li><li><strong>FLOGI (Fabric Login) و FCID (24-bit):</strong> به محض اتصال سرور (<code>N_Port</code>) به پورت سوئیچ SAN (<code>F_Port</code>)، فرآیند <code>FLOGI</code> اجرا شده و سوئیچ یک آدرس ۲۴بیتی پویا به نام <strong><code>FCID</code></strong> (معادل IP لایه ۳ در FC) به آن می‌دهد.</li><li><strong>BB_Credit (Buffer-to-Buffer Credit):</strong> پیش از ارسال هر فریم FC، فرستنده مطمئن می‌شود گیرنده بافر خالی (Credit) دارد؛ در نتیجه <strong>هیچ فریمی به دلیل پر شدن بافر Drop نمی‌شود (Lossless by design)</strong>!</li></ul>"
+    },
+    {
+      "id": "spec_dc_stor-section-4",
+      "title": "نمودار معماری Dual-Fabric SAN (Fabric A/B)، VSAN، Single-Initiator Zoning و FCoE",
+      "html": "<p>نمودار زیر جداسازی فیزیکی دو فابریک SAN (Fabric A در VSAN 100 و Fabric B در VSAN 200)، Multipathing و شرط‌های FCoE DCB را نمایش می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Dual-Fabric Fibre Channel SAN (Fabric A/B), VSAN Isolation, Single-Initiator Zoning, NPIV and FCoE DCB\"><rect x=\"18\" y=\"16\" width=\"210\" height=\"82\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"123\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">ESXi Server (Dual HBA)</text><text x=\"123\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">HBA0 WWPN -&gt; Fabric A</text><text x=\"123\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">NPIV: Virtual WWPN per VM</text><rect x=\"274\" y=\"14\" width=\"212\" height=\"86\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">MDS SAN Fabric A (VSAN 100)</text><text x=\"380\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Single-Initiator WWPN Zoning</text><text x=\"380\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">FLOGI -&gt; FCID | BB_Credit Lossless</text><rect x=\"274\" y=\"118\" width=\"212\" height=\"86\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"140\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">MDS SAN Fabric B (VSAN 200)</text><text x=\"380\" y=\"162\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Air-Gapped Redundant Fabric</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">FCoE Link: PFC + ETS + MTU 9216</text><rect x=\"532\" y=\"64\" width=\"210\" height=\"88\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"637\" y=\"88\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">All-Flash SAN Array</text><text x=\"637\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Controller A (VSAN 100) + LUNs</text><text x=\"637\" y=\"128\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">Controller B (VSAN 200) | Multipath</text><line x1=\"228\" y1=\"54\" x2=\"274\" y2=\"54\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"228\" y1=\"74\" x2=\"274\" y2=\"156\" stroke=\"#d97706\" stroke-width=\"3\"/><line x1=\"486\" y1=\"56\" x2=\"532\" y2=\"96\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"486\" y1=\"160\" x2=\"532\" y2=\"124\" stroke=\"#d97706\" stroke-width=\"3\"/></svg>"
+    },
+    {
+      "id": "spec_dc_stor-section-5",
+      "title": "VSAN و قانون طلایی Single-Initiator Zoning (چرا All-in-One Zone یک ضدالگوست؟)",
+      "html": "<p><strong>VSAN (Virtual SAN)</strong> در سوئیچ‌های <strong>Cisco MDS</strong> معادل VLAN اما بسیار سخت‌گیرانه‌تر است: هر VSAN سرویس نام‌گذاری (Name Server)، جدول مسیریابی <code>FSPF</code> و Zoneset کاملاً جدا دارد و خطا یا طوفان یک VSAN به VSAN دیگر سرایت نمی‌کند.</p><p>درون هر VSAN، <strong>Zoning</strong> مشخص می‌کند کدام Initiator (پورت HBA سرور) اجازه دیدن کدام Target (پورت Storage) را دارد. <strong>بهترین رویه جهانی: Single-Initiator Zoning (ترجیحاً Single-Initiator Single-Target یا با Smart Zoning سیسکو)</strong>. چرا نباید ۲۰ سرور را در یک Zone مشترک گذاشت؟ زیرا هر بار یک سرور ریبوت شود، پیام تغییر وضعیت <strong><code>RSCN (Registered State Change Notification)</code></strong> به ۱۹ سرور دیگر هم فرستاده می‌شود و حتی خطر خطای نوشتن هم‌زمان و Corrupt شدن دیسک وجود دارد!</p>"
+    },
+    {
+      "id": "spec_dc_stor-section-6",
+      "title": "تفاوت مهم NPIV و NPV در دیتاسنترهای مجازی‌سازی‌شده (VMware / Cisco UCS)",
+      "html": "<ul><li><strong>NPIV (N_Port ID Virtualization):</strong> قابلیت استاندارد FC که اجازه می‌دهد روی یک پورت فیزیکی HBA، چندین <code>WWPN</code> و <code>FCID</code> مجازی ثبت شود؛ در نتیجه هر ماشین مجازی (VM) می‌تواند مستقیم Zoning و LUN Masking اختصاصی خود را داشته باشد.</li><li><strong>NPV (N_Port Virtualizer):</strong> حالت کاری سوئیچ لبه (مثل Cisco UCS Fabric Interconnect یا Nexus Edge) که به جای گرفتن یک Domain ID کامل از فابریک و اجرای FSPF، مثل یک پروکسی شفاف <code>FLOGI</code> سرورها را از طریق <code>NP_Port</code> به سوئیچ Core MDS (با <code>NPIV</code> فعال) منتقل می‌کند!</li></ul>"
+    },
+    {
+      "id": "spec_dc_stor-section-7",
+      "title": "FCoE و سه ستون Data Center Bridging (DCB) برای تبدیل اترنت به شبکه بدون اتلاف",
+      "html": "<p><strong>FCoE (Fibre Channel over Ethernet)</strong> فریم‌های استاندارد FC را مستقیم در لایه ۲ اترنت (EtherType <code>0x8906</code>، بدون TCP/IP) کپسوله می‌کند تا سرور با یک جفت کابل <strong>CNA (Converged Network Adapter)</strong> هم شبکه LAN و هم SAN را حمل کند. اما اترنت عادی Lossy است؛ پس FCoE بدون سه قابلیت <strong>DCB</strong> کار نمی‌کند:</p><ol><li><strong>PFC (Priority-based Flow Control — IEEE 802.1Qbb):</strong> مکث (Pause) انتخابی <em>فقط روی کلاس ترافیک FCoE (معمولاً CoS 3)</em> بدون متوقف کردن بقیه ترافیک LAN روی همان کابل!</li><li><strong>ETS (Enhanced Transmission Selection — IEEE 802.1Qaz):</strong> تضمین درصد مشخصی از پهنای باند لینک (مثلاً ۵۰٪) برای ترافیک SAN هنگام ازدحام.</li><li><strong>Jumbo MTU (حداقل ~2240 بایت، استاندارد 9216):</strong> زیرا بار مفید استاندارد یک فریم FC برابر <strong>2112 بایت</strong> است و در اترنت 1500 بایتی جا نمی‌شود!</li></ol>"
+    },
+    {
+      "id": "spec_dc_stor-section-8",
+      "title": "مقایسه معماری‌های ذخیره‌سازی مدرن: FC SAN، FCoE، iSCSI و NVMe-oF (FC / TCP)",
+      "html": "<table><thead><tr><th>فناوری</th><th>لایه انتقال</th><th>مزایا</th><th>چالش / محدودیت</th></tr></thead><tbody><tr><td><strong>Native Fibre Channel (32G/64G)</strong></td><td>فابریک اختصاصی FC (Lossless)</td><td>کمترین تاخیر، پایداری بی‌رقیب، ایزوله‌سازی کامل</td><td>هزینه بالاتر سوئیچ MDS و کارت HBA</td></tr><tr><td><strong>FCoE</strong></td><td>لایه ۲ اترنت Lossless (DCB)</td><td>کاهش کابل‌کشی رک سرور (CNA)</td><td>غیرقابل مسیریابی در L3، پیچیدگی DCB (امروز رو به افول)</td></tr><tr><td><strong>iSCSI</strong></td><td>TCP/IP روی اترنت استاندارد</td><td>ارزان، قابل مسیریابی، راه‌اندازی ساده</td><td>سربار TCP/IP بیشتر نسبت به FC</td></tr><tr><td><strong>NVMe over Fabrics (NVMe/FC و NVMe/TCP)</strong></td><td>FC یا TCP/RDMA</td><td>عملکرد فوق‌العاده برای دیسک‌های All-Flash NVMe و صف‌های موازی</td><td>نیازمند آرایه و درایورهای مدرن</td></tr></tbody></table>"
+    },
+    {
+      "id": "spec_dc_stor-section-9",
+      "title": "طراحی افزونگی طلایی SAN: چرا هرگز Fabric A و Fabric B را به هم وصل نمی‌کنیم؟",
+      "html": "<p>در شبکه LAN سوئیچ‌های Core را با vPC یا لینک‌های بین‌سوئیچی به هم وصل می‌کنیم، اما در <strong>Fibre Channel SAN این کار یک اشتباه فاجعه‌بار است!</strong> Fabric A (مثلاً VSAN 100) و Fabric B (مثلاً VSAN 200) باید کاملاً <strong>Air-Gapped (از نظر فیزیکی و منطقی جدا)</strong> بمانند تا اگر یک خطای فابریک، باگ فیرم‌ویر یا اشتباه Zoning در Fabric A رخ داد، Fabric B بدون هیچ آسیبی I/O تمام دیتابیس‌ها را از طریق نرم‌افزار <strong>Multipathing (MPIO / VMware NMP / PowerPath)</strong> روی سرور ادامه دهد.</p>"
+    },
+    {
+      "id": "spec_dc_stor-section-10",
+      "title": "تفاوت Zoning در سوئیچ با LUN Masking در Storage Array",
+      "html": "<p>امنیت SAN دولایه است: (۱) <strong>Zoning روی سوئیچ SAN</strong> مشخص می‌کند کدام Initiator اصلاً اجازه دیدن و برقراری ارتباط در سطح فابریک با کدام پورت Target را دارد؛ و (۲) <strong>LUN Masking روی خود Storage Array</strong> تعیین می‌کند پس از رسیدن به آن پورت Target، آن WWPN دقیقاً کدام دیسک‌ها (LUNها) را ببیند. اجرای هم‌زمان هر دو لایه استاندارد دفاع در عمق دیتاسنتر است.</p>"
+    },
+    {
+      "id": "spec_dc_stor-section-11",
+      "title": "کژفهمی‌های رایج درباره شبکه ذخیره‌سازی (SAN)",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای افزونگی بهتر است یک کابل ISL بین سوئیچ MDS فابریک A و فابریک B بکشیم.»</strong> واقعیت: خیر! این کار دو فابریک را به یک دامنه خرابی واحد ادغام می‌کند و هدف طراحی Dual-Fabric SAN را نابود می‌سازد.</li><li><strong>کژفهمی ۲: «FCoE می‌تواند مثل iSCSI از میان روترهای لایه ۳ بین دو دیتاسنتر عبور کند.»</strong> واقعیت: خیر؛ FCoE یک پروتکل لایه ۲ (EtherType <code>0x8906</code>) و غیرقابل روت در L3 است (برای اتصال دو سایت FC از <strong>FCIP</strong> روی IP استفاده می‌شود).</li><li><strong>کژفهمی ۳: «NPIV و NPV دو نام برای یک ویژگی یکسان هستند.»</strong> واقعیت: NPIV روی سوئیچ Core فعال می‌شود تا چندین WWPN روی یک پورت بپذیرد؛ NPV روی سوئیچ لبه (Edge) فعال می‌شود تا به عنوان پروکسی به سمت سوئیچ دارای NPIV وصل گردد.</li></ul>"
+    },
+    {
+      "id": "spec_dc_stor-section-12",
+      "title": "عیب‌یابی پرتکرار در SAN و FCoE",
+      "html": "<p><strong>تله ۱ — فراموش کردن <code>zoneset activate</code>:</strong> در Cisco MDS پس از ویرایش Zone، تا زمانی که <code>zoneset activate name ... vsan ...</code> (و در حالت Enhanced دستور <code>zone commit</code>) را نزنید، تغییرات فقط در دیتابیس متنی می‌ماند و در سخت‌افزار اعمال نمی‌شود!</p><p><strong>تله ۲ — خطای <code>Slow Drain Device</code> در FC:</strong> اگر یک سرور معیوب نتواند فریم‌ها را به سرعت بخواند و <code>BB_Credit</code> را برنگرداند (Credit Starvation)، به دلیل ماهیت Lossless، تراکم به کل لینک ISL و سایر سرورها سرریز می‌شود (راه‌حل: قابلیت Slow Drain Detection و Timeout/Drop فریم‌های کهنه روی Cisco MDS).</p>"
+    },
+    {
+      "id": "spec_dc_stor-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> سرور ESXi-01 دارای HBA0 در VSAN 100 و HBA1 در VSAN 200 است؛ پورت Storage A در VSAN 100 قرار دارد. آیا HBA1 می‌تواند به پورت Storage A دسترسی بگیرد؟ <strong>پاسخ:</strong> <strong>خیر</strong>؛ VSANها مرز ایزوله‌سازی سخت لایه ۲ هستند و ارتباط بین VSANها (بدون IVR) مسدود است.</p><p><strong>تمرین ۲:</strong> لینک FCoE روی یک پورت اترنت با <code>MTU 1500</code> و بدون <code>PFC روی CoS 3</code> پیکربندی شده است. چه مشکلی رخ می‌دهد؟ <strong>پاسخ:</strong> فریم‌های FC با بار مفید ۲۱۱۲ بایت در MTU 1500 جا نمی‌شوند و در نبود PFC، هنگام کوچک‌ترین ازدحام Drop شده و ارتباط SAN فرو می‌پاشد.</p>"
+    },
+    {
+      "id": "spec_dc_stor-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/dcn/mds9000/sw/9x/configuration/fabric/cisco-mds-9000-nx-os-fabric-configuration-guide-9x.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی پیکربندی فابریک Cisco MDS 9000 SAN</a> و <a href=\"https://standards.ieee.org/ieee/802.1Qbb/4408/\" target=\"_blank\" rel=\"noopener\">استاندارد IEEE 802.1Qbb (PFC)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سوئیچ واقعی Cisco MDS، آرایه Storage یا لینک فیزیکی Fibre Channel/FCoE در این محیط اجرا نشده است.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، تفکیک NPIV/NPV، BB_Credit/Slow Drain، مقایسه NVMe-oF و شبیه‌ساز Zoning/FCoE DCB."
+  "glossary": [
+    {
+      "term": "Fibre Channel (FC)",
+      "fa": "شبکه ذخیره‌سازی فایبر چنل",
+      "simple": "پروتکل پرسرعت و بدون اتلاف (Lossless) اختصاصی برای اتصال سرورها به آرایه‌های ذخیره‌سازی SAN."
+    },
+    {
+      "term": "VSAN",
+      "fa": "شبکه SAN مجازی",
+      "simple": "ایزوله‌سازی کامل فابریک، Name Server، FSPF و Zoneset درون سوئیچ‌های Cisco MDS."
+    },
+    {
+      "term": "WWPN / WWNN",
+      "fa": "شناسه جهانی پورت/گره",
+      "simple": "شناسه ۶۴بیتی یکتای پورت HBA یا پورت Storage (معادل MAC) که مبنای Zoning امن است."
+    },
+    {
+      "term": "FLOGI & FCID",
+      "fa": "ورود فابریک و شناسه ۲۴بیتی",
+      "simple": "فرآیند ثبت‌نام پورت N_Port روی سوئیچ SAN و دریافت آدرس ۲۴بیتی FCID."
+    },
+    {
+      "term": "Single-Initiator Zoning",
+      "fa": "زون‌بندی تک‌آغازگر",
+      "simple": "بهترین رویه قرار دادن تنها یک Initiator در هر Zone برای مهار طوفان RSCN و جداسازی خطا."
+    },
+    {
+      "term": "RSCN",
+      "fa": "اعلان تغییر وضعیت فابریک",
+      "simple": "پیامی که هنگام ورود/خروج یک عضو در Zone به سایر اعضای همان Zone ارسال می‌شود."
+    },
+    {
+      "term": "BB_Credit",
+      "fa": "اعتبار بافر-به-بافر",
+      "simple": "مکانیسم کنترل جریان لایه ۲ FC که بدون بافر خالی در گیرنده فریم نمی‌فرستد (Lossless)."
+    },
+    {
+      "term": "Slow Drain Device",
+      "fa": "تجهیز کند تخلیه‌کننده بافر",
+      "simple": "تجهیز معیوبی که BB_Credit برنمی‌گرداند و باعث پس‌زدگی تراکم در کل فابریک SAN می‌شود."
+    },
+    {
+      "term": "NPIV",
+      "fa": "مجازی‌سازی شناسه N_Port",
+      "simple": "ثبت چندین WWPN/FCID مجازی روی یک پورت فیزیکی HBA (مثلاً برای هر VM به‌طور مجزا)."
+    },
+    {
+      "term": "NPV",
+      "fa": "حالت پروکسی لبه SAN",
+      "simple": "N_Port Virtualizer؛ سوئیچ لبه بدون Domain ID که FLOGI سرورها را به سوئیچ Core دارای NPIV می‌فرستد."
+    },
+    {
+      "term": "FCoE",
+      "fa": "فایبر چنل روی اترنت",
+      "simple": "کپسوله‌سازی فریم FC در لایه ۲ اترنت (EtherType 0x8906) نیازمند DCB بدون اتلاف."
+    },
+    {
+      "term": "PFC (IEEE 802.1Qbb)",
+      "fa": "کنترل جریان مبتنی بر اولویت",
+      "simple": "مکث انتخابی ترافیک روی یک CoS خاص (مثل CoS 3 برای FCoE) بدون توقف سایر ترافیک اترنت."
+    },
+    {
+      "term": "ETS (IEEE 802.1Qaz)",
+      "fa": "تخصیص پهنای باند پیشرفته",
+      "simple": "تضمین حداقل درصد پهنای باند برای ترافیک ذخیره‌سازی روی لینک همگرای اترنت."
+    },
+    {
+      "term": "LUN Masking",
+      "fa": "ماسک کردن دیسک روی آرایه",
+      "simple": "تعیین دقیق دیسک‌های قابل مشاهده برای هر WWPN روی خود Storage Array (مکمل Zoning)."
+    },
+    {
+      "term": "NVMe-oF",
+      "fa": "NVMe روی فابریک شبکه",
+      "simple": "اجرای پروتکل پرسرعت NVMe روی FC یا TCP/RDMA برای آرایه‌های All-Flash مدرن."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/spec_dc_stor-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (ایزوله‌سازی VSAN، Single-Initiator Zoning، NPIV و ممیزی FCoE DCB) — سوئیچ MDS واقعی اجرا نشده",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سوئیچ واقعی Cisco MDS یا آرایه SAN متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ واقعی Cisco MDS، کارت HBA یا آرایه ذخیره‌سازی SAN در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی چهار بررسی حیاتی SAN را اجرا می‌کند: (۱) پذیرش Single-Initiator Zoning در VSAN 100، (۲) مسدودسازی دسترسی بین VSAN 200 و VSAN 100، (۳) دسترسی مستقیم LUN برای یک VM با WWPN مجازی <code>NPIV</code>، و (۴) ممیزی آمادگی <code>FCoE DCB</code> (بررسی PFC روی CoS 3، ETS و MTU 9216).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_dc_stor_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_dc_stor_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — spec_dc_stor (Data Center Storage Networking: FC SAN, VSAN, Zoning, NPIV &amp; FCoE DCB)\nSimulates Fibre Channel Single-Initiator Zoning (using explicit role registry rather than hardcoded WWPN\nOUI prefixes), VSAN isolation, NPIV virtual WWPN login, and FCoE lossless Ethernet (DCB: PFC + ETS + Jumbo MTU).\nNo real Cisco MDS SAN switch or storage array is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_vsan(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (1 &lt;= val &lt;= 4093):\n        raise ValueError(f&quot;{name} must be a Fibre Channel VSAN int in [1, 4093] (not bool), got {val!r}&quot;)\n    return val\n\n\ndef evaluate_fc_access(\n    initiator: dict,\n    target: dict,\n    zones: list[dict],\n    known_initiator_wwpns: set[str] | None = None,\n) -&gt; dict:\n    init_vsan = _require_vsan(initiator.get(&quot;vsan&quot;), &quot;initiator.vsan&quot;)\n    tgt_vsan = _require_vsan(target.get(&quot;vsan&quot;), &quot;target.vsan&quot;)\n    if init_vsan != tgt_vsan:\n        return {\n            &quot;allowed&quot;: False,\n            &quot;reason&quot;: f&quot;VSAN mismatch ({init_vsan} != {tgt_vsan}) — hard L2 fabric isolation&quot;,\n        }\n    initiator_registry = set(known_initiator_wwpns) if known_initiator_wwpns is not None else {initiator[&quot;wwpn&quot;]}\n    initiator_registry.add(initiator[&quot;wwpn&quot;])\n\n    for zone in zones:\n        if _require_vsan(zone.get(&quot;vsan&quot;), &quot;zone.vsan&quot;) != init_vsan:\n            continue\n        members = set(zone[&quot;members&quot;])\n        if initiator[&quot;wwpn&quot;] in members and target[&quot;wwpn&quot;] in members:\n            init_count = sum(1 for m in members if m in initiator_registry)\n            best_practice = init_count == 1\n            return {\n                &quot;allowed&quot;: True,\n                &quot;zone&quot;: zone[&quot;name&quot;],\n                &quot;initiators_in_zone&quot;: init_count,\n                &quot;single_initiator_best_practice&quot;: best_practice,\n                &quot;warning&quot;: None if best_practice else f&quot;{init_count} initiators share one zone (RSCN blast risk)&quot;,\n            }\n    return {&quot;allowed&quot;: False, &quot;reason&quot;: &quot;No active zoneset entry pairs this initiator and target WWPN&quot;}\n\n\ndef check_fcoe_dcb_readiness(link: dict) -&gt; dict:\n    if not isinstance(link, dict) or not isinstance(link.get(&quot;name&quot;), str) or not link[&quot;name&quot;].strip():\n        raise ValueError(&quot;link must be a dict with a non-empty string &#x27;name&#x27;&quot;)\n    for key in (&quot;pfc_cos3_enabled&quot;, &quot;ets_enabled&quot;):\n        if key not in link:\n            raise ValueError(f&quot;link missing required boolean key &#x27;{key}&#x27;&quot;)\n    pfc = _require_bool(link[&quot;pfc_cos3_enabled&quot;], &quot;link[&#x27;pfc_cos3_enabled&#x27;]&quot;)\n    ets = _require_bool(link[&quot;ets_enabled&quot;], &quot;link[&#x27;ets_enabled&#x27;]&quot;)\n    mtu = link.get(&quot;mtu&quot;, 1500)\n    if isinstance(mtu, bool) or not isinstance(mtu, int) or mtu &lt;= 0:\n        raise ValueError(f&quot;link[&#x27;mtu&#x27;] must be a positive int (not bool), got {mtu!r}&quot;)\n    issues = []\n    if not pfc:\n        issues.append(&quot;PFC (802.1Qbb) missing on CoS 3 — frames will drop under congestion&quot;)\n    if not ets:\n        issues.append(&quot;ETS (802.1Qaz) missing — storage bandwidth not guaranteed&quot;)\n    if mtu &lt; 2240:\n        issues.append(f&quot;MTU {mtu} too small for 2112B FC payload + FCoE headers (need &gt;=2240 / 9216)&quot;)\n    return {&quot;link&quot;: link[&quot;name&quot;], &quot;lossless_ready&quot;: len(issues) == 0, &quot;issues&quot;: issues}\n\n\ndef main() -&gt; None:\n    esxi01_fabric_a = {&quot;name&quot;: &quot;ESXi-01-HBA0&quot;, &quot;vsan&quot;: 100, &quot;wwpn&quot;: &quot;20:00:00:11:aa:01:00:01&quot;}\n    esxi02_qlogic = {&quot;name&quot;: &quot;ESXi-02-QLogic-HBA0&quot;, &quot;vsan&quot;: 100, &quot;wwpn&quot;: &quot;21:00:00:24:ff:02:00:01&quot;}\n    esxi01_fabric_b = {&quot;name&quot;: &quot;ESXi-01-HBA1&quot;, &quot;vsan&quot;: 200, &quot;wwpn&quot;: &quot;20:00:00:11:aa:01:00:02&quot;}\n    vm_sql_npiv = {&quot;name&quot;: &quot;VM-SQL-vHBA (NPIV)&quot;, &quot;vsan&quot;: 100, &quot;wwpn&quot;: &quot;20:00:00:11:ff:99:00:01&quot;}\n    storage_a = {&quot;name&quot;: &quot;Storage-Array-PortA&quot;, &quot;vsan&quot;: 100, &quot;wwpn&quot;: &quot;50:00:09:70:00:01:00:01&quot;}\n\n    known_initiators = {\n        esxi01_fabric_a[&quot;wwpn&quot;],\n        esxi02_qlogic[&quot;wwpn&quot;],\n        esxi01_fabric_b[&quot;wwpn&quot;],\n        vm_sql_npiv[&quot;wwpn&quot;],\n    }\n\n    zones = [\n        {\n            &quot;name&quot;: &quot;Z_ESXI01_VMAX_P1&quot;,\n            &quot;vsan&quot;: 100,\n            &quot;members&quot;: [esxi01_fabric_a[&quot;wwpn&quot;], storage_a[&quot;wwpn&quot;]],\n        },\n        {\n            &quot;name&quot;: &quot;Z_VM_SQL_NPIV_VMAX_P1&quot;,\n            &quot;vsan&quot;: 100,\n            &quot;members&quot;: [vm_sql_npiv[&quot;wwpn&quot;], storage_a[&quot;wwpn&quot;]],\n        },\n    ]\n    bad_multi_init_zones = [\n        {\n            &quot;name&quot;: &quot;Z_LEGACY_ALL_ESXI_VMAX&quot;,\n            &quot;vsan&quot;: 100,\n            &quot;members&quot;: [esxi01_fabric_a[&quot;wwpn&quot;], esxi02_qlogic[&quot;wwpn&quot;], storage_a[&quot;wwpn&quot;]],\n        }\n    ]\n\n    ok_single = evaluate_fc_access(esxi01_fabric_a, storage_a, zones, known_initiators)\n    blocked_vsan = evaluate_fc_access(esxi01_fabric_b, storage_a, zones, known_initiators)\n    ok_npiv = evaluate_fc_access(vm_sql_npiv, storage_a, zones, known_initiators)\n    bad_multi_init = evaluate_fc_access(esxi02_qlogic, storage_a, bad_multi_init_zones, known_initiators)\n    dcb_bad = check_fcoe_dcb_readiness({&quot;name&quot;: &quot;Eth1/1-Bad&quot;, &quot;pfc_cos3_enabled&quot;: False, &quot;ets_enabled&quot;: True, &quot;mtu&quot;: 1500})\n    dcb_good = check_fcoe_dcb_readiness({&quot;name&quot;: &quot;Eth1/2-Good&quot;, &quot;pfc_cos3_enabled&quot;: True, &quot;ets_enabled&quot;: True, &quot;mtu&quot;: 9216})\n\n    assert ok_single[&quot;allowed&quot;] is True and ok_single[&quot;single_initiator_best_practice&quot;] is True\n    assert blocked_vsan[&quot;allowed&quot;] is False\n    assert ok_npiv[&quot;allowed&quot;] is True and ok_npiv[&quot;single_initiator_best_practice&quot;] is True\n    assert bad_multi_init[&quot;allowed&quot;] is True and bad_multi_init[&quot;single_initiator_best_practice&quot;] is False\n    assert dcb_bad[&quot;lossless_ready&quot;] is False and dcb_good[&quot;lossless_ready&quot;] is True\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_MDS_OR_SAN_HARDWARE&quot;,\n        &quot;fc_zoning_checks&quot;: {\n            &quot;fabric_a_single_initiator&quot;: ok_single,\n            &quot;cross_vsan_blocked&quot;: blocked_vsan,\n            &quot;npiv_vm_direct_lun&quot;: ok_npiv,\n            &quot;multi_initiator_antipattern_flagged&quot;: bad_multi_init,\n        },\n        &quot;fcoe_dcb_checks&quot;: [dcb_bad, dcb_good],\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> موفقیت <code>fabric_a_single_initiator</code> و <code>npiv_vm_direct_lun</code>، مسدودشدن <code>cross_vsan_blocked</code>، و شکست لینک <code>Eth1/1-Bad</code> در برابر قبولی <code>Eth1/2-Good</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع ساخت و فعال‌سازی Zone در Cisco MDS NX-OS (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference Cisco MDS Zoning snippet (NOT executed on live MDS)\nzone name Z_ESXI01_VMAX_P1 vsan 100\n member pwwn 20:00:00:11:aa:01:00:01\n member pwwn 50:00:09:70:00:01:00:01\nzoneset name ZS_PROD vsan 100\n member Z_ESXI01_VMAX_P1\nzoneset activate name ZS_PROD vsan 100</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس شبکه ذخیره‌سازی SAN، Fibre Channel، VSAN/Zoning و FCoE",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-specializations",
-   "recommendedCourse": "spec-datacenter",
-   "blueprint": "/academy-assets/v5/blueprints/spec_dc_stor.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_dc_stor_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۵: حذف پیش‌فرض شکننده پیشوند WWPN (20:00:00:11) در spec_dc_stor_lab.py و جایگزینی با رجیستری صریح نقش Initiator همراه با افزودن تست منفی Zone چند-Initiator (با HBA دوم QLogic با OUI متفاوت) برای اثبات هشدار RSCN."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "چرا بهترین رویه استاندارد در طراحی Fibre Channel SAN، استفاده از Single-Initiator Zoning (به جای قرار دادن همه سرورها در یک Zone) است؟",
+      "options": [
+        "زیرا کاهش تعداد اعضا از ارسال پیام‌های تغییر وضعیت (RSCN) میان سرورها، اختلال متقابل و خطر دسترسی غیرمجاز به LUNها جلوگیری می‌کند",
+        "زیرا سوئیچ MDS بیش از دو عضو در Zone نمی‌پذیرد",
+        "برای کاهش سرعت لینک به ۱ گیگابیت",
+        "برای تبدیل FC به TCP/IP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Single-Initiator Zoning دامنه پیام‌های RSCN و ریسک خطای عملیاتی بین سرورهای مستقل را به حداقل می‌رساند.</p>"
+    },
+    {
+      "title": "در طراحی Dual-Fabric SAN (فابریک A در VSAN 100 و فابریک B در VSAN 200)، چرا نباید دو فابریک را با کابل ISL به هم متصل کرد؟",
+      "options": [
+        "زیرا کابل فیبر وجود ندارد",
+        "زیرا اتصال آن‌ها دو دامنه خرابی مجزا را به یک دامنه خرابی واحد تبدیل می‌کند و هدف اصلی افزونگی Air-Gapped SAN را از بین می‌برد",
+        "زیرا VSANها همیشه روی یک کابل کار می‌کنند",
+        "زیرا Multipathing سرور از کار می‌افتد اگر دو فابریک جدا باشند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ایزوله‌سازی کامل Fabric A و Fabric B تضمین می‌کند خطای یک فابریک هیچ اثری بر فابریک دوم نداشته باشد.</p>"
+    },
+    {
+      "title": "کدام سه پیش‌نیاز Data Center Bridging (DCB) برای کارکرد بدون اتلاف (Lossless) پروتکل FCoE روی اترنت حیاتی است؟",
+      "options": [
+        "NAT، DHCP و RIP",
+        "STP، VTP و Telnet",
+        "PFC (IEEE 802.1Qbb) روی CoS مخصوص FCoE، ETS (802.1Qaz) برای تضمین پهنای باند و Jumbo MTU (حداقل ~2240 / 9216 بایت)",
+        "فقط تغییر نام VLAN"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>فریم FC بار مفید ۲۱۱۲ بایتی دارد و بدون PFC/ETS/Jumbo MTU روی اترنت دچار افت فریم و شکست SAN می‌شود.</p>"
+    },
+    {
+      "title": "مکانیسم کنترل جریان BB_Credit (Buffer-to-Buffer Credit) در Fibre Channel چه ویژگی‌ای را تضمین می‌کند؟",
+      "options": [
+        "رمزنگاری AES-256",
+        "تخصیص آدرس IPv6",
+        "مسیریابی روی اینترنت",
+        "انتقال بدون اتلاف (Lossless)؛ فرستنده تا زمانی که گیرنده بافر خالی (Credit) اعلام نکند فریم جدید ارسال نمی‌کند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>BB_Credit پایه Lossless بودن بومی Fibre Channel است (اما در صورت خرابی یک گیرنده می‌تواند به پدیده Slow Drain منجر شود).</p>"
+    },
+    {
+      "title": "تفاوت دقیق میان NPIV و NPV در یک دیتاسنتر Cisco UCS / MDS چیست؟",
+      "options": [
+        "NPIV روی سوئیچ Core اجازه ثبت چند WWPN/FCID مجازی روی یک پورت را می‌دهد، و NPV روی سوئیچ لبه (Edge) بدون مصرف Domain ID ترافیک FLOGI را به سوئیچ دارای NPIV پروکسی می‌کند",
+        "هر دو دقیقاً یک معنی دارند",
+        "NPV فقط برای iSCSI است",
+        "NPIV پورت‌ها را خاموش می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در معماری UCS/Nexus معمولاً Edge در مد NPV و Core MDS با قابلیت NPIV فعال پیکربندی می‌شود.</p>"
+    },
+    {
+      "title": "پس از اتصال فیزیکی HBA سرور (N_Port) به پورت سوئیچ SAN (F_Port)، کدام فرآیند انجام می‌شود و چه شناسه‌ای اختصاص می‌یابد؟",
+      "options": [
+        "DHCP Discover و آدرس IPv4",
+        "FLOGI (Fabric Login) و تخصیص یک آدرس ۲۴بیتی FCID",
+        "ARP Request و MAC 48-bit",
+        "BGP Open و AS Number"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>FLOGI ورود اولیه به فابریک FC است که طی آن سوئیچ یک آدرس ۲۴بیتی FCID به N_Port می‌دهد.</p>"
+    },
+    {
+      "title": "چرا FCoE برعکس iSCSI نمی‌تواند مستقیماً از میان روترهای لایه ۳ بین دو دیتاسنتر عبور کند؟",
+      "options": [
+        "چون سرعتش پایین است",
+        "چون فقط روی کابل مسی کار می‌کند",
+        "چون FCoE یک پروتکل لایه ۲ اترنت (EtherType 0x8906) بدون هدر IP است و غیرقابل روت در لایه ۳ می‌باشد",
+        "چون رمز عبور ندارد"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>FCoE فقط در دامنه لایه ۲ Lossless (معمولاً بین سرور تا Top-of-Rack) کار می‌کند؛ برای گسترش FC روی WAN از FCIP استفاده می‌شود.</p>"
+    },
+    {
+      "title": "پدیده Slow Drain Device در شبکه Fibre Channel چگونه می‌تواند کل فابریک را تحت‌تأثیر قرار دهد؟",
+      "options": [
+        "با مصرف تمام آدرس‌های DHCP",
+        "با خاموش کردن برق سوئیچ",
+        "با حذف فایل‌های پیکربندی",
+        "دستگاه معیوب BB_Credit را به موقع برنمی‌گرداند و به دلیل ماهیت Lossless، تراکم به لینک‌های ISL و سایر سرورها پس می‌زند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>تشخیص و مهار Slow Drain روی سوئیچ‌های MDS یکی از مهارت‌های کلیدی مهندسان SAN است.</p>"
+    },
+    {
+      "title": "در Cisco MDS پس از اضافه کردن یک عضو جدید به Zone و Zoneset، چرا سرور هنوز دیسک را نمی‌بیند؟",
+      "options": [
+        "تا زمانی که دستور zoneset activate (و در Enhanced Mode دستور zone commit) اجرا نشود، تغییر در سخت‌افزار فابریک فعال نمی‌گردد",
+        "زیرا باید کل سوئیچ MDS ریبوت شود",
+        "زیرا Zoning روی سرور اجرا می‌شود",
+        "زیرا VSAN 1 همیشه خاموش است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تغییرات Zoning در MDS دو مرحله‌ای است و بدون <code>zoneset activate</code> فقط در دیتابیس غیرفعال باقی می‌ماند.</p>"
+    },
+    {
+      "title": "تفاوت نقش Zoning (روی سوئیچ SAN) با LUN Masking (روی Storage Array) چیست؟",
+      "options": [
+        "هر دو روی کارت شبکه وای‌فای انجام می‌شوند",
+        "Zoning تعیین می‌کند کدام Initiator اجازه دیدن کدام پورت Target در فابریک را دارد، و LUN Masking روی آرایه تعیین می‌کند آن Initiator دقیقاً کدام دیسک‌ها (LUN) را ببیند",
+        "LUN Masking جایگزین کامل VSAN است",
+        "هیچ ارتباطی با امنیت ندارند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>استفاده هم‌زمان از Zoning و LUN Masking امنیت دولایه استاندارد SAN را تشکیل می‌دهد.</p>"
+    },
+    {
+      "title": "کدام فناوری مدرن ذخیره‌سازی برای بهره‌گیری حداکثری از صف‌های موازی و تاخیر فوق‌العاده پایین دیسک‌های All-Flash طراحی شده و هم روی FC و هم روی TCP قابل اجراست؟",
+      "options": [
+        "RIPv2",
+        "Token Ring",
+        "NVMe over Fabrics (NVMe/FC و NVMe/TCP)",
+        "Telnet SAN"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>NVMe-oF گلوگاه‌های پروتکل قدیمی SCSI را حذف کرده و کارایی بسیار بالاتری برای All-Flash فراهم می‌کند.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "اتصال زنده به Cisco MDS 9710 دیتاسنتر",
+        "تست تخریب LUN روی Storage واقعی",
+        "فقط متن نظری بدون کد",
+        "شبیه‌سازی محلی (Local Mock) در Python 3 برای بررسی ایزوله‌سازی VSAN، Single-Initiator Zoning، NPIV و ممیزی FCoE DCB"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سوئیچ MDS یا آرایه SAN واقعی متصل نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "spec_dc_stor",
+    "sources": [
+      "https://www.cisco.com/c/en/us/td/docs/dcn/mds9000/sw/9x/configuration/fabric/cisco-mds-9000-nx-os-fabric-configuration-guide-9x.html",
+      "https://standards.ieee.org/ieee/802.1Qbb/4408/"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سوئیچ واقعی Cisco MDS یا آرایه ذخیره‌سازی SAN متصل نشده است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، تفکیک NPIV/NPV، BB_Credit/Slow Drain، مقایسه NVMe-oF و شبیه‌ساز Zoning/FCoE DCB."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/spec_dc_stor-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-specializations",
+      "recommendedCourse": "spec-datacenter",
+      "blueprint": "/academy-assets/v5/blueprints/spec_dc_stor.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/spec_dc_stor_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۵: حذف پیش‌فرض شکننده پیشوند WWPN (20:00:00:11) در spec_dc_stor_lab.py و جایگزینی با رجیستری صریح نقش Initiator همراه با افزودن تست منفی Zone چند-Initiator (با HBA دوم QLogic با OUI متفاوت) برای اثبات هشدار RSCN."
+    ]
+  }
 }

@@ -13,6 +13,12 @@ import json
 CUSTOMER_AGGREGATE = ipaddress.ip_network("198.51.100.0/24")
 
 
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
 class MockIOSXRRouter:
     def __init__(self) -> None:
         self.running = {"hostname": "PE-TEHRAN-01", "ebgp_neighbor_policy_in": None, "ebgp_neighbor_policy_out": None}
@@ -20,14 +26,21 @@ class MockIOSXRRouter:
         self.commit_history: list[dict] = [{"commit_id": 1000000001, "state": copy.deepcopy(self.running)}]
 
     def stage_config(self, updates: dict) -> dict:
+        if not isinstance(updates, dict):
+            raise ValueError(f"updates must be a dict, got {type(updates).__name__}")
         self.candidate.update(updates)
         diff = {k: (self.running.get(k), v) for k, v in self.candidate.items() if self.running.get(k) != v}
         return {"staged_diff": diff, "running_unchanged": self.running}
 
     def commit(self, confirmed_seconds: int | None = None, confirmed_by_operator: bool = True) -> dict:
+        confirmed = _require_bool(confirmed_by_operator, "confirmed_by_operator")
+        if confirmed_seconds is not None and (
+            isinstance(confirmed_seconds, bool) or not isinstance(confirmed_seconds, int) or confirmed_seconds <= 0
+        ):
+            raise ValueError(f"confirmed_seconds must be None or a positive int (not bool), got {confirmed_seconds!r}")
         prev = copy.deepcopy(self.running)
         self.running = copy.deepcopy(self.candidate)
-        if confirmed_seconds and not confirmed_by_operator:
+        if confirmed_seconds is not None and not confirmed:
             # Simulate operator lockout -> automatic rollback after timer expiry
             self.running = prev
             self.candidate = copy.deepcopy(prev)
@@ -42,9 +55,17 @@ class MockIOSXRRouter:
 
 
 def eval_rpl_policy(policy_name: str | None, prefix: str, prefix_len: int, local_pref: int = 100) -> dict:
+    if isinstance(prefix_len, bool) or not isinstance(prefix_len, int):
+        raise ValueError(f"prefix_len must be an int (not bool), got {prefix_len!r}")
+    if isinstance(local_pref, bool) or not isinstance(local_pref, int) or local_pref < 0:
+        raise ValueError(f"local_pref must be a non-negative int (not bool), got {local_pref!r}")
+    if not isinstance(prefix, str) or not prefix.strip():
+        raise ValueError(f"prefix must be a non-empty IP string, got {prefix!r}")
     # IOS-XR eBGP default safety (RFC 8212): without an attached RPL policy, all prefixes are denied!
     if policy_name is None:
         return {"prefix": f"{prefix}/{prefix_len}", "action": "DROP", "reason": "IOS-XR eBGP default-deny (no RPL policy attached)"}
+    if not isinstance(policy_name, str):
+        raise ValueError(f"policy_name must be None or str, got {policy_name!r}")
     try:
         net = ipaddress.ip_network(f"{prefix}/{prefix_len}", strict=True)
     except ValueError as exc:

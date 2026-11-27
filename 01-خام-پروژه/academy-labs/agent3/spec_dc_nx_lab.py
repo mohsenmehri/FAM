@@ -11,7 +11,25 @@ from __future__ import annotations
 import json
 
 
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
 def check_vpc_type1(peer1: dict, peer2: dict) -> dict:
+    for pname, peer in (("peer1", peer1), ("peer2", peer2)):
+        if not isinstance(peer, dict):
+            raise ValueError(f"{pname} must be a dict")
+        for key in ("mtu", "stp_mode", "native_vlan"):
+            if key not in peer:
+                raise ValueError(f"{pname} missing required key '{key}'")
+        if isinstance(peer["mtu"], bool) or not isinstance(peer["mtu"], int) or peer["mtu"] <= 0:
+            raise ValueError(f"{pname}.mtu must be a positive int (not bool), got {peer['mtu']!r}")
+        if isinstance(peer["native_vlan"], bool) or not isinstance(peer["native_vlan"], int) or not (1 <= peer["native_vlan"] <= 4094):
+            raise ValueError(f"{pname}.native_vlan must be an int in [1, 4094] (not bool), got {peer['native_vlan']!r}")
+        if not isinstance(peer["stp_mode"], str) or not peer["stp_mode"].strip():
+            raise ValueError(f"{pname}.stp_mode must be a non-empty str, got {peer['stp_mode']!r}")
     mismatches = []
     for key in ("mtu", "stp_mode", "native_vlan"):
         if peer1[key] != peer2[key]:
@@ -24,11 +42,13 @@ def check_vpc_type1(peer1: dict, peer2: dict) -> dict:
 
 
 def simulate_peer_link_failure(keepalive_alive: bool, orphan_port_suspend: bool) -> dict:
-    if keepalive_alive:
+    ka = _require_bool(keepalive_alive, "keepalive_alive")
+    orphan = _require_bool(orphan_port_suspend, "orphan_port_suspend")
+    if ka:
         return {
             "primary_state": "ACTIVE (forwards traffic)",
             "secondary_vpc_member_ports": "SUSPENDED (prevents split-brain)",
-            "secondary_orphan_port": "SUSPENDED (fails over cleanly)" if orphan_port_suspend else "REMAINS_UP_BLACKHOLE_RISK",
+            "secondary_orphan_port": "SUSPENDED (fails over cleanly)" if orphan else "REMAINS_UP_BLACKHOLE_RISK",
         }
     return {
         "primary_state": "DOWN_OR_UNREACHABLE",

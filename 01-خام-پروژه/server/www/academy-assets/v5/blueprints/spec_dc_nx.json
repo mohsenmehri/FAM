@@ -1,339 +1,339 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "spec_dc_nx",
- "objectiveId": "spec_dc_nx",
- "kind": "lesson",
- "track": "Specialist",
- "course": "spec-datacenter",
- "title": "۷.۳ Data Center: سیستم‌عامل Cisco NX-OS، معماری Nexus و vPC (Virtual Port Channel)",
- "titleEn": "Data Center Deep Dive: Cisco NX-OS Architecture, Nexus vPC, Type-1 Consistency & Orphan Ports",
- "domain": "Data Center Networking",
- "source": "Legacy spec_dc_nx rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [],
- "sections": [
-  {
-   "id": "spec_dc_nx-section-1",
-   "title": "مسئله واقعی: چرا در دیتاسنتر به جای یکی کردن Control Plane (SVL)، از دو Nexus مستقل با vPC استفاده می‌کنیم؟",
-   "html": "<p>در دیتاسنتر، توقف کامل صفحه کنترل (Control Plane) دو سوئیچ Top-of-Rack به دلیل یک باگ یا ارتقای نرم‌افزار غیرقابل پذیرش است. <strong>Cisco NX-OS</strong> روی سوئیچ‌های <strong>Nexus</strong> با معماری ماژولار و فناوری <strong>vPC (Virtual Port Channel)</strong> به دو سوئیچ Nexus اجازه می‌دهد <em>دو Control Plane کاملاً مستقل</em> داشته باشند و هم‌زمان از دید سرورها یا سوئیچ‌های پایین‌دست به عنوان یک جفت Active/Active LACP عمل کنند — به شرط آنکه قواعد <strong>Type-1 Consistency</strong>، جدایی <strong>Peer-Keepalive</strong> و تله <strong>Orphan Ports</strong> را دقیق رعایت کنید.</p>"
-  },
-  {
-   "id": "spec_dc_nx-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر LACP، STP، VLAN/SVI و مفهوم Multichassis EtherChannel.</p><ul><li>تبیین چهار تفاوت روز اول <strong>Cisco NX-OS</strong> با IOS/IOS-XE (مدل <code>feature ...</code>، ایزوله‌سازی <code>mgmt0</code> در <code>vrf management</code>، <code>checkpoint/rollback</code> و نبود <code>do</code> اجباری).</li><li>کالبدشکافی دو لینک حیاتی <strong>vPC</strong>: <strong>Peer-Link</strong> (حمل MAC/ARP sync و ترافیک Orphan) و <strong>Peer-Keepalive</strong> (ضربان قلب L3 روی <code>UDP 3200</code>).</li><li>تشخیص تفاوت <strong>Type-1 Consistency</strong> (موجب Suspend شدن پورت‌ها) با <strong>Type-2 Consistency</strong> (هشدار بدون Suspend).</li><li>مهار تله <strong>Orphan Ports</strong> هنگام افت Peer-Link و کاربرد ویژگی‌های <code>peer-gateway</code>، <code>peer-switch</code> و <code>auto-recovery</code>.</li></ul>"
-  },
-  {
-   "id": "spec_dc_nx-section-3",
-   "title": "چهار تفاوت کلیدی Cisco NX-OS با IOS در روز اول دیتاسنتر",
-   "html": "<ol><li><strong>معماری ماژولار <code>feature ...</code>:</strong> تا زمانی که دستور <code>feature vpc</code>، <code>feature lacp</code>، <code>feature bgp</code> یا <code>feature interface-vlan</code> را روشن نکنید، سرویس مربوطه در حافظه بارگذاری نمی‌شود و حتی دستورات آن در CLI وجود ندارد!</li><li><strong>ایزوله‌سازی <code>mgmt0</code> درون <code>vrf management</code>:</strong> پورت مدیریت <code>mgmt0</code> به‌طور پیش‌فرض جدا از جدول مسیریابی <code>default</code> است؛ بنابراین برای پینگ در شبکه مدیریت باید صریحاً بنویسید <code>ping 10.10.90.1 vrf management</code>!</li><li><strong>اجرای مستقیم <code>show</code> در هر حالت و <code>checkpoint / rollback</code>:</strong> در NX-OS نیازی به کلمه <code>do</code> پیش از دستورات <code>show</code> در حالت Config نیست، و قبل از هر تغییر بزرگ می‌توان با <code>checkpoint BEFORE_CHG</code> نقطه بازگشت آنی ساخت.</li><li><strong>پشتیبانی از ارتقای مستقل و عدم Shared Fate:</strong> دو سوئیچ Nexus در یک دامنه vPC می‌توانند یک‌به‌یک با هدف کمینه‌سازی قطعی سرورهای Dual-Homed ارتقا داده شوند (سرورهای تک‌اتصالی / Orphan Ports روی سوئیچ در حال ارتقا همچنان دچار قطعی می‌شوند و رعایت سازگاری Type-1 و ISSU/پنجره نگهداری ضروری است).</li></ol>"
-  },
-  {
-   "id": "spec_dc_nx-section-4",
-   "title": "نمودار معماری vPC: Peer-Link، Peer-Keepalive (UDP 3200) و تله Orphan Port",
-   "html": "<p>نمودار زیر تفکیک دو Control Plane مستقل، لینک‌های Peer-Link و Peer-Keepalive، عضو vPC و پورت تک‌اتصال Orphan را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco NX-OS vPC Architecture: Peer-Link, Peer-Keepalive UDP 3200, vPC Member and Orphan Port\"><rect x=\"36\" y=\"16\" width=\"276\" height=\"92\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"174\" y=\"40\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Nexus N9K-1 (vPC Primary)</text><text x=\"174\" y=\"62\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Independent Control Plane #1</text><text x=\"174\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">mgmt0 in VRF management | feature vpc</text><rect x=\"448\" y=\"16\" width=\"276\" height=\"92\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"586\" y=\"40\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Nexus N9K-2 (vPC Secondary)</text><text x=\"586\" y=\"62\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Independent Control Plane #2</text><text x=\"586\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Type-1 Mismatch =&gt; vPC Ports Suspend!</text><line x1=\"312\" y1=\"42\" x2=\"448\" y2=\"42\" stroke=\"#1d4ed8\" stroke-width=\"4\"/><text x=\"380\" y=\"34\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1e3a8a\">vPC Peer-Link (2x 40/100G)</text><line x1=\"312\" y1=\"84\" x2=\"448\" y2=\"84\" stroke=\"#d97706\" stroke-width=\"3\" stroke-dasharray=\"6,3\"/><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#92400e\">Peer-Keepalive (L3 UDP 3200)</text><rect x=\"130\" y=\"150\" width=\"260\" height=\"58\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"260\" y=\"174\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Dual-Homed Server (vPC LACP)</text><text x=\"260\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Active/Active Forwarding (No STP Block)</text><rect x=\"466\" y=\"150\" width=\"240\" height=\"58\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"586\" y=\"174\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#991b1b\">Orphan Port (Single-Homed)</text><text x=\"586\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Needs vpc orphan-port suspend!</text><line x1=\"174\" y1=\"108\" x2=\"220\" y2=\"150\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"540\" y1=\"108\" x2=\"310\" y2=\"150\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"586\" y1=\"108\" x2=\"586\" y2=\"150\" stroke=\"#b91c1c\" stroke-width=\"3\"/></svg>"
-  },
-  {
-   "id": "spec_dc_nx-section-5",
-   "title": "کالبدشکافی دو لینک حیاتی vPC: Peer-Link در برابر Peer-Keepalive",
-   "html": "<ul><li><strong>vPC Peer-Link:</strong> یک Port-Channel پرسرعت (حداقل ۲ لینک 10G/40G/100G) بین دو Nexus برای همگام‌سازی جدول‌های MAC/ARP/IGMP از طریق پروتکل <strong>CFS (Cisco Fabric Services)</strong> و عبور ترافیک اضطراری یا Orphan Ports. <strong>قانون جلوگیری از حلقه vPC (Loop Avoidance Rule):</strong> فریمی که از طریق Peer-Link وارد یک سوئیچ Nexus می‌شود، هرگز مجاز به خروج از هیچ پورت عضو vPC دیگری نیست (مگر برای پورت Orphan یا وقتی لینک طرف مقابل قطع باشد).</li><li><strong>vPC Peer-Keepalive:</strong> یک لینک لایه ۳ سبک (معمولاً روی <code>mgmt0 / vrf management</code> یا یک VRF اختصاصی مجزا — <strong>هرگز از درون خود Peer-Link عبور نکند!</strong>) که پیام ضربان قلب <strong><code>UDP 3200</code></strong> را هر ۱ ثانیه می‌فرستد تا در صورت افت Peer-Link مشخص شود آیا همتا واقعاً مرده است یا هنوز زنده است (جلوگیری از Split-Brain).</li></ul>"
-  },
-  {
-   "id": "spec_dc_nx-section-6",
-   "title": "بررسی سازگاری vPC: تفاوت Type-1 Consistency و Type-2 Consistency",
-   "html": "<p>از آنجا که دو سوئیچ Nexus دو Control Plane مجزا دارند، ممکن است مدیر اشتباهاً تنظیمی را روی یکی عوض کند و روی دیگری فراموش کند! مکانیسم <strong>vPC Consistency Check</strong> دو سطح دارد:</p><ul><li><strong>Type-1 (سراسری یا سطح پورت — بحرانی):</strong> مانند عدم تطابق <strong><code>MTU</code></strong> (مثلاً 9216 در برابر 1500)، حالت STP (<code>rapid-pvst</code> در برابر <code>mst</code>) یا Native VLAN. در صورت ناهماهنگی Type-1، سوئیچ <strong>پورت‌های vPC ناسازگار (یا کل vPCها روی Secondary) را <code>Suspend</code> می‌کند</strong> تا حلقه یا خرابی ترافیک رخ ندهد!</li><li><strong>Type-2 (هشداردهنده):</strong> مانند اختلاف در لیست VLANهای مجاز (اگرچه VLAN ناسازگار ممکن است روی آن پورت Suspend شود) یا برخی تنظیمات QoS/ACL؛ کل Port-Channel را نمی‌بندد اما Syslog هشدار می‌دهد.</li></ul>"
-  },
-  {
-   "id": "spec_dc_nx-section-7",
-   "title": "تله کلاسیک Orphan Ports هنگام افت Peer-Link و فرمان نجات vpc orphan-port suspend",
-   "html": "<p>وقتی <strong>Peer-Link قطع می‌شود ولی Peer-Keepalive زنده است</strong>، سوئیچ <code>vPC Secondary</code> برای جلوگیری از Split-Brain تمام پورت‌های عضو vPC و SVIهای خود را <code>Suspend</code> می‌کند تا تمام سرورهای Dual-Homed به‌طور تمیز از طریق <code>Primary</code> سرویس بگیرند. <strong>اما تله خطرناک برای Orphan Portها (سرور/فایروال تک‌اتصال متصل فقط به Secondary):</strong> به‌طور پیش‌فرض پورت‌های Orphan پس از افت Peer-Link همچنان <code>UP</code> می‌مانند! در نتیجه ترافیک آن سرور به سمت Secondary می‌رود و آنجا به دلیل نداشتن مسیر بالا به <strong>Blackhole</strong> می‌افتد (و در فایروال Active/Standby باعث عدم Failover می‌شود!). راه‌حل روی آن اینترفیس: پیکربندی <strong><code>vpc orphan-port suspend</code></strong> تا با افت Peer-Link آن پورت هم پایین بیاید و کلاستر سرور/فایروال تمیز به گره متصل به Primary سوییچ کند!</p>"
-  },
-  {
-   "id": "spec_dc_nx-section-8",
-   "title": "سه ویژگی تکمیلی حیاتی vPC در تولید: peer-switch، peer-gateway و auto-recovery",
-   "html": "<ul><li><strong><code>peer-switch</code>:</strong> هر دو Nexus یک Bridge ID واحد STP اعلام می‌کنند تا هنگام افت Primary، هیچ تغییر Root و قطعی کوتاه STP رخ ندهد.</li><li><strong><code>peer-gateway</code>:</strong> اجازه می‌دهد هر Nexus بسته‌هایی را که به اشتباه با MAC فیزیکی همتا (به جای Virtual MAC HSRP) ارسال شده‌اند (رایج در برخی Storageها و Load Balancerها) مستقیماً محلی روت کند به جای آنکه از Peer-Link بفرستد و با قانون Loop Avoidance Drop شود!</li><li><strong><code>auto-recovery</code>:</strong> اگر پس از قطعی برق کل رک، فقط سوئیچ Secondary روشن شود (و Primary نیاید)، پس از تایمر (پیش‌فرض ۲۴۰ ثانیه) Secondary به‌طور خودکار نقش Primary را به دست می‌گیرد تا سرورها بی‌ارتباط نمانند.</li></ul>"
-  },
-  {
-   "id": "spec_dc_nx-section-9",
-   "title": "نکته مسیریابی روی vPC: هشدار اجرای پروتکل مسیریابی پویا روی SVI مشترک و راه‌حل layer3 peer-router",
-   "html": "<p>در گذشته برقراری همسایگی OSPF/BGP با یک روتر/فایروال متصل از طریق vPC روی SVI چالش‌برانگیز بود (به دلیل قانون vPC Loop Avoidance هنگام عبور بسته‌های روتینگ از Peer-Link). در NX-OS مدرن برای این سناریو باید ویژگی <strong><code>layer3 peer-router</code></strong> در <code>vpc domain</code> فعال شود (یا از لینک‌های مجزای L3 نقطه‌به‌نقطه خارج از vPC استفاده گردد).</p>"
-  },
-  {
-   "id": "spec_dc_nx-section-10",
-   "title": "بررسی سریع سلامت vPC با چهار دستور طلایی NX-OS (مرجع)",
-   "html": "<p>چهار دستور کلیدی عیب‌یابی در NX-OS (مرجع؛ اجرا نشده روی سخت‌افزار زنده): <code>show vpc</code> (بررسی نقش Primary/Secondary، وضعیت Peer-Link و Keepalive)، <code>show vpc consistency-parameters global</code>، <code>show vpc consistency-parameters interface po&lt;id&gt;</code> و <code>show vpc orphan-ports</code>.</p>"
-  },
-  {
-   "id": "spec_dc_nx-section-11",
-   "title": "کژفهمی‌های رایج درباره NX-OS و vPC",
-   "html": "<ul><li><strong>کژفهمی ۱: «vPC مثل StackWise Virtual دو سوئیچ را به یک سوئیچ واحد با یک IP مدیریت تبدیل می‌کند.»</strong> واقعیت: خیر؛ هر Nexus در vPC پیکربندی، IP مدیریت و Control Plane مستقل دارد و تغییرات باید روی هر دو (ترجیحاً با Ansible/Terraform/ND) اعمال شوند.</li><li><strong>کژفهمی ۲: «می‌توانیم ترافیک Peer-Keepalive را از همان VLAN روی Peer-Link عبور دهیم.»</strong> واقعیت: یکی از بدترین اشتباهات طراحی! اگر Peer-Link قطع شود Keepalive هم با آن قطع می‌شود و دو سوئیچ به Split-Brain می‌افتند.</li><li><strong>کژفهمی ۳: «چون در vPC هر دو سوئیچ فعال‌اند دیگر نیازی به HSRP/VRRP نیست.»</strong> واقعیت: برعکس SVL، در vPC همچنان HSRP/VRRP روی SVIها پیکربندی می‌شود (البته در vPC هر دو عضو در Data Plane به‌صورت Active/Active ترافیک ارسال‌شده به Virtual MAC را روت می‌کنند!).</li></ul>"
-  },
-  {
-   "id": "spec_dc_nx-section-12",
-   "title": "عیب‌یابی خطاهای روزمره NX-OS و vPC",
-   "html": "<p><strong>خطای ۱ — <code>ping 10.10.90.1</code> از CLI پاسخ نمی‌دهد در حالی که SSH روی <code>mgmt0</code> وصل است:</strong> فراموش کردن <code>vrf management</code> در دستور <code>ping</code> (دستور صحیح: <code>ping 10.10.90.1 vrf management</code>).</p><p><strong>خطای ۲ — پس از تغییر MTU به Jumbo Frame (9216) روی یک سمت، نیمی از لینک‌های سرور قطع شد:</strong> ناهماهنگی Type-1 در MTU؛ تا زمانی که هر دو همتا MTU یکسان نداشته باشند vPC در حالت Suspend می‌ماند.</p>"
-  },
-  {
-   "id": "spec_dc_nx-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> روی N9K-1 مقدار MTU پورت‌چنل ۱۰ برابر <code>9216</code> و روی N9K-2 برابر <code>1500</code> تنظیم شده است. چه نوع خطایی رخ می‌دهد و وضعیت پورت‌چنل روی Secondary چیست؟ <strong>پاسخ:</strong> ناهماهنگی <strong>Type-1 Consistency</strong> رخ داده و پورت vPC روی Secondary به وضعیت <strong><code>Suspended</code></strong> می‌رود.</p><p><strong>تمرین ۲:</strong> Peer-Link قطع می‌شود ولی Peer-Keepalive روی <code>mgmt0</code> زنده است. یک فایروال تک‌اتصال روی Secondary قرار دارد. تفاوت بودن یا نبودن <code>vpc orphan-port suspend</code> چیست؟ <strong>پاسخ:</strong> بدون آن، پورت Orphan بالا می‌ماند و ترافیک فایروال به Blackhole می‌رود؛ با <code>vpc orphan-port suspend</code> آن پورت پایین می‌آید تا کلاستر فایروال بلافاصله به گره متصل به Primary سوییچ کند.</p>"
-  },
-  {
-   "id": "spec_dc_nx-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/interfaces/cisco-nexus-9000-series-nx-os-interfaces-configuration-guide-103x/m-configuring-vpcs.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی پیکربندی vPC روی Cisco Nexus 9000 NX-OS</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سوئیچ واقعی Cisco Nexus 9000 یا NX-OSv در این محیط اجرا نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "Cisco NX-OS",
-   "fa": "سیستم‌عامل دیتاسنتر سیسکو",
-   "simple": "سیستم‌عامل ماژولار سوئیچ‌های Nexus با فعال‌سازی ویژگی از طریق دستور feature."
-  },
-  {
-   "term": "vPC",
-   "fa": "پورت‌چنل مجازی Nexus",
-   "simple": "Virtual Port Channel؛ تجمیع Active/Active لینک‌های سرور به دو Nexus دارای Control Plane مستقل."
-  },
-  {
-   "term": "vPC Peer-Link",
-   "fa": "لینک همتای vPC",
-   "simple": "Port-Channel پرسرعت میان دو Nexus برای همگام‌سازی CFS (MAC/ARP) و ترافیک Orphan."
-  },
-  {
-   "term": "vPC Peer-Keepalive",
-   "fa": "ضربان قلب vPC",
-   "simple": "لینک L3 مجزا (UDP 3200) جهت اطلاع از زنده بودن همتا و جلوگیری از Split-Brain هنگام افت Peer-Link."
-  },
-  {
-   "term": "Type-1 Consistency",
-   "fa": "سازگاری نوع ۱ (حیاتی)",
-   "simple": "پارامترهای حیاتی مثل MTU و حالت STP که ناهماهنگی آن‌ها پورت vPC را Suspend می‌کند."
-  },
-  {
-   "term": "Type-2 Consistency",
-   "fa": "سازگاری نوع ۲",
-   "simple": "پارامترهایی که ناهماهنگی آن‌ها هشدار می‌دهد بدون آنکه کل Port-Channel را ببندد."
-  },
-  {
-   "term": "Orphan Port",
-   "fa": "پورت تک‌اتصال یتیم",
-   "simple": "تجهیز متصل به تنها یکی از دو Nexus در VLANهای vPC (مستعد Blackhole در افت Peer-Link)."
-  },
-  {
-   "term": "vpc orphan-port suspend",
-   "fa": "تعلیق پورت یتیم",
-   "simple": "فرمانی که با افت Peer-Link پورت Orphan روی Secondary را می‌بندد تا Failover تمیز انجام شود."
-  },
-  {
-   "term": "peer-gateway",
-   "fa": "دروازه همتا در vPC",
-   "simple": "روت محلی بسته‌هایی که به اشتباه با MAC فیزیکی همتا به جای Virtual MAC ارسال شده‌اند."
-  },
-  {
-   "term": "peer-switch",
-   "fa": "هویت واحد STP در vPC",
-   "simple": "اعلام Bridge ID یکسان STP از هر دو Nexus برای حذف وقفه همگرایی هنگام افت Primary."
-  },
-  {
-   "term": "auto-recovery",
-   "fa": "بازیابی خودکار vPC",
-   "simple": "بالا آمدن خودکار Secondary به عنوان Primary در صورتی که پس از قطعی برق تنها یک سوئیچ روشن شود."
-  },
-  {
-   "term": "layer3 peer-router",
-   "fa": "مسیریابی پویا روی vPC",
-   "simple": "قابلیت NX-OS برای پشتیبانی امن از همسایگی OSPF/BGP با روترهای متصل از طریق vPC."
-  },
-  {
-   "term": "vrf management",
-   "fa": "VRF اختصاصی mgmt0",
-   "simple": "فضای مسیریابی ایزوله پورت مدیریت mgmt0 در NX-OS (نیازمند ذکر vrf management در ping/SSH)."
-  },
-  {
-   "term": "CFS",
-   "fa": "سرویس فابریک سیسکو",
-   "simple": "Cisco Fabric Services؛ پروتکل همگام‌سازی جدول‌های MAC، ARP و وضعیت vPC روی Peer-Link."
-  },
-  {
-   "term": "checkpoint / rollback",
-   "fa": "نقطه بازگشت سریع NX-OS",
-   "simple": "ذخیره فوری اسنپ‌شات پیکربندی در NX-OS و بازگشت اتمیک به آن در صورت خطا."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (بررسی Type-1 Consistency در MTU و تله Orphan Port هنگام افت Peer-Link) — سوئیچ Nexus واقعی اجرا نشده",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سوئیچ واقعی Cisco Nexus 9000 متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ واقعی Cisco Nexus 9000 یا شبیه‌ساز NX-OSv در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی دو سناریوی کلاسیک عیب‌یابی NX-OS vPC را آزمون می‌کند: (۱) تشخیص ناهماهنگی <code>Type-1 Consistency</code> هنگام اختلاف MTU (9216 در برابر 1500) و Suspend شدن پورت‌های Secondary، و (۲) مقایسه وضعیت پورت Orphan هنگام افت Peer-Link با و بدون <code>vpc orphan-port suspend</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_dc_nx_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_dc_nx_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — spec_dc_nx: Cisco NX-OS vPC Type-1 Consistency,\nPeer-Link/Keepalive Split-Brain Protection &amp; Orphan Port Trap Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of NX-OS vPC consistency\nvalidation and peer-link failure behavior. No live Cisco Nexus switch connected.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\n\ndef check_vpc_type1(peer1: dict, peer2: dict) -&gt; dict:\n    mismatches = []\n    for key in (&quot;mtu&quot;, &quot;stp_mode&quot;, &quot;native_vlan&quot;):\n        if peer1[key] != peer2[key]:\n            mismatches.append(f&quot;{key}: primary={peer1[key]} vs secondary={peer2[key]}&quot;)\n    return {\n        &quot;type1_consistent&quot;: len(mismatches) == 0,\n        &quot;mismatches&quot;: mismatches,\n        &quot;secondary_vpc_ports_state&quot;: &quot;UP&quot; if not mismatches else &quot;SUSPENDED&quot;,\n    }\n\n\ndef simulate_peer_link_failure(keepalive_alive: bool, orphan_port_suspend: bool) -&gt; dict:\n    if keepalive_alive:\n        return {\n            &quot;primary_state&quot;: &quot;ACTIVE (forwards traffic)&quot;,\n            &quot;secondary_vpc_member_ports&quot;: &quot;SUSPENDED (prevents split-brain)&quot;,\n            &quot;secondary_orphan_port&quot;: &quot;SUSPENDED (fails over cleanly)&quot; if orphan_port_suspend else &quot;REMAINS_UP_BLACKHOLE_RISK&quot;,\n        }\n    return {\n        &quot;primary_state&quot;: &quot;DOWN_OR_UNREACHABLE&quot;,\n        &quot;secondary_vpc_member_ports&quot;: &quot;TAKES_OVER_AS_PRIMARY&quot;,\n        &quot;secondary_orphan_port&quot;: &quot;UP_AND_FORWARDING&quot;,\n    }\n\n\ndef main() -&gt; None:\n    mtu_mismatch = check_vpc_type1(\n        {&quot;mtu&quot;: 9216, &quot;stp_mode&quot;: &quot;rapid-pvst&quot;, &quot;native_vlan&quot;: 1},\n        {&quot;mtu&quot;: 1500, &quot;stp_mode&quot;: &quot;rapid-pvst&quot;, &quot;native_vlan&quot;: 1},\n    )\n    assert mtu_mismatch[&quot;type1_consistent&quot;] is False\n    assert mtu_mismatch[&quot;secondary_vpc_ports_state&quot;] == &quot;SUSPENDED&quot;\n\n    orphan_trap = simulate_peer_link_failure(keepalive_alive=True, orphan_port_suspend=False)\n    orphan_fixed = simulate_peer_link_failure(keepalive_alive=True, orphan_port_suspend=True)\n    assert orphan_trap[&quot;secondary_orphan_port&quot;] == &quot;REMAINS_UP_BLACKHOLE_RISK&quot;\n    assert &quot;SUSPENDED&quot; in orphan_fixed[&quot;secondary_orphan_port&quot;]\n\n    print(&quot;=== spec_dc_nx NX-OS vPC Consistency &amp; Orphan Port Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;type1_mtu_check&quot;: mtu_mismatch,\n        &quot;peer_link_down_without_orphan_suspend&quot;: orphan_trap,\n        &quot;peer_link_down_with_orphan_suspend&quot;: orphan_fixed,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>type1_consistent: False</code> با <code>secondary_vpc_ports_state: 'SUSPENDED'</code>، و تغییر وضعیت پورت Orphan از <code>REMAINS_UP_BLACKHOLE_RISK</code> به <code>SUSPENDED (fails over cleanly)</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع پیکربندی vPC Domain روی Nexus 9000 (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference NX-OS vPC snippet (NOT executed on live Nexus)\nfeature vpc\nfeature lacp\nvpc domain 10\n peer-switch\n peer-gateway\n auto-recovery\n peer-keepalive destination 10.10.90.12 source 10.10.90.11 vrf management</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس Cisco NX-OS و معماری Nexus vPC",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "در Cisco NX-OS، اگر پورت mgmt0 آدرس 10.10.90.11/24 داشته باشد، چرا ping 10.10.90.1 بدون ذکر VRF پاسخ نمی‌دهد؟",
-   "options": [
-    "چون mgmt0 فقط IPv6 دارد",
-    "چون دستور ping حذف شده است",
-    "چون باید feature ping روشن شود",
-    "چون پورت mgmt0 به‌طور پیش‌فرض درون VRF management ایزوله شده و باید ping 10.10.90.1 vrf management اجرا شود"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>جداسازی <code>mgmt0</code> در <code>vrf management</code> یکی از اولین تفاوت‌های کلیدی NX-OS با IOS است.</p>"
-  },
-  {
-   "title": "در یک Port-Channel عضو vPC، اگر MTU روی N9K-1 برابر 9216 و روی N9K-2 برابر 1500 تنظیم شود، چه رخ می‌دهد؟",
-   "options": [
-    "ناهماهنگی Type-1 Consistency رخ داده و پورت vPC ناسازگار (روی Secondary) Suspend می‌شود",
-    "ترافیک با دو برابر سرعت عبور می‌کند",
-    "پورت mgmt0 خاموش می‌شود",
-    "هر دو سوئیچ ریبوت می‌شوند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>MTU یک پارامتر Type-1 است و اختلاف آن موجب Suspend شدن پورت جهت پیشگیری از خرابی ترافیک می‌شود.</p>"
-  },
-  {
-   "title": "کاربرد اصلی لینک vPC Peer-Keepalive چیست؟",
-   "options": [
-    "حمل تمام ترافیک دیتابیس سرورها",
-    "ارسال پیام ضربان قلب سبک (UDP 3200) از یک مسیر L3 مجزا برای تشخیص زنده بودن همتا و جلوگیری از Split-Brain هنگام افت Peer-Link",
-    "جایگزینی پروتکل BGP",
-    "حذف نیاز به LACP"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>Peer-Keepalive هرگز ترافیک داده حمل نمی‌کند و باید از مسیری کاملاً مستقل از Peer-Link عبور کند.</p>"
-  },
-  {
-   "title": "تفاوت معماری اصلی میان Nexus vPC و Catalyst StackWise Virtual (SVL) چیست؟",
-   "options": [
-    "در vPC دو سوئیچ یک Control Plane واحد دارند",
-    "در vPC هر دو سوئیچ Nexus دارای دو Control Plane مستقل هستند (ارتقای مستقل و نبود Shared Fate)، اما در SVL دو سوئیچ یک Control Plane مشترک دارند",
-    "vPC از LACP پشتیبانی نمی‌کند",
-    "هیچ تفاوتی ندارند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>استقلال Control Plane دو Nexus مزیت کلیدی پایداری و ارتقای مستقل یک‌به‌یک vPC برای سرورهای Dual-Homed است (البته Orphan Portهای تک‌اتصالی روی گره در حال ارتقا همچنان قطعی دارند).</p>"
-  },
-  {
-   "title": "هنگام افت vPC Peer-Link در حالی که Peer-Keepalive هنوز زنده است، چه خطری متوجه یک Orphan Port متصل به Secondary است و راه‌حل چیست؟",
-   "options": [
-    "پورت Orphan سرعتش دو برابر می‌شود",
-    "هیچ خطری ندارد",
-    "پورت Orphan به‌طور پیش‌فرض UP می‌ماند و ترافیک آن Blackhole می‌شود؛ راه‌حل تنظیم vpc orphan-port suspend روی آن پورت است",
-    "Primary خاموش می‌شود"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>بستن خودکار پورت Orphan روی Secondary اجازه می‌دهد کلاستر سرور/فایروال تمیز به گره متصل به Primary سوییچ کند.</p>"
-  },
-  {
-   "title": "قابلیت peer-gateway در دامنه vPC کدام مشکل عملیاتی خاص را حل می‌کند؟",
-   "options": [
-    "تغییر پورت UDP 3200 به TCP 80",
-    "حذف Peer-Link",
-    "تبدیل NX-OS به ACI",
-    "امکان مسیریابی محلی بسته‌هایی که برخی تجهیزات (مثل Storage/Load Balancer) به اشتباه با MAC فیزیکی همتا به جای Virtual MAC HSRP می‌فرستند"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>بدون <code>peer-gateway</code> چنین بسته‌هایی به Peer-Link رفته و ممکن است توسط قانون Loop Avoidance Drop شوند.</p>"
-  },
-  {
-   "title": "چرا در NX-OS پیش از پیکربندی vPC یا BGP باید دستوراتی مانند feature vpc یا feature bgp را اجرا کرد؟",
-   "options": [
-    "زیرا NX-OS معماری ماژولار دارد و تا ویژگی فعال (feature) نشود، فرآیند آن بارگذاری نشده و دستوراتش در CLI ظاهر نمی‌شوند",
-    "برای فعال کردن پورت کنسول",
-    "برای حذف لایسنس",
-    "زیرا NX-OS فایل متنی ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>مدل <code>feature</code> مصرف حافظه و سطح حمله سیستم‌عامل دیتاسنتر را بهینه نگه می‌دارد.</p>"
-  },
-  {
-   "title": "نقش ویژگی peer-switch در پیکربندی vPC domain چیست؟",
-   "options": [
-    "خاموش کردن کل STP روی شبکه",
-    "اعلام یک Bridge ID واحد STP از هر دو Nexus تا هنگام افت Primary هیچ جابه‌جایی Root و وقفه همگرایی STP رخ ندهد",
-    "تغییر رمز عبور ادمین",
-    "تبدیل vPC به SVL"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p><code>peer-switch</code> پایداری لایه ۲ و زمان همگرایی را در رخدادهای Failover به‌شدت بهبود می‌بخشد.</p>"
-  },
-  {
-   "title": "تنظیم auto-recovery در vPC چه سناریوی بحرانی را پوشش می‌دهد؟",
-   "options": [
-    "پاک کردن خودکار VLANها",
-    "ارسال خودکار ایمیل",
-    "بازگرداندن خودکار سرویس توسط Secondary به عنوان Primary اگر پس از قطعی برق کامل رک، تنها سوئیچ Secondary روشن شود و Primary بالا نیاید",
-    "جایگزینی Peer-Keepalive"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>بدون <code>auto-recovery</code>، سوئیچ Secondary در نبود Primary پس از Boot پورت‌های vPC را بالا نمی‌آورد!</p>"
-  },
-  {
-   "title": "قانون جلوگیری از حلقه vPC (vPC Loop Avoidance Rule) چه می‌گوید؟",
-   "options": [
-    "فریم‌های دریافتی از هر پورت باید از همه پورت‌ها پخش شوند",
-    "ترافیک فقط از Primary عبور می‌کند",
-    "پورت Peer-Link فقط برای SSH است",
-    "فریمی که از طریق vPC Peer-Link وارد یک Nexus می‌شود، هرگز نباید از هیچ پورت عضو vPC دیگری روی همان Nexus خارج شود (مگر در شرایط استثنا مانند افت لینک طرف مقابل)"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>این قانون جایگزین مسدودسازی STP می‌شود و از برگشت ترافیک Broadcast/Multicast/Unknown Unicast و ایجاد حلقه جلوگیری می‌کند.</p>"
-  },
-  {
-   "title": "برای پشتیبانی ایمن از همسایگی OSPF/BGP با روتر یا فایروال متصل از طریق vPC روی SVI، کدام قابلیت NX-OS لازم است؟",
-   "options": [
-    "layer3 peer-router در vpc domain",
-    "disable lacp",
-    "no feature vpc",
-    "switchport mode access"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p><code>layer3 peer-router</code> اجازه می‌دهد هر دو همتای vPC بسته‌های روتینگ دریافتی از Peer-Link را بدون افت ناشی از قانون حلقه پردازش کنند.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "تست قطع فیبر روی دو Nexus 93180YC فیزیکی",
-    "تغییر MTU دیتاسنتر تولیدی",
-    "فقط متن نظری بدون کد",
-    "شبیه‌سازی محلی (Local Mock) در Python 3 برای بررسی Type-1 Consistency در MTU و مقایسه پورت Orphan با و بدون vpc orphan-port suspend"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سوئیچ Nexus واقعی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.5",
-  "legacyId": "spec_dc_nx",
-  "sources": [
-   "https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/interfaces/cisco-nexus-9000-series-nx-os-interfaces-configuration-guide-103x/m-configuring-vpcs.html",
-   "https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/104x/configuration/interfaces/cisco-nexus-9000-series-nx-os-interfaces-configuration-guide-104x/m-configuring-vpcs.html"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "spec_dc_nx",
+  "objectiveId": "spec_dc_nx",
+  "kind": "lesson",
+  "track": "Specialist",
+  "course": "spec-datacenter",
+  "title": "۷.۳ Data Center: سیستم‌عامل Cisco NX-OS، معماری Nexus و vPC (Virtual Port Channel)",
+  "titleEn": "Data Center Deep Dive: Cisco NX-OS Architecture, Nexus vPC, Type-1 Consistency & Orphan Ports",
+  "domain": "Data Center Networking",
+  "source": "Legacy spec_dc_nx rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [],
+  "sections": [
+    {
+      "id": "spec_dc_nx-section-1",
+      "title": "مسئله واقعی: چرا در دیتاسنتر به جای یکی کردن Control Plane (SVL)، از دو Nexus مستقل با vPC استفاده می‌کنیم؟",
+      "html": "<p>در دیتاسنتر، توقف کامل صفحه کنترل (Control Plane) دو سوئیچ Top-of-Rack به دلیل یک باگ یا ارتقای نرم‌افزار غیرقابل پذیرش است. <strong>Cisco NX-OS</strong> روی سوئیچ‌های <strong>Nexus</strong> با معماری ماژولار و فناوری <strong>vPC (Virtual Port Channel)</strong> به دو سوئیچ Nexus اجازه می‌دهد <em>دو Control Plane کاملاً مستقل</em> داشته باشند و هم‌زمان از دید سرورها یا سوئیچ‌های پایین‌دست به عنوان یک جفت Active/Active LACP عمل کنند — به شرط آنکه قواعد <strong>Type-1 Consistency</strong>، جدایی <strong>Peer-Keepalive</strong> و تله <strong>Orphan Ports</strong> را دقیق رعایت کنید.</p>"
+    },
+    {
+      "id": "spec_dc_nx-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر LACP، STP، VLAN/SVI و مفهوم Multichassis EtherChannel.</p><ul><li>تبیین چهار تفاوت روز اول <strong>Cisco NX-OS</strong> با IOS/IOS-XE (مدل <code>feature ...</code>، ایزوله‌سازی <code>mgmt0</code> در <code>vrf management</code>، <code>checkpoint/rollback</code> و نبود <code>do</code> اجباری).</li><li>کالبدشکافی دو لینک حیاتی <strong>vPC</strong>: <strong>Peer-Link</strong> (حمل MAC/ARP sync و ترافیک Orphan) و <strong>Peer-Keepalive</strong> (ضربان قلب L3 روی <code>UDP 3200</code>).</li><li>تشخیص تفاوت <strong>Type-1 Consistency</strong> (موجب Suspend شدن پورت‌ها) با <strong>Type-2 Consistency</strong> (هشدار بدون Suspend).</li><li>مهار تله <strong>Orphan Ports</strong> هنگام افت Peer-Link و کاربرد ویژگی‌های <code>peer-gateway</code>، <code>peer-switch</code> و <code>auto-recovery</code>.</li></ul>"
+    },
+    {
+      "id": "spec_dc_nx-section-3",
+      "title": "چهار تفاوت کلیدی Cisco NX-OS با IOS در روز اول دیتاسنتر",
+      "html": "<ol><li><strong>معماری ماژولار <code>feature ...</code>:</strong> تا زمانی که دستور <code>feature vpc</code>، <code>feature lacp</code>، <code>feature bgp</code> یا <code>feature interface-vlan</code> را روشن نکنید، سرویس مربوطه در حافظه بارگذاری نمی‌شود و حتی دستورات آن در CLI وجود ندارد!</li><li><strong>ایزوله‌سازی <code>mgmt0</code> درون <code>vrf management</code>:</strong> پورت مدیریت <code>mgmt0</code> به‌طور پیش‌فرض جدا از جدول مسیریابی <code>default</code> است؛ بنابراین برای پینگ در شبکه مدیریت باید صریحاً بنویسید <code>ping 10.10.90.1 vrf management</code>!</li><li><strong>اجرای مستقیم <code>show</code> در هر حالت و <code>checkpoint / rollback</code>:</strong> در NX-OS نیازی به کلمه <code>do</code> پیش از دستورات <code>show</code> در حالت Config نیست، و قبل از هر تغییر بزرگ می‌توان با <code>checkpoint BEFORE_CHG</code> نقطه بازگشت آنی ساخت.</li><li><strong>پشتیبانی از ارتقای مستقل و عدم Shared Fate:</strong> دو سوئیچ Nexus در یک دامنه vPC می‌توانند یک‌به‌یک با هدف کمینه‌سازی قطعی سرورهای Dual-Homed ارتقا داده شوند (سرورهای تک‌اتصالی / Orphan Ports روی سوئیچ در حال ارتقا همچنان دچار قطعی می‌شوند و رعایت سازگاری Type-1 و ISSU/پنجره نگهداری ضروری است).</li></ol>"
+    },
+    {
+      "id": "spec_dc_nx-section-4",
+      "title": "نمودار معماری vPC: Peer-Link، Peer-Keepalive (UDP 3200) و تله Orphan Port",
+      "html": "<p>نمودار زیر تفکیک دو Control Plane مستقل، لینک‌های Peer-Link و Peer-Keepalive، عضو vPC و پورت تک‌اتصال Orphan را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco NX-OS vPC Architecture: Peer-Link, Peer-Keepalive UDP 3200, vPC Member and Orphan Port\"><rect x=\"36\" y=\"16\" width=\"276\" height=\"92\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"174\" y=\"40\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Nexus N9K-1 (vPC Primary)</text><text x=\"174\" y=\"62\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Independent Control Plane #1</text><text x=\"174\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">mgmt0 in VRF management | feature vpc</text><rect x=\"448\" y=\"16\" width=\"276\" height=\"92\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"586\" y=\"40\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Nexus N9K-2 (vPC Secondary)</text><text x=\"586\" y=\"62\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Independent Control Plane #2</text><text x=\"586\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Type-1 Mismatch =&gt; vPC Ports Suspend!</text><line x1=\"312\" y1=\"42\" x2=\"448\" y2=\"42\" stroke=\"#1d4ed8\" stroke-width=\"4\"/><text x=\"380\" y=\"34\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1e3a8a\">vPC Peer-Link (2x 40/100G)</text><line x1=\"312\" y1=\"84\" x2=\"448\" y2=\"84\" stroke=\"#d97706\" stroke-width=\"3\" stroke-dasharray=\"6,3\"/><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#92400e\">Peer-Keepalive (L3 UDP 3200)</text><rect x=\"130\" y=\"150\" width=\"260\" height=\"58\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"260\" y=\"174\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Dual-Homed Server (vPC LACP)</text><text x=\"260\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Active/Active Forwarding (No STP Block)</text><rect x=\"466\" y=\"150\" width=\"240\" height=\"58\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"586\" y=\"174\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#991b1b\">Orphan Port (Single-Homed)</text><text x=\"586\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Needs vpc orphan-port suspend!</text><line x1=\"174\" y1=\"108\" x2=\"220\" y2=\"150\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"540\" y1=\"108\" x2=\"310\" y2=\"150\" stroke=\"#15803d\" stroke-width=\"3\"/><line x1=\"586\" y1=\"108\" x2=\"586\" y2=\"150\" stroke=\"#b91c1c\" stroke-width=\"3\"/></svg>"
+    },
+    {
+      "id": "spec_dc_nx-section-5",
+      "title": "کالبدشکافی دو لینک حیاتی vPC: Peer-Link در برابر Peer-Keepalive",
+      "html": "<ul><li><strong>vPC Peer-Link:</strong> یک Port-Channel پرسرعت (حداقل ۲ لینک 10G/40G/100G) بین دو Nexus برای همگام‌سازی جدول‌های MAC/ARP/IGMP از طریق پروتکل <strong>CFS (Cisco Fabric Services)</strong> و عبور ترافیک اضطراری یا Orphan Ports. <strong>قانون جلوگیری از حلقه vPC (Loop Avoidance Rule):</strong> فریمی که از طریق Peer-Link وارد یک سوئیچ Nexus می‌شود، هرگز مجاز به خروج از هیچ پورت عضو vPC دیگری نیست (مگر برای پورت Orphan یا وقتی لینک طرف مقابل قطع باشد).</li><li><strong>vPC Peer-Keepalive:</strong> یک لینک لایه ۳ سبک (معمولاً روی <code>mgmt0 / vrf management</code> یا یک VRF اختصاصی مجزا — <strong>هرگز از درون خود Peer-Link عبور نکند!</strong>) که پیام ضربان قلب <strong><code>UDP 3200</code></strong> را هر ۱ ثانیه می‌فرستد تا در صورت افت Peer-Link مشخص شود آیا همتا واقعاً مرده است یا هنوز زنده است (جلوگیری از Split-Brain).</li></ul>"
+    },
+    {
+      "id": "spec_dc_nx-section-6",
+      "title": "بررسی سازگاری vPC: تفاوت Type-1 Consistency و Type-2 Consistency",
+      "html": "<p>از آنجا که دو سوئیچ Nexus دو Control Plane مجزا دارند، ممکن است مدیر اشتباهاً تنظیمی را روی یکی عوض کند و روی دیگری فراموش کند! مکانیسم <strong>vPC Consistency Check</strong> دو سطح دارد:</p><ul><li><strong>Type-1 (سراسری یا سطح پورت — بحرانی):</strong> مانند عدم تطابق <strong><code>MTU</code></strong> (مثلاً 9216 در برابر 1500)، حالت STP (<code>rapid-pvst</code> در برابر <code>mst</code>) یا Native VLAN. در صورت ناهماهنگی Type-1، سوئیچ <strong>پورت‌های vPC ناسازگار (یا کل vPCها روی Secondary) را <code>Suspend</code> می‌کند</strong> تا حلقه یا خرابی ترافیک رخ ندهد!</li><li><strong>Type-2 (هشداردهنده):</strong> مانند اختلاف در لیست VLANهای مجاز (اگرچه VLAN ناسازگار ممکن است روی آن پورت Suspend شود) یا برخی تنظیمات QoS/ACL؛ کل Port-Channel را نمی‌بندد اما Syslog هشدار می‌دهد.</li></ul>"
+    },
+    {
+      "id": "spec_dc_nx-section-7",
+      "title": "تله کلاسیک Orphan Ports هنگام افت Peer-Link و فرمان نجات vpc orphan-port suspend",
+      "html": "<p>وقتی <strong>Peer-Link قطع می‌شود ولی Peer-Keepalive زنده است</strong>، سوئیچ <code>vPC Secondary</code> برای جلوگیری از Split-Brain تمام پورت‌های عضو vPC و SVIهای خود را <code>Suspend</code> می‌کند تا تمام سرورهای Dual-Homed به‌طور تمیز از طریق <code>Primary</code> سرویس بگیرند. <strong>اما تله خطرناک برای Orphan Portها (سرور/فایروال تک‌اتصال متصل فقط به Secondary):</strong> به‌طور پیش‌فرض پورت‌های Orphan پس از افت Peer-Link همچنان <code>UP</code> می‌مانند! در نتیجه ترافیک آن سرور به سمت Secondary می‌رود و آنجا به دلیل نداشتن مسیر بالا به <strong>Blackhole</strong> می‌افتد (و در فایروال Active/Standby باعث عدم Failover می‌شود!). راه‌حل روی آن اینترفیس: پیکربندی <strong><code>vpc orphan-port suspend</code></strong> تا با افت Peer-Link آن پورت هم پایین بیاید و کلاستر سرور/فایروال تمیز به گره متصل به Primary سوییچ کند!</p>"
+    },
+    {
+      "id": "spec_dc_nx-section-8",
+      "title": "سه ویژگی تکمیلی حیاتی vPC در تولید: peer-switch، peer-gateway و auto-recovery",
+      "html": "<ul><li><strong><code>peer-switch</code>:</strong> هر دو Nexus یک Bridge ID واحد STP اعلام می‌کنند تا هنگام افت Primary، هیچ تغییر Root و قطعی کوتاه STP رخ ندهد.</li><li><strong><code>peer-gateway</code>:</strong> اجازه می‌دهد هر Nexus بسته‌هایی را که به اشتباه با MAC فیزیکی همتا (به جای Virtual MAC HSRP) ارسال شده‌اند (رایج در برخی Storageها و Load Balancerها) مستقیماً محلی روت کند به جای آنکه از Peer-Link بفرستد و با قانون Loop Avoidance Drop شود!</li><li><strong><code>auto-recovery</code>:</strong> اگر پس از قطعی برق کل رک، فقط سوئیچ Secondary روشن شود (و Primary نیاید)، پس از تایمر (پیش‌فرض ۲۴۰ ثانیه) Secondary به‌طور خودکار نقش Primary را به دست می‌گیرد تا سرورها بی‌ارتباط نمانند.</li></ul>"
+    },
+    {
+      "id": "spec_dc_nx-section-9",
+      "title": "نکته مسیریابی روی vPC: هشدار اجرای پروتکل مسیریابی پویا روی SVI مشترک و راه‌حل layer3 peer-router",
+      "html": "<p>در گذشته برقراری همسایگی OSPF/BGP با یک روتر/فایروال متصل از طریق vPC روی SVI چالش‌برانگیز بود (به دلیل قانون vPC Loop Avoidance هنگام عبور بسته‌های روتینگ از Peer-Link). در NX-OS مدرن برای این سناریو باید ویژگی <strong><code>layer3 peer-router</code></strong> در <code>vpc domain</code> فعال شود (یا از لینک‌های مجزای L3 نقطه‌به‌نقطه خارج از vPC استفاده گردد).</p>"
+    },
+    {
+      "id": "spec_dc_nx-section-10",
+      "title": "بررسی سریع سلامت vPC با چهار دستور طلایی NX-OS (مرجع)",
+      "html": "<p>چهار دستور کلیدی عیب‌یابی در NX-OS (مرجع؛ اجرا نشده روی سخت‌افزار زنده): <code>show vpc</code> (بررسی نقش Primary/Secondary، وضعیت Peer-Link و Keepalive)، <code>show vpc consistency-parameters global</code>، <code>show vpc consistency-parameters interface po&lt;id&gt;</code> و <code>show vpc orphan-ports</code>.</p>"
+    },
+    {
+      "id": "spec_dc_nx-section-11",
+      "title": "کژفهمی‌های رایج درباره NX-OS و vPC",
+      "html": "<ul><li><strong>کژفهمی ۱: «vPC مثل StackWise Virtual دو سوئیچ را به یک سوئیچ واحد با یک IP مدیریت تبدیل می‌کند.»</strong> واقعیت: خیر؛ هر Nexus در vPC پیکربندی، IP مدیریت و Control Plane مستقل دارد و تغییرات باید روی هر دو (ترجیحاً با Ansible/Terraform/ND) اعمال شوند.</li><li><strong>کژفهمی ۲: «می‌توانیم ترافیک Peer-Keepalive را از همان VLAN روی Peer-Link عبور دهیم.»</strong> واقعیت: یکی از بدترین اشتباهات طراحی! اگر Peer-Link قطع شود Keepalive هم با آن قطع می‌شود و دو سوئیچ به Split-Brain می‌افتند.</li><li><strong>کژفهمی ۳: «چون در vPC هر دو سوئیچ فعال‌اند دیگر نیازی به HSRP/VRRP نیست.»</strong> واقعیت: برعکس SVL، در vPC همچنان HSRP/VRRP روی SVIها پیکربندی می‌شود (البته در vPC هر دو عضو در Data Plane به‌صورت Active/Active ترافیک ارسال‌شده به Virtual MAC را روت می‌کنند!).</li></ul>"
+    },
+    {
+      "id": "spec_dc_nx-section-12",
+      "title": "عیب‌یابی خطاهای روزمره NX-OS و vPC",
+      "html": "<p><strong>خطای ۱ — <code>ping 10.10.90.1</code> از CLI پاسخ نمی‌دهد در حالی که SSH روی <code>mgmt0</code> وصل است:</strong> فراموش کردن <code>vrf management</code> در دستور <code>ping</code> (دستور صحیح: <code>ping 10.10.90.1 vrf management</code>).</p><p><strong>خطای ۲ — پس از تغییر MTU به Jumbo Frame (9216) روی یک سمت، نیمی از لینک‌های سرور قطع شد:</strong> ناهماهنگی Type-1 در MTU؛ تا زمانی که هر دو همتا MTU یکسان نداشته باشند vPC در حالت Suspend می‌ماند.</p>"
+    },
+    {
+      "id": "spec_dc_nx-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> روی N9K-1 مقدار MTU پورت‌چنل ۱۰ برابر <code>9216</code> و روی N9K-2 برابر <code>1500</code> تنظیم شده است. چه نوع خطایی رخ می‌دهد و وضعیت پورت‌چنل روی Secondary چیست؟ <strong>پاسخ:</strong> ناهماهنگی <strong>Type-1 Consistency</strong> رخ داده و پورت vPC روی Secondary به وضعیت <strong><code>Suspended</code></strong> می‌رود.</p><p><strong>تمرین ۲:</strong> Peer-Link قطع می‌شود ولی Peer-Keepalive روی <code>mgmt0</code> زنده است. یک فایروال تک‌اتصال روی Secondary قرار دارد. تفاوت بودن یا نبودن <code>vpc orphan-port suspend</code> چیست؟ <strong>پاسخ:</strong> بدون آن، پورت Orphan بالا می‌ماند و ترافیک فایروال به Blackhole می‌رود؛ با <code>vpc orphan-port suspend</code> آن پورت پایین می‌آید تا کلاستر فایروال بلافاصله به گره متصل به Primary سوییچ کند.</p>"
+    },
+    {
+      "id": "spec_dc_nx-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/interfaces/cisco-nexus-9000-series-nx-os-interfaces-configuration-guide-103x/m-configuring-vpcs.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی پیکربندی vPC روی Cisco Nexus 9000 NX-OS</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سوئیچ واقعی Cisco Nexus 9000 یا NX-OSv در این محیط اجرا نشده است.</p>"
+    }
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سوئیچ واقعی Cisco Nexus 9000 متصل نشده است."
+  "glossary": [
+    {
+      "term": "Cisco NX-OS",
+      "fa": "سیستم‌عامل دیتاسنتر سیسکو",
+      "simple": "سیستم‌عامل ماژولار سوئیچ‌های Nexus با فعال‌سازی ویژگی از طریق دستور feature."
+    },
+    {
+      "term": "vPC",
+      "fa": "پورت‌چنل مجازی Nexus",
+      "simple": "Virtual Port Channel؛ تجمیع Active/Active لینک‌های سرور به دو Nexus دارای Control Plane مستقل."
+    },
+    {
+      "term": "vPC Peer-Link",
+      "fa": "لینک همتای vPC",
+      "simple": "Port-Channel پرسرعت میان دو Nexus برای همگام‌سازی CFS (MAC/ARP) و ترافیک Orphan."
+    },
+    {
+      "term": "vPC Peer-Keepalive",
+      "fa": "ضربان قلب vPC",
+      "simple": "لینک L3 مجزا (UDP 3200) جهت اطلاع از زنده بودن همتا و جلوگیری از Split-Brain هنگام افت Peer-Link."
+    },
+    {
+      "term": "Type-1 Consistency",
+      "fa": "سازگاری نوع ۱ (حیاتی)",
+      "simple": "پارامترهای حیاتی مثل MTU و حالت STP که ناهماهنگی آن‌ها پورت vPC را Suspend می‌کند."
+    },
+    {
+      "term": "Type-2 Consistency",
+      "fa": "سازگاری نوع ۲",
+      "simple": "پارامترهایی که ناهماهنگی آن‌ها هشدار می‌دهد بدون آنکه کل Port-Channel را ببندد."
+    },
+    {
+      "term": "Orphan Port",
+      "fa": "پورت تک‌اتصال یتیم",
+      "simple": "تجهیز متصل به تنها یکی از دو Nexus در VLANهای vPC (مستعد Blackhole در افت Peer-Link)."
+    },
+    {
+      "term": "vpc orphan-port suspend",
+      "fa": "تعلیق پورت یتیم",
+      "simple": "فرمانی که با افت Peer-Link پورت Orphan روی Secondary را می‌بندد تا Failover تمیز انجام شود."
+    },
+    {
+      "term": "peer-gateway",
+      "fa": "دروازه همتا در vPC",
+      "simple": "روت محلی بسته‌هایی که به اشتباه با MAC فیزیکی همتا به جای Virtual MAC ارسال شده‌اند."
+    },
+    {
+      "term": "peer-switch",
+      "fa": "هویت واحد STP در vPC",
+      "simple": "اعلام Bridge ID یکسان STP از هر دو Nexus برای حذف وقفه همگرایی هنگام افت Primary."
+    },
+    {
+      "term": "auto-recovery",
+      "fa": "بازیابی خودکار vPC",
+      "simple": "بالا آمدن خودکار Secondary به عنوان Primary در صورتی که پس از قطعی برق تنها یک سوئیچ روشن شود."
+    },
+    {
+      "term": "layer3 peer-router",
+      "fa": "مسیریابی پویا روی vPC",
+      "simple": "قابلیت NX-OS برای پشتیبانی امن از همسایگی OSPF/BGP با روترهای متصل از طریق vPC."
+    },
+    {
+      "term": "vrf management",
+      "fa": "VRF اختصاصی mgmt0",
+      "simple": "فضای مسیریابی ایزوله پورت مدیریت mgmt0 در NX-OS (نیازمند ذکر vrf management در ping/SSH)."
+    },
+    {
+      "term": "CFS",
+      "fa": "سرویس فابریک سیسکو",
+      "simple": "Cisco Fabric Services؛ پروتکل همگام‌سازی جدول‌های MAC، ARP و وضعیت vPC روی Peer-Link."
+    },
+    {
+      "term": "checkpoint / rollback",
+      "fa": "نقطه بازگشت سریع NX-OS",
+      "simple": "ذخیره فوری اسنپ‌شات پیکربندی در NX-OS و بازگشت اتمیک به آن در صورت خطا."
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، قانون Loop Avoidance، layer3 peer-router و شبیه‌ساز Type-1 / Orphan Port."
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (بررسی Type-1 Consistency در MTU و تله Orphan Port هنگام افت Peer-Link) — سوئیچ Nexus واقعی اجرا نشده",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سوئیچ واقعی Cisco Nexus 9000 متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ واقعی Cisco Nexus 9000 یا شبیه‌ساز NX-OSv در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی دو سناریوی کلاسیک عیب‌یابی NX-OS vPC را آزمون می‌کند: (۱) تشخیص ناهماهنگی <code>Type-1 Consistency</code> هنگام اختلاف MTU (9216 در برابر 1500) و Suspend شدن پورت‌های Secondary، و (۲) مقایسه وضعیت پورت Orphan هنگام افت Peer-Link با و بدون <code>vpc orphan-port suspend</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_dc_nx_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_dc_nx_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — spec_dc_nx: Cisco NX-OS vPC Type-1 Consistency,\nPeer-Link/Keepalive Split-Brain Protection &amp; Orphan Port Trap Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of NX-OS vPC consistency\nvalidation and peer-link failure behavior. No live Cisco Nexus switch connected.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef check_vpc_type1(peer1: dict, peer2: dict) -&gt; dict:\n    for pname, peer in ((&quot;peer1&quot;, peer1), (&quot;peer2&quot;, peer2)):\n        if not isinstance(peer, dict):\n            raise ValueError(f&quot;{pname} must be a dict&quot;)\n        for key in (&quot;mtu&quot;, &quot;stp_mode&quot;, &quot;native_vlan&quot;):\n            if key not in peer:\n                raise ValueError(f&quot;{pname} missing required key &#x27;{key}&#x27;&quot;)\n        if isinstance(peer[&quot;mtu&quot;], bool) or not isinstance(peer[&quot;mtu&quot;], int) or peer[&quot;mtu&quot;] &lt;= 0:\n            raise ValueError(f&quot;{pname}.mtu must be a positive int (not bool), got {peer[&#x27;mtu&#x27;]!r}&quot;)\n        if isinstance(peer[&quot;native_vlan&quot;], bool) or not isinstance(peer[&quot;native_vlan&quot;], int) or not (1 &lt;= peer[&quot;native_vlan&quot;] &lt;= 4094):\n            raise ValueError(f&quot;{pname}.native_vlan must be an int in [1, 4094] (not bool), got {peer[&#x27;native_vlan&#x27;]!r}&quot;)\n        if not isinstance(peer[&quot;stp_mode&quot;], str) or not peer[&quot;stp_mode&quot;].strip():\n            raise ValueError(f&quot;{pname}.stp_mode must be a non-empty str, got {peer[&#x27;stp_mode&#x27;]!r}&quot;)\n    mismatches = []\n    for key in (&quot;mtu&quot;, &quot;stp_mode&quot;, &quot;native_vlan&quot;):\n        if peer1[key] != peer2[key]:\n            mismatches.append(f&quot;{key}: primary={peer1[key]} vs secondary={peer2[key]}&quot;)\n    return {\n        &quot;type1_consistent&quot;: len(mismatches) == 0,\n        &quot;mismatches&quot;: mismatches,\n        &quot;secondary_vpc_ports_state&quot;: &quot;UP&quot; if not mismatches else &quot;SUSPENDED&quot;,\n    }\n\n\ndef simulate_peer_link_failure(keepalive_alive: bool, orphan_port_suspend: bool) -&gt; dict:\n    ka = _require_bool(keepalive_alive, &quot;keepalive_alive&quot;)\n    orphan = _require_bool(orphan_port_suspend, &quot;orphan_port_suspend&quot;)\n    if ka:\n        return {\n            &quot;primary_state&quot;: &quot;ACTIVE (forwards traffic)&quot;,\n            &quot;secondary_vpc_member_ports&quot;: &quot;SUSPENDED (prevents split-brain)&quot;,\n            &quot;secondary_orphan_port&quot;: &quot;SUSPENDED (fails over cleanly)&quot; if orphan else &quot;REMAINS_UP_BLACKHOLE_RISK&quot;,\n        }\n    return {\n        &quot;primary_state&quot;: &quot;DOWN_OR_UNREACHABLE&quot;,\n        &quot;secondary_vpc_member_ports&quot;: &quot;TAKES_OVER_AS_PRIMARY&quot;,\n        &quot;secondary_orphan_port&quot;: &quot;UP_AND_FORWARDING&quot;,\n    }\n\n\ndef main() -&gt; None:\n    mtu_mismatch = check_vpc_type1(\n        {&quot;mtu&quot;: 9216, &quot;stp_mode&quot;: &quot;rapid-pvst&quot;, &quot;native_vlan&quot;: 1},\n        {&quot;mtu&quot;: 1500, &quot;stp_mode&quot;: &quot;rapid-pvst&quot;, &quot;native_vlan&quot;: 1},\n    )\n    assert mtu_mismatch[&quot;type1_consistent&quot;] is False\n    assert mtu_mismatch[&quot;secondary_vpc_ports_state&quot;] == &quot;SUSPENDED&quot;\n\n    orphan_trap = simulate_peer_link_failure(keepalive_alive=True, orphan_port_suspend=False)\n    orphan_fixed = simulate_peer_link_failure(keepalive_alive=True, orphan_port_suspend=True)\n    assert orphan_trap[&quot;secondary_orphan_port&quot;] == &quot;REMAINS_UP_BLACKHOLE_RISK&quot;\n    assert &quot;SUSPENDED&quot; in orphan_fixed[&quot;secondary_orphan_port&quot;]\n\n    print(&quot;=== spec_dc_nx NX-OS vPC Consistency &amp; Orphan Port Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;type1_mtu_check&quot;: mtu_mismatch,\n        &quot;peer_link_down_without_orphan_suspend&quot;: orphan_trap,\n        &quot;peer_link_down_with_orphan_suspend&quot;: orphan_fixed,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>type1_consistent: False</code> با <code>secondary_vpc_ports_state: 'SUSPENDED'</code>، و تغییر وضعیت پورت Orphan از <code>REMAINS_UP_BLACKHOLE_RISK</code> به <code>SUSPENDED (fails over cleanly)</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع پیکربندی vPC Domain روی Nexus 9000 (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference NX-OS vPC snippet (NOT executed on live Nexus)\nfeature vpc\nfeature lacp\nvpc domain 10\n peer-switch\n peer-gateway\n auto-recovery\n peer-keepalive destination 10.10.90.12 source 10.10.90.11 vrf management</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس Cisco NX-OS و معماری Nexus vPC",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در Cisco NX-OS، اگر پورت mgmt0 آدرس 10.10.90.11/24 داشته باشد، چرا ping 10.10.90.1 بدون ذکر VRF پاسخ نمی‌دهد؟",
+      "options": [
+        "چون mgmt0 فقط IPv6 دارد",
+        "چون دستور ping حذف شده است",
+        "چون باید feature ping روشن شود",
+        "چون پورت mgmt0 به‌طور پیش‌فرض درون VRF management ایزوله شده و باید ping 10.10.90.1 vrf management اجرا شود"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>جداسازی <code>mgmt0</code> در <code>vrf management</code> یکی از اولین تفاوت‌های کلیدی NX-OS با IOS است.</p>"
+    },
+    {
+      "title": "در یک Port-Channel عضو vPC، اگر MTU روی N9K-1 برابر 9216 و روی N9K-2 برابر 1500 تنظیم شود، چه رخ می‌دهد؟",
+      "options": [
+        "ناهماهنگی Type-1 Consistency رخ داده و پورت vPC ناسازگار (روی Secondary) Suspend می‌شود",
+        "ترافیک با دو برابر سرعت عبور می‌کند",
+        "پورت mgmt0 خاموش می‌شود",
+        "هر دو سوئیچ ریبوت می‌شوند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>MTU یک پارامتر Type-1 است و اختلاف آن موجب Suspend شدن پورت جهت پیشگیری از خرابی ترافیک می‌شود.</p>"
+    },
+    {
+      "title": "کاربرد اصلی لینک vPC Peer-Keepalive چیست؟",
+      "options": [
+        "حمل تمام ترافیک دیتابیس سرورها",
+        "ارسال پیام ضربان قلب سبک (UDP 3200) از یک مسیر L3 مجزا برای تشخیص زنده بودن همتا و جلوگیری از Split-Brain هنگام افت Peer-Link",
+        "جایگزینی پروتکل BGP",
+        "حذف نیاز به LACP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Peer-Keepalive هرگز ترافیک داده حمل نمی‌کند و باید از مسیری کاملاً مستقل از Peer-Link عبور کند.</p>"
+    },
+    {
+      "title": "تفاوت معماری اصلی میان Nexus vPC و Catalyst StackWise Virtual (SVL) چیست؟",
+      "options": [
+        "در vPC دو سوئیچ یک Control Plane واحد دارند",
+        "در vPC هر دو سوئیچ Nexus دارای دو Control Plane مستقل هستند (ارتقای مستقل و نبود Shared Fate)، اما در SVL دو سوئیچ یک Control Plane مشترک دارند",
+        "vPC از LACP پشتیبانی نمی‌کند",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>استقلال Control Plane دو Nexus مزیت کلیدی پایداری و ارتقای مستقل یک‌به‌یک vPC برای سرورهای Dual-Homed است (البته Orphan Portهای تک‌اتصالی روی گره در حال ارتقا همچنان قطعی دارند).</p>"
+    },
+    {
+      "title": "هنگام افت vPC Peer-Link در حالی که Peer-Keepalive هنوز زنده است، چه خطری متوجه یک Orphan Port متصل به Secondary است و راه‌حل چیست؟",
+      "options": [
+        "پورت Orphan سرعتش دو برابر می‌شود",
+        "هیچ خطری ندارد",
+        "پورت Orphan به‌طور پیش‌فرض UP می‌ماند و ترافیک آن Blackhole می‌شود؛ راه‌حل تنظیم vpc orphan-port suspend روی آن پورت است",
+        "Primary خاموش می‌شود"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بستن خودکار پورت Orphan روی Secondary اجازه می‌دهد کلاستر سرور/فایروال تمیز به گره متصل به Primary سوییچ کند.</p>"
+    },
+    {
+      "title": "قابلیت peer-gateway در دامنه vPC کدام مشکل عملیاتی خاص را حل می‌کند؟",
+      "options": [
+        "تغییر پورت UDP 3200 به TCP 80",
+        "حذف Peer-Link",
+        "تبدیل NX-OS به ACI",
+        "امکان مسیریابی محلی بسته‌هایی که برخی تجهیزات (مثل Storage/Load Balancer) به اشتباه با MAC فیزیکی همتا به جای Virtual MAC HSRP می‌فرستند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>بدون <code>peer-gateway</code> چنین بسته‌هایی به Peer-Link رفته و ممکن است توسط قانون Loop Avoidance Drop شوند.</p>"
+    },
+    {
+      "title": "چرا در NX-OS پیش از پیکربندی vPC یا BGP باید دستوراتی مانند feature vpc یا feature bgp را اجرا کرد؟",
+      "options": [
+        "زیرا NX-OS معماری ماژولار دارد و تا ویژگی فعال (feature) نشود، فرآیند آن بارگذاری نشده و دستوراتش در CLI ظاهر نمی‌شوند",
+        "برای فعال کردن پورت کنسول",
+        "برای حذف لایسنس",
+        "زیرا NX-OS فایل متنی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مدل <code>feature</code> مصرف حافظه و سطح حمله سیستم‌عامل دیتاسنتر را بهینه نگه می‌دارد.</p>"
+    },
+    {
+      "title": "نقش ویژگی peer-switch در پیکربندی vPC domain چیست؟",
+      "options": [
+        "خاموش کردن کل STP روی شبکه",
+        "اعلام یک Bridge ID واحد STP از هر دو Nexus تا هنگام افت Primary هیچ جابه‌جایی Root و وقفه همگرایی STP رخ ندهد",
+        "تغییر رمز عبور ادمین",
+        "تبدیل vPC به SVL"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>peer-switch</code> پایداری لایه ۲ و زمان همگرایی را در رخدادهای Failover به‌شدت بهبود می‌بخشد.</p>"
+    },
+    {
+      "title": "تنظیم auto-recovery در vPC چه سناریوی بحرانی را پوشش می‌دهد؟",
+      "options": [
+        "پاک کردن خودکار VLANها",
+        "ارسال خودکار ایمیل",
+        "بازگرداندن خودکار سرویس توسط Secondary به عنوان Primary اگر پس از قطعی برق کامل رک، تنها سوئیچ Secondary روشن شود و Primary بالا نیاید",
+        "جایگزینی Peer-Keepalive"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بدون <code>auto-recovery</code>، سوئیچ Secondary در نبود Primary پس از Boot پورت‌های vPC را بالا نمی‌آورد!</p>"
+    },
+    {
+      "title": "قانون جلوگیری از حلقه vPC (vPC Loop Avoidance Rule) چه می‌گوید؟",
+      "options": [
+        "فریم‌های دریافتی از هر پورت باید از همه پورت‌ها پخش شوند",
+        "ترافیک فقط از Primary عبور می‌کند",
+        "پورت Peer-Link فقط برای SSH است",
+        "فریمی که از طریق vPC Peer-Link وارد یک Nexus می‌شود، هرگز نباید از هیچ پورت عضو vPC دیگری روی همان Nexus خارج شود (مگر در شرایط استثنا مانند افت لینک طرف مقابل)"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>این قانون جایگزین مسدودسازی STP می‌شود و از برگشت ترافیک Broadcast/Multicast/Unknown Unicast و ایجاد حلقه جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "برای پشتیبانی ایمن از همسایگی OSPF/BGP با روتر یا فایروال متصل از طریق vPC روی SVI، کدام قابلیت NX-OS لازم است؟",
+      "options": [
+        "layer3 peer-router در vpc domain",
+        "disable lacp",
+        "no feature vpc",
+        "switchport mode access"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p><code>layer3 peer-router</code> اجازه می‌دهد هر دو همتای vPC بسته‌های روتینگ دریافتی از Peer-Link را بدون افت ناشی از قانون حلقه پردازش کنند.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "تست قطع فیبر روی دو Nexus 93180YC فیزیکی",
+        "تغییر MTU دیتاسنتر تولیدی",
+        "فقط متن نظری بدون کد",
+        "شبیه‌سازی محلی (Local Mock) در Python 3 برای بررسی Type-1 Consistency در MTU و مقایسه پورت Orphan با و بدون vpc orphan-port suspend"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سوئیچ Nexus واقعی متصل نیست.</p>"
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/spec_dc_nx-review-fa.md"
-  },
-  "integration": {
-   "recommendedPath": "fam-specializations",
-   "recommendedCourse": "spec-datacenter",
-   "blueprint": "/academy-assets/v5/blueprints/spec_dc_nx.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_dc_nx_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۵: مشروط کردن ادعای «ارتقای بدون قطعی vPC» در بخش ۳ و پرسش ۴ به سرورهای Dual-Homed (استثنای Orphan Portهای تک‌اتصالی، سازگاری Type-1 و پنجره نگهداری) طبق مستند رسمی NX-OS vPC."
-  ]
- }
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "spec_dc_nx",
+    "sources": [
+      "https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/interfaces/cisco-nexus-9000-series-nx-os-interfaces-configuration-guide-103x/m-configuring-vpcs.html",
+      "https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/104x/configuration/interfaces/cisco-nexus-9000-series-nx-os-interfaces-configuration-guide-104x/m-configuring-vpcs.html"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سوئیچ واقعی Cisco Nexus 9000 متصل نشده است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، قانون Loop Avoidance، layer3 peer-router و شبیه‌ساز Type-1 / Orphan Port."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/spec_dc_nx-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-specializations",
+      "recommendedCourse": "spec-datacenter",
+      "blueprint": "/academy-assets/v5/blueprints/spec_dc_nx.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/spec_dc_nx_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۵: مشروط کردن ادعای «ارتقای بدون قطعی vPC» در بخش ۳ و پرسش ۴ به سرورهای Dual-Homed (استثنای Orphan Portهای تک‌اتصالی، سازگاری Type-1 و پنجره نگهداری) طبق مستند رسمی NX-OS vPC."
+    ]
+  }
 }

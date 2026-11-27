@@ -14,12 +14,27 @@ import json
 SUPPORTED_SVL_FAMILIES = ("C9400", "C9500", "C9600")
 
 
+def _require_bool(val: object, name: str) -> bool:
+    if not isinstance(val, bool):
+        raise ValueError(f"{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})")
+    return val
+
+
 def is_svl_supported_model(model: str) -> bool:
+    if not isinstance(model, str) or not model.strip():
+        raise ValueError(f"model must be a non-empty str, got {model!r}")
     upper = model.strip().upper()
     return any(upper.startswith(prefix) for prefix in SUPPORTED_SVL_FAMILIES)
 
 
 def validate_svl_pair(sw1: dict, sw2: dict) -> list[str]:
+    for sname, sw in (("sw1", sw1), ("sw2", sw2)):
+        if not isinstance(sw, dict):
+            raise ValueError(f"{sname} must be a dict")
+        for key in ("model", "ios_xe", "license"):
+            val = sw.get(key)
+            if not isinstance(val, str) or not val.strip():
+                raise ValueError(f"{sname}['{key}'] must be a non-empty str, got {val!r}")
     errs = []
     if not is_svl_supported_model(sw1["model"]) or not is_svl_supported_model(sw2["model"]):
         errs.append(
@@ -35,9 +50,11 @@ def validate_svl_pair(sw1: dict, sw2: dict) -> list[str]:
 
 
 def simulate_svl_failure(svl_up: bool, dad_up: bool) -> dict:
-    if svl_up:
+    svl = _require_bool(svl_up, "svl_up")
+    dad = _require_bool(dad_up, "dad_up")
+    if svl:
         return {"sw1_role": "ACTIVE", "sw2_role": "STANDBY", "split_brain": False, "mec_active_uplinks": 2}
-    if not svl_up and not dad_up:
+    if not svl and not dad:
         # Both assume Active with identical virtual MAC/IP -> Split-Brain!
         return {"sw1_role": "ACTIVE", "sw2_role": "ACTIVE", "split_brain": True, "mec_active_uplinks": 2}
     # SVL down, DAD alive -> Former Active enters Recovery (shuts non-DAD ports), Standby takes over cleanly!
