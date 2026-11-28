@@ -147,7 +147,10 @@
   let presetIdx = 1;
   let remainingSec = presets[presetIdx] * 60;
   let timerHandle = null;
-  const todayKey = () => new Date().toISOString().slice(0, 10);
+  const todayKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
   const loadTodayMins = () => {
     try {
       const raw = JSON.parse(localStorage.getItem(TIMER_KEY) || '{}');
@@ -213,6 +216,7 @@
   pathCard.append(pathMeter, pathMeta);
 
   let totalCatalogLessons = 127;
+  let quickSearchLessons = [];
   const syncSidebarProgress = () => {
     const done = window.FamAcademyCatalog?.getCompletedSet ? window.FamAcademyCatalog.getCompletedSet().size : 0;
     const pct = totalCatalogLessons ? Math.round((done * 100) / totalCatalogLessons) : 0;
@@ -222,8 +226,20 @@
   fetch('/academy-assets/curriculum-catalog.json?v=20261123c', { cache: 'no-store' })
     .then(response => { if (!response.ok) throw new Error('catalog unavailable'); return response.json(); })
     .then(catalog => {
-      totalCatalogLessons = (catalog.paths || []).reduce((sum, path) =>
-        sum + (path.courses || []).reduce((courseSum, course) => courseSum + (course.lessons || []).length, 0), 0);
+      quickSearchLessons = (catalog.paths || []).flatMap(path =>
+        (path.courses || []).flatMap(course =>
+          (course.lessons || []).map(l => ({
+            id: l.id,
+            title: l.title || l.id,
+            titleEn: l.titleEn || '',
+            summary: l.summary || l.description || '',
+            course: course.title || '',
+            path: path.title || '',
+            hay: [l.title, l.titleEn, l.id, l.summary, l.description, course.title, ...(Array.isArray(l.keywords) ? l.keywords : [])].filter(Boolean).join(' ').toLowerCase()
+          }))
+        )
+      );
+      totalCatalogLessons = quickSearchLessons.length;
       if (lessonsPill) lessonsPill.textContent = totalCatalogLessons.toLocaleString('fa-IR');
       syncSidebarProgress();
     })
@@ -393,7 +409,8 @@
       else window.FamJourney?.renderProgress();
       root.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else if (act === 'coverage') {
-      clickExisting('btn-coverage');
+      if (location.hash !== '#/coverage') location.hash = '#/coverage';
+      else window.dispatchEvent(new CustomEvent('fam-open-coverage'));
       root.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else if (act === 'sample') {
       clickExisting('btn-blueprint');
@@ -435,17 +452,70 @@
     }
   });
 
-  search.addEventListener('click', () => {
-    const input = $('s4-search');
-    if (input) {
-      input.focus();
-      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  function openQuickSearch() {
+    let dialog = $('fam-qsearch-dialog');
+    if (!dialog) {
+      dialog = document.createElement('dialog');
+      dialog.id = 'fam-qsearch-dialog';
+      dialog.className = 'fam-qsearch-dialog';
+      dialog.setAttribute('aria-label', 'جست‌وجوی سریع درس‌ها');
+      const head = el('div', 'fam-qsearch-head');
+      const qInput = document.createElement('input');
+      qInput.type = 'search';
+      qInput.className = 'fam-qsearch-input';
+      qInput.placeholder = 'نام درس، پروتکل یا موضوع را بنویسید (مثلاً OSPF، VLAN، BGP، Terraform)…';
+      const closeBtn = el('button', 'btn', 'بستن');
+      closeBtn.type = 'button';
+      closeBtn.addEventListener('click', () => dialog.close());
+      head.append(qInput, closeBtn);
+      const list = el('div', 'fam-qsearch-list');
+      dialog.append(head, list);
+      const renderHits = (query) => {
+        const q = String(query || '').trim().toLowerCase();
+        const matches = q
+          ? quickSearchLessons.filter(item => item.hay.includes(q)).slice(0, 30)
+          : quickSearchLessons.slice(0, 12);
+        list.replaceChildren();
+        if (!matches.length) {
+          list.append(el('div', 'journey-empty', 'درسی با این عبارت پیدا نشد.'));
+          return;
+        }
+        matches.forEach(item => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'fam-qsearch-hit';
+          const title = el('strong', '', item.title);
+          const meta = el('small', '', `${item.path} · ${item.course}`);
+          btn.append(title, meta);
+          btn.addEventListener('click', () => {
+            dialog.close();
+            location.hash = '#' + encodeURIComponent(item.id);
+          });
+          list.append(btn);
+        });
+      };
+      qInput.addEventListener('input', () => renderHits(qInput.value));
+      dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+      dialog._renderHits = renderHits;
+      dialog._input = qInput;
+      document.body.append(dialog);
     }
-  });
+    if (typeof dialog.showModal === 'function') {
+      if (!dialog.open) dialog.showModal();
+      dialog._renderHits(dialog._input.value);
+      dialog._input.focus();
+      dialog._input.select();
+    } else {
+      const input = $('s4-search');
+      if (input) input.focus();
+    }
+  }
+
+  search.addEventListener('click', openQuickSearch);
   document.addEventListener('keydown', (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault();
-      search.click();
+      openQuickSearch();
     }
   });
 
@@ -489,6 +559,7 @@
     if (location.hash === '#/progress') setActive('progress');
     else if (location.hash === '#/paths') setActive('paths');
     else if (location.hash === '#/lab') setActive('lab');
+    else if (location.hash === '#/coverage') setActive('coverage');
     else setActive('home');
   };
   window.addEventListener('hashchange', syncHashState);

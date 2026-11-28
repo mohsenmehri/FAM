@@ -126,10 +126,28 @@
   "ip -br addr show": "[Educational Mock Output — NOT live Linux host]\nlo               UNKNOWN        127.0.0.1/8 ::1/128\neth0             UP             10.10.20.15/24 fe80::50:56ff:feab:1001/64",
   "ss -tulnp": "[Educational Mock Output — NOT live Linux host]\nNetid State  Recv-Q Send-Q Local Address:Port  Peer Address:Port Process\ntcp   LISTEN 0      128    0.0.0.0:22          0.0.0.0:*         users:((\"sshd\",pid=901))\ntcp   LISTEN 0      128    127.0.0.1:8765      0.0.0.0:*         users:((\"python3\",pid=1420))",
   "nso_cli --context admin show devices": "[Educational Mock Output — NOT live Cisco NSO]\nNAME      ADDRESS      PORT  NED-ID               ADMIN-STATE\nedge-r1   10.255.0.1   830   cisco-iosxe-nc-7.9   unlocked\ncore-sw1  10.255.0.2   830   cisco-iosxe-nc-7.9   unlocked",
-  "nso_cli --context admin show services": "[Educational Mock Output — NOT live Cisco NSO]\nSERVICE-INSTANCE         DEVICES             SYNC-STATUS\nl3vpn-corp-site1         edge-r1, core-sw1   in-sync"
+  "nso_cli --context admin show services": "[Educational Mock Output — NOT live Cisco NSO]\nSERVICE-INSTANCE         DEVICES             SYNC-STATUS\nl3vpn-corp-site1         edge-r1, core-sw1   in-sync",
+  "show version": "[Educational Mock Output — NOT live Cisco IOS-XE]\nCisco IOS XE Software, Version 17.09.04a (Simulated Educational Model)\nCisco IOS Software [Cupertino], Catalyst L3 Switch / C8000V Software, Version 17.9.4a\nSystem image file is \"bootflash:packages.conf\"\nUptime is 14 days, 6 hours, 22 minutes (simulated)\nConfiguration register is 0x2102",
+  "show ip protocols": "[Educational Mock Output — NOT live router]\n*** IP Routing is NSF aware ***\nRouting Protocol is \"ospf 1\"\n  Outgoing update filter list for all interfaces is not set\n  Router ID 10.255.0.1\n  Number of areas in this router is 1. 1 normal 0 stub 0 nssa\n  Routing for Networks:\n    10.0.12.0 0.0.0.3 area 0\n    10.10.0.0 0.0.255.255 area 0\n  Routing Information Sources:\n    Gateway         Distance      Last Update\n    10.255.0.2           110      00:08:14\n  Distance: (default is 110)",
+  "show ip ospf interface": "[Educational Mock Output — NOT live router]\nGigabitEthernet0/0 is up, line protocol is up\n  Internet Address 10.0.12.1/30, Interface ID 1, Area 0\n  Process ID 1, Router ID 10.255.0.1, Network Type POINT_TO_POINT, Cost: 1\n  Transmit Delay is 1 sec, State POINT_TO_POINT\n  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5\n  Adjacent with neighbor 10.255.0.2 (FULL)",
+  "show ip ospf interface brief": "[Educational Mock Output — NOT live router]\nInterface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C\nLo0          1     0               10.255.0.1/32      1     LOOP  0/0\nGi0/0        1     0               10.0.12.1/30       1     P2P   1/1\nGi0/1        1     0               10.10.10.1/24      1     DR    0/0",
+  "show ip ospf database": "[Educational Mock Output — NOT live router]\n            OSPF Router with ID (10.255.0.1) (Process ID 1)\n                Router Link States (Area 0)\nLink ID         ADV Router      Age         Seq#       Checksum Link count\n10.255.0.1      10.255.0.1      412         0x80000007 0x00A14C 3\n10.255.0.2      10.255.0.2      398         0x80000006 0x008F12 2",
+  "show ip eigrp neighbors": "[Educational Mock Output — NOT live router]\nEIGRP-IPv4 Neighbors for AS(100)\nH   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq\n                                                   (sec)         (ms)       Cnt Num\n0   10.0.12.2               Gi0/0                    12 04:18:10   11   100  0  48",
+  "show ip bgp neighbors": "[Educational Mock Output — NOT live router]\nBGP neighbor is 10.0.12.2,  remote AS 65200, external link\n  BGP version 4, remote router ID 10.255.0.2\n  BGP state = Established, up for 03:42:19\n  Hold time is 180, keepalive interval is 60 seconds\n  Address tracking is enabled, the RIB does have a route to 10.0.12.2\n  Prefixes Current: 24 (Consumes 4224 bytes)",
+  "show startup-config": "[Educational Mock Output — NOT live router]\n! Simulated NVRAM startup-config\nhostname FAM-LAB\ninterface GigabitEthernet0/0\n ip address 10.0.12.1 255.255.255.252\n no shutdown\nend",
+  "show lldp neighbors": "[Educational Mock Output — NOT live switch]\nCapability codes: (R) Router, (B) Bridge, (T) Telephone, (W) WLAN Access Point\nDevice ID           Local Intf     Hold-time  Capability      Port ID\nDIST-SW2            Gi0/0          120        B,R             Gi0/0\nAP-FLOOR2           Gi0/2          120        W,B             Gi0"
 };
 
   const ALIASES = {
+    'sh ver': 'show version',
+    'sh ip prot': 'show ip protocols',
+    'sh ip ospf int': 'show ip ospf interface',
+    'sh ip ospf int br': 'show ip ospf interface brief',
+    'sh ip ospf db': 'show ip ospf database',
+    'sh ip eigrp nei': 'show ip eigrp neighbors',
+    'sh ip bgp nei': 'show ip bgp neighbors',
+    'sh start': 'show startup-config',
+    'sh lldp nei': 'show lldp neighbors',
     'sh ip int br': 'show ip interface brief',
     'sh int status': 'show interfaces status',
     'sh int trunk': 'show interfaces trunk',
@@ -275,8 +293,93 @@
       mode: 'priv', // 'user' (>), 'priv' (#), 'config' ((config)#), 'config-if' ((config-if)#)
       activeInterface: null,
       voiceVlans: {},
+      interfaces: {},
+      vlans: {},
       history: []
     };
+
+    function ensureIf(name) {
+      if (!state.interfaces[name]) {
+        state.interfaces[name] = {
+          ip: 'unassigned',
+          mask: '',
+          adminDown: false,
+          description: '',
+          mode: '',
+          accessVlan: null,
+          voiceVlan: null
+        };
+      }
+      return state.interfaces[name];
+    }
+
+    function renderStatefulShow(cmdKey) {
+      const base = CLI_DB[cmdKey] || '';
+      const ifNames = Object.keys(state.interfaces);
+      if (cmdKey === 'show ip interface brief' && ifNames.length) {
+        const extra = ifNames.map(name => {
+          const cfg = state.interfaces[name];
+          const status = cfg.adminDown ? 'administratively down' : 'up';
+          const proto = cfg.adminDown ? 'down' : 'up';
+          return `${name.padEnd(23, ' ')} ${String(cfg.ip).padEnd(15, ' ')} YES manual ${status.padEnd(21, ' ')} ${proto}`;
+        }).join('\n');
+        return `${base}\n--- Session Configured Interfaces (Stateful Mock) ---\n${extra}`;
+      }
+      if (cmdKey === 'show interfaces status' && ifNames.length) {
+        const extra = ifNames.map(name => {
+          const cfg = state.interfaces[name];
+          const st = cfg.adminDown ? 'disabled' : 'connected';
+          const vl = cfg.mode === 'trunk' ? 'trunk' : (cfg.accessVlan ? String(cfg.accessVlan) : '1');
+          const vNote = cfg.voiceVlan ? ` (voice:${cfg.voiceVlan})` : '';
+          const desc = cfg.description ? cfg.description.slice(0, 18) : 'session-cfg';
+          return `${name.padEnd(12, ' ')} ${desc.padEnd(18, ' ')} ${st.padEnd(10, ' ')} ${(vl + vNote).padEnd(14, ' ')} a-full  a-1000 10/100/1000BaseTX`;
+        }).join('\n');
+        return `${base}\n--- Session Configured Ports (Stateful Mock) ---\n${extra}`;
+      }
+      if (cmdKey === 'show vlan brief' && (Object.keys(state.vlans).length || ifNames.some(n => state.interfaces[n].accessVlan))) {
+        const vlanMap = { ...state.vlans };
+        ifNames.forEach(n => {
+          const vid = state.interfaces[n].accessVlan;
+          if (vid) vlanMap[vid] = vlanMap[vid] || { name: `VLAN${String(vid).padStart(4, '0')}`, ports: [] };
+          if (vid && !vlanMap[vid].ports.includes(n)) vlanMap[vid].ports.push(n);
+        });
+        const extra = Object.keys(vlanMap).sort((a, b) => Number(a) - Number(b)).map(vid => {
+          const v = vlanMap[vid];
+          return `${String(vid).padEnd(4, ' ')} ${String(v.name || 'VLAN' + vid).padEnd(32, ' ')} active    ${(v.ports || []).join(', ')}`;
+        }).join('\n');
+        return `${base}\n--- Session Created VLANs (Stateful Mock) ---\n${extra}`;
+      }
+      if (cmdKey === 'show running-config') {
+        const lines = [
+          '[Educational Stateful Mock — NOT live Cisco IOS device]',
+          '!',
+          `hostname ${state.host}`,
+          '!'
+        ];
+        Object.keys(state.vlans).sort((a, b) => Number(a) - Number(b)).forEach(vid => {
+          lines.push(`vlan ${vid}`);
+          if (state.vlans[vid].name) lines.push(` name ${state.vlans[vid].name}`);
+          lines.push('!');
+        });
+        ifNames.forEach(name => {
+          const cfg = state.interfaces[name];
+          lines.push(`interface ${name}`);
+          if (cfg.description) lines.push(` description ${cfg.description}`);
+          if (cfg.mode) lines.push(` switchport mode ${cfg.mode}`);
+          if (cfg.accessVlan) lines.push(` switchport access vlan ${cfg.accessVlan}`);
+          if (cfg.voiceVlan) lines.push(` switchport voice vlan ${cfg.voiceVlan}`);
+          if (cfg.ip && cfg.ip !== 'unassigned' && cfg.mask) lines.push(` ip address ${cfg.ip} ${cfg.mask}`);
+          lines.push(cfg.adminDown ? ' shutdown' : ' no shutdown');
+          lines.push('!');
+        });
+        if (!ifNames.length && !Object.keys(state.vlans).length) {
+          return base.replace(/hostname\s+\S+/i, `hostname ${state.host}`);
+        }
+        lines.push('end');
+        return lines.join('\n');
+      }
+      return base;
+    }
 
     function prompt() {
       if (state.mode === 'user') return `${state.host}> `;
@@ -292,16 +395,27 @@
       const lower = input.toLowerCase().replace(/\s+/g, ' ');
       const normalized = ALIASES[lower] || lower;
 
+      if (normalized.startsWith('do ') && (state.mode === 'config' || state.mode === 'config-if')) {
+        const subCmd = input.slice(3).trim();
+        const savedMode = state.mode;
+        const savedIf = state.activeInterface;
+        state.mode = 'priv';
+        const res = execute(subCmd);
+        state.mode = savedMode;
+        state.activeInterface = savedIf;
+        return { ...res, prompt: prompt() };
+      }
+
       if (normalized === 'clear') {
         return { output: '', clear: true, prompt: prompt(), matched: true };
       }
       if (normalized === 'help' || normalized === '?') {
         return {
           output: [
-            'شبیه‌ساز آموزشی CLI سمت مرورگر (Mock — بدون اتصال به تجهیز واقعی):',
-            'حالت‌ها: enable | disable | configure terminal | interface <name> | hostname <NAME> | switchport voice vlan <1-4094> | exit | end | clear',
+            'شبیه‌ساز آموزشی CLI سمت مرورگر (Stateful Mock — بدون اتصال به تجهیز واقعی):',
+            'حالت‌ها و پیکربندی Stateful: enable | disable | configure terminal | hostname <NAME> | vlan <1-4094> | interface <name> | ip address <IPv4> <MASK> | no shutdown | shutdown | description <text> | switchport mode access|trunk | switchport access vlan <1-4094> | switchport voice vlan <1-4094> | do <show ...> | exit | end | clear',
             'تست IP معتبر (IPv4/IPv6): ping <valid-ip> | traceroute <valid-ip>',
-            'نمونه فرمان‌های مرجع پشتیبانی‌شده: show ip interface brief | show vlan brief | show interfaces trunk | show vlan private-vlan | show etherchannel summary | show standby brief | show ip ospf neighbor | show ip eigrp topology | show ip bgp summary | show ip bgp | show ip route | show ip cef | show policy-map interface | show ip mroute | show dmvpn | show ntp associations | show authentication sessions | show sdwan control connections | show sdwan bfd sessions | show sip-ua calls | show netconf-yang sessions | terraform plan | ansible-playbook site.yml --check --diff'
+            'نمونه فرمان‌های نمایشی: show version | show running-config | show ip interface brief | show interfaces status | show vlan brief | show interfaces trunk | show ip protocols | show ip ospf neighbor | show ip ospf interface | show ip eigrp topology | show ip bgp summary | show ip route | show ip cef | show lldp neighbors | terraform plan | ansible-playbook site.yml --check --diff'
           ].join('\n'),
           prompt: prompt(),
           matched: true
@@ -338,6 +452,18 @@
         else if (state.mode === 'priv') { state.mode = 'user'; }
         return { output: '', prompt: prompt(), matched: true };
       }
+      if (normalized.startsWith('vlan ')) {
+        if (state.mode !== 'config' && state.mode !== 'config-if') {
+          return { output: '% دستور vlan فقط در حالت (config)# مجاز است. ابتدا configure terminal وارد کنید.', prompt: prompt(), matched: false };
+        }
+        const vidStr = normalized.slice(5).trim();
+        if (!/^[1-9][0-9]{0,3}$/.test(vidStr) || Number(vidStr) > 4094) {
+          return { output: '% شناسه VLAN نامعتبر است (عدد صحیح بین 1 تا 4094 وارد کنید).', prompt: prompt(), matched: false };
+        }
+        const vid = Number(vidStr);
+        state.vlans[vid] = state.vlans[vid] || { name: `VLAN${String(vid).padStart(4, '0')}`, ports: [] };
+        return { output: `[Stateful Mock] VLAN ${vid} created/updated. با show vlan brief یا show running-config بررسی کنید.`, prompt: prompt(), matched: true };
+      }
       if (normalized.startsWith('interface ')) {
         if (state.mode !== 'config' && state.mode !== 'config-if') {
           return { output: '% دستور interface فقط در حالت (config)# مجاز است. ابتدا configure terminal وارد کنید.', prompt: prompt(), matched: false };
@@ -348,7 +474,69 @@
         }
         state.mode = 'config-if';
         state.activeInterface = ifName;
+        ensureIf(ifName);
         return { output: `[Mock] Selected interface ${ifName}`, prompt: prompt(), matched: true };
+      }
+      if (normalized.startsWith('ip address ')) {
+        if (state.mode !== 'config-if') {
+          return { output: '% دستور ip address فقط در حالت (config-if)# مجاز است (configure terminal -> interface <name>).', prompt: prompt(), matched: false };
+        }
+        const parts = input.slice(11).trim().split(/\s+/);
+        if (parts.length !== 2 || !isValidIPv4(parts[0]) || !isValidIPv4(parts[1])) {
+          return { output: '% قالب صحیح: ip address <IPv4> <Subnet-Mask> (مثلاً ip address 10.10.10.1 255.255.255.0).', prompt: prompt(), matched: false };
+        }
+        const cfg = ensureIf(state.activeInterface);
+        cfg.ip = parts[0];
+        cfg.mask = parts[1];
+        return { output: `[Stateful Mock] IP ${parts[0]} ${parts[1]} configured on ${state.activeInterface}.`, prompt: prompt(), matched: true };
+      }
+      if (normalized === 'no shutdown' || normalized === 'no shut') {
+        if (state.mode !== 'config-if') {
+          return { output: '% دستور no shutdown فقط در حالت (config-if)# مجاز است.', prompt: prompt(), matched: false };
+        }
+        const cfg = ensureIf(state.activeInterface);
+        cfg.adminDown = false;
+        return { output: `%LINK-3-UPDOWN: Interface ${state.activeInterface}, changed state to up (Stateful Mock)`, prompt: prompt(), matched: true };
+      }
+      if (normalized === 'shutdown' || normalized === 'shut') {
+        if (state.mode !== 'config-if') {
+          return { output: '% دستور shutdown فقط در حالت (config-if)# مجاز است.', prompt: prompt(), matched: false };
+        }
+        const cfg = ensureIf(state.activeInterface);
+        cfg.adminDown = true;
+        return { output: `%LINK-5-CHANGED: Interface ${state.activeInterface}, changed state to administratively down (Stateful Mock)`, prompt: prompt(), matched: true };
+      }
+      if (normalized.startsWith('description ')) {
+        if (state.mode !== 'config-if') {
+          return { output: '% دستور description فقط در حالت (config-if)# مجاز است.', prompt: prompt(), matched: false };
+        }
+        const cfg = ensureIf(state.activeInterface);
+        cfg.description = input.slice(12).trim().slice(0, 64);
+        return { output: `[Stateful Mock] Description set on ${state.activeInterface}.`, prompt: prompt(), matched: true };
+      }
+      if (normalized === 'switchport mode access' || normalized === 'switchport mode trunk') {
+        if (state.mode !== 'config-if') {
+          return { output: '% دستور switchport mode فقط در حالت (config-if)# مجاز است.', prompt: prompt(), matched: false };
+        }
+        const modeVal = normalized.endsWith('trunk') ? 'trunk' : 'access';
+        ensureIf(state.activeInterface).mode = modeVal;
+        return { output: `[Stateful Mock] ${state.activeInterface} switchport mode set to ${modeVal}.`, prompt: prompt(), matched: true };
+      }
+      if (normalized.startsWith('switchport access vlan ')) {
+        if (state.mode !== 'config-if') {
+          return { output: '% دستور switchport access vlan فقط در حالت (config-if)# مجاز است.', prompt: prompt(), matched: false };
+        }
+        const vidStr = normalized.slice(23).trim();
+        if (!/^[1-9][0-9]{0,3}$/.test(vidStr) || Number(vidStr) > 4094) {
+          return { output: '% شناسه VLAN نامعتبر است (عدد صحیح بین 1 تا 4094 وارد کنید).', prompt: prompt(), matched: false };
+        }
+        const vid = Number(vidStr);
+        const cfg = ensureIf(state.activeInterface);
+        cfg.accessVlan = vid;
+        if (!cfg.mode) cfg.mode = 'access';
+        state.vlans[vid] = state.vlans[vid] || { name: `VLAN${String(vid).padStart(4, '0')}`, ports: [] };
+        if (!state.vlans[vid].ports.includes(state.activeInterface)) state.vlans[vid].ports.push(state.activeInterface);
+        return { output: `[Stateful Mock] Access VLAN ${vid} assigned to ${state.activeInterface}.`, prompt: prompt(), matched: true };
       }
       if (normalized.startsWith('switchport voice vlan ')) {
         if (state.mode !== 'config-if') {
@@ -359,6 +547,7 @@
           return { output: '% شناسه VLAN نامعتبر است (عدد صحیح بین 1 تا 4094 وارد کنید).', prompt: prompt(), matched: false };
         }
         state.voiceVlans[state.activeInterface] = Number(vidStr);
+        ensureIf(state.activeInterface).voiceVlan = Number(vidStr);
         return { output: `[Simulated Mock] Voice VLAN ${vidStr} assigned to ${state.activeInterface} (not applied to live hardware).`, prompt: prompt(), matched: true };
       }
       if (normalized.startsWith('hostname ')) {
@@ -394,11 +583,11 @@
       }
 
       if (Object.prototype.hasOwnProperty.call(CLI_DB, normalized)) {
-        return { output: CLI_DB[normalized], prompt: prompt(), matched: true };
+        return { output: renderStatefulShow(normalized), prompt: prompt(), matched: true };
       }
       const prefixHits = Object.keys(CLI_DB).filter(k => k.startsWith(normalized));
       if (prefixHits.length === 1) {
-        return { output: CLI_DB[prefixHits[0]], prompt: prompt(), matched: true };
+        return { output: renderStatefulShow(prefixHits[0]), prompt: prompt(), matched: true };
       }
 
       return {
@@ -484,6 +673,11 @@
       promptSpan.textContent = res.prompt;
       input.value = '';
       histIndex = session.state.history.length;
+      if (trimmed && res.matched && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('fam-cli-executed', {
+          detail: { cmd: trimmed, matched: res.matched, lessonId: bp.lessonId || bp.id || '' }
+        }));
+      }
       return res;
     }
 

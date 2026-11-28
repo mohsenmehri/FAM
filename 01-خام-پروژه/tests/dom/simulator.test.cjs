@@ -18,12 +18,12 @@ async function testStandaloneSimulator() {
   w.eval(simSrc);
   const api = w.FamAcademySimulator;
   assert.ok(api);
-  assert.equal(api.commandCount, 125);
+  assert.equal(api.commandCount, 134);
   assert.equal(api.exactScenarioCount, 47);
 
   // 1. ZERO placeholder responses across all registered CLI commands
   const cmds = api.getSupportedCommands();
-  assert.equal(cmds.length, 125);
+  assert.equal(cmds.length, 134);
   for (const cmd of cmds) {
     assert.ok(!/^#/.test(cmd), `comment key leaked into CLI_DB: ${cmd}`);
     const out = String(api.getCommandOutput(cmd) || '');
@@ -107,7 +107,19 @@ async function testStandaloneSimulator() {
   assert.equal(card.querySelector('[data-sim-prompt]').textContent, 'EDGE-BGP1(config)# ');
   mounted.runCommand('hostname CORE-R9');
   assert.equal(card.querySelector('[data-sim-prompt]').textContent, 'CORE-R9(config)# ');
+  mounted.runCommand('vlan 50');
   mounted.runCommand('interface GigabitEthernet0/1');
+  assert.equal(mounted.runCommand('ip address 10.50.0.1 255.255.255.0').matched, true);
+  assert.equal(mounted.runCommand('no shutdown').matched, true);
+  assert.equal(mounted.runCommand('switchport access vlan 50').matched, true);
+  const doBrief = mounted.runCommand('do show ip interface brief');
+  assert.equal(doBrief.matched, true);
+  assert.match(doBrief.output, /10\.50\.0\.1/);
+  assert.match(mounted.runCommand('do show running-config').output, /hostname CORE-R9/);
+  assert.match(mounted.runCommand('do show vlan brief').output, /50\s+VLAN0050/);
+  assert.equal(mounted.runCommand('do show ip protocols').matched, true);
+  assert.equal(mounted.runCommand('do show ip ospf interface').matched, true);
+  assert.equal(mounted.runCommand('do show version').matched, true);
   assert.equal(card.querySelector('[data-sim-prompt]').textContent, 'CORE-R9(config-if)# ');
   const okVoice = mounted.runCommand('switchport voice vlan 20');
   assert.equal(okVoice.matched, true);

@@ -25,9 +25,11 @@ const choice = (i, n) => quiz().querySelector(`input[name="lesson-question-${i}"
 assert.equal(quiz().querySelectorAll('fieldset').length, 12);
 grade();
 assert.match(result(), /نمره: 0 از ۱۰/);
+assert.equal([...quiz().querySelectorAll('input[type="radio"]')].every(el => el.disabled), true, 'quiz options must lock after submission');
 assert.equal(persisted.at(-1).labs.quizAttempts[bp.lessonId].unanswered, 12);
 assert.equal(persisted.at(-1).labs.quizAttempts[bp.lessonId].correct, 0);
 retry();
+assert.equal([...quiz().querySelectorAll('input[type="radio"]')].every(el => !el.disabled), true, 'quiz options must unlock on retry');
 assert.equal(result(), '');
 assert.equal(quiz().querySelectorAll('input:checked').length, 0);
 choice(0,bp.interactiveQuiz[0].correctIndex);

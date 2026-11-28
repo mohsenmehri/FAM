@@ -38,7 +38,7 @@ class SerializationTests(unittest.TestCase):
         catalog = json.loads((ROOT / 'server/www/academy-assets/curriculum-catalog.json').read_text())
         items = [l for p in catalog['paths'] for c in p['courses'] for l in c['lessons'] if l['id']=='auto_05']
         self.assertEqual(len(items), 1)
-        self.assertEqual(items[0]['prerequisites'], [])
+        self.assertEqual(items[0]['prerequisites'], ['auto_02'])
         self.assertIn('بازبینی مستقل انسانی انجام نشده', bp['reviewStatus'])
 
 if __name__ == '__main__': unittest.main()

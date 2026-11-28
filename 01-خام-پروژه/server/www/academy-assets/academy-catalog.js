@@ -86,7 +86,7 @@
         </svg>
         <div class="hero-topo-caption">
           <span>توپولوژی نمادین مسیر یادگیری از مبانی تا معماری شبکه</span>
-          <span class="ltr">CLI Sim · 125 cmds</span>
+          <span class="ltr">CLI Sim · ${Number(window.FamAcademySimulator?.commandCount || 134)} cmds</span>
         </div>
       </div>`;
   }
@@ -101,17 +101,53 @@
     return { done, total, pct: total ? Math.round(done / total * 100) : 0 };
   }
 
-  function loadDailyMissions() {
-    const today = new Date().toISOString().slice(0, 10);
+  function localDateKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function loadMissionRecord() {
+    const today = localDateKey();
     try {
       const raw = JSON.parse(localStorage.getItem(MISSION_KEY) || '{}');
-      if (raw.day === today && raw.done && typeof raw.done === 'object') return raw.done;
+      if (raw.day === today && raw.done && typeof raw.done === 'object') {
+        return { day: today, done: raw.done, cliCount: Math.max(0, Number(raw.cliCount) || 0) };
+      }
     } catch (_) {}
-    return {};
+    return { day: today, done: {}, cliCount: 0 };
   }
+  function saveMissionRecord(record) {
+    try {
+      localStorage.setItem(MISSION_KEY, JSON.stringify({
+        day: localDateKey(),
+        done: record.done || {},
+        cliCount: Math.max(0, Number(record.cliCount) || 0)
+      }));
+    } catch (_) {}
+  }
+  function loadDailyMissions() { return loadMissionRecord().done; }
   function saveDailyMissions(doneMap) {
-    const today = new Date().toISOString().slice(0, 10);
-    try { localStorage.setItem(MISSION_KEY, JSON.stringify({ day: today, done: doneMap })); } catch (_) {}
+    const rec = loadMissionRecord();
+    rec.done = doneMap;
+    saveMissionRecord(rec);
+  }
+  if (!window.__famMissionsWired && typeof window.addEventListener === 'function') {
+    window.__famMissionsWired = true;
+    window.addEventListener('fam-lesson-opened', () => {
+      const rec = loadMissionRecord();
+      rec.done['study-one'] = true;
+      saveMissionRecord(rec);
+    });
+    window.addEventListener('fam-cli-executed', () => {
+      const rec = loadMissionRecord();
+      rec.cliCount = (rec.cliCount || 0) + 1;
+      if (rec.cliCount >= 3) rec.done['cli-practice'] = true;
+      saveMissionRecord(rec);
+    });
+    window.addEventListener('fam-quiz-graded', () => {
+      const rec = loadMissionRecord();
+      rec.done['quiz-check'] = true;
+      saveMissionRecord(rec);
+    });
   }
 
   function renderDashboard(container, catalog, onOpenLesson) {
@@ -137,11 +173,13 @@
     const greeting = user && user !== 'e2e-test-user' ? `سلام ${esc(user)}؛ ` : '';
     const level = ({ beginner: 'سطح پایه', intermediate: 'سطح میانی', advanced: 'سطح پیشرفته' })[profile.level] || 'مسیر منعطف';
     const nodes = target.slice(0, 6);
-    const missionsState = loadDailyMissions();
+    const missionRec = loadMissionRecord();
+    const missionsState = missionRec.done;
+    const cliCount = Math.min(3, missionRec.cliCount || 0);
     const dailyMissions = [
-      { id: 'study-one', title: 'مطالعه حداقل ۱ درس و مرور بخش‌های کلیدی', badge: '۲۰ دقیقه' },
-      { id: 'cli-practice', title: 'اجرای حداقل ۳ دستور تشخیصی در شبیه‌ساز CLI', badge: 'عملی' },
-      { id: 'quiz-check', title: 'پاسخ‌دهی به آزمون ۱۲سؤالی یک درس و بررسی نکات', badge: 'ارزیابی' }
+      { id: 'study-one', title: 'مطالعه حداقل ۱ درس و مرور بخش‌های کلیدی', badge: missionsState['study-one'] ? 'ثبت خودکار ✓' : '۲۰ دقیقه' },
+      { id: 'cli-practice', title: 'اجرای حداقل ۳ دستور تشخیصی در شبیه‌ساز CLI', badge: missionsState['cli-practice'] ? '۳/۳ ✓' : `${cliCount.toLocaleString('fa-IR')}/۳ عملي` },
+      { id: 'quiz-check', title: 'پاسخ‌دهی به آزمون ۱۲سؤالی یک درس و بررسی نکات', badge: missionsState['quiz-check'] ? 'ثبت خودکار ✓' : 'ارزیابی' }
     ];
 
     container.innerHTML = `
@@ -169,7 +207,7 @@
           <article class="mission-card">
             <span class="journey-kicker">DAILY MISSIONS</span>
             <h2 style="margin:4px 0 2px;font-size:18px">مأموریت‌های مطالعه امروز</h2>
-            <p style="margin:0;font-size:12.5px;color:var(--muted)">چک‌لیست شخصی روزانه (ذخیره محلی در مرورگر شما)</p>
+            <p style="margin:0;font-size:12.5px;color:var(--muted)">با مطالعه درس، اجرای ۳ فرمان CLI و ثبت آزمون به‌صورت خودکار تیک می‌خورند (قابل ویرایش دستی)</p>
             <div class="mission-list">
               ${dailyMissions.map(m => `
                 <label class="mission-item ${missionsState[m.id] ? 'is-done' : ''}">
@@ -494,5 +532,86 @@
     mountSelected();
   }
 
-  window.FamAcademyCatalog = { getCompletedSet, calcCourseProgress, calcPathProgress, renderDashboard, renderPathRoadmap, renderLabWorkbench };
+  function renderCoverageView(container, catalog, onOpenLesson) {
+    const sim = window.FamAcademySimulator;
+    const cmds = sim && typeof sim.getSupportedCommands === 'function' ? sim.getSupportedCommands() : [];
+    const statefulCmds = [
+      { cmd: 'configure terminal', cat: 'Stateful Config', note: 'ورود به حالت پیکربندی سراسری (config)#' },
+      { cmd: 'hostname <NAME>', cat: 'Stateful Config', note: 'تغییر نام دستگاه و انعکاس در running-config' },
+      { cmd: 'vlan <1-4094>', cat: 'Stateful Config', note: 'ساخت VLAN جدید و نمایش در show vlan brief' },
+      { cmd: 'interface <name>', cat: 'Stateful Config', note: 'انتخاب اینترفیس و ورود به (config-if)#' },
+      { cmd: 'ip address <IPv4> <MASK>', cat: 'Stateful Config', note: 'تنظیم IPv4 و انعکاس در show ip interface brief' },
+      { cmd: 'no shutdown / shutdown', cat: 'Stateful Config', note: 'فعال/غیرفعال‌سازی وضعیت لینک اینترفیس' },
+      { cmd: 'switchport mode access|trunk', cat: 'Stateful Config', note: 'تعیین حالت پورت لایه ۲' },
+      { cmd: 'switchport access vlan <1-4094>', cat: 'Stateful Config', note: 'تخصیص VLAN دسترسی و ثبت در جدول VLAN' },
+      { cmd: 'switchport voice vlan <1-4094>', cat: 'Stateful Config', note: 'تخصیص VLAN صوتی به پورت' },
+      { cmd: 'do <show ...>', cat: 'Stateful Config', note: 'اجرای فرمان‌های show بدون خروج از حالت config' }
+    ];
+    const classify = c => {
+      const s = c.toLowerCase();
+      if (/^(terraform|ansible|git|python|pip|yamllint|curl|ssh|openssl|nso_cli|ip -br|ss )/.test(s) || /netconf|restconf|yang/.test(s)) return 'Automation & Linux';
+      if (/ospf|eigrp|bgp|route|cef|vrf|bfd|mroute|rpf|protocols/.test(s)) return 'Routing & L3';
+      if (/vlan|trunk|mac|spanning|etherchannel|vpc|fex|cdp|lldp|interfaces status/.test(s)) return 'Switching & L2';
+      if (/sdwan|dmvpn|crypto|acl|access-lists|auth|aaa|cts|ssh|policy-map|ntp|nat|dhcp/.test(s)) return 'Security, QoS & WAN';
+      return 'Core IOS & Platform';
+    };
+    const allItems = [
+      ...statefulCmds,
+      ...cmds.map(c => ({ cmd: c, cat: classify(c), note: 'خروجی مرجع آموزشی (Mock)' }))
+    ];
+    const categories = ['همه', 'Stateful Config', 'Switching & L2', 'Routing & L3', 'Security, QoS & WAN', 'Automation & Linux', 'Core IOS & Platform'];
+    let activeCat = 'همه';
+    let query = '';
+
+    container.innerHTML = `
+      <div class="coverage-view">
+        <div class="journey-progress-head">
+          <div>
+            <span class="journey-kicker">CLI COMMAND COVERAGE</span>
+            <h1>پوشش فرمان‌های IOS و NetDevOps</h1>
+            <p>فهرست کامل ${(cmds.length + statefulCmds.length).toLocaleString('fa-IR')} فرمان پشتیبانی‌شده در شبیه‌ساز آموزشی (شامل ${statefulCmds.length.toLocaleString('fa-IR')} فرمان پیکربندی Stateful و ${cmds.length.toLocaleString('fa-IR')} فرمان نمایشی و ابزار NetOps).</p>
+          </div>
+          <button type="button" class="journey-primary small" id="cov-go-lab">تمرین در آزمایشگاه CLI ←</button>
+        </div>
+        <div class="coverage-toolbar">
+          <input type="search" id="cov-search" class="coverage-search" placeholder="جست‌وجوی فرمان (مثلاً ospf، vlan، bgp، ip address، terraform)…">
+          <div class="roadmap-path-tabs" id="cov-tabs">
+            ${categories.map(cat => `<button type="button" class="roadmap-path-tab ${cat === activeCat ? 'active' : ''}" data-cov-cat="${esc(cat)}">${esc(cat)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="coverage-grid" id="cov-grid"></div>
+      </div>`;
+
+    const grid = container.querySelector('#cov-grid');
+    const renderGrid = () => {
+      const q = query.trim().toLowerCase();
+      const filtered = allItems.filter(it => {
+        if (activeCat !== 'همه' && it.cat !== activeCat) return false;
+        if (q && !(it.cmd.toLowerCase().includes(q) || it.cat.toLowerCase().includes(q) || it.note.toLowerCase().includes(q))) return false;
+        return true;
+      });
+      if (!filtered.length) {
+        grid.innerHTML = '<div class="journey-empty">فرمانی با این فیلتر پیدا نشد.</div>';
+        return;
+      }
+      grid.innerHTML = filtered.map(it => `
+        <article class="coverage-cmd-card">
+          <code>${esc(it.cmd)}</code>
+          <div class="coverage-cmd-meta"><span>${esc(it.cat)}</span><span>${esc(it.note)}</span></div>
+        </article>`).join('');
+    };
+
+    container.querySelector('#cov-go-lab').onclick = () => { location.hash = '#/lab'; };
+    container.querySelector('#cov-search').addEventListener('input', e => { query = e.target.value || ''; renderGrid(); });
+    container.querySelectorAll('[data-cov-cat]').forEach(btn => {
+      btn.onclick = () => {
+        activeCat = btn.dataset.covCat;
+        container.querySelectorAll('[data-cov-cat]').forEach(b => b.classList.toggle('active', b === btn));
+        renderGrid();
+      };
+    });
+    renderGrid();
+  }
+
+  window.FamAcademyCatalog = { getCompletedSet, calcCourseProgress, calcPathProgress, renderDashboard, renderPathRoadmap, renderLabWorkbench, renderCoverageView };
 })();

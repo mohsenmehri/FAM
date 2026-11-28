@@ -362,7 +362,41 @@
     // A stage and a section may share an ID. Keep both without duplicate DOM IDs.
     const used = new Set();
     if (sections.length || stages.length) {
-      return [...sections, ...stages].map((s, i) => {
+      const stripPlain = h => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      const combinedSecPlain = sections.map(s => stripPlain(s.html)).join(' ');
+      const cleanedStages = stages.map(st => {
+        if (st.id === 'lab' && sections.length >= 6) {
+          const lp = stripPlain(st.html);
+          if (lp.length > 180) {
+            const sample = lp.slice(40, Math.min(lp.length, 220)).trim();
+            const tailSample = lp.slice(Math.max(40, lp.length - 180), lp.length - 20).trim();
+            if (sample.length > 40 && combinedSecPlain.includes(sample) && (!tailSample || combinedSecPlain.includes(tailSample))) {
+              const cfgSec = sections.find(s => /پیکربندی|رویه/.test(s.title));
+              const verSec = sections.find(s => /تأیید|شاهد/.test(s.title));
+              return {
+                ...st,
+                html: `<div class="lesson-lab-shortcut">
+                  <strong>تمرین عملی و راستی‌آزمایی این درس</strong>
+                  <p>مراحل کامل پیکربندی و فرمان‌های تأیید در بخش‌های بالای همین درس آورده شده است (برای جلوگیری از تکرار مجدد نمایش داده نشد). می‌توانید مستقیماً در <strong>شبیه‌ساز CLI</strong> پایین همین صفحه فرمان‌ها را تمرین کنید.</p>
+                  <div class="lesson-lab-shortcut-actions">
+                    ${cfgSec ? `<a class="btn" href="#sec-${escapeHtml(cfgSec.id)}">مرور پیکربندی و رویه ↑</a>` : ''}
+                    ${verSec ? `<a class="btn" href="#sec-${escapeHtml(verSec.id)}">مرور تأیید و شاهد ↑</a>` : ''}
+                  </div>
+                </div>`
+              };
+            }
+          }
+        }
+        return st;
+      });
+      const isTrailingWrapup = title => /(جمع[\u200c\s]*بندی|منابع و محدودیت|درس بعدی|گام بعدی|مسیر بعدی)/.test(String(title || ''));
+      const coreSections = [];
+      const trailingSections = [];
+      sections.forEach(s => {
+        if (stages.length && isTrailingWrapup(s.title)) trailingSections.push(s);
+        else coreSections.push(s);
+      });
+      return [...coreSections, ...cleanedStages, ...trailingSections].map((s, i) => {
         let id = s.id || `part-${i + 1}`;
         while (used.has(id)) id = `stage-${id}`;
         used.add(id);
@@ -628,11 +662,13 @@
     const quizQuestions = getQuizQuestions(bp);
     if (quiz && Array.isArray(quizQuestions)) {
       const result = quiz.querySelector('.lesson-quiz-result');
+      const gradeControl = quiz.querySelector('[data-quiz-grade]');
+      const retryControl = quiz.querySelector('[data-quiz-retry]');
       const previous = getQuizAttempts()[bp.lessonId];
       if (previous && Number.isInteger(previous.correct) && Number.isInteger(previous.total) && previous.total > 0) {
         result.textContent = `آخرین نتیجه ثبت‌شده: ${previous.correct} از ${previous.total} پاسخ درست`;
       }
-      quiz.querySelector('[data-quiz-grade]').onclick = () => {
+      gradeControl.onclick = () => {
         let correct = 0, incorrect = 0, unanswered = 0;
         quizQuestions.forEach((q, i) => {
           const selected = quiz.querySelector(`input[name="lesson-question-${i}"]:checked`);
@@ -645,14 +681,26 @@
           feedback.className = `lesson-quiz-feedback ${isCorrect ? 'is-correct' : 'is-incorrect'}`;
           feedback.hidden = false;
         });
-        result.textContent = `نمره: ${Number((correct * 10 / quizQuestions.length).toFixed(2))} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered}`;
+        quiz.querySelectorAll('input[type="radio"]').forEach(input => { input.disabled = true; });
+        quiz.classList.add('is-graded');
+        gradeControl.disabled = true;
+        result.textContent = `نمره: ${Number((correct * 10 / quizQuestions.length).toFixed(2))} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered} — گزینه‌ها قفل شدند؛ برای آزمون دوباره روی «تلاش مجدد» بزنید.`;
         saveQuizAttempt(bp.lessonId, { correct, incorrect, unanswered, total: quizQuestions.length });
+        if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+          window.dispatchEvent(new CustomEvent('fam-quiz-graded', { detail: { lessonId: bp.lessonId, correct, incorrect, unanswered, total: quizQuestions.length } }));
+        }
       };
-      quiz.querySelector('[data-quiz-retry]').onclick = () => {
-        quiz.querySelectorAll('input:checked').forEach(input => { input.checked = false; });
+      retryControl.onclick = () => {
+        quiz.querySelectorAll('input[type="radio"]').forEach(input => { input.disabled = false; input.checked = false; });
+        quiz.classList.remove('is-graded');
+        gradeControl.disabled = false;
         quiz.querySelectorAll('[data-feedback]').forEach(feedback => { feedback.hidden = true; feedback.textContent = ''; });
         result.textContent = '';
       };
+    }
+
+    if (bp.lessonId && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('fam-lesson-opened', { detail: { lessonId: bp.lessonId } }));
     }
 
     const gradeBtn = container.querySelector('#le-grade-btn');
