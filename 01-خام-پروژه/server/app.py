@@ -3,6 +3,7 @@ All authorisation is server-side. Browser snapshots use optimistic revisions and
 idempotent receipts; no last-writer-wins or automatic conflict overwrite.
 """
 import copy
+import decimal
 import hashlib
 import hmac
 import ipaddress
@@ -882,7 +883,16 @@ def create_app(config=None):
                 result[key]=value
             return result
         def reject_constant(_): raise ValueError('non-finite number')
-        return json.loads(payload, object_pairs_hook=unique_object, parse_constant=reject_constant)
+        def finite_float(token):
+            value=float(token)
+            if not math.isfinite(value): raise ValueError('float overflow')
+            try:
+                if decimal.Decimal(token) != decimal.Decimal(str(value)):
+                    raise ValueError('float precision loss')
+            except decimal.InvalidOperation as exc:
+                raise ValueError('invalid decimal') from exc
+            return value
+        return json.loads(payload, object_pairs_hook=unique_object, parse_constant=reject_constant, parse_float=finite_float)
 
     def parse_legacy_progress(payload):
         try:

@@ -427,9 +427,9 @@ class FamAppApiTests(unittest.TestCase):
         headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
         with sqlite3.connect(self.db_path) as db:
             uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
-        outer_cases=(' {"other":"first","other":"second"}', '{"other":NaN}', '{broken')
+        outer_cases=(' {"other":"first","other":"second"}', '{"other":NaN}', '{"other":1e999}', '{"other":-1e999}', '{"other":1e-999}', '{"other":0.100000000000000000001}', '{broken')
         inner_cases=('{"completed":[],"completed":["x"]}', '{"completed":[],"x":NaN}',
-                     '{"completed":[],"x":Infinity}')
+                     '{"completed":[],"x":Infinity}', '{"completed":[],"x":1e999}', '{"completed":[],"x":1e-999}')
         for payload,changes in [(raw,{'fam3.progress.v1':'{}'}) for raw in outer_cases]+[(json.dumps({'fam4.learn.v1':raw}),{'fam4.learn.v1':'{"completed":[]}'}) for raw in inner_cases]:
             with self.subTest(payload=payload):
                 with sqlite3.connect(self.db_path) as db:
