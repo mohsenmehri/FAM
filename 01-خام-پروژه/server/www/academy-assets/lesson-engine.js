@@ -456,27 +456,27 @@
             </div>
           </div>
         </header>
-        <aside class="lesson-review-status" role="status" aria-label="وضعیت بازبینی و آزمایش درس" style="margin:12px 0;padding:12px 16px;border:1px solid #b45309;border-radius:10px;background:#fff7ed;color:#7c2d12;line-height:1.7">
-          <strong>${escapeHtml(reviewLabel)}</strong><br><span>${escapeHtml(evidenceLabel)}</span>
+        <aside class="lesson-review-status" role="status" aria-label="وضعیت بازبینی و آزمایش درس">
+          <strong>${escapeHtml(reviewLabel)}</strong> · <span>${escapeHtml(evidenceLabel)}</span>
         </aside>
-        ${hasStages(bp) ? `
-          <nav id="le-stage-bar" class="stepper lesson-stepper" aria-label="بخش‌های درس">
-            ${sections.map((s, idx) => `<button type="button" id="side-sec-${escapeHtml(s.id)}" class="stepper-item le-stage-pill" data-stage-idx="${idx}" data-stage-id="${escapeHtml(s.id)}" aria-label="بخش ${idx + 1}: ${escapeHtml(s.title)}"><span class="stepper-dot">${stageIcon(s.id, idx)}</span><span class="stepper-label">${escapeHtml(stageLabels[s.id] || s.title)}</span></button>`).join('')}
-          </nav>` : ''}
+        <div class="lesson-reading-bar" id="le-stage-bar">
+          <div class="lesson-reading-meta">
+            <span id="le-reading-label">مطالعه پیوسته · ${sections.length} بخش</span>
+            <div class="lesson-reading-track"><i id="le-reading-fill" style="width:${Math.round(100 / Math.max(1, sections.length))}%"></i></div>
+          </div>
+          ${hasStages(bp) ? '<button id="le-mode-toggle" type="button" class="btn lesson-mode-btn" aria-pressed="false">نمایش بخش‌به‌بخش</button>' : ''}
+        </div>
         <div class="lesson-body-grid">
           <div class="lesson-content">
-            ${sections.map((s, idx) => {
-              const hiddenStyle = (hasStages(bp) && idx !== 0) ? ' style="display:none"' : '';
-              return `<article id="sec-${s.id}" class="card le-stage-card" data-stage-idx="${idx}"${hiddenStyle}><header class="lesson-stage-heading"><span class="lesson-stage-number">${idx + 1}</span><div><span class="lesson-stage-caption">بخش ${idx + 1} از ${sections.length}</span><h2>${escapeHtml(s.title)}</h2></div></header><div class="lesson-stage-content">${s.html}</div></article>`;
-            }).join('')}
+            ${sections.map((s, idx) => `<article id="sec-${s.id}" class="le-stage-card" data-stage-idx="${idx}"><header class="lesson-stage-heading"><span class="lesson-stage-number">${idx + 1}</span><div><span class="lesson-stage-caption">بخش ${idx + 1} از ${sections.length}</span><h2>${escapeHtml(s.title)}</h2></div></header><div class="lesson-stage-content">${s.html}</div></article>`).join('')}
             ${hasStages(bp) ? `
-            <div class="step-foot lesson-step-foot">
-              <button id="le-stage-prev" class="btn" type="button">بخش قبلی</button>
-              <button id="le-stage-next" class="btn primary" type="button">بخش بعدی</button>
+            <div class="step-foot lesson-step-foot" id="le-step-foot" hidden>
+              <button id="le-stage-prev" class="btn" type="button">← بخش قبلی</button>
+              <button id="le-stage-next" class="btn primary" type="button">بخش بعدی →</button>
             </div>` : ''}
             <div class="lesson-adjacent">
-              <button id="le-prev-btn" class="btn" ${adj.prev ? '' : 'disabled'}>درس قبلی${adj.prev ? ': ' + escapeHtml(adj.prev.title) : ''}</button>
-              <button id="le-next-btn" class="btn" ${adj.next ? '' : 'disabled'}>${adj.next ? 'درس بعدی: ' + escapeHtml(adj.next.title) : 'درس بعدی'}</button>
+              <button id="le-prev-btn" class="lesson-adj-card" type="button" ${adj.prev ? '' : 'disabled'}><small>درس قبلی</small><strong>${adj.prev ? escapeHtml(adj.prev.title) : 'ابتدای مسیر'}</strong></button>
+              <button id="le-next-btn" class="lesson-adj-card" type="button" ${adj.next ? '' : 'disabled'}><small>درس بعدی</small><strong>${adj.next ? escapeHtml(adj.next.title) : 'پایان مسیر'}</strong></button>
             </div>
           </div>
           <aside class="lesson-side-rail" aria-label="فهرست و یادداشت‌های درس">
@@ -528,36 +528,49 @@
       container.querySelectorAll('.lesson-toc-link').forEach((btn, i) => {
         btn.classList.toggle('active', i === idx);
       });
+      const fill = container.querySelector('#le-reading-fill');
+      if (fill) fill.style.width = `${Math.round(((idx + 1) * 100) / Math.max(1, sections.length))}%`;
     };
 
     let activeStageIdx = 0;
+    let stepMode = false;
     const isStaged = hasStages(bp) > 0;
-    const updateStageProgress = () => {
-      if (!isStaged) return;
-      container.querySelectorAll('.le-stage-pill').forEach((pill, i) => {
-        const current = i === activeStageIdx;
-        pill.classList.toggle('current', current);
-        if (current) pill.setAttribute('aria-current', 'step');
-        else pill.removeAttribute('aria-current');
+    const readingLabel = container.querySelector('#le-reading-label');
+    const stepFoot = container.querySelector('#le-step-foot');
+    const modeToggle = container.querySelector('#le-mode-toggle');
+
+    const applyReadingMode = () => {
+      const cards = container.querySelectorAll('.le-stage-card');
+      cards.forEach((card, i) => {
+        card.style.display = (!stepMode || i === activeStageIdx) ? '' : 'none';
       });
-      syncTocActive(activeStageIdx);
-    };
-    const setActiveStage = (nextIdx) => {
-      if (!isStaged) return;
-      activeStageIdx = Math.max(0, Math.min(sections.length - 1, nextIdx));
-      container.querySelectorAll('.le-stage-card').forEach((card, i) => {
-        card.style.display = i === activeStageIdx ? 'block' : 'none';
-      });
+      if (stepFoot) stepFoot.hidden = !stepMode;
+      if (modeToggle) {
+        modeToggle.textContent = stepMode ? 'نمایش همه بخش‌ها یکجا' : 'نمایش بخش‌به‌بخش';
+        modeToggle.setAttribute('aria-pressed', String(stepMode));
+      }
+      if (readingLabel) {
+        readingLabel.textContent = stepMode
+          ? `حالت بخش‌به‌بخش · بخش ${activeStageIdx + 1} از ${sections.length}`
+          : `مطالعه پیوسته · ${sections.length} بخش`;
+      }
       const prevS = container.querySelector('#le-stage-prev');
       const nextS = container.querySelector('#le-stage-next');
       if (prevS) prevS.disabled = activeStageIdx === 0;
       if (nextS) nextS.disabled = activeStageIdx === sections.length - 1;
-      updateStageProgress();
+      syncTocActive(activeStageIdx);
     };
+
+    const setActiveStage = (nextIdx) => {
+      activeStageIdx = Math.max(0, Math.min(sections.length - 1, nextIdx));
+      applyReadingMode();
+    };
+
     container.querySelectorAll('.lesson-toc-link').forEach((btn, i) => {
       btn.onclick = () => {
-        if (isStaged) {
-          setActiveStage(i);
+        activeStageIdx = i;
+        if (stepMode) {
+          applyReadingMode();
           container.querySelector('#le-stage-bar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
           syncTocActive(i);
@@ -566,22 +579,23 @@
         }
       };
     });
+
     if (isStaged) {
-      container.querySelectorAll('.le-stage-pill').forEach((pill, i) => {
-        pill.onclick = () => {
-          setActiveStage(i);
-          container.querySelector('#le-stage-bar')?.scrollIntoView({ block: 'start' });
+      if (modeToggle) {
+        modeToggle.onclick = () => {
+          stepMode = !stepMode;
+          applyReadingMode();
         };
-      });
+      }
       const prevS = container.querySelector('#le-stage-prev');
       const nextS = container.querySelector('#le-stage-next');
       const goToStage = index => {
         setActiveStage(index);
-        container.querySelector('#le-stage-bar')?.scrollIntoView({ block: 'start' });
+        container.querySelector('#le-stage-bar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       };
       if (prevS) prevS.onclick = () => goToStage(activeStageIdx - 1);
       if (nextS) nextS.onclick = () => goToStage(activeStageIdx + 1);
-      setActiveStage(0);
+      applyReadingMode();
     }
 
     const compBtn = container.querySelector('#le-complete-btn');
