@@ -101,4 +101,7 @@ class IntakeCandidateTests(unittest.TestCase):
         self.assertEqual(lesson['lab']['labType'], 'Reference')
         self.assertIn('در انتظار', lesson['candidateStatus'])
         catalog = json.loads((ROOT / 'server/www/academy-assets/curriculum-catalog.json').read_text())
-        self.assertNotIn('ccna_02_vlan', {l['id'] for t in catalog['paths'] for c in t['courses'] for l in c['lessons']})
+        record = next(l for t in catalog['paths'] for c in t['courses'] for l in c['lessons'] if l['id'] == 'ccna_02_vlan')
+        # The historical candidate remains a reference; the catalog uses the reviewed blueprint instead.
+        self.assertEqual(record['blueprint'], '/academy-assets/v5/blueprints/ccna_02_vlan.json')
+        self.assertNotIn('candidates/', record['blueprint'])

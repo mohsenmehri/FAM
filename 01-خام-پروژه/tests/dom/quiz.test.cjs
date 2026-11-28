@@ -70,15 +70,15 @@ for (const item of catalog.paths.flatMap(track => track.courses.flatMap(course =
   if (["s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "ccna_01", "ccna_02"].includes(item.id)) {
     assert.match(notice.textContent, /بازبینی معنایی توسط نویسنده/);
     assert.match(notice.textContent, /بازبینی مستقل انجام نشده/);
-  } else if (["auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_10", "auto_20"].includes(item.id)) {
+  } else if (["auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_10", "auto_20", "ccna_02_vlan"].includes(item.id)) {
     assert.match(notice.textContent, /بازبینی فنی توسط یکپارچه‌ساز/);
     assert.match(notice.textContent, /بازبینی مستقل انسانی انجام نشده/);
-    assert.match(notice.textContent, item.id === "auto_06" ? /HTTP واقعی محلی/ : item.id === "auto_20" ? /شبیه‌سازی Python محلی/ : item.id === "auto_05" ? /پارس JSON و XML محلی/ : item.id === "auto_04" ? /Git محلی/ : /Python محلی/);
+    assert.match(notice.textContent, item.id === "ccna_02_vlan" ? /شبیه‌سازی Python محلی/ : item.id === "auto_06" ? /HTTP واقعی محلی/ : item.id === "auto_20" ? /شبیه‌سازی Python محلی/ : item.id === "auto_05" ? /پارس JSON و XML محلی/ : item.id === "auto_04" ? /Git محلی/ : /Python محلی/);
     assert.match(notice.textContent, item.id === "auto_01" ? /tcpdump مرجع است و روی تجهیز اجرا نشده/ : /سناریوی تجهیز مرجع/);
   } else {
     assert.match(notice.textContent, /در انتظار بازبینی/);
   }
-  if (!["auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_10", "auto_20"].includes(item.id)) assert.match(notice.textContent, /اجرای واقعی آن تأیید نشده/);
+  if (!["auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_10", "auto_20", "ccna_02_vlan"].includes(item.id)) assert.match(notice.textContent, /اجرای واقعی آن تأیید نشده/);
 }
 const unknown = {...bp, reviewStatus: '', evidence: ''};
 w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), unknown);

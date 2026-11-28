@@ -874,7 +874,7 @@ def create_app(config=None):
     legacy_completion_map = {'s02': 's02'}
     legacy_archive_key = 'fam.academy.legacy.archive.v1'
 
-    def parse_legacy_progress(payload):
+    def strict_progress_json(payload):
         def unique_object(pairs):
             result={}
             for key,value in pairs:
@@ -882,10 +882,13 @@ def create_app(config=None):
                 result[key]=value
             return result
         def reject_constant(_): raise ValueError('non-finite number')
+        return json.loads(payload, object_pairs_hook=unique_object, parse_constant=reject_constant)
+
+    def parse_legacy_progress(payload):
         try:
-            outer=json.loads(payload, object_pairs_hook=unique_object, parse_constant=reject_constant)
+            outer=strict_progress_json(payload)
             raw=outer.get('fam4.learn.v1') if isinstance(outer,dict) else None
-            legacy=json.loads(raw, object_pairs_hook=unique_object, parse_constant=reject_constant) if isinstance(raw,str) else None
+            legacy=strict_progress_json(raw) if isinstance(raw,str) else None
             if (not isinstance(legacy,dict) or any(k in legacy for k in ('completed','labs','profile','selfAssessed')) or
                 not isinstance(legacy.get('completedLessons'),list) or
                 not all(isinstance(x,str) for x in legacy['completedLessons'])):
@@ -1026,15 +1029,18 @@ def create_app(config=None):
             revision=row['revision'] if row else 0
             if expected is not None and expected != revision:
                 fail(409,'پیشرفت در نشست دیگری تغییر کرده است؛ پیش از تلاش دوباره داده‌ها را بررسی کنید.')
-            progress=json.loads(row['payload']) if row else {}
-            if not isinstance(progress,dict):fail(500,'وضعیت آکادمی معتبر نیست؛ با مدیر سامانه تماس بگیرید.')
+            try:
+                progress=strict_progress_json(row['payload']) if row else {}
+                if not isinstance(progress,dict): raise ValueError('invalid outer progress')
+            except (TypeError,ValueError,RecursionError):
+                fail(409,'پیشرفت ذخیره‌شده مبهم یا خراب است؛ برای حفظ داده، ذخیره متوقف شد.')
             if 'fam4.learn.v1' in changes and 'fam4.learn.v1' in progress:
                 try:
-                    existing=json.loads(progress['fam4.learn.v1'])
+                    existing=strict_progress_json(progress['fam4.learn.v1'])
                     legacy={'completedLessons','quizScores','notes','missions','examScore','activeLesson'}
                     safe=(isinstance(existing,dict) and isinstance(existing.get('completed'),list)
                           and not (legacy & existing.keys()))
-                except (TypeError,ValueError):
+                except (TypeError,ValueError,RecursionError):
                     safe=False
                 if not safe:
                     fail(409,'پیشرفت قدیمی یا ناشناخته قابل بازنویسی نیست؛ مهاجرت هنوز فعال نشده است.')

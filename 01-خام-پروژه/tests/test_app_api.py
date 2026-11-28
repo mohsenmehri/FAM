@@ -422,6 +422,24 @@ class FamAppApiTests(unittest.TestCase):
             payload,rev=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
             self.assertEqual(json.loads(payload)['unknown'],'preserve-me'); self.assertEqual(rev,8)
 
+    def test_ambiguous_progress_is_not_rewritten_by_any_save(self):
+        csrf=self._login_admin().get_json()['csrf']
+        headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+        outer_cases=(' {"other":"first","other":"second"}', '{"other":NaN}', '{broken')
+        inner_cases=('{"completed":[],"completed":["x"]}', '{"completed":[],"x":NaN}',
+                     '{"completed":[],"x":Infinity}')
+        for payload,changes in [(raw,{'fam3.progress.v1':'{}'}) for raw in outer_cases]+[(json.dumps({'fam4.learn.v1':raw}),{'fam4.learn.v1':'{"completed":[]}'}) for raw in inner_cases]:
+            with self.subTest(payload=payload):
+                with sqlite3.connect(self.db_path) as db:
+                    db.execute('INSERT OR REPLACE INTO academy_progress(user_id,payload,updated_at,revision) VALUES(?,?,?,?)',(uid,payload,0,12))
+                res=self.client.post('/api/academy/progress',json={'changes':changes,'expectedRevision':12},headers=headers,environ_base=self.https_env)
+                self.assertEqual(res.status_code,409)
+                with sqlite3.connect(self.db_path) as db:
+                    self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(payload,12))
+                    self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups WHERE user_id=?',(uid,)).fetchone()[0],0)
+
     def test_academy_export_is_owner_scoped_raw_and_read_only(self):
         url='/api/academy/progress/export'
         self.assertEqual(self.client.get(url,environ_base=self.https_env).status_code,401)
