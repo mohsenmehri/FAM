@@ -30,6 +30,20 @@ class MockNornirTests(unittest.TestCase):
             with self.subTest(workers=bad),self.assertRaises(ValueError):lab.run_nornir_style_pilot(inv,'pilot',['show'],True,bad)
         with self.assertRaises(ValueError):lab.run_nornir_style_pilot(inv,'pilot','config',True)
 
+    def test_upstream_guard_role_and_platform_boundaries(self):
+        inv=[{'host':'a','data':{'role':'pilot'}},{'host':'b','data':{'role':'prod'}}]
+        self.assertEqual(len(lab.run_nornir_style_pilot(inv,'pilot',['cmd'],True)),1)
+        with self.assertRaises(RuntimeError): lab.run_nornir_style_pilot(inv,'pilot',['cmd'],True,task_honors_dry_run=False)
+        with self.assertRaises(RuntimeError): lab.run_nornir_style_pilot([],'pilot',['cmd'],True,task_honors_dry_run=False)
+        with self.assertRaises(ValueError): lab.run_nornir_style_pilot([{'data':{'role':'pilot'}}],'pilot',['cmd'])
+        with self.assertRaises(ValueError): lab.run_nornir_style_pilot(inv,'',['cmd'])
+        with lab.MockNetmikoConnection('x',platform='cisco_ios') as conn:
+            self.assertTrue(conn.send_config_set(['cmd'])['applied'])
+            self.assertTrue(conn.save_config()['saved'])
+        with lab.MockNetmikoConnection('x',platform='cisco_xr') as conn:
+            with self.assertRaises(NotImplementedError): conn.save_config()
+        with self.assertRaises(TypeError): lab.MockNetmikoConnection('x').send_config_set(['cmd'],dry_run=True)
+
     def test_embedded(self):
         bp=json.loads((ROOT/'server/www/academy-assets/v5/blueprints/auto_03.json').read_text())
         self.assertIn(source.read_text(),html.unescape(bp['stages']['lab']['html']))

@@ -869,6 +869,31 @@ def create_app(config=None):
         response.headers['Content-Disposition'] = 'attachment; filename="fam-academy-progress.json"'
         return response
 
+    # Explicitly reviewed equivalence: only completion, never scores/notes/labs.
+    # An identical ID or alias alone must never grant migration rights.
+    legacy_completion_map = {'s02': 's02'}
+    legacy_archive_key = 'fam.academy.legacy.archive.v1'
+
+    def parse_legacy_progress(payload):
+        def unique_object(pairs):
+            result={}
+            for key,value in pairs:
+                if key in result: raise ValueError('duplicate key')
+                result[key]=value
+            return result
+        def reject_constant(_): raise ValueError('non-finite number')
+        try:
+            outer=json.loads(payload, object_pairs_hook=unique_object, parse_constant=reject_constant)
+            raw=outer.get('fam4.learn.v1') if isinstance(outer,dict) else None
+            legacy=json.loads(raw, object_pairs_hook=unique_object, parse_constant=reject_constant) if isinstance(raw,str) else None
+            if (not isinstance(legacy,dict) or any(k in legacy for k in ('completed','labs','profile','selfAssessed')) or
+                not isinstance(legacy.get('completedLessons'),list) or
+                not all(isinstance(x,str) for x in legacy['completedLessons'])):
+                raise ValueError('unknown or mixed schema')
+        except (ValueError,TypeError,RecursionError):
+            fail(409, 'قالب قدیمی قابل تشخیص نیست؛ هیچ تبدیلی انجام نشده است.')
+        return outer,raw,legacy
+
     @app.get('/api/academy/progress/legacy-preview')
     def preview_academy_legacy():
         with connect() as db:
@@ -878,27 +903,50 @@ def create_app(config=None):
             row=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
         if not row:
             fail(404, 'پیشرفت ذخیره‌شده‌ای وجود ندارد.')
-        def unique_object(pairs):
-            result={}
-            for key,value in pairs:
-                if key in result: raise ValueError('duplicate key')
-                result[key]=value
-            return result
-        def reject_constant(_): raise ValueError('non-finite number')
-        try:
-            outer=json.loads(row['payload'], object_pairs_hook=unique_object, parse_constant=reject_constant)
-            raw=outer.get('fam4.learn.v1') if isinstance(outer,dict) else None
-            legacy=json.loads(raw, object_pairs_hook=unique_object, parse_constant=reject_constant) if isinstance(raw,str) else None
-            if (not isinstance(legacy,dict) or 'completed' in legacy or
-                not isinstance(legacy.get('completedLessons'),list) or
-                not all(isinstance(x,str) for x in legacy['completedLessons'])):
-                raise ValueError('unknown or mixed schema')
-        except (ValueError,TypeError,RecursionError):
-            fail(409, 'قالب قدیمی قابل تشخیص نیست؛ هیچ تبدیلی انجام نشده است.')
+        outer,_,legacy=parse_legacy_progress(row['payload'])
+        eligible=sorted(set(legacy['completedLessons']) & legacy_completion_map.keys())
+        available=bool(eligible) and legacy_archive_key not in outer
         return jsonify(revision=row['revision'], completedCount=len(legacy['completedLessons']),
                        uniqueCompletedCount=len(set(legacy['completedLessons'])),
                        retainedFields=[k for k in ('activeLesson','quizScores','notes','missions','examScore') if k in legacy],
-                       mappedCount=0, migrationAvailable=False)
+                       mappedCount=len(eligible) if available else 0, eligible=eligible if available else [],
+                       migrationAvailable=available)
+
+    @app.post('/api/academy/progress/migrate')
+    def migrate_academy_legacy():
+        body=data()
+        if (not isinstance(body,dict) or set(body)!={'expectedRevision','selectedLessons'} or
+            type(body['expectedRevision']) is not int or not 0 <= body['expectedRevision'] < 2**63-1 or
+            not isinstance(body['selectedLessons'],list) or not body['selectedLessons'] or
+            len(body['selectedLessons']) > len(legacy_completion_map) or
+            any(not isinstance(x,str) for x in body['selectedLessons']) or
+            len(set(body['selectedLessons'])) != len(body['selectedLessons'])):
+            fail(400, 'انتخاب درس و نسخه پیشرفت معتبر لازم است.')
+        with transaction() as db:
+            user,_=user_and_session(db)
+            row=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
+            if not row or row['revision'] != body['expectedRevision']:
+                fail(409, 'پیشرفت تغییر کرده است؛ دوباره پیش‌نمایش بگیرید.')
+            outer,raw,legacy=parse_legacy_progress(row['payload'])
+            if legacy_archive_key in outer:
+                fail(409, 'بایگانی قدیمی موجود است؛ برای پیشگیری از بازنویسی مهاجرت متوقف شد.')
+            selected=body['selectedLessons']
+            if any(x not in legacy_completion_map or x not in legacy['completedLessons'] for x in selected):
+                fail(400, 'انتخاب شامل درس تأییدنشده یا تکمیل‌نشده است.')
+            # Archive exact old value alongside unrelated keys; no quiz, note or
+            # lab data is reinterpreted. The full prior payload is also backed up.
+            outer[legacy_archive_key]=raw
+            outer['fam4.learn.v1']=packed({'completed':[legacy_completion_map[x] for x in selected], 'labs':{}})
+            payload=packed(outer)
+            if len(payload.encode('utf-8'))>8*1024*1024:
+                fail(413, 'برای نگهداری نسخه قدیمی فضای مجاز کافی نیست؛ هیچ داده‌ای تغییر نکرد.')
+            now=int(time.time()*1000)
+            db.execute('INSERT INTO academy_progress_backups(user_id,revision,payload,saved_at) VALUES(?,?,?,?)',
+                       (user['id'],row['revision'],row['payload'],now))
+            revision=row['revision']+1
+            db.execute('UPDATE academy_progress SET payload=?,revision=?,updated_at=? WHERE user_id=?',
+                       (payload,revision,now,user['id']))
+        return jsonify(ok=True,revision=revision,migrated=selected)
 
     @app.get('/api/academy/progress/backups')
     def list_academy_progress_backups():

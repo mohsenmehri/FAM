@@ -56,17 +56,33 @@
       if (sharedProgressLocked) document.addEventListener('DOMContentLoaded', () => saveStatus(lockedMessage));
       document.addEventListener('DOMContentLoaded', () => {
         const preview = document.getElementById('academy-legacy-preview');
-        if (!preview || !sharedProgressLocked || !csrf) return;
+        const migrate = document.getElementById('academy-legacy-migrate');
+        if (!preview || !migrate || !sharedProgressLocked || !csrf) return;
         preview.hidden = false;
+        let plan = null;
         preview.addEventListener('click', async () => {
-          preview.disabled = true;
+          preview.disabled = true; migrate.hidden = true; plan = null;
           try {
             const response = await fetch('/api/academy/progress/legacy-preview', {credentials:'same-origin', headers:{'X-FAM-CSRF':csrf}});
             if (!response.ok) throw new Error('unrecognized');
             const info = await response.json();
-            saveStatus('پیش‌نمایش فقط‌خواندنی: ' + info.uniqueCompletedCount + ' شناسه تکمیل قدیمی؛ انتقال تأییدشده: ' + info.mappedCount + '. نمره، یادداشت و داده‌های دیگر تبدیل نشده‌اند؛ مهاجرت فعال نیست.');
+            if (!Number.isSafeInteger(info.revision) || !Array.isArray(info.eligible) ||
+                info.eligible.some(id => id !== 's02')) throw new Error('unsupported plan');
+            saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ قابل انتقال: ' + (info.eligible.join('، ') || 'هیچ‌کدام') + '. سایر تکمیل‌ها، نمره‌ها و یادداشت‌ها نمایش جدید ندارند اما نسخه خام حفظ می‌شود.');
+            if (info.migrationAvailable && info.eligible.length) { plan=info; migrate.hidden=false; }
           } catch (_) { saveStatus('قالب قدیمی قابل تشخیص نیست یا نشست تغییر کرده است؛ داده تغییر نکرد.'); }
           finally { preview.disabled = false; }
+        });
+        migrate.addEventListener('click', async () => {
+          if (!plan || !window.confirm('فقط تکمیل درس s02 منتقل می‌شود؛ سایر تکمیل‌ها، نمره‌ها و یادداشت‌ها در نسخه خام حفظ می‌شوند اما در رابط جدید نمایش داده نمی‌شوند. ادامه می‌دهید؟')) return;
+          revisionConflict=true; preview.disabled=true; migrate.disabled=true;
+          try {
+            const response=await fetch('/api/academy/progress/migrate', {method:'POST', credentials:'same-origin',
+              headers:{'Content-Type':'application/json','X-FAM-CSRF':csrf},
+              body:JSON.stringify({expectedRevision:plan.revision,selectedLessons:plan.eligible})});
+            if (!response.ok) throw new Error('migration failed');
+            saveStatus('انتقال انتخاب‌شده انجام شد؛ برای جلوگیری از بازنویسی صفحه را بازخوانی کنید.');
+          } catch (_) { saveStatus('انتقال انجام نشد یا نتیجه نامشخص است؛ صفحه را بازخوانی و نسخه‌ها را بررسی کنید.'); }
         });
       });
       document.addEventListener('DOMContentLoaded', () => {
@@ -359,7 +375,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 
   <div id="academy-save-status" role="status" aria-live="polite" style="padding:0 20px;color:var(--warn)"></div>
   <div style="padding:0 20px"><button id="academy-export-progress" type="button" hidden>دریافت نسخه خام پیشرفت حساب</button><small> نسخه ممکن است یادداشت و اطلاعات حساس داشته باشد؛ در محل امن نگهداری کنید. این دریافت، مهاجرت یا بازیابی نیست.</small></div>
-  <div style="padding:0 20px"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button></div>
+  <div style="padding:0 20px"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-legacy-migrate" type="button" hidden>انتقال تکمیل s02 پس از تأیید</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button></div>
   <main class="container" id="app-root"></main>
 
   <script src="/academy-assets/lesson-engine.js?v=20261123c"></script>

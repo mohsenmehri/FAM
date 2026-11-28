@@ -539,13 +539,13 @@ class FamAppApiTests(unittest.TestCase):
             db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,10,7))
         result=self.client.get(preview,headers=h,environ_base=self.https_env)
         self.assertEqual(result.status_code,200);self.assertEqual(result.json['completedCount'],3)
-        self.assertEqual(result.json['uniqueCompletedCount'],2);self.assertEqual(result.json['mappedCount'],0)
-        self.assertFalse(result.json['migrationAvailable']);self.assertNotIn('private',str(result.json))
+        self.assertEqual(result.json['uniqueCompletedCount'],2);self.assertEqual(result.json['mappedCount'],1)
+        self.assertTrue(result.json['migrationAvailable']);self.assertEqual(result.json['eligible'],['s02']);self.assertNotIn('private',str(result.json))
         with sqlite3.connect(self.db_path) as db:
             self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,7))
         # Unknown/mixed/malformed JSON and duplicate keys cannot be previewed as valid.
         for item in ('{"completedLessons":[],"completedLessons":["s02"]}', '{bad',
-                     json.dumps({'completed':[],'completedLessons':[]}), '{"completedLessons":[],"x":NaN}'):
+                     json.dumps({'completed':[],'completedLessons':[]}), json.dumps({'labs':{},'completedLessons':[]}), '{"completedLessons":[],"x":NaN}'):
             with self.subTest(item=item):
                 with sqlite3.connect(self.db_path) as db:
                     db.execute('UPDATE academy_progress SET payload=? WHERE user_id=?',(json.dumps({'fam4.learn.v1':item}),uid))
@@ -558,6 +558,95 @@ class FamAppApiTests(unittest.TestCase):
         self.assertEqual(attempt.status_code,409)
         with sqlite3.connect(self.db_path) as db:
             self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,9))
+
+    def test_selected_legacy_migration_is_atomic_explicit_and_reversible(self):
+        url='/api/academy/progress/migrate'; preview='/api/academy/progress/legacy-preview'
+        self.assertEqual(self.client.post(url,json={},headers={'Origin':self.ORIGIN},environ_base=self.https_env).status_code,401)
+        csrf=self._login_admin().json['csrf']; h={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+        old=json.dumps({'completedLessons':['s02','s01','s02'],'notes':{'s01':'secret'},'quizScores':{'s02':90},'unknown':'preserve'})
+        raw=json.dumps({'fam4.learn.v1':old,'some-other-key':'untouched'})
+        with sqlite3.connect(self.db_path) as db:db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,1,5))
+        def post(body):return self.client.post(url,json=body,headers=h,environ_base=self.https_env)
+        self.assertEqual(post({'expectedRevision':4,'selectedLessons':['s02']}).status_code,409)
+        for selection in (['s01'],['s02','s02'],[],['s02','s01'],[True]):
+            with self.subTest(selection=selection):self.assertEqual(post({'expectedRevision':5,'selectedLessons':selection}).status_code,400)
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("CREATE TRIGGER fail_migration BEFORE UPDATE ON academy_progress BEGIN SELECT RAISE(ABORT, 'migration failure'); END")
+        self.assertNotEqual(post({'expectedRevision':5,'selectedLessons':['s02']}).status_code,200)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,5))
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups WHERE user_id=?',(uid,)).fetchone()[0],0)
+            db.execute('DROP TRIGGER fail_migration')
+        result=post({'expectedRevision':5,'selectedLessons':['s02']});self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json['revision'],6);self.assertEqual(result.json['migrated'],['s02'])
+        self.assertEqual(post({'expectedRevision':5,'selectedLessons':['s02']}).status_code,409)
+        with sqlite3.connect(self.db_path) as db:
+            payload,revision=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
+            backup=db.execute('SELECT payload FROM academy_progress_backups WHERE user_id=? AND revision=5',(uid,)).fetchone()[0]
+        self.assertEqual(backup,raw);self.assertEqual(revision,6);state=json.loads(payload)
+        self.assertEqual(state['fam.academy.legacy.archive.v1'],old);self.assertEqual(state['some-other-key'],'untouched')
+        self.assertEqual(json.loads(state['fam4.learn.v1']),{'completed':['s02'],'labs':{}})
+        # Subsequent saves cannot access the archive; unknown keys are retained.
+        normal=self.client.post('/api/academy/progress',json={'expectedRevision':6,'changes':{'fam4.learn.v1':json.dumps({'completed':['s02'],'labs':{'x':1}})}},headers=h,environ_base=self.https_env)
+        self.assertEqual(normal.status_code,200)
+        with sqlite3.connect(self.db_path) as db:
+            payload=db.execute('SELECT payload FROM academy_progress WHERE user_id=?',(uid,)).fetchone()[0]
+            self.assertEqual(json.loads(payload)['fam.academy.legacy.archive.v1'],old)
+        restored=self.client.post('/api/academy/progress/restore',json={'backupRevision':5,'expectedRevision':7},headers=h,environ_base=self.https_env)
+        self.assertEqual(restored.status_code,200)
+        with sqlite3.connect(self.db_path) as db:
+            payload,revision=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
+            self.assertEqual(payload,raw);self.assertEqual(revision,8)
+        self.assertEqual(self.client.post('/api/academy/progress',json={'expectedRevision':8,'changes':{'fam4.learn.v1':'{}'}},headers=h,environ_base=self.https_env).status_code,409)
+
+    def test_migration_rejects_archive_collision_and_cross_account_request(self):
+        url='/api/academy/progress/migrate'
+        csrf=self._login_admin().json['csrf'];h={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+            db.execute("INSERT INTO users(id,username,name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash) SELECT 'other','other',name,role,enabled,regions,sheets,categories,permissions,revision,salt,hash FROM users WHERE id=?",(uid,))
+            raw=json.dumps({'fam4.learn.v1':json.dumps({'completedLessons':['s02']}),'fam.academy.legacy.archive.v1':'keep'})
+            db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,1,5))
+            db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',('other','other-secret',1,5))
+        bad=self.client.post(url,json={'expectedRevision':5,'selectedLessons':['s02'],'user_id':'other'},headers=h,environ_base=self.https_env)
+        self.assertEqual(bad.status_code,400)
+        collision=self.client.post(url,json={'expectedRevision':5,'selectedLessons':['s02']},headers=h,environ_base=self.https_env)
+        self.assertEqual(collision.status_code,409)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,5))
+            self.assertEqual(db.execute("SELECT payload,revision FROM academy_progress WHERE user_id='other'").fetchone(),('other-secret',5))
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups').fetchone()[0],0)
+
+    def test_two_migrations_race_without_overwrite(self):
+        clients=[]
+        for _ in range(2):
+            c=self.app.test_client(); login=c.post('/api/login',json={'username':'admin','password':self.ADMIN_PASSWORD},headers={'Origin':self.ORIGIN},environ_base=self.https_env)
+            self.assertEqual(login.status_code,200);clients.append((c,login.json['csrf']))
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+            raw=json.dumps({'fam4.learn.v1':json.dumps({'completedLessons':['s02']})})
+            db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,1,1))
+        barrier=threading.Barrier(3);out=[];errors=[];lock=threading.Lock()
+        def worker(i):
+            try:
+                barrier.wait(timeout=10); c,csrf=clients[i]
+                response=c.post('/api/academy/progress/migrate',json={'expectedRevision':1,'selectedLessons':['s02']},headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf},environ_base=self.https_env)
+                with lock:out.append(response.status_code)
+            except BaseException as exc:
+                with lock:errors.append(repr(exc))
+        ts=[threading.Thread(target=worker,args=(i,)) for i in range(2)]
+        for t in ts:t.start()
+        try:barrier.wait(timeout=10)
+        finally:
+            for t in ts:t.join(timeout=20)
+        self.assertFalse(any(t.is_alive() for t in ts));self.assertEqual(errors,[]);self.assertEqual(sorted(out),[200,409])
+        with sqlite3.connect(self.db_path) as db:
+            row=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
+            backups=db.execute('SELECT payload FROM academy_progress_backups WHERE user_id=?',(uid,)).fetchall()
+        self.assertEqual(row[1],2);self.assertEqual(len(backups),1);self.assertEqual(backups[0][0],raw)
+        self.assertEqual(json.loads(json.loads(row[0])['fam4.learn.v1'])['completed'],['s02'])
 
     def test_osi_lesson_is_resolvable_and_auth_gated(self):
         path = "/academy-assets/v5/blueprints/academy-stage-zero-osi-fa.json"

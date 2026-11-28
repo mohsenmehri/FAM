@@ -150,7 +150,7 @@ def estimate_fiber_rtt_ms(
 def validate_pars_global_hld(design: dict, sync_product_profile: str = "netapp_vmsc_snapmirror_active_sync") -> dict:
     if not isinstance(design, dict):
         raise ValueError(f"design must be a dict, got {type(design).__name__}")
-    if sync_product_profile not in PRODUCT_SYNC_PROFILES:
+    if not isinstance(sync_product_profile, str) or sync_product_profile not in PRODUCT_SYNC_PROFILES:
         raise ValueError(
             f"Unknown sync_product_profile {sync_product_profile!r}; "
             f"expected one of {sorted(PRODUCT_SYNC_PROFILES)}"

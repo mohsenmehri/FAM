@@ -30,6 +30,12 @@ class IntakeCandidateTests(unittest.TestCase):
                 if name == 'auto_20': self.assertIn(name, ids)
                 else: self.assertNotIn(name, ids)
 
+    def test_ccde_unknown_profile_type_fails_cleanly(self):
+        lab = load('ccde_18')
+        for profile in ([], {}, None, True, 'unknown'):
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                lab.validate_pars_global_hld({}, profile)
+
     def test_auto20_zero_variance_and_large_finite_values(self):
         lab = load('auto_20')
         for baseline, value in (([1, 1], 1), ([1, 1], 2), ([0, 0], 0),
