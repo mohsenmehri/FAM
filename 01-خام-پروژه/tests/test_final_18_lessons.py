@@ -64,6 +64,32 @@ class Final18LessonsTests(unittest.TestCase):
                 self.assertEqual(res.returncode, 0, res.stderr + res.stdout)
                 self.assertTrue(res.stdout.strip())
 
+    def test_simulator_has_zero_placeholder_responses_and_strict_ip_validators(self):
+        sim_src = (ROOT / "server/www/academy-assets/academy-simulator.js").read_text(encoding="utf-8")
+        offline_html = (ROOT.parent / "FAM-Academy-Offline.html").read_text(encoding="utf-8")
+        self.assertNotIn("خروجی شبیه‌ساز برای", sim_src)
+        self.assertNotIn("خروجی شبیه‌ساز برای", offline_html)
+        self.assertIn("function isValidIPv4(", sim_src)
+        self.assertIn("function isValidIPv6(", sim_src)
+        self.assertIn("matchType: 'exact'", sim_src)
+        self.assertIn("matchType: 'track-default'", sim_src)
+
+    def test_all_127_blueprints_have_valid_prerequisites(self):
+        catalog = json.loads(
+            (ROOT / "server/www/academy-assets/curriculum-catalog.json").read_text(encoding="utf-8")
+        )
+        valid_ids = {
+            lesson["id"]
+            for path in catalog["paths"]
+            for course in path["courses"]
+            for lesson in course["lessons"]
+        }
+        self.assertEqual(len(valid_ids), 127)
+        for lid in sorted(valid_ids):
+            bp = json.loads((BP_DIR / f"{lid}.json").read_text(encoding="utf-8"))
+            for prereq in bp.get("prerequisites", []):
+                self.assertIn(prereq, valid_ids, f"dangling prerequisite {prereq} in {lid}")
+
 
 if __name__ == "__main__":
     unittest.main()
