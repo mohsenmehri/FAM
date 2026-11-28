@@ -68,3 +68,7 @@
 - **تست مرتبط:** `test_phase11_handoff_f3a80939_ccde18_and_auto03_remediation` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** خودبازبینی نویسنده (نه بازبینی مستقل انسانی)؛ آزمایشگاه محلی/Mock Python بدون اتصال زنده است و برای بازبینی مستقل Agent 2 آماده است.
 
+## به‌روزرسانی فاز ۱۳ (همگام‌سازی `AGENT-HANDOFF-fa.md` و `ccde_18-f3b5-intake-fa.md` @ `9cdaf84b4e`)
+- اعتبارسنجی `isinstance(sync_product_profile, str)` پیش از بررسی عضویت تا ورودی غیرقابل‌هش (`list`/`dict`) به‌جای `TypeError` خطای `ValueError` بدهد.
+- افزودن ارجاع رسمی Broadcom KB 326979 با تصریح محدودیت آستانه ≤۵ms RTT **صرفاً بین دو Data Site** در vSAN Stretched Cluster (غیرقابل تعمیم به Witness یا سایر توپولوژی‌ها).
+- **وضعیت بازبینی:** همچنان خودبازبینی نویسنده (`author-agent-self-review-not-independent`).

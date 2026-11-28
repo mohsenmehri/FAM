@@ -268,17 +268,19 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         auto07 = load_module(AGENT3_LAB_DIR / "auto_07_lab.py", "auto_07_lab_testmod")
         secret = b"unit-test-secret"
         now_ts = 1764201600
-        good_tok = auto07.build_hs256_jwt({"sub": "u", "exp": now_ts + 3600}, secret)
-        self.assertTrue(auto07.verify_hs256_jwt(good_tok, secret, now_ts=now_ts)["valid"])
+        good_tok = auto07.build_hs256_jwt_demo({"sub": "u", "exp": now_ts + 3600}, secret)
+        good_res = auto07.evaluate_hs256_jwt_demo(good_tok, secret, now_ts=now_ts)
+        self.assertTrue(good_res["demo_checks_passed"])
+        self.assertTrue(good_res["educational_demo_only"])
 
         parts = good_tok.split(".")
         none_hdr = auto07.b64url_encode(json.dumps({"alg": "none", "typ": "JWT"}).encode("utf-8"))
-        self.assertFalse(auto07.verify_hs256_jwt(f"{none_hdr}.{parts[1]}.", secret, now_ts=now_ts)["valid"])
+        self.assertFalse(auto07.evaluate_hs256_jwt_demo(f"{none_hdr}.{parts[1]}.", secret, now_ts=now_ts)["demo_checks_passed"])
 
-        exp_tok = auto07.build_hs256_jwt({"sub": "u", "exp": now_ts - 10}, secret)
-        exp_res = auto07.verify_hs256_jwt(exp_tok, secret, now_ts=now_ts)
-        self.assertFalse(exp_res["valid"])
-        self.assertEqual(exp_res["reason"], "token_expired")
+        exp_tok = auto07.build_hs256_jwt_demo({"sub": "u", "exp": now_ts - 10}, secret)
+        exp_res = auto07.evaluate_hs256_jwt_demo(exp_tok, secret, now_ts=now_ts)
+        self.assertFalse(exp_res["demo_checks_passed"])
+        self.assertEqual(exp_res["reason"], "token_expired_or_missing_exp")
 
         self.assertTrue(auto07.verify_san_match("api.netops.example", ["*.netops.example"]))
         self.assertFalse(auto07.verify_san_match("a.b.netops.example", ["*.netops.example"]))
@@ -1650,16 +1652,16 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
 
         bad_bools = ("False", "True", "", 0, 1, None, [], {})
 
-        # 1. auto_07: bool exp rejected (isinstance(True, int) trap!), malformed base64/JSON returns valid=False cleanly
+        # 1. auto_07: bool exp rejected (isinstance(True, int) trap!), malformed base64/JSON returns clean rejection
         a07 = load_module(AGENT3_LAB_DIR / "auto_07_lab.py", "auto_07_p10e")
         secret = b"test-secret"
-        bool_exp_tok = a07.build_hs256_jwt({"sub": "bot", "exp": True}, secret)
-        res_bool_exp = a07.verify_hs256_jwt(bool_exp_tok, secret, now_ts=0)
-        self.assertFalse(res_bool_exp["valid"])
-        self.assertEqual(res_bool_exp["reason"], "token_expired")
-        self.assertFalse(a07.verify_hs256_jwt("not!b64.not!b64.sig", secret)["valid"])
+        bool_exp_tok = a07.build_hs256_jwt_demo({"sub": "bot", "exp": True}, secret)
+        res_bool_exp = a07.evaluate_hs256_jwt_demo(bool_exp_tok, secret, now_ts=0)
+        self.assertFalse(res_bool_exp["demo_checks_passed"])
+        self.assertEqual(res_bool_exp["reason"], "token_expired_or_missing_exp")
+        self.assertFalse(a07.evaluate_hs256_jwt_demo("not!b64.not!b64.sig", secret)["demo_checks_passed"])
         with self.assertRaises(ValueError):
-            a07.verify_hs256_jwt(bool_exp_tok, secret, now_ts=True)
+            a07.evaluate_hs256_jwt_demo(bool_exp_tok, secret, now_ts=True)
 
         # 2. auto_15: invalid desired / prefixes types rejected
         a15 = load_module(AGENT3_LAB_DIR / "auto_15_lab.py", "auto_15_p10e")
@@ -2055,6 +2057,187 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         self.assertEqual(m_bfd.simulate_fnf_active_timeout(1500, 60, 1500)["export_buckets"], 25)
         with self.assertRaises(ValueError):
             m_bfd.negotiate_bfd_detection(50, 50, 3, 50, 50, 3, multihop="True")
+
+    def test_phase13_handoff_9cdaf84b_auto07_09_and_proactive_audit(self):
+        """Phase 13: resolve batch-auto-07-09-intake-fa.md & ccde_18 @ 9cdaf84b4e + proactively harden auto_11/13/14."""
+        import threading
+        import urllib.error
+        import urllib.request
+
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. auto_07: non-ASCII signature ("☃") must NEVER raise TypeError; explicit educational boundary; nbf/iss/aud/RFC 8725
+        a07 = load_module(AGENT3_LAB_DIR / "auto_07_lab.py", "auto_07_p13")
+        secret = b"p13-test-secret"
+        now_ts = 1764201600
+        tok = a07.build_hs256_jwt_demo(
+            {"iss": "https://idp.example", "aud": ["api-a", "api-b"], "sub": "bot", "nbf": now_ts - 10, "exp": now_ts + 600},
+            secret,
+        )
+        h, p, s = tok.split(".")
+        snowman_res = a07.evaluate_hs256_jwt_demo(f"{h}.{p}.☃", secret, now_ts=now_ts)
+        self.assertFalse(snowman_res["demo_checks_passed"])
+        self.assertEqual(snowman_res["reason"], "malformed_signature_encoding")
+        self.assertTrue(snowman_res["not_production_jwt_verifier"])
+        self.assertNotIn("valid", snowman_res)
+        self.assertIn("jwks_kid_key_rotation", snowman_res["checks_not_implemented"])
+
+        # Future nbf & mismatched iss/aud rejected cleanly
+        future_nbf_tok = a07.build_hs256_jwt_demo({"sub": "bot", "nbf": now_ts + 300, "exp": now_ts + 600}, secret)
+        self.assertEqual(a07.evaluate_hs256_jwt_demo(future_nbf_tok, secret, now_ts=now_ts)["reason"], "token_not_yet_valid_nbf")
+        self.assertEqual(
+            a07.evaluate_hs256_jwt_demo(tok, secret, now_ts=now_ts, expected_iss="https://other.example")["reason"],
+            "invalid_issuer",
+        )
+        self.assertEqual(
+            a07.evaluate_hs256_jwt_demo(tok, secret, now_ts=now_ts, expected_aud="api-z")["reason"],
+            "invalid_audience",
+        )
+        self.assertTrue(
+            a07.evaluate_hs256_jwt_demo(tok, secret, now_ts=now_ts, expected_iss="https://idp.example", expected_aud="api-b")["demo_checks_passed"]
+        )
+        # IP literal wildcard rejected in SAN match
+        self.assertFalse(a07.verify_san_match("10.0.0.1", ["*.0.0.1"]))
+        # Prose regression: RFC 8725 cited and revocation explicitly client/policy dependent
+        bp07_txt = (BLUEPRINT_DIR / "auto_07.json").read_text(encoding="utf-8")
+        self.assertIn("RFC 8725", bp07_txt)
+        self.assertIn("یکسان و همگانی نیست", bp07_txt)
+
+        # 2. auto_08: byte-oriented RFC 6242 chunking splits multi-byte UTF-8 ('سلام') cleanly on 1-byte chunks
+        a08 = load_module(AGENT3_LAB_DIR / "auto_08_lab.py", "auto_08_p13")
+        framed_persian = a08.frame_netconf_1_1_chunked("سلام", chunk_size=1)
+        self.assertIsInstance(framed_persian, bytes)
+        self.assertEqual(a08.parse_netconf_1_1_chunked(framed_persian), "سلام")
+        # Leading zero, truncated body, missing terminator, trailing bytes, invalid UTF-8 all raise ValueError
+        for bad_frame in (
+            b"\n#04\nabcd\n##\n",
+            b"\n#10\nabc\n##\n",
+            b"\n#3\nabc",
+            b"\n#3\nabc\n##\nextra",
+            b"\n##\n",
+            b"\n#2\n\xff\xfe\n##\n",
+        ):
+            with self.assertRaises(ValueError):
+                a08.parse_netconf_1_1_chunked(bad_frame)
+
+        # 3. auto_09: per-server isolated state, POST /wrong -> 404 (no mutation), application/json -> 415, Accept -> 406, body cap -> 413
+        a09 = load_module(AGENT3_LAB_DIR / "auto_09_lab.py", "auto_09_p13")
+        srv = a09.EducationalRestconfServer(("127.0.0.1", 0), a09.RestconfHandler, max_body_bytes=256)
+        port = srv.server_address[1]
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
+        try:
+            base = f"http://127.0.0.1:{port}"
+            payload = json.dumps({"ietf-interfaces:interface": [{"name": "Loopback99", "enabled": True}]}).encode("utf-8")
+
+            # POST /wrong with application/json MUST NOT mutate store (404)
+            req_wrong = urllib.request.Request(
+                f"{base}/wrong",
+                data=payload,
+                headers={"Content-Type": "application/json", "Accept": a09.YANG_JSON},
+                method="POST",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as ctx_wrong:
+                urllib.request.urlopen(req_wrong, timeout=5)
+            self.assertEqual(ctx_wrong.exception.code, 404)
+            self.assertNotIn("Loopback99", srv.config_store)
+
+            # Valid collection path with wrong Content-Type: application/json -> 415 (no mutation)
+            req_415 = urllib.request.Request(
+                f"{base}{a09.COLLECTION_PATH}",
+                data=payload,
+                headers={"Content-Type": "application/json", "Accept": a09.YANG_JSON},
+                method="POST",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as ctx_415:
+                urllib.request.urlopen(req_415, timeout=5)
+            self.assertEqual(ctx_415.exception.code, 415)
+            self.assertNotIn("Loopback99", srv.config_store)
+
+            # Oversized body -> 413 Payload Too Large
+            big_payload = json.dumps({"ietf-interfaces:interface": [{"name": "Loopback99", "description": "x" * 400}]}).encode("utf-8")
+            req_413 = urllib.request.Request(
+                f"{base}{a09.COLLECTION_PATH}",
+                data=big_payload,
+                headers={"Content-Type": a09.YANG_JSON, "Accept": a09.YANG_JSON},
+                method="POST",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as ctx_413:
+                urllib.request.urlopen(req_413, timeout=5)
+            self.assertEqual(ctx_413.exception.code, 413)
+
+            # Incompatible Accept -> 406
+            req_406 = urllib.request.Request(f"{base}{a09.COLLECTION_PATH}", headers={"Accept": "text/plain"})
+            with self.assertRaises(urllib.error.HTTPError) as ctx_406:
+                urllib.request.urlopen(req_406, timeout=5)
+            self.assertEqual(ctx_406.exception.code, 406)
+        finally:
+            srv.shutdown()
+            t.join(timeout=5)
+            srv.server_close()
+
+        # 4. ccde_18: unhashable profile (list/dict) raises ValueError (not TypeError) + Broadcom KB 326979 scoped to data sites
+        c18 = load_module(AGENT3_LAB_DIR / "ccde_18_lab.py", "ccde_18_p13")
+        sample_design = {
+            "dc_distance_km": 5000,
+            "storage_replication": "asynchronous",
+            "target_rpo_minutes": 15,
+            "dci_l2_stretched": False,
+            "gslb_enabled": True,
+            "wan_model": "regional_sdwan_sase",
+            "cloud_hub": "dual_colo_exchange",
+            "macro_vrfs": 4,
+            "micro_sgt_enabled": True,
+            "eu_residency_policy_enforced": True,
+            "eu_personal_data_transferred_outside_eea": False,
+            "encryption_in_transit_assumed": True,
+        }
+        for bad_prof in ([], {}, 123, None):
+            with self.assertRaises(ValueError):
+                c18.validate_pars_global_hld(sample_design, sync_product_profile=bad_prof)
+        self.assertIn("326979", (BLUEPRINT_DIR / "ccde_18.json").read_text(encoding="utf-8"))
+
+        # 5. Proactive audit: auto_11 isolated state + element validation; auto_13 unhashable device/fail_on; auto_14 strict GET path & bad query
+        a11 = load_module(AGENT3_LAB_DIR / "auto_11_lab.py", "auto_11_p13")
+        with self.assertRaises(ValueError):
+            a11.run_ios_config_task("core_routers", [123], ["description OK"], device_state=a11.build_initial_device_state())
+        a13 = load_module(AGENT3_LAB_DIR / "auto_13_lab.py", "auto_13_p13")
+        nso = a13.NsoOrchestratorMock()
+        with self.assertRaises(ValueError):
+            nso.commit_service("VRF1", "65000:1", fail_on_device=[])
+        with self.assertRaises(ValueError):
+            nso.check_sync({})
+        a14 = load_module(AGENT3_LAB_DIR / "auto_14_lab.py", "auto_14_p13")
+        cat_srv = a14.MockCatalystServer(("127.0.0.1", 0), a14.MockCatalystCenter)
+        cat_port = cat_srv.server_address[1]
+        cat_t = threading.Thread(target=cat_srv.serve_forever, daemon=True)
+        cat_t.start()
+        try:
+            with self.assertRaises(urllib.error.HTTPError) as ctx_cat404:
+                urllib.request.urlopen(
+                    urllib.request.Request(f"http://127.0.0.1:{cat_port}/wrong", headers={"X-Auth-Token": "mock-dna-token-123"}),
+                    timeout=5,
+                )
+            self.assertEqual(ctx_cat404.exception.code, 404)
+            with self.assertRaises(urllib.error.HTTPError) as ctx_cat400:
+                urllib.request.urlopen(
+                    urllib.request.Request(
+                        f"http://127.0.0.1:{cat_port}{a14.DEVICES_PATH}?offset=abc&limit=2",
+                        headers={"X-Auth-Token": "mock-dna-token-123"},
+                    ),
+                    timeout=5,
+                )
+            self.assertEqual(ctx_cat400.exception.code, 400)
+        finally:
+            cat_srv.shutdown()
+            cat_t.join(timeout=5)
+            cat_srv.server_close()
 
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))

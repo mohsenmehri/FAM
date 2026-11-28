@@ -343,5 +343,20 @@
   - `adv_bfd_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI
 - **جمع‌بندی تکمیل فاز ۱۲ (۱۷/۱۷ درس انتقالی):** تمام ۱۷ درس سابق ایجنت ۱ (`12 ccna_*` + `5 adv_*`) به‌صورت مستقل ممیزی، به بسته کامل v5 ارتقا و در ۳ دسته قابل ادغام (`12A`، `12B`، `12C`) با `SHARED_FILES_TOUCHED=0` تحویل شدند؛ تمام بازبینی‌ها **خودبازبینی نویسنده (`author-agent-self-review-not-independent`)** هستند و در انتظار بازبینی مستقل Agent 2 / SME می‌باشند.
 
+## ۱۳. همگام‌سازی کامل با دفتر هماهنگی `AGENT-HANDOFF-fa.md` @ `9cdaf84b4e` — رفع ایرادهای `auto_07` تا `auto_09`، تکمیل `ccde_18` و ممیزی پیشگیرانه `auto_11`/`auto_13`/`auto_14`
+
+- **رفع کامل ایرادهای ثبت‌شده در `batch-auto-07-09-intake-fa.md` @ `9cdaf84b4e`:**
+  - `auto_07`: رفع باگ `TypeError` روی امضای غیر-ASCII (`☃`) با اعتبارسنجی سخت‌گیرانه ASCII Base64URL و مقایسه بایتی `hmac.compare_digest(bytes, bytes)`؛ حذف نام/کلید گمراه‌کننده `verify_hs256_jwt`/`valid` و جایگزینی با `evaluate_hs256_jwt_demo` و کلیدهای صریح `demo_checks_passed`، `educational_demo_only`، `not_production_jwt_verifier`، `checks_performed` و `checks_not_implemented`؛ افزودن بررسی `nbf` و اختیاری `iss`/`aud`/`typ` و رد کلیدهای تکراری JSON و Wildcard روی IP literal در SAN؛ بازنویسی بخش‌های ۶، ۱۰ و ۱۴ و پرسش‌های آزمون برای تصریح وابستگی بررسی ابطال گواهینامه (CRL/OCSP) به کلاینت و سیاست، ارجاع صریح به **RFC 8725** و مرز غیرتولیدی آزمایشگاه.
+  - `auto_08`: بازطراحی کامل فریم‌بندی NETCONF 1.1 (`frame_netconf_1_1_chunked` و `parse_netconf_1_1_chunked`) به مدل **بایت‌محور (octet-oriented)** مطابق RFC 6242 بخش 4.2 — برش تک‌بایتی رشته‌های چندبایتی UTF-8 (مانند `'سلام'`) بدون `UnicodeDecodeError` انجام و رمزگشایی UTF-8 صرفاً در مرز پیام سرهم‌شده اجرا می‌شود؛ اعتبارسنجی دقیق ABNF (`1..4294967295` بدون صفر ابتدایی، رد فریم ناقص/اضافی/بدون پایان) و تصریح صادقانه سادگی `NetconfDatastoreMock` (نبود تایمر واقعی، اعتبارسنج YANG و SSH زنده) در کد، متن و آزمون.
+  - `auto_09`: حذف کامل وضعیت سراسری `CONFIG_STORE` و جایگزینی با `EducationalRestconfServer` ایزوله به‌ازای هر نمونه سرور با قفل ریسمانی؛ اعتبارسنجی دقیق مسیر در همه متدها (`POST /wrong` -> `404` بدون هیچ تغییری در store)، الزام `Content-Type: application/yang-data+json` (`application/json` -> `415`)، بررسی `Accept` (`406`)، محدودیت اندازه بدنه (`413`)، رد کلیدهای تکراری JSON، قالب RFC 7951 (`{"ietf-interfaces:interface": [...]}`)، `thread.join(timeout=5)` هنگام بستن سرور، و حذف هرگونه ادعای پیاده‌سازی کامل RFC 8040 یا آمادگی تولیدی (بدون TLS و تجهیز زنده).
+- **تکمیل نکات `ccde_18` و `ccna_02_vlan` در دفتر هماهنگی `9cdaf84b4e`:**
+  - `ccde_18`: افزودن بررسی `isinstance(sync_product_profile, str)` تا ورودی‌های غیرقابل‌هش (`list`/`dict`) به‌جای `TypeError` خطای `ValueError` بدهند، و ثبت ارجاع رسمی **Broadcom KB 326979** (`https://knowledge.broadcom.com/external/article/326979/vsan-health-service-stretched-cluster.html`) با تصریح محدودیت آستانه ≤۵ms RTT **صرفاً بین دو Data Site** (غیرقابل تعمیم به Witness یا سایر توپولوژی‌ها).
+  - `ccna_02_vlan`: راستی‌آزمایی مجدد در برابر `ccna_02_vlan-intake-fa.md` — تمامی نکات (فهرست `10,20,50,999` در دو سمت و خروجی نمونه، حفظ سؤال ۴، تفکیک `access` از `nonegotiate`، شرطی بودن پیش‌فرض untagged Native VLAN و عیب‌یابی چندلایه) پیش‌تر در فاز ۱۲A لحاظ و اکنون دوباره تأیید شدند.
+- **ممیزی پیشگیرانه درس‌های آماده صف بعدی (`auto_11`، `auto_13`، `auto_14`):**
+  - `auto_14`: سخت‌سازی سرور loopback HTTP (بررسی دقیق مسیر `GET /wrong -> 404`، خطای `400` به‌جای استثنای `ValueError` روی `offset=abc`، محدودسازی امن `Retry-After`، ایزوله‌سازی `devices` در نمونه سرور و `thread.join(timeout=5)`).
+  - `auto_11`: افزودن `build_initial_device_state()` و پارامتر اختیاری `device_state` برای ایزوله‌سازی وضعیت و اعتبارسنجی نوع رشته‌ای تک‌تک اعضای `parents`/`lines`.
+  - `auto_13`: افزودن بررسی `isinstance(..., str)` پیش از جست‌وجو در دیکشنری برای `fail_on_device` و `device` (رد `list`/`dict` با `ValueError` به‌جای `TypeError`).
+- **تطابق کد embedded:** تمامی ۷ بلوپرینت ویرایش‌شده byte-for-byte با فایل `*_lab.py` متناظر همگام و با تست `test_phase13_handoff_9cdaf84b_auto07_09_and_proactive_audit` تأیید شدند (`38/38 OK`، `SHARED_FILES_TOUCHED=0`).
+
 
 

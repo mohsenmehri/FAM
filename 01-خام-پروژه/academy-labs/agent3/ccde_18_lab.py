@@ -34,8 +34,12 @@ PRODUCT_SYNC_PROFILES = {
         "max_rtt_ms": 5.0,
         "strict_lt": False,
         "max_jitter_ms": None,
-        "comparator_text": "<= 5.0 ms RTT",
-        "source_note": "VMware vSAN Stretched Cluster data-site RTT ceiling (<= 5 ms; verify exact vSAN release).",
+        "comparator_text": "<= 5.0 ms RTT (data sites only)",
+        "source_note": (
+            "Broadcom KB 326979 confirms the <= 5 ms RTT health check threshold ONLY between the two "
+            "data sites in a VMware vSAN Stretched Cluster — do NOT generalize to witness or other topologies "
+            "(https://knowledge.broadcom.com/external/article/326979/vsan-health-service-stretched-cluster.html)."
+        ),
     },
     "netapp_vmsc_snapmirror_active_sync": {
         "max_rtt_ms": 10.0,
@@ -170,7 +174,7 @@ def estimate_fiber_rtt_ms(
 def validate_pars_global_hld(design: dict, sync_product_profile: str = "netapp_vmsc_snapmirror_active_sync") -> dict:
     if not isinstance(design, dict):
         raise ValueError(f"design must be a dict, got {type(design).__name__}")
-    if sync_product_profile not in PRODUCT_SYNC_PROFILES:
+    if not isinstance(sync_product_profile, str) or sync_product_profile not in PRODUCT_SYNC_PROFILES:
         raise ValueError(
             f"Unknown sync_product_profile {sync_product_profile!r}; "
             f"expected one of {sorted(PRODUCT_SYNC_PROFILES)}"

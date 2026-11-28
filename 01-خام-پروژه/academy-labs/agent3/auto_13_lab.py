@@ -33,7 +33,7 @@ class NsoOrchestratorMock:
 
     def commit_service(self, vrf_name: str, rd: str, fail_on_device: str | None = None) -> dict:
         rendered = self.render_ned_commands(vrf_name, rd)
-        if fail_on_device is not None and fail_on_device not in rendered:
+        if fail_on_device is not None and (not isinstance(fail_on_device, str) or fail_on_device not in rendered):
             raise ValueError(f"Unknown fail_on_device {fail_on_device!r}; expected one of {sorted(rendered)}")
         cdb_backup = copy.deepcopy(self.cdb_devices)
         live_backup = copy.deepcopy(self.live_devices)
@@ -51,7 +51,7 @@ class NsoOrchestratorMock:
             return {"status": "aborted", "error": str(exc), "rollback_triggered": True}
 
     def check_sync(self, device: str) -> str:
-        if device not in self.cdb_devices:
+        if not isinstance(device, str) or device not in self.cdb_devices:
             raise ValueError(f"Unknown NSO device: {device!r}")
         return "in-sync" if self.cdb_devices[device] == self.live_devices[device] else "out-of-sync"
 

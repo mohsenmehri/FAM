@@ -13,3 +13,9 @@
 ## به‌روزرسانی فاز ۱۰E — خودبازبینی نویسنده (reviewed.9؛ بدون بازبینی مستقل انسانی)
 - **تغییرات:** افزودن پاسخ `400 Bad Request` (`malformed-message` / `invalid-value` مطابق RFC 8040) برای JSON ناقص، فیلد `enabled` غیربولی و مقدار نامعتبر `content=` در سرور RESTCONF Loopback.
 - **وضعیت اجرا:** اجرای محلی Python بدون تجهیز شبکه یا سرویس بیرونی زنده؛ تطابق دقیق بایتی کد HTML با `auto_09_lab.py` تأیید شد.
+
+## به‌روزرسانی فاز ۱۳ (رفع کامل ایرادهای `batch-auto-07-09-intake-fa.md` @ `9cdaf84b4e`)
+- حذف متغیر سراسری `CONFIG_STORE` و ایجاد `EducationalRestconfServer` ایزوله به‌ازای هر نمونه سرور با قفل ریسمانی و `thread.join(timeout=5)`.
+- اعتبارسنجی دقیق مسیر (`POST /wrong` -> `404` بدون تغییر وضعیت)، الزام `Content-Type: application/yang-data+json` (`application/json` -> `415`)، بررسی `Accept` (`406`)، سقف اندازه بدنه (`413`)، رد کلید تکراری JSON و قالب RFC 7951 (`{"ietf-interfaces:interface": [...]}`).
+- تصریح صریح شبیه‌ساز آموزشی حداقلی روی HTTP محلی (نه پیاده‌سازی کامل RFC 8040، بدون TLS/احراز هویت و بدون تجهیز زنده).
+- **وضعیت بازبینی:** همچنان خودبازبینی نویسنده (`author-agent-self-review-not-independent`) — آماده بازبینی مجدد یکپارچه‌ساز/انسان مستقل.

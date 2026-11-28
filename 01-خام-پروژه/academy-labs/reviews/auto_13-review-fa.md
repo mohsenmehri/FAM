@@ -11,3 +11,7 @@
 - **اصلاح انجام‌شده:** افزودن `_require_non_empty_str` و بررسی وجود تجهیز در `commit_service`/`check_sync`.
 - **تست مرتبط:** `test_phase8c2_remaining_automation_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** شبیه‌ساز محلی بدون NSO زنده؛ بازبینی نویسنده (نه مستقل).
+
+## به‌روزرسانی فاز ۱۳ (ممیزی پیشگیرانه پیش از intake)
+- افزودن بررسی `isinstance(..., str)` پیش از جست‌وجو در دیکشنری برای `fail_on_device` و `device` (رد `list`/`dict` با `ValueError` به‌جای `TypeError`).
+- **وضعیت بازبینی:** همچنان خودبازبینی نویسنده (`author-agent-self-review-not-independent`).

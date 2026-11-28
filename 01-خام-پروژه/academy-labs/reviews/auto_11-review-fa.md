@@ -11,3 +11,7 @@
 - **اصلاح انجام‌شده:** اعمال `_require_bool`، اعتبارسنجی `hosts_pattern`/`parents`/`lines` و افزودن `handler_actually_executed`.
 - **تست مرتبط:** `test_phase8c2_remaining_automation_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** شبیه‌ساز محلی بدون Ansible/SSH؛ بازبینی نویسنده (نه مستقل).
+
+## به‌روزرسانی فاز ۱۳ (ممیزی پیشگیرانه پیش از intake)
+- افزودن `build_initial_device_state()` و پارامتر اختیاری `device_state` برای ایزوله‌سازی وضعیت میان اجراها و اعتبارسنجی نوع رشته‌ای تک‌تک اعضای `parents` و `lines`.
+- **وضعیت بازبینی:** همچنان خودبازبینی نویسنده (`author-agent-self-review-not-independent`).

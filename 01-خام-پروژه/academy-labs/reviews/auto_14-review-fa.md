@@ -11,3 +11,7 @@
 - **اصلاح انجام‌شده:** انتقال `rate_hits` به شیء `MockCatalystServer`، اعتبارسنجی `page_size > 0`، افزودن `max_retries` و اعتبارسنجی ورودی‌های ChatOps.
 - **تست مرتبط:** `test_phase8c2_remaining_automation_labs` در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** سرور محلی Loopback `127.0.0.1` بدون Sandbox زنده؛ بازبینی نویسنده (نه مستقل).
+
+## به‌روزرسانی فاز ۱۳ (ممیزی پیشگیرانه سرور loopback پیش از intake)
+- سخت‌سازی سرور loopback HTTP: بررسی دقیق مسیر `GET /wrong -> 404`، خطای `400` روی پارامتر غیرعددی `offset`/`limit`، ایزوله‌سازی `devices` در نمونه سرور، محدودسازی امن `Retry-After` و `thread.join(timeout=5)`.
+- **وضعیت بازبینی:** همچنان خودبازبینی نویسنده (`author-agent-self-review-not-independent`).
