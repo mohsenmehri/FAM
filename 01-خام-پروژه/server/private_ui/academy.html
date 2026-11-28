@@ -333,6 +333,7 @@
         });
       }
 
+      let catalogPromise = null;
       window.FamAcademyBridge = {
         user: boot.user || (boot.userName ? { username: boot.userName } : null),
         offline: boot.offline === true,
@@ -341,6 +342,21 @@
         lastError: '',
         lastStatus: 0,
         lastCode: '',
+        fetchCatalog() {
+          if (!catalogPromise) {
+            catalogPromise = (async () => {
+              try {
+                const res = await window.fetch('/academy-assets/curriculum-catalog.json', { credentials: 'same-origin', cache: 'no-store' });
+                if (!res || !res.ok) throw new Error('HTTP ' + (res ? res.status : 0));
+                return await res.json();
+              } catch (err) {
+                catalogPromise = null;
+                throw err;
+              }
+            })();
+          }
+          return catalogPromise;
+        },
         async saveProgress(payload) {
           this.lastError = '';
           this.lastStatus = 0;
@@ -691,7 +707,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 @media(max-width:650px){.fa-topbar{align-items:flex-start}.fa-brand{margin-bottom:4px}.fa-nav{width:100%;overflow-x:auto;flex-wrap:nowrap}.fa-nav .btn{white-space:nowrap}.fa-path-grid{grid-template-columns:1fr}.fa-hero{padding:20px}.fa-hero h1{font-size:30px}.fa-stat{padding:11px}.fa-stat strong{font-size:18px}.fa-lesson-row{align-items:flex-start;flex-wrap:wrap}.fa-lesson-row button{margin-right:46px}}
 @media(prefers-reduced-motion:no-preference){.fa-path-card{transition:transform .2s,border-color .2s}.fa-path-card:hover{transform:translateY(-3px);border-color:#7b9cff77}}
 </style>
-  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261128i">
+  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261128j">
 </head>
 <body>
   <header class="topbar fa-topbar">
@@ -717,10 +733,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   </section>
   <main class="container" id="app-root"></main>
 
-  <script src="/academy-assets/academy-simulator.js?v=20261128i"></script>
-  <script src="/academy-assets/lesson-engine.js?v=20261128i"></script>
-  <script src="/academy-assets/academy-catalog.js?v=20261128i"></script>
-  <script src="/academy-assets/academy-journey.js?v=20261128i"></script>
+  <script src="/academy-assets/academy-simulator.js?v=20261128j"></script>
+  <script src="/academy-assets/lesson-engine.js?v=20261128j"></script>
+  <script src="/academy-assets/academy-catalog.js?v=20261128j"></script>
+  <script src="/academy-assets/academy-journey.js?v=20261128j"></script>
   <script nonce="__FAM_CSP_NONCE__">
 (() => {
   'use strict';
@@ -733,10 +749,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     root.dataset.loadSequence = requestId;
     root.innerHTML = '<div class="fa-loading">در حال بارگذاری مسیرهای آموزشی…</div>';
     try {
-      const response = await fetch('/academy-assets/curriculum-catalog.json', { credentials: 'same-origin', cache: 'no-store' });
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-      catalog = await response.json();
-      if (root.dataset.loadSequence !== requestId) return;
+      catalog = window.FamAcademyBridge?.fetchCatalog
+        ? await window.FamAcademyBridge.fetchCatalog()
+        : await (await fetch('/academy-assets/curriculum-catalog.json', { credentials: 'same-origin', cache: 'no-store' })).json();
+      if (typeof document === 'undefined' || !root || root.dataset.loadSequence !== requestId) return;
       if (!catalog || !Array.isArray(catalog.paths) || !window.FamAcademyCatalog) throw new Error('ساختار کاتالوگ معتبر نیست');
       window.FamAcademyCatalog.renderDashboard(root, catalog, openBlueprint);
       if (openSelectedPath || (restoreInitialHash && location.hash === '#/paths')) {
@@ -769,7 +785,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
         if (current?.blueprint) openBlueprint(current.blueprint);
       }
     } catch (error) {
-      if (root.dataset.loadSequence !== requestId) return;
+      if (typeof document === 'undefined' || !root || root.dataset.loadSequence !== requestId) return;
       const errEl = document.createElement('div');
       errEl.className = 'fa-error';
       errEl.textContent = 'بارگذاری آکادمی انجام نشد: ' + String(error.message || error);
@@ -806,7 +822,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
         }
       });
     } catch (error) {
-      if (root.dataset.loadSequence !== requestId) return;
+      if (typeof document === 'undefined' || !root || root.dataset.loadSequence !== requestId) return;
       const errEl = document.createElement('div');
       errEl.className = 'fa-error';
       errEl.textContent = 'باز کردن درس ناموفق بود: ' + String(error.message || error);
@@ -849,8 +865,9 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   document.getElementById('btn-back-paths').onclick = () => loadCatalog();
   document.getElementById('btn-blueprint').onclick = async () => {
     try {
-      const response = await fetch('/academy-assets/curriculum-catalog.json', { credentials: 'same-origin', cache: 'no-store' });
-      const cat = await response.json();
+      const cat = window.FamAcademyBridge?.fetchCatalog
+        ? await window.FamAcademyBridge.fetchCatalog()
+        : await (await fetch('/academy-assets/curriculum-catalog.json', { credentials: 'same-origin', cache: 'no-store' })).json();
       const first = (cat.paths || []).flatMap(x => (x.courses || []).flatMap(c => c.lessons || [])).find(l => l.blueprint);
       if (first) openBlueprint(first.blueprint);
     } catch (_) {}
@@ -1118,11 +1135,11 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     const requestId = String((Number(root.dataset.loadSequence) || 0) + 1);
     root.dataset.loadSequence = requestId;
     try {
-      const [bpRes, catRes] = await Promise.all([
+      const [bpRes, catData] = await Promise.all([
         fetch(lesson.blueprint, { cache: 'no-store' }),
-        fullCatalogCache ? Promise.resolve(null) : fetch("/academy-assets/curriculum-catalog.json?v=20261123c")
+        fullCatalogCache ? Promise.resolve(null) : (window.FamAcademyBridge?.fetchCatalog ? window.FamAcademyBridge.fetchCatalog() : fetch("/academy-assets/curriculum-catalog.json").then(r => r.ok ? r.json() : null))
       ]);
-      if (catRes && catRes.ok) fullCatalogCache = await catRes.json();
+      if (catData) fullCatalogCache = catData;
       if (!bpRes.ok) throw new Error('HTTP ' + bpRes.status);
       const bp = await bpRes.json();
       if (root.dataset.loadSequence !== requestId) return;
@@ -1450,8 +1467,11 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     });
   }
 
-  fetch("/academy-assets/curriculum-catalog.json?v=20261123c")
-    .then(r => r.ok ? r.json() : null)
+  const sharedCatalogPromise = window.FamAcademyBridge?.fetchCatalog
+    ? window.FamAcademyBridge.fetchCatalog()
+    : fetch("/academy-assets/curriculum-catalog.json").then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+
+  sharedCatalogPromise
     .then(cat => {
       glossaryCatalog = cat;
       const first = (cat?.paths || []).flatMap(p => (p.courses || []).flatMap(c => c.lessons || [])).find(l => l.blueprint);
@@ -1464,9 +1484,9 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       renderGlossaryChips();
     }).catch(() => {});
 
-  fetch("/academy-assets/curriculum-catalog.json?v=20261123c")
-    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  sharedCatalogPromise
     .then(cat => {
+      if (typeof document === 'undefined' || !cat) return;
       lessons = [];
       const trackCounts = {};
       for (const p of (cat.paths || [])) {
@@ -1505,7 +1525,9 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       renderS4();
     })
     .catch(err => {
+      if (typeof document === 'undefined') return;
       const el = document.getElementById("s4-error");
+      if (!el) return;
       el.textContent = "خطای اعتبارسنجی کاتالوگ: " + err.message;
       el.style.display = "block";
     });
@@ -1525,7 +1547,11 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     const q = normFa(inp.value.trim());
     const track = sel.value;
     if (!catCache) {
-      try { catCache = await (await fetch("/academy-assets/curriculum-catalog.json?v=20261123c", { credentials: "same-origin", cache: "no-store" })).json(); } catch { return; }
+      try {
+        catCache = window.FamAcademyBridge?.fetchCatalog
+          ? await window.FamAcademyBridge.fetchCatalog()
+          : await (await fetch("/academy-assets/curriculum-catalog.json", { credentials: "same-origin", cache: "no-store" })).json();
+      } catch { return; }
     }
     if (!q && track === "ALL") {
       resBox.style.display = "none";
@@ -1586,7 +1612,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   sel.addEventListener("change", runFilter);
 })();
 </script>
-  <script src="/academy-assets/academy-reference-shell.js?v=20261128i"></script>
+  <script src="/academy-assets/academy-reference-shell.js?v=20261128j"></script>
 </body>
 
 </html>

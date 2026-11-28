@@ -28,9 +28,13 @@
   const profile = () => current().profile || {};
   async function getCatalog() {
     if (!catalog) {
-      const res = await fetch('/academy-assets/curriculum-catalog.json', { cache:'no-store' });
-      if (!res.ok) throw new Error('کاتالوگ در دسترس نیست');
-      catalog = await res.json();
+      if (window.FamAcademyBridge && typeof window.FamAcademyBridge.fetchCatalog === 'function') {
+        catalog = await window.FamAcademyBridge.fetchCatalog();
+      } else {
+        const res = await fetch('/academy-assets/curriculum-catalog.json', { cache:'no-store' });
+        if (!res.ok) throw new Error('کاتالوگ در دسترس نیست');
+        catalog = await res.json();
+      }
     }
     return catalog;
   }
@@ -160,12 +164,21 @@
           : null;
         return { title: course.title, done: cDone, total: ls.length, pct: cPct, quizCount: cQuizzes.length, avg: cAvg };
       }));
+      let quizHistory = current().labs?.quizHistory;
+      if ((!quizHistory || typeof quizHistory !== 'object') && !isSignedInOnline) {
+        try { quizHistory = JSON.parse(localStorage.getItem('fam_academy_quiz_history_v1') || '{}'); } catch (_) { quizHistory = {}; }
+      }
+      if (!quizHistory || typeof quizHistory !== 'object') quizHistory = {};
       const scoreBadge = lessonId => {
         const q = quizAttempts?.[lessonId];
         if (!q || !Number(q.total)) return '';
         const ratio = Number(q.correct || 0) / Number(q.total);
         const sc = Number((ratio * 10).toFixed(1));
-        return `<span class="journey-score-badge ${ratio >= 0.7 ? 'is-pass' : 'is-low'}">آزمون: ${sc}/۱۰</span>`;
+        const h = quizHistory?.[lessonId];
+        const bestPart = h && Number.isInteger(h.bestCorrect) && h.attempts > 1
+          ? ` · بهترین: ${Number((h.bestCorrect * 10 / Number(q.total)).toFixed(1))} (${h.attempts} تلاش)`
+          : '';
+        return `<span class="journey-score-badge ${ratio >= 0.7 ? 'is-pass' : 'is-low'}">آزمون: ${sc}/۱۰${bestPart}</span>`;
       };
       root.innerHTML=`<div class="journey-progress-page"><div class="journey-progress-head"><div><span class="journey-kicker">YOUR LEARNING PROFILE</span><h1>پیشرفت و سنجش تسلط من</h1><p>ترکیبی از درس‌های تکمیل‌شده، نمرات آزمون ۱۲سؤالی و پیشرفت هر دوره.</p></div><div class="journey-head-actions"><button class="journey-primary small" id="journey-edit-profile" type="button">ویرایش هدف و برنامه ←</button><button class="btn btn-reset-fresh" id="journey-reset-fresh" type="button">شروع از صفر (حالت خام)</button></div></div>
         <div class="journey-progress-grid"><article class="journey-panel"><span class="journey-kicker">LESSONS COMPLETED</span><h2>درس‌های تکمیل‌شده</h2><div class="journey-stat">${done.length}<small>از ${count} درس</small></div><div class="fa-progress journey-meter"><span style="width:${pct}%"></span></div><p>بر اساس تکمیل ثبت‌شده درس‌ها</p></article>

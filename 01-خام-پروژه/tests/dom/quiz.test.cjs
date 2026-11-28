@@ -44,7 +44,25 @@ bp.interactiveQuiz.forEach((question,i) => choice(i,question.correctIndex));
 grade();
 assert.match(result(), /نمره: 10 از ۱۰/);
 assert.equal(persisted.at(-1).labs.quizAttempts[bp.lessonId].correct,12);
+assert.equal(persisted.at(-1).labs.quizHistory[bp.lessonId].bestCorrect,12,'quizHistory tracks best score');
+assert.equal(persisted.at(-1).labs.quizHistory[bp.lessonId].attempts,3,'quizHistory tracks attempt count');
 assert.deepEqual(persisted.at(-1).completed, [], 'quiz result is not automatic completion');
+// Phase 4: document.title updates and "review wrong only" filter hides correct questions
+assert.equal(w.document.title, `${bp.title} — FAM Academy`);
+retry();
+choice(0, bp.interactiveQuiz[0].correctIndex);
+grade();
+const wrongBtn = quiz().querySelector('[data-quiz-filter-wrong]');
+assert.equal(wrongBtn.hidden, false, 'review wrong button must appear when mistakes/unanswered exist');
+wrongBtn.click();
+assert.equal(quiz().querySelector('fieldset[data-question="0"]').hidden, true, 'correct question must hide in wrong-only review mode');
+assert.equal(quiz().querySelector('fieldset[data-question="1"]').hidden, false, 'unanswered/wrong question must stay visible');
+wrongBtn.click();
+assert.equal(quiz().querySelector('fieldset[data-question="0"]').hidden, false, 'toggling off shows all questions');
+retry();
+bp.interactiveQuiz.forEach((question,i) => choice(i,question.correctIndex));
+grade();
+assert.equal(quiz().querySelector('[data-quiz-filter-wrong]').hidden, true, 'review wrong button stays hidden on perfect score');
 render();
 assert.match(result(), /آخرین نتیجه ثبت‌شده: 12 از 12/);
 // A different signed-in account does not load the first account's result.

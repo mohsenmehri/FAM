@@ -109,9 +109,18 @@
   ];
   const navLinks = new Map();
   let lessonsPill = null;
+  const routeHrefMap = {
+    home: '#/dashboard',
+    paths: '#/paths',
+    lab: '#/lab',
+    progress: '#/progress',
+    planner: '#fam-stage4-panel',
+    glossary: '#s4-glossary-card',
+    coverage: '#/coverage'
+  };
   for (const [id, label, ico, act, pillText] of navItems) {
     const a = el('a', 'side-link');
-    a.href = '#' + act;
+    a.href = routeHrefMap[act] || '#/dashboard';
     a.dataset.action = act;
     const i = el('span', 'side-icon');
     i.append(icon(ico, 19));
@@ -120,6 +129,7 @@
     a.append(i, copy);
     if (pillText) {
       const pill = el('span', 'side-pill', pillText);
+      pill.setAttribute('aria-hidden', 'true');
       if (id === 'paths') lessonsPill = pill;
       a.append(pill);
     }
@@ -226,8 +236,13 @@
     pathFill.style.width = `${pct}%`;
     pathMeta.textContent = `${done.toLocaleString('fa-IR')} از ${totalCatalogLessons.toLocaleString('fa-IR')} درس (${pct.toLocaleString('fa-IR')}٪)`;
   };
-  fetch('/academy-assets/curriculum-catalog.json?v=20261123c', { cache: 'no-store' })
-    .then(response => { if (!response.ok) throw new Error('catalog unavailable'); return response.json(); })
+  const loadCatalogForShell = () => (
+    window.FamAcademyBridge && typeof window.FamAcademyBridge.fetchCatalog === 'function'
+      ? window.FamAcademyBridge.fetchCatalog()
+      : fetch('/academy-assets/curriculum-catalog.json', { cache: 'no-store' })
+          .then(response => { if (!response.ok) throw new Error('catalog unavailable'); return response.json(); })
+  );
+  loadCatalogForShell()
     .then(catalog => {
       quickSearchLessons = (catalog.paths || []).flatMap(path =>
         (path.courses || []).flatMap(course =>
@@ -351,7 +366,7 @@
   ];
   for (const [act, label, ico] of bottomActions) {
     const a = el('a', '');
-    a.href = '#' + act;
+    a.href = routeHrefMap[act] || '#/dashboard';
     a.dataset.action = act;
     a.append(icon(ico, 20), el('span', '', label));
     bottom.append(a);
@@ -495,7 +510,23 @@
       closeBtn.addEventListener('click', () => dialog.close());
       head.append(qInput, closeBtn);
       const list = el('div', 'fam-qsearch-list');
+      list.setAttribute('role', 'listbox');
+      list.setAttribute('aria-label', 'نتایج جست‌وجو');
       dialog.append(head, list);
+      let activeIdx = -1;
+      const syncActiveHit = (nextIdx) => {
+        const hits = [...list.querySelectorAll('.fam-qsearch-hit')];
+        if (!hits.length) { activeIdx = -1; return; }
+        activeIdx = ((nextIdx % hits.length) + hits.length) % hits.length;
+        hits.forEach((btn, idx) => {
+          const isAct = idx === activeIdx;
+          btn.classList.toggle('is-active', isAct);
+          btn.setAttribute('aria-selected', String(isAct));
+          if (isAct && typeof btn.scrollIntoView === 'function') {
+            btn.scrollIntoView({ block: 'nearest' });
+          }
+        });
+      };
       const renderHits = (query) => {
         const q = normSearch(query);
         const allMatches = q
@@ -504,6 +535,7 @@
         const limit = q ? 30 : 12;
         const matches = allMatches.slice(0, limit);
         list.replaceChildren();
+        activeIdx = -1;
         if (!matches.length) {
           list.append(el('div', 'journey-empty', 'درسی با این عبارت پیدا نشد.'));
           return;
@@ -513,21 +545,40 @@
           info.style.cssText = 'font-size:12px;color:var(--muted);padding:4px 8px 6px;';
           list.append(info);
         }
-        matches.forEach(item => {
+        matches.forEach((item, idx) => {
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'fam-qsearch-hit';
+          btn.setAttribute('role', 'option');
+          btn.setAttribute('aria-selected', 'false');
           const title = el('strong', '', item.title);
           const meta = el('small', '', `${item.path} · ${item.course}`);
           btn.append(title, meta);
+          btn.addEventListener('mouseenter', () => syncActiveHit(idx));
           btn.addEventListener('click', () => {
             dialog.close();
             location.hash = '#' + encodeURIComponent(item.id);
           });
           list.append(btn);
         });
+        syncActiveHit(0);
       };
       qInput.addEventListener('input', () => renderHits(qInput.value));
+      qInput.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          syncActiveHit(activeIdx + 1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          syncActiveHit(activeIdx - 1);
+        } else if (e.key === 'Enter') {
+          const hits = [...list.querySelectorAll('.fam-qsearch-hit')];
+          if (hits.length) {
+            e.preventDefault();
+            (hits[activeIdx >= 0 ? activeIdx : 0]).click();
+          }
+        }
+      });
       dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
       dialog._renderHits = renderHits;
       dialog._input = qInput;

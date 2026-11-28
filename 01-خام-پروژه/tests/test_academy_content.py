@@ -210,6 +210,9 @@ class AcademyContentTests(unittest.TestCase):
                 else:
                     self.assertEqual(evidence, "Designed — Not Run", lesson["id"])
                 self.assertGreaterEqual(len(blueprint.get("glossary", [])), 15, lesson["id"])
+                raw_bp_text = blueprint_path(lesson).read_text(encoding="utf-8")
+                self.assertNotIn("\u064a", raw_bp_text, f"Arabic Yeh (U+064A) found in {lesson['id']}")
+                self.assertNotIn("\u0643", raw_bp_text, f"Arabic Kaf (U+0643) found in {lesson['id']}")
                 quiz = blueprint.get("interactiveQuiz", [])
                 self.assertEqual(len(quiz), 12, lesson["id"])
                 seen_questions = set()

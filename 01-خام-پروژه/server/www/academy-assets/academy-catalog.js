@@ -110,6 +110,12 @@
   }
   function loadMissionRecord() {
     const today = localDateKey();
+    const bridge = window.FamAcademyBridge;
+    const remote = bridge && !bridge.offline ? bridge.progress?.labs?.dailyMissions : null;
+    if (remote && remote.day === today && remote.done && typeof remote.done === 'object') {
+      const cliCmds = Array.isArray(remote.cliCmds) ? remote.cliCmds.filter(Boolean) : [];
+      return { day: today, done: { ...remote.done }, cliCmds, cliCount: Math.max(cliCmds.length, Number(remote.cliCount) || 0) };
+    }
     try {
       const raw = JSON.parse(localStorage.getItem(missionStorageKey()) || '{}');
       if (raw.day === today && raw.done && typeof raw.done === 'object') {
@@ -119,16 +125,30 @@
     } catch (_) {}
     return { day: today, done: {}, cliCmds: [], cliCount: 0 };
   }
+  let missionSyncTimer = null;
   function saveMissionRecord(record) {
-    try {
-      const cliCmds = Array.isArray(record.cliCmds) ? Array.from(new Set(record.cliCmds)).slice(0, 50) : [];
-      localStorage.setItem(missionStorageKey(), JSON.stringify({
-        day: localDateKey(),
-        done: record.done || {},
-        cliCmds,
-        cliCount: Math.max(cliCmds.length, Number(record.cliCount) || 0)
-      }));
-    } catch (_) {}
+    const cliCmds = Array.isArray(record.cliCmds) ? Array.from(new Set(record.cliCmds)).slice(0, 50) : [];
+    const payload = {
+      day: localDateKey(),
+      done: record.done || {},
+      cliCmds,
+      cliCount: Math.max(cliCmds.length, Number(record.cliCount) || 0)
+    };
+    try { localStorage.setItem(missionStorageKey(), JSON.stringify(payload)); } catch (_) {}
+    const bridge = window.FamAcademyBridge;
+    if (bridge && !bridge.offline && !bridge.sharedProgressLocked && typeof bridge.saveProgress === 'function') {
+      const cur = bridge.progress && typeof bridge.progress === 'object' ? bridge.progress : { completed: [], labs: {} };
+      const next = {
+        ...cur,
+        completed: Array.isArray(cur.completed) ? cur.completed : [],
+        labs: { ...(cur.labs && typeof cur.labs === 'object' ? cur.labs : {}), dailyMissions: payload }
+      };
+      bridge.progress = next;
+      clearTimeout(missionSyncTimer);
+      missionSyncTimer = setTimeout(() => {
+        bridge.saveProgress(next).catch(() => {});
+      }, 450);
+    }
   }
   function loadDailyMissions() { return loadMissionRecord().done; }
   function saveDailyMissions(doneMap) {
@@ -184,7 +204,7 @@
     const doneTarget = target.filter(l => completed.has(l.id)).length;
     const pctTarget = target.length ? Math.round(doneTarget / target.length * 100) : 0;
     const user = window.FamAcademyBridge?.user?.username || '';
-    const greeting = user && user !== 'e2e-test-user' ? `سلام ${esc(user)}؛ ` : '';
+    const greeting = user && !window.FamAcademyBridge?.offline ? `سلام ${esc(user)}؛ ` : '';
     const level = ({ beginner: 'سطح پایه', intermediate: 'سطح میانی', advanced: 'سطح پیشرفته' })[profile.level] || 'مسیر منعطف';
     const nodes = target.slice(0, 6);
     const missionRec = loadMissionRecord();
@@ -340,7 +360,7 @@
     const assessed = new Set(window.FamAcademyBridge?.progress?.selfAssessed || []);
     const ready = l => (l.prerequisites || []).every(id => completed.has(id) || assessed.has(id));
     const next = lessons.find(l => !completed.has(l.id) && ready(l) && l.blueprint) || lessons.find(l => !completed.has(l.id)) || lessons[0];
-    const cols = 4, stepX = 210, stepY = 150, rows = Math.ceil(lessons.length / cols), graphWidth = 850, graphHeight = Math.max(230, rows * stepY + 60);
+    const cols = 4, stepX = 210, stepY = 150, rows = Math.ceil(lessons.length / cols), graphWidth = 960, graphHeight = Math.max(230, rows * stepY + 60);
     const point = i => ({ x: 110 + (i % cols) * stepX, y: 65 + Math.floor(i / cols) * stepY });
     const lines = lessons.flatMap((l, i) => (l.prerequisites || []).map(id => {
       const j = lessons.findIndex(item => item.id === id);

@@ -47,14 +47,40 @@
     return {};
   }
 
+  function getQuizHistory() {
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      const value = bridge.progress?.labs?.quizHistory;
+      return value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : {};
+    }
+    try {
+      const value = JSON.parse(localStorage.getItem('fam_academy_quiz_history_v1') || '{}');
+      if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+    } catch {}
+    return {};
+  }
+
   function saveQuizAttempt(lessonId, attempt) {
     const attempts = getQuizAttempts();
     attempts[lessonId] = attempt;
+    const history = getQuizHistory();
+    const prev = history[lessonId] && typeof history[lessonId] === 'object' ? history[lessonId] : {};
+    const prevBest = Number.isInteger(prev.bestCorrect) ? prev.bestCorrect : -1;
+    const prevCount = Number.isInteger(prev.attempts) ? prev.attempts : 0;
+    history[lessonId] = {
+      bestCorrect: Math.max(prevBest, Number(attempt.correct || 0)),
+      total: Number(attempt.total || 0),
+      attempts: prevCount + 1,
+      lastAt: Date.now()
+    };
     const bridge = window.FamAcademyBridge;
     if (bridge) {
-      persistProgress(getCompletedList(), { ...(bridge.progress?.labs || {}), quizAttempts: attempts });
+      persistProgress(getCompletedList(), { ...(bridge.progress?.labs || {}), quizAttempts: attempts, quizHistory: history });
     } else {
-      try { localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(attempts)); } catch {}
+      try {
+        localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(attempts));
+        localStorage.setItem('fam_academy_quiz_history_v1', JSON.stringify(history));
+      } catch {}
     }
   }
 
@@ -124,21 +150,22 @@
 
   function renderUnreadyLesson(container, lessonMeta, opts = {}) {
     if (!container || !lessonMeta) return;
+    if (lessonMeta.title) document.title = `${lessonMeta.title} — FAM Academy`;
     const adj = getAdjacentLessons(opts.catalog, lessonMeta.id);
     container.innerHTML = `
-      <div style="padding:16px;background:#0f172a;border:1px solid #1e293b;border-radius:10px;color:#e2e8f0">
-        ${opts.onBackToCatalog ? `<button id="le-back-cat" class="btn" style="margin-bottom:12px;font-size:12px">← بازگشت به نقشه مسیر</button>` : ''}
+      <div class="lesson-unready-box">
+        ${opts.onBackToCatalog ? `<button id="le-back-cat" class="btn" style="margin-bottom:12px;font-size:12px" type="button">← بازگشت به نقشه مسیر</button>` : ''}
         <div style="margin-bottom:10px">
-          <span class="badge">${lessonMeta.track || 'CCNA'} · ${lessonMeta.courseTitle || ''}</span>
-          <h2 style="margin:8px 0 6px;color:#fff;font-size:18px">${lessonMeta.title}</h2>
+          <span class="badge">${escapeHtml(lessonMeta.track || 'CCNA')} · ${escapeHtml(lessonMeta.courseTitle || '')}</span>
+          <h2 style="margin:8px 0 6px;color:var(--text);font-size:18px">${escapeHtml(lessonMeta.title || '')}</h2>
         </div>
-        <div class="card" style="padding:16px;border:1px solid #f59e0b;background:#06090f;margin-bottom:14px">
-          <strong style="color:#fbbf24;font-size:14px">این درس هنوز آماده نیست</strong>
-          <p style="margin:6px 0 0;font-size:12px;color:#94a3b8">محتوای آموزشی و Blueprint این درس در مراحل بعدی اضافه خواهد شد.</p>
+        <div class="card lesson-unready-notice">
+          <strong style="color:var(--amber);font-size:14px">این درس هنوز آماده نیست</strong>
+          <p style="margin:6px 0 0;font-size:12.5px;color:var(--muted)">محتوای آموزشی و Blueprint این درس در مراحل بعدی اضافه خواهد شد.</p>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid #1e293b">
-          <button id="le-prev-btn" class="btn" ${adj.prev ? '' : 'disabled style="opacity:.45"'}>← درس قبلی${adj.prev ? ': ' + adj.prev.title : ''}</button>
-          <button id="le-next-btn" class="btn primary" ${adj.next ? '' : 'disabled style="opacity:.45"'}>${adj.next ? 'درس بعدی: ' + adj.next.title : 'درس بعدی'} →</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line)">
+          <button id="le-prev-btn" class="btn" type="button" ${adj.prev ? '' : 'disabled style="opacity:.45"'}>← درس قبلی${adj.prev ? ': ' + escapeHtml(adj.prev.title) : ''}</button>
+          <button id="le-next-btn" class="btn primary" type="button" ${adj.next ? '' : 'disabled style="opacity:.45"'}>${adj.next ? 'درس بعدی: ' + escapeHtml(adj.next.title) : 'درس بعدی'} →</button>
         </div>
       </div>`;
     const backBtn = container.querySelector('#le-back-cat');
@@ -276,7 +303,7 @@
         ${order.map(origIdx => `<label class="lesson-quiz-option"><input type="radio" name="lesson-question-${i}" value="${origIdx}"> <span>${renderInlineQuizHtml(opts[origIdx])}</span></label>`).join('')}
         <div class="lesson-quiz-feedback" data-feedback="${i}" hidden></div></fieldset>`;
       }).join('')}
-      <div class="lesson-quiz-actions"><button class="btn primary" type="button" data-quiz-grade>ثبت و بررسی آزمون</button><button class="btn" type="button" data-quiz-retry>تلاش مجدد</button></div>
+      <div class="lesson-quiz-actions"><button class="btn primary" type="button" data-quiz-grade>ثبت و بررسی آزمون</button><button class="btn" type="button" data-quiz-retry>تلاش مجدد</button><button class="btn quiz-review-wrong-btn" type="button" data-quiz-filter-wrong hidden aria-pressed="false">مرور فقط سؤال‌های غلط</button></div>
       <p class="lesson-quiz-result" role="status" aria-live="polite"></p></div>`;
   }
 
@@ -501,6 +528,9 @@
     const evidenceLabel = /^Designed\s*[—–-]\s*Not Run$/i.test(evidence)
       ? 'آزمایشگاه طراحی شده است؛ اجرای واقعی آن تأیید نشده است.'
       : evidence ? `وضعیت اجرای ثبت‌شده: ${evidence}` : 'وضعیت اجرای آزمایشگاه مشخص نیست.';
+    if (bp.title && typeof document !== 'undefined') {
+      document.title = `${bp.title} — FAM Academy`;
+    }
 
     container.innerHTML = `
       <div class="lesson-layout lesson-reference-unit">
@@ -757,17 +787,38 @@
       const gradeControl = quiz.querySelector('[data-quiz-grade]');
       const retryControl = quiz.querySelector('[data-quiz-retry]');
       const previous = getQuizAttempts()[bp.lessonId];
+      const previousHistory = getQuizHistory()[bp.lessonId];
+      const filterWrongBtn = quiz.querySelector('[data-quiz-filter-wrong]');
+      let showingWrongOnly = false;
+      const applyWrongFilter = (onlyWrong) => {
+        showingWrongOnly = Boolean(onlyWrong);
+        quiz.querySelectorAll('fieldset[data-question]').forEach(fs => {
+          fs.hidden = showingWrongOnly && fs.dataset.gradedState === 'correct';
+        });
+        if (filterWrongBtn) {
+          filterWrongBtn.setAttribute('aria-pressed', String(showingWrongOnly));
+          filterWrongBtn.textContent = showingWrongOnly ? 'نمایش همه سؤالات' : 'مرور فقط سؤال‌های غلط';
+        }
+      };
+      if (filterWrongBtn) {
+        filterWrongBtn.onclick = () => applyWrongFilter(!showingWrongOnly);
+      }
       if (previous && Number.isInteger(previous.correct) && Number.isInteger(previous.total) && previous.total > 0) {
-        result.textContent = `آخرین نتیجه ثبت‌شده: ${previous.correct} از ${previous.total} پاسخ درست`;
+        const bestNote = previousHistory && Number.isInteger(previousHistory.bestCorrect) && previousHistory.attempts > 1
+          ? ` (بهترین رکورد: ${previousHistory.bestCorrect} از ${previous.total} در ${previousHistory.attempts} تلاش)`
+          : '';
+        result.textContent = `آخرین نتیجه ثبت‌شده: ${previous.correct} از ${previous.total} پاسخ درست${bestNote}`;
       }
       gradeControl.onclick = () => {
         let correct = 0, incorrect = 0, unanswered = 0;
         quizQuestions.forEach((q, i) => {
           const selected = quiz.querySelector(`input[name="lesson-question-${i}"]:checked`);
           const feedback = quiz.querySelector(`[data-feedback="${i}"]`);
+          const fs = quiz.querySelector(`fieldset[data-question="${i}"]`);
           if (!selected) unanswered++;
           const isCorrect = selected && Number(selected.value) === q.answer;
           if (isCorrect) correct++; else if (selected) incorrect++;
+          if (fs) fs.dataset.gradedState = isCorrect ? 'correct' : 'wrong';
           feedback.textContent = `${!selected ? 'بدون پاسخ' : isCorrect ? 'درست' : 'نادرست'} — پاسخ صحیح: ${q.options?.[q.answer] || 'نامشخص'}. ${q.explanation || ''}`;
           if (q.explanationHtml) feedback.insertAdjacentHTML('beforeend', q.explanationHtml);
           feedback.className = `lesson-quiz-feedback ${isCorrect ? 'is-correct' : 'is-incorrect'}`;
@@ -776,6 +827,10 @@
         quiz.querySelectorAll('input[type="radio"]').forEach(input => { input.disabled = true; });
         quiz.classList.add('is-graded');
         gradeControl.disabled = true;
+        if (filterWrongBtn) {
+          filterWrongBtn.hidden = (incorrect + unanswered) === 0;
+          applyWrongFilter(false);
+        }
         const answered = quizQuestions.length - unanswered;
         const emptyWarning = answered === 0
           ? ' (هشدار: هیچ گزینه‌ای انتخاب نشده است — برای ارزیابی واقعی و تکمیل مأموریت، ابتدا به سؤالات پاسخ دهید.)'
@@ -788,6 +843,13 @@
       };
       retryControl.onclick = () => {
         quiz.querySelectorAll('input[type="radio"]').forEach(input => { input.disabled = false; input.checked = false; });
+        quiz.querySelectorAll('fieldset[data-question]').forEach(fs => { fs.hidden = false; delete fs.dataset.gradedState; });
+        if (filterWrongBtn) {
+          filterWrongBtn.hidden = true;
+          filterWrongBtn.setAttribute('aria-pressed', 'false');
+          filterWrongBtn.textContent = 'مرور فقط سؤال‌های غلط';
+        }
+        showingWrongOnly = false;
         quiz.classList.remove('is-graded');
         gradeControl.disabled = false;
         quiz.querySelectorAll('[data-feedback]').forEach(feedback => { feedback.hidden = true; feedback.textContent = ''; });
