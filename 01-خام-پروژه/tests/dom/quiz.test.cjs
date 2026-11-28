@@ -105,3 +105,49 @@ osi.interactiveQuiz.forEach((question,i) => oq.querySelector(`input[name="lesson
 oq.querySelector('[data-quiz-grade]').click();
 assert.match(oq.querySelector('.lesson-quiz-result').textContent, /نمره: 10 از ۱۰/);
 console.log('jsdom: OSI quiz full-score interaction passed');
+
+// Phase 3: inline <code> rendering in quiz titles without turning XML/HTML tags into XSS
+const adv01 = JSON.parse(fs.readFileSync(path.join(root,'server/www/academy-assets/v5/blueprints/adv_01.json'),'utf8'));
+w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), adv01);
+const advQuiz = w.document.querySelector('[data-lesson-quiz]');
+assert(advQuiz.querySelector('legend code'), 'inline <code> in adv_01 quiz title must render as <code> element');
+assert.doesNotMatch(advQuiz.textContent, /<code>|<\/code>/, 'raw <code> tags must not leak as text');
+const auto08 = JSON.parse(fs.readFileSync(path.join(root,'server/www/academy-assets/v5/blueprints/auto_08.json'),'utf8'));
+w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), auto08);
+const aq = w.document.querySelector('[data-lesson-quiz]');
+assert.match(aq.textContent, /<rpc>/, 'XML tokens like <rpc> must remain visible as literal text');
+assert.equal(aq.querySelector('script,img,rpc,hello,validate'), null, 'XML tags like <rpc>/<hello> must stay escaped text');
+// Verify deterministic visual option shuffle (not all 12 questions keep 0,1,2,3 order)
+const domOrders = [...aq.querySelectorAll('fieldset')].map(fs => [...fs.querySelectorAll('input[type="radio"]')].map(i => i.value).join(','));
+assert(domOrders.some(ord => ord !== '0,1,2,3'), 'quiz options should be visually shuffled while preserving original value indices');
+console.log('jsdom: quiz inline code rendering, XML escaping, and visual option shuffle passed');
+
+// Phase 3: CLI simulator stateful physics (subnet mask, interface dedup, VLAN move, shutdown ping)
+const simCode = fs.readFileSync(path.join(root, 'server/www/academy-assets/academy-simulator.js'), 'utf8');
+w.eval(simCode);
+const sess = w.FamAcademySimulator.createSession('TEST-R1');
+sess.execute('configure terminal');
+sess.execute('interface gi0/0');
+const badMask = sess.execute('ip address 10.0.0.1 255.0.255.0');
+assert.equal(badMask.matched, false, 'non-contiguous mask 255.0.255.0 must be rejected');
+const goodIp = sess.execute('ip address 10.99.0.1 255.255.255.0');
+assert.equal(goodIp.matched, true, 'valid contiguous mask must be accepted');
+const brief = sess.execute('do show ip interface brief').output;
+const gi00Rows = brief.split('\n').filter(line => /^GigabitEthernet0\/0\b/.test(line.trim()));
+assert.equal(gi00Rows.length, 1, 'show ip interface brief must replace existing GigabitEthernet0/0 row instead of duplicating it');
+assert.match(gi00Rows[0], /10\.99\.0\.1/);
+sess.execute('shutdown');
+const pingDown = sess.execute('do ping 10.99.0.2').output;
+assert.match(pingDown, /0 percent \(0\/5\)/, 'ping on administratively down interface must fail');
+sess.execute('no shutdown');
+const pingUp = sess.execute('do ping 10.99.0.2').output;
+assert.match(pingUp, /100 percent \(5\/5\)/, 'ping after no shutdown must succeed');
+sess.execute('interface fa0/1');
+sess.execute('switchport access vlan 10');
+sess.execute('switchport access vlan 20');
+const vlanOut = sess.execute('do show vlan brief').output;
+const vlan10Line = vlanOut.split('\n').find(l => l.trim().startsWith('10 '));
+const vlan20Line = vlanOut.split('\n').find(l => l.trim().startsWith('20 '));
+assert(!vlan10Line.includes('FastEthernet0/1'), 'moving port from VLAN 10 to 20 must remove it from VLAN 10');
+assert(vlan20Line.includes('FastEthernet0/1'), 'port must appear in new VLAN 20');
+console.log('jsdom: CLI simulator mask validation, interface dedup, shutdown ping, and VLAN move passed');

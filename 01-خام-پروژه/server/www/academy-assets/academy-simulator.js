@@ -264,6 +264,38 @@
     return isValidIPv4(raw) || isValidIPv6(raw);
   }
 
+  function ipv4ToUint32(ip) {
+    if (!isValidIPv4(ip)) return null;
+    const o = ip.split('.').map(Number);
+    return (((o[0] << 24) | (o[1] << 16) | (o[2] << 8) | o[3]) >>> 0);
+  }
+
+  function isValidSubnetMask(raw) {
+    const m = ipv4ToUint32(raw);
+    if (m === null) return false;
+    const inv = (~m) >>> 0;
+    return (((inv + 1) >>> 0) & inv) === 0;
+  }
+
+  function canonicalIfaceName(raw) {
+    const clean = String(raw || '').trim();
+    const rules = [
+      [/^(?:gigabitethernet|gigabit|gig|gi)\s*(\d[\d/.:-]*)$/i, 'GigabitEthernet$1'],
+      [/^(?:fastethernet|fast|fa)\s*(\d[\d/.:-]*)$/i, 'FastEthernet$1'],
+      [/^(?:tengigabitethernet|tengig|te)\s*(\d[\d/.:-]*)$/i, 'TenGigabitEthernet$1'],
+      [/^(?:ethernet|eth|e)\s*(\d[\d/.:-]*)$/i, 'Ethernet$1'],
+      [/^(?:loopback|lo)\s*(\d+)$/i, 'Loopback$1'],
+      [/^(?:vlan|vl)\s*(\d+)$/i, 'Vlan$1'],
+      [/^(?:port-channel|po)\s*(\d+)$/i, 'Port-channel$1'],
+      [/^(?:serial|se)\s*(\d[\d/.:-]*)$/i, 'Serial$1'],
+      [/^(?:tunnel|tu)\s*(\d+)$/i, 'Tunnel$1']
+    ];
+    for (const [re, rep] of rules) {
+      if (re.test(clean)) return clean.replace(re, rep);
+    }
+    return clean;
+  }
+
   function scenarioForLesson(bp) {
     const id = typeof bp === 'string' ? bp : String(bp?.lessonId || bp?.id || '');
     if (Object.prototype.hasOwnProperty.call(LESSON_SCENARIOS, id)) {
@@ -317,13 +349,23 @@
       const base = CLI_DB[cmdKey] || '';
       const ifNames = Object.keys(state.interfaces);
       if (cmdKey === 'show ip interface brief' && ifNames.length) {
-        const extra = ifNames.map(name => {
-          const cfg = state.interfaces[name];
+        const formatRow = (name, cfg) => {
           const status = cfg.adminDown ? 'administratively down' : 'up';
           const proto = cfg.adminDown ? 'down' : 'up';
           return `${name.padEnd(23, ' ')} ${String(cfg.ip).padEnd(15, ' ')} YES manual ${status.padEnd(21, ' ')} ${proto}`;
-        }).join('\n');
-        return `${base}\n--- Session Configured Interfaces (Stateful Mock) ---\n${extra}`;
+        };
+        const handled = new Set();
+        const baseLines = base.split('\n').map(line => {
+          const firstTok = line.trim().split(/\s+/)[0];
+          const canonLine = canonicalIfaceName(firstTok);
+          if (state.interfaces[canonLine]) {
+            handled.add(canonLine);
+            return formatRow(canonLine, state.interfaces[canonLine]);
+          }
+          return line;
+        });
+        const extra = ifNames.filter(n => !handled.has(n)).map(n => formatRow(n, state.interfaces[n]));
+        return [...baseLines, ...extra].join('\n');
       }
       if (cmdKey === 'show interfaces status' && ifNames.length) {
         const extra = ifNames.map(name => {
@@ -337,17 +379,54 @@
         return `${base}\n--- Session Configured Ports (Stateful Mock) ---\n${extra}`;
       }
       if (cmdKey === 'show vlan brief' && (Object.keys(state.vlans).length || ifNames.some(n => state.interfaces[n].accessVlan))) {
-        const vlanMap = { ...state.vlans };
+        const vlanMap = {};
+        for (const [vid, v] of Object.entries(state.vlans)) {
+          vlanMap[String(vid)] = { name: v.name, ports: Array.isArray(v.ports) ? [...v.ports] : [] };
+        }
+        const movedPorts = new Set();
         ifNames.forEach(n => {
           const vid = state.interfaces[n].accessVlan;
-          if (vid) vlanMap[vid] = vlanMap[vid] || { name: `VLAN${String(vid).padStart(4, '0')}`, ports: [] };
-          if (vid && !vlanMap[vid].ports.includes(n)) vlanMap[vid].ports.push(n);
+          if (!vid) return;
+          movedPorts.add(n);
+          const key = String(vid);
+          for (const k of Object.keys(vlanMap)) {
+            if (k !== key) vlanMap[k].ports = vlanMap[k].ports.filter(p => p !== n);
+          }
+          vlanMap[key] = vlanMap[key] || { name: `VLAN${key.padStart(4, '0')}`, ports: [] };
+          if (!vlanMap[key].ports.includes(n)) vlanMap[key].ports.push(n);
         });
-        const extra = Object.keys(vlanMap).sort((a, b) => Number(a) - Number(b)).map(vid => {
-          const v = vlanMap[vid];
-          return `${String(vid).padEnd(4, ' ')} ${String(v.name || 'VLAN' + vid).padEnd(32, ' ')} active    ${(v.ports || []).join(', ')}`;
-        }).join('\n');
-        return `${base}\n--- Session Created VLANs (Stateful Mock) ---\n${extra}`;
+        const handledVids = new Set();
+        const baseLines = base.split('\n').map(line => {
+          const m = line.match(/^(\d+)\s+(\S+)\s+(active|suspend|act\/lshut)\s*(.*)$/);
+          if (!m) return line;
+          const vid = m[1];
+          const baseName = m[2];
+          const baseStatus = m[3];
+          const basePorts = m[4].trim()
+            ? m[4].split(',').map(p => p.trim()).filter(p => p && !movedPorts.has(canonicalIfaceName(p)))
+            : [];
+          if (vlanMap[vid]) {
+            handledVids.add(vid);
+            const mergedPorts = [...basePorts];
+            for (const p of vlanMap[vid].ports) {
+              if (!mergedPorts.includes(p)) mergedPorts.push(p);
+            }
+            const name = vlanMap[vid].name || baseName;
+            return `${vid.padEnd(4, ' ')} ${name.padEnd(32, ' ')} ${baseStatus.padEnd(9, ' ')} ${mergedPorts.join(', ')}`;
+          }
+          if (movedPorts.size) {
+            return `${vid.padEnd(4, ' ')} ${baseName.padEnd(32, ' ')} ${baseStatus.padEnd(9, ' ')} ${basePorts.join(', ')}`;
+          }
+          return line;
+        });
+        const extra = Object.keys(vlanMap)
+          .filter(vid => !handledVids.has(vid))
+          .sort((a, b) => Number(a) - Number(b))
+          .map(vid => {
+            const v = vlanMap[vid];
+            return `${String(vid).padEnd(4, ' ')} ${String(v.name || 'VLAN' + vid).padEnd(32, ' ')} active    ${(v.ports || []).join(', ')}`;
+          });
+        return [...baseLines, ...extra].join('\n');
       }
       if (cmdKey === 'show running-config') {
         const lines = [
@@ -468,10 +547,11 @@
         if (state.mode !== 'config' && state.mode !== 'config-if') {
           return { output: '% دستور interface فقط در حالت (config)# مجاز است. ابتدا configure terminal وارد کنید.', prompt: prompt(), matched: false };
         }
-        const ifName = input.slice(10).trim();
-        if (!/^[A-Za-z][A-Za-z0-9/.:-]{0,31}$/.test(ifName)) {
+        const rawIf = input.slice(10).trim();
+        if (!/^[A-Za-z][A-Za-z0-9/.:\s-]{0,31}$/.test(rawIf)) {
           return { output: '% نام اینترفیس نامعتبر است.', prompt: prompt(), matched: false };
         }
+        const ifName = canonicalIfaceName(rawIf);
         state.mode = 'config-if';
         state.activeInterface = ifName;
         ensureIf(ifName);
@@ -484,6 +564,9 @@
         const parts = input.slice(11).trim().split(/\s+/);
         if (parts.length !== 2 || !isValidIPv4(parts[0]) || !isValidIPv4(parts[1])) {
           return { output: '% قالب صحیح: ip address <IPv4> <Subnet-Mask> (مثلاً ip address 10.10.10.1 255.255.255.0).', prompt: prompt(), matched: false };
+        }
+        if (!isValidSubnetMask(parts[1])) {
+          return { output: `% Bad mask ${parts[1]} for address ${parts[0]} (ماسک زیرشبکه باید بیت‌های ۱ پیوسته داشته باشد، مانند 255.255.255.0 یا 255.255.254.0).`, prompt: prompt(), matched: false };
         }
         const cfg = ensureIf(state.activeInterface);
         cfg.ip = parts[0];
@@ -532,6 +615,12 @@
         }
         const vid = Number(vidStr);
         const cfg = ensureIf(state.activeInterface);
+        // Remove port from any previously assigned VLAN before moving it.
+        for (const v of Object.values(state.vlans)) {
+          if (Array.isArray(v.ports)) {
+            v.ports = v.ports.filter(p => p !== state.activeInterface);
+          }
+        }
         cfg.accessVlan = vid;
         if (!cfg.mode) cfg.mode = 'access';
         state.vlans[vid] = state.vlans[vid] || { name: `VLAN${String(vid).padStart(4, '0')}`, ports: [] };
@@ -563,6 +652,33 @@
         const target = input.slice(5).trim();
         if (!isValidIP(target)) {
           return { output: `% آدرس IP نامعتبر است ("${target}"). یک آدرس معتبر IPv4 (مانند 10.0.12.2) یا IPv6 (مانند 2001:db8::1) وارد کنید.`, prompt: prompt(), matched: false };
+        }
+        const configuredIfs = Object.entries(state.interfaces);
+        let downIfName = null;
+        if (configuredIfs.length) {
+          const t32 = ipv4ToUint32(target);
+          const matchingIf = configuredIfs.find(([, cfg]) => {
+            if (!cfg.ip || cfg.ip === 'unassigned') return false;
+            if (cfg.ip === target) return true;
+            if (t32 !== null && cfg.mask && isValidSubnetMask(cfg.mask)) {
+              const i32 = ipv4ToUint32(cfg.ip);
+              const m32 = ipv4ToUint32(cfg.mask);
+              if (i32 !== null && m32 !== null && ((i32 & m32) >>> 0) === ((t32 & m32) >>> 0)) return true;
+            }
+            return false;
+          });
+          if (matchingIf && matchingIf[1].adminDown) {
+            downIfName = matchingIf[0];
+          } else if (configuredIfs.every(([, cfg]) => cfg.adminDown)) {
+            downIfName = configuredIfs[0][0];
+          }
+        }
+        if (downIfName) {
+          return {
+            output: `[Simulated Mock Ping — اینترفیس ${downIfName} در وضعیت administratively down است]\nSending 5, 100-byte ICMP Echos to ${target}, timeout is 2 seconds:\n.....\nSuccess rate is 0 percent (0/5) — ابتدا با no shutdown اینترفیس را فعال کنید.`,
+            prompt: prompt(),
+            matched: true
+          };
         }
         return {
           output: `[Simulated Mock Ping — هیچ بسته واقعی شبکه ارسال نشد]\nSending 5, 100-byte ICMP Echos to ${target}, timeout is 2 seconds:\n!!!!!\nSuccess rate is 100 percent (5/5), simulated round-trip min/avg/max = 1/2/4 ms`,
@@ -635,15 +751,15 @@
     const term = document.createElement('pre');
     term.setAttribute('dir', 'ltr');
     term.setAttribute('data-sim-output', '1');
-    term.style.cssText = 'margin:0 0 10px;padding:12px;min-height:130px;max-height:300px;overflow:auto;border-radius:8px;background:#020617;border:1px solid #1e293b;color:#a7f3d0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;white-space:pre-wrap;';
+    term.style.cssText = 'margin:0 0 10px;padding:12px;min-height:130px;max-height:300px;overflow:auto;border-radius:8px;background:#020617;border:1px solid #1e293b;color:#a7f3d0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;white-space:pre-wrap;text-align:left;';
     term.textContent = `[FAM Educational CLI Mock · Lesson: ${bp.lessonId || bp.id} · Scenario: ${scenario.matchType}]\nType "help" or click a suggested command below.\n`;
 
     const form = document.createElement('form');
-    form.style.cssText = 'display:flex;gap:8px;align-items:center;direction:ltr;';
+    form.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;direction:ltr;width:100%;';
 
     const promptSpan = document.createElement('span');
     promptSpan.setAttribute('data-sim-prompt', '1');
-    promptSpan.style.cssText = 'font-family:ui-monospace,monospace;font-size:13px;color:#38bdf8;white-space:nowrap;';
+    promptSpan.style.cssText = 'font-family:ui-monospace,monospace;font-size:13px;font-weight:700;color:var(--cyan);white-space:nowrap;';
     promptSpan.textContent = session.prompt();
 
     const input = document.createElement('input');
@@ -651,7 +767,7 @@
     input.setAttribute('data-sim-input', '1');
     input.setAttribute('aria-label', 'ورود فرمان شبیه‌ساز CLI');
     input.placeholder = 'e.g. show ip route  or  help';
-    input.style.cssText = 'flex:1;padding:8px 10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#f8fafc;font-family:ui-monospace,monospace;font-size:13px;';
+    input.style.cssText = 'flex:1 1 160px;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#f8fafc;font-family:ui-monospace,monospace;font-size:13px;';
 
     const runBtn = document.createElement('button');
     runBtn.type = 'submit';
@@ -675,7 +791,12 @@
       histIndex = session.state.history.length;
       if (trimmed && res.matched && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
         window.dispatchEvent(new CustomEvent('fam-cli-executed', {
-          detail: { cmd: trimmed, matched: res.matched, lessonId: bp.lessonId || bp.id || '' }
+          detail: {
+            cmd: trimmed,
+            matched: res.matched,
+            isHelp: /^(help|\?|clear|cls)$/i.test(trimmed),
+            lessonId: bp.lessonId || bp.id || ''
+          }
         }));
       }
       return res;
@@ -731,6 +852,8 @@
     isValidIP,
     isValidIPv4,
     isValidIPv6,
+    isValidSubnetMask,
+    canonicalIfaceName,
     commandCount: Object.keys(CLI_DB).length,
     exactScenarioCount: Object.keys(LESSON_SCENARIOS).length,
     getSupportedCommands: () => Object.keys(CLI_DB),

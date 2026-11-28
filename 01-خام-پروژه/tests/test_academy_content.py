@@ -212,11 +212,17 @@ class AcademyContentTests(unittest.TestCase):
                 self.assertGreaterEqual(len(blueprint.get("glossary", [])), 15, lesson["id"])
                 quiz = blueprint.get("interactiveQuiz", [])
                 self.assertEqual(len(quiz), 12, lesson["id"])
+                seen_questions = set()
                 for index, question in enumerate(quiz, start=1):
                     with self.subTest(lesson=lesson["id"], question=index):
                         self.assertEqual(len(question.get("options", [])), 4)
                         self.assertIsInstance(question.get("correctIndex"), int)
                         self.assertTrue(question.get("explanationHtml"))
+                        q_text = question.get("prompt") or question.get("question") or question.get("title") or ""
+                        q_norm = re.sub(r"\s+", " ", str(q_text).strip())
+                        self.assertTrue(q_norm, f"Empty quiz question in {lesson['id']} Q{index}")
+                        self.assertNotIn(q_norm, seen_questions, f"Duplicate quiz question in {lesson['id']}")
+                        seen_questions.add(q_norm)
 
     def test_unexecuted_lab_status_is_explicit_for_every_lesson(self):
         status_pattern = re.compile(

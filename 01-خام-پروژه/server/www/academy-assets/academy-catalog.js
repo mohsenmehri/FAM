@@ -3,6 +3,8 @@
   const STORAGE_KEY = 'fam_academy_progress_v1';
   const MISSION_KEY = 'fam.academy.missions.v1';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const normSearch = s => String(s || '').replace(/[\u200c\u0640]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[إأآ]/g, 'ا').replace(/ة/g, 'ه').toLowerCase().trim();
+  const missionStorageKey = () => `${MISSION_KEY}.${window.FamAcademyBridge?.user?.username || 'guest'}`;
 
   function getCompletedSet() {
     const bridge = window.FamAcademyBridge;
@@ -24,9 +26,10 @@
   }
 
   function liveTopologySvg() {
+    const simTotal = Number(window.FamAcademySimulator?.commandCount || 0) + 10;
     return `
       <div class="hero-topo-wrap">
-        <svg class="hero-topo-svg" viewBox="0 0 640 360" role="img" aria-label="نقشه زنده توپولوژی شبکه آکادمی">
+        <svg class="hero-topo-svg" viewBox="0 0 640 360" role="img" aria-label="نمودار نمادین ساختار مسیرهای یادگیری شبکه از لایه دسترسی تا هسته">
           <defs>
             <linearGradient id="famLinkG" x1="0" y1="0" x2="1" y2="0">
               <stop stop-color="#00d4ff"/><stop offset="1" stop-color="#3b82f6"/>
@@ -44,7 +47,7 @@
             <path id="topoL6" d="M466 280 C424 300 376 312 340 325"/>
             <path id="topoL7" d="M508 280 C532 300 548 312 558 325"/>
           </g>
-          <g>
+          <g class="topo-packet-layer" aria-hidden="true">
             <circle r="4.5" fill="#7df9ff"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#topoL1"/></animateMotion></circle>
             <circle r="4.2" fill="#34d399"><animateMotion dur="3.2s" repeatCount="indefinite" begin="0.5s"><mpath href="#topoL2"/></animateMotion></circle>
             <circle r="4.2" fill="#fbbf24"><animateMotion dur="3.2s" repeatCount="indefinite" begin="1.4s"><mpath href="#topoL3"/></animateMotion></circle>
@@ -86,7 +89,7 @@
         </svg>
         <div class="hero-topo-caption">
           <span>توپولوژی نمادین مسیر یادگیری از مبانی تا معماری شبکه</span>
-          <span class="ltr">CLI Sim · ${Number(window.FamAcademySimulator?.commandCount || 134)} cmds</span>
+          <span class="ltr">CLI Sim · ${simTotal > 10 ? simTotal : 134} cmds</span>
         </div>
       </div>`;
   }
@@ -108,19 +111,22 @@
   function loadMissionRecord() {
     const today = localDateKey();
     try {
-      const raw = JSON.parse(localStorage.getItem(MISSION_KEY) || '{}');
+      const raw = JSON.parse(localStorage.getItem(missionStorageKey()) || '{}');
       if (raw.day === today && raw.done && typeof raw.done === 'object') {
-        return { day: today, done: raw.done, cliCount: Math.max(0, Number(raw.cliCount) || 0) };
+        const cliCmds = Array.isArray(raw.cliCmds) ? raw.cliCmds.filter(Boolean) : [];
+        return { day: today, done: raw.done, cliCmds, cliCount: Math.max(cliCmds.length, Number(raw.cliCount) || 0) };
       }
     } catch (_) {}
-    return { day: today, done: {}, cliCount: 0 };
+    return { day: today, done: {}, cliCmds: [], cliCount: 0 };
   }
   function saveMissionRecord(record) {
     try {
-      localStorage.setItem(MISSION_KEY, JSON.stringify({
+      const cliCmds = Array.isArray(record.cliCmds) ? Array.from(new Set(record.cliCmds)).slice(0, 50) : [];
+      localStorage.setItem(missionStorageKey(), JSON.stringify({
         day: localDateKey(),
         done: record.done || {},
-        cliCount: Math.max(0, Number(record.cliCount) || 0)
+        cliCmds,
+        cliCount: Math.max(cliCmds.length, Number(record.cliCount) || 0)
       }));
     } catch (_) {}
   }
@@ -137,13 +143,21 @@
       rec.done['study-one'] = true;
       saveMissionRecord(rec);
     });
-    window.addEventListener('fam-cli-executed', () => {
+    window.addEventListener('fam-cli-executed', e => {
+      const det = e && e.detail ? e.detail : {};
+      const cmdKey = String(det.cmd || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!cmdKey || det.isHelp || /^(help|\?|clear|cls)$/.test(cmdKey)) return;
       const rec = loadMissionRecord();
-      rec.cliCount = (rec.cliCount || 0) + 1;
-      if (rec.cliCount >= 3) rec.done['cli-practice'] = true;
+      if (!rec.cliCmds.includes(cmdKey)) {
+        rec.cliCmds.push(cmdKey);
+        rec.cliCount = rec.cliCmds.length;
+      }
+      if (rec.cliCmds.length >= 3) rec.done['cli-practice'] = true;
       saveMissionRecord(rec);
     });
-    window.addEventListener('fam-quiz-graded', () => {
+    window.addEventListener('fam-quiz-graded', e => {
+      const det = e && e.detail ? e.detail : {};
+      if (Number(det.answered || 0) <= 0) return;
       const rec = loadMissionRecord();
       rec.done['quiz-check'] = true;
       saveMissionRecord(rec);
@@ -178,7 +192,7 @@
     const cliCount = Math.min(3, missionRec.cliCount || 0);
     const dailyMissions = [
       { id: 'study-one', title: 'مطالعه حداقل ۱ درس و مرور بخش‌های کلیدی', badge: missionsState['study-one'] ? 'ثبت خودکار ✓' : '۲۰ دقیقه' },
-      { id: 'cli-practice', title: 'اجرای حداقل ۳ دستور تشخیصی در شبیه‌ساز CLI', badge: missionsState['cli-practice'] ? '۳/۳ ✓' : `${cliCount.toLocaleString('fa-IR')}/۳ عملي` },
+      { id: 'cli-practice', title: 'اجرای حداقل ۳ فرمان متمایز در شبیه‌ساز CLI', badge: missionsState['cli-practice'] ? '۳/۳ ✓' : `${cliCount.toLocaleString('fa-IR')}/۳ عملی` },
       { id: 'quiz-check', title: 'پاسخ‌دهی به آزمون ۱۲سؤالی یک درس و بررسی نکات', badge: missionsState['quiz-check'] ? 'ثبت خودکار ✓' : 'ارزیابی' }
     ];
 
@@ -345,7 +359,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <button id="fa-catalog-back" class="fa-action" type="button">← بازگشت به داشبورد</button>
           <div class="roadmap-path-tabs" role="tablist" aria-label="تغییر مسیر آموزشی">
-            ${allPaths.map(p => `<button type="button" class="roadmap-path-tab ${p.id === path.id ? 'active' : ''}" data-switch-path="${esc(p.id)}">${esc(p.title)} (${(p.courses || []).reduce((s, c) => s + (c.lessons || []).length, 0)})</button>`).join('')}
+            ${allPaths.map(p => `<button type="button" role="tab" aria-selected="${p.id === path.id ? 'true' : 'false'}" class="roadmap-path-tab ${p.id === path.id ? 'active' : ''}" data-switch-path="${esc(p.id)}">${esc(p.title)} (${(p.courses || []).reduce((s, c) => s + (c.lessons || []).length, 0)})</button>`).join('')}
           </div>
         </div>
         <div class="reference-roadmap-heading">
@@ -427,6 +441,7 @@
     );
     const hasExact = id => Boolean(sim && typeof sim.scenarioForLesson === 'function' && sim.scenarioForLesson(id)?.matchType === 'exact');
     const exactCount = all.filter(l => hasExact(l.id)).length;
+    const totalSimCmds = Number(sim?.commandCount || 0) + 10;
     let activeFilter = 'exact';
     let query = '';
     let selected = all.find(l => l.id === 'adv_bgp') || all.find(l => hasExact(l.id)) || all[0];
@@ -437,7 +452,7 @@
           <div>
             <span class="journey-kicker">INTERACTIVE CLI WORKBENCH</span>
             <h1>آزمایشگاه مستقل و شبیه‌ساز CLI</h1>
-            <p>تمرین مستقیم روی ۱۲۵ فرمان آموزشی بدون خروجی جعلی — ${exactCount.toLocaleString('fa-IR')} سناریوی اختصاصی درس + ${(all.length - exactCount).toLocaleString('fa-IR')} سناریوی پایه مسیر (شبیه‌ساز آموزشی مرورگر؛ بدون اتصال به تجهیز واقعی).</p>
+            <p>تمرین مستقیم روی ${totalSimCmds.toLocaleString('fa-IR')} فرمان آموزشی بدون خروجی جعلی — ${exactCount.toLocaleString('fa-IR')} سناریوی اختصاصی درس + ${(all.length - exactCount).toLocaleString('fa-IR')} سناریوی پایه مسیر (شبیه‌ساز آموزشی مرورگر؛ بدون اتصال به تجهیز واقعی).</p>
           </div>
           <button class="btn" id="lab-back-home" type="button">← بازگشت به داشبورد</button>
         </header>
@@ -483,11 +498,11 @@
     };
 
     const renderList = () => {
-      const q = query.trim().toLowerCase();
+      const q = normSearch(query);
       const filtered = all.filter(l => {
         if (activeFilter === 'exact' && !hasExact(l.id)) return false;
         if (activeFilter === 'fam-automation' && l.pathId !== 'fam-automation') return false;
-        if (q && !(l.title.toLowerCase().includes(q) || l.id.toLowerCase().includes(q) || (l.courseTitle || '').toLowerCase().includes(q))) return false;
+        if (q && !(normSearch(l.title).includes(q) || normSearch(l.id).includes(q) || normSearch(l.courseTitle || '').includes(q))) return false;
         return true;
       });
       listEl.replaceChildren();
@@ -575,8 +590,8 @@
         </div>
         <div class="coverage-toolbar">
           <input type="search" id="cov-search" class="coverage-search" placeholder="جست‌وجوی فرمان (مثلاً ospf، vlan، bgp، ip address، terraform)…">
-          <div class="roadmap-path-tabs" id="cov-tabs">
-            ${categories.map(cat => `<button type="button" class="roadmap-path-tab ${cat === activeCat ? 'active' : ''}" data-cov-cat="${esc(cat)}">${esc(cat)}</button>`).join('')}
+          <div class="roadmap-path-tabs" id="cov-tabs" role="tablist" aria-label="فیلتر دسته فرمان‌ها">
+            ${categories.map(cat => `<button type="button" role="tab" aria-selected="${cat === activeCat ? 'true' : 'false'}" class="roadmap-path-tab ${cat === activeCat ? 'active' : ''}" data-cov-cat="${esc(cat)}">${esc(cat)}</button>`).join('')}
           </div>
         </div>
         <div class="coverage-grid" id="cov-grid"></div>
@@ -584,10 +599,10 @@
 
     const grid = container.querySelector('#cov-grid');
     const renderGrid = () => {
-      const q = query.trim().toLowerCase();
+      const q = normSearch(query);
       const filtered = allItems.filter(it => {
         if (activeCat !== 'همه' && it.cat !== activeCat) return false;
-        if (q && !(it.cmd.toLowerCase().includes(q) || it.cat.toLowerCase().includes(q) || it.note.toLowerCase().includes(q))) return false;
+        if (q && !(normSearch(it.cmd).includes(q) || normSearch(it.cat).includes(q) || normSearch(it.note).includes(q))) return false;
         return true;
       });
       if (!filtered.length) {
@@ -606,7 +621,10 @@
     container.querySelectorAll('[data-cov-cat]').forEach(btn => {
       btn.onclick = () => {
         activeCat = btn.dataset.covCat;
-        container.querySelectorAll('[data-cov-cat]').forEach(b => b.classList.toggle('active', b === btn));
+        container.querySelectorAll('[data-cov-cat]').forEach(b => {
+          b.classList.toggle('active', b === btn);
+          b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+        });
         renderGrid();
       };
     });

@@ -3,6 +3,8 @@
   const $ = (id) => document.getElementById(id);
   const root = $('app-root');
   if (!root || document.querySelector('.app-shell')) return;
+  const normSearch = s => String(s || '').replace(/[\u200c\u0640]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[إأآ]/g, 'ا').replace(/ة/g, 'ه').toLowerCase().trim();
+  const isOfflineMode = () => Boolean(window.FamAcademyBridge?.offline || location.protocol === 'file:');
 
   const oldHeader = document.querySelector('.fa-topbar');
   const oldButtons = ['btn-paths', 'btn-blueprint', 'btn-coverage', 'btn-back-paths']
@@ -95,10 +97,11 @@
 
   const nav = el('nav', 'side-nav');
   nav.setAttribute('aria-label', 'ناوبری اصلی');
+  const simCmdTotal = Number(window.FamAcademySimulator?.commandCount || 0) + 10;
   const navItems = [
     ['home', 'خانه و داشبورد', 'home', 'home', ''],
     ['paths', 'مسیرها و ۱۲۷ درس', 'route', 'paths', '۱۲۷'],
-    ['lab', 'آزمایشگاه و شبیه‌ساز CLI', 'lab', 'lab', '۱۲۵'],
+    ['lab', 'آزمایشگاه و شبیه‌ساز CLI', 'lab', 'lab', (simCmdTotal > 10 ? simCmdTotal : 134).toLocaleString('fa-IR')],
     ['progress', 'پیشرفت و آمار من', 'chart', 'progress', ''],
     ['planner', 'برنامه مطالعه و نقشه راه', 'book', 'planner', ''],
     ['glossary', 'واژه‌نامه جامع شبکه', 'glossary', 'glossary', ''],
@@ -142,7 +145,7 @@
   const timerMeta = el('div', 'side-timer-meta', 'مطالعه امروز: ۰ دقیقه');
   timerBox.append(timerHead, timerDisplay, timerControls, timerMeta);
 
-  const TIMER_KEY = 'fam.academy.timer.v1';
+  const TIMER_KEY = 'fam.academy.timer.v1.' + (window.FamAcademyBridge?.user?.username || 'guest');
   const presets = [25, 45, 60];
   let presetIdx = 1;
   let remainingSec = presets[presetIdx] * 60;
@@ -235,7 +238,7 @@
             summary: l.summary || l.description || '',
             course: course.title || '',
             path: path.title || '',
-            hay: [l.title, l.titleEn, l.id, l.summary, l.description, course.title, ...(Array.isArray(l.keywords) ? l.keywords : [])].filter(Boolean).join(' ').toLowerCase()
+            hay: normSearch([l.title, l.titleEn, l.id, l.summary, l.description, course.title, ...(Array.isArray(l.keywords) ? l.keywords : [])].filter(Boolean).join(' '))
           }))
         )
       );
@@ -248,10 +251,12 @@
   const portalNav = el('nav', 'side-nav');
   portalNav.setAttribute('aria-label', 'دسترسی به پنل FAM');
   const backFam = el('a', 'side-link');
-  backFam.href = window.FamAcademyBridge?.offline ? '#/dashboard' : '/app';
+  const offline = isOfflineMode();
+  backFam.href = offline ? '#/dashboard' : '/app';
+  if (offline) backFam.dataset.action = 'home';
   const backIcon = el('span', 'side-icon');
   backIcon.append(icon('portal', 18));
-  backFam.append(backIcon, el('span', 'side-label', window.FamAcademyBridge?.offline ? 'نسخه آفلاین محلی' : 'بازگشت به پنل اصلی FAM'));
+  backFam.append(backIcon, el('span', 'side-label', offline ? 'نسخه آفلاین آکادمی' : 'بازگشت به پنل اصلی FAM'));
   portalNav.append(backFam);
 
   const sideFoot = el('div', 'side-foot');
@@ -440,10 +445,27 @@
     sidebar.inert = !open;
     sidebar.setAttribute('aria-hidden', String(!open));
   }
-  const mobile = window.matchMedia('(max-width: 860px)').matches;
-  syncMenu(!mobile);
+  const mqMobile = window.matchMedia('(max-width: 860px)');
+  syncMenu(!mqMobile.matches);
+  const handleViewportChange = (e) => {
+    if (!e.matches) {
+      shell.classList.remove('academy-menu-mobile-open');
+      syncMenu(!shell.classList.contains('academy-menu-collapsed'));
+    } else {
+      syncMenu(shell.classList.contains('academy-menu-mobile-open'));
+    }
+  };
+  if (typeof mqMobile.addEventListener === 'function') mqMobile.addEventListener('change', handleViewportChange);
+  else if (typeof mqMobile.addListener === 'function') mqMobile.addListener(handleViewportChange);
+
+  backdrop.addEventListener('click', () => {
+    if (shell.classList.contains('academy-menu-mobile-open')) {
+      shell.classList.remove('academy-menu-mobile-open');
+      syncMenu(false);
+    }
+  });
   menuButton.addEventListener('click', () => {
-    if (window.matchMedia('(max-width: 860px)').matches) {
+    if (mqMobile.matches) {
       const open = shell.classList.toggle('academy-menu-mobile-open');
       syncMenu(open);
     } else {
@@ -471,14 +493,21 @@
       const list = el('div', 'fam-qsearch-list');
       dialog.append(head, list);
       const renderHits = (query) => {
-        const q = String(query || '').trim().toLowerCase();
-        const matches = q
-          ? quickSearchLessons.filter(item => item.hay.includes(q)).slice(0, 30)
-          : quickSearchLessons.slice(0, 12);
+        const q = normSearch(query);
+        const allMatches = q
+          ? quickSearchLessons.filter(item => item.hay.includes(q))
+          : quickSearchLessons;
+        const limit = q ? 30 : 12;
+        const matches = allMatches.slice(0, limit);
         list.replaceChildren();
         if (!matches.length) {
           list.append(el('div', 'journey-empty', 'درسی با این عبارت پیدا نشد.'));
           return;
+        }
+        if (q && allMatches.length > matches.length) {
+          const info = el('div', 'fam-qsearch-count', `نمایش ${matches.length.toLocaleString('fa-IR')} مورد اول از ${allMatches.length.toLocaleString('fa-IR')} نتیجه`);
+          info.style.cssText = 'font-size:12px;color:var(--muted);padding:4px 8px 6px;';
+          list.append(info);
         }
         matches.forEach(item => {
           const btn = document.createElement('button');
@@ -550,9 +579,17 @@
         el('p', '', 'از منوی راست می‌توانید بین داشبورد، مسیرهای یادگیری (۱۲۷ درس)، آزمایشگاه مستقل CLI، آمار پیشرفت و واژه‌نامه جابه‌جا شوید. داخل هر درس فهرست بخش‌ها (TOC)، یادداشت شخصی، شبیه‌ساز CLI و آزمون ۱۲سؤالی در دسترس است. با کلید Ctrl+K سریع در تمام درس‌ها جست‌وجو کنید.'),
         close
       );
+      dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
       document.body.append(dialog);
     }
     if (!dialog.open) dialog.showModal();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && shell.classList.contains('academy-menu-mobile-open')) {
+      shell.classList.remove('academy-menu-mobile-open');
+      syncMenu(false);
+    }
   });
 
   const syncHashState = () => {

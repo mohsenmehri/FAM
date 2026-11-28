@@ -42,12 +42,12 @@
     const d = document.createElement('dialog'); d.id='journey-profile-dialog'; d.className='journey-dialog';
     d.setAttribute('aria-labelledby','journey-profile-title');
     d.innerHTML = `<form id="journey-profile-form"><div class="journey-dialog-head"><span class="journey-kicker">YOUR LEARNING JOURNEY</span>${first ? '' : '<button type="button" class="journey-close" aria-label="بستن">×</button>'}</div>
-      <h2 id="journey-profile-title">${first ? 'مسیر یادگیری‌ات را بساز' : 'هدف و برنامهٔ یادگیری'}</h2><p class="journey-form-intro">مسیر اصلی و مرحله هدف (از Stage Zero و CCNA تا CCNP، تخصص‌ها، CCIE، CCDE یا اتوماسیون) را انتخاب کن تا پیشنهاد درس بعدی دقیق تنظیم شود.</p>
+      <h2 id="journey-profile-title">${first ? 'مسیر یادگیری‌ات را بساز' : 'هدف و برنامهٔ یادگیری'}</h2><p class="journey-form-intro">مسیر اصلی و مرحله هدف (از Stage Zero و CCNA تا مفاهیم پیشرفته CCNP، امنیت، طراحی شبکه یا اتوماسیون) را انتخاب کن تا پیشنهاد درس بعدی دقیق تنظیم شود.</p>
       <fieldset><legend>۱. کدام مسیر اصلی را دنبال می‌کنی؟</legend><div class="journey-choice-grid">${[
-        ['fam-c5','Curriculum 5.0 (۱۰۷ درس)','از صفر تا CCNA، Advanced، CCNP، تخصص‌ها، CCIE و CCDE'],
+        ['fam-c5','Curriculum 5.0 (۱۰۷ درس)','از صفر تا CCNA، مفاهیم پیشرفته CCNP، امنیت و طراحی معماری شبکه'],
         ['fam-automation','Automation / NetDevOps (۲۰ درس)','Linux، Python، API، YANG، Ansible، Docker و Terraform']
       ].map(([v,t,sub]) => `<label class="journey-choice"><input type="radio" name="goal" value="${v}" ${(currentGoal===v)?'checked':''}><span><b>${t}</b><small>${sub}</small></span></label>`).join('')}</div></fieldset>
-      <fieldset id="journey-focus-stage-fieldset"><legend>۲. تمرکز فعلی روی کدام دوره باشد؟ (در Curriculum 5.0)</legend><select name="focusStage" style="width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--text)">${focusStages.map(([v,t]) => `<option value="${v}" ${currentFocus===v?'selected':''}>${t}</option>`).join('')}</select></fieldset>
+      <fieldset id="journey-focus-stage-fieldset"><legend>۲. تمرکز فعلی روی کدام دوره باشد؟ (در Curriculum 5.0)</legend><select name="focusStage" aria-label="انتخاب دوره تمرکز فعلی" style="width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--text)">${focusStages.map(([v,t]) => `<option value="${v}" ${currentFocus===v?'selected':''}>${t}</option>`).join('')}</select></fieldset>
       <fieldset><legend>۳. چقدر با شبکه آشنایی داری؟</legend><div class="journey-choice-grid three">${[['beginner','تازه شروع می‌کنم'],['intermediate','مبانی را می‌دانم'],['advanced','تجربهٔ عملی دارم']].map(([v,t]) => `<label class="journey-choice"><input type="radio" name="level" value="${v}" ${((p.level || 'beginner')===v)?'checked':''}><span><b>${t}</b></span></label>`).join('')}</div></fieldset>
       <div class="journey-form-row"><label>زمان مطالعه در روز <select name="minutes"><option value="15" ${Number(p.minutesPerDay)===15?'selected':''}>۱۵ دقیقه</option><option value="30" ${Number(p.minutesPerDay)===30?'selected':''}>۳۰ دقیقه</option><option value="45" ${!p.minutesPerDay||Number(p.minutesPerDay)===45?'selected':''}>۴۵ دقیقه</option><option value="60" ${Number(p.minutesPerDay)===60?'selected':''}>۶۰ دقیقه</option><option value="90" ${Number(p.minutesPerDay)===90?'selected':''}>۹۰ دقیقه</option></select></label><label>تاریخ هدف <span class="muted">(اختیاری)</span><input type="date" name="targetDate" value="${esc(p.targetDate || '')}"></label></div>
       <fieldset><legend>روزهای پیشنهادی مطالعه</legend><div class="journey-days">${days.map(([v,t])=>`<label><input type="checkbox" name="studyDay" value="${v}" ${selectedDays.includes(v)?'checked':''}><span>${t}</span></label>`).join('')}</div></fieldset>
@@ -61,8 +61,9 @@
     };
     d.querySelectorAll('input[name="goal"]').forEach(r => r.addEventListener('change', syncFocusVis));
     syncFocusVis();
-    const close = () => { d.close(); d.remove(); };
-    d.querySelector('.journey-close')?.addEventListener('click',close);
+    const close = () => { if (d.open) d.close(); d.remove(); };
+    d.addEventListener('close', () => d.remove());
+    d.querySelector('.journey-close')?.addEventListener('click', close);
     d.querySelector('.journey-skip')?.addEventListener('click', close);
     if (first) d.addEventListener('cancel', event => { event.preventDefault(); close(); });
     d.querySelector('form').addEventListener('submit', async event => {
@@ -77,7 +78,28 @@
       const state={ ...current(), completed: [...window.FamAcademyCatalog.getCompletedSet()] };
       const ok=await window.FamAcademyBridge?.saveProgress({ ...state, profile:updated });
       button.disabled=false;
-      if (!ok) { err.textContent='ذخیره انجام نشد؛ اتصال را بررسی و دوباره تلاش کن.'; return; }
+      if (!ok) {
+        const bridge = window.FamAcademyBridge || {};
+        const reason = bridge.lastError || 'ذخیره انجام نشد؛ اتصال را بررسی و دوباره تلاش کن.';
+        err.replaceChildren();
+        err.append(document.createTextNode(reason + ' '));
+        if (bridge.lastStatus === 401 && !bridge.offline) {
+          const loginLink = document.createElement('a');
+          loginLink.href = '/login.html';
+          loginLink.textContent = 'ورود مجدد به حساب ←';
+          loginLink.style.cssText = 'color:var(--cyan);font-weight:800;text-decoration:underline;margin-inline-start:6px';
+          err.append(loginLink);
+        } else if ((bridge.lastStatus === 403 || bridge.lastStatus === 409) && !bridge.offline) {
+          const reloadBtn = document.createElement('button');
+          reloadBtn.type = 'button';
+          reloadBtn.className = 'btn';
+          reloadBtn.textContent = 'بازخوانی صفحه';
+          reloadBtn.style.cssText = 'margin-inline-start:6px;padding:3px 10px;font-size:12px';
+          reloadBtn.addEventListener('click', () => location.reload());
+          err.append(reloadBtn);
+        }
+        return;
+      }
       window.dispatchEvent(new CustomEvent('fam-journey-profile-changed',{detail:updated}));
       close();
       if (location.hash === '#/progress') renderProgress();
@@ -99,10 +121,12 @@
       const goalTitle = p.goal === 'fam-automation' ? 'Automation (۲۰ درس)' : 'Curriculum 5.0 (۱۰۷ درس)';
       const focusTitle = p.goal !== 'fam-automation' && p.focusStage && p.focusStage !== 'all' && stageLabelMap[p.focusStage]
         ? stageLabelMap[p.focusStage] : '';
+      const isSignedInOnline = Boolean(window.FamAcademyBridge && !window.FamAcademyBridge.offline && window.FamAcademyBridge.user);
       let quizAttempts = current().labs?.quizAttempts;
-      if (!quizAttempts || typeof quizAttempts !== 'object') {
+      if ((!quizAttempts || typeof quizAttempts !== 'object') && !isSignedInOnline) {
         try { quizAttempts = JSON.parse(localStorage.getItem('fam_academy_quiz_v1') || '{}'); } catch (_) { quizAttempts = {}; }
       }
+      if (!quizAttempts || typeof quizAttempts !== 'object') quizAttempts = {};
       const attemptEntries = Object.entries(quizAttempts || {}).filter(([, v]) => v && Number(v.total) > 0);
       const quizCount = attemptEntries.length;
       const avgScore = quizCount

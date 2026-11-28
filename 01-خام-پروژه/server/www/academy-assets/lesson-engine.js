@@ -238,15 +238,44 @@
     }).join("");
   }
 
-  function renderQuizQuestions(questions, instructions) {
+  function renderInlineQuizHtml(str) {
+    const escaped = escapeHtml(str);
+    return escaped
+      .replace(/&lt;(code|strong|em)&gt;([\s\S]*?)&lt;\/\1&gt;/gi, '<$1>$2</$1>');
+  }
+
+  function seededOptionOrder(seedStr, count) {
+    const order = Array.from({ length: count }, (_, idx) => idx);
+    if (count < 2) return order;
+    let h = 2166136261 >>> 0;
+    const s = String(seedStr || 'fam');
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    for (let i = count - 1; i > 0; i--) {
+      h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
+      const j = h % (i + 1);
+      const tmp = order[i];
+      order[i] = order[j];
+      order[j] = tmp;
+    }
+    return order;
+  }
+
+  function renderQuizQuestions(questions, instructions, lessonId) {
     const normalized = questions.map(q => String(q.q || '').replace(/^سؤال\s*[0-9۰-۹٠-٩]+\s*/, '').trim());
     const repetitive = normalized.length > 1 && new Set(normalized).size === 1;
     return `<div class="lesson-quiz" data-lesson-quiz>
       ${instructions ? `<p>${escapeHtml(instructions)}</p>` : ''}
       ${repetitive ? '<p class="lesson-quiz-warning">سؤال‌های فعلی این درس تکراری و نیازمند بازبینی آموزشی هستند؛ این آزمون هنوز سنجش جامع نیست.</p>' : ''}
-      ${questions.map((q, i) => `<fieldset class="lesson-quiz-question" data-question="${i}"><legend>${i + 1}. ${q.promptHtml || escapeHtml(q.q)}</legend>
-        ${(Array.isArray(q.options) ? q.options : []).map((option, n) => `<label class="lesson-quiz-option"><input type="radio" name="lesson-question-${i}" value="${n}"> <span>${escapeHtml(option)}</span></label>`).join('')}
-        <div class="lesson-quiz-feedback" data-feedback="${i}" hidden></div></fieldset>`).join('')}
+      ${questions.map((q, i) => {
+        const opts = Array.isArray(q.options) ? q.options : [];
+        const order = seededOptionOrder(`${lessonId || 'lesson'}:${i}`, opts.length);
+        return `<fieldset class="lesson-quiz-question" data-question="${i}"><legend>${i + 1}. ${q.promptHtml || renderInlineQuizHtml(q.q)}</legend>
+        ${order.map(origIdx => `<label class="lesson-quiz-option"><input type="radio" name="lesson-question-${i}" value="${origIdx}"> <span>${renderInlineQuizHtml(opts[origIdx])}</span></label>`).join('')}
+        <div class="lesson-quiz-feedback" data-feedback="${i}" hidden></div></fieldset>`;
+      }).join('')}
       <div class="lesson-quiz-actions"><button class="btn primary" type="button" data-quiz-grade>ثبت و بررسی آزمون</button><button class="btn" type="button" data-quiz-retry>تلاش مجدد</button></div>
       <p class="lesson-quiz-result" role="status" aria-live="polite"></p></div>`;
   }
@@ -254,7 +283,7 @@
   function getQuizQuestions(bp) {
     if (Array.isArray(bp.interactiveQuiz) && bp.interactiveQuiz.length) {
       return bp.interactiveQuiz.map(q => ({ q: q.title, promptHtml: q.promptHtml,
-        options: q.options, answer: q.correctIndex, explanationHtml: q.explanationHtml }));
+        options: q.options, answer: q.correctIndex, explanation: q.explanation, explanationHtml: q.explanationHtml }));
     }
     return Array.isArray(bp.stages?.quiz?.questions) ? bp.stages.quiz.questions : [];
   }
@@ -327,7 +356,7 @@
         const questions = getQuizQuestions(bp);
         if (questions.length) {
           html = html.replace(/<div\s+id=['"]encor-interactive-quiz['"]\s*><\/div>/g, '');
-          html += renderQuizQuestions(questions, st.instructions);
+          html += renderQuizQuestions(questions, st.instructions, bp.lessonId || bp.id);
         } else if (!st.html && st.questionCount) {
           html += `<p>این آزمون شامل <strong>${esc(st.questionCount)}</strong> سؤال تسلط است.</p>`;
         }
@@ -521,9 +550,9 @@
               </nav>
             </section>
             <section class="lesson-rail-card">
-              <h3><span>یادداشت شخصی این درس</span></h3>
-              <textarea id="le-lesson-notes" class="lesson-notes-area" placeholder="نکات کلیدی، فرمان‌های مهم یا سؤال‌های خود را اینجا بنویسید..."></textarea>
-              <div id="le-notes-status" class="lesson-notes-meta">ذخیره خودکار محلی در همین مرورگر</div>
+              <h3><span>یادداشت شخصی این درس</span><span id="le-notes-count" class="side-pill" aria-live="polite">۰ / ۶٬۰۰۰</span></h3>
+              <textarea id="le-lesson-notes" class="lesson-notes-area" maxlength="6000" aria-label="یادداشت شخصی این درس" placeholder="نکات کلیدی، فرمان‌های مهم یا سؤال‌های خود را اینجا بنویسید (حداکثر ۶٬۰۰۰ نویسه)..."></textarea>
+              <div id="le-notes-status" class="lesson-notes-meta" role="status" aria-live="polite">ذخیره خودکار محلی در همین مرورگر</div>
             </section>
           </aside>
         </div>
@@ -533,32 +562,60 @@
     if (backBtn && opts.onBackToCatalog) backBtn.onclick = opts.onBackToCatalog;
     setupGlossaryToggle(container);
 
-    // Sticky TOC + Per-Lesson Personal Notes (account-synced when signed in, local fallback offline)
+    // Sticky TOC + Per-Lesson Personal Notes (account-synced when signed in online, local fallback offline)
     const NOTES_STORAGE_KEY = 'fam.academy.notes.v1';
+    const NOTE_MAX_CHARS = 6000;
     const notesArea = container.querySelector('#le-lesson-notes');
     const notesStatus = container.querySelector('#le-notes-status');
+    const notesCount = container.querySelector('#le-notes-count');
     if (notesArea && bp.lessonId) {
       const bridge = window.FamAcademyBridge;
+      const isOfflineMode = Boolean(bridge?.offline || window.FAM_ACADEMY_BOOTSTRAP?.offline === true);
+      const canServerSync = Boolean(bridge && typeof bridge.saveProgress === 'function' && !isOfflineMode);
+      const updateCharCount = (len) => {
+        if (!notesCount) return;
+        notesCount.textContent = `${len.toLocaleString('fa-IR')} / ${NOTE_MAX_CHARS.toLocaleString('fa-IR')}`;
+        notesCount.style.color = len >= NOTE_MAX_CHARS ? 'var(--amber)' : '';
+      };
       if (bridge) {
         const remoteNotes = bridge.progress?.labs?.lessonNotes;
         if (remoteNotes && typeof remoteNotes[bp.lessonId] === 'string') {
           notesArea.value = remoteNotes[bp.lessonId];
         }
-        if (notesStatus) notesStatus.textContent = 'همگام با حساب کاربری';
+        if (notesStatus) {
+          notesStatus.textContent = isOfflineMode
+            ? 'ذخیره محلی در مرورگر (نسخه آفلاین)'
+            : 'همگام با حساب کاربری';
+        }
       } else {
         try {
           const allNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '{}');
           if (allNotes && typeof allNotes[bp.lessonId] === 'string') notesArea.value = allNotes[bp.lessonId];
         } catch (_) {}
-        if (notesStatus) notesStatus.textContent = 'ذخیره محلی (حالت آفلاین)';
+        if (notesStatus) notesStatus.textContent = 'ذخیره محلی در مرورگر (نسخه آفلاین)';
       }
+      updateCharCount(notesArea.value.length);
       let saveTimer = null;
       notesArea.addEventListener('input', () => {
+        const rawVal = String(notesArea.value || '');
+        updateCharCount(rawVal.length);
         const activeBridge = window.FamAcademyBridge;
-        if (notesStatus) notesStatus.textContent = activeBridge ? 'در حال همگام‌سازی با حساب…' : 'در حال ذخیره محلی…';
+        const offlineNow = Boolean(activeBridge?.offline || window.FAM_ACADEMY_BOOTSTRAP?.offline === true);
+        if (rawVal.length > NOTE_MAX_CHARS) {
+          if (notesStatus) notesStatus.textContent = `یادداشت بیش از ${NOTE_MAX_CHARS.toLocaleString('fa-IR')} نویسه است؛ لطفاً آن را کوتاه کنید تا ذخیره شود (متن به‌طور خودکار بریده نمی‌شود).`;
+          if (saveTimer) clearTimeout(saveTimer);
+          return;
+        }
+        if (notesStatus) {
+          notesStatus.textContent = (activeBridge && !offlineNow)
+            ? 'در حال همگام‌سازی با حساب…'
+            : 'در حال ذخیره محلی…';
+        }
         if (saveTimer) clearTimeout(saveTimer);
         saveTimer = setTimeout(async () => {
-          const val = String(notesArea.value || '').slice(0, 6000);
+          const val = String(notesArea.value || '');
+          if (val.length > NOTE_MAX_CHARS) return;
+          const limitNote = val.length === NOTE_MAX_CHARS ? ' (به سقف ۶٬۰۰۰ نویسه رسیدید)' : '';
           if (activeBridge && typeof activeBridge.saveProgress === 'function') {
             const curLabs = (activeBridge.progress && typeof activeBridge.progress.labs === 'object' && !Array.isArray(activeBridge.progress.labs))
               ? activeBridge.progress.labs : {};
@@ -572,9 +629,11 @@
               labs: { ...curLabs, lessonNotes: curNotes }
             });
             if (notesStatus) {
-              notesStatus.textContent = ok
-                ? 'در حساب کاربری ذخیره شد ✓'
-                : 'ذخیره در سرور ناموفق بود؛ اتصال را بررسی کنید.';
+              if (ok) {
+                notesStatus.textContent = (offlineNow ? 'ذخیره محلی در مرورگر (نسخه آفلاین) ✓' : 'در حساب کاربری ذخیره شد ✓') + limitNote;
+              } else {
+                notesStatus.textContent = activeBridge.lastError || 'ذخیره در سرور ناموفق بود؛ اتصال یا وضعیت نشست را بررسی کنید.';
+              }
             }
           } else {
             try {
@@ -582,7 +641,7 @@
               if (val.trim()) allNotes[bp.lessonId] = val;
               else delete allNotes[bp.lessonId];
               localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(allNotes));
-              if (notesStatus) notesStatus.textContent = 'ذخیره محلی (حالت آفلاین) ✓';
+              if (notesStatus) notesStatus.textContent = 'ذخیره محلی در مرورگر (نسخه آفلاین) ✓' + limitNote;
             } catch (_) {
               if (notesStatus) notesStatus.textContent = 'ذخیره محلی یادداشت در دسترس نیست.';
             }
@@ -717,10 +776,14 @@
         quiz.querySelectorAll('input[type="radio"]').forEach(input => { input.disabled = true; });
         quiz.classList.add('is-graded');
         gradeControl.disabled = true;
-        result.textContent = `نمره: ${Number((correct * 10 / quizQuestions.length).toFixed(2))} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered} — گزینه‌ها قفل شدند؛ برای آزمون دوباره روی «تلاش مجدد» بزنید.`;
+        const answered = quizQuestions.length - unanswered;
+        const emptyWarning = answered === 0
+          ? ' (هشدار: هیچ گزینه‌ای انتخاب نشده است — برای ارزیابی واقعی و تکمیل مأموریت، ابتدا به سؤالات پاسخ دهید.)'
+          : '';
+        result.textContent = `نمره: ${Number((correct * 10 / quizQuestions.length).toFixed(2))} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered} — گزینه‌ها قفل شدند؛ برای آزمون دوباره روی «تلاش مجدد» بزنید.${emptyWarning}`;
         saveQuizAttempt(bp.lessonId, { correct, incorrect, unanswered, total: quizQuestions.length });
         if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
-          window.dispatchEvent(new CustomEvent('fam-quiz-graded', { detail: { lessonId: bp.lessonId, correct, incorrect, unanswered, total: quizQuestions.length } }));
+          window.dispatchEvent(new CustomEvent('fam-quiz-graded', { detail: { lessonId: bp.lessonId, correct, incorrect, unanswered, answered, total: quizQuestions.length } }));
         }
       };
       retryControl.onclick = () => {

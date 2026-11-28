@@ -246,12 +246,61 @@
           toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
         });
       });
+      // Session activity keepalive: keeps active /academy learners from hitting
+      // the server idle_timeout_minutes silently (matches FAM.html semantics).
+      let lastActivityPing = Date.now();
+      let activityPingInFlight = false;
+      function pingSessionActivity() {
+        if (boot.offline === true || !csrf || activityPingInFlight) return;
+        const now = Date.now();
+        if (now - lastActivityPing < 60000) return;
+        if (typeof fetch !== 'function') return;
+        activityPingInFlight = true;
+        lastActivityPing = now;
+        Promise.resolve(fetch('/api/session/activity', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-FAM-CSRF': csrf }
+        })).then(async res => {
+          if (res && res.status === 401) {
+            const msg = 'نشست کاربری شما به‌دلیل بی‌کاری منقضی شده است؛ برای ذخیرهٔ پیشرفت دوباره وارد شوید.';
+            if (window.FamAcademyBridge) {
+              window.FamAcademyBridge.lastStatus = 401;
+              window.FamAcademyBridge.lastCode = 'session_expired';
+              window.FamAcademyBridge.lastError = msg;
+            }
+            saveStatus(msg);
+            if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+              window.dispatchEvent(new CustomEvent('fam-academy-session-expired', { detail: { message: msg } }));
+            }
+          }
+        }).catch(() => {}).finally(() => { activityPingInFlight = false; });
+      }
+      if (boot.offline !== true && csrf && typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        for (const ev of ['pointerdown', 'keydown', 'scroll', 'touchstart']) {
+          document.addEventListener(ev, pingSessionActivity, { passive: true });
+        }
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) pingSessionActivity();
+        });
+      }
+
       window.FamAcademyBridge = {
         user: boot.user || (boot.userName ? { username: boot.userName } : null),
+        offline: boot.offline === true,
         progress: readProgress(),
         sharedProgressLocked,
+        lastError: '',
+        lastStatus: 0,
+        lastCode: '',
         async saveProgress(payload) {
+          this.lastError = '';
+          this.lastStatus = 0;
+          this.lastCode = '';
           if (sharedProgressLocked) {
+            this.lastStatus = 409;
+            this.lastCode = 'shared_progress_locked';
+            this.lastError = lockedMessage;
             saveStatus(lockedMessage);
             return false;
           }
@@ -274,9 +323,16 @@
           this.progress = JSON.parse(serialized);
           const sequence = ++saveSequence;
           saveStatus('در حال ذخیرهٔ پیشرفت…');
+          const bridge = this;
           const save = async () => {
             try {
-              if (revisionConflict || progressRevision === null) { revisionConflict = true; return false; }
+              if (revisionConflict || progressRevision === null) {
+                revisionConflict = true;
+                bridge.lastStatus = 409;
+                bridge.lastCode = 'revision_conflict';
+                bridge.lastError = 'تعارض نسخه پیشرفت؛ ذخیره متوقف شد. صفحه را بازخوانی کنید و دوباره تلاش کنید.';
+                return false;
+              }
               const expectedRevision = progressRevision;
               const response = await fetch('/api/academy/progress', {
                 method: 'POST',
@@ -284,18 +340,53 @@
                 headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
                 body: JSON.stringify({ changes: { 'fam4.learn.v1': serialized }, expectedRevision })
               });
-              if (response.status === 409) { revisionConflict = true; return false; }
-              if (!response.ok) return false;
+              if (response.status === 409) {
+                revisionConflict = true;
+                bridge.lastStatus = 409;
+                bridge.lastCode = 'revision_conflict';
+                let serverErr = '';
+                try { if (typeof response.json === 'function') serverErr = (await response.json())?.error || ''; } catch (_) {}
+                bridge.lastError = serverErr || 'تعارض نسخه پیشرفت؛ پیشرفت شما در زبانهٔ دیگری تغییر کرده است. صفحه را بازخوانی کنید.';
+                return false;
+              }
+              if (!response.ok) {
+                const st = Number(response.status) || 0;
+                bridge.lastStatus = st;
+                let errBody = null;
+                try { if (typeof response.json === 'function') errBody = await response.json(); } catch (_) {}
+                const serverErr = errBody && typeof errBody.error === 'string' ? errBody.error : '';
+                if (st === 401) {
+                  bridge.lastCode = 'unauthorized';
+                  bridge.lastError = serverErr || 'نشست کاربری شما منقضی شده است؛ دوباره وارد شوید تا تغییرات ذخیره شوند.';
+                } else if (st === 403) {
+                  bridge.lastCode = 'forbidden';
+                  bridge.lastError = serverErr || 'توکن امنیتی یا نشست تغییر کرده است؛ صفحه را بازخوانی کنید و دوباره تلاش کنید.';
+                } else if (st >= 400) {
+                  bridge.lastCode = 'http_' + st;
+                  bridge.lastError = serverErr || ('ذخیره نشد (خطای سرور ' + st + ')؛ لطفاً دوباره تلاش کنید.');
+                } else {
+                  bridge.lastCode = 'save_failed';
+                  bridge.lastError = serverErr || 'ذخیره نشد؛ اتصال را بررسی کنید. برای تلاش دوباره تغییری ثبت کنید.';
+                }
+                return false;
+              }
               const result = await response.json();
               if (!Number.isSafeInteger(result.revision) || result.revision !== expectedRevision + 1) {
                 revisionConflict = true;
+                bridge.lastStatus = 409;
+                bridge.lastCode = 'revision_mismatch';
+                bridge.lastError = 'تعارض نسخه پیشرفت؛ پاسخ سرور با نسخهٔ مورد انتظار هم‌خوانی نداشت.';
                 return false;
               }
               progressRevision = result.revision;
+              lastActivityPing = Date.now();
               return true;
             } catch (_) {
               // The server may have committed before a response was lost;
               // the next write keeps the old revision and will safely conflict.
+              bridge.lastStatus = 0;
+              bridge.lastCode = 'network_error';
+              bridge.lastError = 'ارتباط با سرور برقرار نشد؛ اتصال شبکه یا گواهی HTTPS را بررسی و دوباره تلاش کنید.';
               return false;
             }
           };
@@ -305,7 +396,7 @@
           if (sequence === saveSequence) {
             saveStatus(ok ? 'پیشرفت ذخیره شد.' : revisionConflict
               ? 'تعارض نسخه پیشرفت؛ ذخیره متوقف شد. تغییرات این نشست ذخیره نشده‌اند؛ پیش از بازخوانی از آنها یادداشت بردارید.'
-              : 'ذخیره نشد؛ اتصال را بررسی کنید. برای تلاش دوباره تغییری ثبت کنید.');
+              : (bridge.lastError || 'ذخیره نشد؛ اتصال را بررسی کنید. برای تلاش دوباره تغییری ثبت کنید.'));
           }
           return ok;
         }
@@ -451,7 +542,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 @media(max-width:650px){.fa-topbar{align-items:flex-start}.fa-brand{margin-bottom:4px}.fa-nav{width:100%;overflow-x:auto;flex-wrap:nowrap}.fa-nav .btn{white-space:nowrap}.fa-path-grid{grid-template-columns:1fr}.fa-hero{padding:20px}.fa-hero h1{font-size:30px}.fa-stat{padding:11px}.fa-stat strong{font-size:18px}.fa-lesson-row{align-items:flex-start;flex-wrap:wrap}.fa-lesson-row button{margin-right:46px}}
 @media(prefers-reduced-motion:no-preference){.fa-path-card{transition:transform .2s,border-color .2s}.fa-path-card:hover{transform:translateY(-3px);border-color:#7b9cff77}}
 </style>
-  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261128f">
+  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261128g">
 </head>
 <body>
   <header class="topbar fa-topbar">
@@ -477,10 +568,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   </section>
   <main class="container" id="app-root"></main>
 
-  <script src="/academy-assets/academy-simulator.js?v=20261128f"></script>
-  <script src="/academy-assets/lesson-engine.js?v=20261128f"></script>
-  <script src="/academy-assets/academy-catalog.js?v=20261128f"></script>
-  <script src="/academy-assets/academy-journey.js?v=20261128f"></script>
+  <script src="/academy-assets/academy-simulator.js?v=20261128g"></script>
+  <script src="/academy-assets/lesson-engine.js?v=20261128g"></script>
+  <script src="/academy-assets/academy-catalog.js?v=20261128g"></script>
+  <script src="/academy-assets/academy-journey.js?v=20261128g"></script>
   <script nonce="__FAM_CSP_NONCE__">
 (() => {
   'use strict';
@@ -549,17 +640,19 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       if (!window.FamLessonEngine) throw new Error('موتور محتوای درس بارگذاری نشده است');
       const bpRoot = document.getElementById('bp-lesson-root');
       if (bpRoot) bpRoot.className = 'bp-lesson-shell';
+      const allLessons = (catalog?.paths || []).flatMap(p => (p.courses || []).flatMap(c => c.lessons || []));
+      const matchedLesson = allLessons.find(item => item.blueprint === url);
+      const activeLessonId = blueprint.lessonId || blueprint.id || matchedLesson?.id || '';
+      if (activeLessonId && location.hash !== '#' + activeLessonId) {
+        try { history.pushState(null, '', '#' + activeLessonId); } catch (_) {}
+      }
       window.FamLessonEngine.renderLesson(bpRoot, blueprint, {
         catalog,
-        onNavigate: url => {
-          const all = catalog.paths.flatMap(p => (p.courses || []).flatMap(c => c.lessons || []));
-          const next = all.find(item => item.blueprint === url);
-          const isLessonHash = all.some(item => '#' + item.id === location.hash);
-          if (next && isLessonHash && window.location.hash !== '#' + next.id) location.hash = next.id;
-          else openBlueprint(url);
+        onNavigate: nextUrl => {
+          openBlueprint(nextUrl);
         },
         onBackToCatalog: () => {
-          try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+          try { history.pushState(null, '', '#/dashboard'); } catch (_) {}
           loadCatalog();
         }
       });
@@ -594,8 +687,14 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     if (location.hash === '#/progress') window.FamJourney.renderProgress();
     else if (location.hash === '#/lab') openLabView();
     else if (location.hash === '#/coverage') openCoverageView();
-    else if (location.hash === '#/dashboard') loadCatalog();
+    else if (location.hash === '#/dashboard' || location.hash === '') loadCatalog();
     else if (location.hash === '#/paths') loadCatalog(true);
+    else if (location.hash.startsWith('#') && !location.hash.startsWith('#/') && catalog) {
+      const targetId = location.hash.slice(1);
+      const lesson = (catalog.paths || []).flatMap(p => (p.courses || []).flatMap(c => c.lessons || []))
+        .find(l => l.id === targetId);
+      if (lesson?.blueprint) openBlueprint(lesson.blueprint);
+    }
   });
   document.getElementById('btn-paths').onclick = () => loadCatalog();
   document.getElementById('btn-back-paths').onclick = () => loadCatalog();
@@ -673,8 +772,8 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 
   <div id="s4-search-wrap" style="max-width:1280px;margin:10px auto 0;padding:0 16px;">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <input id="s4-search" type="search" placeholder="🔍 جست‌وجوی درس یا اصطلاح شبکه (مثلاً OSPF، VLAN، Routing Table)..." style="flex:1;min-width:220px;padding:10px 14px;border-radius:10px;border:1px solid rgba(56,189,248,0.35);background:rgba(15,23,42,0.85);color:#f8fafc;font-family:inherit;" />
-      <select id="s4-filter-track" style="padding:10px 12px;border-radius:10px;border:1px solid rgba(139,92,246,0.35);background:rgba(15,23,42,0.85);color:#f8fafc;font-family:inherit;">
+      <input id="s4-search" type="search" aria-label="جست‌وجوی درس یا اصطلاح شبکه" placeholder="🔍 جست‌وجوی درس یا اصطلاح شبکه (مثلاً OSPF، VLAN، Routing Table)..." style="flex:1;min-width:220px;padding:10px 14px;border-radius:10px;border:1px solid rgba(56,189,248,0.35);background:rgba(15,23,42,0.85);color:#f8fafc;font-family:inherit;" />
+      <select id="s4-filter-track" aria-label="فیلتر مسیر آموزشی" style="padding:10px 12px;border-radius:10px;border:1px solid rgba(139,92,246,0.35);background:rgba(15,23,42,0.85);color:#f8fafc;font-family:inherit;">
         <option value="ALL">همه مسیرها</option>
         <option value="fam-c5">فقط Curriculum 5.0</option>
         <option value="fam-automation">فقط اتوماسیون</option>
@@ -690,7 +789,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   <div id="s4-error" class="s4-card" style="display:none; border-color:#ef4444; color:#ef4444;"></div>
   <div class="s4-grid">
     <div class="s4-card">
-      <div class="s4-title"><span>داشبورد پیشرفت</span><span id="s4-goal-badge">CCNA</span></div>
+      <div class="s4-title"><span>داشبورد پیشرفت</span><span id="s4-goal-badge">Curriculum 5.0</span></div>
       <div id="s4-progress-text" style="margin-bottom:8px;"></div>
       <div style="height:10px; background:#1e293b; border-radius:999px; overflow:hidden; margin-bottom:10px;">
         <div id="s4-progress-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#38bdf8,#22c55e);"></div>
@@ -700,18 +799,18 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     <div class="s4-card">
       <div class="s4-title"><span>برنامه‌ریزی مطالعه</span></div>
       <form id="s4-ob-form" style="display:grid; gap:8px;">
-        <select id="s4-goal" style="padding:7px; border-radius:6px;">
-          <option value="fam-c5">Curriculum 5.0 — از صفر تا CCNA / CCNP / CCIE / CCDE (۱۰۷ درس)</option>
+        <select id="s4-goal" aria-label="انتخاب مسیر هدف مطالعه" style="padding:7px; border-radius:6px;">
+          <option value="fam-c5">Curriculum 5.0 — از صفر تا طراحی پیشرفته شبکه (۱۰۷ درس)</option>
           <option value="fam-automation">اتوماسیون — NetDevOps و IaC (۲۰ درس)</option>
         </select>
-        <select id="s4-level" style="padding:7px; border-radius:6px;">
+        <select id="s4-level" aria-label="انتخاب سطح فعلی یادگیری" style="padding:7px; border-radius:6px;">
           <option value="beginner">مبتدی (۱.۰x)</option>
           <option value="intermediate">متوسط (۰.۸x)</option>
           <option value="advanced">پیشرفته (۰.۶۵x)</option>
         </select>
         <div style="display:flex; gap:8px;">
-          <input id="s4-mins" type="number" min="15" max="300" value="45" style="width:50%; padding:7px; border-radius:6px;" title="دقیقه در روز" />
-          <input id="s4-days" type="number" min="1" max="7" value="5" style="width:50%; padding:7px; border-radius:6px;" title="روز در هفته" />
+          <input id="s4-mins" type="number" min="15" max="300" value="45" style="width:50%; padding:7px; border-radius:6px;" title="دقیقه در روز" aria-label="دقیقه مطالعه در روز" />
+          <input id="s4-days" type="number" min="1" max="7" value="5" style="width:50%; padding:7px; border-radius:6px;" title="روز در هفته" aria-label="تعداد روز مطالعه در هفته" />
         </div>
         <button type="submit" class="btn btn-primary">ذخیره برنامه</button>
       </form>
@@ -721,7 +820,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   <div class="s4-card s4-map-card">
     <header class="s4-map-heading">
       <div><span class="s4-map-eyebrow">YOUR NETWORK LEARNING JOURNEY</span><h2>نقشهٔ گرافیکی مسیر یادگیری</h2><p>مسیرها بر اساس پیش‌نیازهای واقعی کاتالوگ به هم متصل شده‌اند. برای شروع هر درس، گره آن را انتخاب کن.</p></div>
-      <div class="s4-map-count"><strong id="s4-map-lesson-count">—</strong><span>درس<br>مسیر Curriculum 5.0</span></div>
+      <div class="s4-map-count"><strong id="s4-map-lesson-count">—</strong><span>درس فعال<br>در دو مسیر آکادمی</span></div>
     </header>
     <div class="s4-map-toolbar"><div class="s4-map-legend" aria-label="راهنمای وضعیت درس‌ها"><span><i class="done"></i> تکمیل‌شده</span><span><i class="in-progress"></i> در حال مطالعه</span><span><i class="ready"></i> آمادهٔ مطالعه</span><span><i class="locked"></i> دارای پیش‌نیاز</span></div><div class="s4-map-zoom" role="group" aria-label="بزرگ‌نمایی نقشه"><button type="button" id="s4-zoom-out" aria-label="کوچک‌نمایی نقشه">−</button><button type="button" id="s4-zoom-reset" aria-label="بازگرداندن بزرگ‌نمایی به ۱۰۰ درصد"><output id="s4-zoom-value" aria-live="polite">100%</output></button><button type="button" id="s4-zoom-in" aria-label="بزرگ‌نمایی نقشه">+</button><button type="button" id="s4-zoom-fit">نمای کلی</button></div><span class="s4-map-scroll-hint">↔ ↕ برای دیدن همهٔ نقشه، آن را جابه‌جا کن</span></div>
     <div class="s4-roadmap-scroll" tabindex="0" role="region" aria-label="نقشه درس‌ها؛ برای مشاهده تمام مسیر پیمایش کنید">
@@ -729,7 +828,14 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     </div>
   </div>
   <div class="s4-card" id="s4-glossary-card">
-    <div class="s4-title"><span>واژه‌نامهٔ تعاملی درس اول</span></div>
+    <div class="s4-title">
+      <span id="s4-glossary-heading">واژه‌نامهٔ تعاملی (۱۵ اصطلاح پایه از درس نخست)</span>
+      <button type="button" class="btn" id="s4-glossary-load-all">بارگذاری واژه‌نامهٔ کل ۱۲۷ درس</button>
+    </div>
+    <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="s4-glossary-filter" type="search" aria-label="فیلتر اصطلاحات واژه‌نامه" placeholder="جست‌وجوی اصطلاح (مثلاً BGP، VLAN، Drift، SSH)…" style="flex:1;min-width:200px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-family:inherit;font-size:12.5px" />
+      <small id="s4-glossary-meta" style="color:var(--muted);font-size:12px">هر درس نیز واژه‌نامهٔ اختصاصی خود را دارد.</small>
+    </div>
     <div id="s4-glossary-chips" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
   </div>
   <div class="s4-card">
@@ -738,25 +844,33 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   </div>
 </section>
 
-<div id="s4-modal" class="s4-modal-bg">
+<div id="s4-modal" class="s4-modal-bg" role="dialog" aria-modal="true" aria-labelledby="s4-modal-title">
   <div class="s4-modal">
-    <div class="s4-title"><span id="s4-modal-title">پیش‌نیازها</span><button type="button" class="btn" id="s4-modal-close">✕</button></div>
-    <div id="s4-modal-target" style="margin-bottom:10px; font-size:0.85rem; color:#38bdf8;"></div>
+    <div class="s4-title"><span id="s4-modal-title">پیش‌نیازها</span><button type="button" class="btn" id="s4-modal-close" aria-label="بستن پنجره">✕</button></div>
+    <div id="s4-modal-target" style="margin-bottom:10px; font-size:0.85rem; color:var(--cyan);"></div>
     <div id="s4-modal-list"></div>
   </div>
 </div>
 
 <script nonce="__FAM_CSP_NONCE__">
 (() => {
-  const S4_KEY = "fam_academy_v2_state";
-  const bridgeCompleted = (window.FamAcademyBridge && Array.isArray(window.FamAcademyBridge.progress?.completed))
-    ? window.FamAcademyBridge.progress.completed : [];
+  const _bridge = window.FamAcademyBridge;
+  const _authUser = (_bridge && !_bridge.offline && _bridge.user && (_bridge.user.username || _bridge.user.id))
+    ? String(_bridge.user.username || _bridge.user.id) : '';
+  const S4_KEY = _authUser ? ("fam_academy_v2_state::" + _authUser) : "fam_academy_v2_state";
+  const bridgeCompleted = (_bridge && Array.isArray(_bridge.progress?.completed))
+    ? _bridge.progress.completed : [];
+  const bridgeSelfAssessed = (_bridge && Array.isArray(_bridge.progress?.selfAssessed))
+    ? _bridge.progress.selfAssessed : [];
 
   function loadS4() {
     try {
       const raw = JSON.parse(localStorage.getItem(S4_KEY) || "{}");
-      const p = { ...(raw.profile && typeof raw.profile === "object" ? raw.profile : {}), ...(window.FamAcademyBridge?.progress?.profile || {}) };
       const clean = arr => Array.isArray(arr) ? [...new Set(arr.filter(x => typeof x === "string" && x.trim()))] : [];
+      // When authenticated, server bridge is the source of truth — never leak another account's localStorage.
+      const p = _authUser
+        ? { ...(raw.profile && typeof raw.profile === "object" ? raw.profile : {}), ...(_bridge?.progress?.profile || {}) }
+        : { ...(raw.profile && typeof raw.profile === "object" ? raw.profile : {}), ...(_bridge?.progress?.profile || {}) };
       return {
         profile: {
           level: ["beginner", "intermediate", "advanced"].includes(p.level) ? p.level : "beginner",
@@ -764,12 +878,12 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
           minutesPerDay: Number(p.minutesPerDay) >= 15 ? Number(p.minutesPerDay) : 45,
           daysPerWeek: Number(p.daysPerWeek) >= 1 && Number(p.daysPerWeek) <= 7 ? Number(p.daysPerWeek) : 5
         },
-        completed: [...new Set([...clean(raw.completed), ...bridgeCompleted])],
+        completed: _authUser ? [...new Set(bridgeCompleted)] : [...new Set([...clean(raw.completed), ...bridgeCompleted])],
         inProgress: clean(raw.inProgress),
-        selfAssessed: clean(raw.selfAssessed)
+        selfAssessed: _authUser ? [...new Set(bridgeSelfAssessed)] : [...new Set([...clean(raw.selfAssessed), ...bridgeSelfAssessed])]
       };
     } catch {
-      return { profile: { level: "beginner", goal: "fam-c5", minutesPerDay: 45, daysPerWeek: 5 }, completed: [...bridgeCompleted], inProgress: [], selfAssessed: [] };
+      return { profile: { level: "beginner", goal: "fam-c5", minutesPerDay: 45, daysPerWeek: 5 }, completed: [...bridgeCompleted], inProgress: [], selfAssessed: [...bridgeSelfAssessed] };
     }
   }
 
@@ -918,10 +1032,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
           }
         };
         const b2 = document.createElement("button"); b2.className = "btn"; b2.textContent = "رفتن به درس پیش‌نیاز";
-        b2.onclick = () => { m.classList.remove("open"); openLessonS4(pid); };
+        b2.onclick = () => { closeS4Modal(); openLessonS4(pid); };
         btns.append(b1, b2); row.appendChild(btns); list.appendChild(row);
       });
-      m.classList.add("open");
+      openS4Modal();
       return;
     }
     if (!s4.completed.includes(id) && !s4.inProgress.includes(id)) { s4.inProgress.push(id); saveS4(); }
@@ -950,13 +1064,25 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 
     const mult = s4.profile.level === "advanced" ? 0.65 : s4.profile.level === "intermediate" ? 0.8 : 1.0;
     const wMins = s4.profile.minutesPerDay * s4.profile.daysPerWeek;
-    const weeks = (gl.length - done) === 0 ? 0 : Math.max(1, Math.ceil(((gl.length - done) * 90 * mult) / Math.max(1, wMins)));
-    document.getElementById("s4-plan-summary").textContent = `تخمین باقی‌مانده: ${weeks} هفته (${gl.length - done} درس × ۹۰ دقیقه × ${mult})`;
+    const remainingLessons = gl.filter(l => getStatus(l.id) !== "done");
+    const totalEstMins = remainingLessons.reduce((sum, l) => sum + (Number(l.estimatedMinutes) || 45), 0);
+    const adjustedMins = Math.round(totalEstMins * mult);
+    const weeks = remainingLessons.length === 0 ? 0 : Math.max(1, Math.ceil(adjustedMins / Math.max(1, wMins)));
+    document.getElementById("s4-plan-summary").textContent = remainingLessons.length === 0
+      ? "تبریک! تمام درس‌های این مسیر را کامل کرده‌اید."
+      : `تخمین باقی‌مانده: ${weeks} هفته (${remainingLessons.length} درس · مجموع ${adjustedMins} دقیقه با ضریب سطح ${mult})`;
 
     const canvas = document.getElementById("s4-canvas");
     const svg = document.getElementById("s4-svg");
     const rowsNeeded = Math.max(1, Math.ceil(lessons.length / MAP_COLS));
-    canvas.style.height = Math.round(80 + rowsNeeded * 140 * 1.3) + "px";
+    const canvasHeight = Math.round(80 + rowsNeeded * 140 * 1.3);
+    const canvasWidth = 1120;
+    canvas.style.width = canvasWidth + "px";
+    canvas.style.height = canvasHeight + "px";
+    svg.setAttribute("width", String(canvasWidth));
+    svg.setAttribute("height", String(canvasHeight));
+    mapSpace.style.width = `${Math.round(canvasWidth * mapZoom)}px`;
+    mapSpace.style.height = `${Math.round(canvasHeight * mapZoom)}px`;
     canvas.querySelectorAll(".s4-node").forEach(n => n.remove());
     svg.innerHTML = "";
     const position = id => { const i = lessons.findIndex(l => l.id === id); const p = i < 0 ? {x:30, y:30} : mapSlot(i); return {x: Math.round(p.x * 1.34), y: Math.round(p.y * 1.3)}; };
@@ -1007,16 +1133,22 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   const zoomOut = document.getElementById('s4-zoom-out');
   const zoomIn = document.getElementById('s4-zoom-in');
   let mapZoom = 1;
+  function getCanvasDims() {
+    const w = parseFloat(mapCanvas.style.width) || mapCanvas.scrollWidth || 1120;
+    const h = parseFloat(mapCanvas.style.height) || mapCanvas.scrollHeight || 950;
+    return { w, h };
+  }
   function setMapZoom(value, fit = false) {
-    const next = Math.max(.1, Math.min(2, Math.round(value * 100) / 100));
+    const next = Math.max(.25, Math.min(2, Math.round(value * 100) / 100));
+    const { w, h } = getCanvasDims();
     const centerX = (mapViewport.scrollLeft + mapViewport.clientWidth / 2) / mapZoom;
     const centerY = (mapViewport.scrollTop + mapViewport.clientHeight / 2) / mapZoom;
     mapZoom = next;
     mapCanvas.style.transform = `scale(${next})`;
-    mapSpace.style.width = `${1580 * next}px`;
-    mapSpace.style.height = `${950 * next}px`;
+    mapSpace.style.width = `${Math.round(w * next)}px`;
+    mapSpace.style.height = `${Math.round(h * next)}px`;
     document.getElementById('s4-zoom-value').textContent = `${Math.round(next * 100)}%`;
-    zoomOut.disabled = next <= .1;
+    zoomOut.disabled = next <= .25;
     zoomIn.disabled = next >= 2;
     mapViewport.scrollLeft = fit ? 0 : Math.max(0, centerX * next - mapViewport.clientWidth / 2);
     mapViewport.scrollTop = fit ? 0 : Math.max(0, centerY * next - mapViewport.clientHeight / 2);
@@ -1024,7 +1156,11 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   zoomOut.onclick = () => setMapZoom(mapZoom - .1);
   zoomIn.onclick = () => setMapZoom(mapZoom + .1);
   document.getElementById('s4-zoom-reset').onclick = () => setMapZoom(1);
-  document.getElementById('s4-zoom-fit').onclick = () => setMapZoom(Math.floor(Math.min(mapViewport.clientWidth / 1580, mapViewport.clientHeight / 950, 1) * 100) / 100, true);
+  document.getElementById('s4-zoom-fit').onclick = () => {
+    const { w } = getCanvasDims();
+    const fitScale = Math.floor(Math.min(Math.max(0.35, (mapViewport.clientWidth - 20) / Math.max(1, w)), 1) * 100) / 100;
+    setMapZoom(fitScale, true);
+  };
   let mapInitiallyPositioned = false;
   document.getElementById("s4-toggle-btn").onclick = () => {
     const open = document.getElementById("fam-stage4-panel").classList.toggle("open");
@@ -1036,7 +1172,30 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   document.getElementById("s4-panel-close").onclick = () => {
     document.getElementById("fam-stage4-panel").classList.remove("open");
   };
-  document.getElementById("s4-modal-close").onclick = () => { targetStack = []; document.getElementById("s4-modal").classList.remove("open"); };
+  const s4Modal = document.getElementById("s4-modal");
+  let s4ModalTrigger = null;
+  function openS4Modal() {
+    s4ModalTrigger = document.activeElement;
+    s4Modal.classList.add("open");
+    const closeBtn = document.getElementById("s4-modal-close");
+    if (closeBtn) closeBtn.focus();
+  }
+  function closeS4Modal() {
+    targetStack = [];
+    s4Modal.classList.remove("open");
+    if (s4ModalTrigger && typeof s4ModalTrigger.focus === "function") {
+      try { s4ModalTrigger.focus(); } catch (_) {}
+    }
+    s4ModalTrigger = null;
+  }
+  document.getElementById("s4-modal-close").onclick = closeS4Modal;
+  s4Modal.addEventListener("click", e => { if (e.target === s4Modal) closeS4Modal(); });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && s4Modal.classList.contains("open")) {
+      e.preventDefault();
+      closeS4Modal();
+    }
+  });
   document.getElementById("s4-ob-form").onsubmit = e => {
     e.preventDefault();
     s4.profile.goal = document.getElementById("s4-goal").value;
@@ -1046,41 +1205,114 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     saveS4(); renderS4();
   };
 
-  fetch("/academy-assets/curriculum-catalog.json?v=20261123c")
-    .then(r => r.ok ? r.json() : null)
-    .then(cat => {
-      const first = (cat?.paths || []).flatMap(p => (p.courses || []).flatMap(c => c.lessons || [])).find(l => l.blueprint);
-      return first ? fetch(first.blueprint, { cache: 'no-store' }) : null;
-    })
-    .then(r => r.ok ? r.json() : null)
-    .then(bp => {
-      if (!bp || !Array.isArray(bp.glossary)) return;
-      const wrap = document.getElementById("s4-glossary-chips");
-      if (!wrap) return;
-      bp.glossary.forEach(item => {
+  function normFa(str) {
+    return String(str || '').replace(/[يیى]/g, 'ی').replace(/[كک]/g, 'ک').replace(/[\u200c\u200f]/g, ' ').toLowerCase();
+  }
+  let glossaryItems = [];
+  let glossaryAllLoaded = false;
+  let glossaryCatalog = null;
+  function renderGlossaryChips() {
+    const wrap = document.getElementById("s4-glossary-chips");
+    const filterEl = document.getElementById("s4-glossary-filter");
+    const metaEl = document.getElementById("s4-glossary-meta");
+    if (!wrap) return;
+    const q = normFa(filterEl ? filterEl.value.trim() : '');
+    const matched = q
+      ? glossaryItems.filter(it => normFa([it.term, it.fa, it.simple].filter(Boolean).join(' ')).includes(q))
+      : glossaryItems;
+    const visible = matched.slice(0, 60);
+    wrap.replaceChildren();
+    if (!visible.length) {
+      const empty = document.createElement("span");
+      empty.style.cssText = "color:var(--muted);font-size:12.5px;";
+      empty.textContent = "اصطلاحی با این عبارت پیدا نشد.";
+      wrap.appendChild(empty);
+    } else {
+      visible.forEach(item => {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn s4-glossary-chip";
-        btn.style.cssText = "background:rgba(56,189,248,0.14); border:1px solid rgba(56,189,248,0.35); color:#f8fafc; padding:6px 12px; border-radius:999px; cursor:pointer;";
         btn.textContent = item.term;
         btn.onclick = () => {
-          const m = document.getElementById("s4-modal");
-          document.getElementById("s4-modal-title").textContent = item.term + " — " + item.fa;
-          document.getElementById("s4-modal-target").textContent = item.simple || item.fa;
+          document.getElementById("s4-modal-title").textContent = item.term + (item.fa ? (" — " + item.fa) : "");
+          document.getElementById("s4-modal-target").textContent = item.simple || item.fa || "";
           const list = document.getElementById("s4-modal-list");
           list.replaceChildren();
           if (item.relatedLessonId) {
             const rel = document.createElement("div");
             rel.className = "s4-item";
             const span = document.createElement("span");
-            span.textContent = "درس مرتبط: " + item.relatedLessonId;
-            rel.appendChild(span);
+            span.textContent = "درس مرتبط: " + (lMap.get(item.relatedLessonId)?.title || item.relatedLessonId);
+            const openBtn = document.createElement("button");
+            openBtn.type = "button";
+            openBtn.className = "btn";
+            openBtn.textContent = "باز کردن درس";
+            openBtn.onclick = () => { closeS4Modal(); openLessonS4(item.relatedLessonId); };
+            rel.append(span, openBtn);
             list.appendChild(rel);
           }
-          m.classList.add("open");
+          openS4Modal();
         };
         wrap.appendChild(btn);
       });
+    }
+    if (metaEl) {
+      metaEl.textContent = matched.length > 60
+        ? `نمایش ۶۰ مورد از ${matched.length.toLocaleString('fa-IR')} اصطلاح — برای دیدن موارد دیگر عبارت دقیق‌تری بنویسید.`
+        : `${matched.length.toLocaleString('fa-IR')} اصطلاح نمایش داده شد.`;
+    }
+  }
+  const glossaryFilterEl = document.getElementById("s4-glossary-filter");
+  if (glossaryFilterEl) glossaryFilterEl.addEventListener("input", renderGlossaryChips);
+  const glossaryLoadAllBtn = document.getElementById("s4-glossary-load-all");
+  if (glossaryLoadAllBtn) {
+    glossaryLoadAllBtn.addEventListener("click", async () => {
+      if (glossaryAllLoaded || !glossaryCatalog) return;
+      glossaryLoadAllBtn.disabled = true;
+      glossaryLoadAllBtn.textContent = "در حال بارگذاری…";
+      try {
+        const allLessons = (glossaryCatalog.paths || []).flatMap(p => (p.courses || []).flatMap(c => c.lessons || [])).filter(l => l.blueprint);
+        const seen = new Map();
+        const addItems = (arr, lessonId) => {
+          if (!Array.isArray(arr)) return;
+          for (const it of arr) {
+            if (!it || !it.term) continue;
+            const k = String(it.term).trim().toLowerCase();
+            if (!seen.has(k)) seen.set(k, { ...it, relatedLessonId: it.relatedLessonId || lessonId });
+          }
+        };
+        glossaryItems.forEach(it => addItems([it], it.relatedLessonId));
+        const batchSize = 16;
+        for (let i = 0; i < allLessons.length; i += batchSize) {
+          const chunk = allLessons.slice(i, i + batchSize);
+          const results = await Promise.all(chunk.map(l => fetch(l.blueprint).then(r => r.ok ? r.json() : null).catch(() => null)));
+          results.forEach((bp, idx) => { if (bp && Array.isArray(bp.glossary)) addItems(bp.glossary, chunk[idx].id); });
+        }
+        glossaryItems = [...seen.values()];
+        glossaryAllLoaded = true;
+        const head = document.getElementById("s4-glossary-heading");
+        if (head) head.textContent = `واژه‌نامهٔ جامع (${glossaryItems.length.toLocaleString('fa-IR')} اصطلاح از کل ۱۲۷ درس)`;
+        glossaryLoadAllBtn.textContent = "کل واژه‌نامه بارگذاری شد ✓";
+        renderGlossaryChips();
+      } catch (_) {
+        glossaryLoadAllBtn.disabled = false;
+        glossaryLoadAllBtn.textContent = "تلاش مجدد برای بارگذاری واژه‌نامه";
+      }
+    });
+  }
+
+  fetch("/academy-assets/curriculum-catalog.json?v=20261123c")
+    .then(r => r.ok ? r.json() : null)
+    .then(cat => {
+      glossaryCatalog = cat;
+      const first = (cat?.paths || []).flatMap(p => (p.courses || []).flatMap(c => c.lessons || [])).find(l => l.blueprint);
+      return first ? fetch(first.blueprint, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(bp => ({ bp, lessonId: first.id })) : null;
+    })
+    .then(payload => {
+      const bp = payload && payload.bp;
+      if (!bp || !Array.isArray(bp.glossary)) return;
+      glossaryItems = bp.glossary.map(it => ({ ...it, relatedLessonId: it.relatedLessonId || payload.lessonId }));
+      renderGlossaryChips();
     }).catch(() => {});
 
   fetch("/academy-assets/curriculum-catalog.json?v=20261123c")
@@ -1108,7 +1340,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
         option.textContent = `${trackNames[option.value] || option.value} (${faCount(count)} درس)`;
       });
       const goalLabels = {
-        'fam-c5': 'Curriculum 5.0 — از صفر تا CCDE',
+        'fam-c5': 'Curriculum 5.0 — از صفر تا طراحی پیشرفته شبکه',
         'fam-automation': 'Automation — NetDevOps و IaC'
       };
       document.querySelectorAll('#s4-goal option').forEach(option => {
@@ -1138,9 +1370,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   const resBox = document.getElementById("s4-search-results");
   if (!inp || !sel || !resBox) return;
   let catCache = null;
+  const normFa = str => String(str || '').replace(/[يیى]/g, 'ی').replace(/[كک]/g, 'ک').replace(/[\u200c\u200f]/g, ' ').toLowerCase();
 
   async function runFilter() {
-    const q = inp.value.trim().toLowerCase();
+    const q = normFa(inp.value.trim());
     const track = sel.value;
     if (!catCache) {
       try { catCache = await (await fetch("/academy-assets/curriculum-catalog.json?v=20261123c", { credentials: "same-origin", cache: "no-store" })).json(); } catch { return; }
@@ -1150,39 +1383,45 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       resBox.replaceChildren();
       return;
     }
-    const frag = document.createDocumentFragment();
-    let hitCount = 0;
+    const hits = [];
     for (const p of (catCache.paths || [])) {
       if (track !== "ALL" && p.id !== track) continue;
       for (const c of (p.courses || [])) {
         for (const l of (c.lessons || [])) {
-          const hay = [l.title, l.titleEn, l.id, l.summary, l.description, c.title, ...(Array.isArray(l.keywords) ? l.keywords : [])]
-            .filter(Boolean).join(" ").toLowerCase();
-          if (!q || hay.includes(q)) {
-            hitCount++;
-            const row = document.createElement("div");
-            row.style.cssText = "padding:8px 10px;border-bottom:1px solid rgba(148,163,184,0.15);";
-            const link = document.createElement("a");
-            link.href = "#" + l.id;
-            link.className = "s4-search-hit";
-            link.dataset.lesson = l.id;
-            link.style.cssText = "color:#38bdf8;text-decoration:none;font-weight:700;display:block;";
-            link.textContent = l.title;
-            link.addEventListener("click", () => { resBox.style.display = "none"; });
-            const meta = document.createElement("div");
-            meta.style.cssText = "font-size:0.78rem;opacity:0.85;";
-            meta.textContent = p.title + " · " + c.title;
-            const summary = document.createElement("div");
-            summary.style.cssText = "font-size:0.78rem;opacity:0.7;";
-            summary.textContent = l.summary || l.description || c.title;
-            row.append(link, meta, summary);
-            frag.appendChild(row);
-          }
+          const hay = normFa([l.title, l.titleEn, l.id, l.summary, l.description, c.title, ...(Array.isArray(l.keywords) ? l.keywords : [])]
+            .filter(Boolean).join(" "));
+          if (!q || hay.includes(q)) hits.push({ p, c, l });
         }
       }
     }
     resBox.replaceChildren();
-    if (hitCount) {
+    if (hits.length) {
+      const head = document.createElement("div");
+      head.style.cssText = "font-size:12px;color:var(--muted);padding:0 10px 8px;border-bottom:1px solid var(--line);";
+      head.textContent = hits.length > 30
+        ? `نمایش ۳۰ مورد از ${hits.length.toLocaleString('fa-IR')} نتیجه — برای دیدن موارد دقیق‌تر عبارت را محدودتر کنید.`
+        : `${hits.length.toLocaleString('fa-IR')} نتیجه یافت شد.`;
+      resBox.appendChild(head);
+      const frag = document.createDocumentFragment();
+      for (const { p, c, l } of hits.slice(0, 30)) {
+        const row = document.createElement("div");
+        row.style.cssText = "padding:8px 10px;border-bottom:1px solid rgba(148,163,184,0.15);";
+        const link = document.createElement("a");
+        link.href = "#" + l.id;
+        link.className = "s4-search-hit";
+        link.dataset.lesson = l.id;
+        link.style.cssText = "color:var(--cyan);text-decoration:none;font-weight:700;display:block;";
+        link.textContent = l.title;
+        link.addEventListener("click", () => { resBox.style.display = "none"; });
+        const meta = document.createElement("div");
+        meta.style.cssText = "font-size:0.78rem;opacity:0.85;";
+        meta.textContent = p.title + " · " + c.title;
+        const summary = document.createElement("div");
+        summary.style.cssText = "font-size:0.78rem;opacity:0.7;";
+        summary.textContent = l.summary || l.description || c.title;
+        row.append(link, meta, summary);
+        frag.appendChild(row);
+      }
       resBox.appendChild(frag);
     } else {
       const empty = document.createElement("div");
@@ -1198,7 +1437,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   sel.addEventListener("change", runFilter);
 })();
 </script>
-  <script src="/academy-assets/academy-reference-shell.js?v=20261128e"></script>
+  <script src="/academy-assets/academy-reference-shell.js?v=20261128g"></script>
 </body>
 
 </html>
