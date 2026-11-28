@@ -652,6 +652,47 @@ class FamAppApiTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT payload,revision FROM academy_progress WHERE user_id='other'").fetchone(),('other-secret',5))
             self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups').fetchone()[0],0)
 
+    def test_migration_races_unrevisioned_other_key_save_without_lost_data(self):
+        clients=[]
+        for _ in range(2):
+            c=self.app.test_client()
+            login=c.post('/api/login',json={'username':'admin','password':self.ADMIN_PASSWORD},headers={'Origin':self.ORIGIN},environ_base=self.https_env)
+            self.assertEqual(login.status_code,200);clients.append((c,login.json['csrf']))
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+            old=json.dumps({'completedLessons':['s02'],'notes':{'s02':'sensitive'}})
+            raw=json.dumps({'fam4.learn.v1':old,'unrelated':'preserve'})
+            db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,1,1))
+        barrier=threading.Barrier(3);results={};errors=[];lock=threading.Lock()
+        def worker(kind):
+            try:
+                barrier.wait(timeout=10)
+                c,csrf=clients[0 if kind=='migrate' else 1]
+                url='/api/academy/progress/migrate' if kind=='migrate' else '/api/academy/progress'
+                body={'expectedRevision':1,'selectedLessons':['s02']} if kind=='migrate' else {'changes':{'fam3.progress.v1':'independent'}}
+                response=c.post(url,json=body,headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf},environ_base=self.https_env)
+                with lock:results[kind]=response.status_code
+            except BaseException as exc:
+                with lock:errors.append(repr(exc))
+        threads=[threading.Thread(target=worker,args=(kind,)) for kind in ('migrate','save')]
+        for t in threads:t.start()
+        try:barrier.wait(timeout=10)
+        finally:
+            for t in threads:t.join(timeout=20)
+        self.assertFalse(any(t.is_alive() for t in threads));self.assertEqual(errors,[])
+        self.assertEqual(set(results),{'migrate','save'});self.assertEqual(results['save'],200)
+        self.assertIn(results['migrate'],(200,409))
+        with sqlite3.connect(self.db_path) as db:
+            payload,revision=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
+            backups=db.execute('SELECT revision,payload FROM academy_progress_backups WHERE user_id=?',(uid,)).fetchall()
+        state=json.loads(payload)
+        self.assertEqual(state['fam3.progress.v1'],'independent');self.assertEqual(state['unrelated'],'preserve')
+        if results['migrate']==200:
+            self.assertEqual(revision,3);self.assertEqual(state['fam.academy.legacy.archive.v1'],old)
+            self.assertEqual(json.loads(state['fam4.learn.v1'])['completed'],['s02']);self.assertEqual(backups,[(1,raw)])
+        else:
+            self.assertEqual(revision,2);self.assertEqual(state['fam4.learn.v1'],old);self.assertEqual(backups,[])
+
     def test_two_migrations_race_without_overwrite(self):
         clients=[]
         for _ in range(2):

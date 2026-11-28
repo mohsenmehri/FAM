@@ -27,3 +27,16 @@ class CandidateRegression(unittest.TestCase):
         for data in (b'\n##\n', b'\n#01\na\n##\n',b'\n#1\na', b'\n#1\na\n##\nextra',
                      b'\n#4294967296\na\n##\n',b'\n#1\n\xff\n##\n'):
             with self.subTest(data=data), self.assertRaises(ValueError):netconf.parse_netconf_1_1_chunked(data)
+
+class UpdatedJwtCandidateTests(unittest.TestCase):
+    def test_new_candidate_recursion_and_configured_not_performed(self):
+        updated=load('auto_07_993')
+        token=updated.build_hs256_jwt_demo({'exp':1893456000},b'secret')
+        header,_,sig=token.split('.')
+        nested=b'{"x":'+b'['*1100+b'0'+b']'*1100+b'}'
+        result=updated.evaluate_hs256_jwt_demo(header+'.'+updated.b64url_encode(nested)+'.'+sig,b'secret')
+        self.assertFalse(result['demo_checks_passed'])
+        self.assertEqual(result['reason'],'malformed_jwt_encoding_or_json')
+        self.assertIn('checks_configured',result)
+        self.assertNotIn('checks_performed',result)
+        self.assertFalse(updated.evaluate_hs256_jwt_demo(header+'.e30.☃',b'secret')['demo_checks_passed'])

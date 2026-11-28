@@ -168,7 +168,7 @@ class AcademyContentTests(unittest.TestCase):
                 if path["id"] == "fam-c5":
                     self.assertTrue(lesson["id"].startswith(("ccna-v11-", "ccna-v20-", "academy-stage-zero-")) or lesson["id"] in {"s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "ccna_01", "ccna_02", "ccna_02_vlan"})
                 else:
-                    self.assertIn(lesson["id"], {"academy-automation-terraform", "auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_10", "auto_20"})
+                    self.assertIn(lesson["id"], {"academy-automation-terraform", "auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_08", "auto_10", "auto_20"})
                 self.assertTrue(lesson["blueprint"].startswith("/academy-assets/v5/blueprints/"))
 
     def test_terraform_blueprint_embeds_the_actual_mock_source(self):
@@ -196,7 +196,7 @@ class AcademyContentTests(unittest.TestCase):
             blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
             with self.subTest(lesson=lesson["id"]):
                 self.assertGreaterEqual(len(blueprint.get("sections", [])), 14, lesson["id"])
-                if lesson["id"] in {"auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_10", "auto_20", "ccna_02_vlan"}:
+                if lesson["id"] in {"auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_08", "auto_10", "auto_20", "ccna_02_vlan"}:
                     self.assertIn("محلی", blueprint.get("evidence", ""))
                     self.assertIn("روی تجهیز اجرا نشده", blueprint["evidence"])
                 else:

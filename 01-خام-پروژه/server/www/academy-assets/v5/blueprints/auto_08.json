@@ -1,0 +1,347 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_08",
+ "objectiveId": "auto_08",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۸ از ۲۰): پروتکل NETCONF",
+ "titleEn": "Automation 08: NETCONF Protocol (RFC 6241 & RFC 6242)",
+ "domain": "Network Automation",
+ "source": "Legacy auto_08 rewritten and audited",
+ "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+ "reviewStatus": "بازبینی فنی توسط یکپارچه‌ساز انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_08-section-1",
+   "title": "مسئله واقعی: چرا ارسال خط‌به‌خط CLI روی SSH هنگام تغییر ACL می‌تواند روتر را از دسترس خارج کند؟",
+   "html": "<p>تغییر ACL با CLI ممکن است دسترسی مدیریتی را قطع کند؛ راه بازگشت خارج از شبکه و برنامه تغییر همچنان ضروری‌اند. NETCONF سازوکارهای استاندارد مدیریت پیکربندی را فراهم می‌کند؛ قابلیت‌هایی چون candidate، validate و confirmed-commit اختیاری‌اند و باید در hello و پیاده‌سازی دستگاه بررسی شوند. NETCONF به‌تنهایی ایمنی یا موفقیت rollback را در همه تجهیزات تضمین نمی‌کند.</p>"
+  },
+  {
+   "id": "auto_08-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با XML و Namespaceها (درس <code>auto_05</code>) و SSH (درس <code>auto_03</code>).</p><ul><li>تبیین معماری ۴ لایه <strong>NETCONF (RFC 6241)</strong> و تبادل قابلیت‌ها در <code>&lt;hello&gt;</code>.</li><li>تشخیص تفاوت <strong>فریم‌بندی NETCONF 1.0 (<code>]]&gt;]]&gt;</code>)</strong> با <strong>NETCONF 1.1 Chunked Framing (RFC 6242)</strong>.</li><li>کار با سه Datastore (<code>running</code>، <code>candidate</code>، <code>startup</code>) و تفاوت <code>&lt;get&gt;</code> با <code>&lt;get-config&gt;</code>.</li><li>طراحی تراکنش ایمن با <code>&lt;lock&gt;</code>، <code>&lt;edit-config&gt;</code>، <code>&lt;validate&gt;</code> و <code>confirmed-commit</code> (شامل نقش <code>persist</code>).</li></ul>"
+  },
+  {
+   "id": "auto_08-section-3",
+   "title": "معماری ۴ لایه NETCONF و دست‌دادن اولیه <hello>",
+   "html": "<p>معماری RFC 6241 از چهار لایه مستقل تشکیل شده است: (۱) <strong>Secure Transport</strong> (استاندارد رایج: SSH زیرسیستم <code>netconf</code> روی <strong>TCP 830</strong>، یا TLS روی TCP 6513)؛ (۲) <strong>Messages</strong> شامل <code>&lt;rpc&gt;</code>، <code>&lt;rpc-reply&gt;</code> و اعلان‌ها از افزونه‌های جداگانه؛ (۳) <strong>Operations</strong> مانند <code>&lt;get&gt;</code>، <code>&lt;get-config&gt;</code>، <code>&lt;edit-config&gt;</code>، <code>&lt;lock&gt;</code>، <code>&lt;commit&gt;</code>؛ و (۴) <strong>Content</strong> یعنی داده‌های ساختاریافته XML منطبق بر مدل‌های YANG.</p><p>پس از برقراری نشست NETCONF، کلاینت و سرور پیام <code>&lt;hello&gt;</code> را با فهرست <strong>Capabilities</strong> (مانند پشتیبانی از <code>candidate</code>، <code>confirmed-commit</code>، <code>validate</code> و مدل‌های YANG پشتیبانی‌شده) مبادله می‌کنند.</p>"
+  },
+  {
+   "id": "auto_08-section-4",
+   "title": "نمودار معماری ۴ لایه و چرخه تراکنش Confirmed Commit در NETCONF",
+   "html": "<p>در نمودار زیر لایه‌های RFC 6241 و مسیر امن تغییرات از Candidate به Running با حفاظ Auto-Rollback نشان داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"NETCONF 4-Layer Architecture and Confirmed-Commit Datastore Flow\"><rect x=\"14\" y=\"16\" width=\"290\" height=\"186\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"159\" y=\"38\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">NETCONF 4 Layers (RFC 6241)</text><rect x=\"30\" y=\"50\" width=\"258\" height=\"30\" rx=\"5\" fill=\"#dbeafe\" stroke=\"#2563eb\"/><text x=\"159\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">4. Content: YANG-modeled XML Data</text><rect x=\"30\" y=\"86\" width=\"258\" height=\"30\" rx=\"5\" fill=\"#bfdbfe\" stroke=\"#2563eb\"/><text x=\"159\" y=\"106\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">3. Operations: &lt;get&gt;, &lt;edit-config&gt;, &lt;lock&gt;</text><rect x=\"30\" y=\"122\" width=\"258\" height=\"30\" rx=\"5\" fill=\"#93c5fd\" stroke=\"#2563eb\"/><text x=\"159\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">2. Messages: &lt;rpc&gt;, &lt;rpc-reply&gt;, &lt;notification&gt;</text><rect x=\"30\" y=\"158\" width=\"258\" height=\"32\" rx=\"5\" fill=\"#60a5fa\" stroke=\"#1d4ed8\"/><text x=\"159\" y=\"178\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#0f172a\">1. Transport: SSH TCP 830 (Chunked 1.1)</text><rect x=\"334\" y=\"16\" width=\"412\" height=\"186\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"540\" y=\"38\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Safe Transaction &amp; Confirmed Commit</text><rect x=\"352\" y=\"54\" width=\"110\" height=\"44\" rx=\"6\" fill=\"#fef3c7\" stroke=\"#d97706\"/><text x=\"407\" y=\"74\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#92400e\">Candidate DS</text><text x=\"407\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">&lt;lock&gt; + &lt;edit&gt;</text><rect x=\"488\" y=\"54\" width=\"110\" height=\"44\" rx=\"6\" fill=\"#dcfce7\" stroke=\"#15803d\"/><text x=\"543\" y=\"74\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Running DS</text><text x=\"543\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">confirmed-commit</text><rect x=\"624\" y=\"54\" width=\"106\" height=\"44\" rx=\"6\" fill=\"#e0e7ff\" stroke=\"#4338ca\"/><text x=\"677\" y=\"74\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#312e81\">Startup DS</text><text x=\"677\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">&lt;copy-config&gt;</text><line x1=\"462\" y1=\"76\" x2=\"488\" y2=\"76\" stroke=\"#15803d\" stroke-width=\"2\"/><line x1=\"598\" y1=\"76\" x2=\"624\" y2=\"76\" stroke=\"#4338ca\" stroke-width=\"2\"/><rect x=\"352\" y=\"118\" width=\"378\" height=\"68\" rx=\"6\" fill=\"#fee2e2\" stroke=\"#b91c1c\"/><text x=\"541\" y=\"138\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#991b1b\">Auto-Rollback Guard (RFC 6241 Sec. 8.4)</text><text x=\"541\" y=\"156\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">No confirming &lt;commit/&gt; within timeout (or session drops</text><text x=\"541\" y=\"172\" text-anchor=\"middle\" font-size=\"10\" fill=\"#7f1d1d\">without persist) =&gt; Automatic Rollback to safe config!</text></svg>"
+  },
+  {
+   "id": "auto_08-section-5",
+   "title": "چرا NETCONF 1.1 فریم‌بندی Chunked Framing (RFC 6242) را جایگزین ]]>]]> کرد؟",
+   "html": "<p>در NETCONF 1.0 پایان هر پیام XML با دنباله کاراکتری ثابت <code>]]&gt;]]&gt;</code> مشخص می‌شد. <strong>مشکل امنیتی و فنی:</strong> اگر این دنباله به تصادف (یا عمداً) در بخش‌های XML مانند comment یا attribute قرار می‌گرفت، پارسر آن را پایان پیام تلقی می‌کرد و فریم‌بندی کل نشست می‌شکست (حتی امکان تزریق پیام در برخی پیاده‌سازی‌ها وجود داشت)!</p><p>در <strong>NETCONF 1.1 (RFC 6242 بخش 4.2)</strong> از <strong>Chunked Framing مبتنی بر octet (بایت)</strong> استفاده می‌شود (<code>\\n#&lt;chunk-size&gt;\\n&lt;chunk-bytes&gt;...\\n##\\n</code> که در آن <code>chunk-size</code> عددی بدون صفرِ ابتدایی در بازه <code>1..4294967295</code> است). <strong>نکته مهندسی بسیار مهم:</strong> چون اندازه‌گیری تکه‌ها در RFC 6242 بر پایه <em>بایت (octet)</em> است نه کاراکتر، در پیام‌های UTF-8 چندبایتی (مانند متن فارسی <code>سلام</code> که ۸ بایت است) ممکن است یک کاراکتر میان دو تکه شکسته شود؛ این مدل ابتدا بایت‌های تکه‌ها را سرهم و سپس پیام را به UTF-8 تبدیل می‌کند؛ پردازش جریانی نیز ممکن است.</p>"
+  },
+  {
+   "id": "auto_08-section-6",
+   "title": "تفاوت حیاتی <get> و <get-config> (Config Data در برابر State Data)",
+   "html": "<ul><li><strong><code>&lt;get-config&gt;</code>:</strong> فقط <strong>داده‌های پیکربندی (Configuration Data)</strong> را از Datastore انتخاب‌شده (<code>running</code>، <code>candidate</code> یا <code>startup</code>) برمی‌گرداند؛ بسته به حجم خروجی مناسب برای پشتیبان‌گیری و مقایسه پیکربندی است.</li><li><strong><code>&lt;get&gt;</code>:</strong> هم پیکربندی <code>running</code> و هم <strong>داده‌های وضعیت عملیاتی موجود (Operational State Data)</strong> مانند <code>oper-status</code>، شمارنده بسته‌ها، همسایه‌های BGP و دمای سخت‌افزار را برمی‌گرداند. (در NMDA / RFC 8526 در معماری RFC 8342 عملیات <code>&lt;get-data&gt;</code> روی datastore <code>operational</code> تعریف شده است.)</li></ul>"
+  },
+  {
+   "id": "auto_08-section-7",
+   "title": "سه Datastore کلاسیک و قفل‌گذاری <lock> / <unlock>",
+   "html": "<p>پیکربندی در NETCONF می‌تواند در سه مخزن (Datastore) باشد: <code>running</code> (پیکربندی فعال در حال اجرا)، <code>candidate</code> (پیش‌نویس جداگانه برای ویرایش و آزمایش پیش از اعمال، در صورت پشتیبانی Capability) و <code>startup</code> (پیکربندی ذخیره‌شده برای بوت بعدی).</p><p>برای جلوگیری از تداخل دو مهندس یا دو پایپ‌لاین هم‌زمان (Race Condition)، پیش از ویرایش باید <code>&lt;lock&gt;</code> روی Datastore هدف گرفته شود و در پایان (حتی در صورت خطا، داخل بلوک <code>finally</code>) آزاد (<code>&lt;unlock&gt;</code>) گردد.</p><p>candidate و startup اختیاری‌اند. قفل و سطح پوشش آن و تعامل CLI یا سایر مسیرهای مدیریت را در دستگاه آزمایش و مستندات بررسی کنید؛ قفل، خطای دستگاه یا همه تغییرات خارجی را تضمیناً حذف نمی‌کند.</p>"
+  },
+  {
+   "id": "auto_08-section-8",
+   "title": "عملکرد دقیق <edit-config> و عملیات‌های merge / replace / create / delete / remove",
+   "html": "<p>در <code>&lt;edit-config&gt;</code> می‌توان رفتار تغییر روی هر گره XML را با ویژگی <code>nc:operation</code> کنترل کرد: <code>merge</code> (ادغام با موجود)، <code>replace</code> (جایگزینی کامل شاخه)، <code>create</code> (ایجاد تنها اگر وجود نداشته باشد؛ وگرنه خطا)، <code>delete</code> (حذف و پرتاب خطا اگر وجود نداشته باشد) و <code>remove</code> (حذف بی‌خطا حتی اگر وجود نداشته باشد — ایده‌آل برای Idempotency). در صورت پشتیبانی capability مربوط، گزینه <code>&lt;error-option&gt;rollback-on-error&lt;/error-option&gt;</code> از اعمال نیمه‌کاره درون همان RPC جلوگیری می‌کند.</p>"
+  },
+  {
+   "id": "auto_08-section-9",
+   "title": "مکانیسم طلایی Confirmed Commit و تفاوت با/بدون پارامتر persist",
+   "html": "<p>هنگام تغییر ACL مدیریتی یا مسیر BGP بحرانی، به جای commit عادی، از <strong><code>&lt;confirmed/&gt;</code></strong> با تایمر مثلاً <code>&lt;confirm-timeout&gt;120&lt;/confirm-timeout&gt;</code> استفاده می‌کنیم. روتر تغییرات را موقتاً اعمال می‌کند؛ اگر تا سقف ۱۲۰ ثانیه پیام تأییدی <code>&lt;commit/&gt;</code> ارسال نشود، روتر <strong>به‌طور خودکار Rollback</strong> می‌کند! <strong>نکته دقیق RFC 6241 بخش 8.4:</strong> اگر پارامتر <code>&lt;persist&gt;</code> مشخص نشده باشد، <em>قطع شدن یا بسته شدن خود نشست NETCONF</em> می‌تواند بلافاصله Rollback را حتی پیش از پایان ۱۲۰ ثانیه آغاز کند؛ اگر می‌خواهید تأیید نهایی را از نشست دوم بفرستید باید شناسه <code>persist</code> / <code>persist-id</code> بدهید.</p><p>confirmed-commit نیازمند پشتیبانی و candidate است. تکرار، زمان‌سنج، مجوز و امکان بازیابی باید مطابق نسخه و سناریوی دستگاه آزموده شوند؛ بازگشت موفقیت تغییر را اثبات نمی‌کند.</p>"
+  },
+  {
+   "id": "auto_08-section-10",
+   "title": "کاربرد عملی در Python با ncclient و فعال‌سازی روی IOS-XE (مرجع)",
+   "html": "<p>در پایتون کتابخانه شخص ثالث برای اتصال NETCONF <strong><code>ncclient</code></strong> است (بر بستر <code>paramiko</code>). در تجهیزات Cisco IOS-XE فعال‌سازی سرور NETCONF با دستور <code>netconf-yang</code> انجام می‌شود (پیش‌نیاز: AAA محلی/مرکزی و کلید RSA/SSH معتبر). برای کاهش حجم غیرضروری، در صورت نیاز و پشتیبانی در درخواست‌های <code>get</code> از <strong>Subtree Filter</strong> یا XPath استفاده کنید تا کل پیکربندی چندمگابایتی روتر بی‌دلیل دانلود نشود!</p>"
+  },
+  {
+   "id": "auto_08-section-11",
+   "title": "کژفهمی‌های رایج درباره NETCONF",
+   "html": "<ul><li><strong>کژفهمی ۱: «NETCONF همان SSH روی پورت ۲۲ با خروجی XML است.»</strong> واقعیت: NETCONF زیرسیستم مجزای <code>netconf</code> روی پورت استاندارد <strong>TCP 830</strong> است و پیام‌رسانی RPC ساختاریافته و Datastore دارد.</li><li><strong>کژفهمی ۲: «وقتی confirmed-commit می‌زنیم، تغییر خودبه‌خود در startup-config هم ذخیره می‌شود.»</strong> واقعیت: <code>commit</code> فقط <code>candidate</code> را به <code>running</code> منتقل می‌کند؛ ذخیره پایدار در <code>startup</code> (در تجهیزاتی که startup جدا دارند) نیازمند <code>&lt;copy-config&gt;</code> یا RPC ذخیره‌سازی است.</li><li><strong>کژفهمی ۳: «delete و remove در edit-config یکسان‌اند.»</strong> واقعیت: اگر گره هدف از قبل وجود نداشته باشد، <code>delete</code> خطای <code>data-missing</code> می‌دهد اما <code>remove</code> بدون خطا موفق می‌شود.</li></ul>"
+  },
+  {
+   "id": "auto_08-section-12",
+   "title": "عیب‌یابی نشست‌ها و خطاهای RPC در NETCONF",
+   "html": "<p><strong>lock-denied:</strong> ممکن است datastore توسط نشست NETCONF دیگری قفل باشد؛ در error-info، <code>session-id</code> می‌تواند شناسه دارنده باشد (صفر وقتی نشست NETCONF نباشد). نحوه تعامل CLI به پیاده‌سازی بستگی دارد.</p><p><strong>اتصال ناموفق به ۸۳۰:</strong> فعال بودن سرویس، مسیریابی، ACL، کلید میزبان SSH و دسترسی حساب را بررسی کنید؛ رد اتصال، timeout و خطای احراز هویت یکسان نیستند.</p>"
+  },
+  {
+   "id": "auto_08-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> اسکریپت شما بدون استفاده از فیلتر، <code>&lt;get&gt;</code> روی یک روتر Core با جدول BGP بزرگ می‌فرستد و Timeout می‌خورد. مشکل چیست و راه‌حل کدام است؟ <strong>پاسخ:</strong> <code>&lt;get&gt;</code> بدون فیلتر ممکن است Config و State در دسترس را در XML حجیم برگرداند؛ با سنجش حجم و پشتیبانی دستگاه می‌توان از <strong>Subtree Filter</strong> یا XPath دقیق (یا <code>&lt;get-config&gt;</code> در صورت نیاز صرفاً به پیکربندی) استفاده کرد.</p><p><strong>تمرین ۲:</strong> مهندسی با <code>confirmed-commit</code> با مهلت ۱۸۰ ثانیه ACL اشتباهی می‌فرستد و نشست SSH قطع می‌شود. چه رخ می‌دهد؟ <strong>پاسخ:</strong> در حالت بدون <code>persist</code>، قطع نشست یا پایان تایمر ۱۸۰ ثانیه بدون <code>&lt;commit/&gt;</code> تأییدی باعث <strong>Rollback خودکار</strong> به پیکربندی ایمن قبلی می‌شود.</p>"
+  },
+  {
+   "id": "auto_08-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc6241\" target=\"_blank\" rel=\"noopener\">RFC 6241 (NETCONF Protocol)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc6242\" target=\"_blank\" rel=\"noopener\">RFC 6242 (NETCONF over SSH / Chunked Framing)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8342\" target=\"_blank\" rel=\"noopener\">RFC 8342 (NMDA)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک <strong>شبیه‌ساز آموزشی محلی (Local Simulator)</strong> در Python 3 است: بخش فریم‌بندی RFC 6242 به‌صورت کامل بایت‌محور (octet-oriented) پیاده‌سازی شده و حتی برش تک‌بایتی رشته‌های چندبایتی UTF-8 (مانند <code>سلام</code>) و فریم‌های ناقص/نامعتبر را می‌آزماید؛ اما کلاس <code>NetconfDatastoreMock</code> یک ماشین حالت بسیار ساده آموزشی است و هم‌زمانی واقعی نشست‌ها، اعتبارسنجی کامل اسکیمای YANG/XML، تایمر واقعی ساعت‌دیواری <code>confirm-timeout</code>، دست‌به‌دست شدن <code>persist</code>/<code>persist-id</code> و اتصال زنده SSH پورت TCP 830 را مدل یا اجرا نمی‌کند.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "NETCONF (RFC 6241)",
+   "fa": "پروتکل NETCONF",
+   "simple": "پروتکل استاندارد و تراکنشی مدیریت پیکربندی شبکه با XML و RPC روی SSH پورت ۸۳۰."
+  },
+  {
+   "term": "TCP Port 830",
+   "fa": "پورت استاندارد ۸۳۰",
+   "simple": "پورت پیش‌فرض زیرسیستم SSH برای پروتکل NETCONF."
+  },
+  {
+   "term": "<hello> Capability",
+   "fa": "مذاکره قابلیت‌ها",
+   "simple": "تبادل اولیه فهرست قابلیت‌ها و مدل‌های YANG پشتیبانی‌شده میان کلاینت و سرور."
+  },
+  {
+   "term": "Chunked Framing (RFC 6242)",
+   "fa": "فریم‌بندی تکه‌ای ۱.۱",
+   "simple": "جایگزین طول‌محور (#len) به جای جداکننده آسیب‌پذیر ]]>]]> در NETCONF 1.1."
+  },
+  {
+   "term": "Datastore",
+   "fa": "مخزن پیکربندی",
+   "simple": "فضای منطقی نگهداری پیکربندی مانند running، candidate و startup."
+  },
+  {
+   "term": "Candidate Datastore",
+   "fa": "مخزن پیش‌نویس",
+   "simple": "فضای ویرایش و اعتبارسنجی تغییرات پیش از اعمال یکپارچه به running."
+  },
+  {
+   "term": "<get> vs <get-config>",
+   "fa": "تفاوت get و get-config",
+   "simple": "get هر دو Config و State زنده را می‌خواند؛ get-config فقط پیکربندی را برمی‌گرداند."
+  },
+  {
+   "term": "<lock> / <unlock>",
+   "fa": "قفل‌گذاری Datastore",
+   "simple": "قفل مخزن برای محدود کردن تداخل؛ تعامل با CLI و سایر مسیرها به پیاده‌سازی وابسته است."
+  },
+  {
+   "term": "<validate>",
+   "fa": "اعتبارسنجی پیش از اعمال",
+   "simple": "عملیات اختیاری اعتبارسنجی؛ پشتیبانی و دامنه بررسی به قابلیت و دستگاه وابسته است."
+  },
+  {
+   "term": "Confirmed Commit",
+   "fa": "اعمال نیازمند تأیید",
+   "simple": "اعمال موقت با تایمر بازگشت خودکار (Rollback) در صورت نبود commit تأییدی."
+  },
+  {
+   "term": "persist / persist-id",
+   "fa": "شناسه پایداری تأیید",
+   "simple": "پارامتری که اجازه می‌دهد confirmed-commit پس از بسته شدن نشست اول از نشست دوم تأیید شود."
+  },
+  {
+   "term": "rollback-on-error",
+   "fa": "بازگشت در صورت خطا",
+   "simple": "قابلیت اختیاری بازگشت تغییرات همان edit-config هنگام خطا."
+  },
+  {
+   "term": "delete vs remove",
+   "fa": "تفاوت delete و remove",
+   "simple": "delete در نبود گره خطا می‌دهد؛ remove در نبود گره نیز بدون خطا موفق می‌شود."
+  },
+  {
+   "term": "Subtree Filter",
+   "fa": "فیلتر زیرشاخه XML",
+   "simple": "محدود کردن خروجی <get> یا <get-config> به شاخه دقیق مورد نیاز برای کاهش بار."
+  },
+  {
+   "term": "ncclient",
+   "fa": "کتابخانه ncclient",
+   "simple": "کتابخانه استاندارد پایتون برای برقراری نشست و ارسال RPCهای NETCONF."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (Chunked Framing 1.1 و Confirmed-Commit Rollback) — تجهیز واقعی اجرا نشده",
+   "executionStatus": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر IOS-XE/IOS-XR/NX-OS یا نشست SSH پورت ۸۳۰ واقعی در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی نشان می‌دهد چرا پیام حاوی <code>]]&gt;]]&gt;</code> در NETCONF 1.0 می‌شکند اما در <strong>NETCONF 1.1 Chunked Framing</strong> سالم می‌ماند، و سپس چرخه <code>&lt;lock&gt;</code>، ACL خراب، <code>confirmed-commit</code> و <strong>Auto-Rollback</strong> را اجرا و راستی‌آزمایی می‌کند.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_08_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_08_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_08: NETCONF (RFC 6241 / RFC 6242) Local Educational Simulator.\n\nExecution boundary &amp; honest limitations:\n- Byte-oriented RFC 6242 Section 4.2 chunked framing in pure Python 3 stdlib:\n  chunks are split strictly on OCTET boundaries (not characters), so multi-byte\n  UTF-8 sequences (e.g., Persian text like &#x27;سلام&#x27;) split across chunk boundaries\n  frame and reassemble cleanly without UnicodeDecodeError, with UTF-8 decoding\n  performed only at the complete reassembled message boundary.\n- The datastore class (NetconfDatastoreMock) is a MINIMAL EDUCATIONAL STATE MACHINE:\n  it does NOT model real concurrent NETCONF sessions, real YANG/XML schema validation,\n  real wall-clock confirm-timeout timers, persist/persist-id cross-session handoff,\n  or live SSH-830 network devices.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport copy\nimport json\nimport re\n\nRFC6242_MAX_CHUNK_SIZE = 4294967295  # 2^32 - 1 per RFC 6242 Section 4.2 ABNF\n_CHUNK_SIZE_RE = re.compile(rb&quot;^[1-9][0-9]{0,9}$&quot;)\n\n\ndef frame_netconf_1_0(xml_payload: str) -&gt; str:\n    if not isinstance(xml_payload, str):\n        raise ValueError(&quot;xml_payload must be str&quot;)\n    return xml_payload + &quot;]]&gt;]]&gt;&quot;\n\n\ndef frame_netconf_1_1_chunked(xml_payload: str | bytes, chunk_size: int | None = None) -&gt; bytes:\n    &quot;&quot;&quot;Encode payload into byte-oriented RFC 6242 Section 4.2 chunked framing.\n\n    Per RFC 6242, chunk-size counts OCTETS (1..4294967295); individual chunks do NOT\n    need to be standalone valid UTF-8 strings.\n    &quot;&quot;&quot;\n    if isinstance(xml_payload, str):\n        data = xml_payload.encode(&quot;utf-8&quot;)\n    elif isinstance(xml_payload, (bytes, bytearray)):\n        data = bytes(xml_payload)\n    else:\n        raise ValueError(&quot;xml_payload must be non-empty str or bytes&quot;)\n    if not data:\n        raise ValueError(&quot;xml_payload must be non-empty&quot;)\n\n    if chunk_size is None:\n        if len(data) &gt; RFC6242_MAX_CHUNK_SIZE:\n            raise ValueError(&quot;single chunk exceeds RFC 6242 max chunk-size&quot;)\n        return b&quot;\\n#&quot; + str(len(data)).encode(&quot;ascii&quot;) + b&quot;\\n&quot; + data + b&quot;\\n##\\n&quot;\n\n    if (\n        isinstance(chunk_size, bool)\n        or not isinstance(chunk_size, int)\n        or chunk_size &lt;= 0\n        or chunk_size &gt; RFC6242_MAX_CHUNK_SIZE\n    ):\n        raise ValueError(\n            f&quot;chunk_size must be an int in 1..{RFC6242_MAX_CHUNK_SIZE} (not bool), got {chunk_size!r}&quot;\n        )\n\n    parts: list[bytes] = []\n    for i in range(0, len(data), chunk_size):\n        piece = data[i : i + chunk_size]\n        parts.append(b&quot;\\n#&quot; + str(len(piece)).encode(&quot;ascii&quot;) + b&quot;\\n&quot; + piece)\n    parts.append(b&quot;\\n##\\n&quot;)\n    return b&quot;&quot;.join(parts)\n\n\ndef parse_netconf_1_1_chunked_bytes(framed: bytes | str) -&gt; bytes:\n    &quot;&quot;&quot;Parse RFC 6242 Section 4.2 chunked framing into raw reassembled message octets.&quot;&quot;&quot;\n    if isinstance(framed, str):\n        raw = framed.encode(&quot;utf-8&quot;)\n    elif isinstance(framed, (bytes, bytearray)):\n        raw = bytes(framed)\n    else:\n        raise ValueError(&quot;framed message must be bytes or str&quot;)\n\n    pos = 0\n    chunks: list[bytes] = []\n    while pos &lt; len(raw):\n        if raw[pos : pos + 4] == b&quot;\\n##\\n&quot;:\n            pos += 4\n            if pos != len(raw):\n                raise ValueError(&quot;Trailing bytes after RFC 6242 end-of-chunks marker&quot;)\n            if not chunks:\n                raise ValueError(&quot;RFC 6242 message contained zero chunks&quot;)\n            return b&quot;&quot;.join(chunks)\n        if not raw[pos:].startswith(b&quot;\\n#&quot;):\n            raise ValueError(f&quot;Invalid RFC 6242 chunk header at byte {pos}&quot;)\n        nl = raw.find(b&quot;\\n&quot;, pos + 2)\n        if nl == -1:\n            raise ValueError(&quot;Unterminated RFC 6242 chunk length header&quot;)\n        size_token = raw[pos + 2 : nl]\n        if not _CHUNK_SIZE_RE.fullmatch(size_token):\n            raise ValueError(f&quot;Invalid RFC 6242 chunk-size token: {size_token!r}&quot;)\n        size = int(size_token.decode(&quot;ascii&quot;))\n        if size &lt;= 0 or size &gt; RFC6242_MAX_CHUNK_SIZE:\n            raise ValueError(f&quot;RFC 6242 chunk-size out of range: {size}&quot;)\n        start = nl + 1\n        end = start + size\n        if end &gt; len(raw):\n            raise ValueError(&quot;Truncated RFC 6242 chunk body&quot;)\n        chunks.append(raw[start:end])\n        pos = end\n    raise ValueError(&quot;Missing RFC 6242 end-of-chunks marker &#x27;\\\\n##\\\\n&#x27;&quot;)\n\n\ndef parse_netconf_1_1_chunked(framed: bytes | str) -&gt; str:\n    &quot;&quot;&quot;Reassemble RFC 6242 byte chunks first, then decode complete UTF-8 message text.&quot;&quot;&quot;\n    reassembled = parse_netconf_1_1_chunked_bytes(framed)\n    try:\n        return reassembled.decode(&quot;utf-8&quot;)\n    except UnicodeDecodeError as exc:\n        raise ValueError(&quot;Reassembled NETCONF 1.1 payload is not valid UTF-8&quot;) from exc\n\n\nclass NetconfDatastoreMock:\n    &quot;&quot;&quot;Minimal educational datastore state machine (NOT a real NETCONF server/timer/validator).&quot;&quot;&quot;\n\n    def __init__(self) -&gt; None:\n        self.running = {&quot;acl_mgmt&quot;: [&quot;permit 10.0.0.0/24&quot;]}\n        self.candidate = copy.deepcopy(self.running)\n        self.locked_by: str | None = None\n        self.pending_backup: dict | None = None\n\n    def lock(self, session_id: str) -&gt; None:\n        if not isinstance(session_id, str) or not session_id.strip():\n            raise ValueError(&quot;session_id must be a non-empty str&quot;)\n        if self.locked_by and self.locked_by != session_id:\n            raise RuntimeError(f&quot;Datastore already locked by {self.locked_by}&quot;)\n        self.locked_by = session_id\n\n    def unlock(self, session_id: str) -&gt; None:\n        if not isinstance(session_id, str) or not session_id.strip():\n            raise ValueError(&quot;session_id must be a non-empty str&quot;)\n        if self.locked_by is not None and self.locked_by != session_id:\n            raise RuntimeError(f&quot;Session {session_id!r} cannot unlock lock held by {self.locked_by!r}&quot;)\n        self.locked_by = None\n\n    def edit_candidate(self, session_id: str, new_acl: list[str]) -&gt; None:\n        if not isinstance(session_id, str) or not session_id.strip() or self.locked_by != session_id:\n            raise RuntimeError(&quot;Must hold &lt;lock&gt; before edit&quot;)\n        if not isinstance(new_acl, list) or not all(isinstance(rule, str) and rule.strip() for rule in new_acl):\n            raise ValueError(&quot;new_acl must be a list of non-empty str&quot;)\n        self.candidate[&quot;acl_mgmt&quot;] = list(new_acl)\n\n    def validate_candidate(self) -&gt; bool:\n        return bool(self.candidate.get(&quot;acl_mgmt&quot;))\n\n    def commit_confirmed(self, session_id: str) -&gt; None:\n        if not isinstance(session_id, str) or not session_id.strip() or self.locked_by != session_id:\n            raise RuntimeError(&quot;Must hold &lt;lock&gt; before confirmed-commit&quot;)\n        if self.pending_backup is not None:\n            raise RuntimeError(&quot;This minimal model does not support repeated confirmed commits&quot;)\n        if not self.validate_candidate():\n            raise ValueError(&quot;Candidate datastore validation failed (empty acl_mgmt)&quot;)\n        self.pending_backup = copy.deepcopy(self.running)\n        self.running = copy.deepcopy(self.candidate)\n\n    def confirm_timeout_expired(self) -&gt; None:\n        if self.pending_backup is not None:\n            self.running = copy.deepcopy(self.pending_backup)\n            self.candidate = copy.deepcopy(self.pending_backup)\n            self.pending_backup = None\n\n    def confirm_commit(self, session_id: str) -&gt; None:\n        if not isinstance(session_id, str) or not session_id.strip() or self.locked_by != session_id or self.pending_backup is None:\n            raise RuntimeError(&quot;Model confirmation requires owner and pending change&quot;)\n        self.pending_backup = None\n\n\ndef main() -&gt; None:\n    tricky_xml = &quot;&lt;rpc&gt;&lt;!-- valid XML comment ]]&gt;]]&gt; --&gt;&lt;description&gt;فارسی سلام&lt;/description&gt;&lt;/rpc&gt;&quot;\n    v10 = frame_netconf_1_0(tricky_xml)\n    v10_split_pieces = v10.split(&quot;]]&gt;]]&gt;&quot;)  # breaks prematurely!\n    v11 = frame_netconf_1_1_chunked(tricky_xml)\n    v11_decoded = parse_netconf_1_1_chunked(v11)\n    v11_multi = parse_netconf_1_1_chunked(frame_netconf_1_1_chunked(tricky_xml, chunk_size=7))\n    # Byte-oriented UTF-8 check: 1-byte chunks across multi-byte Persian characters (&#x27;سلام&#x27; = 8 UTF-8 octets)\n    persian_1byte_framed = frame_netconf_1_1_chunked(&quot;سلام&quot;, chunk_size=1)\n    assert parse_netconf_1_1_chunked(persian_1byte_framed) == &quot;سلام&quot;\n    assert len(v10_split_pieces) &gt; 2, &quot;NETCONF 1.0 delimiter should break on embedded ]]&gt;]]&gt;&quot;\n    assert v11_decoded == tricky_xml and v11_multi == tricky_xml\n\n    ds = NetconfDatastoreMock()\n    ds.lock(&quot;sess-101&quot;)\n    ds.edit_candidate(&quot;sess-101&quot;, [&quot;deny any&quot;])  # broken ACL that locks out admin!\n    ds.commit_confirmed(&quot;sess-101&quot;)\n    assert ds.running[&quot;acl_mgmt&quot;] == [&quot;deny any&quot;]\n    # Simulated timeout expiration (no real wall-clock timer or live router)\n    ds.confirm_timeout_expired()\n    assert ds.running[&quot;acl_mgmt&quot;] == [&quot;permit 10.0.0.0/24&quot;], &quot;Auto-rollback failed&quot;\n\n    # Safe change with explicit confirming &lt;commit/&gt;\n    ds.edit_candidate(&quot;sess-101&quot;, [&quot;permit 10.0.0.0/24&quot;, &quot;permit 10.1.0.0/24&quot;])\n    ds.commit_confirmed(&quot;sess-101&quot;)\n    ds.confirm_commit(&quot;sess-101&quot;)\n    ds.unlock(&quot;sess-101&quot;)\n    assert len(ds.running[&quot;acl_mgmt&quot;]) == 2\n\n    print(&quot;=== auto_08 NETCONF RFC 6241/6242 Byte-Oriented Local Simulator ===&quot;)\n    print(json.dumps({\n        &quot;netconf_1_0_broken_split_count&quot;: len(v10_split_pieces),\n        &quot;netconf_1_1_chunked_intact&quot;: v11_decoded == tricky_xml,\n        &quot;netconf_1_1_multichunk_intact&quot;: v11_multi == tricky_xml,\n        &quot;utf8_1byte_octet_chunking_verified&quot;: True,\n        &quot;confirmed_commit_mock_rollback_verified&quot;: True,\n        &quot;final_running_acl&quot;: ds.running[&quot;acl_mgmt&quot;],\n        &quot;simulator_scope_note&quot;: &quot;Educational mock only; no live SSH-830 router, real YANG validator, or wall-clock timer.&quot;,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>netconf_1_0_broken_split_count: 3</code>، <code>netconf_1_1_chunked_intact: True</code> و <code>confirmed_commit_mock_rollback_verified: True</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع اتصال واقعی با <code>ncclient</code> روی IOS-XE (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference ncclient snippet (NOT executed against live hardware)\nfrom ncclient import manager\nwith manager.connect(host=\"192.0.2.10\", port=830, username=\"netops\", password=\"...\", hostkey_verify=True) as m:\n    # Check advertised capabilities and recovery plan before any edit.\n    m.lock(target=\"candidate\")\n    try:\n        pass  # Illustrative only; no edit or commit is executed here.\n    finally:\n        m.unlock(target=\"candidate\")</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p><p>مدل وضعیت تنها یک نشست و فراخوانی دستی انقضای فرضی را شبیه‌سازی می‌کند؛ تایمر یا اعتبارسنج XML/YANG و اتصال دستگاه ندارد. مثال جداکننده در comment معتبر XML است، نه متن عادی حاوی ] ] &gt;.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس پروتکل NETCONF",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "در پروتکل NETCONF (RFC 6241) برای دریافت وضعیت عملیاتی زنده اینترفیس‌ها (oper-status و شمارنده‌ها) همراه با پیکربندی، کدام عملیات به کار می‌رود؟",
+   "options": [
+    "<get>",
+    "<get-config source='startup'>",
+    "<discard-changes>",
+    "<unlock>"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>get داده پیکربندی running و اطلاعات state موجود را برمی‌گرداند؛ get-config پیکربندی مخزن انتخابی را می‌خواند. دامنه و فیلترها به دستگاه وابسته‌اند.</p>"
+  },
+  {
+   "title": "چرا در NETCONF 1.1 (RFC 6242) روش فریم‌بندی پیام از ]]>]]> به Chunked Framing تغییر کرد؟",
+   "options": [
+    "برای تغییر پورت از ۸۳۰ به ۲۳",
+    "برای جلوگیری از شکست فریم پیام در صورت وجود تصادفی یا عمدی رشته ]]>]]> درون پیام XML مانند comment",
+    "برای جایگزینی XML با CSV",
+    "برای غیرفعال کردن رمزنگاری SSH"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Chunked Framing در RFC 6242 بر پایه تعداد دقیق <strong>بایت (octet)</strong> فریم‌بندی می‌کند (حتی اگر یک کاراکتر چندبایتی UTF-8 میان دو تکه بیفتد پس از سرهم‌کردن بایت‌ها درست بازگشایی می‌شود) و مانع شکستن مرز پیام توسط دنباله <code>]]&gt;]]&gt;</code> درون محتوا می‌گردد.</p>"
+  },
+  {
+   "title": "در تغییر یک ACL حیاتی با NETCONF با استفاده از confirmed-commit (مثلاً تایمر ۱۲۰ ثانیه)، کدام بیان دقیق‌تر است؟",
+   "options": [
+    "روتر بلافاصله به حالت کارخانه ریست می‌شود",
+    "تغییر فوراً در startup-config قفل می‌شود",
+    "در حالت بدون persist قطع نشست می‌تواند rollback را آغاز کند و در هر حال بدون ارسال <commit/> تأییدی تا پایان ۱۲۰ ثانیه، تغییرات خودکار Rollback می‌شوند",
+    "پورت ۸۳۰ به ۴۴۳ تغییر می‌کند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>مطابق RFC 6241 بخش 8.4، <code>confirmed-commit</code> بدون تأیید نهایی به پیکربندی ایمن قبل بازمی‌گردد.</p>"
+  },
+  {
+   "title": "پورت استاندارد و پروتکل انتقال رایج NETCONF کدام است؟",
+   "options": [
+    "UDP 161",
+    "TCP 23 (Telnet)",
+    "UDP 830",
+    "TCP 830 روی زیرسیستم SSH"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>پروتکل NETCONF به‌طور استاندارد روی زیرسیستم <code>netconf</code> در SSH و پورت TCP 830 اجرا می‌شود.</p>"
+  },
+  {
+   "title": "نقش پیام اولیه <hello> در ابتدای یک نشست NETCONF چیست؟",
+   "options": [
+    "تبادل فهرست Capabilities (مانند candidate، confirmed-commit و مدل‌های YANG پشتیبانی‌شده) بین کلاینت و سرور",
+    "حذف تمام اینترفیس‌های روتر",
+    "رمزگشایی فایل‌های YAML",
+    "تغییر IP مدیریت روتر"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>با تبادل <code>&lt;hello&gt;</code> هر دو سمت می‌فهمند کدام نسخه فریم‌بندی، Datastoreها و مدل‌های YANG در این نشست پشتیبانی می‌شوند.</p>"
+  },
+  {
+   "title": "تفاوت رفتار عملیات delete و remove در <edit-config> هنگامی که گره هدف از قبل روی روتر وجود ندارد چیست؟",
+   "options": [
+    "هر دو دقیقاً یک خطا می‌دهند",
+    "delete خطای data-missing می‌دهد، اما remove بدون خطا و به‌صورت Idempotent موفق می‌شود",
+    "remove کل روتر را پاک می‌کند",
+    "delete فقط در HTTP است"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>استفاده از <code>remove</code> در اسکریپت‌های خودکار باعث می‌شود تکرار حذف یک مورد ناموجود باعث شکست پایپ‌لاین نشود.</p>"
+  },
+  {
+   "title": "هدف اصلی استفاده از <lock> روی candidate یا running datastore پیش از <edit-config> چیست؟",
+   "options": [
+    "فشرده‌سازی پیام‌های XML",
+    "خاموش کردن SNMP",
+    "جلوگیری از تداخل و Race Condition هنگام ویرایش هم‌زمان یک تجهیز توسط چند کاربر یا پایپ‌لاین",
+    "اجبار به استفاده از NETCONF 1.0"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>قفل datastore در محدوده مشخص استاندارد تداخل را محدود می‌کند؛ پوشش CLI و تغییرات خارج از NETCONF به پیاده‌سازی وابسته است.</p>"
+  },
+  {
+   "title": "نقش پارامتر persist در عملیات confirmed-commit چیست؟",
+   "options": [
+    "غیرفعال کردن Rollback برای همیشه",
+    "تبدیل XML به JSON",
+    "افزایش سرعت لینک اترنت",
+    "اجازه می‌دهد confirmed-commit پس از بسته شدن نشست اول زنده بماند و توسط نشست دومی با همان persist-id تأیید شود"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>بدون <code>persist</code> بسته شدن نشست اول باعث rollback فوری می‌شود؛ با <code>persist</code> نشست جدید می‌تواند تأیید نهایی را ارسال کند.</p>"
+  },
+  {
+   "title": "چرا ارسال <get> بدون Subtree Filter یا XPath روی یک روتر Core بزرگ توصیه نمی‌شود؟",
+   "options": [
+    "ممکن است داده‌های پیکربندی و وضعیت زیادی بازگرداند و بسته به دستگاه و اندازه خروجی فشار و timeout ایجاد کند",
+    "زیرا <get> بدون فیلتر پیکربندی را پاک می‌کند",
+    "زیرا NETCONF از فیلتر پشتیبانی نمی‌کند",
+    "زیرا باعث قفل شدن پورت کنسول می‌شود"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>در عملیات روزمره پایش و اتوماسیون روی تجهیزات بزرگ، بهتر است با Subtree Filter یا XPath دقیقاً همان شاخه YANG مورد نیاز درخواست شود (و دریافت کل پیکربندی با <code>&lt;get-config&gt;</code> تنها برای پشتیبان‌گیری برنامه‌ریزی‌شده انجام گیرد).</p>"
+  },
+  {
+   "title": "کدام لایه در معماری ۴ لایه NETCONF مسئول پیام‌های <rpc>، <rpc-reply> و <notification> است؟",
+   "options": [
+    "لایه Secure Transport",
+    "لایه Messages",
+    "لایه Content",
+    "لایه فیزیکی"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>لایه دوم (Messages) قالب RPC و پاسخ/اعلان را مستقل از نوع عملیات و محتوای YANG تعریف می‌کند.</p>"
+  },
+  {
+   "title": "در صورت پشتیبانی قابلیت rollback-on-error، گزینه error-option در edit-config چه هدفی دارد؟",
+   "options": [
+    "تغییرات را در startup ذخیره می‌کند",
+    "خطاها را نادیده می‌گیرد و ادامه می‌دهد",
+    "در صورت بروز خطا هنگام اعمال هر بخش از RPC، سرور تغییرات همان RPC را به وضعیت پیشین بازمی‌گرداند تا پیکربندی نیمه‌کاره نماند",
+    "پورت ۸۳۰ را می‌بندد"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>این قابلیت اختیاری است و به خطای همان RPC مربوط است؛ تضمین رفتار کل workflow یا rollback موفق روی هر پیاده‌سازی نیست.</p>"
+  },
+  {
+   "title": "آزمایشگاه Python این درس چگونه اجرا شده است؟",
+   "options": [
+    "اتصال مستقیم به روتر تولیدی با ncclient روی پورت ۸۳۰",
+    "تغییر واقعی ACL فایروال سازمان با تایمر واقعی سرور",
+    "فقط متن بدون کد",
+    "شبیه‌سازی آموزشی محلی با Python 3 برای فریم‌بندی بایت‌محور RFC 6242 (شامل UTF-8 چندبایتی) و مدل ساده Datastore/Rollback بدون تایمر واقعی، اعتبارسنجی YANG یا تجهیز زنده"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه محلی در Python 3 فریم‌بندی بایت‌محور RFC 6242 را می‌سنجد و یک مدل ساده آموزشی از Datastore ارائه می‌دهد؛ هیچ تجهیز زنده، SSH پورت ۸۳۰، تایمر واقعی یا اعتبارسنج YANG اجرا نشده است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "integration-review.1",
+  "legacyId": "auto_08",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc6241",
+   "https://www.rfc-editor.org/rfc/rfc6242",
+   "https://www.rfc-editor.org/rfc/rfc8342"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی یا سرور SSH پورت ۸۳۰ متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "گسترش از ۲ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و شبیه‌ساز کامل Chunked Framing + Confirmed Commit Rollback."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و کد Local Mock؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_08-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_08.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_08_lab.py"
+  },
+  "technicalAuditFixes": [
+   "تلطیف عبارت مطلق «همیشه باید» در توضیح پرسش ۹ با تفکیک پایش روزمره از پشتیبان‌گیری کامل برنامه‌ریزی‌شده در NETCONF (RFC 6241).",
+   "اصلاح بازبینی فاز ۸C-1: جایگزینی assertهای پروتکلی با ValueError/RuntimeError (مقاوم در برابر python -O) و پشتیبانی از پارس چندتکه‌ای RFC 6242 در auto_08_lab.py."
+  ],
+  "integrationReview": {
+   "date": "2026-11-27",
+   "reviewer": "integrator-agent-not-human",
+   "sourceCommit": "993f50877232481fb24d99bfd771b178f15ba7ce",
+   "evidence": "academy-labs/reviews/auto_08-integration-review-fa.md"
+  }
+ }
+}
