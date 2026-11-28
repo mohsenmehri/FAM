@@ -107,7 +107,7 @@ CURRENT_STEP="6-rebuild-start-and-healthcheck"
 echo "[6/6] بازسازی و راه‌اندازی نسخه قبلی..."
 cd "${APP_DIR}"
 docker compose build --pull=false app
-docker compose up -d --wait
+docker compose up -d --force-recreate --wait
 docker compose ps
 docker compose exec -T app python -c "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8765/'); print('APP HTTP:', r.status)"
 SERVICE_STATE="RUNNING_ROLLED_BACK"

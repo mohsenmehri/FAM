@@ -42,10 +42,14 @@ def build():
   'use strict';
   const resources = __RESOURCES__;
   // Block all unbundled fetches rather than silently accessing the network.
+  // Use a fixed synthetic origin so root-relative /academy-assets/* paths work
+  // identically on Windows file:///C:/..., Linux/macOS file:///..., and about:srcdoc.
   window.fetch = async input => {
+    const raw = typeof input === 'string' ? input : (input && typeof input.url === 'string' ? input.url : '');
     let url;
-    try { url = new URL(typeof input === 'string' ? input : input.url, location.href); }
+    try { url = new URL(raw, 'https://fam-offline.invalid'); }
     catch (_) { return new Response('', {status:404}); }
+    if (url.origin !== 'https://fam-offline.invalid') return new Response('', {status:404});
     const data = resources[url.pathname];
     if (!data) return new Response('', {status:404});
     return new Response(JSON.stringify(data), {status:200, headers:{'Content-Type':'application/json'}});

@@ -162,7 +162,7 @@ CURRENT_STEP="10a-build-image"
 echo "[10/10] ساخت ایمیج و راه‌اندازی سرویس‌ها + بررسی سلامت..."
 docker compose build --pull=false app
 CURRENT_STEP="10b-start-services"
-docker compose up -d --wait
+docker compose up -d --force-recreate --wait
 SERVICE_STATE="RUNNING_UNHEALTHY_NEEDS_ROLLBACK_OR_INSPECTION"
 CURRENT_STEP="10c-healthcheck"
 docker compose ps

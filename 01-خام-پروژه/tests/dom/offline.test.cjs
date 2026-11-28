@@ -74,6 +74,38 @@ async function waitFor(fn) {
   await waitFor(()=>w.localStorage.getItem('fam.academy.offline.v2'));
   assert.equal(JSON.parse(w.localStorage.getItem('fam.academy.offline.v2')).labs.quizAttempts.auto_02.correct,1);
   dom.window.close();
+
+  // Regression: Windows file:///C:/... URLs and about:blank/srcdoc must load bundled assets without HTTP 404,
+  // while external-origin requests spoofing bundled pathnames remain blocked with 404.
+  for (const testUrl of [
+    'file:///C:/Users/Mohsen/Downloads/FAM-Academy-Offline.html#academy-stage-zero-osi-fa',
+    'about:blank',
+  ]) {
+    const winDom = new JSDOM(html, {
+      url: testUrl,
+      runScripts: 'dangerously',
+      virtualConsole: vc,
+      beforeParse(win) {
+        win.Response = global.Response;
+        win.matchMedia = () => ({matches:false, addEventListener(){}, removeEventListener(){}, addListener(){}, removeListener(){}});
+        win.fetch = () => { throw new Error('unexpected network fetch'); };
+        win.HTMLElement.prototype.scrollIntoView = function(){};
+      },
+    });
+    const ww = winDom.window;
+    const okRes = await ww.fetch('/academy-assets/curriculum-catalog.json');
+    assert.equal(okRes.status, 200, `bundled catalog must load under ${testUrl}`);
+    const okQsRes = await ww.fetch('/academy-assets/curriculum-catalog.json?v=20261123c');
+    assert.equal(okQsRes.status, 200, `query-string catalog must load under ${testUrl}`);
+    const spoofRes = await ww.fetch('https://evil.invalid/academy-assets/curriculum-catalog.json');
+    assert.equal(spoofRes.status, 404, `external origin spoofing bundled path must return 404 under ${testUrl}`);
+    if (testUrl.startsWith('file:///C:/')) {
+      await waitFor(() => ww.document.querySelector('[data-lesson-quiz]'));
+      assert.equal(ww.document.querySelector('.fa-error'), null);
+    }
+    winDom.window.close();
+  }
+
   assert.deepEqual(errors,[]);
-  console.log('jsdom offline: bundled lessons, network blocking, quiz local persistence and reload passed');
+  console.log('jsdom offline: bundled lessons, Windows file:///C:/ + about:blank loading, network blocking, quiz local persistence and reload passed');
 })().catch(e=>{console.error(e);process.exitCode=1});
