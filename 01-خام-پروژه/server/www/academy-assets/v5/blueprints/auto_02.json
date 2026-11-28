@@ -1,349 +1,349 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "auto_02",
- "objectiveId": "auto_02",
- "kind": "lesson",
- "track": "Automation",
- "course": "automation-foundations",
- "title": "۷.۷ Automation (درس ۲ از ۲۰): Python مقدماتی برای شبکه",
- "titleEn": "Automation 02: Python Fundamentals for Network Engineers",
- "domain": "Network Automation",
- "source": "Legacy auto_02 rewritten and audited",
- "evidence": "اجرای Python محلی روی متن مصنوعی و فایل موقت آزموده شده؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
- "reviewStatus": "بازبینی فنی توسط یکپارچه‌ساز انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
- "estimatedMinutes": 50,
- "prerequisites": [],
- "sections": [
-  {
-   "id": "auto_02-section-1",
-   "title": "مسئله واقعی: چرا کپی‌پیست کردن پیکربندی برای ۱۰۰ سوئیچ محکوم به خطاست؟",
-   "html": "<p>تصور کنید باید روی ۱۰۰ سوئیچ Access بررسی کنید کدام پورت‌ها در وضعیت <code>up/up</code> هستند، کدام VLANهای استاندارد روی هر سوئیچ جا افتاده‌اند و خروجی یکپارچه JSON برای ممیزی بسازید. انجام دستی این کار در Notepad و ترمینال نه‌تنها ساعت‌ها زمان می‌برد، بلکه یک خطای تایپی انسانی در یکی از سوئیچ‌ها می‌تواند کل بخش را قطع کند. پایتون به شما اجازه می‌دهد با چند ساختار داده ساده، همین تحلیل را به‌صورت تکرارپذیر تحلیل کنید؛ درستی نتیجه همچنان به ورودی، تست و بازبینی بستگی دارد.</p>"
-  },
-  {
-   "id": "auto_02-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> آشنایی پایه با خط فرمان لینوکس (درس <code>auto_01</code>) و ساختار پیکربندی شبکه.</p><ul><li>کار با رشته‌ها (<code>.strip()</code>، <code>.splitlines()</code>، <code>.split()</code> و <code>f-string</code>) برای پارس خروجی‌های متنی CLI.</li><li>انتخاب درست میان <code>list</code>، <code>dict</code>، <code>set</code> و <code>tuple</code> در مدل‌سازی تجهیزات، VLANها و خروجی‌های API.</li><li>مدیریت ایمن فایل‌ها با <code>with open(..., encoding=\"utf-8\")</code> و مدیریت دقیق خطاها با <code>try/except</code> مشخص (پرهیز از bare <code>except:</code>).</li><li>ایزوله‌سازی وابستگی‌ها با <code>venv</code> و نگهداری امن رمزهای عبور بیرون از سورس‌کد (<code>os.environ</code> و <code>getpass</code>).</li></ul>"
-  },
-  {
-   "id": "auto_02-section-3",
-   "title": "پارس متن CLI با String و f-string",
-   "html": "<p>خروجی‌های CLI تجهیزات شبکه در اصل رشته‌های چندخطی هستند. سه متد رشته‌ای زیر در بسیاری از اسکریپت‌ها کاربرد دارند:</p><ul><li><code>.splitlines()</code>: متن چندخطی را بدون وابستگی به <code>\\r\\n</code> ویندوز یا <code>\\n</code> لینوکس به فهرست خطوط می‌شکند.</li><li><code>.strip()</code>: فاصله‌ها و کاراکترهای انتهای خط اضافی ابتدا و انتهای رشته را پاک می‌کند.</li><li><code>.split()</code>: بر اساس یک یا چند فضای خالی پیاپی ستون‌ها را جدا می‌کند (نکته ظریف: در <code>show ip interface brief</code> عبارت <code>administratively down</code> دو کلمه دارد؛ بنابراین گرفتن ستون آخر با اندیس <code>parts[-1]</code> برای <code>Protocol</code> و الحاق <code>parts[4:-1]</code> برای <code>Status</code> بسیار امن‌تر از فرض ثابت بودن طول لیست است!).</li></ul>"
-  },
-  {
-   "id": "auto_02-section-4",
-   "title": "چهار ساختار داده کلیدی: List، Dict، Set و Tuple در شبکه",
-   "html": "<table><thead><tr><th>ساختار داده</th><th>ویژگی کلیدی</th><th>کاربرد واقعی در شبکه</th></tr></thead><tbody><tr><td><code>list</code></td><td>مرتب و قابل تغییر</td><td>فهرست دستورات پیکربندی، لیست اینترفیس‌ها یا IPهای شعبه</td></tr><tr><td><code>dict</code></td><td>نگاشت کلید-مقدار (نگاشت پایتون؛ قابل تبدیل به JSON در صورت سازگاری نوع داده)</td><td>مشخصات یک روتر، جدول همسایگان، بدنه پاسخ REST API</td></tr><tr><td><code>set</code></td><td>عناصر یکتا با عملگرهای مجموعه‌ای سریع</td><td>مقایسه VLANهای مطلوب و موجود: <code>desired - observed</code> (جاافتاده) و <code>observed - desired</code> (اضافی)</td></tr><tr><td><code>tuple</code></td><td>مرتب و تغییرناپذیر (Immutable)</td><td>ثابت‌ها مانند زوج <code>(ip, port)</code>؛ tuple تنها ساختار خود را ثابت می‌کند و عناصر قابل‌تغییر درونش ممکن است تغییر کنند</td></tr></tbody></table>"
-  },
-  {
-   "id": "auto_02-section-5",
-   "title": "نمودار جریان اسکریپت ایمن پایتون برای شبکه",
-   "html": "<p>در نمودار زیر چرخه تبدیل متن خام CLI به گزارش ساخت‌یافته با رعایت ایمنی فایل، مدیریت خطای دقیق و محیط مجازی نشان داده شده است.</p><svg viewBox=\"0 0 760 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Python Data Structures and Safe Automation Flow\"><rect x=\"14\" y=\"20\" width=\"165\" height=\"170\" rx=\"10\" fill=\"#f1f5f9\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"96\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#0f172a\">Raw CLI / File</text><text x=\"96\" y=\"76\" text-anchor=\"middle\" font-size=\"11\" fill=\"#334155\">with open(..., utf-8)</text><text x=\"96\" y=\"102\" text-anchor=\"middle\" font-size=\"11\" fill=\"#334155\">.strip() / .splitlines()</text><text x=\"96\" y=\"128\" text-anchor=\"middle\" font-size=\"11\" fill=\"#334155\">.split() + f-strings</text><rect x=\"208\" y=\"20\" width=\"175\" height=\"170\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"295\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Core Structures</text><text x=\"295\" y=\"76\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">list: ordered interfaces</text><text x=\"295\" y=\"102\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">dict: JSON key-value</text><text x=\"295\" y=\"128\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">set: VLAN diff (A - B)</text><text x=\"295\" y=\"154\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">tuple: immutable record</text><rect x=\"412\" y=\"20\" width=\"160\" height=\"170\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"492\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Safety Guards</text><text x=\"492\" y=\"78\" text-anchor=\"middle\" font-size=\"11\" fill=\"#78350f\">Specific try/except</text><text x=\"492\" y=\"104\" text-anchor=\"middle\" font-size=\"11\" fill=\"#b91c1c\">NO bare except:</text><text x=\"492\" y=\"130\" text-anchor=\"middle\" font-size=\"11\" fill=\"#78350f\">os.environ / getpass</text><text x=\"492\" y=\"156\" text-anchor=\"middle\" font-size=\"11\" fill=\"#78350f\">python3 -m venv .venv</text><rect x=\"600\" y=\"40\" width=\"146\" height=\"130\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"673\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Structured Output</text><text x=\"673\" y=\"102\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">JSON / CSV Report</text><text x=\"673\" y=\"126\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">Audit Diff</text><line x1=\"179\" y1=\"105\" x2=\"208\" y2=\"105\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"383\" y1=\"105\" x2=\"412\" y2=\"105\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"572\" y1=\"105\" x2=\"600\" y2=\"105\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
-  },
-  {
-   "id": "auto_02-section-6",
-   "title": "List Comprehension و توابع خوانا",
-   "html": "<p>برای فیلتر کردن سریع داده‌ها بدون حلقه‌های شلوغ، <strong>List Comprehension</strong> هم خوانا و هم سریع است:</p><pre dir=\"ltr\"><code>up_ifaces = [row[\"interface\"] for row in parsed if row[\"status\"] == \"up\" and row[\"protocol\"] == \"up\"]</code></pre><p>همیشه منطق پارس، اعتبارسنجی (مثل بررسی محدوده VLAN بین ۱ تا ۴۰۹۴) و تولید خروجی را در <strong>توابع کوچک و تک‌وظیفه</strong> بنویسید تا بتوانید هر تابع را مستقلاً با <code>unittest</code> یا <code>pytest</code> آزمون کنید (بدون نیاز به وصل شدن به روتر واقعی).</p>"
-  },
-  {
-   "id": "auto_02-section-7",
-   "title": "کار امن با فایل‌ها: چرا همیشه with open(..., encoding='utf-8')؟",
-   "html": "<p>اگر فایل را با <code>f = open(\"cfg.txt\", \"w\")</code> باز کنید و پیش از رسیدن به <code>f.close()</code> یک استثنا (Exception) رخ دهد، توصیف‌گر فایل باز می‌ماند و ممکن است بافر روی دیسک Flush نشده و فایل پیکربندی ناقص ذخیره شود. ساختار <strong>Context Manager</strong> (<code>with open(\"cfg.txt\", \"w\", encoding=\"utf-8\") as f:</code>) تضمین می‌کند به محض خروج از بلوک — حتی در صورت بروز خطا — فایل به‌طور خودکار و امن بسته شود. ذکر صریح <code>encoding=\"utf-8\"</code> نیز جلوی خطاهای رمزگذاری در ویندوز/لینوکس هنگام وجود متن فارسی یا کاراکترهای خاص را می‌گیرد.</p>"
-  },
-  {
-   "id": "auto_02-section-8",
-   "title": "مدیریت خطا (try/except) و خطر bare except:",
-   "html": "<p>در اسکریپت‌های شبکه، خطاهایی مانند <code>ValueError</code>، <code>FileNotFoundError</code> یا <code>TimeoutError</code> طبیعی هستند و باید دقیق گرفته و لاگ شوند. اما نوشتن <code>except:</code> خالی (<strong>bare except</strong>) یک ضدارزش خطرناک است؛ زیرا علاوه بر خطای شبکه، خطاهای برنامه‌نویسی خودتان (مثل <code>NameError</code> یا <code>TypeError</code>) و حتی کلید توقف کاربر <code>Ctrl+C</code> (<code>KeyboardInterrupt</code>) را هم بی‌صدا می‌بلعد و عیب‌یابی را ناممکن می‌کند! همیشه نوع استثنای دقیق را بگیرید (مثلاً <code>except ValueError as exc:</code>).</p>"
-  },
-  {
-   "id": "auto_02-section-9",
-   "title": "محیط مجازی (venv) و مهار وابستگی‌ها",
-   "html": "<p>نصب کتابخانه‌ها با <code>sudo pip install</code> در پایتون سراسری سیستم‌عامل لینوکس می‌تواند ابزارهای خود توزیع (مانند <code>apt</code> یا <code>dnf</code>) را خراب کند (در توزیع‌های جدید PEP 668 حتی این کار را مسدود می‌کند). روش استاندارد برای هر پروژه اتوماسیون:</p><pre dir=\"ltr\"><code>python3 -m venv .venv\nsource .venv/bin/activate\npip install -r requirements.txt</code></pre><p>پوشه <code>.venv/</code> را هرگز در Git کامیت نکنید؛ فقط فایل <code>requirements.txt</code> (با نسخه‌های مشخص) را در مخزن نگه دارید.</p>"
-  },
-  {
-   "id": "auto_02-section-10",
-   "title": "امنیت رمزهای عبور در اسکریپت‌های پایتون",
-   "html": "<p><strong>قانون طلایی:</strong> هرگز نام کاربری و رمز عبور روتر یا API Token را به صورت ثابت (Hardcoded) داخل فایل <code>.py</code> ننویسید! سه الگوی امن پایه:</p><ol><li><strong>متغیر محیطی (<code>os.environ[\"NET_PASS\"]</code>):</strong> مناسب برای اجراهای خودکار و CI/CD (با بارگذاری از Vault یا Secrets Manager).</li><li><strong>دریافت تعاملی پنهان (<code>getpass.getpass()</code>):</strong> هنگام اجرای دستی توسط مهندس تا رمز روی صفحه ترمینال چاپ نشود.</li><li><strong>عدم چاپ رمز در لاگ و Trace:</strong> هنگام ثبت خطاها، آبجکت اتصال یا دیکشنری حاوی <code>password</code> را مستقیماً در <code>print</code> یا <code>logging</code> نریزید.</li></ol>"
-  },
-  {
-   "id": "auto_02-section-11",
-   "title": "کژفهمی‌های رایج پایتون در اتوماسیون شبکه",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای مقایسه دو لیست VLAN حتماً باید دو حلقه تو در تو نوشت.»</strong> واقعیت: تبدیل به <code>set</code> و استفاده از عملگرهای <code>-</code> و <code>&amp;</code> هم کوتاه‌تر و هم بسیار سریع‌تر است.</li><li><strong>کژفهمی ۲: «برای اینکه اسکریپت کرش نکند، کل کد را داخل try / except: می‌گذاریم.»</strong> واقعیت: پنهان کردن خطاها با bare except باعث می‌شود اسکریپت با داده ناقص یا خراب روی شبکه ادامه دهد و فاجعه بسازد.</li><li><strong>کژفهمی ۳: «دیکشنری پایتون دقیقاً همان رشته JSON است.»</strong> واقعیت: ساختارشان متناظر است اما در پایتون کلید/رشته با کوتیشن تکی و <code>True/None</code> مجاز است، در حالی که JSON استاندارد (RFC 8259) فقط کوتیشن دوتایی و <code>true/null</code> می‌پذیرد و تبدیل با <code>json.dumps/loads</code> انجام می‌شود.</li></ul>"
-  },
-  {
-   "id": "auto_02-section-12",
-   "title": "عیب‌یابی خطاهای پرتکرار اسکریپت‌های مقدماتی",
-   "html": "<p><strong>خطای ۱ — <code>KeyError: 'vlan'</code> هنگام خواندن پاسخ API:</strong> به جای <code>dev[\"vlan\"]</code> برای فیلدهای اختیاری از <code>dev.get(\"vlan\", \"unassigned\")</code> استفاده کنید تا نبود کلید اسکریپت را متوقف نکند.</p><p><strong>خطای ۲ — به‌هم‌ریختن ستون‌ها در <code>administratively down</code>:</strong> اگر <code>parts[4]</code> و <code>parts[5]</code> را مستقیم بخوانید، در خط <code>administratively down down</code> ستون Protocol اشتباه خوانده می‌شود! با <code>protocol = parts[-1]</code> و <code>status = \" \".join(parts[4:-1])</code> برای همین قالب فرضی از جابه‌جایی جلوگیری می‌شود؛ خروجی‌های متفاوت نیاز به parser و تست متناسب دارند.</p>"
-  },
-  {
-   "id": "auto_02-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> روی سوئیچی VLANهای مطلوب <code>{10, 20, 30}</code> و VLANهای فعلی <code>{10, 99}</code> هستند. حاصل <code>desired - observed</code>، <code>observed - desired</code> و <code>desired &amp; observed</code> چیست؟ <strong>پاسخ:</strong> <code>to_add = {20, 30}</code>، <code>unexpected_extra = {99}</code> و <code>compliant = {10}</code>.</p><p><strong>تمرین ۲:</strong> چرا تابع <code>safe_parse_vlan_id(\"5000\")</code> باید خطای <code>ValueError</code> برگرداند؟ <strong>پاسخ:</strong> اگرچه <code>\"5000\"</code> به عدد صحیح تبدیل می‌شود، خارج از بازه استاندارد IEEE 802.1Q (۱ تا ۴۰۹۴) است و اعتبارسنجی پیش از ارسال به تجهیز جلوی خطای پیکربندی را می‌گیرد.</p>"
-  },
-  {
-   "id": "auto_02-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://docs.python.org/3/tutorial/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Python 3</a>، <a href=\"https://docs.python.org/3/library/venv.html\" target=\"_blank\" rel=\"noopener\">مستندات ماژول venv</a> و <a href=\"https://docs.python.org/3/library/getpass.html\" target=\"_blank\" rel=\"noopener\">ماژول getpass</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> اسکریپت آزمایشگاه این درس واقعاً در Python 3 اجرا و با تست خودکار تأیید شده است، اما ورودی آن متن نمونه مصنوعی <code>show ip interface brief</code> است و هیچ اتصال واقعی به روتر یا سوئیچ سیسکو برقرار نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "f-string",
-   "fa": "رشته قالب‌بندی‌شده",
-   "simple": "روش خوانا و مدرن درج متغیرها داخل رشته در پایتون (مثلاً f'vlan {vid}')."
-  },
-  {
-   "term": "list",
-   "fa": "فهرست (List)",
-   "simple": "ساختار داده مرتب و قابل تغییر برای نگهداری دنباله دستورات یا اشیاء."
-  },
-  {
-   "term": "dict",
-   "fa": "دیکشنری (Dict)",
-   "simple": "ساختار کلید-مقدار در پایتون، معادل ساختاری آبجکت‌های JSON."
-  },
-  {
-   "term": "set",
-   "fa": "مجموعه (Set)",
-   "simple": "مجموعه عناصر یکتا برای محاسبه سریع تفاوت، اشتراک و اجتماع (مثل ممیزی VLAN)."
-  },
-  {
-   "term": "tuple",
-   "fa": "تاپل (Tuple)",
-   "simple": "دنباله مرتب و تغییرناپذیر برای داده‌های ثابت."
-  },
-  {
-   "term": "List Comprehension",
-   "fa": "سازنده فشرده لیست",
-   "simple": "نحو مختصر و خوانا برای ساخت یا فیلتر کردن لیست در یک عبارت."
-  },
-  {
-   "term": "Context Manager (with)",
-   "fa": "مدیر زمینه with",
-   "simple": "تضمین بسته‌شدن خودکار فایل یا نشست حتی در صورت بروز استثنا."
-  },
-  {
-   "term": "encoding='utf-8'",
-   "fa": "رمزگذاری UTF-8",
-   "simple": "تعیین صریح کدگذاری متن هنگام خواندن/نوشتن فایل در سیستم‌عامل‌های مختلف."
-  },
-  {
-   "term": "try / except",
-   "fa": "مدیریت استثنا",
-   "simple": "گرفتن و مدیریت خطاهای پیش‌بینی‌شده بدون از کار افتادن کنترل‌نشده برنامه."
-  },
-  {
-   "term": "Bare except",
-   "fa": "except بدون نوع خطا",
-   "simple": "ضدارزشی که خطاهای برنامه‌نویسی و Ctrl+C را نیز بی‌صدا پنهان می‌کند."
-  },
-  {
-   "term": "venv",
-   "fa": "محیط مجازی پایتون",
-   "simple": "محیط ایزوله پروژه برای نصب کتابخانه‌ها بدون تداخل با پایتون سیستم‌عامل."
-  },
-  {
-   "term": "requirements.txt",
-   "fa": "فهرست وابستگی‌ها",
-   "simple": "فایل ثبت نام و نسخه کتابخانه‌های لازم برای بازتولید محیط پروژه."
-  },
-  {
-   "term": "os.environ",
-   "fa": "متغیرهای محیطی",
-   "simple": "خواندن رمزها و تنظیمات حساس از محیط سیستم به جای Hardcode در کد."
-  },
-  {
-   "term": "getpass",
-   "fa": "دریافت پنهان رمز",
-   "simple": "ماژول استاندارد پایتون برای خواندن رمز عبور از کاربر بدون نمایش روی صفحه."
-  },
-  {
-   "term": "KeyError",
-   "fa": "خطای نبود کلید",
-   "simple": "خطای دسترسی مستقیم به کلید ناموجود در دیکشنری (قابل پیشگیری با متد .get())."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه محلی Python 3 (پارس CLI نمونه، تفاضل Set و ذخیره JSON) — تجهیز واقعی اجرا نشده",
-   "executionStatus": "اجرای Python محلی روی متن مصنوعی و فایل موقت آزموده شده؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اسکریپت محلی واقعی Python 3 (روی داده مصنوعی)</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر یا سوئیچ واقعی به این اسکریپت متصل نشده است. parser فقط قالب نمونه را می‌پذیرد و خطای ورودی را گزارش می‌کند؛ فایل موقت، ذخیره‌سازی اتمی یا ماندگار را اثبات نمی‌کند.</p><p>در این آزمایشگاه واقعی Python 3، خروجی چندخطی <code>show ip interface brief</code> (شامل حالت دوکلمه‌ای <code>administratively down</code>) را پارس می‌کنید، تفاضل VLANهای مطلوب و موجود را با <code>set</code> می‌سنجید و خروجی JSON را با <code>with open</code> در پوشه موقت ذخیره می‌کنید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_02_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_02_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Lab for auto_02 (Parsing CLI text, Sets/Dicts, with open &amp; safe exceptions).\n\nRuns locally in Python 3 using synthetic CLI text; no real Cisco router is contacted.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport json\nfrom pathlib import Path\nimport tempfile\n\nSAMPLE_SHOW_IP_INT_BR = &quot;&quot;&quot;\nInterface              IP-Address      OK? Method Status                Protocol\nGigabitEthernet0/0     192.0.2.1       YES manual up                    up\nGigabitEthernet0/1     198.51.100.1    YES manual administratively down down\nLoopback0              203.0.113.10    YES manual up                    up\n&quot;&quot;&quot;.strip()\n\n\ndef parse_interfaces(raw_output: str) -&gt; list[dict[str, str]]:\n    &quot;&quot;&quot;Parse the stated simplified table, failing closed on malformed input.\n\n    This is not a general IOS parser; validate platform output separately.\n    &quot;&quot;&quot;\n    lines = [line for line in raw_output.splitlines() if line.strip()]\n    if not lines or lines[0].split() != [&quot;Interface&quot;, &quot;IP-Address&quot;, &quot;OK?&quot;, &quot;Method&quot;, &quot;Status&quot;, &quot;Protocol&quot;]:\n        raise ValueError(&quot;missing or unsupported table header&quot;)\n    results: list[dict[str, str]] = []\n    for line in lines[1:]:\n        parts = line.strip().split()\n        if len(parts) &lt; 6:\n            raise ValueError(f&quot;malformed interface row: {line!r}&quot;)\n        interface, ip_addr, ok_flag, method = parts[0], parts[1], parts[2], parts[3]\n        protocol = parts[-1]\n        status = &quot; &quot;.join(parts[4:-1])\n        results.append({\n            &quot;interface&quot;: interface,\n            &quot;ip&quot;: ip_addr,\n            &quot;ok&quot;: ok_flag,\n            &quot;method&quot;: method,\n            &quot;status&quot;: status,\n            &quot;protocol&quot;: protocol,\n        })\n    return results\n\n\ndef diff_vlans(desired_vlans: set[int], observed_vlans: set[int]) -&gt; dict[str, list[int]]:\n    &quot;&quot;&quot;Use Python sets to identify missing and unexpected VLANs cleanly.&quot;&quot;&quot;\n    return {\n        &quot;to_add&quot;: sorted(desired_vlans - observed_vlans),\n        &quot;unexpected_extra&quot;: sorted(observed_vlans - desired_vlans),\n        &quot;compliant&quot;: sorted(desired_vlans &amp; observed_vlans),\n    }\n\n\ndef safe_parse_vlan_id(raw_value: str) -&gt; int:\n    &quot;&quot;&quot;Validate VLAN ID using specific exceptions (never bare except).&quot;&quot;&quot;\n    try:\n        vid = int(raw_value.strip())\n    except ValueError as exc:\n        raise ValueError(f&quot;VLAN ID must be an integer, got {raw_value!r}&quot;) from exc\n    if not (1 &lt;= vid &lt;= 4094):\n        raise ValueError(f&quot;VLAN ID out of 802.1Q range (1..4094): {vid}&quot;)\n    return vid\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python lab only — synthetic CLI text; no real router or switch is contacted.&quot;)\n    parsed = parse_interfaces(SAMPLE_SHOW_IP_INT_BR)\n    up_ifaces = [row[&quot;interface&quot;] for row in parsed if row[&quot;status&quot;] == &quot;up&quot; and row[&quot;protocol&quot;] == &quot;up&quot;]\n    print(&quot;Parsed interfaces:&quot;, len(parsed), &quot;| up/up:&quot;, up_ifaces)\n    print(&quot;VLAN diff:&quot;, diff_vlans({10, 20, 30}, {10, 99}))\n    with tempfile.TemporaryDirectory() as tmp:\n        out_file = Path(tmp) / &quot;interfaces.json&quot;\n        with open(out_file, &quot;w&quot;, encoding=&quot;utf-8&quot;) as fh:\n            json.dump(parsed, fh, indent=2)\n        print(&quot;Saved JSON to temporary file via &#x27;with open&#x27;:&quot;, out_file.stat().st_size, &quot;bytes&quot;)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> پارس ۳ اینترفیس با دو اینترفیس <code>up/up</code> (<code>GigabitEthernet0/0</code> و <code>Loopback0</code>)، تفاضل VLANها با <code>to_add=[20, 30]</code> و <code>unexpected_extra=[99]</code>، و ذخیره موفق فایل JSON.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>توسعه اختیاری در محیط خودتان:</strong> یک محیط مجازی بسازید (<code>python3 -m venv .venv</code>) و تابع <code>safe_parse_vlan_id</code> را با ورودی‌های نامعتبر مانند <code>\"abc\"</code> و <code>\"4095\"</code> بیازمایید. هیچ اتصال SSH یا تجهیز سیسکویی در این درس اجرا نشده است.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس Python مقدماتی برای شبکه",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "چرا استفاده از except: خالی (bare except) در اسکریپت‌های اتوماسیون شبکه خطرناک است؟",
-   "options": [
-    "زیرا پایتون اجازه خواندن فایل نمی‌دهد",
-    "زیرا علاوه بر خطای شبکه، خطاهای برنامه‌نویسی (مثل NameError) و حتی Ctrl+C را بی‌صدا می‌بلعد و عیب‌یابی را پنهان می‌کند",
-    "زیرا سرعت CPU را نصف می‌کند",
-    "زیرا دیکشنری را حذف می‌کند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>به عنوان قاعده حرفه‌ای باید نوع دقیق استثنا (مانند <code>ValueError</code> یا <code>TimeoutError</code>) گرفته شود تا باگ‌های کد و سیگنال توقف پنهان نشوند (حتی در لایه بیرونی لاگ‌گیری نیز باید <code>Exception</code> ثبت و مجدداً raise شود، نه <code>except:</code> خالی).</p>"
-  },
-  {
-   "title": "مزیت اصلی with open('cfg.txt', 'w', encoding='utf-8') as f نسبت به f = open(...) چیست؟",
-   "options": [
-    "فایل را خودکار با AES رمزنگاری می‌کند",
-    "فایل را مستقیم روی روتر سیسکو می‌فرستد",
-    "تضمین می‌کند فایل پس از پایان بلوک — حتی هنگام بروز استثنا — به‌طور خودکار و ایمن بسته شود",
-    "محدودیت حجم دیسک را حذف می‌کند"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>Context Manager با <code>with</code> بستن فایل را در خروج از بلوک مدیریت می‌کند؛ نوشتن کامل یا اتمی در صورت خطا تضمین نیست.</p>"
-  },
-  {
-   "title": "بهترین کار اولیه برای نصب کتابخانه‌های پایتون پروژه بدون تداخل با پکیج‌های سیستم‌عامل چیست؟",
-   "options": [
-    "اجرای chmod 777 روی /usr/bin/python3",
-    "حذف فایل‌های سیستمی لینوکس",
-    "نصب همه کتابخانه‌ها با sudo pip در سیستم سراسری",
-    "ساخت و فعال‌سازی محیط مجازی اختصاصی با python3 -m venv .venv"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p><code>venv</code> وابستگی‌های هر پروژه را ایزوله نگه می‌دارد و خطر تداخل وابستگی‌ها با سیستم‌عامل را کاهش می‌دهد.</p>"
-  },
-  {
-   "title": "برای یافتن VLANهایی که باید به سوئیچ اضافه شوند (در desired هستند اما در observed نیستند) کدام عبارت پایتون دقیق‌تر است؟",
-   "options": [
-    "desired - observed (تفاضل دو set)",
-    "desired + observed",
-    "desired / observed",
-    "observed - desired"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در مجموعه‌ها (<code>set</code>)، تفاضل <code>desired - observed</code> عناصر موجود در مطلوب و غایب در مشاهده‌شده را برمی‌گرداند.</p>"
-  },
-  {
-   "title": "هنگام پارس خط GigabitEthernet0/1 198.51.100.1 YES manual administratively down down با .split()، کدام روش خواندن ستون Protocol امن‌تر است؟",
-   "options": [
-    "همیشه parts[5]",
-    "استفاده از parts[-1] برای Protocol و ' '.join(parts[4:-1]) برای Status",
-    "استفاده از parts[0]",
-    "حذف خط‌های down از خروجی"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>عبارت <code>administratively down</code> دو توکن دارد؛ اندیس از انتها (<code>-1</code>) مانع جابه‌جایی ستون Protocol می‌شود.</p>"
-  },
-  {
-   "title": "کدام روش برای دریافت رمز عبور تجهیزات در اسکریپت دستی بدون نمایش روی ترمینال و بدون ذخیره در کد استاندارد است؟",
-   "options": [
-    "نوشتن password = 'Cisco123' در بالای فایل",
-    "چاپ رمز در stdout",
-    "استفاده از ماژول getpass.getpass() یا خواندن از متغیر محیطی os.environ",
-    "ذخیره رمز در نام فایل اسکریپت"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>هرگز رمز را Hardcode نکنید؛ برای اجرای تعاملی <code>getpass</code> و برای اجرای خودکار رازسنج مناسب و متغیر محیطی محدود به دسترسی استفاده می‌شود؛ متغیر محیطی ذاتاً محرمانه نیست.</p>"
-  },
-  {
-   "title": "چگونه می‌توان هنگام خواندن کلید اختیاری 'description' از دیکشنری interface از بروز KeyError جلوگیری کرد؟",
-   "options": [
-    "با interface['description']",
-    "با حذف دیکشنری",
-    "با تبدیل به tuple",
-    "با متد interface.get('description', '')"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>متد <code>.get(key, default)</code> در صورت نبود کلید به جای پرتاب <code>KeyError</code> مقدار پیش‌فرض برمی‌گرداند.</p>"
-  },
-  {
-   "title": "تفاوت مهم بین یک dict در پایتون و یک رشته JSON معتبر (RFC 8259) چیست؟",
-   "options": [
-    "در JSON استاندارد باید از کوتیشن دوتایی و true/false/null استفاده شود و تبدیل میان این دو با json.dumps و json.loads انجام می‌گیرد",
-    "هیچ تفاوتی ندارند و کلیدهای JSON بدون کوتیشن هم مجازند",
-    "JSON از لیست پشتیبانی نمی‌کند",
-    "دیکشنری پایتون فقط عدد ذخیره می‌کند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>اگرچه dict با آبجکت JSON شباهت دارد، JSON یک فرمت متنی سخت‌گیرانه است که با ماژول <code>json</code> سریال‌سازی/پارس می‌شود.</p>"
-  },
-  {
-   "title": "چرا پوشه .venv نباید در مخزن Git کامیت شود؟",
-   "options": [
-    "زیرا پایتون اجازه اجرای آن را نمی‌دهد",
-    "زیرا وابسته به سیستم‌عامل/مسیر محلی و بسیار حجیم است؛ به‌جای آن فایل requirements.txt نسخه‌بندی می‌شود",
-    "زیرا Git فقط فایل‌های تصویر را قبول می‌کند",
-    "زیرا .venv رمز عبور کاربر را حذف می‌کند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>مخزن باید فقط کد و <code>requirements.txt</code> را نگه دارد تا هر همکار محیط مجازی خود را تمیز بسازد.</p>"
-  },
-  {
-   "title": "ساختار داده tuple در پایتون چه ویژگی متمایزی نسبت به list دارد؟",
-   "options": [
-    "می‌توان عناصر آن را درجا حذف و اضافه کرد",
-    "فقط رشته می‌پذیرد",
-    "خود tuple تغییرناپذیر است؛ برای کلید دیکشنری همه عناصر آن باید hashable باشند",
-    "ترتیب عناصر را حفظ نمی‌کند"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>خود tuple تغییرناپذیر است، اما عناصر داخلی ممکن است قابل‌تغییر باشند؛ کلید دیکشنری بودن به hashable بودن تمام عناصر بستگی دارد.</p>"
-  },
-  {
-   "title": "متد .splitlines() چه مزیتی نسبت به .split('\\n') در پارس خروجی تجهیزات شبکه دارد؟",
-   "options": [
-    "ترافیک شبکه را فشرده می‌کند",
-    "همه فاصله‌های وسط خط را پاک می‌کند",
-    "فقط سطر اول را نگه می‌دارد",
-    "پایان خط‌های \\r\\n (متداول در خروجی SSH/Telnet) و \\n را یکسان و تمیز مدیریت می‌کند"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>تجهیزات شبکه اغلب <code>\\r\\n</code> برمی‌گردانند؛ <code>.splitlines()</code> بدون جا گذاشتن کاراکتر <code>\\r</code> خطوط را جدا می‌کند.</p>"
-  },
-  {
-   "title": "در آزمایشگاه این درس چه چیزی واقعاً اجرا شده است؟",
-   "options": [
-    "اسکریپت واقعی Python 3 روی متن نمونه مصنوعی CLI و پوشه موقت محلی، بدون اتصال به هیچ روتر یا سوئیچ واقعی",
-    "پیکربندی زنده VLAN روی ۱۰۰ سوئیچ Catalyst",
-    "اتصال SSH به روتر لبه اینترنت",
-    "نصب کتابخانه در پایتون سراسری با sudo"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت محلی در Python 3 روی داده مصنوعی اجرا و تست شده و هیچ تجهیز شبکه‌ای متصل نشده است.</p>"
-  }
- ],
- "meta": {
-  "version": "integration-review.1",
-  "legacyId": "auto_02",
-  "sources": [
-   "https://docs.python.org/3/tutorial/",
-   "https://docs.python.org/3/library/venv.html",
-   "https://docs.python.org/3/library/getpass.html",
-   "https://www.rfc-editor.org/rfc/rfc8259"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "auto_02",
+  "objectiveId": "auto_02",
+  "kind": "lesson",
+  "track": "Automation",
+  "course": "automation-foundations",
+  "title": "۷.۷ Automation (درس ۲ از ۲۰): Python مقدماتی برای شبکه",
+  "titleEn": "Automation 02: Python Fundamentals for Network Engineers",
+  "domain": "Network Automation",
+  "source": "Legacy auto_02 rewritten and audited",
+  "evidence": "اجرای Python محلی روی متن مصنوعی و فایل موقت آزموده شده؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "بازبینی فنی توسط یکپارچه‌ساز انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "estimatedMinutes": 50,
+  "prerequisites": [],
+  "sections": [
+    {
+      "id": "auto_02-section-1",
+      "title": "مسئله واقعی: چرا کپی‌پیست کردن پیکربندی برای ۱۰۰ سوئیچ محکوم به خطاست؟",
+      "html": "<p>تصور کنید باید روی ۱۰۰ سوئیچ Access بررسی کنید کدام پورت‌ها در وضعیت <code>up/up</code> هستند، کدام VLANهای استاندارد روی هر سوئیچ جا افتاده‌اند و خروجی یکپارچه JSON برای ممیزی بسازید. انجام دستی این کار در Notepad و ترمینال نه‌تنها ساعت‌ها زمان می‌برد، بلکه یک خطای تایپی انسانی در یکی از سوئیچ‌ها می‌تواند کل بخش را قطع کند. پایتون به شما اجازه می‌دهد با چند ساختار داده ساده، همین تحلیل را به‌صورت تکرارپذیر تحلیل کنید؛ درستی نتیجه همچنان به ورودی، تست و بازبینی بستگی دارد.</p>"
+    },
+    {
+      "id": "auto_02-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> آشنایی پایه با خط فرمان لینوکس (درس <code>auto_01</code>) و ساختار پیکربندی شبکه.</p><ul><li>کار با رشته‌ها (<code>.strip()</code>، <code>.splitlines()</code>، <code>.split()</code> و <code>f-string</code>) برای پارس خروجی‌های متنی CLI.</li><li>انتخاب درست میان <code>list</code>، <code>dict</code>، <code>set</code> و <code>tuple</code> در مدل‌سازی تجهیزات، VLANها و خروجی‌های API.</li><li>مدیریت ایمن فایل‌ها با <code>with open(..., encoding=\"utf-8\")</code> و مدیریت دقیق خطاها با <code>try/except</code> مشخص (پرهیز از bare <code>except:</code>).</li><li>ایزوله‌سازی وابستگی‌ها با <code>venv</code> و نگهداری امن رمزهای عبور بیرون از سورس‌کد (<code>os.environ</code> و <code>getpass</code>).</li></ul>"
+    },
+    {
+      "id": "auto_02-section-3",
+      "title": "پارس متن CLI با String و f-string",
+      "html": "<p>خروجی‌های CLI تجهیزات شبکه در اصل رشته‌های چندخطی هستند. سه متد رشته‌ای زیر در بسیاری از اسکریپت‌ها کاربرد دارند:</p><ul><li><code>.splitlines()</code>: متن چندخطی را بدون وابستگی به <code>\\r\\n</code> ویندوز یا <code>\\n</code> لینوکس به فهرست خطوط می‌شکند.</li><li><code>.strip()</code>: فاصله‌ها و کاراکترهای انتهای خط اضافی ابتدا و انتهای رشته را پاک می‌کند.</li><li><code>.split()</code>: بر اساس یک یا چند فضای خالی پیاپی ستون‌ها را جدا می‌کند (نکته ظریف: در <code>show ip interface brief</code> عبارت <code>administratively down</code> دو کلمه دارد؛ بنابراین گرفتن ستون آخر با اندیس <code>parts[-1]</code> برای <code>Protocol</code> و الحاق <code>parts[4:-1]</code> برای <code>Status</code> بسیار امن‌تر از فرض ثابت بودن طول لیست است!).</li></ul>"
+    },
+    {
+      "id": "auto_02-section-4",
+      "title": "چهار ساختار داده کلیدی: List، Dict، Set و Tuple در شبکه",
+      "html": "<table><thead><tr><th>ساختار داده</th><th>ویژگی کلیدی</th><th>کاربرد واقعی در شبکه</th></tr></thead><tbody><tr><td><code>list</code></td><td>مرتب و قابل تغییر</td><td>فهرست دستورات پیکربندی، لیست اینترفیس‌ها یا IPهای شعبه</td></tr><tr><td><code>dict</code></td><td>نگاشت کلید-مقدار (نگاشت پایتون؛ قابل تبدیل به JSON در صورت سازگاری نوع داده)</td><td>مشخصات یک روتر، جدول همسایگان، بدنه پاسخ REST API</td></tr><tr><td><code>set</code></td><td>عناصر یکتا با عملگرهای مجموعه‌ای سریع</td><td>مقایسه VLANهای مطلوب و موجود: <code>desired - observed</code> (جاافتاده) و <code>observed - desired</code> (اضافی)</td></tr><tr><td><code>tuple</code></td><td>مرتب و تغییرناپذیر (Immutable)</td><td>ثابت‌ها مانند زوج <code>(ip, port)</code>؛ tuple تنها ساختار خود را ثابت می‌کند و عناصر قابل‌تغییر درونش ممکن است تغییر کنند</td></tr></tbody></table>"
+    },
+    {
+      "id": "auto_02-section-5",
+      "title": "نمودار جریان اسکریپت ایمن پایتون برای شبکه",
+      "html": "<p>در نمودار زیر چرخه تبدیل متن خام CLI به گزارش ساخت‌یافته با رعایت ایمنی فایل، مدیریت خطای دقیق و محیط مجازی نشان داده شده است.</p><svg viewBox=\"0 0 760 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Python Data Structures and Safe Automation Flow\"><rect x=\"14\" y=\"20\" width=\"165\" height=\"170\" rx=\"10\" fill=\"#f1f5f9\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"96\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#0f172a\">Raw CLI / File</text><text x=\"96\" y=\"76\" text-anchor=\"middle\" font-size=\"11\" fill=\"#334155\">with open(..., utf-8)</text><text x=\"96\" y=\"102\" text-anchor=\"middle\" font-size=\"11\" fill=\"#334155\">.strip() / .splitlines()</text><text x=\"96\" y=\"128\" text-anchor=\"middle\" font-size=\"11\" fill=\"#334155\">.split() + f-strings</text><rect x=\"208\" y=\"20\" width=\"175\" height=\"170\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"295\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Core Structures</text><text x=\"295\" y=\"76\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">list: ordered interfaces</text><text x=\"295\" y=\"102\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">dict: JSON key-value</text><text x=\"295\" y=\"128\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">set: VLAN diff (A - B)</text><text x=\"295\" y=\"154\" text-anchor=\"middle\" font-size=\"11\" fill=\"#0f172a\">tuple: immutable record</text><rect x=\"412\" y=\"20\" width=\"160\" height=\"170\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"492\" y=\"45\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Safety Guards</text><text x=\"492\" y=\"78\" text-anchor=\"middle\" font-size=\"11\" fill=\"#78350f\">Specific try/except</text><text x=\"492\" y=\"104\" text-anchor=\"middle\" font-size=\"11\" fill=\"#b91c1c\">NO bare except:</text><text x=\"492\" y=\"130\" text-anchor=\"middle\" font-size=\"11\" fill=\"#78350f\">os.environ / getpass</text><text x=\"492\" y=\"156\" text-anchor=\"middle\" font-size=\"11\" fill=\"#78350f\">python3 -m venv .venv</text><rect x=\"600\" y=\"40\" width=\"146\" height=\"130\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"673\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Structured Output</text><text x=\"673\" y=\"102\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">JSON / CSV Report</text><text x=\"673\" y=\"126\" text-anchor=\"middle\" font-size=\"11\" fill=\"#14532d\">Audit Diff</text><line x1=\"179\" y1=\"105\" x2=\"208\" y2=\"105\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"383\" y1=\"105\" x2=\"412\" y2=\"105\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"572\" y1=\"105\" x2=\"600\" y2=\"105\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
+    },
+    {
+      "id": "auto_02-section-6",
+      "title": "List Comprehension و توابع خوانا",
+      "html": "<p>برای فیلتر کردن سریع داده‌ها بدون حلقه‌های شلوغ، <strong>List Comprehension</strong> هم خوانا و هم سریع است:</p><pre dir=\"ltr\"><code>up_ifaces = [row[\"interface\"] for row in parsed if row[\"status\"] == \"up\" and row[\"protocol\"] == \"up\"]</code></pre><p>همیشه منطق پارس، اعتبارسنجی (مثل بررسی محدوده VLAN بین ۱ تا ۴۰۹۴) و تولید خروجی را در <strong>توابع کوچک و تک‌وظیفه</strong> بنویسید تا بتوانید هر تابع را مستقلاً با <code>unittest</code> یا <code>pytest</code> آزمون کنید (بدون نیاز به وصل شدن به روتر واقعی).</p>"
+    },
+    {
+      "id": "auto_02-section-7",
+      "title": "کار امن با فایل‌ها: چرا همیشه with open(..., encoding='utf-8')؟",
+      "html": "<p>اگر فایل را با <code>f = open(\"cfg.txt\", \"w\")</code> باز کنید و پیش از رسیدن به <code>f.close()</code> یک استثنا (Exception) رخ دهد، توصیف‌گر فایل باز می‌ماند و ممکن است بافر روی دیسک Flush نشده و فایل پیکربندی ناقص ذخیره شود. ساختار <strong>Context Manager</strong> (<code>with open(\"cfg.txt\", \"w\", encoding=\"utf-8\") as f:</code>) تضمین می‌کند به محض خروج از بلوک — حتی در صورت بروز خطا — فایل به‌طور خودکار و امن بسته شود. ذکر صریح <code>encoding=\"utf-8\"</code> نیز جلوی خطاهای رمزگذاری در ویندوز/لینوکس هنگام وجود متن فارسی یا کاراکترهای خاص را می‌گیرد.</p>"
+    },
+    {
+      "id": "auto_02-section-8",
+      "title": "مدیریت خطا (try/except) و خطر bare except:",
+      "html": "<p>در اسکریپت‌های شبکه، خطاهایی مانند <code>ValueError</code>، <code>FileNotFoundError</code> یا <code>TimeoutError</code> طبیعی هستند و باید دقیق گرفته و لاگ شوند. اما نوشتن <code>except:</code> خالی (<strong>bare except</strong>) یک ضدارزش خطرناک است؛ زیرا علاوه بر خطای شبکه، خطاهای برنامه‌نویسی خودتان (مثل <code>NameError</code> یا <code>TypeError</code>) و حتی کلید توقف کاربر <code>Ctrl+C</code> (<code>KeyboardInterrupt</code>) را هم بی‌صدا می‌بلعد و عیب‌یابی را ناممکن می‌کند! همیشه نوع استثنای دقیق را بگیرید (مثلاً <code>except ValueError as exc:</code>).</p>"
+    },
+    {
+      "id": "auto_02-section-9",
+      "title": "محیط مجازی (venv) و مهار وابستگی‌ها",
+      "html": "<p>نصب کتابخانه‌ها با <code>sudo pip install</code> در پایتون سراسری سیستم‌عامل لینوکس می‌تواند ابزارهای خود توزیع (مانند <code>apt</code> یا <code>dnf</code>) را خراب کند (در توزیع‌های جدید PEP 668 حتی این کار را مسدود می‌کند). روش استاندارد برای هر پروژه اتوماسیون:</p><pre dir=\"ltr\"><code>python3 -m venv .venv\nsource .venv/bin/activate\npip install -r requirements.txt</code></pre><p>پوشه <code>.venv/</code> را هرگز در Git کامیت نکنید؛ فقط فایل <code>requirements.txt</code> (با نسخه‌های مشخص) را در مخزن نگه دارید.</p>"
+    },
+    {
+      "id": "auto_02-section-10",
+      "title": "امنیت رمزهای عبور در اسکریپت‌های پایتون",
+      "html": "<p><strong>قانون طلایی:</strong> هرگز نام کاربری و رمز عبور روتر یا API Token را به صورت ثابت (Hardcoded) داخل فایل <code>.py</code> ننویسید! سه الگوی امن پایه:</p><ol><li><strong>متغیر محیطی (<code>os.environ[\"NET_PASS\"]</code>):</strong> مناسب برای اجراهای خودکار و CI/CD (با بارگذاری از Vault یا Secrets Manager).</li><li><strong>دریافت تعاملی پنهان (<code>getpass.getpass()</code>):</strong> هنگام اجرای دستی توسط مهندس تا رمز روی صفحه ترمینال چاپ نشود.</li><li><strong>عدم چاپ رمز در لاگ و Trace:</strong> هنگام ثبت خطاها، آبجکت اتصال یا دیکشنری حاوی <code>password</code> را مستقیماً در <code>print</code> یا <code>logging</code> نریزید.</li></ol>"
+    },
+    {
+      "id": "auto_02-section-11",
+      "title": "کژفهمی‌های رایج پایتون در اتوماسیون شبکه",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای مقایسه دو لیست VLAN حتماً باید دو حلقه تو در تو نوشت.»</strong> واقعیت: تبدیل به <code>set</code> و استفاده از عملگرهای <code>-</code> و <code>&amp;</code> هم کوتاه‌تر و هم بسیار سریع‌تر است.</li><li><strong>کژفهمی ۲: «برای اینکه اسکریپت کرش نکند، کل کد را داخل try / except: می‌گذاریم.»</strong> واقعیت: پنهان کردن خطاها با bare except باعث می‌شود اسکریپت با داده ناقص یا خراب روی شبکه ادامه دهد و فاجعه بسازد.</li><li><strong>کژفهمی ۳: «دیکشنری پایتون دقیقاً همان رشته JSON است.»</strong> واقعیت: ساختارشان متناظر است اما در پایتون کلید/رشته با کوتیشن تکی و <code>True/None</code> مجاز است، در حالی که JSON استاندارد (RFC 8259) فقط کوتیشن دوتایی و <code>true/null</code> می‌پذیرد و تبدیل با <code>json.dumps/loads</code> انجام می‌شود.</li></ul>"
+    },
+    {
+      "id": "auto_02-section-12",
+      "title": "عیب‌یابی خطاهای پرتکرار اسکریپت‌های مقدماتی",
+      "html": "<p><strong>خطای ۱ — <code>KeyError: 'vlan'</code> هنگام خواندن پاسخ API:</strong> به جای <code>dev[\"vlan\"]</code> برای فیلدهای اختیاری از <code>dev.get(\"vlan\", \"unassigned\")</code> استفاده کنید تا نبود کلید اسکریپت را متوقف نکند.</p><p><strong>خطای ۲ — به‌هم‌ریختن ستون‌ها در <code>administratively down</code>:</strong> اگر <code>parts[4]</code> و <code>parts[5]</code> را مستقیم بخوانید، در خط <code>administratively down down</code> ستون Protocol اشتباه خوانده می‌شود! با <code>protocol = parts[-1]</code> و <code>status = \" \".join(parts[4:-1])</code> برای همین قالب فرضی از جابه‌جایی جلوگیری می‌شود؛ خروجی‌های متفاوت نیاز به parser و تست متناسب دارند.</p>"
+    },
+    {
+      "id": "auto_02-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> روی سوئیچی VLANهای مطلوب <code>{10, 20, 30}</code> و VLANهای فعلی <code>{10, 99}</code> هستند. حاصل <code>desired - observed</code>، <code>observed - desired</code> و <code>desired &amp; observed</code> چیست؟ <strong>پاسخ:</strong> <code>to_add = {20, 30}</code>، <code>unexpected_extra = {99}</code> و <code>compliant = {10}</code>.</p><p><strong>تمرین ۲:</strong> چرا تابع <code>safe_parse_vlan_id(\"5000\")</code> باید خطای <code>ValueError</code> برگرداند؟ <strong>پاسخ:</strong> اگرچه <code>\"5000\"</code> به عدد صحیح تبدیل می‌شود، خارج از بازه استاندارد IEEE 802.1Q (۱ تا ۴۰۹۴) است و اعتبارسنجی پیش از ارسال به تجهیز جلوی خطای پیکربندی را می‌گیرد.</p>"
+    },
+    {
+      "id": "auto_02-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://docs.python.org/3/tutorial/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Python 3</a>، <a href=\"https://docs.python.org/3/library/venv.html\" target=\"_blank\" rel=\"noopener\">مستندات ماژول venv</a> و <a href=\"https://docs.python.org/3/library/getpass.html\" target=\"_blank\" rel=\"noopener\">ماژول getpass</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> اسکریپت آزمایشگاه این درس واقعاً در Python 3 اجرا و با تست خودکار تأیید شده است، اما ورودی آن متن نمونه مصنوعی <code>show ip interface brief</code> است و هیچ اتصال واقعی به روتر یا سوئیچ سیسکو برقرار نشده است.</p>"
+    }
   ],
-  "limitations": [
-   "کد آزمایشگاه در Python 3 اجرا و تست شده اما از متن مصنوعی CLI استفاده می‌کند و هیچ تجهیز واقعی شبکه متصل نشده است.",
-   "parser برای جدول مصنوعی مشخص است و هر فرمت واقعی IOS، امنیت راز و کامل بودن فایل را تضمین نمی‌کند."
+  "glossary": [
+    {
+      "term": "f-string",
+      "fa": "رشته قالب‌بندی‌شده",
+      "simple": "روش خوانا و مدرن درج متغیرها داخل رشته در پایتون (مثلاً f'vlan {vid}')."
+    },
+    {
+      "term": "list",
+      "fa": "فهرست (List)",
+      "simple": "ساختار داده مرتب و قابل تغییر برای نگهداری دنباله دستورات یا اشیاء."
+    },
+    {
+      "term": "dict",
+      "fa": "دیکشنری (Dict)",
+      "simple": "ساختار کلید-مقدار در پایتون، معادل ساختاری آبجکت‌های JSON."
+    },
+    {
+      "term": "set",
+      "fa": "مجموعه (Set)",
+      "simple": "مجموعه عناصر یکتا برای محاسبه سریع تفاوت، اشتراک و اجتماع (مثل ممیزی VLAN)."
+    },
+    {
+      "term": "tuple",
+      "fa": "تاپل (Tuple)",
+      "simple": "دنباله مرتب و تغییرناپذیر برای داده‌های ثابت."
+    },
+    {
+      "term": "List Comprehension",
+      "fa": "سازنده فشرده لیست",
+      "simple": "نحو مختصر و خوانا برای ساخت یا فیلتر کردن لیست در یک عبارت."
+    },
+    {
+      "term": "Context Manager (with)",
+      "fa": "مدیر زمینه with",
+      "simple": "تضمین بسته‌شدن خودکار فایل یا نشست حتی در صورت بروز استثنا."
+    },
+    {
+      "term": "encoding='utf-8'",
+      "fa": "رمزگذاری UTF-8",
+      "simple": "تعیین صریح کدگذاری متن هنگام خواندن/نوشتن فایل در سیستم‌عامل‌های مختلف."
+    },
+    {
+      "term": "try / except",
+      "fa": "مدیریت استثنا",
+      "simple": "گرفتن و مدیریت خطاهای پیش‌بینی‌شده بدون از کار افتادن کنترل‌نشده برنامه."
+    },
+    {
+      "term": "Bare except",
+      "fa": "except بدون نوع خطا",
+      "simple": "ضدارزشی که خطاهای برنامه‌نویسی و Ctrl+C را نیز بی‌صدا پنهان می‌کند."
+    },
+    {
+      "term": "venv",
+      "fa": "محیط مجازی پایتون",
+      "simple": "محیط ایزوله پروژه برای نصب کتابخانه‌ها بدون تداخل با پایتون سیستم‌عامل."
+    },
+    {
+      "term": "requirements.txt",
+      "fa": "فهرست وابستگی‌ها",
+      "simple": "فایل ثبت نام و نسخه کتابخانه‌های لازم برای بازتولید محیط پروژه."
+    },
+    {
+      "term": "os.environ",
+      "fa": "متغیرهای محیطی",
+      "simple": "خواندن رمزها و تنظیمات حساس از محیط سیستم به جای Hardcode در کد."
+    },
+    {
+      "term": "getpass",
+      "fa": "دریافت پنهان رمز",
+      "simple": "ماژول استاندارد پایتون برای خواندن رمز عبور از کاربر بدون نمایش روی صفحه."
+    },
+    {
+      "term": "KeyError",
+      "fa": "خطای نبود کلید",
+      "simple": "خطای دسترسی مستقیم به کلید ناموجود در دیکشنری (قابل پیشگیری با متد .get())."
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش از ۲ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش همراه با تله واقعی پارس 'administratively down'.",
-   "افزودن آزمایشگاه محلی قابل اجرا با بررسی تفاضل Set، اعتبارسنجی محدوده VLAN و ذخیره امن JSON."
-  ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت Python؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/auto_02-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه محلی Python 3 (پارس CLI نمونه، تفاضل Set و ذخیره JSON) — تجهیز واقعی اجرا نشده",
+      "executionStatus": "اجرای Python محلی روی متن مصنوعی و فایل موقت آزموده شده؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اسکریپت محلی واقعی Python 3 (روی داده مصنوعی)</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر یا سوئیچ واقعی به این اسکریپت متصل نشده است. parser فقط قالب نمونه را می‌پذیرد و خطای ورودی را گزارش می‌کند؛ فایل موقت، ذخیره‌سازی اتمی یا ماندگار را اثبات نمی‌کند.</p><p>در این آزمایشگاه واقعی Python 3، خروجی چندخطی <code>show ip interface brief</code> (شامل حالت دوکلمه‌ای <code>administratively down</code>) را پارس می‌کنید، تفاضل VLANهای مطلوب و موجود را با <code>set</code> می‌سنجید و خروجی JSON را با <code>with open</code> در پوشه موقت ذخیره می‌کنید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_02_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_02_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Lab for auto_02 (Parsing CLI text, Sets/Dicts, with open &amp; safe exceptions).\n\nRuns locally in Python 3 using synthetic CLI text; no real Cisco router is contacted.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport json\nfrom pathlib import Path\nimport tempfile\n\nSAMPLE_SHOW_IP_INT_BR = &quot;&quot;&quot;\nInterface              IP-Address      OK? Method Status                Protocol\nGigabitEthernet0/0     192.0.2.1       YES manual up                    up\nGigabitEthernet0/1     198.51.100.1    YES manual administratively down down\nLoopback0              203.0.113.10    YES manual up                    up\n&quot;&quot;&quot;.strip()\n\n\ndef parse_interfaces(raw_output: str) -&gt; list[dict[str, str]]:\n    &quot;&quot;&quot;Parse the stated simplified table, failing closed on malformed input.\n\n    This is not a general IOS parser; validate platform output separately.\n    &quot;&quot;&quot;\n    lines = [line for line in raw_output.splitlines() if line.strip()]\n    if not lines or lines[0].split() != [&quot;Interface&quot;, &quot;IP-Address&quot;, &quot;OK?&quot;, &quot;Method&quot;, &quot;Status&quot;, &quot;Protocol&quot;]:\n        raise ValueError(&quot;missing or unsupported table header&quot;)\n    results: list[dict[str, str]] = []\n    for line in lines[1:]:\n        parts = line.strip().split()\n        if len(parts) &lt; 6:\n            raise ValueError(f&quot;malformed interface row: {line!r}&quot;)\n        interface, ip_addr, ok_flag, method = parts[0], parts[1], parts[2], parts[3]\n        protocol = parts[-1]\n        status = &quot; &quot;.join(parts[4:-1])\n        results.append({\n            &quot;interface&quot;: interface,\n            &quot;ip&quot;: ip_addr,\n            &quot;ok&quot;: ok_flag,\n            &quot;method&quot;: method,\n            &quot;status&quot;: status,\n            &quot;protocol&quot;: protocol,\n        })\n    return results\n\n\ndef diff_vlans(desired_vlans: set[int], observed_vlans: set[int]) -&gt; dict[str, list[int]]:\n    &quot;&quot;&quot;Use Python sets to identify missing and unexpected VLANs cleanly.&quot;&quot;&quot;\n    return {\n        &quot;to_add&quot;: sorted(desired_vlans - observed_vlans),\n        &quot;unexpected_extra&quot;: sorted(observed_vlans - desired_vlans),\n        &quot;compliant&quot;: sorted(desired_vlans &amp; observed_vlans),\n    }\n\n\ndef safe_parse_vlan_id(raw_value: str) -&gt; int:\n    &quot;&quot;&quot;Validate VLAN ID using specific exceptions (never bare except).&quot;&quot;&quot;\n    try:\n        vid = int(raw_value.strip())\n    except ValueError as exc:\n        raise ValueError(f&quot;VLAN ID must be an integer, got {raw_value!r}&quot;) from exc\n    if not (1 &lt;= vid &lt;= 4094):\n        raise ValueError(f&quot;VLAN ID out of 802.1Q range (1..4094): {vid}&quot;)\n    return vid\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python lab only — synthetic CLI text; no real router or switch is contacted.&quot;)\n    parsed = parse_interfaces(SAMPLE_SHOW_IP_INT_BR)\n    up_ifaces = [row[&quot;interface&quot;] for row in parsed if row[&quot;status&quot;] == &quot;up&quot; and row[&quot;protocol&quot;] == &quot;up&quot;]\n    print(&quot;Parsed interfaces:&quot;, len(parsed), &quot;| up/up:&quot;, up_ifaces)\n    print(&quot;VLAN diff:&quot;, diff_vlans({10, 20, 30}, {10, 99}))\n    with tempfile.TemporaryDirectory() as tmp:\n        out_file = Path(tmp) / &quot;interfaces.json&quot;\n        with open(out_file, &quot;w&quot;, encoding=&quot;utf-8&quot;) as fh:\n            json.dump(parsed, fh, indent=2)\n        print(&quot;Saved JSON to temporary file via &#x27;with open&#x27;:&quot;, out_file.stat().st_size, &quot;bytes&quot;)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> پارس ۳ اینترفیس با دو اینترفیس <code>up/up</code> (<code>GigabitEthernet0/0</code> و <code>Loopback0</code>)، تفاضل VLANها با <code>to_add=[20, 30]</code> و <code>unexpected_extra=[99]</code>، و ذخیره موفق فایل JSON.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>توسعه اختیاری در محیط خودتان:</strong> یک محیط مجازی بسازید (<code>python3 -m venv .venv</code>) و تابع <code>safe_parse_vlan_id</code> را با ورودی‌های نامعتبر مانند <code>\"abc\"</code> و <code>\"4095\"</code> بیازمایید. هیچ اتصال SSH یا تجهیز سیسکویی در این درس اجرا نشده است.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس Python مقدماتی برای شبکه",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-automation",
-   "recommendedCourse": "automation-foundations",
-   "blueprint": "/academy-assets/v5/blueprints/auto_02.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_02_lab.py"
-  },
-  "technicalAuditFixes": [
-   "تلطیف عبارت مطلق «همیشه باید» در توضیح پرسش ۱ با ذکر الگوی صحیح لایه بیرونی لاگ‌گیری و re-raise در Python."
+  "interactiveQuiz": [
+    {
+      "title": "چرا استفاده از except: خالی (bare except) در اسکریپت‌های اتوماسیون شبکه خطرناک است؟",
+      "options": [
+        "زیرا پایتون اجازه خواندن فایل نمی‌دهد",
+        "زیرا علاوه بر خطای شبکه، خطاهای برنامه‌نویسی (مثل NameError) و حتی Ctrl+C را بی‌صدا می‌بلعد و عیب‌یابی را پنهان می‌کند",
+        "زیرا سرعت CPU را نصف می‌کند",
+        "زیرا دیکشنری را حذف می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>به عنوان قاعده حرفه‌ای باید نوع دقیق استثنا (مانند <code>ValueError</code> یا <code>TimeoutError</code>) گرفته شود تا باگ‌های کد و سیگنال توقف پنهان نشوند (حتی در لایه بیرونی لاگ‌گیری نیز باید <code>Exception</code> ثبت و مجدداً raise شود، نه <code>except:</code> خالی).</p>"
+    },
+    {
+      "title": "مزیت اصلی with open('cfg.txt', 'w', encoding='utf-8') as f نسبت به f = open(...) چیست؟",
+      "options": [
+        "فایل را خودکار با AES رمزنگاری می‌کند",
+        "فایل را مستقیم روی روتر سیسکو می‌فرستد",
+        "تضمین می‌کند فایل پس از پایان بلوک — حتی هنگام بروز استثنا — به‌طور خودکار و ایمن بسته شود",
+        "محدودیت حجم دیسک را حذف می‌کند"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Context Manager با <code>with</code> بستن فایل را در خروج از بلوک مدیریت می‌کند؛ نوشتن کامل یا اتمی در صورت خطا تضمین نیست.</p>"
+    },
+    {
+      "title": "بهترین کار اولیه برای نصب کتابخانه‌های پایتون پروژه بدون تداخل با پکیج‌های سیستم‌عامل چیست؟",
+      "options": [
+        "اجرای chmod 777 روی /usr/bin/python3",
+        "حذف فایل‌های سیستمی لینوکس",
+        "نصب همه کتابخانه‌ها با sudo pip در سیستم سراسری",
+        "ساخت و فعال‌سازی محیط مجازی اختصاصی با python3 -m venv .venv"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p><code>venv</code> وابستگی‌های هر پروژه را ایزوله نگه می‌دارد و خطر تداخل وابستگی‌ها با سیستم‌عامل را کاهش می‌دهد.</p>"
+    },
+    {
+      "title": "برای یافتن VLANهایی که باید به سوئیچ اضافه شوند (در desired هستند اما در observed نیستند) کدام عبارت پایتون دقیق‌تر است؟",
+      "options": [
+        "desired - observed (تفاضل دو set)",
+        "desired + observed",
+        "desired / observed",
+        "observed - desired"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در مجموعه‌ها (<code>set</code>)، تفاضل <code>desired - observed</code> عناصر موجود در مطلوب و غایب در مشاهده‌شده را برمی‌گرداند.</p>"
+    },
+    {
+      "title": "هنگام پارس خط GigabitEthernet0/1 198.51.100.1 YES manual administratively down down با .split()، کدام روش خواندن ستون Protocol امن‌تر است؟",
+      "options": [
+        "همیشه parts[5]",
+        "استفاده از parts[-1] برای Protocol و ' '.join(parts[4:-1]) برای Status",
+        "استفاده از parts[0]",
+        "حذف خط‌های down از خروجی"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>عبارت <code>administratively down</code> دو توکن دارد؛ اندیس از انتها (<code>-1</code>) مانع جابه‌جایی ستون Protocol می‌شود.</p>"
+    },
+    {
+      "title": "کدام روش برای دریافت رمز عبور تجهیزات در اسکریپت دستی بدون نمایش روی ترمینال و بدون ذخیره در کد استاندارد است؟",
+      "options": [
+        "نوشتن password = 'Cisco123' در بالای فایل",
+        "چاپ رمز در stdout",
+        "استفاده از ماژول getpass.getpass() یا خواندن از متغیر محیطی os.environ",
+        "ذخیره رمز در نام فایل اسکریپت"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>هرگز رمز را Hardcode نکنید؛ برای اجرای تعاملی <code>getpass</code> و برای اجرای خودکار رازسنج مناسب و متغیر محیطی محدود به دسترسی استفاده می‌شود؛ متغیر محیطی ذاتاً محرمانه نیست.</p>"
+    },
+    {
+      "title": "چگونه می‌توان هنگام خواندن کلید اختیاری 'description' از دیکشنری interface از بروز KeyError جلوگیری کرد؟",
+      "options": [
+        "با interface['description']",
+        "با حذف دیکشنری",
+        "با تبدیل به tuple",
+        "با متد interface.get('description', '')"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>متد <code>.get(key, default)</code> در صورت نبود کلید به جای پرتاب <code>KeyError</code> مقدار پیش‌فرض برمی‌گرداند.</p>"
+    },
+    {
+      "title": "تفاوت مهم بین یک dict در پایتون و یک رشته JSON معتبر (RFC 8259) چیست؟",
+      "options": [
+        "در JSON استاندارد باید از کوتیشن دوتایی و true/false/null استفاده شود و تبدیل میان این دو با json.dumps و json.loads انجام می‌گیرد",
+        "هیچ تفاوتی ندارند و کلیدهای JSON بدون کوتیشن هم مجازند",
+        "JSON از لیست پشتیبانی نمی‌کند",
+        "دیکشنری پایتون فقط عدد ذخیره می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>اگرچه dict با آبجکت JSON شباهت دارد، JSON یک فرمت متنی سخت‌گیرانه است که با ماژول <code>json</code> سریال‌سازی/پارس می‌شود.</p>"
+    },
+    {
+      "title": "چرا پوشه .venv نباید در مخزن Git کامیت شود؟",
+      "options": [
+        "زیرا پایتون اجازه اجرای آن را نمی‌دهد",
+        "زیرا وابسته به سیستم‌عامل/مسیر محلی و بسیار حجیم است؛ به‌جای آن فایل requirements.txt نسخه‌بندی می‌شود",
+        "زیرا Git فقط فایل‌های تصویر را قبول می‌کند",
+        "زیرا .venv رمز عبور کاربر را حذف می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مخزن باید فقط کد و <code>requirements.txt</code> را نگه دارد تا هر همکار محیط مجازی خود را تمیز بسازد.</p>"
+    },
+    {
+      "title": "ساختار داده tuple در پایتون چه ویژگی متمایزی نسبت به list دارد؟",
+      "options": [
+        "می‌توان عناصر آن را درجا حذف و اضافه کرد",
+        "فقط رشته می‌پذیرد",
+        "خود tuple تغییرناپذیر است؛ برای کلید دیکشنری همه عناصر آن باید hashable باشند",
+        "ترتیب عناصر را حفظ نمی‌کند"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>خود tuple تغییرناپذیر است، اما عناصر داخلی ممکن است قابل‌تغییر باشند؛ کلید دیکشنری بودن به hashable بودن تمام عناصر بستگی دارد.</p>"
+    },
+    {
+      "title": "متد .splitlines() چه مزیتی نسبت به .split('\\n') در پارس خروجی تجهیزات شبکه دارد؟",
+      "options": [
+        "ترافیک شبکه را فشرده می‌کند",
+        "همه فاصله‌های وسط خط را پاک می‌کند",
+        "فقط سطر اول را نگه می‌دارد",
+        "پایان خط‌های \\r\\n (متداول در خروجی SSH/Telnet) و \\n را یکسان و تمیز مدیریت می‌کند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>تجهیزات شبکه اغلب <code>\\r\\n</code> برمی‌گردانند؛ <code>.splitlines()</code> بدون جا گذاشتن کاراکتر <code>\\r</code> خطوط را جدا می‌کند.</p>"
+    },
+    {
+      "title": "در اسکریپت‌نویسی پایتون برای خواندن یک فایل پیکربندی شبکه، چرا استفاده از بلوک `with open(...) as f:` نسبت به `open()` بدون `with` ارجح است؟",
+      "options": [
+        "فایل را به صورت خودکار رمزنگاری می‌کند",
+        "حتی در صورت بروز خطا (Exception) فایل را به شکل تضمین‌شده می‌بندد و از نشت File Descriptor جلوگیری می‌کند",
+        "سرعت پردازنده را دو برابر می‌کند",
+        "فقط برای فایل‌های باینری کار می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Context Manager (`with`) تضمین می‌کند منبع فایل پس از خروج از بلوک یا بروز خطا بلافاصله و ایمن بسته شود.</p>"
+    }
   ],
-  "integrationReview": {
-   "date": "2026-11-27",
-   "reviewer": "integrator-agent-not-human",
-   "sourceCommit": "d0fdaa06fbd0898901a1b43c153ad9182567f928",
-   "evidence": "academy-labs/reviews/auto_02-integration-review-fa.md"
+  "meta": {
+    "version": "integration-review.1",
+    "legacyId": "auto_02",
+    "sources": [
+      "https://docs.python.org/3/tutorial/",
+      "https://docs.python.org/3/library/venv.html",
+      "https://docs.python.org/3/library/getpass.html",
+      "https://www.rfc-editor.org/rfc/rfc8259"
+    ],
+    "limitations": [
+      "کد آزمایشگاه در Python 3 اجرا و تست شده اما از متن مصنوعی CLI استفاده می‌کند و هیچ تجهیز واقعی شبکه متصل نشده است.",
+      "parser برای جدول مصنوعی مشخص است و هر فرمت واقعی IOS، امنیت راز و کامل بودن فایل را تضمین نمی‌کند."
+    ],
+    "legacyAuditFixes": [
+      "گسترش از ۲ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش همراه با تله واقعی پارس 'administratively down'.",
+      "افزودن آزمایشگاه محلی قابل اجرا با بررسی تفاضل Set، اعتبارسنجی محدوده VLAN و ذخیره امن JSON."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت Python؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/auto_02-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-automation",
+      "recommendedCourse": "automation-foundations",
+      "blueprint": "/academy-assets/v5/blueprints/auto_02.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/auto_02_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تلطیف عبارت مطلق «همیشه باید» در توضیح پرسش ۱ با ذکر الگوی صحیح لایه بیرونی لاگ‌گیری و re-raise در Python."
+    ],
+    "integrationReview": {
+      "date": "2026-11-27",
+      "reviewer": "integrator-agent-not-human",
+      "sourceCommit": "d0fdaa06fbd0898901a1b43c153ad9182567f928",
+      "evidence": "academy-labs/reviews/auto_02-integration-review-fa.md"
+    }
   }
- }
 }

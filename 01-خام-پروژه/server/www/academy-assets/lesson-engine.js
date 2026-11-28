@@ -533,28 +533,61 @@
     if (backBtn && opts.onBackToCatalog) backBtn.onclick = opts.onBackToCatalog;
     setupGlossaryToggle(container);
 
-    // Sticky TOC + Per-Lesson Personal Notes (local browser storage, safe try/catch)
+    // Sticky TOC + Per-Lesson Personal Notes (account-synced when signed in, local fallback offline)
     const NOTES_STORAGE_KEY = 'fam.academy.notes.v1';
     const notesArea = container.querySelector('#le-lesson-notes');
     const notesStatus = container.querySelector('#le-notes-status');
     if (notesArea && bp.lessonId) {
-      try {
-        const allNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '{}');
-        if (allNotes && typeof allNotes[bp.lessonId] === 'string') notesArea.value = allNotes[bp.lessonId];
-      } catch (_) {}
+      const bridge = window.FamAcademyBridge;
+      if (bridge) {
+        const remoteNotes = bridge.progress?.labs?.lessonNotes;
+        if (remoteNotes && typeof remoteNotes[bp.lessonId] === 'string') {
+          notesArea.value = remoteNotes[bp.lessonId];
+        }
+        if (notesStatus) notesStatus.textContent = 'همگام با حساب کاربری';
+      } else {
+        try {
+          const allNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '{}');
+          if (allNotes && typeof allNotes[bp.lessonId] === 'string') notesArea.value = allNotes[bp.lessonId];
+        } catch (_) {}
+        if (notesStatus) notesStatus.textContent = 'ذخیره محلی (حالت آفلاین)';
+      }
       let saveTimer = null;
       notesArea.addEventListener('input', () => {
+        const activeBridge = window.FamAcademyBridge;
+        if (notesStatus) notesStatus.textContent = activeBridge ? 'در حال همگام‌سازی با حساب…' : 'در حال ذخیره محلی…';
         if (saveTimer) clearTimeout(saveTimer);
-        saveTimer = setTimeout(() => {
-          try {
-            const allNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '{}') || {};
-            allNotes[bp.lessonId] = notesArea.value;
-            localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(allNotes));
-            if (notesStatus) notesStatus.textContent = 'یادداشت به‌صورت محلی ذخیره شد.';
-          } catch (_) {
-            if (notesStatus) notesStatus.textContent = 'ذخیره محلی یادداشت در دسترس نیست.';
+        saveTimer = setTimeout(async () => {
+          const val = String(notesArea.value || '').slice(0, 6000);
+          if (activeBridge && typeof activeBridge.saveProgress === 'function') {
+            const curLabs = (activeBridge.progress && typeof activeBridge.progress.labs === 'object' && !Array.isArray(activeBridge.progress.labs))
+              ? activeBridge.progress.labs : {};
+            const curNotes = (curLabs.lessonNotes && typeof curLabs.lessonNotes === 'object' && !Array.isArray(curLabs.lessonNotes))
+              ? { ...curLabs.lessonNotes } : {};
+            if (val.trim()) curNotes[bp.lessonId] = val;
+            else delete curNotes[bp.lessonId];
+            const ok = await activeBridge.saveProgress({
+              ...(activeBridge.progress || {}),
+              completed: getCompletedList(),
+              labs: { ...curLabs, lessonNotes: curNotes }
+            });
+            if (notesStatus) {
+              notesStatus.textContent = ok
+                ? 'در حساب کاربری ذخیره شد ✓'
+                : 'ذخیره در سرور ناموفق بود؛ اتصال را بررسی کنید.';
+            }
+          } else {
+            try {
+              const allNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '{}') || {};
+              if (val.trim()) allNotes[bp.lessonId] = val;
+              else delete allNotes[bp.lessonId];
+              localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(allNotes));
+              if (notesStatus) notesStatus.textContent = 'ذخیره محلی (حالت آفلاین) ✓';
+            } catch (_) {
+              if (notesStatus) notesStatus.textContent = 'ذخیره محلی یادداشت در دسترس نیست.';
+            }
           }
-        }, 250);
+        }, 450);
       });
     }
 

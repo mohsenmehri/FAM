@@ -1,343 +1,343 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "ccde_12",
- "objectiveId": "ccde_12",
- "kind": "lesson",
- "track": "CCDE",
- "course": "ccde-design",
- "title": "۹.۱۲ CCDE — معماری مقیاس‌پذیری (Scalability): ۴ دیوار مقیاس، Scale-Out افقی و سلسله‌مراتب",
- "titleEn": "CCDE Topic 12: Scalability Architecture — 4 Scaling Walls, Horizontal Scale-Out, Hierarchy & Summarization",
- "domain": "Scalability & Modular Design",
- "source": "Legacy ccde_12 rewritten and expanded",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 50,
- "prerequisites": [
-  "ccde_01",
-  "ccde_04",
-  "ccde_11"
- ],
- "sections": [
-  {
-   "id": "ccde_12-section-1",
-   "title": "مسئله واقعی: چگونه شبکه‌ای بسازیم که اضافه کردن شعبه شماره ۲۰۱ یا رک شماره ۵۰۰ هیچ تغییری در هسته و سایت‌های قبلی نخواهد؟",
-   "html": "<p>تفاوت یک «شبکه کارا» با یک «معماری مقیاس‌پذیر» در این یک جمله خلاصه می‌شود: <strong>رشد خطی هزینه و پیچیدگی، نه رشد انفجاری درجه‌دو (<code>O(N²)</code>)!</strong> وقتی سازمانی با ۲۰۰ روتر بدون Route Reflector و بدون خلاصه‌سازی رشد می‌کند، تعداد نشست‌های iBGP به <strong>۱۹٬۹۰۰ نشست</strong> و جدول هسته به هزاران پیشوند نوسان‌دار منفجر می‌شود! معمار CCDE از روز اول ۴ دیوار مقیاس را می‌شناسد و با <strong>سلسله‌مراتب، خلاصه‌سازی، مقیاس افقی (Scale-Out) و الگوهای خودکار</strong> آن‌ها را می‌شکند.</p>"
-  },
-  {
-   "id": "ccde_12-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code>، <code>ccde_04</code> و <code>ccde_11</code>.</p><ul><li>شناسایی <strong>۴ دیوار مقیاس (4 Scaling Walls)</strong>: <strong>صفحه کنترل (O(N²) و SPF)</strong>، <strong>صفحه داده (FIB/TCAM)</strong>، <strong>محدودیت فیزیکی/شاسی</strong> و <strong>دیوار عملیاتی/انسانی</strong>.</li><li>مقایسه <strong>مقیاس عمودی (Scale-Up)</strong> در برابر <strong>مقیاس افقی (Scale-Out)</strong> از دید هزینه، سقف رشد و Blast Radius.</li><li>به‌کارگیری ابزارهای کلاسیک مقیاس کنترل‌پلین: <strong>Route Reflector، OSPF Areas / IS-IS Levels، BGP-LU Unified MPLS و خلاصه‌سازی در مرزها</strong>.</li><li>تبیین <strong>مقیاس‌پذیری عملیاتی (Operational Scalability)</strong> با قالب‌های استاندارد (Golden Templates) و ZTP.</li></ul>"
-  },
-  {
-   "id": "ccde_12-section-3",
-   "title": "چهار دیوار مقیاس‌پذیری (4 Scaling Walls) در شبکه‌های سازمانی و اپراتوری",
-   "html": "<ol><li><strong>دیوار صفحه کنترل (Control-Plane Wall):</strong> رشد درجه‌دو نشست‌های Full-Mesh (<code>N(N-1)/2</code> — روی ۲۰۰ روتر = ۱۹٬۹۰۰ نشست!) و بزرگ شدن پایگاه داده LSA/LSP در یک ناحیه IGP واحد.</li><li><strong>دیوار صفحه داده (Data-Plane Wall):</strong> سرریز جدول FIB/RIB/TCAM، جدول MAC/ARP یا جدول NAT/Session روی تجهیزات میانی و هسته.</li><li><strong>دیوار فیزیکی (Physical Wall):</strong> پر شدن اسلات‌های یک شاسی بزرگ (Scale-Up Ceiling)، محدودیت پورت Spine (Radix) و کمبود برق/کولینگ.</li><li><strong>دیوار عملیاتی (Operational Wall):</strong> تیمی که ۲۰۰ شعبه را با ۲۰۰ کانفیگ متفاوت و دستی مدیریت می‌کند، حتی اگر سخت‌افزار جا داشته باشد در شعبه ۲۰۱ام زیر بار خطای انسانی و MTTR متوقف می‌شود!</li></ol>"
-  },
-  {
-   "id": "ccde_12-section-4",
-   "title": "نمودار ۴ دیوار مقیاس و درمان CCDE (Route Reflector، Summarization و Scale-Out)",
-   "html": "<p>نمودار زیر کاهش ۵۰برابری نشست‌های iBGP و کاهش ۲۵برابری جدول هسته با سلسله‌مراتب و خلاصه‌سازی را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Scalability Architecture: 4 Scaling Walls and Horizontal Scale-Out via Hierarchy, RR and Summarization\"><rect x=\"14\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"190\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">4 Scaling Walls (Flat Design Hits!)</text><text x=\"190\" y=\"56\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">1. Control Plane: O(N^2) Mesh = 19,900 iBGP!</text><text x=\"190\" y=\"74\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">2. Data Plane: Unsummarized 5,000+ Core Routes</text><text x=\"190\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">3. Physical: Single Chassis Scale-Up Ceiling</text><text x=\"190\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">4. Operational: Manual CLI Cannot Scale 500 Sites</text><rect x=\"394\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"570\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">CCDE Scale-Out Cure (Linear Growth)</text><text x=\"570\" y=\"56\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">1. BGP Route Reflectors: 19,900 -&gt; 397 (50x Drop!)</text><text x=\"570\" y=\"74\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">2. Boundary Summarization: 5,000 -&gt; 200 Routes!</text><text x=\"570\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">3. Horizontal Modular Pods (Leaf/Spine/Super-Spine)</text><text x=\"570\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">4. ZTP + Standard Templates + Intent Automation</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">CCDE Scalability Golden Formula: Scale-Out Horizontally + Hierarchy + Summarization + Template Automation!</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Adding Site #201 Must NEVER Require Redesigning the Core or Reconfiguring Sites #1..#200</text></svg>"
-  },
-  {
-   "id": "ccde_12-section-5",
-   "title": "دوئل معماری: مقیاس عمودی (Vertical Scale-Up) در برابر مقیاس افقی (Horizontal Scale-Out)",
-   "html": "<table><thead><tr><th>معیار</th><th>Scale-Up (شاسی غول‌پیکر بزرگ‌تر)</th><th>Scale-Out (افزودن بلوک/Pod/Spine یکسان)</th></tr></thead><tbody><tr><td>سقف رشد</td><td>محدود به بزرگ‌ترین شاسی کارخانه (دیوار سخت!)</td><td><strong>تقریباً نامحدود (افزودن Pod و Leaf جدید)</strong></td></tr><tr><td>شعاع انفجار (Blast Radius)</td><td>بسیار عظیم (سوختن یک شاسی = سقوط بخش بزرگی از شبکه)</td><td><strong>کوچک و مهارشده درون یک بلوک/گره</strong></td></tr><tr><td>اقتصاد رشد</td><td>جهش‌های پرهزینه ناگهانی (Forklift)</td><td><strong>خطی و همگام با درآمد (Pay-as-You-Grow)</strong></td></tr></tbody></table>"
-  },
-  {
-   "id": "ccde_12-section-6",
-   "title": "شکستن دیوار O(N²) صفحه کنترل: Route Reflector، OSPF Areas و Unified MPLS",
-   "html": "<p>در شبکه‌ای با ۲۰۰ روتر، iBGP Full-Mesh نیازمند <code>200 × 199 / 2 = 19,900</code> نشست TCP است؛ اما تنها با افزودن یک جفت <strong>BGP Route Reflector</strong>، تعداد نشست‌ها به <strong>۳۹۷ نشست (کاهش ۵۰برابری!)</strong> سقوط می‌کند و افزودن روتر ۲۰۱ام فقط ۲ نشست جدید می‌خواهد (رشد <code>O(N)</code> خطی!). به‌طور مشابه، در OSPF/IS-IS شکستن ناحیه‌ها (Area/Level) و در مقیاس چند هزار روتر استفاده از <strong>Unified MPLS (BGP-LU)</strong> اندازه LSDB و محاسبات SPF را کوچک و سریع نگه می‌دارد.</p>"
-  },
-  {
-   "id": "ccde_12-section-7",
-   "title": "جادوی خلاصه‌سازی (Summarization) + پنهان‌سازی جزئیات (Information Hiding)",
-   "html": "<p>در علوم کامپیوتر و معماری شبکه، کلید مقیاس‌پذیری <strong>پنهان‌سازی جزئیات محلی (Abstraction / Information Hiding)</strong> است: هسته شبکه هیچ نیازی ندارد بداند در شعبه شماره ۷۴ دقیقاً کدام ۲۵ ساب‌نت کوچک Up یا Down هستند! با خلاصه‌سازی ۲۵ ساب‌نت هر سایت به یک پیشوند واحد در مرز، جدول ۲۰۰ سایت از <strong>۵٬۰۰۰ مسیر به ۲۰۰ مسیر (کاهش ۲۵برابری!)</strong> می‌رسد و نوسان داخلی هر سایت هرگز هسته را تکان نمی‌دهد.</p>"
-  },
-  {
-   "id": "ccde_12-section-8",
-   "title": "حفظ تقارن طراحی و الگوهای تکراری (Cookie-Cutter Modularity)",
-   "html": "<p>یکی از رازهای مقیاس ابرشرکت‌ها (Google، Meta، AWS) الگوی <strong>Cookie-Cutter Building Blocks</strong> است: به جای طراحی یک معماری اختصاصی و «هنری» برای هر دیتاسنتر یا شعبه، یک بلوک استاندارد (مثلاً یک Pod دقیقاً ۱٬۰۲۴سروری یا ۳ پروفایل شعبه) طراحی، آزمایش و تایید می‌شود و سپس دقیقاً همان بلوک ده‌ها بار تکرار (Clone) می‌گردد!</p>"
-  },
-  {
-   "id": "ccde_12-section-9",
-   "title": "مقیاس‌پذیری صفحه داده و تونل‌ها (از Static Full-Mesh VPN به Dynamic/Hub-Spoke)",
-   "html": "<p>وقتی تعداد شعب از ۲۰ به ۵۰۰ می‌رسد، نگهداری تونل‌های ایستا (Static IPsec Full-Mesh) روی روترهای لبه حافظه کلیدهای SA و CPU را می‌بلعد. راه‌حل مقیاس‌پذیر: <strong>Hub-and-Spoke منطقه‌ای</strong> یا تونل‌های <strong>پویای On-Demand</strong> (DMVPN Phase 3 / SD-WAN Dynamic Mesh) که فقط در لحظه نیاز واقعی بین دو شعبه ساخته شده و پس از اتمام ترافیک حذف می‌شوند.</p>"
-  },
-  {
-   "id": "ccde_12-section-10",
-   "title": "مقیاس‌پذیری عملیاتی: چرا بدون اتوماسیون و Source of Truth هیچ شبکه‌ای واقعاً مقیاس نمی‌گیرد؟",
-   "html": "<p>حتی با بهترین سخت‌افزار 5-Stage Clos و Route Reflector، اگر تیم شما هنوز با SSH دستی و فایل اکسل IPها را مدیریت کند، در مرز ۱۰۰–۲۰۰ تجهیز به <strong>دیوار عملیاتی</strong> می‌خورید! ترکیب <strong>Source of Truth (NetBox) + Golden Jinja2 Templates + ZTP + CI/CD</strong> تضمین می‌کند تیمی ۴نفره بتواند ۱٬۰۰۰ سایت را با همان کیفیت و امنیت ۱۰ سایت اداره کند.</p>"
-  },
-  {
-   "id": "ccde_12-section-11",
-   "title": "کژفهمی‌های رایج درباره Scalability",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای مقیاس دادن شبکه کافی است هر بار شاسی بزرگ‌تر و گران‌تری (Scale-Up) بخریم.»</strong> واقعیت: Scale-Up به سرعت به دیوار فیزیکی/مالی می‌خورد و یک تک‌نقطه خرابی غول‌پیکر می‌سازد؛ آینده مقیاس متعلق به <strong>Scale-Out افقی ماژولار</strong> است.</li><li><strong>کژفهمی ۲: «مقیاس‌پذیری فقط مربوط به سخت‌افزار و تعداد پورت است و ربطی به پروتکل‌ها و تیم عملیات ندارد.»</strong> واقعیت: رشد <code>O(N²)</code> نشست‌های BGP/تونل‌ها و پیچیدگی عملیاتی دستی خیلی پیش‌تر از پر شدن پورت‌ها شبکه را متوقف می‌کنند!</li><li><strong>کژفهمی ۳: «گذاشتن همه ۱٬۰۰۰ روتر در یک OSPF Area 0 شبکه را ساده‌تر و مقیاس‌پذیرتر می‌کند.»</strong> واقعیت: یک Area 0 عظیم بدون سلسله‌مراتب و خلاصه‌سازی دچار طوفان LSA و SPF مکرر می‌شود.</li></ul>"
-  },
-  {
-   "id": "ccde_12-section-12",
-   "title": "چک‌لیست پنج‌پرسشی مقیاس‌پذیری CCDE",
-   "html": "<ol><li>آیا رشد نشست‌های پروتکلی (BGP/VPN) از <code>O(N²)</code> به <strong><code>O(N)</code> خطی</strong> تبدیل شده است؟</li><li>آیا طرح آدرس‌دهی پیوسته امکان <strong>خلاصه‌سازی در مرزها</strong> را فراهم می‌کند؟</li><li>آیا مسیر رشد از طریق <strong>Scale-Out افقی ماژولار (Cookie-Cutter)</strong> بدون تغییر هسته طراحی شده است؟</li><li>آیا سقف جداول FIB/MAC/Session برای افق ۵ساله بررسی شده است؟</li><li>آیا <strong>الگوهای استاندارد و اتوماسیون ZTP</strong> برای شکستن دیوار عملیاتی دیده شده‌اند؟</li></ol>"
-  },
-  {
-   "id": "ccde_12-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> سازمانی ۲۰۰ روتر iBGP دارد که هر کدام ۲۵ ساب‌نت محلی دارند. با افزودن ۲ Route Reflector و خلاصه‌سازی مرزی، تعداد نشست‌های iBGP و تعداد مسیرهای هسته چه تغییری می‌کند؟ <strong>پاسخ:</strong> نشست‌های iBGP از <strong>۱۹٬۹۰۰ به ۳۹۷</strong> (کاهش ۵۰برابری!) و جدول مسیر هسته از <strong>۵٬۰۰۰ مسیر به ۲۰۰ مسیر</strong> (کاهش ۲۵برابری!) کاهش می‌یابد.</p><p><strong>تمرین ۲:</strong> چرا در دیتاسنترهای بزرگ، افزودن سوئیچ‌های Leaf/Spine هم‌اندازه (Scale-Out) بر خرید یک سوئیچ شاسی غول‌پیکر (Scale-Up) ارجح است؟ <strong>پاسخ:</strong> حذف سقف سخت شاسی، هزینه خطی Pay-as-You-Grow و نگه داشتن Blast Radius درون یک گره/Pod کوچک.</p>"
-  },
-  {
-   "id": "ccde_12-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc4456\" target=\"_blank\" rel=\"noopener\">RFC 4456 (BGP Route Reflection — Alternative to Full Mesh iBGP)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc7938\" target=\"_blank\" rel=\"noopener\">RFC 7938 (Horizontal Clos Scaling)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای مقایسه رشد <code>O(N²)</code> در برابر <code>O(N)</code> و خلاصه‌سازی است و به هیچ تجهیز زنده متصل نیست.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "Horizontal Scale-Out",
-   "fa": "مقیاس‌پذیری افقی ماژولار",
-   "simple": "افزودن بلوک‌ها/Podها/سوئیچ‌های یکسان و استاندارد برای رشد خطی بدون تغییر هسته."
-  },
-  {
-   "term": "Vertical Scale-Up",
-   "fa": "مقیاس‌پذیری عمودی با شاسی بزرگ‌تر",
-   "simple": "ارتقای یک تجهیز واحد به مدل بزرگ‌تر که به سرعت به دیوار فیزیکی و Blast Radius عظیم می‌خورد."
-  },
-  {
-   "term": "O(N^2) Full-Mesh Wall",
-   "fa": "دیوار رشد درجه‌دو نشست‌ها",
-   "simple": "انفجار تعداد نشست‌های iBGP یا تونل‌های VPN در شبکه مسطح با افزایش تعداد گره‌ها."
-  },
-  {
-   "term": "BGP Route Reflector (RR)",
-   "fa": "بازتاب‌دهنده مسیر BGP",
-   "simple": "شکستن الزام Full-Mesh iBGP و تبدیل رشد نشست‌ها از O(N^2) به O(N) خطی (RFC 4456)."
-  },
-  {
-   "term": "Information Hiding",
-   "fa": "پنهان‌سازی جزئیات محلی در مرزها",
-   "simple": "مخفی کردن ساب‌نت‌ها و نوسانات داخلی یک بلوک از هسته از طریق خلاصه‌سازی مسیر."
-  },
-  {
-   "term": "Cookie-Cutter Modularity",
-   "fa": "بلوک‌های تکرارشونده استاندارد",
-   "simple": "طراحی یک الگوی آزموده‌شده (Pod یا Branch Profile) و تکثیر دقیق آن بدون طراحی مجدد."
-  },
-  {
-   "term": "Operational Scalability",
-   "fa": "مقیاس‌پذیری عملیاتی و تیمی",
-   "simple": "توانایی یک تیم کوچک در مدیریت صدها/هزاران تجهیز با ZTP، Golden Templates و Source of Truth."
-  },
-  {
-   "term": "Hierarchy (Areas / Levels)",
-   "fa": "سلسله‌مراتب پروتکل‌های IGP",
-   "simple": "تقسیم دامنه مسیریابی به ناحیه‌های کوچک (OSPF Area / IS-IS Level) برای کنترل اندازه LSDB."
-  },
-  {
-   "term": "Dynamic On-Demand Tunnels",
-   "fa": "تونل‌های پویای درخواستی",
-   "simple": "ایجاد تونل مستقیم بین دو شعبه فقط در زمان نیاز واقعی جهت پیشگیری از انفجار SAهای ایستا."
-  },
-  {
-   "term": "Core RIB/FIB Reduction",
-   "fa": "کوچک‌سازی جدول مسیر هسته",
-   "simple": "کاهش چشمگیر مسیرهای هسته با خلاصه‌سازی پیوسته CIDR و BGP-Free Core."
-  },
-  {
-   "term": "4 Scaling Walls",
-   "fa": "چهار دیوار مقیاس CCDE",
-   "simple": "دیوار صفحه کنترل، دیوار صفحه داده، دیوار فیزیکی/شاسی و دیوار عملیاتی/انسانی."
-  },
-  {
-   "term": "Linear Growth Cost",
-   "fa": "رشد خطی هزینه و پیچیدگی",
-   "simple": "هدف نهایی معماری مقیاس‌پذیر: سایت جدید فقط به اندازه خودش هزینه و پیچیدگی اضافه کند."
-  },
-  {
-   "term": "Unified MPLS Scaling",
-   "fa": "مقیاس چندهزارروتری با BGP-LU",
-   "simple": "شکستن شبکه عظیم به دامنه‌های IGP مجزا و پیوند آن‌ها با BGP Labeled Unicast."
-  },
-  {
-   "term": "Stateful Table Exhaustion",
-   "fa": "سرریز جداول حالت‌مند (NAT/FW)",
-   "simple": "اتمام ظرفیت جدول نشست‌های فایروال یا CGNAT پیش از پر شدن پهنای باند لینک‌ها."
-  },
-  {
-   "term": "Template-Driven Deployment",
-   "fa": "استقرار مبتنی بر قالب استاندارد",
-   "simple": "تولید یکپارچه و بدون خطای کانفیگ سایت‌های جدید از روی مدل داده مرکزی."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (مدل مقایسه رشد O(N^2) مسطح در برابر سلسله‌مراتب Route Reflector و خلاصه‌سازی ۲۰۰ سایت) — بدون تجهیز واقعی",
-   "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر تولیدی زنده متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر تولیدی یا شبکه ۲۰۰سایتی زنده در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی به صورت عددی اثر شکستن دیوارهای مقیاس روی یک سازمان ۲۰۰‌سایتی را نشان می‌دهد: سقوط نشست‌های iBGP از <strong>۱۹٬۹۰۰ به ۳۹۷ (کاهش ۵۰٫۱ برابری)</strong> با ۲ Route Reflector، و سقوط جدول مسیر هسته از <strong>۵٬۰۰۰ مسیر به ۲۰۰ مسیر</strong> با خلاصه‌سازی در مرز سایت‌ها!</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_12_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_12_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_12 (CCDE Scalability Architecture: 4 Scaling Walls &amp; Scale-Out vs Scale-Up Modeler)\nModels how flat topology breaks the 4 CCDE scaling walls (Control Plane O(N^2) sessions, FIB/TCAM,\nSwitch Radix, Operational Complexity) with strict input validation on router/RR/site counts.\nNo real production network devices are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef _require_pos_int(val: object, name: str, minimum: int = 1) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or val &lt; minimum:\n        raise ValueError(f&quot;{name} must be an integer &gt;= {minimum}, got {val!r}&quot;)\n    return val\n\n\ndef ibgp_full_mesh_sessions(routers: int) -&gt; int:\n    n = _require_pos_int(routers, &quot;routers&quot;, minimum=1)\n    return n * (n - 1) // 2\n\n\ndef ibgp_rr_sessions(routers: int, route_reflectors: int = 2) -&gt; int:\n    n = _require_pos_int(routers, &quot;routers&quot;, minimum=1)\n    rr = _require_pos_int(route_reflectors, &quot;route_reflectors&quot;, minimum=1)\n    if rr &gt; n:\n        raise ValueError(f&quot;route_reflectors ({rr}) cannot exceed total routers ({n})&quot;)\n    clients = n - rr\n    return clients * rr + (rr * (rr - 1) // 2)\n\n\ndef evaluate_four_scaling_walls(routers: int, routes_per_site: int, sites: int, summarized: bool) -&gt; dict:\n    n = _require_pos_int(routers, &quot;routers&quot;, minimum=2)\n    rps = _require_pos_int(routes_per_site, &quot;routes_per_site&quot;, minimum=1)\n    st = _require_pos_int(sites, &quot;sites&quot;, minimum=1)\n    core_rib_entries = st if summarized else st * rps\n    fm = ibgp_full_mesh_sessions(n)\n    rr_cnt = min(2, n)\n    rr_sess = ibgp_rr_sessions(n, rr_cnt)\n    return {\n        &quot;sites&quot;: st,\n        &quot;summarized_at_boundaries&quot;: summarized,\n        &quot;core_rib_entries&quot;: core_rib_entries,\n        &quot;ibgp_sessions_flat_full_mesh&quot;: fm,\n        &quot;ibgp_sessions_with_rr&quot;: rr_sess,\n        &quot;session_reduction_ratio&quot;: round(fm / max(rr_sess, 1), 1),\n    }\n\n\ndef main() -&gt; None:\n    flat = evaluate_four_scaling_walls(routers=200, routes_per_site=25, sites=200, summarized=False)\n    hier = evaluate_four_scaling_walls(routers=200, routes_per_site=25, sites=200, summarized=True)\n    assert flat[&quot;core_rib_entries&quot;] == 5000 and hier[&quot;core_rib_entries&quot;] == 200\n    assert flat[&quot;ibgp_sessions_flat_full_mesh&quot;] == 19900\n    assert hier[&quot;ibgp_sessions_with_rr&quot;] == 397\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_SCALABILITY_MODELER&quot;,\n        &quot;flat_vs_hierarchical_200_routers&quot;: {\n            &quot;flat_unsummarized&quot;: flat,\n            &quot;hierarchical_summarized_rr&quot;: hier,\n        },\n        &quot;scale_up_vs_scale_out&quot;: {\n            &quot;vertical_scale_up&quot;: &quot;Bigger single chassis -&gt; hits hard physical/cost ceiling &amp; huge blast radius&quot;,\n            &quot;horizontal_scale_out&quot;: &quot;Add identical modular pods/spines/leafs -&gt; linear growth + bounded blast radius&quot;,\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>session_reduction_ratio: 50.1</code> و کاهش <code>core_rib_entries</code> از <code>5000</code> به <code>200</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>فرمول مرجع سنجش مقیاس‌پذیری در سند HLD (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference CCDE Scalability Formulas\n# Flat Full-Mesh Sessions : N * (N - 1) / 2   -&gt; O(N^2) Explodes!\n# Dual-RR Sessions        : 2 * (N - 2) + 1   -&gt; O(N)   Linear!\n# Goal: Site #201 adds +2 RR sessions &amp; +1 summary prefix ONLY.</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس معماری مقیاس‌پذیری (Scalability) در CCDE",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "چهار دیوار اصلی مقیاس‌پذیری (4 Scaling Walls) که یک طراحی تخت (Flat) در رشد بزرگ به آن‌ها برخورد می‌کند کدام‌اند؟",
-   "options": [
-    "دیوار صفحه کنترل (O(N²)/SPF)، دیوار صفحه داده (FIB/TCAM)، دیوار فیزیکی (Radix/شاسی) و دیوار عملیاتی (مدیریت دستی)",
-    "فقط طول کابل و رنگ رک",
-    "فقط سرعت اینترنت و DNS",
-    "فقط تعداد VLANهای یک سوئیچ"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>معمار CCDE هر ۴ بُعد کنترل‌پلین، دیتاپلین، فیزیکی و عملیاتی را هم‌زمان برای رشد ۵ساله مهندسی می‌کند.</p>"
-  },
-  {
-   "title": "در شبکه‌ای با ۲۰۰ روتر iBGP، افزودن ۲ Route Reflector تعداد نشست‌های iBGP را تقریباً از چند به چند کاهش می‌دهد؟",
-   "options": [
-    "از ۲۰۰ به ۱۰۰",
-    "از ۱۹٬۹۰۰ نشست (Full-Mesh O(N²)) به ۳۹۷ نشست (کاهش بیش از ۵۰ برابری!)",
-    "هیچ کاهشی ایجاد نمی‌کند",
-    "تعداد نشست‌ها را دو برابر می‌کند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p><code>200×199/2 = 19,900</code> در برابر <code>198×2 + 1 = 397</code> — قدرت تبدیل <code>O(N²)</code> به <code>O(N)</code> خطی!</p>"
-  },
-  {
-   "title": "چرا مقیاس افقی ماژولار (Horizontal Scale-Out) در دیتاسنترها و هسته‌های مدرن بر مقیاس عمودی (Vertical Scale-Up) ترجیح دارد؟",
-   "options": [
-    "زیرا Scale-Up به سرعت به سقف سخت شاسی و Blast Radius عظیم می‌خورد، اما Scale-Out با افزودن بلوک‌های استاندارد رشد خطی Pay-as-You-Grow و Blast Radius کوچک می‌دهد",
-    "زیرا Scale-Out هیچ کابلی نمی‌خواهد",
-    "زیرا Scale-Up از IPv4 پشتیبانی نمی‌کند",
-    "هیچ تفاوتی ندارند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>معماری‌های Clos و Pod-Based دقیقاً تجسم مهندسی Horizontal Scale-Out هستند.</p>"
-  },
-  {
-   "title": "مفهوم «پنهان‌سازی جزئیات (Information Hiding)» از طریق خلاصه‌سازی مسیر (Summarization) چگونه مقیاس شبکه را بالا می‌برد؟",
-   "options": [
-    "با حذف مسیرهای پیش‌فرض",
-    "با خلاصه کردن ساب‌نت‌های داخلی هر سایت به یک پیشوند واحد در مرز، که هم جدول هسته را کوچک می‌کند و هم نوسانات داخلی سایت را از هسته مخفی می‌سازد",
-    "با رمزنگاری نام روترها",
-    "با خاموش کردن IGP"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>خلاصه‌سازی در مرزها همزمان دیوار صفحه داده (اندازه FIB) و دیوار صفحه کنترل (نوسان SPF/BGP) را حل می‌کند.</p>"
-  },
-  {
-   "title": "مهم‌ترین نشانه یک معماری واقعاً مقیاس‌پذیر هنگام افزودن شعبه شماره ۲۰۱ یا Pod شماره ۱۰ چیست؟",
-   "options": [
-    "نیاز به بازطراحی هسته و تغییر کانفیگ ۲۰۰ سایت قبلی",
-    "افزودن سایت جدید بدون هیچ تغییر معماری در هسته و بدون دست زدن به ۲۰۰ سایت قبلی (تکرار الگوی استاندارد)",
-    "قطع کل شبکه برای ۲۴ ساعت",
-    "حذف BGP و رفتن به Static Route"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>استقلال بلوک‌ها و الگوهای Cookie-Cutter شرط اصلی رشد روان سازمانی است.</p>"
-  },
-  {
-   "title": "دیوار «مقیاس‌پذیری عملیاتی (Operational Scalability)» چگونه و با چه ابزارهایی شکسته می‌شود؟",
-   "options": [
-    "با استخدام ۱۰۰ مهندس برای کپی-پیست دستی CLI",
-    "با استانداردسازی الگوهای بلوکی (Golden Templates)، منبع واحد حقیقت (Source of Truth)، راه‌اندازی صفرلمس (ZTP) و اتوماسیون CI/CD",
-    "با حذف مستندات و مانیتورینگ",
-    "فقط با خرید روتر سریع‌تر"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>بدون اتوماسیون و استانداردسازی قالب‌ها، پیچیدگی عملیاتی سریع‌ترین ترمز رشد سازمان است.</p>"
-  },
-  {
-   "title": "چرا در سازمانی با ۵۰۰ شعبه، استفاده از تونل‌های IPsec ایستا به شکل Full-Mesh شکست می‌خورد و راه‌حل مقیاس‌پذیر آن چیست؟",
-   "options": [
-    "زیرا تعداد تونل‌ها به بیش از ۱۲۴٬۰۰۰ می‌رسد و حافظه SA روترها منفجر می‌شود؛ راه‌حل Hub-and-Spoke منطقه‌ای یا تونل‌های پویای On-Demand (SD-WAN / DMVPN Phase 3) است",
-    "زیرا IPsec فقط ۲ تونل پشتیبانی می‌کند",
-    "زیرا اینترنت قطع می‌شود",
-    "هیچ مشکلی ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>تونل‌های پویای On-Demand تنها برای جفت شعب دارای ترافیک فعال ساخته می‌شوند و حافظه لبه را سبک نگه می‌دارند.</p>"
-  },
-  {
-   "title": "الگوی طراحی «Cookie-Cutter Modularity» در ابرشرکت‌ها به چه معناست؟",
-   "options": [
-    "طراحی یک ساختار کاملاً منحصربه‌فرد و متفاوت برای هر دیتاسنتر",
-    "طراحی و تایید یک بلوک استاندارد واحد (مثلاً یک Pod یکسان) و تکثیر دقیق آن ده‌ها بار برای کاهش هزینه طراحی، باگ و MTTR",
-    "کاهش امنیت در بلوک‌های جدید",
-    "استفاده از سخت‌افزارهای نامتجانس"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>یکنواختی بلوک‌ها کلید نگهداری سریع و اتوماسیون بی‌نقص در مقیاس هزاران تجهیز است.</p>"
-  },
-  {
-   "title": "اگر ۲۰۰ سایت هر کدام ۲۵ ساب‌نت /24 پیوسته داشته باشند و در مرز خلاصه شوند، جدول هسته از چند مسیر به چند مسیر کاهش می‌یابد؟",
-   "options": [
-    "از ۵٬۰۰۰ مسیر به ۲۰۰ مسیر (کاهش ۲۵ برابری)",
-    "از ۲۰۰ به ۵٬۰۰۰ مسیر",
-    "به ۱ مسیر واحد برای همه سایت‌ها",
-    "تغییری نمی‌کند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>هر سایت به جای ۲۵ پیشوند مجزا، تنها یک پیشوند خلاصه‌شده پیوسته به هسته معرفی می‌کند.</p>"
-  },
-  {
-   "title": "کدام پروتکل/معماری اجازه می‌دهد شبکه‌ای با ۱۰٬۰۰۰ روتر بدون ایجاد یک دامنه IGP غول‌پیکر و کند، LSP سرتاسری داشته باشد؟",
-   "options": [
-    "OSPF Area 0 واحد بدون Area دیگر",
-    "Unified MPLS / Seamless MPLS با استفاده از دامنه‌های IGP مجزا و اتصال آن‌ها با BGP-LU",
-    "RIPv2 سراسری",
-    "Spanning Tree سراسری"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>Unified MPLS با محدود نگه داشتن هر دامنه IGP به چند صد گره، مقیاس ده‌هزارروتری را ممکن می‌سازد.</p>"
-  },
-  {
-   "title": "چرا در طراحی مقیاس‌پذیر، باید جداول حالت‌مند (Stateful Tables مثل NAT/CGNAT و Firewall Sessions) نیز در تحلیل مقیاس لحاظ شوند؟",
-   "options": [
-    "زیرا اتمام ظرفیت جدول Session/NAT می‌تواند بسیار پیش‌تر از پر شدن پهنای باند لینک، کل ترافیک جدید کاربران را مسدود کند",
-    "زیرا فایروال جدول Session ندارد",
-    "فقط پهنای باند مهم است",
-    "جداول حالت‌مند نامحدودند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>دیوار صفحه داده شامل تمام جداول سخت‌افزاری و حالت‌مند (FIB، TCAM، NAT، FW Session) است.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "ایجاد زنده ۱۹٬۹۰۰ نشست BGP روی ۲۰۰ روتر واقعی",
-    "فقط متن نظری بدون کد",
-    "مدل‌سازی محلی (Local Mock) در Python 3 برای مقایسه رشد O(N²) مسطح در برابر Route Reflector و خلاصه‌سازی مرزی ۲۰۰ سایت",
-    "اتصال به دیتاسنتر AWS"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ روتر تولیدی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.6",
-  "legacyId": "ccde_12",
-  "sources": [
-   "https://www.rfc-editor.org/rfc/rfc4456",
-   "https://www.rfc-editor.org/rfc/rfc7938"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccde_12",
+  "objectiveId": "ccde_12",
+  "kind": "lesson",
+  "track": "CCDE",
+  "course": "ccde-design",
+  "title": "۹.۱۲ CCDE — معماری مقیاس‌پذیری (Scalability): ۴ دیوار مقیاس، Scale-Out افقی و سلسله‌مراتب",
+  "titleEn": "CCDE Topic 12: Scalability Architecture — 4 Scaling Walls, Horizontal Scale-Out, Hierarchy & Summarization",
+  "domain": "Scalability & Modular Design",
+  "source": "Legacy ccde_12 rewritten and expanded",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 50,
+  "prerequisites": [
+    "ccde_01",
+    "ccde_04",
+    "ccde_11"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ روتر تولیدی زنده متصل نیست."
+  "sections": [
+    {
+      "id": "ccde_12-section-1",
+      "title": "مسئله واقعی: چگونه شبکه‌ای بسازیم که اضافه کردن شعبه شماره ۲۰۱ یا رک شماره ۵۰۰ هیچ تغییری در هسته و سایت‌های قبلی نخواهد؟",
+      "html": "<p>تفاوت یک «شبکه کارا» با یک «معماری مقیاس‌پذیر» در این یک جمله خلاصه می‌شود: <strong>رشد خطی هزینه و پیچیدگی، نه رشد انفجاری درجه‌دو (<code>O(N²)</code>)!</strong> وقتی سازمانی با ۲۰۰ روتر بدون Route Reflector و بدون خلاصه‌سازی رشد می‌کند، تعداد نشست‌های iBGP به <strong>۱۹٬۹۰۰ نشست</strong> و جدول هسته به هزاران پیشوند نوسان‌دار منفجر می‌شود! معمار CCDE از روز اول ۴ دیوار مقیاس را می‌شناسد و با <strong>سلسله‌مراتب، خلاصه‌سازی، مقیاس افقی (Scale-Out) و الگوهای خودکار</strong> آن‌ها را می‌شکند.</p>"
+    },
+    {
+      "id": "ccde_12-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code>، <code>ccde_04</code> و <code>ccde_11</code>.</p><ul><li>شناسایی <strong>۴ دیوار مقیاس (4 Scaling Walls)</strong>: <strong>صفحه کنترل (O(N²) و SPF)</strong>، <strong>صفحه داده (FIB/TCAM)</strong>، <strong>محدودیت فیزیکی/شاسی</strong> و <strong>دیوار عملیاتی/انسانی</strong>.</li><li>مقایسه <strong>مقیاس عمودی (Scale-Up)</strong> در برابر <strong>مقیاس افقی (Scale-Out)</strong> از دید هزینه، سقف رشد و Blast Radius.</li><li>به‌کارگیری ابزارهای کلاسیک مقیاس کنترل‌پلین: <strong>Route Reflector، OSPF Areas / IS-IS Levels، BGP-LU Unified MPLS و خلاصه‌سازی در مرزها</strong>.</li><li>تبیین <strong>مقیاس‌پذیری عملیاتی (Operational Scalability)</strong> با قالب‌های استاندارد (Golden Templates) و ZTP.</li></ul>"
+    },
+    {
+      "id": "ccde_12-section-3",
+      "title": "چهار دیوار مقیاس‌پذیری (4 Scaling Walls) در شبکه‌های سازمانی و اپراتوری",
+      "html": "<ol><li><strong>دیوار صفحه کنترل (Control-Plane Wall):</strong> رشد درجه‌دو نشست‌های Full-Mesh (<code>N(N-1)/2</code> — روی ۲۰۰ روتر = ۱۹٬۹۰۰ نشست!) و بزرگ شدن پایگاه داده LSA/LSP در یک ناحیه IGP واحد.</li><li><strong>دیوار صفحه داده (Data-Plane Wall):</strong> سرریز جدول FIB/RIB/TCAM، جدول MAC/ARP یا جدول NAT/Session روی تجهیزات میانی و هسته.</li><li><strong>دیوار فیزیکی (Physical Wall):</strong> پر شدن اسلات‌های یک شاسی بزرگ (Scale-Up Ceiling)، محدودیت پورت Spine (Radix) و کمبود برق/کولینگ.</li><li><strong>دیوار عملیاتی (Operational Wall):</strong> تیمی که ۲۰۰ شعبه را با ۲۰۰ کانفیگ متفاوت و دستی مدیریت می‌کند، حتی اگر سخت‌افزار جا داشته باشد در شعبه ۲۰۱ام زیر بار خطای انسانی و MTTR متوقف می‌شود!</li></ol>"
+    },
+    {
+      "id": "ccde_12-section-4",
+      "title": "نمودار ۴ دیوار مقیاس و درمان CCDE (Route Reflector، Summarization و Scale-Out)",
+      "html": "<p>نمودار زیر کاهش ۵۰برابری نشست‌های iBGP و کاهش ۲۵برابری جدول هسته با سلسله‌مراتب و خلاصه‌سازی را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Scalability Architecture: 4 Scaling Walls and Horizontal Scale-Out via Hierarchy, RR and Summarization\"><rect x=\"14\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"190\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">4 Scaling Walls (Flat Design Hits!)</text><text x=\"190\" y=\"56\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">1. Control Plane: O(N^2) Mesh = 19,900 iBGP!</text><text x=\"190\" y=\"74\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">2. Data Plane: Unsummarized 5,000+ Core Routes</text><text x=\"190\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">3. Physical: Single Chassis Scale-Up Ceiling</text><text x=\"190\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#991b1b\">4. Operational: Manual CLI Cannot Scale 500 Sites</text><rect x=\"394\" y=\"14\" width=\"352\" height=\"116\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"570\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">CCDE Scale-Out Cure (Linear Growth)</text><text x=\"570\" y=\"56\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">1. BGP Route Reflectors: 19,900 -&gt; 397 (50x Drop!)</text><text x=\"570\" y=\"74\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">2. Boundary Summarization: 5,000 -&gt; 200 Routes!</text><text x=\"570\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">3. Horizontal Modular Pods (Leaf/Spine/Super-Spine)</text><text x=\"570\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">4. ZTP + Standard Templates + Intent Automation</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">CCDE Scalability Golden Formula: Scale-Out Horizontally + Hierarchy + Summarization + Template Automation!</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Adding Site #201 Must NEVER Require Redesigning the Core or Reconfiguring Sites #1..#200</text></svg>"
+    },
+    {
+      "id": "ccde_12-section-5",
+      "title": "دوئل معماری: مقیاس عمودی (Vertical Scale-Up) در برابر مقیاس افقی (Horizontal Scale-Out)",
+      "html": "<table><thead><tr><th>معیار</th><th>Scale-Up (شاسی غول‌پیکر بزرگ‌تر)</th><th>Scale-Out (افزودن بلوک/Pod/Spine یکسان)</th></tr></thead><tbody><tr><td>سقف رشد</td><td>محدود به بزرگ‌ترین شاسی کارخانه (دیوار سخت!)</td><td><strong>تقریباً نامحدود (افزودن Pod و Leaf جدید)</strong></td></tr><tr><td>شعاع انفجار (Blast Radius)</td><td>بسیار عظیم (سوختن یک شاسی = سقوط بخش بزرگی از شبکه)</td><td><strong>کوچک و مهارشده درون یک بلوک/گره</strong></td></tr><tr><td>اقتصاد رشد</td><td>جهش‌های پرهزینه ناگهانی (Forklift)</td><td><strong>خطی و همگام با درآمد (Pay-as-You-Grow)</strong></td></tr></tbody></table>"
+    },
+    {
+      "id": "ccde_12-section-6",
+      "title": "شکستن دیوار O(N²) صفحه کنترل: Route Reflector، OSPF Areas و Unified MPLS",
+      "html": "<p>در شبکه‌ای با ۲۰۰ روتر، iBGP Full-Mesh نیازمند <code>200 × 199 / 2 = 19,900</code> نشست TCP است؛ اما تنها با افزودن یک جفت <strong>BGP Route Reflector</strong>، تعداد نشست‌ها به <strong>۳۹۷ نشست (کاهش ۵۰برابری!)</strong> سقوط می‌کند و افزودن روتر ۲۰۱ام فقط ۲ نشست جدید می‌خواهد (رشد <code>O(N)</code> خطی!). به‌طور مشابه، در OSPF/IS-IS شکستن ناحیه‌ها (Area/Level) و در مقیاس چند هزار روتر استفاده از <strong>Unified MPLS (BGP-LU)</strong> اندازه LSDB و محاسبات SPF را کوچک و سریع نگه می‌دارد.</p>"
+    },
+    {
+      "id": "ccde_12-section-7",
+      "title": "جادوی خلاصه‌سازی (Summarization) + پنهان‌سازی جزئیات (Information Hiding)",
+      "html": "<p>در علوم کامپیوتر و معماری شبکه، کلید مقیاس‌پذیری <strong>پنهان‌سازی جزئیات محلی (Abstraction / Information Hiding)</strong> است: هسته شبکه هیچ نیازی ندارد بداند در شعبه شماره ۷۴ دقیقاً کدام ۲۵ ساب‌نت کوچک Up یا Down هستند! با خلاصه‌سازی ۲۵ ساب‌نت هر سایت به یک پیشوند واحد در مرز، جدول ۲۰۰ سایت از <strong>۵٬۰۰۰ مسیر به ۲۰۰ مسیر (کاهش ۲۵برابری!)</strong> می‌رسد و نوسان داخلی هر سایت هرگز هسته را تکان نمی‌دهد.</p>"
+    },
+    {
+      "id": "ccde_12-section-8",
+      "title": "حفظ تقارن طراحی و الگوهای تکراری (Cookie-Cutter Modularity)",
+      "html": "<p>یکی از رازهای مقیاس ابرشرکت‌ها (Google، Meta، AWS) الگوی <strong>Cookie-Cutter Building Blocks</strong> است: به جای طراحی یک معماری اختصاصی و «هنری» برای هر دیتاسنتر یا شعبه، یک بلوک استاندارد (مثلاً یک Pod دقیقاً ۱٬۰۲۴سروری یا ۳ پروفایل شعبه) طراحی، آزمایش و تایید می‌شود و سپس دقیقاً همان بلوک ده‌ها بار تکرار (Clone) می‌گردد!</p>"
+    },
+    {
+      "id": "ccde_12-section-9",
+      "title": "مقیاس‌پذیری صفحه داده و تونل‌ها (از Static Full-Mesh VPN به Dynamic/Hub-Spoke)",
+      "html": "<p>وقتی تعداد شعب از ۲۰ به ۵۰۰ می‌رسد، نگهداری تونل‌های ایستا (Static IPsec Full-Mesh) روی روترهای لبه حافظه کلیدهای SA و CPU را می‌بلعد. راه‌حل مقیاس‌پذیر: <strong>Hub-and-Spoke منطقه‌ای</strong> یا تونل‌های <strong>پویای On-Demand</strong> (DMVPN Phase 3 / SD-WAN Dynamic Mesh) که فقط در لحظه نیاز واقعی بین دو شعبه ساخته شده و پس از اتمام ترافیک حذف می‌شوند.</p>"
+    },
+    {
+      "id": "ccde_12-section-10",
+      "title": "مقیاس‌پذیری عملیاتی: چرا بدون اتوماسیون و Source of Truth هیچ شبکه‌ای واقعاً مقیاس نمی‌گیرد؟",
+      "html": "<p>حتی با بهترین سخت‌افزار 5-Stage Clos و Route Reflector، اگر تیم شما هنوز با SSH دستی و فایل اکسل IPها را مدیریت کند، در مرز ۱۰۰–۲۰۰ تجهیز به <strong>دیوار عملیاتی</strong> می‌خورید! ترکیب <strong>Source of Truth (NetBox) + Golden Jinja2 Templates + ZTP + CI/CD</strong> تضمین می‌کند تیمی ۴نفره بتواند ۱٬۰۰۰ سایت را با همان کیفیت و امنیت ۱۰ سایت اداره کند.</p>"
+    },
+    {
+      "id": "ccde_12-section-11",
+      "title": "کژفهمی‌های رایج درباره Scalability",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای مقیاس دادن شبکه کافی است هر بار شاسی بزرگ‌تر و گران‌تری (Scale-Up) بخریم.»</strong> واقعیت: Scale-Up به سرعت به دیوار فیزیکی/مالی می‌خورد و یک تک‌نقطه خرابی غول‌پیکر می‌سازد؛ آینده مقیاس متعلق به <strong>Scale-Out افقی ماژولار</strong> است.</li><li><strong>کژفهمی ۲: «مقیاس‌پذیری فقط مربوط به سخت‌افزار و تعداد پورت است و ربطی به پروتکل‌ها و تیم عملیات ندارد.»</strong> واقعیت: رشد <code>O(N²)</code> نشست‌های BGP/تونل‌ها و پیچیدگی عملیاتی دستی خیلی پیش‌تر از پر شدن پورت‌ها شبکه را متوقف می‌کنند!</li><li><strong>کژفهمی ۳: «گذاشتن همه ۱٬۰۰۰ روتر در یک OSPF Area 0 شبکه را ساده‌تر و مقیاس‌پذیرتر می‌کند.»</strong> واقعیت: یک Area 0 عظیم بدون سلسله‌مراتب و خلاصه‌سازی دچار طوفان LSA و SPF مکرر می‌شود.</li></ul>"
+    },
+    {
+      "id": "ccde_12-section-12",
+      "title": "چک‌لیست پنج‌پرسشی مقیاس‌پذیری CCDE",
+      "html": "<ol><li>آیا رشد نشست‌های پروتکلی (BGP/VPN) از <code>O(N²)</code> به <strong><code>O(N)</code> خطی</strong> تبدیل شده است؟</li><li>آیا طرح آدرس‌دهی پیوسته امکان <strong>خلاصه‌سازی در مرزها</strong> را فراهم می‌کند؟</li><li>آیا مسیر رشد از طریق <strong>Scale-Out افقی ماژولار (Cookie-Cutter)</strong> بدون تغییر هسته طراحی شده است؟</li><li>آیا سقف جداول FIB/MAC/Session برای افق ۵ساله بررسی شده است؟</li><li>آیا <strong>الگوهای استاندارد و اتوماسیون ZTP</strong> برای شکستن دیوار عملیاتی دیده شده‌اند؟</li></ol>"
+    },
+    {
+      "id": "ccde_12-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> سازمانی ۲۰۰ روتر iBGP دارد که هر کدام ۲۵ ساب‌نت محلی دارند. با افزودن ۲ Route Reflector و خلاصه‌سازی مرزی، تعداد نشست‌های iBGP و تعداد مسیرهای هسته چه تغییری می‌کند؟ <strong>پاسخ:</strong> نشست‌های iBGP از <strong>۱۹٬۹۰۰ به ۳۹۷</strong> (کاهش ۵۰برابری!) و جدول مسیر هسته از <strong>۵٬۰۰۰ مسیر به ۲۰۰ مسیر</strong> (کاهش ۲۵برابری!) کاهش می‌یابد.</p><p><strong>تمرین ۲:</strong> چرا در دیتاسنترهای بزرگ، افزودن سوئیچ‌های Leaf/Spine هم‌اندازه (Scale-Out) بر خرید یک سوئیچ شاسی غول‌پیکر (Scale-Up) ارجح است؟ <strong>پاسخ:</strong> حذف سقف سخت شاسی، هزینه خطی Pay-as-You-Grow و نگه داشتن Blast Radius درون یک گره/Pod کوچک.</p>"
+    },
+    {
+      "id": "ccde_12-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc4456\" target=\"_blank\" rel=\"noopener\">RFC 4456 (BGP Route Reflection — Alternative to Full Mesh iBGP)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc7938\" target=\"_blank\" rel=\"noopener\">RFC 7938 (Horizontal Clos Scaling)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای مقایسه رشد <code>O(N²)</code> در برابر <code>O(N)</code> و خلاصه‌سازی است و به هیچ تجهیز زنده متصل نیست.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش نسخه قدیمی (۱ پرسش) به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Cookie-Cutter Modularity، Operational Scalability و مدل‌ساز O(N^2)/RR."
+  "glossary": [
+    {
+      "term": "Horizontal Scale-Out",
+      "fa": "مقیاس‌پذیری افقی ماژولار",
+      "simple": "افزودن بلوک‌ها/Podها/سوئیچ‌های یکسان و استاندارد برای رشد خطی بدون تغییر هسته."
+    },
+    {
+      "term": "Vertical Scale-Up",
+      "fa": "مقیاس‌پذیری عمودی با شاسی بزرگ‌تر",
+      "simple": "ارتقای یک تجهیز واحد به مدل بزرگ‌تر که به سرعت به دیوار فیزیکی و Blast Radius عظیم می‌خورد."
+    },
+    {
+      "term": "O(N^2) Full-Mesh Wall",
+      "fa": "دیوار رشد درجه‌دو نشست‌ها",
+      "simple": "انفجار تعداد نشست‌های iBGP یا تونل‌های VPN در شبکه مسطح با افزایش تعداد گره‌ها."
+    },
+    {
+      "term": "BGP Route Reflector (RR)",
+      "fa": "بازتاب‌دهنده مسیر BGP",
+      "simple": "شکستن الزام Full-Mesh iBGP و تبدیل رشد نشست‌ها از O(N^2) به O(N) خطی (RFC 4456)."
+    },
+    {
+      "term": "Information Hiding",
+      "fa": "پنهان‌سازی جزئیات محلی در مرزها",
+      "simple": "مخفی کردن ساب‌نت‌ها و نوسانات داخلی یک بلوک از هسته از طریق خلاصه‌سازی مسیر."
+    },
+    {
+      "term": "Cookie-Cutter Modularity",
+      "fa": "بلوک‌های تکرارشونده استاندارد",
+      "simple": "طراحی یک الگوی آزموده‌شده (Pod یا Branch Profile) و تکثیر دقیق آن بدون طراحی مجدد."
+    },
+    {
+      "term": "Operational Scalability",
+      "fa": "مقیاس‌پذیری عملیاتی و تیمی",
+      "simple": "توانایی یک تیم کوچک در مدیریت صدها/هزاران تجهیز با ZTP، Golden Templates و Source of Truth."
+    },
+    {
+      "term": "Hierarchy (Areas / Levels)",
+      "fa": "سلسله‌مراتب پروتکل‌های IGP",
+      "simple": "تقسیم دامنه مسیریابی به ناحیه‌های کوچک (OSPF Area / IS-IS Level) برای کنترل اندازه LSDB."
+    },
+    {
+      "term": "Dynamic On-Demand Tunnels",
+      "fa": "تونل‌های پویای درخواستی",
+      "simple": "ایجاد تونل مستقیم بین دو شعبه فقط در زمان نیاز واقعی جهت پیشگیری از انفجار SAهای ایستا."
+    },
+    {
+      "term": "Core RIB/FIB Reduction",
+      "fa": "کوچک‌سازی جدول مسیر هسته",
+      "simple": "کاهش چشمگیر مسیرهای هسته با خلاصه‌سازی پیوسته CIDR و BGP-Free Core."
+    },
+    {
+      "term": "4 Scaling Walls",
+      "fa": "چهار دیوار مقیاس CCDE",
+      "simple": "دیوار صفحه کنترل، دیوار صفحه داده، دیوار فیزیکی/شاسی و دیوار عملیاتی/انسانی."
+    },
+    {
+      "term": "Linear Growth Cost",
+      "fa": "رشد خطی هزینه و پیچیدگی",
+      "simple": "هدف نهایی معماری مقیاس‌پذیر: سایت جدید فقط به اندازه خودش هزینه و پیچیدگی اضافه کند."
+    },
+    {
+      "term": "Unified MPLS Scaling",
+      "fa": "مقیاس چندهزارروتری با BGP-LU",
+      "simple": "شکستن شبکه عظیم به دامنه‌های IGP مجزا و پیوند آن‌ها با BGP Labeled Unicast."
+    },
+    {
+      "term": "Stateful Table Exhaustion",
+      "fa": "سرریز جداول حالت‌مند (NAT/FW)",
+      "simple": "اتمام ظرفیت جدول نشست‌های فایروال یا CGNAT پیش از پر شدن پهنای باند لینک‌ها."
+    },
+    {
+      "term": "Template-Driven Deployment",
+      "fa": "استقرار مبتنی بر قالب استاندارد",
+      "simple": "تولید یکپارچه و بدون خطای کانفیگ سایت‌های جدید از روی مدل داده مرکزی."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/ccde_12-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (مدل مقایسه رشد O(N^2) مسطح در برابر سلسله‌مراتب Route Reflector و خلاصه‌سازی ۲۰۰ سایت) — بدون تجهیز واقعی",
+      "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر تولیدی زنده متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر تولیدی یا شبکه ۲۰۰سایتی زنده در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی به صورت عددی اثر شکستن دیوارهای مقیاس روی یک سازمان ۲۰۰‌سایتی را نشان می‌دهد: سقوط نشست‌های iBGP از <strong>۱۹٬۹۰۰ به ۳۹۷ (کاهش ۵۰٫۱ برابری)</strong> با ۲ Route Reflector، و سقوط جدول مسیر هسته از <strong>۵٬۰۰۰ مسیر به ۲۰۰ مسیر</strong> با خلاصه‌سازی در مرز سایت‌ها!</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_12_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_12_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_12 (CCDE Scalability Architecture: 4 Scaling Walls &amp; Scale-Out vs Scale-Up Modeler)\nModels how flat topology breaks the 4 CCDE scaling walls (Control Plane O(N^2) sessions, FIB/TCAM,\nSwitch Radix, Operational Complexity) with strict input validation on router/RR/site counts.\nNo real production network devices are connected.\n&quot;&quot;&quot;\n\nimport json\n\n\ndef _require_pos_int(val: object, name: str, minimum: int = 1) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or val &lt; minimum:\n        raise ValueError(f&quot;{name} must be an integer &gt;= {minimum}, got {val!r}&quot;)\n    return val\n\n\ndef ibgp_full_mesh_sessions(routers: int) -&gt; int:\n    n = _require_pos_int(routers, &quot;routers&quot;, minimum=1)\n    return n * (n - 1) // 2\n\n\ndef ibgp_rr_sessions(routers: int, route_reflectors: int = 2) -&gt; int:\n    n = _require_pos_int(routers, &quot;routers&quot;, minimum=1)\n    rr = _require_pos_int(route_reflectors, &quot;route_reflectors&quot;, minimum=1)\n    if rr &gt; n:\n        raise ValueError(f&quot;route_reflectors ({rr}) cannot exceed total routers ({n})&quot;)\n    clients = n - rr\n    return clients * rr + (rr * (rr - 1) // 2)\n\n\ndef evaluate_four_scaling_walls(routers: int, routes_per_site: int, sites: int, summarized: bool) -&gt; dict:\n    n = _require_pos_int(routers, &quot;routers&quot;, minimum=2)\n    rps = _require_pos_int(routes_per_site, &quot;routes_per_site&quot;, minimum=1)\n    st = _require_pos_int(sites, &quot;sites&quot;, minimum=1)\n    core_rib_entries = st if summarized else st * rps\n    fm = ibgp_full_mesh_sessions(n)\n    rr_cnt = min(2, n)\n    rr_sess = ibgp_rr_sessions(n, rr_cnt)\n    return {\n        &quot;sites&quot;: st,\n        &quot;summarized_at_boundaries&quot;: summarized,\n        &quot;core_rib_entries&quot;: core_rib_entries,\n        &quot;ibgp_sessions_flat_full_mesh&quot;: fm,\n        &quot;ibgp_sessions_with_rr&quot;: rr_sess,\n        &quot;session_reduction_ratio&quot;: round(fm / max(rr_sess, 1), 1),\n    }\n\n\ndef main() -&gt; None:\n    flat = evaluate_four_scaling_walls(routers=200, routes_per_site=25, sites=200, summarized=False)\n    hier = evaluate_four_scaling_walls(routers=200, routes_per_site=25, sites=200, summarized=True)\n    assert flat[&quot;core_rib_entries&quot;] == 5000 and hier[&quot;core_rib_entries&quot;] == 200\n    assert flat[&quot;ibgp_sessions_flat_full_mesh&quot;] == 19900\n    assert hier[&quot;ibgp_sessions_with_rr&quot;] == 397\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_SCALABILITY_MODELER&quot;,\n        &quot;flat_vs_hierarchical_200_routers&quot;: {\n            &quot;flat_unsummarized&quot;: flat,\n            &quot;hierarchical_summarized_rr&quot;: hier,\n        },\n        &quot;scale_up_vs_scale_out&quot;: {\n            &quot;vertical_scale_up&quot;: &quot;Bigger single chassis -&gt; hits hard physical/cost ceiling &amp; huge blast radius&quot;,\n            &quot;horizontal_scale_out&quot;: &quot;Add identical modular pods/spines/leafs -&gt; linear growth + bounded blast radius&quot;,\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>session_reduction_ratio: 50.1</code> و کاهش <code>core_rib_entries</code> از <code>5000</code> به <code>200</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>فرمول مرجع سنجش مقیاس‌پذیری در سند HLD (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference CCDE Scalability Formulas\n# Flat Full-Mesh Sessions : N * (N - 1) / 2   -&gt; O(N^2) Explodes!\n# Dual-RR Sessions        : 2 * (N - 2) + 1   -&gt; O(N)   Linear!\n# Goal: Site #201 adds +2 RR sessions &amp; +1 summary prefix ONLY.</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس معماری مقیاس‌پذیری (Scalability) در CCDE",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-ccde",
-   "recommendedCourse": "ccde-design",
-   "blueprint": "/academy-assets/v5/blueprints/ccde_12.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_12_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۶: افزودن اعتبارسنجی ورودی (routers، route_reflectors <= routers، routes_per_site و sites مثبت) و assertها در ccde_12_lab.py."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "چهار دیوار اصلی مقیاس‌پذیری (4 Scaling Walls) که یک طراحی تخت (Flat) در رشد بزرگ به آن‌ها برخورد می‌کند کدام‌اند؟",
+      "options": [
+        "دیوار صفحه کنترل (O(N²)/SPF)، دیوار صفحه داده (FIB/TCAM)، دیوار فیزیکی (Radix/شاسی) و دیوار عملیاتی (مدیریت دستی)",
+        "فقط طول کابل و رنگ رک",
+        "فقط سرعت اینترنت و DNS",
+        "فقط تعداد VLANهای یک سوئیچ"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>معمار CCDE هر ۴ بُعد کنترل‌پلین، دیتاپلین، فیزیکی و عملیاتی را هم‌زمان برای رشد ۵ساله مهندسی می‌کند.</p>"
+    },
+    {
+      "title": "در شبکه‌ای با ۲۰۰ روتر iBGP، افزودن ۲ Route Reflector تعداد نشست‌های iBGP را تقریباً از چند به چند کاهش می‌دهد؟",
+      "options": [
+        "از ۲۰۰ به ۱۰۰",
+        "از ۱۹٬۹۰۰ نشست (Full-Mesh O(N²)) به ۳۹۷ نشست (کاهش بیش از ۵۰ برابری!)",
+        "هیچ کاهشی ایجاد نمی‌کند",
+        "تعداد نشست‌ها را دو برابر می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>200×199/2 = 19,900</code> در برابر <code>198×2 + 1 = 397</code> — قدرت تبدیل <code>O(N²)</code> به <code>O(N)</code> خطی!</p>"
+    },
+    {
+      "title": "چرا مقیاس افقی ماژولار (Horizontal Scale-Out) در دیتاسنترها و هسته‌های مدرن بر مقیاس عمودی (Vertical Scale-Up) ترجیح دارد؟",
+      "options": [
+        "زیرا Scale-Up به سرعت به سقف سخت شاسی و Blast Radius عظیم می‌خورد، اما Scale-Out با افزودن بلوک‌های استاندارد رشد خطی Pay-as-You-Grow و Blast Radius کوچک می‌دهد",
+        "زیرا Scale-Out هیچ کابلی نمی‌خواهد",
+        "زیرا Scale-Up از IPv4 پشتیبانی نمی‌کند",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>معماری‌های Clos و Pod-Based دقیقاً تجسم مهندسی Horizontal Scale-Out هستند.</p>"
+    },
+    {
+      "title": "مفهوم «پنهان‌سازی جزئیات (Information Hiding)» از طریق خلاصه‌سازی مسیر (Summarization) چگونه مقیاس شبکه را بالا می‌برد؟",
+      "options": [
+        "با حذف مسیرهای پیش‌فرض",
+        "با خلاصه کردن ساب‌نت‌های داخلی هر سایت به یک پیشوند واحد در مرز، که هم جدول هسته را کوچک می‌کند و هم نوسانات داخلی سایت را از هسته مخفی می‌سازد",
+        "با رمزنگاری نام روترها",
+        "با خاموش کردن IGP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>خلاصه‌سازی در مرزها همزمان دیوار صفحه داده (اندازه FIB) و دیوار صفحه کنترل (نوسان SPF/BGP) را حل می‌کند.</p>"
+    },
+    {
+      "title": "مهم‌ترین نشانه یک معماری واقعاً مقیاس‌پذیر هنگام افزودن شعبه شماره ۲۰۱ یا Pod شماره ۱۰ چیست؟",
+      "options": [
+        "نیاز به بازطراحی هسته و تغییر کانفیگ ۲۰۰ سایت قبلی",
+        "افزودن سایت جدید بدون هیچ تغییر معماری در هسته و بدون دست زدن به ۲۰۰ سایت قبلی (تکرار الگوی استاندارد)",
+        "قطع کل شبکه برای ۲۴ ساعت",
+        "حذف BGP و رفتن به Static Route"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>استقلال بلوک‌ها و الگوهای Cookie-Cutter شرط اصلی رشد روان سازمانی است.</p>"
+    },
+    {
+      "title": "دیوار «مقیاس‌پذیری عملیاتی (Operational Scalability)» چگونه و با چه ابزارهایی شکسته می‌شود؟",
+      "options": [
+        "با استخدام ۱۰۰ مهندس برای کپی-پیست دستی CLI",
+        "با استانداردسازی الگوهای بلوکی (Golden Templates)، منبع واحد حقیقت (Source of Truth)، راه‌اندازی صفرلمس (ZTP) و اتوماسیون CI/CD",
+        "با حذف مستندات و مانیتورینگ",
+        "فقط با خرید روتر سریع‌تر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون اتوماسیون و استانداردسازی قالب‌ها، پیچیدگی عملیاتی سریع‌ترین ترمز رشد سازمان است.</p>"
+    },
+    {
+      "title": "چرا در سازمانی با ۵۰۰ شعبه، استفاده از تونل‌های IPsec ایستا به شکل Full-Mesh شکست می‌خورد و راه‌حل مقیاس‌پذیر آن چیست؟",
+      "options": [
+        "زیرا تعداد تونل‌ها به بیش از ۱۲۴٬۰۰۰ می‌رسد و حافظه SA روترها منفجر می‌شود؛ راه‌حل Hub-and-Spoke منطقه‌ای یا تونل‌های پویای On-Demand (SD-WAN / DMVPN Phase 3) است",
+        "زیرا IPsec فقط ۲ تونل پشتیبانی می‌کند",
+        "زیرا اینترنت قطع می‌شود",
+        "هیچ مشکلی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تونل‌های پویای On-Demand تنها برای جفت شعب دارای ترافیک فعال ساخته می‌شوند و حافظه لبه را سبک نگه می‌دارند.</p>"
+    },
+    {
+      "title": "الگوی طراحی «Cookie-Cutter Modularity» در ابرشرکت‌ها به چه معناست؟",
+      "options": [
+        "طراحی یک ساختار کاملاً منحصربه‌فرد و متفاوت برای هر دیتاسنتر",
+        "طراحی و تایید یک بلوک استاندارد واحد (مثلاً یک Pod یکسان) و تکثیر دقیق آن ده‌ها بار برای کاهش هزینه طراحی، باگ و MTTR",
+        "کاهش امنیت در بلوک‌های جدید",
+        "استفاده از سخت‌افزارهای نامتجانس"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>یکنواختی بلوک‌ها کلید نگهداری سریع و اتوماسیون بی‌نقص در مقیاس هزاران تجهیز است.</p>"
+    },
+    {
+      "title": "اگر ۲۰۰ سایت هر کدام ۲۵ ساب‌نت /24 پیوسته داشته باشند و در مرز خلاصه شوند، جدول هسته از چند مسیر به چند مسیر کاهش می‌یابد؟",
+      "options": [
+        "از ۵٬۰۰۰ مسیر به ۲۰۰ مسیر (کاهش ۲۵ برابری)",
+        "از ۲۰۰ به ۵٬۰۰۰ مسیر",
+        "به ۱ مسیر واحد برای همه سایت‌ها",
+        "تغییری نمی‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر سایت به جای ۲۵ پیشوند مجزا، تنها یک پیشوند خلاصه‌شده پیوسته به هسته معرفی می‌کند.</p>"
+    },
+    {
+      "title": "کدام پروتکل/معماری اجازه می‌دهد شبکه‌ای با ۱۰٬۰۰۰ روتر بدون ایجاد یک دامنه IGP غول‌پیکر و کند، LSP سرتاسری داشته باشد؟",
+      "options": [
+        "OSPF Area 0 واحد بدون Area دیگر",
+        "Unified MPLS / Seamless MPLS با استفاده از دامنه‌های IGP مجزا و اتصال آن‌ها با BGP-LU",
+        "RIPv2 سراسری",
+        "Spanning Tree سراسری"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Unified MPLS با محدود نگه داشتن هر دامنه IGP به چند صد گره، مقیاس ده‌هزارروتری را ممکن می‌سازد.</p>"
+    },
+    {
+      "title": "چرا در طراحی مقیاس‌پذیر، باید جداول حالت‌مند (Stateful Tables مثل NAT/CGNAT و Firewall Sessions) نیز در تحلیل مقیاس لحاظ شوند؟",
+      "options": [
+        "زیرا اتمام ظرفیت جدول Session/NAT می‌تواند بسیار پیش‌تر از پر شدن پهنای باند لینک، کل ترافیک جدید کاربران را مسدود کند",
+        "زیرا فایروال جدول Session ندارد",
+        "فقط پهنای باند مهم است",
+        "جداول حالت‌مند نامحدودند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>دیوار صفحه داده شامل تمام جداول سخت‌افزاری و حالت‌مند (FIB، TCAM، NAT، FW Session) است.</p>"
+    },
+    {
+      "title": "در معماری مقیاس‌پذیری (Scalability)، چرا «Scale-Out» (افزایش تعداد بلوک‌های استاندارد افقی) معمولاً در رشد بلندمدت بر «Scale-Up» (بزرگ‌تر کردن یک شاسی منفرد) برتری دارد؟",
+      "options": [
+        "زیرا Scale-Up به سقف فیزیکی سخت‌افزار می‌رسد و دامنه خطای بزرگ‌تری (Blast Radius) می‌سازد، در حالی که Scale-Out با تکرار بلوک‌های استاندارد هم ظرفیت را تدریجی رشد می‌دهد و هم اثر خطا را محدود نگه می‌دارد",
+        "چون Scale-Out نیازی به مسیریابی ندارد",
+        "چون شاسی‌های بزرگ‌تر از IPv6 پشتیبانی نمی‌کنند",
+        "چون در Scale-Out تعداد تجهیزات کمتر از یک است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مقیاس‌پذیری افقی (Scale-Out) با الگوهای تکرارپذیر (Pod / Leaf-Spine / Regional Hub) هزینه خطی‌تر، ارتقای آسان‌تر و Blast Radius کوچک‌تری نسبت به شاسی‌های غول‌پیکر ایجاد می‌کند.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.6",
+    "legacyId": "ccde_12",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc4456",
+      "https://www.rfc-editor.org/rfc/rfc7938"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ روتر تولیدی زنده متصل نیست."
+    ],
+    "legacyAuditFixes": [
+      "گسترش نسخه قدیمی (۱ پرسش) به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Cookie-Cutter Modularity، Operational Scalability و مدل‌ساز O(N^2)/RR."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccde_12-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-ccde",
+      "recommendedCourse": "ccde-design",
+      "blueprint": "/academy-assets/v5/blueprints/ccde_12.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_12_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۶: افزودن اعتبارسنجی ورودی (routers، route_reflectors <= routers، routes_per_site و sites مثبت) و assertها در ccde_12_lab.py."
+    ]
+  }
 }

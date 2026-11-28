@@ -1,342 +1,342 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "ccde_04",
- "objectiveId": "ccde_04",
- "kind": "lesson",
- "track": "CCDE",
- "course": "ccde-design",
- "title": "۹.۴ CCDE — طراحی شبکه‌های فوق‌بزرگ (Large Scale)، ۵-Stage Clos و AI/ML Fabric (RoCEv2)",
- "titleEn": "CCDE Topic 4: Large-Scale Network Design — 5-Stage Clos (Super-Spine), RFC 7938 BGP & AI/ML RoCEv2 Fabric",
- "domain": "Large Scale & AI Fabric Architecture",
- "source": "Legacy ccde_04 rewritten, typo-cleaned, and expanded",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [
-  "ccde_01",
-  "ccde_02"
- ],
- "sections": [
-  {
-   "id": "ccde_04-section-1",
-   "title": "مسئله واقعی: چرا طرحی که روی ۱۰ سوئیچ عالی کار می‌کند، در مقیاس ۱۰٬۰۰۰ سرور یا کلاستر GPU هوش مصنوعی منفجر می‌شود؟",
-   "html": "<p>در مقیاس فوق‌بزرگ (Hyperscale Cloud و کلاسترهای آموزش هوش مصنوعی با هزاران GPU مانند H100/B200)، قوانین بازی تغییر می‌کنند! محدودیت تعداد پورت یک شاسی Spine (Radix Limit)، سرریز جدول‌های سخت‌افزاری TCAM/FIB، کندی همگرایی IGP و برخورد جریان‌های عظیم فیل‌مانند (<strong>Elephant Flows</strong>) در ECMP معمولی، طراح را به سمت <strong>معماری ۵مرحله‌ای Clos (Super-Spine/Pod)</strong>، <strong>eBGP Underlay (RFC 7938)</strong> و <strong>فابریک بدون اتلاف RoCEv2 با ECN/PFC و Packet Spraying</strong> هدایت می‌کند.</p>"
-  },
-  {
-   "id": "ccde_04-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code> و <code>ccie_dc</code>.</p><ul><li>شناسایی ۴ گلوگاه پنهان مقیاس فوق‌بزرگ: <strong>Switch Radix</strong>، <strong>سقف FIB/TCAM و همگرایی</strong>، <strong>ECMP Hash Polarization</strong> و <strong>برق/سرمایش/فیبر</strong>.</li><li>محاسبه و مقایسه ظرفیت <strong>3-Stage Clos (Leaf-Spine)</strong> در برابر <strong>5-Stage Clos (Leaf -&gt; Pod-Spine -&gt; Super-Spine)</strong>.</li><li>تبیین چرایی استفاده ابرشرکت‌ها از <strong>eBGP-Only Underlay (RFC 7938)</strong> به جای OSPF/IS-IS در ابرمراکز داده.</li><li>طراحی <strong>AI/ML GPU Fabric</strong> با <strong>1:1 Non-Blocking Rail-Optimized</strong>، <strong>RoCEv2 (RDMA over Converged Ethernet)</strong>، تنظیم دقیق <strong>ECN + PFC</strong> و <strong>Adaptive Routing / Packet Spraying</strong>.</li></ul>"
-  },
-  {
-   "id": "ccde_04-section-3",
-   "title": "چهار گلوگاه فیزیکی و نرم‌افزاری در شبکه‌های فوق‌بزرگ (Large Scale)",
-   "html": "<ol><li><strong>محدودیت Radix سوئیچ Spine:</strong> یک سوئیچ ۶۴پورت 400G حداکثر می‌تواند به ۶۴ سوئیچ Leaf وصل شود؛ فراتر از آن دیگر 3-Stage Clos جا ندارد!</li><li><strong>اندازه جدول مسیر (FIB/TCAM) و زمان همگرایی (Convergence):</strong> انتخاب بین طراحی مسطح (Flat) و سلسله‌مراتبی (Hierarchical) دقیقاً بر اساس سقف جدول مسیر هسته و زمان همگرایی تعیین می‌شود.</li><li><strong>ECMP Hash Polarization و Elephant Flows:</strong> در ۵-تاپل ECMP سنتی، دو جریان سنگین ۴۰۰ گیگابیتی می‌توانند هر دو روی یک لینک هش شوند و لینک را اشباع کنند در حالی که ۷ لینک دیگر خالی‌اند!</li><li><strong>انفجار کابل‌کشی، برق و سرمایش:</strong> هر رک GPU مدرن می‌تواند ۴۰ تا ۱۲۰ کیلووات برق مصرف کند و نیازمند سرمایش مایع و طراحی فیبرهای پربازده Breakout است.</li></ol>"
-  },
-  {
-   "id": "ccde_04-section-4",
-   "title": "نمودار معماری ۵-Stage Clos (Super-Spine) و فابریک هوش مصنوعی AI/ML (RoCEv2)",
-   "html": "<p>نمودار زیر ساختار ۵مرحله‌ای Clos برای مقیاس ابرمراکز داده و ویژگی‌های فابریک بدون اتلاف AI/ML را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Large Scale Network Design: 5-Stage Clos Super-Spine Pods and Lossless AI/ML RoCEv2 Fabric\"><rect x=\"14\" y=\"14\" width=\"354\" height=\"118\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"191\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">5-Stage Clos Hyperscale Fabric</text><text x=\"191\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Tier 3: Super-Spine (Connects All Pods)</text><text x=\"191\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Tier 2: Pod-Spines (eBGP per ASN / Pod)</text><text x=\"191\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Tier 1: ToR Leafs (64p x 8 Pods = 8,192+ 1:1!)</text><text x=\"191\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e3a8a\">Scales Horizontally by Adding New Pods</text><rect x=\"392\" y=\"14\" width=\"354\" height=\"118\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"569\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">AI / ML GPU Cluster Fabric (RoCEv2)</text><text x=\"569\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Elephant All-Reduce Flows (400G/800G)</text><text x=\"569\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">1:1 Non-Blocking + Rail-Optimized Design</text><text x=\"569\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">ECN (Proactive) + PFC (Lossless Safety Net)</text><text x=\"569\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">DLB / Packet Spraying Beats 5-Tuple ECMP!</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Large-Scale Bottlenecks: TCAM/FIB Table Scale, Control-Plane Convergence, Hash Polarization &amp; Power/Cooling</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">RFC 7938 eBGP-Only Clos Underlay Eliminates IGP Flooding Storms Across Thousands of Switches</text></svg>"
-  },
-  {
-   "id": "ccde_04-section-5",
-   "title": "از 3-Stage Clos به 5-Stage Clos (Pod + Super-Spine): فرمول مقیاس افقی ابرمراکز داده",
-   "html": "<p>در <strong>3-Stage Clos</strong> با سوئیچ‌های ۶۴پورت (نسبت هم‌رسانی ۳:۱ یعنی ۱۶ Uplink و ۴۸ پورت سرور روی هر Leaf)، حداکثر ظرفیت برابر <code>64 Leaf × 48 = 3,072</code> پورت سرور است. اما وقتی به <strong>5-Stage Clos</strong> می‌رویم (هر <strong>Pod</strong> شامل ۳۲ Leaf و Pod-Spineهایی است که نیمی از پورت‌ها را به Leafها و نیمی را به لایه سوم <strong>Super-Spine</strong> می‌بندند)، تنها با ۸ Pod در نسبت <strong>۱:۱ Non-Blocking</strong> به <code>256 Leaf × 32 = 8,192</code> پورت سرور (و در ۶۴ Pod تا ده‌ها هزار سرور!) می‌رسیم — و رشد شبکه صرفاً با اضافه کردن یک Pod جدید بدون تغییر هسته انجام می‌شود!</p>"
-  },
-  {
-   "id": "ccde_04-section-6",
-   "title": "چرا ابرشرکت‌ها در دیتاسنتر فوق‌بزرگ از eBGP در Underlay استفاده می‌کنند؟ (RFC 7938)",
-   "html": "<p>پروتکل‌های Link-State (OSPF/IS-IS) هنگام قطع یک لینک در فابریک چندهزارسوئیچی، LSA/LSP را به کل شبکه Flood کرده و الگوریتم SPF را روی همه CPUها تکرار می‌کنند! اما در <strong>RFC 7938 (eBGP-Only Clos Underlay)</strong> با مدل Path-Vector، هر لایه/Pod شماره AS مشخص دارد، دامنه Blast Radius کنترل‌پلین به شدت مهار می‌شود، سیاست‌گذاری و ECMP فوق‌العاده ساده است و دیگر هیچ طوفان Flooding رخ نمی‌دهد!</p>"
-  },
-  {
-   "id": "ccde_04-section-7",
-   "title": "طراحی شبکه ویژه هوش مصنوعی (AI/ML Fabric): چرا RoCEv2 با اترنت عادی فرق دارد؟",
-   "html": "<p>در آموزش مدل‌های بزرگ زبان (LLM)، هزاران GPU در عملیات‌های جمعی <strong>All-Reduce / All-to-All</strong> به‌صورت هم‌زمان جریان‌های غول‌پیکر ۴۰۰G/800G (Elephant Flows) می‌فرستند و کل کلاستر منتظر کندترین GPU می‌ماند (<strong>Tail Latency</strong> — هر افت بسته یعنی تلف شدن میلیون‌ها دلار زمان GPU!). ستون‌های طراحی <strong>Ethernet AI Fabric (RoCEv2 — RDMA over Converged Ethernet v2 روی UDP 4791)</strong>:</p><ul><li><strong>نسبت ۱:۱ Non-Blocking و توپولوژی Rail-Optimized:</strong> هر GPU هم‌شماره در سرورهای مختلف به یک سوئیچ Leaf مشترک (Rail) وصل می‌شود تا ترافیک All-Reduce در ۱ هاپ با صفر Oversubscription انجام شود!</li><li><strong>تنظیم ظریف ECN + PFC (DCQCN):</strong> ابتدا <strong>ECN (Explicit Congestion Notification)</strong> پیش از پر شدن بافر بسته را علامت می‌زند تا فرستنده سرعت را نرم کم کند، و <strong>PFC (802.1Qbb)</strong> صرفاً به عنوان تور ایمنی آخرین لحظه برای جلوگیری از افت بسته عمل می‌کند (بدون ایجاد PFC Deadlock!).</li><li><strong>Dynamic Load Balancing (DLB) / Packet Spraying (و Ultra Ethernet):</strong> جایگزینی 5-tuple ECMP ایستا با پخش هوشمند Cell/Packet روی همه لینک‌های Spine جهت رفع کامل برخورد Elephant Flows.</li></ul>"
-  },
-  {
-   "id": "ccde_04-section-8",
-   "title": "مقایسه اترنت AI (RoCEv2 / Ultra Ethernet) در برابر InfiniBand در کلاسترهای GPU",
-   "html": "<table><thead><tr><th>معیار</th><th>InfiniBand (NDR/XDR)</th><th>AI Ethernet (RoCEv2 + DLB / Ultra Ethernet)</th></tr></thead><tbody><tr><td>مدیریت جریان و تاخیر</td><td>بومی Lossless (Credit-based) با تاخیر بسیار پایین</td><td>Lossless با ECN/DCQCN + PFC و Adaptive Routing (UEC در حال حذف وابستگی به PFC)</td></tr><tr><td>اکوسیستم و قفل فروشنده</td><td>تک‌فروشنده (عملاً NVIDIA) و مهارت تخصصی مجزا</td><td><strong>چندفروشنده‌ای باز</strong>، یکپارچه با تیم و ابزارهای استاندارد شبکه/اتوماسیون</td></tr><tr><td>مقیاس و TCO</td><td>بسیار سریع اما گران در مقیاس چندصدهزار GPU</td><td><strong>مقیاس عظیم و TCO پایین‌تر</strong> با سوئیچ‌های 51.2T اترنت (800G)</td></tr></tbody></table>"
-  },
-  {
-   "id": "ccde_04-section-9",
-   "title": "جلوگیری از معضل Incast در شبکه‌های مقیاس بزرگ و AI",
-   "html": "<p>پدیده <strong>TCP/RDMA Incast</strong> زمانی رخ می‌دهد که ده‌ها یا صدها سرور هم‌زمان داده‌های خود را به یک گیرنده واحد می‌فرستند و بافر مشترک (Shared Buffer) پورت خروجی سوئیچ Leaf در چند میکروثانیه سرریز می‌شود. راه‌حل معمار: استفاده از سوئیچ‌های دارای <strong>Deep Buffer</strong> یا <strong>VOQ (Virtual Output Queuing)</strong>، فعال‌سازی دقیق آستانه‌های <strong>ECN/WRED</strong> و کنترل ترافیک هم‌زمان در لایه اپلیکیشن/کالکتیو (NCCL).</p>"
-  },
-  {
-   "id": "ccde_04-section-10",
-   "title": "اتوماسیون صفرلمس (ZTP) و پایش میکروثانیه‌ای در مقیاس فوق‌بزرگ",
-   "html": "<p>در یک دیتاسنتر با ۲٬۰۰۰ سوئیچ Leaf و Spine، پیکربندی دستی غیرممکن است! کل چرخه عمر از <strong>ZTP (Zero-Touch Provisioning)</strong>، تولید خودکار کانفیگ از <strong>Source of Truth (NetBox)</strong> و <strong>SONiC / NX-OS / EOS</strong> تا تله‌متری لحظه‌ای شمارنده‌های <strong>ECN Mark / PFC Pause / Microburst Buffer Drops</strong> باید ۱۰۰٪ خودکار باشد.</p>"
-  },
-  {
-   "id": "ccde_04-section-11",
-   "title": "کژفهمی‌های رایج درباره شبکه‌های فوق‌بزرگ و AI Fabric",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای کلاستر آموزش AI کافی است همان دیتاسنتر وب با Oversubscription ۳:۱ و ECMP عادی را استفاده کنیم.»</strong> واقعیت: ترافیک Elephant Flow در آموزش GPU روی شبکه ۳:۱ و 5-tuple ECMP دچار افت بسته، Hash Polarization و افت ۴۰–۶۰ درصدی بهره‌وری GPUهای میلیون‌دلاری می‌شود!</li><li><strong>کژفهمی ۲: «در RoCEv2 کافی است فقط PFC را روشن کنیم و به ECN نیازی نیست.»</strong> واقعیت: تکیه صرف به PFC بدون ECN باعث <strong>PFC Pause Storm و Deadlock</strong> در کل فابریک می‌شود؛ ECN باید بسیار زودتر از آستانه PFC سرعت را مهار کند!</li><li><strong>کژفهمی ۳: «انتخاب طراحی مسطح یا سلسله‌مراتبی در مقیاس بزرگ فقط به رنگ یا تعداد کابل بستگی دارد.»</strong> واقعیت: معیار علمی آن سقف جدول مسیر (FIB/RIB) هسته و زمان همگرایی (Convergence) است.</li></ul>"
-  },
-  {
-   "id": "ccde_04-section-12",
-   "title": "اصلاح خطای نسخه قدیمی و چک‌لیست طراحی AI/Hyperscale",
-   "html": "<p><strong>یادداشت ممیزی:</strong> عبارت غلط تایپی نسخه قدیمی به فارسی صحیح و فنی اصلاح شد.</p><p><strong>چک‌لیست معمار Large-Scale:</strong> (۱) محاسبه Switch Radix و تصمیم 3-Stage در برابر 5-Stage Clos، (۲) انتخاب eBGP RFC 7938 برای Underlay، (۳) نسبت ۱:۱ + ECN/PFC + DLB برای AI Fabric، (۴) طراحی ZTP و پایش Microburst.</p>"
-  },
-  {
-   "id": "ccde_04-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> با سوئیچ‌های ۶۴پورت، حداکثر تعداد پورت سرور در 3-Stage Clos (با نسبت ۳:۱) در برابر 5-Stage Clos دارای ۸ Pod (با نسبت ۱:۱ Non-Blocking) چقدر است؟ <strong>پاسخ:</strong> در 3-Stage با نسبت ۳:۱ برابر <code>64 × 48 = 3,072</code> پورت، و در 5-Stage با ۸ Pod و نسبت ۱:۱ Non-Blocking برابر <code>256 × 32 = 8,192</code> پورت سرور (با قابلیت توسعه به ۶۴ Pod)!</p><p><strong>تمرین ۲:</strong> یک دیتاسنتر وب استاندارد با Oversubscription <code>3:1</code>، بدون ECN/PFC و با <code>5-tuple ECMP</code> قصد اجرای RoCEv2 روی کلاستر GPU را دارد. کدام ۳ نقص اصلی باید برطرف شوند؟ <strong>پاسخ:</strong> (۱) تغییر به ۱:۱ Non-Blocking Rail-Optimized، (۲) تنظیم هماهنگ ECN + PFC (DCQCN)، و (۳) ارتقا به Adaptive DLB / Packet Spraying.</p>"
-  },
-  {
-   "id": "ccde_04-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc7938\" target=\"_blank\" rel=\"noopener\">RFC 7938 (Use of BGP for Routing in Large-Scale Data Centers)</a> و <a href=\"https://ultraethernet.org/\" target=\"_blank\" rel=\"noopener\">معماری کنسرسیوم Ultra Ethernet برای AI/HPC</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای محاسبات Clos و ممیزی AI Fabric است و به هیچ کلاستر GPU یا سوئیچ Hyperscale زنده متصل نیست.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "5-Stage Clos (Super-Spine)",
-   "fa": "معماری کلوس ۵مرحله‌ای",
-   "simple": "افزودن لایه Super-Spine بالای Podها جهت عبور از محدودیت پورت Spine و مقیاس ده‌ها هزار سرور."
-  },
-  {
-   "term": "Switch Radix",
-   "fa": "ظرفیت پورت یک سوئیچ",
-   "simple": "تعداد کل پورت‌های پرسرعت یک سوئیچ که حداکثر اندازه یک 3-Stage Clos را تعیین می‌کند."
-  },
-  {
-   "term": "RFC 7938 (eBGP Underlay)",
-   "fa": "مسیریابی تماماً eBGP در Clos",
-   "simple": "استفاده از eBGP در Underlay ابرمراکز داده برای حذف طوفان Flooding پروتکل‌های IGP."
-  },
-  {
-   "term": "RoCEv2",
-   "fa": "RDMA روی اترنت همگرا نسخه ۲",
-   "simple": "انتقال مستقیم حافظه-به-حافظه GPUها روی UDP 4791 با تاخیر میکروثانیه‌ای نیازمند شبکه بدون اتلاف."
-  },
-  {
-   "term": "ECN & DCQCN",
-   "fa": "اعلان صریح ازدحام و کنترل نرخ",
-   "simple": "علامت‌گذاری پیش‌فعال بسته‌ها پیش از پر شدن بافر تا فرستنده RoCEv2 نرم سرعت را کاهش دهد."
-  },
-  {
-   "term": "PFC Pause Storm / Deadlock",
-   "fa": "طوفان مکث و بن‌بست PFC",
-   "simple": "خطر توقف کل فابریک در صورت تکیه صرف به PFC بدون تنظیم دقیق آستانه ECN و Watchdog."
-  },
-  {
-   "term": "Elephant Flows",
-   "fa": "جریان‌های غول‌پیکر طویل",
-   "simple": "جریان‌های پرپهنای‌باند آموزش AI که در 5-tuple ECMP معمولی دچار برخورد و Hash Polarization می‌شوند."
-  },
-  {
-   "term": "DLB / Packet Spraying",
-   "fa": "توزیع بار پویا / پاشش بسته",
-   "simple": "پخش هوشمند بسته‌ها یا فلولت‌ها روی تمام لینک‌های Spine بر اساس بار لحظه‌ای صف‌ها."
-  },
-  {
-   "term": "Rail-Optimized Topology",
-   "fa": "توپولوژی بهینه‌شده ریلی GPU",
-   "simple": "اتصال GPUهای هم‌شماره سرورها به یک سوئیچ Leaf مشترک برای ارتباط ۱هاپه در All-Reduce."
-  },
-  {
-   "term": "Tail Latency",
-   "fa": "تاخیر دم (کندترین عضو)",
-   "simple": "در آموزش موازی AI، کل کلاستر منتظر آخرین GPU می‌ماند؛ یک افت بسته کل گام را معطل می‌کند."
-  },
-  {
-   "term": "Incast Congestion",
-   "fa": "ازدحام هم‌زمان چند-به-یک",
-   "simple": "ارسال هم‌زمان ده‌ها فرستنده به یک پورت خروجی و سرریز میکروثانیه‌ای بافر سوئیچ."
-  },
-  {
-   "term": "VOQ (Virtual Output Queuing)",
-   "fa": "صف‌بندی خروجی مجازی",
-   "simple": "معماری بافر پیشرفته سوئیچ‌های شاسی/AI برای جلوگیری از Head-of-Line Blocking."
-  },
-  {
-   "term": "Ultra Ethernet (UEC)",
-   "fa": "استاندارد اولترا اترنت برای AI",
-   "simple": "تکامل مدرن اترنت برای AI/HPC با Packet Spraying و تحمل دریافت خارج از ترتیب بدون نیاز به PFC."
-  },
-  {
-   "term": "Non-Blocking (1:1)",
-   "fa": "بدون انسداد (هم‌رسانی ۱ به ۱)",
-   "simple": "برابری کامل مجموع ظرفیت پورت‌های سرور و ظرفیت لینک‌های Uplink روی هر Leaf."
-  },
-  {
-   "term": "ZTP (Zero-Touch Provisioning)",
-   "fa": "راه‌اندازی خودکار صفرلمس",
-   "simple": "بارگذاری خودکار سیستم‌عامل و کانفیگ صدها سوئیچ Clos بلافاصله پس از روشن شدن."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (محاسبه‌گر مقیاس 3-Stage در برابر 5-Stage Clos و ممیزی آمادگی AI/ML RoCEv2 Fabric) — بدون کلاستر GPU واقعی",
-   "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سوئیچ Hyperscale یا کلاستر GPU واقعی متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ کلاستر GPU واقعی یا سوئیچ Hyperscale 400G/800G در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو محاسبه کلیدی Large-Scale CCDE را اجرا می‌کند: (۱) مقایسه سقف پورت سرور در <strong>3-Stage Clos</strong> (<code>3,072</code> پورت) در برابر <strong>5-Stage Clos ۸‌پاده ۱:۱</strong> (<code>8,192</code> پورت)، و (۲) ممیزی ۳ پیش‌نیاز فابریک <strong>AI/ML RoCEv2</strong> (نسبت ۱:۱، ECN+PFC و Adaptive DLB/Packet Spraying).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_04_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_04_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_04 (CCDE Large Scale Network Design &amp; AI/ML Fabric: 5-Stage Clos &amp; RoCEv2 ECN/PFC)\nCalculates 3-Stage vs 5-Stage Clos (Super-Spine/Pod) maximum server radix and oversubscription with strict\nboundary validation (valid radix, positive oversubscription, non-zero uplinks/servers, pods &lt;= switch_radix),\nand audits AI/ML GPU cluster fabric readiness using an explicit adaptive load-balancing allowlist.\nNo real hyperscale switch fabric or NVIDIA GPU cluster is connected.\n&quot;&quot;&quot;\n\nimport json\n\nADAPTIVE_AI_LB_MODES = frozenset({\n    &quot;adaptive_dlb_packet_spraying&quot;,\n    &quot;adaptive_routing&quot;,\n    &quot;packet_spraying&quot;,\n})\n\n\ndef clos_3stage_max_servers(switch_radix: int, oversubscription: float = 3.0) -&gt; dict:\n    if isinstance(switch_radix, bool) or not isinstance(switch_radix, int) or switch_radix &lt; 4 or switch_radix % 2 != 0:\n        raise ValueError(f&quot;switch_radix must be an even integer &gt;= 4, got {switch_radix!r}&quot;)\n    if isinstance(oversubscription, bool) or not isinstance(oversubscription, (int, float)) or oversubscription &lt;= 0:\n        raise ValueError(f&quot;oversubscription must be &gt; 0, got {oversubscription!r}&quot;)\n    uplinks_per_leaf = int(round(switch_radix / (1.0 + oversubscription)))\n    servers_per_leaf = switch_radix - uplinks_per_leaf\n    if uplinks_per_leaf &lt; 1 or servers_per_leaf &lt; 1:\n        raise ValueError(\n            f&quot;switch_radix={switch_radix} cannot realize oversubscription={oversubscription} &quot;\n            f&quot;(computed uplinks={uplinks_per_leaf}, servers={servers_per_leaf})&quot;\n        )\n    max_leafs = switch_radix\n    return {\n        &quot;topology&quot;: &quot;3-Stage Clos (Leaf-Spine)&quot;,\n        &quot;switch_radix&quot;: switch_radix,\n        &quot;oversubscription_ratio&quot;: f&quot;{round(servers_per_leaf / uplinks_per_leaf, 2)}:1&quot;,\n        &quot;max_leafs&quot;: max_leafs,\n        &quot;max_spines&quot;: uplinks_per_leaf,\n        &quot;max_server_ports&quot;: max_leafs * servers_per_leaf,\n    }\n\n\ndef clos_5stage_max_servers(switch_radix: int, pods: int, oversubscription: float = 1.0) -&gt; dict:\n    if isinstance(switch_radix, bool) or not isinstance(switch_radix, int) or switch_radix &lt; 4 or switch_radix % 2 != 0:\n        raise ValueError(f&quot;switch_radix must be an even integer &gt;= 4, got {switch_radix!r}&quot;)\n    if isinstance(pods, bool) or not isinstance(pods, int) or not (1 &lt;= pods &lt;= switch_radix):\n        raise ValueError(f&quot;pods must be an integer in 1..{switch_radix} (bounded by Super-Spine radix), got {pods!r}&quot;)\n    if isinstance(oversubscription, bool) or not isinstance(oversubscription, (int, float)) or oversubscription &lt;= 0:\n        raise ValueError(f&quot;oversubscription must be &gt; 0, got {oversubscription!r}&quot;)\n    leafs_per_pod = switch_radix // 2\n    uplinks_per_leaf = int(round(switch_radix / (1.0 + oversubscription)))\n    servers_per_leaf = switch_radix - uplinks_per_leaf\n    if uplinks_per_leaf &lt; 1 or servers_per_leaf &lt; 1:\n        raise ValueError(f&quot;Invalid port split for switch_radix={switch_radix}, oversubscription={oversubscription}&quot;)\n    total_leafs = leafs_per_pod * pods\n    return {\n        &quot;topology&quot;: &quot;5-Stage Clos (Leaf -&gt; Pod-Spine -&gt; Super-Spine)&quot;,\n        &quot;switch_radix&quot;: switch_radix,\n        &quot;pods&quot;: pods,\n        &quot;oversubscription_ratio&quot;: f&quot;{round(servers_per_leaf / uplinks_per_leaf, 2)}:1&quot;,\n        &quot;total_leafs&quot;: total_leafs,\n        &quot;total_server_ports&quot;: total_leafs * servers_per_leaf,\n    }\n\n\ndef audit_ai_ml_fabric(cfg: dict) -&gt; dict:\n    oversub = cfg[&quot;oversubscription&quot;]\n    if isinstance(oversub, bool) or not isinstance(oversub, (int, float)) or oversub &lt;= 0:\n        raise ValueError(f&quot;oversubscription must be &gt; 0, got {oversub!r}&quot;)\n    gaps = []\n    if oversub &gt; 1.0:\n        gaps.append(&quot;AI GPU all-reduce collective typically targets 1:1 non-blocking rail-optimized fabric&quot;)\n    if not (cfg[&quot;ecn_enabled&quot;] and cfg[&quot;pfc_enabled&quot;]):\n        gaps.append(&quot;RoCEv2 lossless profile expects ECN (proactive marking) + PFC (last-resort pause) tuned together&quot;)\n    lb = cfg.get(&quot;load_balancing&quot;, &quot;&quot;)\n    if lb not in ADAPTIVE_AI_LB_MODES:\n        gaps.append(\n            f&quot;Load balancing &#x27;{lb}&#x27; is not in adaptive AI allowlist {sorted(ADAPTIVE_AI_LB_MODES)} &quot;\n            &quot;(risk of hash polarization on elephant AI flows)&quot;\n        )\n    return {&quot;profile&quot;: cfg[&quot;name&quot;], &quot;ai_fabric_ready&quot;: len(gaps) == 0, &quot;gaps&quot;: gaps}\n\n\ndef main() -&gt; None:\n    c3 = clos_3stage_max_servers(64, 3.0)\n    c5 = clos_5stage_max_servers(64, 8, 1.0)\n    bad_web = audit_ai_ml_fabric({&quot;name&quot;: &quot;Standard_Web_DC&quot;, &quot;oversubscription&quot;: 3.0, &quot;ecn_enabled&quot;: False, &quot;pfc_enabled&quot;: False, &quot;load_balancing&quot;: &quot;static_5tuple_ecmp&quot;})\n    good_gpu = audit_ai_ml_fabric({&quot;name&quot;: &quot;GPU_AI_Cluster_Fabric&quot;, &quot;oversubscription&quot;: 1.0, &quot;ecn_enabled&quot;: True, &quot;pfc_enabled&quot;: True, &quot;load_balancing&quot;: &quot;adaptive_dlb_packet_spraying&quot;})\n    bad_lb = audit_ai_ml_fabric({&quot;name&quot;: &quot;Unknown_LB_Fabric&quot;, &quot;oversubscription&quot;: 1.0, &quot;ecn_enabled&quot;: True, &quot;pfc_enabled&quot;: True, &quot;load_balancing&quot;: &quot;unknown_lb_mode&quot;})\n\n    assert c3[&quot;max_server_ports&quot;] == 3072\n    assert c5[&quot;total_server_ports&quot;] == 8192\n    assert bad_web[&quot;ai_fabric_ready&quot;] is False and len(bad_web[&quot;gaps&quot;]) == 3\n    assert good_gpu[&quot;ai_fabric_ready&quot;] is True\n    assert bad_lb[&quot;ai_fabric_ready&quot;] is False\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_LARGESCALE_AI_MODELER&quot;,\n        &quot;clos_scaling_64port_switches&quot;: {\n            &quot;three_stage_3to1&quot;: c3,\n            &quot;five_stage_8pods_nonblocking&quot;: c5,\n        },\n        &quot;ai_fabric_audits&quot;: [bad_web, good_gpu, bad_lb],\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف ۳ شکاف بحرانی در پروفایل <code>Standard_Web_DC</code> و قبولی کامل (<code>ai_fabric_ready: True</code>) در <code>GPU_AI_Cluster_Fabric</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع آستانه‌های بافر ECN پیش از PFC در فابریک RoCEv2 (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference RoCEv2 Buffer Tuning Rule (HLD)\n# ECN Kmin &lt; ECN Kmax &lt; PFC Xoff Pause Threshold &lt; Queue Tail-Drop\n# Goal: ECN throttles senders smoothly BEFORE PFC Pause ever triggers!</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس طراحی شبکه‌های فوق‌بزرگ (Large Scale)، 5-Stage Clos و AI Fabric",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "در طراحی شبکه‌های فوق‌بزرگ (CCDE Large Scale)، مهم‌ترین معیار مهندسی برای انتخاب بین طراحی مسطح و سلسله‌مراتبی چیست؟",
-   "options": [
-    "رنگ کابل‌های شبکه",
-    "تعداد مسیرها در جدول مسیر روترهای هسته (FIB/RIB Scale) و زمان همگرایی (Convergence)",
-    "تعداد پریزهای برق اتاق مدیر",
-    "نام تجاری رک‌ها"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>کنترل اندازه جدول مسیر هسته و زمان همگرایی تعیین می‌کند چه زمانی باید لایه‌های سلسله‌مراتبی و خلاصه‌سازی اضافه کرد.</p>"
-  },
-  {
-   "title": "چه زمانی یک ابرمرکز داده مجبور به گذار از 3-Stage Clos (Leaf-Spine) به 5-Stage Clos (Leaf -> Pod-Spine -> Super-Spine) می‌شود؟",
-   "options": [
-    "وقتی تعداد سوئیچ‌های Leaf از ظرفیت پورت (Radix) یک سوئیچ Spine فراتر می‌رود و نیاز به مقیاس افقی Pod-by-Pod ایجاد می‌شود",
-    "وقتی تنها ۴ سرور داریم",
-    "برای فعال کردن Spanning Tree",
-    "برای کاهش سرعت به ۱ گیگابیت"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>محدودیت Radix سوئیچ Spine سقف 3-Stage Clos است و لایه Super-Spine در 5-Stage Clos امکان رشد تا ده‌ها هزار سرور را می‌دهد.</p>"
-  },
-  {
-   "title": "چرا ابرشرکت‌ها در دیتاسنترهای فوق‌بزرگ از eBGP در لایه Underlay (استاندارد RFC 7938) به جای OSPF/IS-IS استفاده می‌کنند؟",
-   "options": [
-    "زیرا eBGP هیچ آدرس IP نمی‌خواهد",
-    "زیرا eBGP با مدل Path-Vector از طوفان Flooding (LSA/LSP) و محاسبات مکرر SPF در مقیاس چندهزارسوئیچی جلوگیری کرده و Failure Domain کنترل‌پلین را محدود می‌کند",
-    "زیرا OSPF از ECMP پشتیبانی نمی‌کند",
-    "زیرا eBGP لایه ۲ است"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>RFC 7938 یکی از تأثیرگذارترین الگوهای طراحی ابرمراکز داده مدرن در جهان است.</p>"
-  },
-  {
-   "title": "چرا در فابریک آموزش هوش مصنوعی (AI/ML GPU Cluster با RoCEv2)، الگوریتم 5-tuple ECMP سنتی ناکارآمد است؟",
-   "options": [
-    "زیرا ترافیک آموزش AI شامل جریان‌های بسیار سنگین و طویل (Elephant Flows) است که در 5-tuple ECMP دچار برخورد هش (Hash Polarization) روی یک لینک و اشباع می‌شوند؛ راه‌حل DLB / Packet Spraying است",
-    "زیرا GPUها از IP استفاده نمی‌کنند",
-    "زیرا ECMP فقط ۱ لینک دارد",
-    "هیچ مشکلی ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>توزیع بار پویا (DLB) یا پاشش بسته (Packet Spraying) تمام ظرفیت لینک‌های Spine را به طور یکنواخت برای جریان‌های AI به کار می‌گیرد.</p>"
-  },
-  {
-   "title": "رابطه صحیح میان آستانه‌های ECN و PFC در تنظیم یک فابریک بدون اتلاف RoCEv2 چیست؟",
-   "options": [
-    "PFC باید بسیار زودتر از ECN فعال شود",
-    "آستانه علامت‌گذاری ECN باید زودتر از آستانه مکث PFC تنظیم شود تا فرستنده نرم سرعت را کم کند و PFC تنها به عنوان تور ایمنی آخرین لحظه (بدون Pause Storm) عمل نماید",
-    "نیازی به هیچ‌کدام نیست",
-    "ECN باعث Drop فوری همه بسته‌ها می‌شود"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>تنظیم دقیق <code>ECN &lt; PFC &lt; Tail-Drop</code> کلید پایداری شبکه بدون اتلاف RoCEv2 است.</p>"
-  },
-  {
-   "title": "منظور از طراحی «Rail-Optimized» در کلاسترهای GPU (مانند سرورهای ۸-GPU) چیست؟",
-   "options": [
-    "نصب سرورها روی ریل قطار",
-    "استفاده از کابل مسی Cat5",
-    "اتصال GPUهای هم‌شماره (مثلاً همه GPU0ها) از سرورهای مختلف به یک سوئیچ Leaf مشترک تا ترافیک All-Reduce در ۱ هاپ با نسبت ۱:۱ انجام شود",
-    "اتصال همه GPUها به یک پورت ۱ گیگابیتی"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>Rail-Optimized ترافیک سنگین همگام‌سازی بین GPUهای هم‌شماره را در کوتاه‌ترین مسیر (یک سوئیچ Leaf) بدون عبور از Spine نگه می‌دارد.</p>"
-  },
-  {
-   "title": "پدیده Incast در شبکه‌های مقیاس بزرگ و AI چگونه رخ می‌دهد؟",
-   "options": [
-    "وقتی همه سرورها خاموش‌اند",
-    "وقتی فقط یک سرور ترافیک می‌فرستد",
-    "وقتی ده‌ها یا صدها سرور هم‌زمان به یک پورت گیرنده واحد داده می‌فرستند و بافر پورت خروجی در چند میکروثانیه سرریز می‌شود",
-    "وقتی DNS قطع است"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>مهار Incast نیازمند بافر مناسب (یا VOQ)، تنظیم دقیق ECN و زمان‌بندی هوشمند در سطح کلکتیو است.</p>"
-  },
-  {
-   "title": "چرا در آموزش موازی LLM روی هزاران GPU، شاخص «Tail Latency» (تاخیر دم) بسیار حیاتی‌تر از میانگین تاخیر است؟",
-   "options": [
-    "زیرا در هر گام همگام‌سازی (All-Reduce)، تمام هزاران GPU باید منتظر کندترین GPU بمانند و افت حتی یک بسته زمان کل کلاستر میلیون‌دلاری را تلف می‌کند",
-    "زیرا میانگین همیشه صفر است",
-    "زیرا Tail Latency فقط مربوط به صوت است",
-    "هیچ اهمیتی ندارد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در پردازش موازی همگام، یک Microburst کوچک روی یک لینک می‌تواند کل بهره‌وری کلاستر GPU را افت دهد.</p>"
-  },
-  {
-   "title": "نسبت هم‌رسانی (Oversubscription) استاندارد در فابریک آموزش GPU هوش مصنوعی در مقایسه با دیتاسنتر وب عادی (۳:۱) چیست؟",
-   "options": [
-    "۱۰:۱ برای صرفه‌جویی",
-    "۱:۱ Non-Blocking (بدون انسداد؛ برابری کامل ظرفیت سرور و Uplink)",
-    "۲۰:۱ روی لینک ۱ گیگابیتی",
-    "اهمیتی ندارد"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>هزینه GPUها بسیار بیشتر از سوئیچ شبکه است؛ هرگز نباید با Oversubscription در شبکه، GPUهای گران‌قیمت را بیکار نگه داشت!</p>"
-  },
-  {
-   "title": "هدف کنسرسیوم Ultra Ethernet (UEC) در نسل جدید فابریک‌های AI/HPC چیست؟",
-   "options": [
-    "بازگشت به اترنت ۱۰ مگابیتی",
-    "حذف کامل IP از دیتاسنتر",
-    "تکامل استاندارد باز اترنت با Packet Spraying، پذیرش بسته‌های خارج از ترتیب و کنترل ازدحام مدرن بدون وابستگی شکننده به PFC",
-    "قفل کردن بازار روی یک فروشنده خاص"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>Ultra Ethernet پاسخ استاندارد و چندفروشنده‌ای اترنت به چالش‌های مقیاس صدهزار GPUیی است.</p>"
-  },
-  {
-   "title": "معماری VOQ (Virtual Output Queuing) در سوئیچ‌های شاسی و AI چه مزیتی دارد؟",
-   "options": [
-    "جلوگیری از Head-of-Line Blocking از طریق نگه‌داری صف‌های مجزا در ورودی به ازای هر پورت خروجی و انتقال بدون افت روی فابریک داخلی",
-    "حذف کامل حافظه بافر",
-    "تبدیل اترنت به Token Ring",
-    "کاهش تعداد پورت‌ها"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>VOQ مانع از آن می‌شود که ازدحام روی یک پورت خروجی، بسته‌های سالم عازم پورت‌های خروجی دیگر را مسدود کند.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "اتصال زنده به کلاستر ۱۰٬۰۰۰ عددی NVIDIA H100",
-    "تست واقعی 800G روی سوئیچ فیزیکی",
-    "فقط متن نظری بدون کد",
-    "مدل‌سازی محلی (Local Mock) در Python 3 برای محاسبه ظرفیت 3-Stage در برابر 5-Stage Clos و ممیزی آمادگی AI/ML RoCEv2 Fabric"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ کلاستر GPU یا سوئیچ Hyperscale واقعی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.6",
-  "legacyId": "ccde_04",
-  "sources": [
-   "https://www.rfc-editor.org/rfc/rfc7938",
-   "https://ultraethernet.org/"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccde_04",
+  "objectiveId": "ccde_04",
+  "kind": "lesson",
+  "track": "CCDE",
+  "course": "ccde-design",
+  "title": "۹.۴ CCDE — طراحی شبکه‌های فوق‌بزرگ (Large Scale)، ۵-Stage Clos و AI/ML Fabric (RoCEv2)",
+  "titleEn": "CCDE Topic 4: Large-Scale Network Design — 5-Stage Clos (Super-Spine), RFC 7938 BGP & AI/ML RoCEv2 Fabric",
+  "domain": "Large Scale & AI Fabric Architecture",
+  "source": "Legacy ccde_04 rewritten, typo-cleaned, and expanded",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccde_01",
+    "ccde_02"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ کلاستر GPU یا سوئیچ Hyperscale زنده متصل نیست."
+  "sections": [
+    {
+      "id": "ccde_04-section-1",
+      "title": "مسئله واقعی: چرا طرحی که روی ۱۰ سوئیچ عالی کار می‌کند، در مقیاس ۱۰٬۰۰۰ سرور یا کلاستر GPU هوش مصنوعی منفجر می‌شود؟",
+      "html": "<p>در مقیاس فوق‌بزرگ (Hyperscale Cloud و کلاسترهای آموزش هوش مصنوعی با هزاران GPU مانند H100/B200)، قوانین بازی تغییر می‌کنند! محدودیت تعداد پورت یک شاسی Spine (Radix Limit)، سرریز جدول‌های سخت‌افزاری TCAM/FIB، کندی همگرایی IGP و برخورد جریان‌های عظیم فیل‌مانند (<strong>Elephant Flows</strong>) در ECMP معمولی، طراح را به سمت <strong>معماری ۵مرحله‌ای Clos (Super-Spine/Pod)</strong>، <strong>eBGP Underlay (RFC 7938)</strong> و <strong>فابریک بدون اتلاف RoCEv2 با ECN/PFC و Packet Spraying</strong> هدایت می‌کند.</p>"
+    },
+    {
+      "id": "ccde_04-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> درس‌های <code>ccde_01</code> و <code>ccie_dc</code>.</p><ul><li>شناسایی ۴ گلوگاه پنهان مقیاس فوق‌بزرگ: <strong>Switch Radix</strong>، <strong>سقف FIB/TCAM و همگرایی</strong>، <strong>ECMP Hash Polarization</strong> و <strong>برق/سرمایش/فیبر</strong>.</li><li>محاسبه و مقایسه ظرفیت <strong>3-Stage Clos (Leaf-Spine)</strong> در برابر <strong>5-Stage Clos (Leaf -&gt; Pod-Spine -&gt; Super-Spine)</strong>.</li><li>تبیین چرایی استفاده ابرشرکت‌ها از <strong>eBGP-Only Underlay (RFC 7938)</strong> به جای OSPF/IS-IS در ابرمراکز داده.</li><li>طراحی <strong>AI/ML GPU Fabric</strong> با <strong>1:1 Non-Blocking Rail-Optimized</strong>، <strong>RoCEv2 (RDMA over Converged Ethernet)</strong>، تنظیم دقیق <strong>ECN + PFC</strong> و <strong>Adaptive Routing / Packet Spraying</strong>.</li></ul>"
+    },
+    {
+      "id": "ccde_04-section-3",
+      "title": "چهار گلوگاه فیزیکی و نرم‌افزاری در شبکه‌های فوق‌بزرگ (Large Scale)",
+      "html": "<ol><li><strong>محدودیت Radix سوئیچ Spine:</strong> یک سوئیچ ۶۴پورت 400G حداکثر می‌تواند به ۶۴ سوئیچ Leaf وصل شود؛ فراتر از آن دیگر 3-Stage Clos جا ندارد!</li><li><strong>اندازه جدول مسیر (FIB/TCAM) و زمان همگرایی (Convergence):</strong> انتخاب بین طراحی مسطح (Flat) و سلسله‌مراتبی (Hierarchical) دقیقاً بر اساس سقف جدول مسیر هسته و زمان همگرایی تعیین می‌شود.</li><li><strong>ECMP Hash Polarization و Elephant Flows:</strong> در ۵-تاپل ECMP سنتی، دو جریان سنگین ۴۰۰ گیگابیتی می‌توانند هر دو روی یک لینک هش شوند و لینک را اشباع کنند در حالی که ۷ لینک دیگر خالی‌اند!</li><li><strong>انفجار کابل‌کشی، برق و سرمایش:</strong> هر رک GPU مدرن می‌تواند ۴۰ تا ۱۲۰ کیلووات برق مصرف کند و نیازمند سرمایش مایع و طراحی فیبرهای پربازده Breakout است.</li></ol>"
+    },
+    {
+      "id": "ccde_04-section-4",
+      "title": "نمودار معماری ۵-Stage Clos (Super-Spine) و فابریک هوش مصنوعی AI/ML (RoCEv2)",
+      "html": "<p>نمودار زیر ساختار ۵مرحله‌ای Clos برای مقیاس ابرمراکز داده و ویژگی‌های فابریک بدون اتلاف AI/ML را نشان می‌دهد.</p><svg viewBox=\"0 0 760 225\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCDE Large Scale Network Design: 5-Stage Clos Super-Spine Pods and Lossless AI/ML RoCEv2 Fabric\"><rect x=\"14\" y=\"14\" width=\"354\" height=\"118\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"191\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">5-Stage Clos Hyperscale Fabric</text><text x=\"191\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Tier 3: Super-Spine (Connects All Pods)</text><text x=\"191\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">Tier 2: Pod-Spines (eBGP per ASN / Pod)</text><text x=\"191\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Tier 1: ToR Leafs (64p x 8 Pods = 8,192+ 1:1!)</text><text x=\"191\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e3a8a\">Scales Horizontally by Adding New Pods</text><rect x=\"392\" y=\"14\" width=\"354\" height=\"118\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"569\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">AI / ML GPU Cluster Fabric (RoCEv2)</text><text x=\"569\" y=\"58\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Elephant All-Reduce Flows (400G/800G)</text><text x=\"569\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">1:1 Non-Blocking + Rail-Optimized Design</text><text x=\"569\" y=\"94\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">ECN (Proactive) + PFC (Lossless Safety Net)</text><text x=\"569\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">DLB / Packet Spraying Beats 5-Tuple ECMP!</text><rect x=\"14\" y=\"148\" width=\"732\" height=\"62\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"380\" y=\"172\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Large-Scale Bottlenecks: TCAM/FIB Table Scale, Control-Plane Convergence, Hash Polarization &amp; Power/Cooling</text><text x=\"380\" y=\"192\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">RFC 7938 eBGP-Only Clos Underlay Eliminates IGP Flooding Storms Across Thousands of Switches</text></svg>"
+    },
+    {
+      "id": "ccde_04-section-5",
+      "title": "از 3-Stage Clos به 5-Stage Clos (Pod + Super-Spine): فرمول مقیاس افقی ابرمراکز داده",
+      "html": "<p>در <strong>3-Stage Clos</strong> با سوئیچ‌های ۶۴پورت (نسبت هم‌رسانی ۳:۱ یعنی ۱۶ Uplink و ۴۸ پورت سرور روی هر Leaf)، حداکثر ظرفیت برابر <code>64 Leaf × 48 = 3,072</code> پورت سرور است. اما وقتی به <strong>5-Stage Clos</strong> می‌رویم (هر <strong>Pod</strong> شامل ۳۲ Leaf و Pod-Spineهایی است که نیمی از پورت‌ها را به Leafها و نیمی را به لایه سوم <strong>Super-Spine</strong> می‌بندند)، تنها با ۸ Pod در نسبت <strong>۱:۱ Non-Blocking</strong> به <code>256 Leaf × 32 = 8,192</code> پورت سرور (و در ۶۴ Pod تا ده‌ها هزار سرور!) می‌رسیم — و رشد شبکه صرفاً با اضافه کردن یک Pod جدید بدون تغییر هسته انجام می‌شود!</p>"
+    },
+    {
+      "id": "ccde_04-section-6",
+      "title": "چرا ابرشرکت‌ها در دیتاسنتر فوق‌بزرگ از eBGP در Underlay استفاده می‌کنند؟ (RFC 7938)",
+      "html": "<p>پروتکل‌های Link-State (OSPF/IS-IS) هنگام قطع یک لینک در فابریک چندهزارسوئیچی، LSA/LSP را به کل شبکه Flood کرده و الگوریتم SPF را روی همه CPUها تکرار می‌کنند! اما در <strong>RFC 7938 (eBGP-Only Clos Underlay)</strong> با مدل Path-Vector، هر لایه/Pod شماره AS مشخص دارد، دامنه Blast Radius کنترل‌پلین به شدت مهار می‌شود، سیاست‌گذاری و ECMP فوق‌العاده ساده است و دیگر هیچ طوفان Flooding رخ نمی‌دهد!</p>"
+    },
+    {
+      "id": "ccde_04-section-7",
+      "title": "طراحی شبکه ویژه هوش مصنوعی (AI/ML Fabric): چرا RoCEv2 با اترنت عادی فرق دارد؟",
+      "html": "<p>در آموزش مدل‌های بزرگ زبان (LLM)، هزاران GPU در عملیات‌های جمعی <strong>All-Reduce / All-to-All</strong> به‌صورت هم‌زمان جریان‌های غول‌پیکر ۴۰۰G/800G (Elephant Flows) می‌فرستند و کل کلاستر منتظر کندترین GPU می‌ماند (<strong>Tail Latency</strong> — هر افت بسته یعنی تلف شدن میلیون‌ها دلار زمان GPU!). ستون‌های طراحی <strong>Ethernet AI Fabric (RoCEv2 — RDMA over Converged Ethernet v2 روی UDP 4791)</strong>:</p><ul><li><strong>نسبت ۱:۱ Non-Blocking و توپولوژی Rail-Optimized:</strong> هر GPU هم‌شماره در سرورهای مختلف به یک سوئیچ Leaf مشترک (Rail) وصل می‌شود تا ترافیک All-Reduce در ۱ هاپ با صفر Oversubscription انجام شود!</li><li><strong>تنظیم ظریف ECN + PFC (DCQCN):</strong> ابتدا <strong>ECN (Explicit Congestion Notification)</strong> پیش از پر شدن بافر بسته را علامت می‌زند تا فرستنده سرعت را نرم کم کند، و <strong>PFC (802.1Qbb)</strong> صرفاً به عنوان تور ایمنی آخرین لحظه برای جلوگیری از افت بسته عمل می‌کند (بدون ایجاد PFC Deadlock!).</li><li><strong>Dynamic Load Balancing (DLB) / Packet Spraying (و Ultra Ethernet):</strong> جایگزینی 5-tuple ECMP ایستا با پخش هوشمند Cell/Packet روی همه لینک‌های Spine جهت رفع کامل برخورد Elephant Flows.</li></ul>"
+    },
+    {
+      "id": "ccde_04-section-8",
+      "title": "مقایسه اترنت AI (RoCEv2 / Ultra Ethernet) در برابر InfiniBand در کلاسترهای GPU",
+      "html": "<table><thead><tr><th>معیار</th><th>InfiniBand (NDR/XDR)</th><th>AI Ethernet (RoCEv2 + DLB / Ultra Ethernet)</th></tr></thead><tbody><tr><td>مدیریت جریان و تاخیر</td><td>بومی Lossless (Credit-based) با تاخیر بسیار پایین</td><td>Lossless با ECN/DCQCN + PFC و Adaptive Routing (UEC در حال حذف وابستگی به PFC)</td></tr><tr><td>اکوسیستم و قفل فروشنده</td><td>تک‌فروشنده (عملاً NVIDIA) و مهارت تخصصی مجزا</td><td><strong>چندفروشنده‌ای باز</strong>، یکپارچه با تیم و ابزارهای استاندارد شبکه/اتوماسیون</td></tr><tr><td>مقیاس و TCO</td><td>بسیار سریع اما گران در مقیاس چندصدهزار GPU</td><td><strong>مقیاس عظیم و TCO پایین‌تر</strong> با سوئیچ‌های 51.2T اترنت (800G)</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccde_04-section-9",
+      "title": "جلوگیری از معضل Incast در شبکه‌های مقیاس بزرگ و AI",
+      "html": "<p>پدیده <strong>TCP/RDMA Incast</strong> زمانی رخ می‌دهد که ده‌ها یا صدها سرور هم‌زمان داده‌های خود را به یک گیرنده واحد می‌فرستند و بافر مشترک (Shared Buffer) پورت خروجی سوئیچ Leaf در چند میکروثانیه سرریز می‌شود. راه‌حل معمار: استفاده از سوئیچ‌های دارای <strong>Deep Buffer</strong> یا <strong>VOQ (Virtual Output Queuing)</strong>، فعال‌سازی دقیق آستانه‌های <strong>ECN/WRED</strong> و کنترل ترافیک هم‌زمان در لایه اپلیکیشن/کالکتیو (NCCL).</p>"
+    },
+    {
+      "id": "ccde_04-section-10",
+      "title": "اتوماسیون صفرلمس (ZTP) و پایش میکروثانیه‌ای در مقیاس فوق‌بزرگ",
+      "html": "<p>در یک دیتاسنتر با ۲٬۰۰۰ سوئیچ Leaf و Spine، پیکربندی دستی غیرممکن است! کل چرخه عمر از <strong>ZTP (Zero-Touch Provisioning)</strong>، تولید خودکار کانفیگ از <strong>Source of Truth (NetBox)</strong> و <strong>SONiC / NX-OS / EOS</strong> تا تله‌متری لحظه‌ای شمارنده‌های <strong>ECN Mark / PFC Pause / Microburst Buffer Drops</strong> باید ۱۰۰٪ خودکار باشد.</p>"
+    },
+    {
+      "id": "ccde_04-section-11",
+      "title": "کژفهمی‌های رایج درباره شبکه‌های فوق‌بزرگ و AI Fabric",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای کلاستر آموزش AI کافی است همان دیتاسنتر وب با Oversubscription ۳:۱ و ECMP عادی را استفاده کنیم.»</strong> واقعیت: ترافیک Elephant Flow در آموزش GPU روی شبکه ۳:۱ و 5-tuple ECMP دچار افت بسته، Hash Polarization و افت ۴۰–۶۰ درصدی بهره‌وری GPUهای میلیون‌دلاری می‌شود!</li><li><strong>کژفهمی ۲: «در RoCEv2 کافی است فقط PFC را روشن کنیم و به ECN نیازی نیست.»</strong> واقعیت: تکیه صرف به PFC بدون ECN باعث <strong>PFC Pause Storm و Deadlock</strong> در کل فابریک می‌شود؛ ECN باید بسیار زودتر از آستانه PFC سرعت را مهار کند!</li><li><strong>کژفهمی ۳: «انتخاب طراحی مسطح یا سلسله‌مراتبی در مقیاس بزرگ فقط به رنگ یا تعداد کابل بستگی دارد.»</strong> واقعیت: معیار علمی آن سقف جدول مسیر (FIB/RIB) هسته و زمان همگرایی (Convergence) است.</li></ul>"
+    },
+    {
+      "id": "ccde_04-section-12",
+      "title": "اصلاح خطای نسخه قدیمی و چک‌لیست طراحی AI/Hyperscale",
+      "html": "<p><strong>یادداشت ممیزی:</strong> عبارت غلط تایپی نسخه قدیمی به فارسی صحیح و فنی اصلاح شد.</p><p><strong>چک‌لیست معمار Large-Scale:</strong> (۱) محاسبه Switch Radix و تصمیم 3-Stage در برابر 5-Stage Clos، (۲) انتخاب eBGP RFC 7938 برای Underlay، (۳) نسبت ۱:۱ + ECN/PFC + DLB برای AI Fabric، (۴) طراحی ZTP و پایش Microburst.</p>"
+    },
+    {
+      "id": "ccde_04-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> با سوئیچ‌های ۶۴پورت، حداکثر تعداد پورت سرور در 3-Stage Clos (با نسبت ۳:۱) در برابر 5-Stage Clos دارای ۸ Pod (با نسبت ۱:۱ Non-Blocking) چقدر است؟ <strong>پاسخ:</strong> در 3-Stage با نسبت ۳:۱ برابر <code>64 × 48 = 3,072</code> پورت، و در 5-Stage با ۸ Pod و نسبت ۱:۱ Non-Blocking برابر <code>256 × 32 = 8,192</code> پورت سرور (با قابلیت توسعه به ۶۴ Pod)!</p><p><strong>تمرین ۲:</strong> یک دیتاسنتر وب استاندارد با Oversubscription <code>3:1</code>، بدون ECN/PFC و با <code>5-tuple ECMP</code> قصد اجرای RoCEv2 روی کلاستر GPU را دارد. کدام ۳ نقص اصلی باید برطرف شوند؟ <strong>پاسخ:</strong> (۱) تغییر به ۱:۱ Non-Blocking Rail-Optimized، (۲) تنظیم هماهنگ ECN + PFC (DCQCN)، و (۳) ارتقا به Adaptive DLB / Packet Spraying.</p>"
+    },
+    {
+      "id": "ccde_04-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc7938\" target=\"_blank\" rel=\"noopener\">RFC 7938 (Use of BGP for Routing in Large-Scale Data Centers)</a> و <a href=\"https://ultraethernet.org/\" target=\"_blank\" rel=\"noopener\">معماری کنسرسیوم Ultra Ethernet برای AI/HPC</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 برای محاسبات Clos و ممیزی AI Fabric است و به هیچ کلاستر GPU یا سوئیچ Hyperscale زنده متصل نیست.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "اصلاح خطای تایپی نسخه قدیمی («تعداد کابل‌های فیبرpath») و گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، RFC 7938، Rail-Optimized/Ultra Ethernet و مدل‌ساز 5-Stage Clos + AI Fabric."
+  "glossary": [
+    {
+      "term": "5-Stage Clos (Super-Spine)",
+      "fa": "معماری کلوس ۵مرحله‌ای",
+      "simple": "افزودن لایه Super-Spine بالای Podها جهت عبور از محدودیت پورت Spine و مقیاس ده‌ها هزار سرور."
+    },
+    {
+      "term": "Switch Radix",
+      "fa": "ظرفیت پورت یک سوئیچ",
+      "simple": "تعداد کل پورت‌های پرسرعت یک سوئیچ که حداکثر اندازه یک 3-Stage Clos را تعیین می‌کند."
+    },
+    {
+      "term": "RFC 7938 (eBGP Underlay)",
+      "fa": "مسیریابی تماماً eBGP در Clos",
+      "simple": "استفاده از eBGP در Underlay ابرمراکز داده برای حذف طوفان Flooding پروتکل‌های IGP."
+    },
+    {
+      "term": "RoCEv2",
+      "fa": "RDMA روی اترنت همگرا نسخه ۲",
+      "simple": "انتقال مستقیم حافظه-به-حافظه GPUها روی UDP 4791 با تاخیر میکروثانیه‌ای نیازمند شبکه بدون اتلاف."
+    },
+    {
+      "term": "ECN & DCQCN",
+      "fa": "اعلان صریح ازدحام و کنترل نرخ",
+      "simple": "علامت‌گذاری پیش‌فعال بسته‌ها پیش از پر شدن بافر تا فرستنده RoCEv2 نرم سرعت را کاهش دهد."
+    },
+    {
+      "term": "PFC Pause Storm / Deadlock",
+      "fa": "طوفان مکث و بن‌بست PFC",
+      "simple": "خطر توقف کل فابریک در صورت تکیه صرف به PFC بدون تنظیم دقیق آستانه ECN و Watchdog."
+    },
+    {
+      "term": "Elephant Flows",
+      "fa": "جریان‌های غول‌پیکر طویل",
+      "simple": "جریان‌های پرپهنای‌باند آموزش AI که در 5-tuple ECMP معمولی دچار برخورد و Hash Polarization می‌شوند."
+    },
+    {
+      "term": "DLB / Packet Spraying",
+      "fa": "توزیع بار پویا / پاشش بسته",
+      "simple": "پخش هوشمند بسته‌ها یا فلولت‌ها روی تمام لینک‌های Spine بر اساس بار لحظه‌ای صف‌ها."
+    },
+    {
+      "term": "Rail-Optimized Topology",
+      "fa": "توپولوژی بهینه‌شده ریلی GPU",
+      "simple": "اتصال GPUهای هم‌شماره سرورها به یک سوئیچ Leaf مشترک برای ارتباط ۱هاپه در All-Reduce."
+    },
+    {
+      "term": "Tail Latency",
+      "fa": "تاخیر دم (کندترین عضو)",
+      "simple": "در آموزش موازی AI، کل کلاستر منتظر آخرین GPU می‌ماند؛ یک افت بسته کل گام را معطل می‌کند."
+    },
+    {
+      "term": "Incast Congestion",
+      "fa": "ازدحام هم‌زمان چند-به-یک",
+      "simple": "ارسال هم‌زمان ده‌ها فرستنده به یک پورت خروجی و سرریز میکروثانیه‌ای بافر سوئیچ."
+    },
+    {
+      "term": "VOQ (Virtual Output Queuing)",
+      "fa": "صف‌بندی خروجی مجازی",
+      "simple": "معماری بافر پیشرفته سوئیچ‌های شاسی/AI برای جلوگیری از Head-of-Line Blocking."
+    },
+    {
+      "term": "Ultra Ethernet (UEC)",
+      "fa": "استاندارد اولترا اترنت برای AI",
+      "simple": "تکامل مدرن اترنت برای AI/HPC با Packet Spraying و تحمل دریافت خارج از ترتیب بدون نیاز به PFC."
+    },
+    {
+      "term": "Non-Blocking (1:1)",
+      "fa": "بدون انسداد (هم‌رسانی ۱ به ۱)",
+      "simple": "برابری کامل مجموع ظرفیت پورت‌های سرور و ظرفیت لینک‌های Uplink روی هر Leaf."
+    },
+    {
+      "term": "ZTP (Zero-Touch Provisioning)",
+      "fa": "راه‌اندازی خودکار صفرلمس",
+      "simple": "بارگذاری خودکار سیستم‌عامل و کانفیگ صدها سوئیچ Clos بلافاصله پس از روشن شدن."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/ccde_04-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (محاسبه‌گر مقیاس 3-Stage در برابر 5-Stage Clos و ممیزی آمادگی AI/ML RoCEv2 Fabric) — بدون کلاستر GPU واقعی",
+      "executionStatus": "اسکریپت مدل‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ سوئیچ Hyperscale یا کلاستر GPU واقعی متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>مدل‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ کلاستر GPU واقعی یا سوئیچ Hyperscale 400G/800G در این محیط متصل نشده است.</p><p>این مدل‌ساز محلی دو محاسبه کلیدی Large-Scale CCDE را اجرا می‌کند: (۱) مقایسه سقف پورت سرور در <strong>3-Stage Clos</strong> (<code>3,072</code> پورت) در برابر <strong>5-Stage Clos ۸‌پاده ۱:۱</strong> (<code>8,192</code> پورت)، و (۲) ممیزی ۳ پیش‌نیاز فابریک <strong>AI/ML RoCEv2</strong> (نسبت ۱:۱، ECN+PFC و Adaptive DLB/Packet Spraying).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccde_04_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccde_04_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — ccde_04 (CCDE Large Scale Network Design &amp; AI/ML Fabric: 5-Stage Clos &amp; RoCEv2 ECN/PFC)\nCalculates 3-Stage vs 5-Stage Clos (Super-Spine/Pod) maximum server radix and oversubscription with strict\nboundary validation (valid radix, positive oversubscription, non-zero uplinks/servers, pods &lt;= switch_radix),\nand audits AI/ML GPU cluster fabric readiness using an explicit adaptive load-balancing allowlist.\nNo real hyperscale switch fabric or NVIDIA GPU cluster is connected.\n&quot;&quot;&quot;\n\nimport json\n\nADAPTIVE_AI_LB_MODES = frozenset({\n    &quot;adaptive_dlb_packet_spraying&quot;,\n    &quot;adaptive_routing&quot;,\n    &quot;packet_spraying&quot;,\n})\n\n\ndef clos_3stage_max_servers(switch_radix: int, oversubscription: float = 3.0) -&gt; dict:\n    if isinstance(switch_radix, bool) or not isinstance(switch_radix, int) or switch_radix &lt; 4 or switch_radix % 2 != 0:\n        raise ValueError(f&quot;switch_radix must be an even integer &gt;= 4, got {switch_radix!r}&quot;)\n    if isinstance(oversubscription, bool) or not isinstance(oversubscription, (int, float)) or oversubscription &lt;= 0:\n        raise ValueError(f&quot;oversubscription must be &gt; 0, got {oversubscription!r}&quot;)\n    uplinks_per_leaf = int(round(switch_radix / (1.0 + oversubscription)))\n    servers_per_leaf = switch_radix - uplinks_per_leaf\n    if uplinks_per_leaf &lt; 1 or servers_per_leaf &lt; 1:\n        raise ValueError(\n            f&quot;switch_radix={switch_radix} cannot realize oversubscription={oversubscription} &quot;\n            f&quot;(computed uplinks={uplinks_per_leaf}, servers={servers_per_leaf})&quot;\n        )\n    max_leafs = switch_radix\n    return {\n        &quot;topology&quot;: &quot;3-Stage Clos (Leaf-Spine)&quot;,\n        &quot;switch_radix&quot;: switch_radix,\n        &quot;oversubscription_ratio&quot;: f&quot;{round(servers_per_leaf / uplinks_per_leaf, 2)}:1&quot;,\n        &quot;max_leafs&quot;: max_leafs,\n        &quot;max_spines&quot;: uplinks_per_leaf,\n        &quot;max_server_ports&quot;: max_leafs * servers_per_leaf,\n    }\n\n\ndef clos_5stage_max_servers(switch_radix: int, pods: int, oversubscription: float = 1.0) -&gt; dict:\n    if isinstance(switch_radix, bool) or not isinstance(switch_radix, int) or switch_radix &lt; 4 or switch_radix % 2 != 0:\n        raise ValueError(f&quot;switch_radix must be an even integer &gt;= 4, got {switch_radix!r}&quot;)\n    if isinstance(pods, bool) or not isinstance(pods, int) or not (1 &lt;= pods &lt;= switch_radix):\n        raise ValueError(f&quot;pods must be an integer in 1..{switch_radix} (bounded by Super-Spine radix), got {pods!r}&quot;)\n    if isinstance(oversubscription, bool) or not isinstance(oversubscription, (int, float)) or oversubscription &lt;= 0:\n        raise ValueError(f&quot;oversubscription must be &gt; 0, got {oversubscription!r}&quot;)\n    leafs_per_pod = switch_radix // 2\n    uplinks_per_leaf = int(round(switch_radix / (1.0 + oversubscription)))\n    servers_per_leaf = switch_radix - uplinks_per_leaf\n    if uplinks_per_leaf &lt; 1 or servers_per_leaf &lt; 1:\n        raise ValueError(f&quot;Invalid port split for switch_radix={switch_radix}, oversubscription={oversubscription}&quot;)\n    total_leafs = leafs_per_pod * pods\n    return {\n        &quot;topology&quot;: &quot;5-Stage Clos (Leaf -&gt; Pod-Spine -&gt; Super-Spine)&quot;,\n        &quot;switch_radix&quot;: switch_radix,\n        &quot;pods&quot;: pods,\n        &quot;oversubscription_ratio&quot;: f&quot;{round(servers_per_leaf / uplinks_per_leaf, 2)}:1&quot;,\n        &quot;total_leafs&quot;: total_leafs,\n        &quot;total_server_ports&quot;: total_leafs * servers_per_leaf,\n    }\n\n\ndef audit_ai_ml_fabric(cfg: dict) -&gt; dict:\n    oversub = cfg[&quot;oversubscription&quot;]\n    if isinstance(oversub, bool) or not isinstance(oversub, (int, float)) or oversub &lt;= 0:\n        raise ValueError(f&quot;oversubscription must be &gt; 0, got {oversub!r}&quot;)\n    gaps = []\n    if oversub &gt; 1.0:\n        gaps.append(&quot;AI GPU all-reduce collective typically targets 1:1 non-blocking rail-optimized fabric&quot;)\n    if not (cfg[&quot;ecn_enabled&quot;] and cfg[&quot;pfc_enabled&quot;]):\n        gaps.append(&quot;RoCEv2 lossless profile expects ECN (proactive marking) + PFC (last-resort pause) tuned together&quot;)\n    lb = cfg.get(&quot;load_balancing&quot;, &quot;&quot;)\n    if lb not in ADAPTIVE_AI_LB_MODES:\n        gaps.append(\n            f&quot;Load balancing &#x27;{lb}&#x27; is not in adaptive AI allowlist {sorted(ADAPTIVE_AI_LB_MODES)} &quot;\n            &quot;(risk of hash polarization on elephant AI flows)&quot;\n        )\n    return {&quot;profile&quot;: cfg[&quot;name&quot;], &quot;ai_fabric_ready&quot;: len(gaps) == 0, &quot;gaps&quot;: gaps}\n\n\ndef main() -&gt; None:\n    c3 = clos_3stage_max_servers(64, 3.0)\n    c5 = clos_5stage_max_servers(64, 8, 1.0)\n    bad_web = audit_ai_ml_fabric({&quot;name&quot;: &quot;Standard_Web_DC&quot;, &quot;oversubscription&quot;: 3.0, &quot;ecn_enabled&quot;: False, &quot;pfc_enabled&quot;: False, &quot;load_balancing&quot;: &quot;static_5tuple_ecmp&quot;})\n    good_gpu = audit_ai_ml_fabric({&quot;name&quot;: &quot;GPU_AI_Cluster_Fabric&quot;, &quot;oversubscription&quot;: 1.0, &quot;ecn_enabled&quot;: True, &quot;pfc_enabled&quot;: True, &quot;load_balancing&quot;: &quot;adaptive_dlb_packet_spraying&quot;})\n    bad_lb = audit_ai_ml_fabric({&quot;name&quot;: &quot;Unknown_LB_Fabric&quot;, &quot;oversubscription&quot;: 1.0, &quot;ecn_enabled&quot;: True, &quot;pfc_enabled&quot;: True, &quot;load_balancing&quot;: &quot;unknown_lb_mode&quot;})\n\n    assert c3[&quot;max_server_ports&quot;] == 3072\n    assert c5[&quot;total_server_ports&quot;] == 8192\n    assert bad_web[&quot;ai_fabric_ready&quot;] is False and len(bad_web[&quot;gaps&quot;]) == 3\n    assert good_gpu[&quot;ai_fabric_ready&quot;] is True\n    assert bad_lb[&quot;ai_fabric_ready&quot;] is False\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_CCDE_LARGESCALE_AI_MODELER&quot;,\n        &quot;clos_scaling_64port_switches&quot;: {\n            &quot;three_stage_3to1&quot;: c3,\n            &quot;five_stage_8pods_nonblocking&quot;: c5,\n        },\n        &quot;ai_fabric_audits&quot;: [bad_web, good_gpu, bad_lb],\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کشف ۳ شکاف بحرانی در پروفایل <code>Standard_Web_DC</code> و قبولی کامل (<code>ai_fabric_ready: True</code>) در <code>GPU_AI_Cluster_Fabric</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع آستانه‌های بافر ECN پیش از PFC در فابریک RoCEv2 (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference RoCEv2 Buffer Tuning Rule (HLD)\n# ECN Kmin &lt; ECN Kmax &lt; PFC Xoff Pause Threshold &lt; Queue Tail-Drop\n# Goal: ECN throttles senders smoothly BEFORE PFC Pause ever triggers!</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس طراحی شبکه‌های فوق‌بزرگ (Large Scale)، 5-Stage Clos و AI Fabric",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-ccde",
-   "recommendedCourse": "ccde-design",
-   "blueprint": "/academy-assets/v5/blueprints/ccde_04.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_04_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۶: افزودن اعتبارسنجی مرزی switch_radix زوج >=4، oversubscription>0، pods<=switch_radix (محدود به radix سوپر-اسپاین) و لیست مجاز صریح load_balancing در ccde_04_lab.py همراه با تست‌های منفی."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "در طراحی شبکه‌های فوق‌بزرگ (CCDE Large Scale)، مهم‌ترین معیار مهندسی برای انتخاب بین طراحی مسطح و سلسله‌مراتبی چیست؟",
+      "options": [
+        "رنگ کابل‌های شبکه",
+        "تعداد مسیرها در جدول مسیر روترهای هسته (FIB/RIB Scale) و زمان همگرایی (Convergence)",
+        "تعداد پریزهای برق اتاق مدیر",
+        "نام تجاری رک‌ها"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>کنترل اندازه جدول مسیر هسته و زمان همگرایی تعیین می‌کند چه زمانی باید لایه‌های سلسله‌مراتبی و خلاصه‌سازی اضافه کرد.</p>"
+    },
+    {
+      "title": "چه زمانی یک ابرمرکز داده مجبور به گذار از 3-Stage Clos (Leaf-Spine) به 5-Stage Clos (Leaf -> Pod-Spine -> Super-Spine) می‌شود؟",
+      "options": [
+        "وقتی تعداد سوئیچ‌های Leaf از ظرفیت پورت (Radix) یک سوئیچ Spine فراتر می‌رود و نیاز به مقیاس افقی Pod-by-Pod ایجاد می‌شود",
+        "وقتی تنها ۴ سرور داریم",
+        "برای فعال کردن Spanning Tree",
+        "برای کاهش سرعت به ۱ گیگابیت"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>محدودیت Radix سوئیچ Spine سقف 3-Stage Clos است و لایه Super-Spine در 5-Stage Clos امکان رشد تا ده‌ها هزار سرور را می‌دهد.</p>"
+    },
+    {
+      "title": "چرا ابرشرکت‌ها در دیتاسنترهای فوق‌بزرگ از eBGP در لایه Underlay (استاندارد RFC 7938) به جای OSPF/IS-IS استفاده می‌کنند؟",
+      "options": [
+        "زیرا eBGP هیچ آدرس IP نمی‌خواهد",
+        "زیرا eBGP با مدل Path-Vector از طوفان Flooding (LSA/LSP) و محاسبات مکرر SPF در مقیاس چندهزارسوئیچی جلوگیری کرده و Failure Domain کنترل‌پلین را محدود می‌کند",
+        "زیرا OSPF از ECMP پشتیبانی نمی‌کند",
+        "زیرا eBGP لایه ۲ است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>RFC 7938 یکی از تأثیرگذارترین الگوهای طراحی ابرمراکز داده مدرن در جهان است.</p>"
+    },
+    {
+      "title": "چرا در فابریک آموزش هوش مصنوعی (AI/ML GPU Cluster با RoCEv2)، الگوریتم 5-tuple ECMP سنتی ناکارآمد است؟",
+      "options": [
+        "زیرا ترافیک آموزش AI شامل جریان‌های بسیار سنگین و طویل (Elephant Flows) است که در 5-tuple ECMP دچار برخورد هش (Hash Polarization) روی یک لینک و اشباع می‌شوند؛ راه‌حل DLB / Packet Spraying است",
+        "زیرا GPUها از IP استفاده نمی‌کنند",
+        "زیرا ECMP فقط ۱ لینک دارد",
+        "هیچ مشکلی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>توزیع بار پویا (DLB) یا پاشش بسته (Packet Spraying) تمام ظرفیت لینک‌های Spine را به طور یکنواخت برای جریان‌های AI به کار می‌گیرد.</p>"
+    },
+    {
+      "title": "رابطه صحیح میان آستانه‌های ECN و PFC در تنظیم یک فابریک بدون اتلاف RoCEv2 چیست؟",
+      "options": [
+        "PFC باید بسیار زودتر از ECN فعال شود",
+        "آستانه علامت‌گذاری ECN باید زودتر از آستانه مکث PFC تنظیم شود تا فرستنده نرم سرعت را کم کند و PFC تنها به عنوان تور ایمنی آخرین لحظه (بدون Pause Storm) عمل نماید",
+        "نیازی به هیچ‌کدام نیست",
+        "ECN باعث Drop فوری همه بسته‌ها می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تنظیم دقیق <code>ECN &lt; PFC &lt; Tail-Drop</code> کلید پایداری شبکه بدون اتلاف RoCEv2 است.</p>"
+    },
+    {
+      "title": "منظور از طراحی «Rail-Optimized» در کلاسترهای GPU (مانند سرورهای ۸-GPU) چیست؟",
+      "options": [
+        "نصب سرورها روی ریل قطار",
+        "استفاده از کابل مسی Cat5",
+        "اتصال GPUهای هم‌شماره (مثلاً همه GPU0ها) از سرورهای مختلف به یک سوئیچ Leaf مشترک تا ترافیک All-Reduce در ۱ هاپ با نسبت ۱:۱ انجام شود",
+        "اتصال همه GPUها به یک پورت ۱ گیگابیتی"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Rail-Optimized ترافیک سنگین همگام‌سازی بین GPUهای هم‌شماره را در کوتاه‌ترین مسیر (یک سوئیچ Leaf) بدون عبور از Spine نگه می‌دارد.</p>"
+    },
+    {
+      "title": "پدیده Incast در شبکه‌های مقیاس بزرگ و AI چگونه رخ می‌دهد؟",
+      "options": [
+        "وقتی همه سرورها خاموش‌اند",
+        "وقتی فقط یک سرور ترافیک می‌فرستد",
+        "وقتی ده‌ها یا صدها سرور هم‌زمان به یک پورت گیرنده واحد داده می‌فرستند و بافر پورت خروجی در چند میکروثانیه سرریز می‌شود",
+        "وقتی DNS قطع است"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>مهار Incast نیازمند بافر مناسب (یا VOQ)، تنظیم دقیق ECN و زمان‌بندی هوشمند در سطح کلکتیو است.</p>"
+    },
+    {
+      "title": "چرا در آموزش موازی LLM روی هزاران GPU، شاخص «Tail Latency» (تاخیر دم) بسیار حیاتی‌تر از میانگین تاخیر است؟",
+      "options": [
+        "زیرا در هر گام همگام‌سازی (All-Reduce)، تمام هزاران GPU باید منتظر کندترین GPU بمانند و افت حتی یک بسته زمان کل کلاستر میلیون‌دلاری را تلف می‌کند",
+        "زیرا میانگین همیشه صفر است",
+        "زیرا Tail Latency فقط مربوط به صوت است",
+        "هیچ اهمیتی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در پردازش موازی همگام، یک Microburst کوچک روی یک لینک می‌تواند کل بهره‌وری کلاستر GPU را افت دهد.</p>"
+    },
+    {
+      "title": "نسبت هم‌رسانی (Oversubscription) استاندارد در فابریک آموزش GPU هوش مصنوعی در مقایسه با دیتاسنتر وب عادی (۳:۱) چیست؟",
+      "options": [
+        "۱۰:۱ برای صرفه‌جویی",
+        "۱:۱ Non-Blocking (بدون انسداد؛ برابری کامل ظرفیت سرور و Uplink)",
+        "۲۰:۱ روی لینک ۱ گیگابیتی",
+        "اهمیتی ندارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>هزینه GPUها بسیار بیشتر از سوئیچ شبکه است؛ هرگز نباید با Oversubscription در شبکه، GPUهای گران‌قیمت را بیکار نگه داشت!</p>"
+    },
+    {
+      "title": "هدف کنسرسیوم Ultra Ethernet (UEC) در نسل جدید فابریک‌های AI/HPC چیست؟",
+      "options": [
+        "بازگشت به اترنت ۱۰ مگابیتی",
+        "حذف کامل IP از دیتاسنتر",
+        "تکامل استاندارد باز اترنت با Packet Spraying، پذیرش بسته‌های خارج از ترتیب و کنترل ازدحام مدرن بدون وابستگی شکننده به PFC",
+        "قفل کردن بازار روی یک فروشنده خاص"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Ultra Ethernet پاسخ استاندارد و چندفروشنده‌ای اترنت به چالش‌های مقیاس صدهزار GPUیی است.</p>"
+    },
+    {
+      "title": "معماری VOQ (Virtual Output Queuing) در سوئیچ‌های شاسی و AI چه مزیتی دارد؟",
+      "options": [
+        "جلوگیری از Head-of-Line Blocking از طریق نگه‌داری صف‌های مجزا در ورودی به ازای هر پورت خروجی و انتقال بدون افت روی فابریک داخلی",
+        "حذف کامل حافظه بافر",
+        "تبدیل اترنت به Token Ring",
+        "کاهش تعداد پورت‌ها"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>VOQ مانع از آن می‌شود که ازدحام روی یک پورت خروجی، بسته‌های سالم عازم پورت‌های خروجی دیگر را مسدود کند.</p>"
+    },
+    {
+      "title": "چرا در دیتاسنترهای فوق‌بزرگ (Hyperscale)، معماری ۵-Stage Clos (Super-Spine / Spine / Leaf) جایگزین ۳-Stage Clos می‌شود؟",
+      "options": [
+        "برای کاهش تعداد سرورهای قابل اتصال",
+        "هنگامی که تعداد Leafها از ظرفیت پورت (Radix) یک لایه Spine فراتر می‌رود، ۵-Stage Clos امکان مقیاس افقی به ده‌ها هزار سرور را با Podهای مستقل و ECMP یکنواخت می‌دهد",
+        "برای حذف کامل مسیریابی لایه ۳",
+        "برای اجرای STP روی کل دیتاسنتر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در مقیاس فوق‌بزرگ، محدودیت پورت (Radix) سوئیچ‌های Spine مانع رشد ۳-Stage است؛ تقسیم شبکه به Podها و اتصال از طریق لایه Super-Spine مقیاس‌پذیری تقریباً خطی ایجاد می‌کند.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.6",
+    "legacyId": "ccde_04",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc7938",
+      "https://ultraethernet.org/"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک مدل‌ساز محلی در Python 3 است و به هیچ کلاستر GPU یا سوئیچ Hyperscale زنده متصل نیست."
+    ],
+    "legacyAuditFixes": [
+      "اصلاح خطای تایپی نسخه قدیمی («تعداد کابل‌های فیبرpath») و گسترش به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، RFC 7938، Rail-Optimized/Ultra Ethernet و مدل‌ساز 5-Stage Clos + AI Fabric."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccde_04-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-ccde",
+      "recommendedCourse": "ccde-design",
+      "blueprint": "/academy-assets/v5/blueprints/ccde_04.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccde_04_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۶: افزودن اعتبارسنجی مرزی switch_radix زوج >=4، oversubscription>0، pods<=switch_radix (محدود به radix سوپر-اسپاین) و لیست مجاز صریح load_balancing در ccde_04_lab.py همراه با تست‌های منفی."
+    ]
+  }
 }

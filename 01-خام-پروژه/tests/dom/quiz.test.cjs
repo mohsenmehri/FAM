@@ -48,13 +48,15 @@ assert.deepEqual(persisted.at(-1).completed, [], 'quiz result is not automatic c
 render();
 assert.match(result(), /آخرین نتیجه ثبت‌شده: 12 از 12/);
 // A different signed-in account does not load the first account's result.
-w.FamAcademyBridge = {progress:{completed:[], labs:{}}, saveProgress(payload){this.progress=payload;return Promise.resolve(true);}};
+w.FamAcademyBridge = {progress:{completed:[], labs:{lessonNotes:{[bp.lessonId]: 'یادداشت حساب دوم'}}}, saveProgress(payload){this.progress=payload;return Promise.resolve(true);}};
 render();
 assert.equal(result(),'');
+assert.equal(w.document.querySelector('#le-lesson-notes').value, 'یادداشت حساب دوم', 'signed-in account loads its own synced notes');
 // A standalone session has its own local key, independent of authenticated data.
 delete w.FamAcademyBridge;
 render();
 assert.equal(result(),'');
+assert.equal(w.document.querySelector('#le-lesson-notes').value, '', 'standalone session does not leak signed-in account notes');
 grade();
 assert.equal(JSON.parse(w.localStorage.getItem('fam_academy_quiz_v1'))[bp.lessonId].correct,0);
 render();

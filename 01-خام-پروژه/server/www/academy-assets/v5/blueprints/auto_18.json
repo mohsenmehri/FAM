@@ -1,340 +1,340 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "auto_18",
- "objectiveId": "auto_18",
- "kind": "lesson",
- "track": "Automation",
- "course": "automation-foundations",
- "title": "۷.۷ Automation (درس ۱۸ از ۲۰): تست خودکار شبکه (pyATS / Genie / Batfish)",
- "titleEn": "Automation 18: Automated Network Testing & Verification with pyATS, Genie, Dq & Batfish",
- "domain": "Network Automation",
- "source": "Legacy auto_18 rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [],
- "sections": [
-  {
-   "id": "auto_18-section-1",
-   "title": "مسئله واقعی: چرا پنج تا ping دستی پس از تغییر BGP یک توهم خطرناک از سلامت شبکه است؟",
-   "html": "<p>پینگ گرفتن از چند IP شناخته‌شده پس از یک تغییر بزرگ مسیریابی یا فایروال فقط ۵ درصد واقعیت را نشان می‌دهد؛ ممکن است یکی از ۱۰ همسایه BGP در VRF مالی قطع شده باشد، یک مسیر پشتیبان به حلقه مسیریابی (Routing Loop) افتاده باشد یا یک سطر ACL ترافیک مهمی را مسدود کرده باشد! دو ابزار مکمل و استاندارد صنعت این خلأ را پر می‌کنند: <strong>Batfish</strong> برای تحلیل ریاضی <em>پیش از استقرار</em> و <strong>Cisco pyATS / Genie</strong> برای تست، پارس ساختاریافته و مقایسه زنده (<code>Pre/Post Diff</code>).</p>"
-  },
-  {
-   "id": "auto_18-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> پایتون (درس <code>auto_02</code>)، CI/CD شبکه (درس <code>auto_16</code>) و مبانی BGP/OSPF/ACL.</p><ul><li>تبیین معماری <strong>Cisco pyATS</strong> (فریم‌ورک تست مستقل از پلتفرم)، <strong>Genie</strong> (پارس‌ها و مدل‌های عملیاتی چندفروشنده‌ای) و فایل <strong>Testbed YAML</strong>.</li><li>ساختارنویسی تست خودکار با <strong>AEtest</strong> (<code>CommonSetup</code>، <code>Testcase</code>، <code>CommonCleanup</code>) و کوئری سریع روی دیکشنری‌های تو در تو با <strong><code>Dq</code></strong>.</li><li>اجرای جریان عملیاتی <strong>Pre-Change / Post-Change Snapshot Diff</strong> (<code>genie learn</code> و <code>genie diff</code>).</li><li>تبیین تحلیل ریاضی پیش از استقرار با <strong>Batfish</strong> (کشف Routing Loop، Blackhole، خطای ACL و شکست همسایگی BGP پیش از ارسال حتی یک دستور به روتر!).</li></ul>"
-  },
-  {
-   "id": "auto_18-section-3",
-   "title": "Cisco pyATS و Genie: از خروجی متنی شکننده تا مدل داده عملیاتی استاندارد",
-   "html": "<p><strong>pyATS (Python Automated Test Systems)</strong> چارچوب رسمی تست پایتون است که توسط سیسکو ساخته شده اما معماری آن <strong>مستقل از پلتفرم (Platform-Agnostic)</strong> است و از IOS-XE، NX-OS، IOS-XR، ASA، Junos، EOS و لینوکس پشتیبانی می‌کند. کتابخانه <strong>Genie</strong> روی pyATS سوار شده و هزاران Parser آماده (برای تبدیل خروجی‌هایی مثل <code>show ip bgp summary</code> یا <code>show interfaces</code> به دیکشنری تمیز Python) و مدل‌های یکپارچه (<code>Ops</code>) میان سیستم‌عامل‌های مختلف فراهم می‌آورد.</p>"
-  },
-  {
-   "id": "auto_18-section-4",
-   "title": "نمودار مقایسه و تکمیل‌کنندگی Batfish (پیش از استقرار) و pyATS/Genie (زنده)",
-   "html": "<p>نمودار زیر نشان می‌دهد چگونه Batfish و pyATS دو سمت چرخه تست شبکه را به‌صورت مکمل پوشش می‌دهند.</p><svg viewBox=\"0 0 760 215\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Automated Network Testing: Batfish Pre-Deployment Static Analysis vs pyATS/Genie Live Verification\"><rect x=\"14\" y=\"18\" width=\"348\" height=\"178\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"188\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">PRE-DEPLOY: Batfish (Static Model)</text><text x=\"188\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Inputs: Candidate Config Files ONLY</text><text x=\"188\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">Builds Mathematical Control/Data Plane</text><text x=\"188\" y=\"122\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">Catches BEFORE push: Loops, Blackholes,</text><text x=\"188\" y=\"140\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">Unreachable ACL lines &amp; BGP Misconfigs</text><text x=\"188\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Zero packet sent to live network!</text><rect x=\"398\" y=\"18\" width=\"348\" height=\"178\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"572\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">PRE/POST LIVE: pyATS &amp; Genie</text><text x=\"572\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Testbed YAML + Multi-Vendor Parsers</text><text x=\"572\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">AEtest (CommonSetup -&gt; Testcase -&gt; Cleanup)</text><text x=\"572\" y=\"122\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Dq: Query Nested Operational Dicts</text><text x=\"572\" y=\"146\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">genie diff pre_snapshot/ post_snapshot/</text><text x=\"572\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Proves live BGP/OSPF/Interfaces stayed UP</text><line x1=\"362\" y1=\"107\" x2=\"398\" y2=\"107\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
-  },
-  {
-   "id": "auto_18-section-5",
-   "title": "ساختار AEtest و قدرت فیلتر کردن داده‌های عمیق با Dq",
-   "html": "<p>موتور تست <strong>AEtest</strong> هر تست شبکه را در سه فاز منظم اجرا می‌کند: <code>CommonSetup</code> (اتصال به تجهیزات تعریف‌شده در <code>testbed.yml</code>)، یک یا چند <code>Testcase</code> (هرکدام دارای <code>@aetest.test</code> با خروجی <code>passed / failed / blocked</code>) و <code>CommonCleanup</code> (بستن تمیز اتصالات).</p><p><strong>چرا <code>Dq</code> (Dictionary Query) زندگی مهندس را نجات می‌دهد؟</strong> خروجی پارس‌شده <code>show bgp all summary</code> یک دیکشنری ۵-سطحی تو در تو است! به‌جای نوشتن پنج حلقه <code>for</code> پرخطا، با یک خط <code>Dq(parsed).contains('Active').get_values('neighbor')</code> می‌توان سریع و خوانا همسایه‌های قطع‌شده را استخراج و روی آن‌ها Assertion نوشت.</p>"
-  },
-  {
-   "id": "auto_18-section-6",
-   "title": "الگوی طلایی Pre-Check / Post-Check Snapshot Diff با Genie CLI",
-   "html": "<p>حتی بدون نوشتن یک خط کد پایتون، Genie CLI اجازه می‌دهد پیش و پس از پنجره تغییرات از وضعیت کل شبکه Snapshot بگیرید و تفاوت دقیق عملیاتی را ببینید:</p><pre dir=\"ltr\"><code># Reference Genie CLI workflow (NOT executed against live routers)\ngenie learn bgp ospf routing interface --testbed-file tb.yml --output pre_change\n# ... apply network change ...\ngenie learn bgp ospf routing interface --testbed-file tb.yml --output post_change\ngenie diff pre_change post_change --exclude \"uptime|packets|octets\"</code></pre><p>دقت کنید که با <code>--exclude</code> شمارنده‌های همیشه متغیر (مثل <code>uptime</code> و شمارنده بسته‌ها) حذف می‌شوند تا تنها تغییرات واقعی (مثل افت یک مسیر یا همسایه) برجسته گردند!</p>"
-  },
-  {
-   "id": "auto_18-section-7",
-   "title": "Batfish: تحلیل ریاضی و پیش‌بینانه شبکه پیش از اعمال تغییر",
-   "html": "<p><strong>Batfish</strong> (متن‌باز) یک رویکرد کاملاً متفاوت و مکمل دارد: به هیچ روتر زنده‌ای وصل نمی‌شود! بلکه صرفاً <strong>فایل‌های پیکربندی متنی پیشنهادی (Candidate Configs)</strong> همه روترها و فایروال‌ها را می‌خواند، مدل ریاضی دقیق <strong>Control Plane (OSPF/BGP/Static)</strong> و <strong>Data Plane (FIB/ACL)</strong> می‌سازد و پیش از استقرار به پرسش‌های حیاتی پاسخ می‌دهد:</p><ul><li>آیا برای ترافیک از شعبه A به دیتاسنتر <strong>Routing Loop</strong> یا <strong>Blackhole</strong> رخ می‌دهد؟</li><li>آیا همه نشست‌های BGP/OSPF از نظر ASN، Area و Subnet هم‌خوانند و Up می‌شوند؟</li><li>آیا در ACL فایروال سطرهای غیرقابل دسترس (Unreachable/Shadowed Rules) وجود دارد یا ترافیک غیرمجازی عبور می‌کند؟</li></ul>"
-  },
-  {
-   "id": "auto_18-section-8",
-   "title": "جایگاه Batfish و pyATS در پایپ‌لاین CI/CD (چپ‌شیفت کردن کیفیت)",
-   "html": "<p>بهترین معماری، ترکیب هر دو در یک CI/CD Pipeline است: در مرحله <strong>CI (پیش از ادغام PR)</strong>، Batfish روی پیکربندی‌های رندرشده با Jinja2/Terraform تحلیل ریاضی می‌زند تا هیچ Loop یا خطای ACL به تولید نرسد؛ و در مرحله <strong>Post-Deploy Verify</strong>، pyATS/Genie روی شبکه زنده تأیید می‌کند که همه همسایه‌ها و سرویس‌ها واقعاً پایدار مانده‌اند.</p>"
-  },
-  {
-   "id": "auto_18-section-9",
-   "title": "مقایسه جامع pyATS/Genie و Batfish",
-   "html": "<table><thead><tr><th>معیار</th><th>Batfish</th><th>Cisco pyATS / Genie</th></tr></thead><tbody><tr><td>زمان اجرا</td><td><strong>پیش از استقرار</strong> (روی فایل‌های کانفیگ)</td><td><strong>حین/پس از استقرار</strong> (روی تجهیزات زنده یا آزمایشگاه مجازی)</td></tr><tr><td>نیاز به تجهیز زنده یا شبیه‌ساز سنگین</td><td>خیر (تحلیل استاتیک ریاضی در ثانیه)</td><td>بله (اتصال به روتر واقعی یا CML/Containerlab)</td></tr><tr><td>نقاط قوت اصلی</td><td>اثبات جامع Reachability، کشف Loop/Blackhole و Shadowed ACL در همه مسیرها</td><td>بررسی وضعیت سخت‌افزار، شمارنده‌ها، همسایه‌های واقعی و Pre/Post Operational Diff</td></tr><tr><td>محدودیت</td><td>باگ‌های سخت‌افزاری/فریم‌ور یا قطعی کابل فیزیکی را نمی‌بیند</td><td>فقط حالت‌هایی را می‌بیند که تست نوشته‌شده واقعاً از تجهیز می‌پرسد</td></tr></tbody></table>"
-  },
-  {
-   "id": "auto_18-section-10",
-   "title": "طراحی Testcaseهای قابل اعتماد (پرهیز از Flaky Tests)",
-   "html": "<p>تست شبکه اگر بر مقادیر ناپایدار (مثل <code>uptime</code> یا تاخیر لحظه‌ای) تکیه کند، خطای کاذب (Flaky) می‌دهد و تیم اعتمادش را از دست می‌دهد. همیشه تست‌ها را بر پایه <strong>قراردادهای پایدار</strong> بنویسید: تعداد همسایه‌های <code>Established</code>، وجود Prefixهای حیاتی در RIB، نبود خطای CRC روبه‌رشد و حفظ وضعیت <code>admin/oper up</code> اینترفیس‌های کلیدی.</p>"
-  },
-  {
-   "id": "auto_18-section-11",
-   "title": "کژفهمی‌های رایج درباره تست خودکار شبکه",
-   "html": "<ul><li><strong>کژفهمی ۱: «pyATS فقط روی تجهیزات سیسکو کار می‌کند.»</strong> واقعیت: هسته pyATS مستقل از پلتفرم است و Genie پارس‌های متعددی برای Junos، Arista EOS، Linux و سایر برندها نیز دارد.</li><li><strong>کژفهمی ۲: «اگر Batfish خطایی ندید، دیگر نیازی به تست زنده پس از استقرار نیست.»</strong> واقعیت: Batfish مدل منطقی کانفیگ را می‌سنجد؛ مشکلات لایه فیزیکی، باگ‌های نرم‌افزاری سیستم‌عامل روتر یا افت Transceiver را فقط تست زنده (pyATS/Telemetry) کشف می‌کند.</li><li><strong>کژفهمی ۳: «در genie diff باید همه فیلدها بدون استثنا مقایسه شوند.»</strong> واقعیت: مقایسه نکردن با <code>--exclude</code> برای فیلدهای متغیر مثل <code>uptime</code> و شمارنده‌ها باعث تولید هزاران خط تفاوت بی‌معنی (Noise) می‌شود.</li></ul>"
-  },
-  {
-   "id": "auto_18-section-12",
-   "title": "عیب‌یابی خطاهای رایج در اجرای تست‌های pyATS و Batfish",
-   "html": "<p><strong>خطای ۱ — <code>SchemaEmptyParserError</code> در Genie:</strong> خروجی دستور روی تجهیز خالی بوده (مثلاً BGP اصلاً روی آن روتر فعال نیست) یا نسخه جدید سیستم‌عامل فرمت خروجی را کمی عوض کرده است؛ باید در کد با <code>try/except</code> مدیریت و نسخه <code>genie.libs.parser</code> به‌روزرسانی شود.</p><p><strong>خطای ۲ — هشدار خطای پارس Batfish روی بخشی از کانفیگ:</strong> Batfish ممکن است دستور بسیار جدید یا اختصاصی یک برند را نشناسد؛ همیشه گزارش <code>initIssues()</code> و <code>fileParseStatus()</code> را در Batfish بررسی کنید تا از پوشش کامل مطمئن شوید.</p>"
-  },
-  {
-   "id": "auto_18-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> در جدول مسیریابی پیشنهادی، <code>R1</code> پیشوند <code>10.50.0.0/24</code> را به <code>R2</code> می‌فرستد و <code>R2</code> همان پیشوند را دوباره به <code>R1</code> برمی‌گرداند؛ همچنین <code>R1</code> پیشوند <code>10.99.0.0/24</code> را به <code>R3</code> می‌فرستد که هیچ مسیری ندارد. تحلیلگر شبه-Batfish پیش از استقرار چه دو خطایی گزارش می‌دهد؟ <strong>پاسخ:</strong> برای <code>10.50.0.0/24</code> خطای <strong><code>ROUTING_LOOP</code></strong> (<code>R1 -> R2 -> R1</code>) و برای <code>10.99.0.0/24</code> خطای <strong><code>BLACKHOLE</code></strong> روی <code>R3</code> — هر دو پیش از لمس حتی یک روتر واقعی!</p><p><strong>تمرین ۲:</strong> پس از استقرار، خروجی پارس‌شده BGP نشان می‌دهد همسایه <code>10.0.0.3</code> از <code>Established</code> به <code>Active</code> رفته است. موتور فیلتر شبه-<code>Dq</code> چه خروجی می‌دهد؟ <strong>پاسخ:</strong> فهرست همسایه‌های ناسالم <code>['10.0.0.3']</code> را برمی‌گرداند و باعث شکست Assertion تست و آغاز Rollback می‌شود.</p>"
-  },
-  {
-   "id": "auto_18-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://developer.cisco.com/docs/pyats/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Cisco pyATS و Genie</a> و <a href=\"https://batfish.readthedocs.io/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Batfish</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 stdlib است که منطق فیلتر شبه-<code>Dq</code> و تحلیل گراف مسیریابی شبه-Batfish را شبیه‌سازی و آزمون می‌کند؛ هیچ سرویس واقعی Batfish یا کتابخانه نصب‌شده pyATS روی روتر زنده اجرا نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "pyATS",
-   "fa": "چارچوب تست pyATS",
-   "simple": "Python Automated Test Systems؛ فریم‌ورک تست خودکار شبکه مستقل از پلتفرم ساخت سیسکو."
-  },
-  {
-   "term": "Genie",
-   "fa": "کتابخانه Genie",
-   "simple": "لایه Parserها، مدل‌های عملیاتی چندفروشنده‌ای (Ops) و ابزار diff روی pyATS."
-  },
-  {
-   "term": "AEtest",
-   "fa": "موتور تست AEtest",
-   "simple": "ساختار اجرای تست‌های pyATS در سه فاز CommonSetup، Testcase و CommonCleanup."
-  },
-  {
-   "term": "Dq (Dictionary Query)",
-   "fa": "ابزار جست‌وجوی Dq",
-   "simple": "رابط زنجیره‌ای در pyATS/Genie برای فیلتر و استخراج سریع داده از دیکشنری‌های عمیق پارس‌شده."
-  },
-  {
-   "term": "Testbed YAML",
-   "fa": "فایل Testbed",
-   "simple": "فایل YAML تعریف‌کننده تجهیزات، سیستم‌عامل، پروتکل اتصال و اعتبارنامه در pyATS."
-  },
-  {
-   "term": "genie learn & diff",
-   "fa": "اسنپ‌شات و مقایسه عملیاتی",
-   "simple": "ثبت وضعیت پیش و پس از تغییر و محاسبه دقیق تفاوت عملیاتی با حذف نویز شمارنده‌ها."
-  },
-  {
-   "term": "Batfish",
-   "fa": "تحلیلگر استاتیک Batfish",
-   "simple": "ابزار متن‌باز تحلیل ریاضی فایل‌های کانفیگ شبکه پیش از استقرار برای کشف خطاها."
-  },
-  {
-   "term": "Routing Loop",
-   "fa": "حلقه مسیریابی",
-   "simple": "ارسال چرخه‌ای بسته میان چند روتر بدون رسیدن به مقصد؛ قابل کشف پیش‌ازاستقرار در Batfish."
-  },
-  {
-   "term": "Blackhole",
-   "fa": "سیاه‌چاله مسیریابی",
-   "simple": "ارسال بسته به مسیریابی که راهی به مقصد ندارد و بسته را بی‌صدا Drop می‌کند."
-  },
-  {
-   "term": "Shadowed ACL Rule",
-   "fa": "قانون ACL پوشیده‌شده",
-   "simple": "سطر ACL که به دلیل پوشش کامل توسط سطرهای بالاتر هرگز اجرا نمی‌شود."
-  },
-  {
-   "term": "Control vs Data Plane Model",
-   "fa": "مدل صفحه کنترل و داده",
-   "simple": "بازسازی ریاضی جدول‌های BGP/OSPF (Control) و مسیر واقعی بسته (Data) در Batfish."
-  },
-  {
-   "term": "Pre/Post Check",
-   "fa": "بررسی پیش و پس از تغییر",
-   "simple": "مقایسه وضعیت عملیاتی شبکه بلافاصله قبل و بعد از پنجره تغییر."
-  },
-  {
-   "term": "Flaky Test",
-   "fa": "تست ناپایدار",
-   "simple": "تستی که به دلیل اتکا به فیلدهای متغیر (مثل uptime) خطای کاذب متناوب تولید می‌کند."
-  },
-  {
-   "term": "Shift-Left Testing",
-   "fa": "انتقال تست به مراحل اولیه",
-   "simple": "کشف خطاها در مرحله کدنویسی و PR (با Batfish) به جای کشف پس از اختلال تولیدی."
-  },
-  {
-   "term": "Assertion",
-   "fa": "گزاره راستی‌آزمایی",
-   "simple": "شرط قطعی در تست خودکار (مثل Established بودن همه همسایه‌های BGP) برای Pass/Fail."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (فیلتر شبه-Dq برای افت BGP و تحلیل گراف شبه-Batfish برای Loop/Blackhole) — ابزار زنده اجرا نشده",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ سرویس واقعی Batfish یا کتابخانه pyATS روی تجهیزات زنده اجرا نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور Batfish، بسته نصب‌شده pyATS/Genie یا روتر واقعی در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی دو بخش مکمل را آزمون می‌کند: (۱) فیلتر شبه-<code>Dq</code> که افت همسایه BGP <code>10.0.0.3</code> به حالت <code>Active</code> را پس از تغییر کشف می‌کند، و (۲) ردیاب گراف شبه-Batfish که پیش از استقرار یک <strong>Routing Loop</strong> (<code>R1->R2->R1</code>) و یک <strong>Blackhole</strong> (<code>R1->R3</code>) را تشخیص می‌دهد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_18_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_18_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_18: Automated Network Testing (pyATS/Genie Dq &amp;\nBatfish-style Pre-Deployment Graph Verification) Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of Genie operational diff,\nDq-style nested state filtering, and Batfish-style static routing-loop /\nblackhole verification before production push. No live pyATS/Batfish runtime.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\n\ndef dq_filter_down_bgp_peers(bgp_parsed: dict) -&gt; list[str]:\n    if not isinstance(bgp_parsed, dict):\n        raise ValueError(f&quot;bgp_parsed must be a dict, got {type(bgp_parsed).__name__}&quot;)\n    down = []\n    for vrf_data in bgp_parsed.get(&quot;vrf&quot;, {}).values():\n        for peer_ip, info in vrf_data.get(&quot;neighbor&quot;, {}).items():\n            if info.get(&quot;session_state&quot;) != &quot;Established&quot;:\n                down.append(peer_ip)\n    return sorted(down)\n\n\ndef batfish_style_trace(rib: dict[str, dict[str, str]], start_router: str, dst_prefix: str) -&gt; dict:\n    if not isinstance(rib, dict):\n        raise ValueError(&quot;rib must be a dict mapping router -&gt; {prefix: next_hop}&quot;)\n    if not isinstance(start_router, str) or not start_router.strip():\n        raise ValueError(&quot;start_router must be a non-empty str&quot;)\n    if not isinstance(dst_prefix, str) or not dst_prefix.strip():\n        raise ValueError(&quot;dst_prefix must be a non-empty str&quot;)\n    visited: list[str] = []\n    cur = start_router\n    while True:\n        if cur in visited:\n            return {&quot;outcome&quot;: &quot;ROUTING_LOOP&quot;, &quot;path&quot;: visited + [cur]}\n        visited.append(cur)\n        next_hop = rib.get(cur, {}).get(dst_prefix)\n        if next_hop is None:\n            return {&quot;outcome&quot;: &quot;BLACKHOLE&quot;, &quot;path&quot;: visited}\n        if next_hop == &quot;LOCAL_DELIVER&quot;:\n            return {&quot;outcome&quot;: &quot;DELIVERED&quot;, &quot;path&quot;: visited}\n        cur = next_hop\n\n\ndef main() -&gt; None:\n    pre_bgp = {&quot;vrf&quot;: {&quot;default&quot;: {&quot;neighbor&quot;: {\n        &quot;10.0.0.2&quot;: {&quot;session_state&quot;: &quot;Established&quot;, &quot;prefixes&quot;: 120},\n        &quot;10.0.0.3&quot;: {&quot;session_state&quot;: &quot;Established&quot;, &quot;prefixes&quot;: 85},\n    }}}}\n    post_bgp = {&quot;vrf&quot;: {&quot;default&quot;: {&quot;neighbor&quot;: {\n        &quot;10.0.0.2&quot;: {&quot;session_state&quot;: &quot;Established&quot;, &quot;prefixes&quot;: 120},\n        &quot;10.0.0.3&quot;: {&quot;session_state&quot;: &quot;Active&quot;, &quot;prefixes&quot;: 0},\n    }}}}\n    pre_down = dq_filter_down_bgp_peers(pre_bgp)\n    post_down = dq_filter_down_bgp_peers(post_bgp)\n    assert pre_down == [] and post_down == [&quot;10.0.0.3&quot;]\n\n    candidate_rib = {\n        &quot;R1&quot;: {&quot;10.50.0.0/24&quot;: &quot;R2&quot;, &quot;10.99.0.0/24&quot;: &quot;R3&quot;, &quot;10.10.0.0/24&quot;: &quot;R2&quot;},\n        &quot;R2&quot;: {&quot;10.50.0.0/24&quot;: &quot;R1&quot;, &quot;10.10.0.0/24&quot;: &quot;LOCAL_DELIVER&quot;},  # Loop on 10.50.0.0/24!\n        &quot;R3&quot;: {},  # Blackhole on 10.99.0.0/24!\n    }\n    loop_res = batfish_style_trace(candidate_rib, &quot;R1&quot;, &quot;10.50.0.0/24&quot;)\n    bh_res = batfish_style_trace(candidate_rib, &quot;R1&quot;, &quot;10.99.0.0/24&quot;)\n    ok_res = batfish_style_trace(candidate_rib, &quot;R1&quot;, &quot;10.10.0.0/24&quot;)\n    assert loop_res[&quot;outcome&quot;] == &quot;ROUTING_LOOP&quot;\n    assert bh_res[&quot;outcome&quot;] == &quot;BLACKHOLE&quot;\n    assert ok_res[&quot;outcome&quot;] == &quot;DELIVERED&quot;\n\n    print(&quot;=== auto_18 pyATS/Genie Dq &amp; Batfish-Style Pre-Check Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;genie_dq_post_change_down_bgp_peers&quot;: post_down,\n        &quot;batfish_style_loop_check&quot;: loop_res,\n        &quot;batfish_style_blackhole_check&quot;: bh_res,\n        &quot;batfish_style_healthy_check&quot;: ok_res,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>genie_dq_post_change_down_bgp_peers: ['10.0.0.3']</code>، <code>batfish_style_loop_check.outcome: 'ROUTING_LOOP'</code> و <code>batfish_style_blackhole_check.outcome: 'BLACKHOLE'</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع اجرای <code>Dq</code> در محیط دارای pyATS/Genie (اجرا نشده در این مخزن):</strong></p><pre dir=\"ltr\"><code># Reference pyATS/Genie Dq snippet (NOT executed against live routers)\nfrom genie.utils import Dq\nactive_peers = Dq(parsed_bgp).contains(\"Active\").get_values(\"neighbor\")</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس تست خودکار شبکه (pyATS / Genie / Batfish)",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "توصیف دقیق Cisco pyATS در اکوسیستم اتوماسیون شبکه کدام است؟",
-   "options": [
-    "چارچوب تست خودکار مستقل از پلتفرم (ساخته‌شده توسط سیسکو و قابل استفاده برای چندین سیستم‌عامل شبکه) برای راستی‌آزمایی عملیاتی",
-    "ابزار طراحی کابل‌کشی فیزیکی",
-    "جایگزین پروتکل OSPF",
-    "نرم‌افزار آنتی‌ویروس دسکتاپ"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>pyATS یک چارچوب تست خودکار پایتونی مستقل از پلتفرم است که همراه با Genie پارس و تست تجهیزات چندفروشنده‌ای را ممکن می‌سازد.</p>"
-  },
-  {
-   "title": "کاربرد اصلی ابزار Dq (Dictionary Query) در pyATS / Genie چیست؟",
-   "options": [
-    "اتصال SSH به روتر",
-    "جست‌وجو، فیلتر و استخراج سریع و خوانای داده‌ها از دیکشنری‌های تو در تو و پیچیده حاصل از پارس دستورات show",
-    "نوشتن فایل Dockerfile",
-    "ساخت گواهینامه X.509"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p><code>Dq</code> نیاز به حلقه‌های تو در توی طولانی پایتون روی ساختارهای چندسطحی خروجی Genie را حذف می‌کند.</p>"
-  },
-  {
-   "title": "Batfish پیش از اعمال تغییرات روی شبکه تولیدی، کدام دسته از خطاها را از روی فایل‌های کانفیگ کشف می‌کند؟",
-   "options": [
-    "فقط قطع بودن کابل برق روتر",
-    "فقط دمای فن سوئیچ",
-    "حلقه‌های مسیریابی (Routing Loops)، سیاه‌چاله‌ها (Blackholes)، مسیرهای غیرقابل دسترس، خطاهای همسایگی BGP و قوانین ACL پوشیده‌شده",
-    "فقط غلط املایی ایمیل‌ها"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>Batfish مدل ریاضی Control و Data Plane را از روی فایل‌های پیکربندی پیشنهادی می‌سازد و خطاهای منطقی را پیش از استقرار کشف می‌کند.</p>"
-  },
-  {
-   "title": "چرا در یک پایپ‌لاین حرفه‌ای CI/CD شبکه بهتر است از هر دو ابزار Batfish و pyATS/Genie در کنار هم استفاده شود؟",
-   "options": [
-    "زیرا هر دو دقیقاً یک کار تکراری انجام می‌دهند",
-    "زیرا pyATS فقط برای وایرلس است",
-    "زیرا Batfish فقط پس از خرابی کار می‌کند",
-    "زیرا Batfish خطاهای منطقی کانفیگ را پیش از استقرار می‌گیرد و pyATS/Genie سلامت زنده و عملیاتی شبکه (سخت‌افزار/همسایه‌ها) را پس از استقرار اثبات می‌کند"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>ترکیب تحلیل استاتیک پیش‌ازاستقرار (Batfish) و راستی‌آزمایی زنده پس‌ازاستقرار (pyATS) بیشترین سطح اطمینان را ایجاد می‌کند.</p>"
-  },
-  {
-   "title": "در دستور genie diff pre_change post_change، چرا استفاده از پارامتر --exclude برای فیلدهایی مثل uptime و شمارنده بسته‌ها ضروری است؟",
-   "options": [
-    "برای حذف تغییرات طبیعی و پرسرعت شمارنده‌ها تا فقط تفاوت‌های عملیاتی واقعی (مثل افت همسایه یا حذف مسیر) نمایش داده شوند",
-    "برای حذف کل گزارش diff",
-    "برای غیرفعال کردن SSH",
-    "برای تغییر پیکربندی روتر"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>بدون حذف فیلدهای همیشه در حال تغییر، گزارش diff پر از نویز می‌شود و تشخیص افت واقعی سرویس را سخت می‌کند.</p>"
-  },
-  {
-   "title": "ساختار استاندارد سه فازی یک اسکریپت تست AEtest در pyATS کدام است؟",
-   "options": [
-    "Ping -> Traceroute -> Exit",
-    "CommonSetup -> Testcase(s) -> CommonCleanup",
-    "Init -> Destroy -> Format",
-    "Build -> Push -> Delete"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p><code>CommonSetup</code> اتصال و آماده‌سازی، <code>Testcase</code> اجرای بررسی‌ها و <code>CommonCleanup</code> آزادسازی تمیز منابع را بر عهده دارد.</p>"
-  },
-  {
-   "title": "فایل testbed.yml در pyATS چه اطلاعاتی را نگهداری می‌کند؟",
-   "options": [
-    "فقط فایل‌های تصویر SVG",
-    "فقط قوانین فایروال ویندوز",
-    "فهرست تجهیزات شبکه، نوع سیستم‌عامل (os)، روش اتصال و توپولوژی لینک‌ها برای اجرای تست‌ها",
-    "فقط کلیدهای عمومی GitHub"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>Testbed فایل توصیف محیط تست در pyATS است (اسرار رمز عبور در آن باید از طریق متغیر محیطی یا Vault تزریق شوند).</p>"
-  },
-  {
-   "title": "کدام خطا را Batfish به ذات نمی‌تواند کشف کند و نیازمند تست زنده (pyATS/Telemetry) است؟",
-   "options": [
-    "وجود Routing Loop در مسیرهای استاتیک",
-    "سطر ACL غیرقابل دسترس (Shadowed)",
-    "عدم تطابق ASN همسایگان BGP در فایل کانفیگ",
-    "خرابی فیزیکی ماژول SFP/کابل فیبر نوری یا باگ نرم‌افزاری لحظه‌ای سیستم‌عامل روتر"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>Batfish فقط روی فایل‌های کانفیگ مدل ریاضی می‌سازد و به سخت‌افزار/لایه فیزیکی زنده متصل نمی‌شود.</p>"
-  },
-  {
-   "title": "وقتی در Batfish یک قانون جدید ACL اضافه می‌کنیم، مفهوم Shadowed / Unreachable Rule چیست؟",
-   "options": [
-    "سطری که به دلیل پوشش کامل ترافیک توسط سطرهای بالاتر، هرگز ترافیکی به آن نمی‌رسد و بی‌اثر است",
-    "سطری که ترافیک را رمزنگاری می‌کند",
-    "سطری که BGP را سریع‌تر می‌کند",
-    "سطری که فقط در شب کار می‌کند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>کشف قوانین پوشیده‌شده (Shadowed) در فایروال‌های بزرگ یکی از پرارزش‌ترین قابلیت‌های تحلیل استاتیک Batfish است.</p>"
-  },
-  {
-   "title": "علت اصلی بروز Flaky Test (تست ناپایدار با خطای کاذب) در تست خودکار شبکه چیست؟",
-   "options": [
-    "بررسی وضعیت Established همسایه‌های BGP",
-    "تکیه کردن Assertionها بر مقادیر لحظه‌ای ناپایدار مانند زمان دقیق پاسخ پینگ یا uptime به جای قراردادهای پایدار",
-    "استفاده از Genie Parser",
-    "اجرای تحلیل Batfish"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>تست‌های شبکه باید روی وضعیت‌های قطعی و پایدار (State Invariants) تکیه کنند تا اعتماد تیم به پایپ‌لاین حفظ شود.</p>"
-  },
-  {
-   "title": "منظور از «Shift-Left Testing» در اتوماسیون شبکه چیست؟",
-   "options": [
-    "جابه‌جا کردن کابل‌ها به سمت چپ رک",
-    "تست کردن شبکه فقط پس از تماس شاکی کاربران",
-    "آوردن تست‌ها و تحلیل‌های خودکار (مانند Batfish و Schema) به ابتدای چرخه تغییر (زمان PR) پیش از استقرار روی تولید",
-    "حذف مرحله Verify پس از استقرار"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>کشف خطا در مرحله Pull Request هزار برابر ارزان‌تر و ایمن‌تر از کشف آن پس از قطعی شبکه تولیدی است.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "اتصال زنده pyATS به روترهای دیتاسنتر تولیدی",
-    "اجرای کانتینر واقعی Batfish روی ۱۰۰ روتر",
-    "فقط متن نظری بدون کد",
-    "شبیه‌سازی محلی (Local Mock) در Python 3 برای فیلتر شبه-Dq روی افت همسایه BGP و ردیاب گراف شبه-Batfish برای Loop و Blackhole"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ سرویس زنده Batfish یا تجهیز واقعی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.8",
-  "legacyId": "auto_18",
-  "sources": [
-   "https://developer.cisco.com/docs/pyats/",
-   "https://batfish.readthedocs.io/"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "auto_18",
+  "objectiveId": "auto_18",
+  "kind": "lesson",
+  "track": "Automation",
+  "course": "automation-foundations",
+  "title": "۷.۷ Automation (درس ۱۸ از ۲۰): تست خودکار شبکه (pyATS / Genie / Batfish)",
+  "titleEn": "Automation 18: Automated Network Testing & Verification with pyATS, Genie, Dq & Batfish",
+  "domain": "Network Automation",
+  "source": "Legacy auto_18 rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [],
+  "sections": [
+    {
+      "id": "auto_18-section-1",
+      "title": "مسئله واقعی: چرا پنج تا ping دستی پس از تغییر BGP یک توهم خطرناک از سلامت شبکه است؟",
+      "html": "<p>پینگ گرفتن از چند IP شناخته‌شده پس از یک تغییر بزرگ مسیریابی یا فایروال فقط ۵ درصد واقعیت را نشان می‌دهد؛ ممکن است یکی از ۱۰ همسایه BGP در VRF مالی قطع شده باشد، یک مسیر پشتیبان به حلقه مسیریابی (Routing Loop) افتاده باشد یا یک سطر ACL ترافیک مهمی را مسدود کرده باشد! دو ابزار مکمل و استاندارد صنعت این خلأ را پر می‌کنند: <strong>Batfish</strong> برای تحلیل ریاضی <em>پیش از استقرار</em> و <strong>Cisco pyATS / Genie</strong> برای تست، پارس ساختاریافته و مقایسه زنده (<code>Pre/Post Diff</code>).</p>"
+    },
+    {
+      "id": "auto_18-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> پایتون (درس <code>auto_02</code>)، CI/CD شبکه (درس <code>auto_16</code>) و مبانی BGP/OSPF/ACL.</p><ul><li>تبیین معماری <strong>Cisco pyATS</strong> (فریم‌ورک تست مستقل از پلتفرم)، <strong>Genie</strong> (پارس‌ها و مدل‌های عملیاتی چندفروشنده‌ای) و فایل <strong>Testbed YAML</strong>.</li><li>ساختارنویسی تست خودکار با <strong>AEtest</strong> (<code>CommonSetup</code>، <code>Testcase</code>، <code>CommonCleanup</code>) و کوئری سریع روی دیکشنری‌های تو در تو با <strong><code>Dq</code></strong>.</li><li>اجرای جریان عملیاتی <strong>Pre-Change / Post-Change Snapshot Diff</strong> (<code>genie learn</code> و <code>genie diff</code>).</li><li>تبیین تحلیل ریاضی پیش از استقرار با <strong>Batfish</strong> (کشف Routing Loop، Blackhole، خطای ACL و شکست همسایگی BGP پیش از ارسال حتی یک دستور به روتر!).</li></ul>"
+    },
+    {
+      "id": "auto_18-section-3",
+      "title": "Cisco pyATS و Genie: از خروجی متنی شکننده تا مدل داده عملیاتی استاندارد",
+      "html": "<p><strong>pyATS (Python Automated Test Systems)</strong> چارچوب رسمی تست پایتون است که توسط سیسکو ساخته شده اما معماری آن <strong>مستقل از پلتفرم (Platform-Agnostic)</strong> است و از IOS-XE، NX-OS، IOS-XR، ASA، Junos، EOS و لینوکس پشتیبانی می‌کند. کتابخانه <strong>Genie</strong> روی pyATS سوار شده و هزاران Parser آماده (برای تبدیل خروجی‌هایی مثل <code>show ip bgp summary</code> یا <code>show interfaces</code> به دیکشنری تمیز Python) و مدل‌های یکپارچه (<code>Ops</code>) میان سیستم‌عامل‌های مختلف فراهم می‌آورد.</p>"
+    },
+    {
+      "id": "auto_18-section-4",
+      "title": "نمودار مقایسه و تکمیل‌کنندگی Batfish (پیش از استقرار) و pyATS/Genie (زنده)",
+      "html": "<p>نمودار زیر نشان می‌دهد چگونه Batfish و pyATS دو سمت چرخه تست شبکه را به‌صورت مکمل پوشش می‌دهند.</p><svg viewBox=\"0 0 760 215\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Automated Network Testing: Batfish Pre-Deployment Static Analysis vs pyATS/Genie Live Verification\"><rect x=\"14\" y=\"18\" width=\"348\" height=\"178\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"188\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">PRE-DEPLOY: Batfish (Static Model)</text><text x=\"188\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Inputs: Candidate Config Files ONLY</text><text x=\"188\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">Builds Mathematical Control/Data Plane</text><text x=\"188\" y=\"122\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">Catches BEFORE push: Loops, Blackholes,</text><text x=\"188\" y=\"140\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">Unreachable ACL lines &amp; BGP Misconfigs</text><text x=\"188\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Zero packet sent to live network!</text><rect x=\"398\" y=\"18\" width=\"348\" height=\"178\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"572\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">PRE/POST LIVE: pyATS &amp; Genie</text><text x=\"572\" y=\"72\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Testbed YAML + Multi-Vendor Parsers</text><text x=\"572\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">AEtest (CommonSetup -&gt; Testcase -&gt; Cleanup)</text><text x=\"572\" y=\"122\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Dq: Query Nested Operational Dicts</text><text x=\"572\" y=\"146\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">genie diff pre_snapshot/ post_snapshot/</text><text x=\"572\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Proves live BGP/OSPF/Interfaces stayed UP</text><line x1=\"362\" y1=\"107\" x2=\"398\" y2=\"107\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
+    },
+    {
+      "id": "auto_18-section-5",
+      "title": "ساختار AEtest و قدرت فیلتر کردن داده‌های عمیق با Dq",
+      "html": "<p>موتور تست <strong>AEtest</strong> هر تست شبکه را در سه فاز منظم اجرا می‌کند: <code>CommonSetup</code> (اتصال به تجهیزات تعریف‌شده در <code>testbed.yml</code>)، یک یا چند <code>Testcase</code> (هرکدام دارای <code>@aetest.test</code> با خروجی <code>passed / failed / blocked</code>) و <code>CommonCleanup</code> (بستن تمیز اتصالات).</p><p><strong>چرا <code>Dq</code> (Dictionary Query) زندگی مهندس را نجات می‌دهد؟</strong> خروجی پارس‌شده <code>show bgp all summary</code> یک دیکشنری ۵-سطحی تو در تو است! به‌جای نوشتن پنج حلقه <code>for</code> پرخطا، با یک خط <code>Dq(parsed).contains('Active').get_values('neighbor')</code> می‌توان سریع و خوانا همسایه‌های قطع‌شده را استخراج و روی آن‌ها Assertion نوشت.</p>"
+    },
+    {
+      "id": "auto_18-section-6",
+      "title": "الگوی طلایی Pre-Check / Post-Check Snapshot Diff با Genie CLI",
+      "html": "<p>حتی بدون نوشتن یک خط کد پایتون، Genie CLI اجازه می‌دهد پیش و پس از پنجره تغییرات از وضعیت کل شبکه Snapshot بگیرید و تفاوت دقیق عملیاتی را ببینید:</p><pre dir=\"ltr\"><code># Reference Genie CLI workflow (NOT executed against live routers)\ngenie learn bgp ospf routing interface --testbed-file tb.yml --output pre_change\n# ... apply network change ...\ngenie learn bgp ospf routing interface --testbed-file tb.yml --output post_change\ngenie diff pre_change post_change --exclude \"uptime|packets|octets\"</code></pre><p>دقت کنید که با <code>--exclude</code> شمارنده‌های همیشه متغیر (مثل <code>uptime</code> و شمارنده بسته‌ها) حذف می‌شوند تا تنها تغییرات واقعی (مثل افت یک مسیر یا همسایه) برجسته گردند!</p>"
+    },
+    {
+      "id": "auto_18-section-7",
+      "title": "Batfish: تحلیل ریاضی و پیش‌بینانه شبکه پیش از اعمال تغییر",
+      "html": "<p><strong>Batfish</strong> (متن‌باز) یک رویکرد کاملاً متفاوت و مکمل دارد: به هیچ روتر زنده‌ای وصل نمی‌شود! بلکه صرفاً <strong>فایل‌های پیکربندی متنی پیشنهادی (Candidate Configs)</strong> همه روترها و فایروال‌ها را می‌خواند، مدل ریاضی دقیق <strong>Control Plane (OSPF/BGP/Static)</strong> و <strong>Data Plane (FIB/ACL)</strong> می‌سازد و پیش از استقرار به پرسش‌های حیاتی پاسخ می‌دهد:</p><ul><li>آیا برای ترافیک از شعبه A به دیتاسنتر <strong>Routing Loop</strong> یا <strong>Blackhole</strong> رخ می‌دهد؟</li><li>آیا همه نشست‌های BGP/OSPF از نظر ASN، Area و Subnet هم‌خوانند و Up می‌شوند؟</li><li>آیا در ACL فایروال سطرهای غیرقابل دسترس (Unreachable/Shadowed Rules) وجود دارد یا ترافیک غیرمجازی عبور می‌کند؟</li></ul>"
+    },
+    {
+      "id": "auto_18-section-8",
+      "title": "جایگاه Batfish و pyATS در پایپ‌لاین CI/CD (چپ‌شیفت کردن کیفیت)",
+      "html": "<p>بهترین معماری، ترکیب هر دو در یک CI/CD Pipeline است: در مرحله <strong>CI (پیش از ادغام PR)</strong>، Batfish روی پیکربندی‌های رندرشده با Jinja2/Terraform تحلیل ریاضی می‌زند تا هیچ Loop یا خطای ACL به تولید نرسد؛ و در مرحله <strong>Post-Deploy Verify</strong>، pyATS/Genie روی شبکه زنده تأیید می‌کند که همه همسایه‌ها و سرویس‌ها واقعاً پایدار مانده‌اند.</p>"
+    },
+    {
+      "id": "auto_18-section-9",
+      "title": "مقایسه جامع pyATS/Genie و Batfish",
+      "html": "<table><thead><tr><th>معیار</th><th>Batfish</th><th>Cisco pyATS / Genie</th></tr></thead><tbody><tr><td>زمان اجرا</td><td><strong>پیش از استقرار</strong> (روی فایل‌های کانفیگ)</td><td><strong>حین/پس از استقرار</strong> (روی تجهیزات زنده یا آزمایشگاه مجازی)</td></tr><tr><td>نیاز به تجهیز زنده یا شبیه‌ساز سنگین</td><td>خیر (تحلیل استاتیک ریاضی در ثانیه)</td><td>بله (اتصال به روتر واقعی یا CML/Containerlab)</td></tr><tr><td>نقاط قوت اصلی</td><td>اثبات جامع Reachability، کشف Loop/Blackhole و Shadowed ACL در همه مسیرها</td><td>بررسی وضعیت سخت‌افزار، شمارنده‌ها، همسایه‌های واقعی و Pre/Post Operational Diff</td></tr><tr><td>محدودیت</td><td>باگ‌های سخت‌افزاری/فریم‌ور یا قطعی کابل فیزیکی را نمی‌بیند</td><td>فقط حالت‌هایی را می‌بیند که تست نوشته‌شده واقعاً از تجهیز می‌پرسد</td></tr></tbody></table>"
+    },
+    {
+      "id": "auto_18-section-10",
+      "title": "طراحی Testcaseهای قابل اعتماد (پرهیز از Flaky Tests)",
+      "html": "<p>تست شبکه اگر بر مقادیر ناپایدار (مثل <code>uptime</code> یا تاخیر لحظه‌ای) تکیه کند، خطای کاذب (Flaky) می‌دهد و تیم اعتمادش را از دست می‌دهد. همیشه تست‌ها را بر پایه <strong>قراردادهای پایدار</strong> بنویسید: تعداد همسایه‌های <code>Established</code>، وجود Prefixهای حیاتی در RIB، نبود خطای CRC روبه‌رشد و حفظ وضعیت <code>admin/oper up</code> اینترفیس‌های کلیدی.</p>"
+    },
+    {
+      "id": "auto_18-section-11",
+      "title": "کژفهمی‌های رایج درباره تست خودکار شبکه",
+      "html": "<ul><li><strong>کژفهمی ۱: «pyATS فقط روی تجهیزات سیسکو کار می‌کند.»</strong> واقعیت: هسته pyATS مستقل از پلتفرم است و Genie پارس‌های متعددی برای Junos، Arista EOS، Linux و سایر برندها نیز دارد.</li><li><strong>کژفهمی ۲: «اگر Batfish خطایی ندید، دیگر نیازی به تست زنده پس از استقرار نیست.»</strong> واقعیت: Batfish مدل منطقی کانفیگ را می‌سنجد؛ مشکلات لایه فیزیکی، باگ‌های نرم‌افزاری سیستم‌عامل روتر یا افت Transceiver را فقط تست زنده (pyATS/Telemetry) کشف می‌کند.</li><li><strong>کژفهمی ۳: «در genie diff باید همه فیلدها بدون استثنا مقایسه شوند.»</strong> واقعیت: مقایسه نکردن با <code>--exclude</code> برای فیلدهای متغیر مثل <code>uptime</code> و شمارنده‌ها باعث تولید هزاران خط تفاوت بی‌معنی (Noise) می‌شود.</li></ul>"
+    },
+    {
+      "id": "auto_18-section-12",
+      "title": "عیب‌یابی خطاهای رایج در اجرای تست‌های pyATS و Batfish",
+      "html": "<p><strong>خطای ۱ — <code>SchemaEmptyParserError</code> در Genie:</strong> خروجی دستور روی تجهیز خالی بوده (مثلاً BGP اصلاً روی آن روتر فعال نیست) یا نسخه جدید سیستم‌عامل فرمت خروجی را کمی عوض کرده است؛ باید در کد با <code>try/except</code> مدیریت و نسخه <code>genie.libs.parser</code> به‌روزرسانی شود.</p><p><strong>خطای ۲ — هشدار خطای پارس Batfish روی بخشی از کانفیگ:</strong> Batfish ممکن است دستور بسیار جدید یا اختصاصی یک برند را نشناسد؛ همیشه گزارش <code>initIssues()</code> و <code>fileParseStatus()</code> را در Batfish بررسی کنید تا از پوشش کامل مطمئن شوید.</p>"
+    },
+    {
+      "id": "auto_18-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> در جدول مسیریابی پیشنهادی، <code>R1</code> پیشوند <code>10.50.0.0/24</code> را به <code>R2</code> می‌فرستد و <code>R2</code> همان پیشوند را دوباره به <code>R1</code> برمی‌گرداند؛ همچنین <code>R1</code> پیشوند <code>10.99.0.0/24</code> را به <code>R3</code> می‌فرستد که هیچ مسیری ندارد. تحلیلگر شبه-Batfish پیش از استقرار چه دو خطایی گزارش می‌دهد؟ <strong>پاسخ:</strong> برای <code>10.50.0.0/24</code> خطای <strong><code>ROUTING_LOOP</code></strong> (<code>R1 -> R2 -> R1</code>) و برای <code>10.99.0.0/24</code> خطای <strong><code>BLACKHOLE</code></strong> روی <code>R3</code> — هر دو پیش از لمس حتی یک روتر واقعی!</p><p><strong>تمرین ۲:</strong> پس از استقرار، خروجی پارس‌شده BGP نشان می‌دهد همسایه <code>10.0.0.3</code> از <code>Established</code> به <code>Active</code> رفته است. موتور فیلتر شبه-<code>Dq</code> چه خروجی می‌دهد؟ <strong>پاسخ:</strong> فهرست همسایه‌های ناسالم <code>['10.0.0.3']</code> را برمی‌گرداند و باعث شکست Assertion تست و آغاز Rollback می‌شود.</p>"
+    },
+    {
+      "id": "auto_18-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://developer.cisco.com/docs/pyats/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Cisco pyATS و Genie</a> و <a href=\"https://batfish.readthedocs.io/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Batfish</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 stdlib است که منطق فیلتر شبه-<code>Dq</code> و تحلیل گراف مسیریابی شبه-Batfish را شبیه‌سازی و آزمون می‌کند؛ هیچ سرویس واقعی Batfish یا کتابخانه نصب‌شده pyATS روی روتر زنده اجرا نشده است.</p>"
+    }
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سرویس واقعی Batfish یا بسته نصب‌شده pyATS روی تجهیز زنده اجرا نشده است."
+  "glossary": [
+    {
+      "term": "pyATS",
+      "fa": "چارچوب تست pyATS",
+      "simple": "Python Automated Test Systems؛ فریم‌ورک تست خودکار شبکه مستقل از پلتفرم ساخت سیسکو."
+    },
+    {
+      "term": "Genie",
+      "fa": "کتابخانه Genie",
+      "simple": "لایه Parserها، مدل‌های عملیاتی چندفروشنده‌ای (Ops) و ابزار diff روی pyATS."
+    },
+    {
+      "term": "AEtest",
+      "fa": "موتور تست AEtest",
+      "simple": "ساختار اجرای تست‌های pyATS در سه فاز CommonSetup، Testcase و CommonCleanup."
+    },
+    {
+      "term": "Dq (Dictionary Query)",
+      "fa": "ابزار جست‌وجوی Dq",
+      "simple": "رابط زنجیره‌ای در pyATS/Genie برای فیلتر و استخراج سریع داده از دیکشنری‌های عمیق پارس‌شده."
+    },
+    {
+      "term": "Testbed YAML",
+      "fa": "فایل Testbed",
+      "simple": "فایل YAML تعریف‌کننده تجهیزات، سیستم‌عامل، پروتکل اتصال و اعتبارنامه در pyATS."
+    },
+    {
+      "term": "genie learn & diff",
+      "fa": "اسنپ‌شات و مقایسه عملیاتی",
+      "simple": "ثبت وضعیت پیش و پس از تغییر و محاسبه دقیق تفاوت عملیاتی با حذف نویز شمارنده‌ها."
+    },
+    {
+      "term": "Batfish",
+      "fa": "تحلیلگر استاتیک Batfish",
+      "simple": "ابزار متن‌باز تحلیل ریاضی فایل‌های کانفیگ شبکه پیش از استقرار برای کشف خطاها."
+    },
+    {
+      "term": "Routing Loop",
+      "fa": "حلقه مسیریابی",
+      "simple": "ارسال چرخه‌ای بسته میان چند روتر بدون رسیدن به مقصد؛ قابل کشف پیش‌ازاستقرار در Batfish."
+    },
+    {
+      "term": "Blackhole",
+      "fa": "سیاه‌چاله مسیریابی",
+      "simple": "ارسال بسته به مسیریابی که راهی به مقصد ندارد و بسته را بی‌صدا Drop می‌کند."
+    },
+    {
+      "term": "Shadowed ACL Rule",
+      "fa": "قانون ACL پوشیده‌شده",
+      "simple": "سطر ACL که به دلیل پوشش کامل توسط سطرهای بالاتر هرگز اجرا نمی‌شود."
+    },
+    {
+      "term": "Control vs Data Plane Model",
+      "fa": "مدل صفحه کنترل و داده",
+      "simple": "بازسازی ریاضی جدول‌های BGP/OSPF (Control) و مسیر واقعی بسته (Data) در Batfish."
+    },
+    {
+      "term": "Pre/Post Check",
+      "fa": "بررسی پیش و پس از تغییر",
+      "simple": "مقایسه وضعیت عملیاتی شبکه بلافاصله قبل و بعد از پنجره تغییر."
+    },
+    {
+      "term": "Flaky Test",
+      "fa": "تست ناپایدار",
+      "simple": "تستی که به دلیل اتکا به فیلدهای متغیر (مثل uptime) خطای کاذب متناوب تولید می‌کند."
+    },
+    {
+      "term": "Shift-Left Testing",
+      "fa": "انتقال تست به مراحل اولیه",
+      "simple": "کشف خطاها در مرحله کدنویسی و PR (با Batfish) به جای کشف پس از اختلال تولیدی."
+    },
+    {
+      "term": "Assertion",
+      "fa": "گزاره راستی‌آزمایی",
+      "simple": "شرط قطعی در تست خودکار (مثل Established بودن همه همسایه‌های BGP) برای Pass/Fail."
+    }
   ],
-  "legacyAuditFixes": [
-   "رفع اشکالات نگارشی نسخه قدیمی («استاندارد Industries»، «چه برای چه استفاده می‌شود؟») و گسترش به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش.",
-   "افزودن مقایسه دقیق مکمل بودن Batfish و pyATS/Genie، الگوی genie learn/diff با --exclude و شبیه‌ساز محلی Dq + Loop/Blackhole."
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (فیلتر شبه-Dq برای افت BGP و تحلیل گراف شبه-Batfish برای Loop/Blackhole) — ابزار زنده اجرا نشده",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ سرویس واقعی Batfish یا کتابخانه pyATS روی تجهیزات زنده اجرا نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور Batfish، بسته نصب‌شده pyATS/Genie یا روتر واقعی در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی دو بخش مکمل را آزمون می‌کند: (۱) فیلتر شبه-<code>Dq</code> که افت همسایه BGP <code>10.0.0.3</code> به حالت <code>Active</code> را پس از تغییر کشف می‌کند، و (۲) ردیاب گراف شبه-Batfish که پیش از استقرار یک <strong>Routing Loop</strong> (<code>R1->R2->R1</code>) و یک <strong>Blackhole</strong> (<code>R1->R3</code>) را تشخیص می‌دهد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_18_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_18_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_18: Automated Network Testing (pyATS/Genie Dq &amp;\nBatfish-style Pre-Deployment Graph Verification) Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of Genie operational diff,\nDq-style nested state filtering, and Batfish-style static routing-loop /\nblackhole verification before production push. No live pyATS/Batfish runtime.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\n\n\ndef dq_filter_down_bgp_peers(bgp_parsed: dict) -&gt; list[str]:\n    if not isinstance(bgp_parsed, dict):\n        raise ValueError(f&quot;bgp_parsed must be a dict, got {type(bgp_parsed).__name__}&quot;)\n    down = []\n    for vrf_data in bgp_parsed.get(&quot;vrf&quot;, {}).values():\n        for peer_ip, info in vrf_data.get(&quot;neighbor&quot;, {}).items():\n            if info.get(&quot;session_state&quot;) != &quot;Established&quot;:\n                down.append(peer_ip)\n    return sorted(down)\n\n\ndef batfish_style_trace(rib: dict[str, dict[str, str]], start_router: str, dst_prefix: str) -&gt; dict:\n    if not isinstance(rib, dict):\n        raise ValueError(&quot;rib must be a dict mapping router -&gt; {prefix: next_hop}&quot;)\n    if not isinstance(start_router, str) or not start_router.strip():\n        raise ValueError(&quot;start_router must be a non-empty str&quot;)\n    if not isinstance(dst_prefix, str) or not dst_prefix.strip():\n        raise ValueError(&quot;dst_prefix must be a non-empty str&quot;)\n    visited: list[str] = []\n    cur = start_router\n    while True:\n        if cur in visited:\n            return {&quot;outcome&quot;: &quot;ROUTING_LOOP&quot;, &quot;path&quot;: visited + [cur]}\n        visited.append(cur)\n        next_hop = rib.get(cur, {}).get(dst_prefix)\n        if next_hop is None:\n            return {&quot;outcome&quot;: &quot;BLACKHOLE&quot;, &quot;path&quot;: visited}\n        if next_hop == &quot;LOCAL_DELIVER&quot;:\n            return {&quot;outcome&quot;: &quot;DELIVERED&quot;, &quot;path&quot;: visited}\n        cur = next_hop\n\n\ndef main() -&gt; None:\n    pre_bgp = {&quot;vrf&quot;: {&quot;default&quot;: {&quot;neighbor&quot;: {\n        &quot;10.0.0.2&quot;: {&quot;session_state&quot;: &quot;Established&quot;, &quot;prefixes&quot;: 120},\n        &quot;10.0.0.3&quot;: {&quot;session_state&quot;: &quot;Established&quot;, &quot;prefixes&quot;: 85},\n    }}}}\n    post_bgp = {&quot;vrf&quot;: {&quot;default&quot;: {&quot;neighbor&quot;: {\n        &quot;10.0.0.2&quot;: {&quot;session_state&quot;: &quot;Established&quot;, &quot;prefixes&quot;: 120},\n        &quot;10.0.0.3&quot;: {&quot;session_state&quot;: &quot;Active&quot;, &quot;prefixes&quot;: 0},\n    }}}}\n    pre_down = dq_filter_down_bgp_peers(pre_bgp)\n    post_down = dq_filter_down_bgp_peers(post_bgp)\n    assert pre_down == [] and post_down == [&quot;10.0.0.3&quot;]\n\n    candidate_rib = {\n        &quot;R1&quot;: {&quot;10.50.0.0/24&quot;: &quot;R2&quot;, &quot;10.99.0.0/24&quot;: &quot;R3&quot;, &quot;10.10.0.0/24&quot;: &quot;R2&quot;},\n        &quot;R2&quot;: {&quot;10.50.0.0/24&quot;: &quot;R1&quot;, &quot;10.10.0.0/24&quot;: &quot;LOCAL_DELIVER&quot;},  # Loop on 10.50.0.0/24!\n        &quot;R3&quot;: {},  # Blackhole on 10.99.0.0/24!\n    }\n    loop_res = batfish_style_trace(candidate_rib, &quot;R1&quot;, &quot;10.50.0.0/24&quot;)\n    bh_res = batfish_style_trace(candidate_rib, &quot;R1&quot;, &quot;10.99.0.0/24&quot;)\n    ok_res = batfish_style_trace(candidate_rib, &quot;R1&quot;, &quot;10.10.0.0/24&quot;)\n    assert loop_res[&quot;outcome&quot;] == &quot;ROUTING_LOOP&quot;\n    assert bh_res[&quot;outcome&quot;] == &quot;BLACKHOLE&quot;\n    assert ok_res[&quot;outcome&quot;] == &quot;DELIVERED&quot;\n\n    print(&quot;=== auto_18 pyATS/Genie Dq &amp; Batfish-Style Pre-Check Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;genie_dq_post_change_down_bgp_peers&quot;: post_down,\n        &quot;batfish_style_loop_check&quot;: loop_res,\n        &quot;batfish_style_blackhole_check&quot;: bh_res,\n        &quot;batfish_style_healthy_check&quot;: ok_res,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>genie_dq_post_change_down_bgp_peers: ['10.0.0.3']</code>، <code>batfish_style_loop_check.outcome: 'ROUTING_LOOP'</code> و <code>batfish_style_blackhole_check.outcome: 'BLACKHOLE'</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع اجرای <code>Dq</code> در محیط دارای pyATS/Genie (اجرا نشده در این مخزن):</strong></p><pre dir=\"ltr\"><code># Reference pyATS/Genie Dq snippet (NOT executed against live routers)\nfrom genie.utils import Dq\nactive_peers = Dq(parsed_bgp).contains(\"Active\").get_values(\"neighbor\")</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس تست خودکار شبکه (pyATS / Genie / Batfish)",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "توصیف دقیق Cisco pyATS در اکوسیستم اتوماسیون شبکه کدام است؟",
+      "options": [
+        "چارچوب تست خودکار مستقل از پلتفرم (ساخته‌شده توسط سیسکو و قابل استفاده برای چندین سیستم‌عامل شبکه) برای راستی‌آزمایی عملیاتی",
+        "ابزار طراحی کابل‌کشی فیزیکی",
+        "جایگزین پروتکل OSPF",
+        "نرم‌افزار آنتی‌ویروس دسکتاپ"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>pyATS یک چارچوب تست خودکار پایتونی مستقل از پلتفرم است که همراه با Genie پارس و تست تجهیزات چندفروشنده‌ای را ممکن می‌سازد.</p>"
+    },
+    {
+      "title": "کاربرد اصلی ابزار Dq (Dictionary Query) در pyATS / Genie چیست؟",
+      "options": [
+        "اتصال SSH به روتر",
+        "جست‌وجو، فیلتر و استخراج سریع و خوانای داده‌ها از دیکشنری‌های تو در تو و پیچیده حاصل از پارس دستورات show",
+        "نوشتن فایل Dockerfile",
+        "ساخت گواهینامه X.509"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>Dq</code> نیاز به حلقه‌های تو در توی طولانی پایتون روی ساختارهای چندسطحی خروجی Genie را حذف می‌کند.</p>"
+    },
+    {
+      "title": "Batfish پیش از اعمال تغییرات روی شبکه تولیدی، کدام دسته از خطاها را از روی فایل‌های کانفیگ کشف می‌کند؟",
+      "options": [
+        "فقط قطع بودن کابل برق روتر",
+        "فقط دمای فن سوئیچ",
+        "حلقه‌های مسیریابی (Routing Loops)، سیاه‌چاله‌ها (Blackholes)، مسیرهای غیرقابل دسترس، خطاهای همسایگی BGP و قوانین ACL پوشیده‌شده",
+        "فقط غلط املایی ایمیل‌ها"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Batfish مدل ریاضی Control و Data Plane را از روی فایل‌های پیکربندی پیشنهادی می‌سازد و خطاهای منطقی را پیش از استقرار کشف می‌کند.</p>"
+    },
+    {
+      "title": "چرا در یک پایپ‌لاین حرفه‌ای CI/CD شبکه بهتر است از هر دو ابزار Batfish و pyATS/Genie در کنار هم استفاده شود؟",
+      "options": [
+        "زیرا هر دو دقیقاً یک کار تکراری انجام می‌دهند",
+        "زیرا pyATS فقط برای وایرلس است",
+        "زیرا Batfish فقط پس از خرابی کار می‌کند",
+        "زیرا Batfish خطاهای منطقی کانفیگ را پیش از استقرار می‌گیرد و pyATS/Genie سلامت زنده و عملیاتی شبکه (سخت‌افزار/همسایه‌ها) را پس از استقرار اثبات می‌کند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>ترکیب تحلیل استاتیک پیش‌ازاستقرار (Batfish) و راستی‌آزمایی زنده پس‌ازاستقرار (pyATS) بیشترین سطح اطمینان را ایجاد می‌کند.</p>"
+    },
+    {
+      "title": "در دستور genie diff pre_change post_change، چرا استفاده از پارامتر --exclude برای فیلدهایی مثل uptime و شمارنده بسته‌ها ضروری است؟",
+      "options": [
+        "برای حذف تغییرات طبیعی و پرسرعت شمارنده‌ها تا فقط تفاوت‌های عملیاتی واقعی (مثل افت همسایه یا حذف مسیر) نمایش داده شوند",
+        "برای حذف کل گزارش diff",
+        "برای غیرفعال کردن SSH",
+        "برای تغییر پیکربندی روتر"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بدون حذف فیلدهای همیشه در حال تغییر، گزارش diff پر از نویز می‌شود و تشخیص افت واقعی سرویس را سخت می‌کند.</p>"
+    },
+    {
+      "title": "ساختار استاندارد سه فازی یک اسکریپت تست AEtest در pyATS کدام است؟",
+      "options": [
+        "Ping -> Traceroute -> Exit",
+        "CommonSetup -> Testcase(s) -> CommonCleanup",
+        "Init -> Destroy -> Format",
+        "Build -> Push -> Delete"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>CommonSetup</code> اتصال و آماده‌سازی، <code>Testcase</code> اجرای بررسی‌ها و <code>CommonCleanup</code> آزادسازی تمیز منابع را بر عهده دارد.</p>"
+    },
+    {
+      "title": "فایل testbed.yml در pyATS چه اطلاعاتی را نگهداری می‌کند؟",
+      "options": [
+        "فقط فایل‌های تصویر SVG",
+        "فقط قوانین فایروال ویندوز",
+        "فهرست تجهیزات شبکه، نوع سیستم‌عامل (os)، روش اتصال و توپولوژی لینک‌ها برای اجرای تست‌ها",
+        "فقط کلیدهای عمومی GitHub"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Testbed فایل توصیف محیط تست در pyATS است (اسرار رمز عبور در آن باید از طریق متغیر محیطی یا Vault تزریق شوند).</p>"
+    },
+    {
+      "title": "کدام خطا را Batfish به ذات نمی‌تواند کشف کند و نیازمند تست زنده (pyATS/Telemetry) است؟",
+      "options": [
+        "وجود Routing Loop در مسیرهای استاتیک",
+        "سطر ACL غیرقابل دسترس (Shadowed)",
+        "عدم تطابق ASN همسایگان BGP در فایل کانفیگ",
+        "خرابی فیزیکی ماژول SFP/کابل فیبر نوری یا باگ نرم‌افزاری لحظه‌ای سیستم‌عامل روتر"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Batfish فقط روی فایل‌های کانفیگ مدل ریاضی می‌سازد و به سخت‌افزار/لایه فیزیکی زنده متصل نمی‌شود.</p>"
+    },
+    {
+      "title": "وقتی در Batfish یک قانون جدید ACL اضافه می‌کنیم، مفهوم Shadowed / Unreachable Rule چیست؟",
+      "options": [
+        "سطری که به دلیل پوشش کامل ترافیک توسط سطرهای بالاتر، هرگز ترافیکی به آن نمی‌رسد و بی‌اثر است",
+        "سطری که ترافیک را رمزنگاری می‌کند",
+        "سطری که BGP را سریع‌تر می‌کند",
+        "سطری که فقط در شب کار می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>کشف قوانین پوشیده‌شده (Shadowed) در فایروال‌های بزرگ یکی از پرارزش‌ترین قابلیت‌های تحلیل استاتیک Batfish است.</p>"
+    },
+    {
+      "title": "علت اصلی بروز Flaky Test (تست ناپایدار با خطای کاذب) در تست خودکار شبکه چیست؟",
+      "options": [
+        "بررسی وضعیت Established همسایه‌های BGP",
+        "تکیه کردن Assertionها بر مقادیر لحظه‌ای ناپایدار مانند زمان دقیق پاسخ پینگ یا uptime به جای قراردادهای پایدار",
+        "استفاده از Genie Parser",
+        "اجرای تحلیل Batfish"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تست‌های شبکه باید روی وضعیت‌های قطعی و پایدار (State Invariants) تکیه کنند تا اعتماد تیم به پایپ‌لاین حفظ شود.</p>"
+    },
+    {
+      "title": "منظور از «Shift-Left Testing» در اتوماسیون شبکه چیست؟",
+      "options": [
+        "جابه‌جا کردن کابل‌ها به سمت چپ رک",
+        "تست کردن شبکه فقط پس از تماس شاکی کاربران",
+        "آوردن تست‌ها و تحلیل‌های خودکار (مانند Batfish و Schema) به ابتدای چرخه تغییر (زمان PR) پیش از استقرار روی تولید",
+        "حذف مرحله Verify پس از استقرار"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کشف خطا در مرحله Pull Request هزار برابر ارزان‌تر و ایمن‌تر از کشف آن پس از قطعی شبکه تولیدی است.</p>"
+    },
+    {
+      "title": "مزیت کلیدی استفاده از pyATS / Genie برای مقایسه وضعیت شبکه پیش و پس از یک تغییر (Pre-Change vs Post-Change Diff) چیست؟",
+      "options": [
+        "فقط مقایسه کاراکتربه‌کاراکتر فایل متنی همراه با تایمرها و Uptime",
+        "تبدیل خروجی CLI به مدل داده‌ای ساخت‌یافته و شناسایی دقیق تفاوت‌های معنادار (مانند افت همسایه BGP یا ناپدید شدن مسیر) با نادیده گرفتن فیلدهای متغیر مثل Uptime",
+        "حذف خودکار کل جدول مسیریابی",
+        "تغییر رمز همه کاربران پس از تست"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مقایسه ساخت‌یافته Genie تفاوت‌های واقعی عملیاتی را از نویزهایی مانند تایمرها جدا می‌کند و راستی‌آزمایی خودکار پس از تغییر را بسیار دقیق می‌سازد.</p>"
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/auto_18-review-fa.md"
-  },
-  "integration": {
-   "recommendedPath": "fam-automation",
-   "recommendedCourse": "automation-foundations",
-   "blueprint": "/academy-assets/v5/blueprints/auto_18.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_18_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۸C-2: افزودن اعتبارسنجی نوع dict/str روی ورودی‌های dq_filter_down_bgp_peers و batfish_style_trace در auto_18_lab.py."
-  ]
- }
+  "meta": {
+    "version": "reviewed.8",
+    "legacyId": "auto_18",
+    "sources": [
+      "https://developer.cisco.com/docs/pyats/",
+      "https://batfish.readthedocs.io/"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ سرویس واقعی Batfish یا بسته نصب‌شده pyATS روی تجهیز زنده اجرا نشده است."
+    ],
+    "legacyAuditFixes": [
+      "رفع اشکالات نگارشی نسخه قدیمی («استاندارد Industries»، «چه برای چه استفاده می‌شود؟») و گسترش به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش.",
+      "افزودن مقایسه دقیق مکمل بودن Batfish و pyATS/Genie، الگوی genie learn/diff با --exclude و شبیه‌ساز محلی Dq + Loop/Blackhole."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/auto_18-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-automation",
+      "recommendedCourse": "automation-foundations",
+      "blueprint": "/academy-assets/v5/blueprints/auto_18.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/auto_18_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۸C-2: افزودن اعتبارسنجی نوع dict/str روی ورودی‌های dq_filter_down_bgp_peers و batfish_style_trace در auto_18_lab.py."
+    ]
+  }
 }

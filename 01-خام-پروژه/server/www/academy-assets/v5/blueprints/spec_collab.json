@@ -1,349 +1,349 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "spec_collab",
- "objectiveId": "spec_collab",
- "kind": "lesson",
- "track": "FAM Specializations",
- "course": "spec-collaboration",
- "title": "تخصص Collaboration & VoIP: پروتکل SIP، RTP، CUCM و طراحی Dial Plan",
- "titleEn": "Collaboration & VoIP Specialization: SIP/SDP, RTP Media Bandwidth, CUCM & Dial Plan",
- "domain": "Collaboration & VoIP",
- "source": "Legacy spec_collab rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [],
- "sections": [
-  {
-   "id": "spec_collab-section-1",
-   "title": "مسئله واقعی: چرا صدای مکالمه ۵۰۰۰ کارمند نباید از سرور مرکز تلفن عبور کند؟",
-   "html": "<p>در سانترال‌های سنتی، تمام خطوط صوتی به یک دستگاه مرکزی وصل بودند. اگر در یک شبکه سازمانی VoIP با ۵۰۰۰ تلفن، کل جریان صوتی لحظه‌ای (RTP) از سرور <strong>CUCM (Cisco Unified Communications Manager)</strong> عبور کند، هم کارت شبکه و CPU سرور فوراً اشباع می‌شود و هم تماس دو همکار در یک اتاق مجبور به پیمودن مسیر رفت‌وبرگشت تا دیتاسنتر مرکزی می‌گردد.</p><p>معماری VoIP مدرن یک اصل طلایی دارد: <strong>جداسازی کامل Control Plane (سیگنالینگ SIP/SDP از طریق CUCM) از Media Plane (جریان مستقیم RTP/SRTP میان دو نقطه انتهایی)</strong>.</p>"
-  },
-  {
-   "id": "spec_collab-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازهای مفهومی:</strong> آشنایی با Voice VLAN، DHCP Option 150، اولویت‌بندی QoS (<code>DSCP EF/46</code> برای صوت و <code>CS3/24</code> برای سیگنالینگ) و تفاوت TCP/UDP.</p><ul><li>تحلیل گام‌به‌گام سیگنالینگ <strong>SIP</strong> (RFC 3261) و بدنه <strong>SDP</strong> (RFC 8866 / 4566) شامل <code>INVITE</code>، <code>100 Trying</code>، <code>180 Ringing</code>، <code>200 OK</code>، <code>ACK</code> و <code>BYE</code>.</li><li>محاسبه دقیق پهنای باند کدک‌های <strong>G.711</strong> و <strong>G.729</strong> در لایه ۳، لایه ۲ اترنت، 802.1Q، نرخ سیم (Wire Rate) و با سربار SRTP/IPsec.</li><li>شناخت معماری خوشه‌ای <strong>CUCM</strong> (Publisher / Subscriber / CM Group / SRST).</li><li>تسلط بر منطق <strong>Dial Plan</strong> در CUCM شامل <strong>Partition</strong>، <strong>CSS (Calling Search Space)</strong>، ترتیب ارزیابی <code>Line CSS + Device CSS</code> و قاعده Longest Match.</li></ul>"
-  },
-  {
-   "id": "spec_collab-section-3",
-   "title": "چرخه سیگنالینگ SIP و مذاکره مدیا با SDP",
-   "html": "<p><strong>SIP (Session Initiation Protocol، RFC 3261)</strong> یک پروتکل متنی شبیه HTTP (روی UDP/TCP 5060 یا TLS 5061) برای شروع، تغییر و پایان تماس است. ترتیب استاندارد برقراری یک تماس موفق (Early Offer) چنین است:</p><ol><li>تلفن A پیام <code>INVITE</code> حاوی بدنه <strong>SDP</strong> (نشانی IP در خط <code>c=IN IP4 ...</code>، پورت UDP در خط <code>m=audio ...</code> و کدک‌های پیشنهادی مانند <code>0=PCMU/G.711u</code>، <code>18=G.729</code>، <code>101=RFC 2833/4733 DTMF</code>) را به CUCM می‌فرستد.</li><li>CUCM بلافاصله <code>100 Trying</code> (پاسخ موقت محلی برای جلوگیری از ارسال مجدد) برمی‌گرداند و <code>INVITE</code> را به تلفن B هدایت می‌کند.</li><li>تلفن B زنگ می‌خورد و <code>180 Ringing</code> می‌فرستد. پس از برداشتن گوشی، <code>200 OK</code> همراه با SDP خود (IP، پورت و کدک توافق‌شده) ارسال می‌کند.</li><li>تلفن A با پیام <code>ACK</code> تماس را نهایی می‌کند و از این لحظه جریان مستقیم <strong>RTP</strong> بین IP و پورت‌های اعلام‌شده در SDP برقرار می‌شود؛ پایان تماس با <code>BYE</code> و <code>200 OK</code> انجام می‌گیرد.</li></ol>"
-  },
-  {
-   "id": "spec_collab-section-4",
-   "title": "نمودار معماری VoIP: تفکیک سیگنالینگ CUCM از جریان مستقیم RTP",
-   "html": "<p>همان‌گونه که در نمودار دیده می‌شود، CUCM در مسیر سیگنالینگ (خط‌چین) قرار دارد اما بسته‌های صوتی RTP (خط پیوسته) مستقیماً میان دو تلفن حرکت می‌کنند (مگر در سناریوهایی مانند MTP، Transcoding، Recording یا عبور از CUBE در حالت Media Flow-Through).</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"VoIP SIP Signaling via CUCM and Direct RTP Media Flow\"><rect x=\"250\" y=\"14\" width=\"260\" height=\"72\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"40\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">CUCM Cluster (Control Plane)</text><text x=\"380\" y=\"60\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Publisher (R/W DB) + Subscribers (Call Processing)</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9a3412\">Dial Plan: Partition + CSS (Line -&gt; Device)</text><rect x=\"20\" y=\"122\" width=\"190\" height=\"82\" rx=\"10\" fill=\"#dbeafe\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"115\" y=\"148\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">IP Phone A (Caller)</text><text x=\"115\" y=\"168\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Voice VLAN 30 | DSCP EF/CS3</text><text x=\"115\" y=\"186\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">SDP c=192.0.2.10 m=16384</text><rect x=\"550\" y=\"122\" width=\"190\" height=\"82\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"645\" y=\"148\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">IP Phone B (Callee)</text><text x=\"645\" y=\"168\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Voice VLAN 30 | DSCP EF/CS3</text><text x=\"645\" y=\"186\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">SDP c=192.0.2.20 m=16400</text><line x1=\"150\" y1=\"122\" x2=\"290\" y2=\"86\" stroke=\"#b45309\" stroke-width=\"2\" stroke-dasharray=\"6,3\"/><line x1=\"610\" y1=\"122\" x2=\"470\" y2=\"86\" stroke=\"#b45309\" stroke-width=\"2\" stroke-dasharray=\"6,3\"/><text x=\"180\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#92400e\">SIP/SDP (5060/5061)</text><text x=\"580\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#92400e\">SIP/SDP (5060/5061)</text><line x1=\"210\" y1=\"163\" x2=\"550\" y2=\"163\" stroke=\"#0f766e\" stroke-width=\"3\"/><text x=\"380\" y=\"154\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f766e\">Direct Media: RTP / SRTP (UDP 16384-32767)</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">G.711: 87.2 kbps/dir | G.729: 31.2 kbps/dir (Eth base, 20 ms)</text></svg>"
-  },
-  {
-   "id": "spec_collab-section-5",
-   "title": "چرا نرخ خام کدک (64 یا 8 kbps) برای طراحی پهنای باند کافی نیست؟",
-   "html": "<p>یکی از پرتکرارترین خطاهای ظرفیت‌سنجی VoIP، ضرب کردن نرخ خام کدک (<code>64 kbps</code> برای G.711 یا <code>8 kbps</code> برای G.729) در تعداد تماس‌هاست. صوت برخلاف انتقال فایل در بسته‌های بزرگ ۱۵۰۰ بایتی فرستاده نمی‌شود؛ برای پایین نگه داشتن تأخیر، معمولاً هر <strong>۲۰ میلی‌ثانیه</strong> یک بسته ارسال می‌شود؛ یعنی <strong>۵۰ بسته در ثانیه (50 pps)</strong>. روی هر بسته کوچک صوتی، دست‌کم <strong>۴۰ بایت هدر L3/L4</strong> سوار می‌شود: IPv4 (۲۰ بایت) + UDP (۸ بایت) + RTP (۱۲ بایت) = ۴۰ بایت! و در لایه ۲ اترنت پایه ۱۸ بایت دیگر (۱۴ بایت هدر + ۴ بایت FCS) و در صورت وجود تگ <code>802.1Q</code> چهار بایت اضافه می‌گردد.</p>"
-  },
-  {
-   "id": "spec_collab-section-6",
-   "title": "جدول محاسبات دقیق پهنای باند G.711 و G.729 (به ازای هر جهت، 20 ms)",
-   "html": "<p>در لینک‌های Full-Duplex، هر تماس شامل یک جریان رفت و یک جریان برگشت است و ظرفیت هر جهت جداگانه سنجیده می‌شود:</p><table><thead><tr><th>کدک (20 ms / 50 pps)</th><th>Payload صوتی</th><th>لایه ۳ (+40 B)</th><th>اترنت پایه (+18 B)</th><th>اترنت + 802.1Q (+22 B)</th><th>نرخ سیم (+20 B Preamble/IFG)</th></tr></thead><tbody><tr><td><strong>G.711 (64 kbps)</strong></td><td>160 B</td><td>200 B → <strong>80.0 kbps</strong></td><td>218 B → <strong>87.2 kbps</strong></td><td>222 B → <strong>88.8 kbps</strong></td><td>238–242 B → <strong>95.2–96.8 kbps</strong></td></tr><tr><td><strong>G.729 (8 kbps)</strong></td><td>20 B</td><td>60 B → <strong>24.0 kbps</strong></td><td>78 B → <strong>31.2 kbps</strong></td><td>82 B → <strong>32.8 kbps</strong></td><td>98–102 B → <strong>39.2–40.8 kbps</strong></td></tr></tbody></table><p><strong>مرز محاسبه:</strong> اعداد بالا بدون <strong>SRTP</strong> (معمولاً ۴ تا ۱۰ بایت Auth Tag اضافه) و بدون هدر تونل <strong>IPsec/GRE</strong> روی WAN هستند؛ در طراحی WAN امن، سربار IPsec/ESP می‌تواند مصرف یک تماس G.729 را به حدود ۵۰ تا ۶۰ kbps در هر جهت برساند.</p>"
-  },
-  {
-   "id": "spec_collab-section-7",
-   "title": "کیفیت سرویس (QoS) و بودجه تأخیر، جیتر و افت بسته",
-   "html": "<p>صوت زنده روی UDP ارسال می‌شود و ارسال مجدد (Retransmission) ندارد؛ بنابراین به سه پارامتر به‌شدت حساس است (معیارهای رایج ITU-T G.114 و Cisco SRND):</p><ul><li><strong>تأخیر یک‌طرفه (One-Way Delay):</strong> هدف زیر <strong>150 ms</strong>.</li><li><strong>جیتر (Jitter / نوسان تأخیر):</strong> هدف زیر <strong>30 ms</strong> (توسط De-jitter Buffer تلفن جذب می‌شود اما جیتر بالا باعث صدای رباتیک/بریده می‌شود).</li><li><strong>افت بسته (Packet Loss):</strong> هدف زیر <strong>1%</strong>.</li></ul><p>برای تضمین این اهداف، ترافیک صوتی RTP با <strong>DSCP EF (46)</strong> در صف اولویت (LLQ — Low Latency Queueing) و ترافیک سیگنالینگ SIP با <strong>DSCP CS3 (24)</strong> در صف تضمین‌شده قرار می‌گیرند.</p>"
-  },
-  {
-   "id": "spec_collab-section-8",
-   "title": "معماری خوشه‌ای CUCM: Publisher، Subscriber، CM Group و SRST",
-   "html": "<p>یک خوشه <strong>CUCM</strong> شامل دقیقاً یک گره <strong>Publisher</strong> (تنها گره دارای پایگاه‌داده Read/Write برای تغییرات پیکربندی، به علاوه کاربری‌های مدیریتی) و یک یا چند گره <strong>Subscriber</strong> (گره‌های پردازش تماس و ثبت تلفن‌ها) است. در طراحی استاندارد، تلفن‌ها از طریق <strong>Cisco Unified CM Group</strong> ابتدا به Subscriberهای فعال (Primary / Secondary) وصل می‌شوند و فقط در حالت اضطراری روی Publisher ثبت می‌گردند.</p><p>اگر Publisher موقتاً از دسترس خارج شود، تماس‌های جاری و برقراری تماس جدید روی Subscriberها ادامه می‌یابد (فقط تغییرات پیکربندی جدید و برخی قابلیت‌های وابسته به DB Write مانند تغییر Call Forward All محدود می‌شوند). همچنین در شعب دورافتاده، برای مقابله با قطع لینک WAN تا CUCM، قابلیت <strong>SRST (Survivable Remote Site Telephony)</strong> روی روتر محلی شعبه فعال می‌شود تا تلفن‌ها هنگام قطع WAN به صورت موقت روی روتر شعبه رجیستر شوند و تماس‌های داخلی و اضطراری برقرار بماند.</p>"
-  },
-  {
-   "id": "spec_collab-section-9",
-   "title": "طراحی Dial Plan در CUCM: تفاوت Partition و Calling Search Space (CSS)",
-   "html": "<p>مکانیسم کنترل دسترسی شماره‌گیری در CUCM از دو سازه مکمل ساخته شده است که نباید با هم اشتباه گرفته شوند:</p><ul><li><strong>Partition (روی مقصد):</strong> برچسب دسته‌بندی است که روی <em>شماره‌های مقصد</em> (مانند Directory Number داخلی، Route Pattern شهری/بین‌المللی، Translation Pattern) گذاشته می‌شود — یعنی «این مقصد در کدام کشو قفل شده است؟». مقصدی که Partition آن <code>&lt;None&gt;</code> باشد برای همه قابل دسترسی است!</li><li><strong>CSS — Calling Search Space (روی مبدأ):</strong> فهرست <strong>ترتیب‌دار</strong> از Partitionهایی است که مبدأ تماس (خط تلفن یا خود دستگاه تلفن) اجازه جست‌وجو در آن‌ها را دارد — یعنی «این تماس‌گیرنده کلید کدام کشوها را دارد؟».</li></ul>"
-  },
-  {
-   "id": "spec_collab-section-10",
-   "title": "قواعد ارزیابی CUCM: ترکیب Line CSS + Device CSS و Longest Match",
-   "html": "<p>در CUCM هم می‌توان روی <strong>Line (شماره داخلی)</strong> یک CSS گذاشت و هم روی <strong>Device (دستگاه تلفن)</strong>. هنگام شماره‌گیری، CUCM این دو را به هم می‌چسباند با این ترتیب ثابت: <strong>ابتدا Line CSS و سپس Device CSS</strong>.</p><ol><li><strong>قاعده اول — Longest / Closest Match:</strong> در تمام Partitionهای موجود در فهرست ترکیبی، الگویی که بیشترین تطابق دقیق را با شماره گرفته‌شده دارد برنده می‌شود (حتی اگر در Partition پایین‌تر لیست باشد).</li><li><strong>قاعده دوم — Tie-Breaker (ترتیب CSS):</strong> اگر دو الگوی <em>کاملاً هم‌ارز</em> در دو Partition مختلف وجود داشته باشند (مثلاً الگوی <code>900!</code> هم در <code>PT_BLOCK_INTL</code> با عملیات Block و هم در <code>PT_ALLOW_INTL</code> با عملیات Route)، Partitionی که <strong>زودتر در فهرست ترکیبی (Line CSS قبل از Device CSS)</strong> آمده برنده می‌شود. به همین دلیل الگوی کلاسیک «Line/Device Approach» قوانین مسدودسازی اختصاصی کاربر را در Line CSS و دسترسی‌های مکانی دستگاه را در Device CSS قرار می‌دهد.</li></ol>"
-  },
-  {
-   "id": "spec_collab-section-11",
-   "title": "کژفهمی‌های رایج در VoIP و Collaboration",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای ۲۰ تماس هم‌زمان G.729 روی WAN، پهنای باند 20 × 8 = 160 kbps کافی است.»</strong> واقعیت: با هدرهای IP/UDP/RTP در 50 pps، مصرف لایه ۳ هر تماس 24 kbps و روی اترنت 31.2–32.8 kbps (و با IPsec بیشتر) در هر جهت است؛ ۲۰ تماس دست‌کم به ۶۲۴ تا بالای ۱۰۰۰ kbps صف اولویت در هر جهت نیاز دارد.</li><li><strong>کژفهمی ۲: «چون گوشی مقابل زنگ خورد (180 Ringing)، پس مسیر صوتی هم سالم است.»</strong> واقعیت: زنگ خوردن فقط سلامت سیگنالینگ SIP از طریق CUCM را ثابت می‌کند؛ بسیاری از خطاهای ACL، مسیریابی بین Voice VLANها یا NAT در SDP دقیقاً پس از برداشتن گوشی با <strong>صدای یک‌طرفه یا بی‌صدا (One-Way / No-Way Audio)</strong> آشکار می‌شوند.</li><li><strong>کژفهمی ۳: «اگر Partition یک Route Pattern را None بگذاریم، هیچ‌کس نمی‌تواند به آن زنگ بزند.»</strong> واقعیت: دقیقاً برعکس! Partition برابر <code>&lt;None&gt;</code> برای <strong>همه CSSها</strong> قابل دسترس است و ریسک امنیتی Toll Fraud ایجاد می‌کند.</li></ul>"
-  },
-  {
-   "id": "spec_collab-section-12",
-   "title": "عیب‌یابی سیستماتیک: تماس برقرار است ولی هیچ صدایی شنیده نمی‌شود (No-Way Audio)",
-   "html": "<p><strong>سناریو:</strong> کارمند شعبه A شماره داخلی شعبه B را می‌گیرد؛ گوشی زنگ می‌خورد، طرف مقابل پاسخ می‌دهد و تایمر مکالمه جلو می‌رود، اما هیچ‌یک صدایی نمی‌شنوند.</p><p><strong>گام‌های تشخیص مهندسی:</strong></p><ol><li>از آنجا که تماس برقرار و تایمر فعال است، سیگنالینگ <code>SIP (5060/5061)</code> به CUCM سالم است؛ تمرکز را روی <strong>Media Plane (RTP)</strong> بگذارید.</li><li>در پیام‌های <code>INVITE</code> و <code>200 OK</code> (از طریق RTMT / TranslatorX یا PCAP)، خطوط <code>c=IN IP4 &lt;IP&gt;</code> و <code>m=audio &lt;Port&gt;</code> را بررسی کنید: آیا آدرس خصوصی ترجمه‌نشده از مرز NAT عبور کرده است؟</li><li>دسترسی لایه ۳ دوطرفه بین ساب‌نت Voice VLAN دو شعبه و باز بودن رنج پورت <strong>UDP 16384–32767</strong> در ACL/فایروال‌های میانی را چک کنید (دو شعبه ممکن است هر دو به CUCM دسترسی داشته باشند ولی به هم نه!).</li><li>در مرز NAT یا اتصال به SIP Trunk بیرونی، از <strong>Cisco CUBE (Session Border Controller)</strong> با Media Flow-Through برای بازنویسی صحیح آدرس‌های SDP و کنترل RTP استفاده کنید.</li></ol>"
-  },
-  {
-   "id": "spec_collab-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> برای ۱۰ تماس هم‌زمان با کدک <strong>G.711</strong> (بسته ۲۰ میلی‌ثانیه‌ای) روی LAN اترنت دارای تگ <code>802.1Q</code> (بدون احتساب Preamble/IFG و بدون SRTP)، حداقل پهنای باند صف اولویت LLQ در هر جهت چقدر است؟ <strong>پاسخ:</strong> هر بسته G.711 شامل <code>160 B (صوت) + 40 B (IP/UDP/RTP) + 18 B (Eth) + 4 B (802.1Q) = 222 Byte</code> است. در <code>50 pps</code> هر تماس برابر <code>222 × 8 × 50 = 88.8 kbps</code> است؛ برای ۱۰ تماس حداقل <strong>888 kbps در هر جهت</strong> لازم است.</p><p><strong>تمرین ۲:</strong> روی یک تلفن، <code>Line CSS = [PT_BLOCK_INTL]</code> و <code>Device CSS = [PT_ALLOW_INTL, PT_LOCAL]</code> تنظیم شده است. الگوی یکسان <code>900</code> در <code>PT_BLOCK_INTL</code> با عمل Block و در <code>PT_ALLOW_INTL</code> با عمل Route وجود دارد. هنگام گرفتن <code>900441234</code> چه رخ می‌دهد؟ <strong>پاسخ:</strong> فهرست ترکیبی برابر <code>[PT_BLOCK_INTL, PT_ALLOW_INTL, PT_LOCAL]</code> است. چون هر دو الگو طول تطابق برابر دارند، ترتیب CSS تعیین‌کننده است و <code>PT_BLOCK_INTL</code> (از Line CSS) برنده شده و تماس مسدود (Block) می‌شود.</p>"
-  },
-  {
-   "id": "spec_collab-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc3261\" target=\"_blank\" rel=\"noopener\">RFC 3261 (SIP)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3550\" target=\"_blank\" rel=\"noopener\">RFC 3550 (RTP)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc8866\" target=\"_blank\" rel=\"noopener\">RFC 8866 (SDP)</a> و راهنمای طراحی Cisco Collaboration Preferred Architecture / CUCM SRND.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ خوشه واقعی CUCM، روتر CUBE یا تلفن SIP در این محیط اجرا نشده است. آزمایشگاه Python محلی صرفاً محاسبات پهنای باند VoIP و شبیه‌ساز منطق ارزیابی Partition/CSS در Dial Plan را اجرا می‌کند.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "SIP",
-   "fa": "پروتکل SIP",
-   "simple": "Session Initiation Protocol (RFC 3261)؛ پروتکل سیگنالینگ برای برقراری، تغییر و قطع تماس VoIP."
-  },
-  {
-   "term": "SDP",
-   "fa": "توصیف نشست SDP",
-   "simple": "بدنه داخل پیام‌های SIP که آدرس IP مدیا (c=)، پورت (m=) و کدک‌های مجاز را مذاکره می‌کند."
-  },
-  {
-   "term": "RTP",
-   "fa": "پروتکل انتقال لحظه‌ای",
-   "simple": "Real-time Transport Protocol (RFC 3550) روی UDP برای حمل مستقیم جریان صوت/تصویر."
-  },
-  {
-   "term": "SRTP",
-   "fa": "پروتکل RTP امن",
-   "simple": "نسخه رمزنگاری‌شده و احراز اصالت‌شده RTP برای جلوگیری از شنود مکالمات."
-  },
-  {
-   "term": "G.711",
-   "fa": "کدک G.711",
-   "simple": "کدک صوتی بدون فشرده‌سازی با نرخ خام 64 kbps و مصرف اترنت پایه 87.2 kbps در هر جهت (20 ms)."
-  },
-  {
-   "term": "G.729",
-   "fa": "کدک G.729",
-   "simple": "کدک فشرده با نرخ خام 8 kbps و مصرف اترنت پایه 31.2 kbps در هر جهت (20 ms)."
-  },
-  {
-   "term": "CUCM",
-   "fa": "مرکز تلفن CUCM",
-   "simple": "Cisco Unified Communications Manager؛ سرور پردازش تماس و مدیریت Dial Plan سازمانی."
-  },
-  {
-   "term": "Publisher / Subscriber",
-   "fa": "گره ناشر و مشترک",
-   "simple": "Publisher تنها دارنده DB خواندن/نوشتن و Subscriberها پردازشگرهای اصلی تماس در خوشه CUCM هستند."
-  },
-  {
-   "term": "SRST",
-   "fa": "بقای تلفن شعبه",
-   "simple": "Survivable Remote Site Telephony؛ پشتیبانی موقت تماس در شعبه هنگام قطع WAN تا CUCM."
-  },
-  {
-   "term": "Partition",
-   "fa": "پارتیشن Dial Plan",
-   "simple": "برچسب دسته‌بندی روی شماره‌های مقصد (DN/Route Pattern) برای کنترل دسترسی تماس."
-  },
-  {
-   "term": "CSS",
-   "fa": "فضای جست‌وجوی تماس",
-   "simple": "Calling Search Space؛ فهرست ترتیب‌دار Partitionهایی که مبدأ تماس اجازه رسیدن به آن‌ها را دارد."
-  },
-  {
-   "term": "Line/Device CSS",
-   "fa": "الگوی ترکیب CSS",
-   "simple": "ترتیب ثابت ارزیابی در CUCM که Line CSS را پیش از Device CSS بررسی می‌کند."
-  },
-  {
-   "term": "Voice VLAN",
-   "fa": "شبکه مجازی صوت",
-   "simple": "VLAN اختصاصی روی پورت دسترسی سوئیچ برای جداسازی و QoS ترافیک تلفن IP."
-  },
-  {
-   "term": "DSCP EF (46)",
-   "fa": "نشان‌گذاری اولویت صوت",
-   "simple": "Expedited Forwarding برای قرار دادن بسته‌های RTP در صف کم‌تأخیر LLQ."
-  },
-  {
-   "term": "Jitter",
-   "fa": "جیتر (نوسان تأخیر)",
-   "simple": "تفاوت زمان رسیدن بسته‌های متوالی RTP؛ هدف طراحی زیر 30 ms."
-  },
-  {
-   "term": "CUBE",
-   "fa": "دروازه CUBE",
-   "simple": "Cisco Unified Border Element؛ Session Border Controller برای مرز SIP Trunk و ترجمه NAT/SDP."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه Python Mock محلی محاسبه پهنای باند VoIP و CUCM Dial Plan + سناریوی مرجع (تجهیز واقعی اجرا نشده)",
-   "executionStatus": "Python Mock محلی اجرا و تست شده؛ هیچ خوشه CUCM، CUBE یا تلفن SIP واقعی اجرا نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>Python Mock محلی</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر، سوئیچ، فایروال یا کنترلر واقعی سیسکو اجرا نشده است.</p><p>در این آزمایشگاه با کد محلی Python، پهنای باند واقعی G.711 و G.729 در لایه ۳، اترنت پایه و 802.1Q را محاسبه می‌کنید و منطق ترکیب <code>Line CSS + Device CSS</code> و قاعده Longest Match / Tie-Breaker را در CUCM Dial Plan می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_collab_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_collab_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for spec_collab (VoIP Bandwidth Math, SIP/SDP &amp; CUCM Dial Plan).\n\nNo real Cisco CUCM, CUBE, SIP phone, or RTP media stream is executed.\nStrict validation rejects non-bool flags (e.g. dot1q=&#x27;False&#x27;), non-positive packetization\nintervals (preventing ZeroDivisionError), negative overhead bytes, and empty dialed strings.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nCODECS = {\n    &quot;G.711&quot;: {&quot;payload_bytes_20ms&quot;: 160, &quot;codec_kbps&quot;: 64.0},\n    &quot;G.729&quot;: {&quot;payload_bytes_20ms&quot;: 20, &quot;codec_kbps&quot;: 8.0},\n}\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_int(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int):\n        raise ValueError(f&quot;{name} must be an int (not bool), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef voip_bandwidth_per_direction(\n    codec: str,\n    packetization_ms: int = 20,\n    dot1q: bool = False,\n    include_wire_preamble_ifg: bool = False,\n    srtp_auth_tag_bytes: int = 0,\n    tunnel_overhead_bytes: int = 0,\n) -&gt; dict[str, float]:\n    &quot;&quot;&quot;Compute exact single-direction VoIP bandwidth in kbps for L3 and L2 Ethernet.&quot;&quot;&quot;\n    if codec not in CODECS:\n        raise ValueError(f&quot;Unsupported codec: {codec!r}&quot;)\n    pkt_ms = _require_int(packetization_ms, &quot;packetization_ms&quot;)\n    if pkt_ms &lt;= 0:\n        raise ValueError(f&quot;packetization_ms must be positive, got {pkt_ms}&quot;)\n    use_dot1q = _require_bool(dot1q, &quot;dot1q&quot;)\n    use_wire = _require_bool(include_wire_preamble_ifg, &quot;include_wire_preamble_ifg&quot;)\n    srtp_b = _require_int(srtp_auth_tag_bytes, &quot;srtp_auth_tag_bytes&quot;)\n    tunnel_b = _require_int(tunnel_overhead_bytes, &quot;tunnel_overhead_bytes&quot;)\n    if srtp_b &lt; 0 or tunnel_b &lt; 0:\n        raise ValueError(&quot;srtp_auth_tag_bytes and tunnel_overhead_bytes must be non-negative&quot;)\n\n    pps = 1000.0 / pkt_ms\n    scale = pkt_ms / 20.0\n    payload = CODECS[codec][&quot;payload_bytes_20ms&quot;] * scale\n    l3_l4_headers = 20 + 8 + 12  # IPv4 (20) + UDP (8) + RTP (12) = 40 B\n    l3_bytes = payload + l3_l4_headers + srtp_b + tunnel_b\n    eth_header_fcs = 18 + (4 if use_dot1q else 0)\n    l2_bytes = l3_bytes + eth_header_fcs\n    wire_bytes = l2_bytes + (20 if use_wire else 0)  # 8B Preamble/SFD + 12B IFG\n    return {\n        &quot;pps&quot;: pps,\n        &quot;l3_bytes&quot;: l3_bytes,\n        &quot;l3_kbps&quot;: round((l3_bytes * 8 * pps) / 1000.0, 2),\n        &quot;l2_bytes&quot;: l2_bytes,\n        &quot;l2_kbps&quot;: round((l2_bytes * 8 * pps) / 1000.0, 2),\n        &quot;wire_kbps&quot;: round((wire_bytes * 8 * pps) / 1000.0, 2),\n    }\n\n\ndef evaluate_cucm_dial_plan(\n    dialed_number: str,\n    line_css: list[str],\n    device_css: list[str],\n    route_table: list[dict[str, str]],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model CUCM CSS evaluation: Line CSS precedes Device CSS, longest match wins, CSS order breaks ties.&quot;&quot;&quot;\n    if not isinstance(dialed_number, str) or not dialed_number.strip():\n        raise ValueError(&quot;dialed_number must be a non-empty str&quot;)\n    effective_css = list(line_css) + [p for p in device_css if p not in line_css]\n    candidates = []\n    for entry in route_table:\n        part = entry[&quot;partition&quot;]\n        if part not in effective_css:\n            continue\n        prefix = entry[&quot;prefix&quot;]\n        if dialed_number.startswith(prefix):\n            candidates.append((len(prefix), -effective_css.index(part), entry))\n    if not candidates:\n        return {&quot;matched&quot;: False, &quot;effective_css&quot;: effective_css, &quot;action&quot;: &quot;reorder_tone_blocked&quot;}\n    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)\n    winner = candidates[0][2]\n    return {\n        &quot;matched&quot;: True,\n        &quot;effective_css&quot;: effective_css,\n        &quot;matched_pattern&quot;: winner[&quot;prefix&quot;],\n        &quot;partition&quot;: winner[&quot;partition&quot;],\n        &quot;action&quot;: winner[&quot;action&quot;],\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real CUCM cluster, SIP trunk, or RTP flow is run.&quot;)\n    g711_base = voip_bandwidth_per_direction(&quot;G.711&quot;)\n    g711_q = voip_bandwidth_per_direction(&quot;G.711&quot;, dot1q=True)\n    g729_base = voip_bandwidth_per_direction(&quot;G.729&quot;)\n    assert g711_base[&quot;l2_kbps&quot;] == 87.2\n    assert g711_q[&quot;l2_kbps&quot;] == 88.8\n    assert g729_base[&quot;l2_kbps&quot;] == 31.2\n    routes = [\n        {&quot;prefix&quot;: &quot;900&quot;, &quot;partition&quot;: &quot;PT_BLOCK_INTL&quot;, &quot;action&quot;: &quot;block&quot;},\n        {&quot;prefix&quot;: &quot;900&quot;, &quot;partition&quot;: &quot;PT_ALLOW_INTL&quot;, &quot;action&quot;: &quot;route_to_cube&quot;},\n        {&quot;prefix&quot;: &quot;9&quot;, &quot;partition&quot;: &quot;PT_LOCAL&quot;, &quot;action&quot;: &quot;route_local&quot;},\n    ]\n    res = evaluate_cucm_dial_plan(&quot;900441234&quot;, [&quot;PT_BLOCK_INTL&quot;], [&quot;PT_ALLOW_INTL&quot;, &quot;PT_LOCAL&quot;], routes)\n    assert res[&quot;matched&quot;] is True and res[&quot;action&quot;] == &quot;block&quot;\n    print(&quot;G.711 (20ms, base Eth):&quot;, g711_base)\n    print(&quot;G.711 (20ms, 802.1Q):&quot;, g711_q)\n    print(&quot;G.729 (20ms, base Eth):&quot;, g729_base)\n    print(&quot;Line CSS overrides Device CSS on tie:&quot;, res)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> G.711 در اترنت پایه <code>87.2 kbps</code> و G.729 در اترنت پایه <code>31.2 kbps</code> (با 802.1Q برابر <code>32.8 kbps</code>) برمی‌گرداند؛ در آزمون Dial Plan، <code>PT_BLOCK_INTL</code> از Line CSS بر <code>PT_ALLOW_INTL</code> از Device CSS پیروز شده و تماس <code>900441234</code> مسدود می‌شود.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>پلتفرم مرجع:</strong> Cisco IOS-XE Switch (Voice VLAN + AutoQoS) + CUCM (اجرا نشده روی سخت‌افزار):</p><pre dir=\"ltr\"><code>! Reference IOS-XE Access Port for IP Phone + PC (NOT executed)\nvlan 30\n name VOICE_VLAN\ninterface GigabitEthernet0/3\n switchport mode access\n switchport access vlan 10\n switchport voice vlan 30\n mls qos trust cos\n! Verify on real switch: show interfaces Gi0/3 switchport</code></pre><p>در محیط آزمایشی واقعی CUCM/CUBE از RTMT یا PCAP برای بازرسی خطوط <code>c=</code> و <code>m=</code> در SDP استفاده کنید.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس تخصص Collaboration & VoIP",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "ترتیب استاندارد پیام‌های SIP برای برقراری یک تماس موفق و پروتکل حامل صدای زنده کدام است؟",
-   "options": [
-    "INVITE -> 180 Ringing -> 200 OK -> ACK برای سیگنالینگ، و RTP روی UDP برای جریان مستقیم صوت",
-    "SYN -> SYN-ACK -> ACK و انتقال صوت با FTP",
-    "BYE -> INVITE -> 200 OK و انتقال صوت با SNMP",
-    "INVITE -> ACK -> 200 OK و عبور اجباری همه RTPها از Publisher"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>مطابق RFC 3261 تماس با INVITE شروع می‌شود، با 180 Ringing و 200 OK پاسخ داده می‌شود و با ACK تایید می‌گردد؛ صدای زنده از طریق RTP روی UDP جریان می‌یابد.</p>"
-  },
-  {
-   "title": "پهنای باند یک جریان در هر جهت برای کدک G.729 (بسته ۲۰ میلی‌ثانیه‌ای) روی اترنت پایه (بدون 802.1Q، Preamble/IFG و SRTP) چقدر است؟",
-   "options": [
-    "8.0 kbps",
-    "31.2 kbps",
-    "64.0 kbps",
-    "87.2 kbps"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>20 B صوت + 40 B هدر IP/UDP/RTP + 18 B اترنت پایه = 78 بایت؛ <code>78 × 8 × 50 pps = 31.2 kbps</code> در هر جهت.</p>"
-  },
-  {
-   "title": "پهنای باند یک جریان در هر جهت برای کدک G.711 (20 ms) روی اترنت دارای تگ 802.1Q (بدون Preamble/IFG و SRTP) چقدر است؟",
-   "options": [
-    "64.0 kbps",
-    "80.0 kbps",
-    "88.8 kbps",
-    "32.8 kbps"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>160 B صوت + 40 B هدر L3/L4 + 18 B اترنت + 4 B تگ 802.1Q = 222 بایت؛ <code>222 × 8 × 50 pps = 88.8 kbps</code>.</p>"
-  },
-  {
-   "title": "تفاوت دقیق Partition و CSS (Calling Search Space) در CUCM Dial Plan چیست؟",
-   "options": [
-    "هر دو نام یک چیزند",
-    "Partition روی مبدأ و CSS روی مقصد اعمال می‌شود",
-    "Partition کدک را انتخاب می‌کند و CSS پورت RTP را می‌بندد",
-    "Partition دسته‌بندی شماره‌های مقصد است و CSS فهرست ترتیب‌دار Partitionهای مجاز روی مبدأ تماس است"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>Partition روی مقاصد (DN، Route Pattern) قرار می‌گیرد و CSS به مبدأ (Line/Device) می‌گوید در کدام Partitionها و به چه ترتیبی جست‌وجو کند.</p>"
-  },
-  {
-   "title": "در ترکیب Line CSS و Device CSS در CUCM، کدام ترتیب ارزیابی اعمال می‌شود و در تساوی طول الگو کدام برنده است؟",
-   "options": [
-    "ابتدا Line CSS و سپس Device CSS؛ در تساوی طول الگو، Partitionی که زودتر در این لیست ترکیبی است برنده می‌شود",
-    "ابتدا Device CSS و سپس Line CSS",
-    "همیشه Device CSS بدون توجه به Longest Match برنده است",
-    "CUCM به‌صورت تصادفی یکی را انتخاب می‌کند"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در CUCM همیشه Longest Match اولویت اول است و در حالت تساوی، ترتیب <code>Line CSS</code> قبل از <code>Device CSS</code> تعیین‌کننده است.</p>"
-  },
-  {
-   "title": "تلفن مقصد زنگ می‌خورد و پس از پاسخ شمارنده تماس جلو می‌رود، اما هیچ‌یک صدایی نمی‌شنوند (No-Way Audio). کدام مورد محتمل‌ترین علت است؟",
-   "options": [
-    "خاموش بودن CUCM Publisher",
-    "مسدود بودن پورت‌های RTP (UDP 16384-32767)، نبود مسیر برگشت بین ساب‌نت‌های Voice یا درج IP خصوصی ترجمه‌نشده در SDP",
-    "اشتباه بودن شماره داخلی در Route Pattern",
-    "قطع بودن کامل پورت TCP 5060"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>برقرار شدن زنگ و تایمر نشانه سلامت SIP است؛ قطع صدا معمولاً از مسیر مستقیم مدیا (RTP/ACL/Routing/NAT-SDP) ناشی می‌شود.</p>"
-  },
-  {
-   "title": "نقش دو خط c= و m= در بدنه SDP درون پیام‌های SIP INVITE و 200 OK چیست؟",
-   "options": [
-    "تعیین رمز عبور ادمین CUCM",
-    "تنظیم VLAN دسترسی کامپیوتر پشت تلفن",
-    "اعلام آدرس IP مقصد مدیا (c=) و شماره پورت/کدک‌های صوتی (m=) برای جریان RTP",
-    "تعیین اولویت Spanning Tree سوئیچ"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>خط <code>c=IN IP4</code> آدرس IP دریافت مدیا و خط <code>m=audio</code> پورت UDP و فهرست کدک‌ها را اعلام می‌کند.</p>"
-  },
-  {
-   "title": "اگر در خوشه CUCM گره Publisher موقتاً از دسترس خارج شود، وضعیت تماس تلفن‌های ثبت‌شده روی Subscriberها چگونه است؟",
-   "options": [
-    "تمام تماس‌های سازمان فوراً قطع می‌شوند",
-    "تمام تلفن‌ها به تنظیمات کارخانه برمی‌گردند",
-    "تلفن‌ها دیگر نمی‌توانند هیچ تماسی بگیرند",
-    "پردازش تماس روی Subscriberها ادامه می‌یابد، اما تغییرات پیکربندی جدید (DB Write) تا بازگشت Publisher متوقف می‌شود"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>Subscriberها کپی خواندنی DB را دارند و Call Processing را ادامه می‌دهند؛ نبود Publisher فقط عملیات نوشتن پیکربندی را متوقف می‌کند.</p>"
-  },
-  {
-   "title": "اگر Partition یک Route Pattern تماس بین‌المللی روی <None> باقی بماند، چه ریسکی ایجاد می‌شود؟",
-   "options": [
-    "برای همه CSSها قابل دسترس می‌شود و ریسک امنیتی و مالی (Toll Fraud) ایجاد می‌کند",
-    "هیچ تلفنی در سازمان نمی‌تواند به آن زنگ بزند",
-    "فقط CUCM Publisher به آن دسترسی دارد",
-    "ترافیک آن به جای RTP روی TCP می‌رود"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در CUCM، Partition <code>&lt;None&gt;</code> همیشه در همه CSSها قابل مشاهده است و نباید برای الگوهای حساس استفاده شود.</p>"
-  },
-  {
-   "title": "مقادیر استاندارد DSCP و معیارهای هدف کیفیت (Delay / Jitter / Loss) برای ترافیک صوتی RTP چیست؟",
-   "options": [
-    "DSCP BE (0)؛ تأخیر زیر ۵۰۰ ms و افت بسته ۱۰٪",
-    "DSCP EF (46) در صف اولویت LLQ؛ تأخیر یک‌طرفه < 150 ms، جیتر < 30 ms و افت بسته < 1%",
-    "DSCP CS1؛ بدون نیاز به صف اولویت",
-    "DSCP EF فقط برای ترافیک HTTP"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>صوت زنده به تأخیر، جیتر و افت بسته بسیار حساس است و با DSCP EF (46) در صف LLQ محافظت می‌شود.</p>"
-  },
-  {
-   "title": "کاربرد SRST (Survivable Remote Site Telephony) در طراحی شعب چیست؟",
-   "options": [
-    "فشرده‌سازی فایل‌های لاگ CUCM",
-    "رمزنگاری ایمیل‌های سازمانی",
-    "تداوم تماس‌های داخلی و اضطراری در شعبه از طریق روتر محلی هنگام قطع لینک WAN تا CUCM مرکزی",
-    "جایگزینی Voice VLAN با Native VLAN"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>SRST به تلفن‌های شعبه اجازه می‌دهد هنگام قطع ارتباط با خوشه مرکزی CUCM، به روتر محلی Fallback کنند.</p>"
-  },
-  {
-   "title": "مرز اجرای آزمایشگاه Python در این درس چیست؟",
-   "options": [
-    "ثبت واقعی تلفن‌های SIP روی خوشه CUCM",
-    "تولید جریان واقعی صوتی RTP روی کارت شبکه",
-    "اعمال AutoQoS روی سوئیچ واقعی Catalyst",
-    "محاسبه محلی پهنای باند VoIP و شبیه‌سازی منطق Dial Plan (Partition/CSS) بدون اجرای CUCM یا تلفن واقعی"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه یک Python Mock محلی است و هیچ خوشه CUCM، CUBE یا تلفن واقعی در این محیط اجرا نشده است.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.8",
-  "legacyId": "spec_collab",
-  "sources": [
-   "https://www.rfc-editor.org/rfc/rfc3261",
-   "https://www.rfc-editor.org/rfc/rfc3550",
-   "https://www.rfc-editor.org/rfc/rfc8866",
-   "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/srnd/collab12/collab12.html"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "spec_collab",
+  "objectiveId": "spec_collab",
+  "kind": "lesson",
+  "track": "FAM Specializations",
+  "course": "spec-collaboration",
+  "title": "تخصص Collaboration & VoIP: پروتکل SIP، RTP، CUCM و طراحی Dial Plan",
+  "titleEn": "Collaboration & VoIP Specialization: SIP/SDP, RTP Media Bandwidth, CUCM & Dial Plan",
+  "domain": "Collaboration & VoIP",
+  "source": "Legacy spec_collab rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [],
+  "sections": [
+    {
+      "id": "spec_collab-section-1",
+      "title": "مسئله واقعی: چرا صدای مکالمه ۵۰۰۰ کارمند نباید از سرور مرکز تلفن عبور کند؟",
+      "html": "<p>در سانترال‌های سنتی، تمام خطوط صوتی به یک دستگاه مرکزی وصل بودند. اگر در یک شبکه سازمانی VoIP با ۵۰۰۰ تلفن، کل جریان صوتی لحظه‌ای (RTP) از سرور <strong>CUCM (Cisco Unified Communications Manager)</strong> عبور کند، هم کارت شبکه و CPU سرور فوراً اشباع می‌شود و هم تماس دو همکار در یک اتاق مجبور به پیمودن مسیر رفت‌وبرگشت تا دیتاسنتر مرکزی می‌گردد.</p><p>معماری VoIP مدرن یک اصل طلایی دارد: <strong>جداسازی کامل Control Plane (سیگنالینگ SIP/SDP از طریق CUCM) از Media Plane (جریان مستقیم RTP/SRTP میان دو نقطه انتهایی)</strong>.</p>"
+    },
+    {
+      "id": "spec_collab-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازهای مفهومی:</strong> آشنایی با Voice VLAN، DHCP Option 150، اولویت‌بندی QoS (<code>DSCP EF/46</code> برای صوت و <code>CS3/24</code> برای سیگنالینگ) و تفاوت TCP/UDP.</p><ul><li>تحلیل گام‌به‌گام سیگنالینگ <strong>SIP</strong> (RFC 3261) و بدنه <strong>SDP</strong> (RFC 8866 / 4566) شامل <code>INVITE</code>، <code>100 Trying</code>، <code>180 Ringing</code>، <code>200 OK</code>، <code>ACK</code> و <code>BYE</code>.</li><li>محاسبه دقیق پهنای باند کدک‌های <strong>G.711</strong> و <strong>G.729</strong> در لایه ۳، لایه ۲ اترنت، 802.1Q، نرخ سیم (Wire Rate) و با سربار SRTP/IPsec.</li><li>شناخت معماری خوشه‌ای <strong>CUCM</strong> (Publisher / Subscriber / CM Group / SRST).</li><li>تسلط بر منطق <strong>Dial Plan</strong> در CUCM شامل <strong>Partition</strong>، <strong>CSS (Calling Search Space)</strong>، ترتیب ارزیابی <code>Line CSS + Device CSS</code> و قاعده Longest Match.</li></ul>"
+    },
+    {
+      "id": "spec_collab-section-3",
+      "title": "چرخه سیگنالینگ SIP و مذاکره مدیا با SDP",
+      "html": "<p><strong>SIP (Session Initiation Protocol، RFC 3261)</strong> یک پروتکل متنی شبیه HTTP (روی UDP/TCP 5060 یا TLS 5061) برای شروع، تغییر و پایان تماس است. ترتیب استاندارد برقراری یک تماس موفق (Early Offer) چنین است:</p><ol><li>تلفن A پیام <code>INVITE</code> حاوی بدنه <strong>SDP</strong> (نشانی IP در خط <code>c=IN IP4 ...</code>، پورت UDP در خط <code>m=audio ...</code> و کدک‌های پیشنهادی مانند <code>0=PCMU/G.711u</code>، <code>18=G.729</code>، <code>101=RFC 2833/4733 DTMF</code>) را به CUCM می‌فرستد.</li><li>CUCM بلافاصله <code>100 Trying</code> (پاسخ موقت محلی برای جلوگیری از ارسال مجدد) برمی‌گرداند و <code>INVITE</code> را به تلفن B هدایت می‌کند.</li><li>تلفن B زنگ می‌خورد و <code>180 Ringing</code> می‌فرستد. پس از برداشتن گوشی، <code>200 OK</code> همراه با SDP خود (IP، پورت و کدک توافق‌شده) ارسال می‌کند.</li><li>تلفن A با پیام <code>ACK</code> تماس را نهایی می‌کند و از این لحظه جریان مستقیم <strong>RTP</strong> بین IP و پورت‌های اعلام‌شده در SDP برقرار می‌شود؛ پایان تماس با <code>BYE</code> و <code>200 OK</code> انجام می‌گیرد.</li></ol>"
+    },
+    {
+      "id": "spec_collab-section-4",
+      "title": "نمودار معماری VoIP: تفکیک سیگنالینگ CUCM از جریان مستقیم RTP",
+      "html": "<p>همان‌گونه که در نمودار دیده می‌شود، CUCM در مسیر سیگنالینگ (خط‌چین) قرار دارد اما بسته‌های صوتی RTP (خط پیوسته) مستقیماً میان دو تلفن حرکت می‌کنند (مگر در سناریوهایی مانند MTP، Transcoding، Recording یا عبور از CUBE در حالت Media Flow-Through).</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"VoIP SIP Signaling via CUCM and Direct RTP Media Flow\"><rect x=\"250\" y=\"14\" width=\"260\" height=\"72\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"40\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">CUCM Cluster (Control Plane)</text><text x=\"380\" y=\"60\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Publisher (R/W DB) + Subscribers (Call Processing)</text><text x=\"380\" y=\"76\" text-anchor=\"middle\" font-size=\"10\" fill=\"#9a3412\">Dial Plan: Partition + CSS (Line -&gt; Device)</text><rect x=\"20\" y=\"122\" width=\"190\" height=\"82\" rx=\"10\" fill=\"#dbeafe\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"115\" y=\"148\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">IP Phone A (Caller)</text><text x=\"115\" y=\"168\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Voice VLAN 30 | DSCP EF/CS3</text><text x=\"115\" y=\"186\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">SDP c=192.0.2.10 m=16384</text><rect x=\"550\" y=\"122\" width=\"190\" height=\"82\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"645\" y=\"148\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">IP Phone B (Callee)</text><text x=\"645\" y=\"168\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Voice VLAN 30 | DSCP EF/CS3</text><text x=\"645\" y=\"186\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">SDP c=192.0.2.20 m=16400</text><line x1=\"150\" y1=\"122\" x2=\"290\" y2=\"86\" stroke=\"#b45309\" stroke-width=\"2\" stroke-dasharray=\"6,3\"/><line x1=\"610\" y1=\"122\" x2=\"470\" y2=\"86\" stroke=\"#b45309\" stroke-width=\"2\" stroke-dasharray=\"6,3\"/><text x=\"180\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#92400e\">SIP/SDP (5060/5061)</text><text x=\"580\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#92400e\">SIP/SDP (5060/5061)</text><line x1=\"210\" y1=\"163\" x2=\"550\" y2=\"163\" stroke=\"#0f766e\" stroke-width=\"3\"/><text x=\"380\" y=\"154\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0f766e\">Direct Media: RTP / SRTP (UDP 16384-32767)</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">G.711: 87.2 kbps/dir | G.729: 31.2 kbps/dir (Eth base, 20 ms)</text></svg>"
+    },
+    {
+      "id": "spec_collab-section-5",
+      "title": "چرا نرخ خام کدک (64 یا 8 kbps) برای طراحی پهنای باند کافی نیست؟",
+      "html": "<p>یکی از پرتکرارترین خطاهای ظرفیت‌سنجی VoIP، ضرب کردن نرخ خام کدک (<code>64 kbps</code> برای G.711 یا <code>8 kbps</code> برای G.729) در تعداد تماس‌هاست. صوت برخلاف انتقال فایل در بسته‌های بزرگ ۱۵۰۰ بایتی فرستاده نمی‌شود؛ برای پایین نگه داشتن تأخیر، معمولاً هر <strong>۲۰ میلی‌ثانیه</strong> یک بسته ارسال می‌شود؛ یعنی <strong>۵۰ بسته در ثانیه (50 pps)</strong>. روی هر بسته کوچک صوتی، دست‌کم <strong>۴۰ بایت هدر L3/L4</strong> سوار می‌شود: IPv4 (۲۰ بایت) + UDP (۸ بایت) + RTP (۱۲ بایت) = ۴۰ بایت! و در لایه ۲ اترنت پایه ۱۸ بایت دیگر (۱۴ بایت هدر + ۴ بایت FCS) و در صورت وجود تگ <code>802.1Q</code> چهار بایت اضافه می‌گردد.</p>"
+    },
+    {
+      "id": "spec_collab-section-6",
+      "title": "جدول محاسبات دقیق پهنای باند G.711 و G.729 (به ازای هر جهت، 20 ms)",
+      "html": "<p>در لینک‌های Full-Duplex، هر تماس شامل یک جریان رفت و یک جریان برگشت است و ظرفیت هر جهت جداگانه سنجیده می‌شود:</p><table><thead><tr><th>کدک (20 ms / 50 pps)</th><th>Payload صوتی</th><th>لایه ۳ (+40 B)</th><th>اترنت پایه (+18 B)</th><th>اترنت + 802.1Q (+22 B)</th><th>نرخ سیم (+20 B Preamble/IFG)</th></tr></thead><tbody><tr><td><strong>G.711 (64 kbps)</strong></td><td>160 B</td><td>200 B → <strong>80.0 kbps</strong></td><td>218 B → <strong>87.2 kbps</strong></td><td>222 B → <strong>88.8 kbps</strong></td><td>238–242 B → <strong>95.2–96.8 kbps</strong></td></tr><tr><td><strong>G.729 (8 kbps)</strong></td><td>20 B</td><td>60 B → <strong>24.0 kbps</strong></td><td>78 B → <strong>31.2 kbps</strong></td><td>82 B → <strong>32.8 kbps</strong></td><td>98–102 B → <strong>39.2–40.8 kbps</strong></td></tr></tbody></table><p><strong>مرز محاسبه:</strong> اعداد بالا بدون <strong>SRTP</strong> (معمولاً ۴ تا ۱۰ بایت Auth Tag اضافه) و بدون هدر تونل <strong>IPsec/GRE</strong> روی WAN هستند؛ در طراحی WAN امن، سربار IPsec/ESP می‌تواند مصرف یک تماس G.729 را به حدود ۵۰ تا ۶۰ kbps در هر جهت برساند.</p>"
+    },
+    {
+      "id": "spec_collab-section-7",
+      "title": "کیفیت سرویس (QoS) و بودجه تأخیر، جیتر و افت بسته",
+      "html": "<p>صوت زنده روی UDP ارسال می‌شود و ارسال مجدد (Retransmission) ندارد؛ بنابراین به سه پارامتر به‌شدت حساس است (معیارهای رایج ITU-T G.114 و Cisco SRND):</p><ul><li><strong>تأخیر یک‌طرفه (One-Way Delay):</strong> هدف زیر <strong>150 ms</strong>.</li><li><strong>جیتر (Jitter / نوسان تأخیر):</strong> هدف زیر <strong>30 ms</strong> (توسط De-jitter Buffer تلفن جذب می‌شود اما جیتر بالا باعث صدای رباتیک/بریده می‌شود).</li><li><strong>افت بسته (Packet Loss):</strong> هدف زیر <strong>1%</strong>.</li></ul><p>برای تضمین این اهداف، ترافیک صوتی RTP با <strong>DSCP EF (46)</strong> در صف اولویت (LLQ — Low Latency Queueing) و ترافیک سیگنالینگ SIP با <strong>DSCP CS3 (24)</strong> در صف تضمین‌شده قرار می‌گیرند.</p>"
+    },
+    {
+      "id": "spec_collab-section-8",
+      "title": "معماری خوشه‌ای CUCM: Publisher، Subscriber، CM Group و SRST",
+      "html": "<p>یک خوشه <strong>CUCM</strong> شامل دقیقاً یک گره <strong>Publisher</strong> (تنها گره دارای پایگاه‌داده Read/Write برای تغییرات پیکربندی، به علاوه کاربری‌های مدیریتی) و یک یا چند گره <strong>Subscriber</strong> (گره‌های پردازش تماس و ثبت تلفن‌ها) است. در طراحی استاندارد، تلفن‌ها از طریق <strong>Cisco Unified CM Group</strong> ابتدا به Subscriberهای فعال (Primary / Secondary) وصل می‌شوند و فقط در حالت اضطراری روی Publisher ثبت می‌گردند.</p><p>اگر Publisher موقتاً از دسترس خارج شود، تماس‌های جاری و برقراری تماس جدید روی Subscriberها ادامه می‌یابد (فقط تغییرات پیکربندی جدید و برخی قابلیت‌های وابسته به DB Write مانند تغییر Call Forward All محدود می‌شوند). همچنین در شعب دورافتاده، برای مقابله با قطع لینک WAN تا CUCM، قابلیت <strong>SRST (Survivable Remote Site Telephony)</strong> روی روتر محلی شعبه فعال می‌شود تا تلفن‌ها هنگام قطع WAN به صورت موقت روی روتر شعبه رجیستر شوند و تماس‌های داخلی و اضطراری برقرار بماند.</p>"
+    },
+    {
+      "id": "spec_collab-section-9",
+      "title": "طراحی Dial Plan در CUCM: تفاوت Partition و Calling Search Space (CSS)",
+      "html": "<p>مکانیسم کنترل دسترسی شماره‌گیری در CUCM از دو سازه مکمل ساخته شده است که نباید با هم اشتباه گرفته شوند:</p><ul><li><strong>Partition (روی مقصد):</strong> برچسب دسته‌بندی است که روی <em>شماره‌های مقصد</em> (مانند Directory Number داخلی، Route Pattern شهری/بین‌المللی، Translation Pattern) گذاشته می‌شود — یعنی «این مقصد در کدام کشو قفل شده است؟». مقصدی که Partition آن <code>&lt;None&gt;</code> باشد برای همه قابل دسترسی است!</li><li><strong>CSS — Calling Search Space (روی مبدأ):</strong> فهرست <strong>ترتیب‌دار</strong> از Partitionهایی است که مبدأ تماس (خط تلفن یا خود دستگاه تلفن) اجازه جست‌وجو در آن‌ها را دارد — یعنی «این تماس‌گیرنده کلید کدام کشوها را دارد؟».</li></ul>"
+    },
+    {
+      "id": "spec_collab-section-10",
+      "title": "قواعد ارزیابی CUCM: ترکیب Line CSS + Device CSS و Longest Match",
+      "html": "<p>در CUCM هم می‌توان روی <strong>Line (شماره داخلی)</strong> یک CSS گذاشت و هم روی <strong>Device (دستگاه تلفن)</strong>. هنگام شماره‌گیری، CUCM این دو را به هم می‌چسباند با این ترتیب ثابت: <strong>ابتدا Line CSS و سپس Device CSS</strong>.</p><ol><li><strong>قاعده اول — Longest / Closest Match:</strong> در تمام Partitionهای موجود در فهرست ترکیبی، الگویی که بیشترین تطابق دقیق را با شماره گرفته‌شده دارد برنده می‌شود (حتی اگر در Partition پایین‌تر لیست باشد).</li><li><strong>قاعده دوم — Tie-Breaker (ترتیب CSS):</strong> اگر دو الگوی <em>کاملاً هم‌ارز</em> در دو Partition مختلف وجود داشته باشند (مثلاً الگوی <code>900!</code> هم در <code>PT_BLOCK_INTL</code> با عملیات Block و هم در <code>PT_ALLOW_INTL</code> با عملیات Route)، Partitionی که <strong>زودتر در فهرست ترکیبی (Line CSS قبل از Device CSS)</strong> آمده برنده می‌شود. به همین دلیل الگوی کلاسیک «Line/Device Approach» قوانین مسدودسازی اختصاصی کاربر را در Line CSS و دسترسی‌های مکانی دستگاه را در Device CSS قرار می‌دهد.</li></ol>"
+    },
+    {
+      "id": "spec_collab-section-11",
+      "title": "کژفهمی‌های رایج در VoIP و Collaboration",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای ۲۰ تماس هم‌زمان G.729 روی WAN، پهنای باند 20 × 8 = 160 kbps کافی است.»</strong> واقعیت: با هدرهای IP/UDP/RTP در 50 pps، مصرف لایه ۳ هر تماس 24 kbps و روی اترنت 31.2–32.8 kbps (و با IPsec بیشتر) در هر جهت است؛ ۲۰ تماس دست‌کم به ۶۲۴ تا بالای ۱۰۰۰ kbps صف اولویت در هر جهت نیاز دارد.</li><li><strong>کژفهمی ۲: «چون گوشی مقابل زنگ خورد (180 Ringing)، پس مسیر صوتی هم سالم است.»</strong> واقعیت: زنگ خوردن فقط سلامت سیگنالینگ SIP از طریق CUCM را ثابت می‌کند؛ بسیاری از خطاهای ACL، مسیریابی بین Voice VLANها یا NAT در SDP دقیقاً پس از برداشتن گوشی با <strong>صدای یک‌طرفه یا بی‌صدا (One-Way / No-Way Audio)</strong> آشکار می‌شوند.</li><li><strong>کژفهمی ۳: «اگر Partition یک Route Pattern را None بگذاریم، هیچ‌کس نمی‌تواند به آن زنگ بزند.»</strong> واقعیت: دقیقاً برعکس! Partition برابر <code>&lt;None&gt;</code> برای <strong>همه CSSها</strong> قابل دسترس است و ریسک امنیتی Toll Fraud ایجاد می‌کند.</li></ul>"
+    },
+    {
+      "id": "spec_collab-section-12",
+      "title": "عیب‌یابی سیستماتیک: تماس برقرار است ولی هیچ صدایی شنیده نمی‌شود (No-Way Audio)",
+      "html": "<p><strong>سناریو:</strong> کارمند شعبه A شماره داخلی شعبه B را می‌گیرد؛ گوشی زنگ می‌خورد، طرف مقابل پاسخ می‌دهد و تایمر مکالمه جلو می‌رود، اما هیچ‌یک صدایی نمی‌شنوند.</p><p><strong>گام‌های تشخیص مهندسی:</strong></p><ol><li>از آنجا که تماس برقرار و تایمر فعال است، سیگنالینگ <code>SIP (5060/5061)</code> به CUCM سالم است؛ تمرکز را روی <strong>Media Plane (RTP)</strong> بگذارید.</li><li>در پیام‌های <code>INVITE</code> و <code>200 OK</code> (از طریق RTMT / TranslatorX یا PCAP)، خطوط <code>c=IN IP4 &lt;IP&gt;</code> و <code>m=audio &lt;Port&gt;</code> را بررسی کنید: آیا آدرس خصوصی ترجمه‌نشده از مرز NAT عبور کرده است؟</li><li>دسترسی لایه ۳ دوطرفه بین ساب‌نت Voice VLAN دو شعبه و باز بودن رنج پورت <strong>UDP 16384–32767</strong> در ACL/فایروال‌های میانی را چک کنید (دو شعبه ممکن است هر دو به CUCM دسترسی داشته باشند ولی به هم نه!).</li><li>در مرز NAT یا اتصال به SIP Trunk بیرونی، از <strong>Cisco CUBE (Session Border Controller)</strong> با Media Flow-Through برای بازنویسی صحیح آدرس‌های SDP و کنترل RTP استفاده کنید.</li></ol>"
+    },
+    {
+      "id": "spec_collab-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> برای ۱۰ تماس هم‌زمان با کدک <strong>G.711</strong> (بسته ۲۰ میلی‌ثانیه‌ای) روی LAN اترنت دارای تگ <code>802.1Q</code> (بدون احتساب Preamble/IFG و بدون SRTP)، حداقل پهنای باند صف اولویت LLQ در هر جهت چقدر است؟ <strong>پاسخ:</strong> هر بسته G.711 شامل <code>160 B (صوت) + 40 B (IP/UDP/RTP) + 18 B (Eth) + 4 B (802.1Q) = 222 Byte</code> است. در <code>50 pps</code> هر تماس برابر <code>222 × 8 × 50 = 88.8 kbps</code> است؛ برای ۱۰ تماس حداقل <strong>888 kbps در هر جهت</strong> لازم است.</p><p><strong>تمرین ۲:</strong> روی یک تلفن، <code>Line CSS = [PT_BLOCK_INTL]</code> و <code>Device CSS = [PT_ALLOW_INTL, PT_LOCAL]</code> تنظیم شده است. الگوی یکسان <code>900</code> در <code>PT_BLOCK_INTL</code> با عمل Block و در <code>PT_ALLOW_INTL</code> با عمل Route وجود دارد. هنگام گرفتن <code>900441234</code> چه رخ می‌دهد؟ <strong>پاسخ:</strong> فهرست ترکیبی برابر <code>[PT_BLOCK_INTL, PT_ALLOW_INTL, PT_LOCAL]</code> است. چون هر دو الگو طول تطابق برابر دارند، ترتیب CSS تعیین‌کننده است و <code>PT_BLOCK_INTL</code> (از Line CSS) برنده شده و تماس مسدود (Block) می‌شود.</p>"
+    },
+    {
+      "id": "spec_collab-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc3261\" target=\"_blank\" rel=\"noopener\">RFC 3261 (SIP)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3550\" target=\"_blank\" rel=\"noopener\">RFC 3550 (RTP)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc8866\" target=\"_blank\" rel=\"noopener\">RFC 8866 (SDP)</a> و راهنمای طراحی Cisco Collaboration Preferred Architecture / CUCM SRND.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ خوشه واقعی CUCM، روتر CUBE یا تلفن SIP در این محیط اجرا نشده است. آزمایشگاه Python محلی صرفاً محاسبات پهنای باند VoIP و شبیه‌ساز منطق ارزیابی Partition/CSS در Dial Plan را اجرا می‌کند.</p>"
+    }
   ],
-  "limitations": [
-   "هیچ خوشه CUCM، CUBE یا تلفن SIP واقعی در این محیط اجرا نشده است.",
-   "محاسبات پایه بدون احتساب سربار اختیاری SRTP یا تونل IPsec/GRE نشان داده شده و مرز آن صریحاً ذکر گردیده است."
+  "glossary": [
+    {
+      "term": "SIP",
+      "fa": "پروتکل SIP",
+      "simple": "Session Initiation Protocol (RFC 3261)؛ پروتکل سیگنالینگ برای برقراری، تغییر و قطع تماس VoIP."
+    },
+    {
+      "term": "SDP",
+      "fa": "توصیف نشست SDP",
+      "simple": "بدنه داخل پیام‌های SIP که آدرس IP مدیا (c=)، پورت (m=) و کدک‌های مجاز را مذاکره می‌کند."
+    },
+    {
+      "term": "RTP",
+      "fa": "پروتکل انتقال لحظه‌ای",
+      "simple": "Real-time Transport Protocol (RFC 3550) روی UDP برای حمل مستقیم جریان صوت/تصویر."
+    },
+    {
+      "term": "SRTP",
+      "fa": "پروتکل RTP امن",
+      "simple": "نسخه رمزنگاری‌شده و احراز اصالت‌شده RTP برای جلوگیری از شنود مکالمات."
+    },
+    {
+      "term": "G.711",
+      "fa": "کدک G.711",
+      "simple": "کدک صوتی بدون فشرده‌سازی با نرخ خام 64 kbps و مصرف اترنت پایه 87.2 kbps در هر جهت (20 ms)."
+    },
+    {
+      "term": "G.729",
+      "fa": "کدک G.729",
+      "simple": "کدک فشرده با نرخ خام 8 kbps و مصرف اترنت پایه 31.2 kbps در هر جهت (20 ms)."
+    },
+    {
+      "term": "CUCM",
+      "fa": "مرکز تلفن CUCM",
+      "simple": "Cisco Unified Communications Manager؛ سرور پردازش تماس و مدیریت Dial Plan سازمانی."
+    },
+    {
+      "term": "Publisher / Subscriber",
+      "fa": "گره ناشر و مشترک",
+      "simple": "Publisher تنها دارنده DB خواندن/نوشتن و Subscriberها پردازشگرهای اصلی تماس در خوشه CUCM هستند."
+    },
+    {
+      "term": "SRST",
+      "fa": "بقای تلفن شعبه",
+      "simple": "Survivable Remote Site Telephony؛ پشتیبانی موقت تماس در شعبه هنگام قطع WAN تا CUCM."
+    },
+    {
+      "term": "Partition",
+      "fa": "پارتیشن Dial Plan",
+      "simple": "برچسب دسته‌بندی روی شماره‌های مقصد (DN/Route Pattern) برای کنترل دسترسی تماس."
+    },
+    {
+      "term": "CSS",
+      "fa": "فضای جست‌وجوی تماس",
+      "simple": "Calling Search Space؛ فهرست ترتیب‌دار Partitionهایی که مبدأ تماس اجازه رسیدن به آن‌ها را دارد."
+    },
+    {
+      "term": "Line/Device CSS",
+      "fa": "الگوی ترکیب CSS",
+      "simple": "ترتیب ثابت ارزیابی در CUCM که Line CSS را پیش از Device CSS بررسی می‌کند."
+    },
+    {
+      "term": "Voice VLAN",
+      "fa": "شبکه مجازی صوت",
+      "simple": "VLAN اختصاصی روی پورت دسترسی سوئیچ برای جداسازی و QoS ترافیک تلفن IP."
+    },
+    {
+      "term": "DSCP EF (46)",
+      "fa": "نشان‌گذاری اولویت صوت",
+      "simple": "Expedited Forwarding برای قرار دادن بسته‌های RTP در صف کم‌تأخیر LLQ."
+    },
+    {
+      "term": "Jitter",
+      "fa": "جیتر (نوسان تأخیر)",
+      "simple": "تفاوت زمان رسیدن بسته‌های متوالی RTP؛ هدف طراحی زیر 30 ms."
+    },
+    {
+      "term": "CUBE",
+      "fa": "دروازه CUBE",
+      "simple": "Cisco Unified Border Element؛ Session Border Controller برای مرز SIP Trunk و ترجمه NAT/SDP."
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۶ واژه و ۱۲ پرسش همراه با جدول کامل L3/L2/802.1Q/Wire Rate.",
-   "افزودن تشریح دقیق ترکیب Line CSS + Device CSS، قاعده Longest Match، ریسک Partition <None> و معماری SRST.",
-   "ارائه آزمایشگاه قابل اجرای Python Mock برای محاسبه پهنای باند و شبیه‌سازی CUCM Dial Plan."
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه Python Mock محلی محاسبه پهنای باند VoIP و CUCM Dial Plan + سناریوی مرجع (تجهیز واقعی اجرا نشده)",
+      "executionStatus": "Python Mock محلی اجرا و تست شده؛ هیچ خوشه CUCM، CUBE یا تلفن SIP واقعی اجرا نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>Python Mock محلی</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر، سوئیچ، فایروال یا کنترلر واقعی سیسکو اجرا نشده است.</p><p>در این آزمایشگاه با کد محلی Python، پهنای باند واقعی G.711 و G.729 در لایه ۳، اترنت پایه و 802.1Q را محاسبه می‌کنید و منطق ترکیب <code>Line CSS + Device CSS</code> و قاعده Longest Match / Tie-Breaker را در CUCM Dial Plan می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_collab_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_collab_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for spec_collab (VoIP Bandwidth Math, SIP/SDP &amp; CUCM Dial Plan).\n\nNo real Cisco CUCM, CUBE, SIP phone, or RTP media stream is executed.\nStrict validation rejects non-bool flags (e.g. dot1q=&#x27;False&#x27;), non-positive packetization\nintervals (preventing ZeroDivisionError), negative overhead bytes, and empty dialed strings.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nCODECS = {\n    &quot;G.711&quot;: {&quot;payload_bytes_20ms&quot;: 160, &quot;codec_kbps&quot;: 64.0},\n    &quot;G.729&quot;: {&quot;payload_bytes_20ms&quot;: 20, &quot;codec_kbps&quot;: 8.0},\n}\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_int(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int):\n        raise ValueError(f&quot;{name} must be an int (not bool), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef voip_bandwidth_per_direction(\n    codec: str,\n    packetization_ms: int = 20,\n    dot1q: bool = False,\n    include_wire_preamble_ifg: bool = False,\n    srtp_auth_tag_bytes: int = 0,\n    tunnel_overhead_bytes: int = 0,\n) -&gt; dict[str, float]:\n    &quot;&quot;&quot;Compute exact single-direction VoIP bandwidth in kbps for L3 and L2 Ethernet.&quot;&quot;&quot;\n    if codec not in CODECS:\n        raise ValueError(f&quot;Unsupported codec: {codec!r}&quot;)\n    pkt_ms = _require_int(packetization_ms, &quot;packetization_ms&quot;)\n    if pkt_ms &lt;= 0:\n        raise ValueError(f&quot;packetization_ms must be positive, got {pkt_ms}&quot;)\n    use_dot1q = _require_bool(dot1q, &quot;dot1q&quot;)\n    use_wire = _require_bool(include_wire_preamble_ifg, &quot;include_wire_preamble_ifg&quot;)\n    srtp_b = _require_int(srtp_auth_tag_bytes, &quot;srtp_auth_tag_bytes&quot;)\n    tunnel_b = _require_int(tunnel_overhead_bytes, &quot;tunnel_overhead_bytes&quot;)\n    if srtp_b &lt; 0 or tunnel_b &lt; 0:\n        raise ValueError(&quot;srtp_auth_tag_bytes and tunnel_overhead_bytes must be non-negative&quot;)\n\n    pps = 1000.0 / pkt_ms\n    scale = pkt_ms / 20.0\n    payload = CODECS[codec][&quot;payload_bytes_20ms&quot;] * scale\n    l3_l4_headers = 20 + 8 + 12  # IPv4 (20) + UDP (8) + RTP (12) = 40 B\n    l3_bytes = payload + l3_l4_headers + srtp_b + tunnel_b\n    eth_header_fcs = 18 + (4 if use_dot1q else 0)\n    l2_bytes = l3_bytes + eth_header_fcs\n    wire_bytes = l2_bytes + (20 if use_wire else 0)  # 8B Preamble/SFD + 12B IFG\n    return {\n        &quot;pps&quot;: pps,\n        &quot;l3_bytes&quot;: l3_bytes,\n        &quot;l3_kbps&quot;: round((l3_bytes * 8 * pps) / 1000.0, 2),\n        &quot;l2_bytes&quot;: l2_bytes,\n        &quot;l2_kbps&quot;: round((l2_bytes * 8 * pps) / 1000.0, 2),\n        &quot;wire_kbps&quot;: round((wire_bytes * 8 * pps) / 1000.0, 2),\n    }\n\n\ndef evaluate_cucm_dial_plan(\n    dialed_number: str,\n    line_css: list[str],\n    device_css: list[str],\n    route_table: list[dict[str, str]],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model CUCM CSS evaluation: Line CSS precedes Device CSS, longest match wins, CSS order breaks ties.&quot;&quot;&quot;\n    if not isinstance(dialed_number, str) or not dialed_number.strip():\n        raise ValueError(&quot;dialed_number must be a non-empty str&quot;)\n    effective_css = list(line_css) + [p for p in device_css if p not in line_css]\n    candidates = []\n    for entry in route_table:\n        part = entry[&quot;partition&quot;]\n        if part not in effective_css:\n            continue\n        prefix = entry[&quot;prefix&quot;]\n        if dialed_number.startswith(prefix):\n            candidates.append((len(prefix), -effective_css.index(part), entry))\n    if not candidates:\n        return {&quot;matched&quot;: False, &quot;effective_css&quot;: effective_css, &quot;action&quot;: &quot;reorder_tone_blocked&quot;}\n    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)\n    winner = candidates[0][2]\n    return {\n        &quot;matched&quot;: True,\n        &quot;effective_css&quot;: effective_css,\n        &quot;matched_pattern&quot;: winner[&quot;prefix&quot;],\n        &quot;partition&quot;: winner[&quot;partition&quot;],\n        &quot;action&quot;: winner[&quot;action&quot;],\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real CUCM cluster, SIP trunk, or RTP flow is run.&quot;)\n    g711_base = voip_bandwidth_per_direction(&quot;G.711&quot;)\n    g711_q = voip_bandwidth_per_direction(&quot;G.711&quot;, dot1q=True)\n    g729_base = voip_bandwidth_per_direction(&quot;G.729&quot;)\n    assert g711_base[&quot;l2_kbps&quot;] == 87.2\n    assert g711_q[&quot;l2_kbps&quot;] == 88.8\n    assert g729_base[&quot;l2_kbps&quot;] == 31.2\n    routes = [\n        {&quot;prefix&quot;: &quot;900&quot;, &quot;partition&quot;: &quot;PT_BLOCK_INTL&quot;, &quot;action&quot;: &quot;block&quot;},\n        {&quot;prefix&quot;: &quot;900&quot;, &quot;partition&quot;: &quot;PT_ALLOW_INTL&quot;, &quot;action&quot;: &quot;route_to_cube&quot;},\n        {&quot;prefix&quot;: &quot;9&quot;, &quot;partition&quot;: &quot;PT_LOCAL&quot;, &quot;action&quot;: &quot;route_local&quot;},\n    ]\n    res = evaluate_cucm_dial_plan(&quot;900441234&quot;, [&quot;PT_BLOCK_INTL&quot;], [&quot;PT_ALLOW_INTL&quot;, &quot;PT_LOCAL&quot;], routes)\n    assert res[&quot;matched&quot;] is True and res[&quot;action&quot;] == &quot;block&quot;\n    print(&quot;G.711 (20ms, base Eth):&quot;, g711_base)\n    print(&quot;G.711 (20ms, 802.1Q):&quot;, g711_q)\n    print(&quot;G.729 (20ms, base Eth):&quot;, g729_base)\n    print(&quot;Line CSS overrides Device CSS on tie:&quot;, res)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> G.711 در اترنت پایه <code>87.2 kbps</code> و G.729 در اترنت پایه <code>31.2 kbps</code> (با 802.1Q برابر <code>32.8 kbps</code>) برمی‌گرداند؛ در آزمون Dial Plan، <code>PT_BLOCK_INTL</code> از Line CSS بر <code>PT_ALLOW_INTL</code> از Device CSS پیروز شده و تماس <code>900441234</code> مسدود می‌شود.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>پلتفرم مرجع:</strong> Cisco IOS-XE Switch (Voice VLAN + AutoQoS) + CUCM (اجرا نشده روی سخت‌افزار):</p><pre dir=\"ltr\"><code>! Reference IOS-XE Access Port for IP Phone + PC (NOT executed)\nvlan 30\n name VOICE_VLAN\ninterface GigabitEthernet0/3\n switchport mode access\n switchport access vlan 10\n switchport voice vlan 30\n mls qos trust cos\n! Verify on real switch: show interfaces Gi0/3 switchport</code></pre><p>در محیط آزمایشی واقعی CUCM/CUBE از RTMT یا PCAP برای بازرسی خطوط <code>c=</code> و <code>m=</code> در SDP استفاده کنید.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس تخصص Collaboration & VoIP",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "ترتیب استاندارد پیام‌های SIP برای برقراری یک تماس موفق و پروتکل حامل صدای زنده کدام است؟",
+      "options": [
+        "INVITE -> 180 Ringing -> 200 OK -> ACK برای سیگنالینگ، و RTP روی UDP برای جریان مستقیم صوت",
+        "SYN -> SYN-ACK -> ACK و انتقال صوت با FTP",
+        "BYE -> INVITE -> 200 OK و انتقال صوت با SNMP",
+        "INVITE -> ACK -> 200 OK و عبور اجباری همه RTPها از Publisher"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مطابق RFC 3261 تماس با INVITE شروع می‌شود، با 180 Ringing و 200 OK پاسخ داده می‌شود و با ACK تایید می‌گردد؛ صدای زنده از طریق RTP روی UDP جریان می‌یابد.</p>"
+    },
+    {
+      "title": "پهنای باند یک جریان در هر جهت برای کدک G.729 (بسته ۲۰ میلی‌ثانیه‌ای) روی اترنت پایه (بدون 802.1Q، Preamble/IFG و SRTP) چقدر است؟",
+      "options": [
+        "8.0 kbps",
+        "31.2 kbps",
+        "64.0 kbps",
+        "87.2 kbps"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>20 B صوت + 40 B هدر IP/UDP/RTP + 18 B اترنت پایه = 78 بایت؛ <code>78 × 8 × 50 pps = 31.2 kbps</code> در هر جهت.</p>"
+    },
+    {
+      "title": "پهنای باند یک جریان در هر جهت برای کدک G.711 (20 ms) روی اترنت دارای تگ 802.1Q (بدون Preamble/IFG و SRTP) چقدر است؟",
+      "options": [
+        "64.0 kbps",
+        "80.0 kbps",
+        "88.8 kbps",
+        "32.8 kbps"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>160 B صوت + 40 B هدر L3/L4 + 18 B اترنت + 4 B تگ 802.1Q = 222 بایت؛ <code>222 × 8 × 50 pps = 88.8 kbps</code>.</p>"
+    },
+    {
+      "title": "تفاوت دقیق Partition و CSS (Calling Search Space) در CUCM Dial Plan چیست؟",
+      "options": [
+        "هر دو نام یک چیزند",
+        "Partition روی مبدأ و CSS روی مقصد اعمال می‌شود",
+        "Partition کدک را انتخاب می‌کند و CSS پورت RTP را می‌بندد",
+        "Partition دسته‌بندی شماره‌های مقصد است و CSS فهرست ترتیب‌دار Partitionهای مجاز روی مبدأ تماس است"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Partition روی مقاصد (DN، Route Pattern) قرار می‌گیرد و CSS به مبدأ (Line/Device) می‌گوید در کدام Partitionها و به چه ترتیبی جست‌وجو کند.</p>"
+    },
+    {
+      "title": "در ترکیب Line CSS و Device CSS در CUCM، کدام ترتیب ارزیابی اعمال می‌شود و در تساوی طول الگو کدام برنده است؟",
+      "options": [
+        "ابتدا Line CSS و سپس Device CSS؛ در تساوی طول الگو، Partitionی که زودتر در این لیست ترکیبی است برنده می‌شود",
+        "ابتدا Device CSS و سپس Line CSS",
+        "همیشه Device CSS بدون توجه به Longest Match برنده است",
+        "CUCM به‌صورت تصادفی یکی را انتخاب می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در CUCM همیشه Longest Match اولویت اول است و در حالت تساوی، ترتیب <code>Line CSS</code> قبل از <code>Device CSS</code> تعیین‌کننده است.</p>"
+    },
+    {
+      "title": "تلفن مقصد زنگ می‌خورد و پس از پاسخ شمارنده تماس جلو می‌رود، اما هیچ‌یک صدایی نمی‌شنوند (No-Way Audio). کدام مورد محتمل‌ترین علت است؟",
+      "options": [
+        "خاموش بودن CUCM Publisher",
+        "مسدود بودن پورت‌های RTP (UDP 16384-32767)، نبود مسیر برگشت بین ساب‌نت‌های Voice یا درج IP خصوصی ترجمه‌نشده در SDP",
+        "اشتباه بودن شماره داخلی در Route Pattern",
+        "قطع بودن کامل پورت TCP 5060"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>برقرار شدن زنگ و تایمر نشانه سلامت SIP است؛ قطع صدا معمولاً از مسیر مستقیم مدیا (RTP/ACL/Routing/NAT-SDP) ناشی می‌شود.</p>"
+    },
+    {
+      "title": "نقش دو خط c= و m= در بدنه SDP درون پیام‌های SIP INVITE و 200 OK چیست؟",
+      "options": [
+        "تعیین رمز عبور ادمین CUCM",
+        "تنظیم VLAN دسترسی کامپیوتر پشت تلفن",
+        "اعلام آدرس IP مقصد مدیا (c=) و شماره پورت/کدک‌های صوتی (m=) برای جریان RTP",
+        "تعیین اولویت Spanning Tree سوئیچ"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>خط <code>c=IN IP4</code> آدرس IP دریافت مدیا و خط <code>m=audio</code> پورت UDP و فهرست کدک‌ها را اعلام می‌کند.</p>"
+    },
+    {
+      "title": "اگر در خوشه CUCM گره Publisher موقتاً از دسترس خارج شود، وضعیت تماس تلفن‌های ثبت‌شده روی Subscriberها چگونه است؟",
+      "options": [
+        "تمام تماس‌های سازمان فوراً قطع می‌شوند",
+        "تمام تلفن‌ها به تنظیمات کارخانه برمی‌گردند",
+        "تلفن‌ها دیگر نمی‌توانند هیچ تماسی بگیرند",
+        "پردازش تماس روی Subscriberها ادامه می‌یابد، اما تغییرات پیکربندی جدید (DB Write) تا بازگشت Publisher متوقف می‌شود"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Subscriberها کپی خواندنی DB را دارند و Call Processing را ادامه می‌دهند؛ نبود Publisher فقط عملیات نوشتن پیکربندی را متوقف می‌کند.</p>"
+    },
+    {
+      "title": "اگر Partition یک Route Pattern تماس بین‌المللی روی <None> باقی بماند، چه ریسکی ایجاد می‌شود؟",
+      "options": [
+        "برای همه CSSها قابل دسترس می‌شود و ریسک امنیتی و مالی (Toll Fraud) ایجاد می‌کند",
+        "هیچ تلفنی در سازمان نمی‌تواند به آن زنگ بزند",
+        "فقط CUCM Publisher به آن دسترسی دارد",
+        "ترافیک آن به جای RTP روی TCP می‌رود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در CUCM، Partition <code>&lt;None&gt;</code> همیشه در همه CSSها قابل مشاهده است و نباید برای الگوهای حساس استفاده شود.</p>"
+    },
+    {
+      "title": "مقادیر استاندارد DSCP و معیارهای هدف کیفیت (Delay / Jitter / Loss) برای ترافیک صوتی RTP چیست؟",
+      "options": [
+        "DSCP BE (0)؛ تأخیر زیر ۵۰۰ ms و افت بسته ۱۰٪",
+        "DSCP EF (46) در صف اولویت LLQ؛ تأخیر یک‌طرفه < 150 ms، جیتر < 30 ms و افت بسته < 1%",
+        "DSCP CS1؛ بدون نیاز به صف اولویت",
+        "DSCP EF فقط برای ترافیک HTTP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>صوت زنده به تأخیر، جیتر و افت بسته بسیار حساس است و با DSCP EF (46) در صف LLQ محافظت می‌شود.</p>"
+    },
+    {
+      "title": "کاربرد SRST (Survivable Remote Site Telephony) در طراحی شعب چیست؟",
+      "options": [
+        "فشرده‌سازی فایل‌های لاگ CUCM",
+        "رمزنگاری ایمیل‌های سازمانی",
+        "تداوم تماس‌های داخلی و اضطراری در شعبه از طریق روتر محلی هنگام قطع لینک WAN تا CUCM مرکزی",
+        "جایگزینی Voice VLAN با Native VLAN"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>SRST به تلفن‌های شعبه اجازه می‌دهد هنگام قطع ارتباط با خوشه مرکزی CUCM، به روتر محلی Fallback کنند.</p>"
+    },
+    {
+      "title": "در یک تماس VoIP مبتنی بر SIP، تفاوت اصلی نقش پیام‌های سیگنالینگ SIP با جریان صوتی RTP چیست؟",
+      "options": [
+        "SIP صدای فشرده کاربر را حمل می‌کند و RTP تماس را برقرار می‌کند",
+        "SIP برای برقراری، تغییر و پایان تماس (Control Plane) به کار می‌رود و پس از مذاکره SDP، صدای واقعی به‌طور مستقیم از طریق RTP (معمولاً UDP) منتقل می‌شود",
+        "هر دو روی پورت TCP 80 ارسال می‌شوند",
+        "RTP فقط برای ایمیل صوتی استفاده می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تفکیک مسیر سیگنالینگ (SIP) از مسیر رسانه (RTP) باعث می‌شود صدای بلادرنگ با کمترین تأخیر بین دو نقطه (یا از طریق CUBE) مبادله شود.</p>"
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۶ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/spec_collab-review-fa.md"
-  },
-  "integration": {
-   "recommendedPath": "fam-specializations",
-   "recommendedCourse": "spec-collaboration",
-   "blueprint": "/academy-assets/v5/blueprints/spec_collab.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_collab_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۸A: اعمال _require_bool روی dot1q و include_wire_preamble_ifg، رد packetization_ms<=0 (جلوگیری از ZeroDivisionError)، رد سربار منفی و dialed_number خالی در spec_collab_lab.py."
-  ]
- }
+  "meta": {
+    "version": "reviewed.8",
+    "legacyId": "spec_collab",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc3261",
+      "https://www.rfc-editor.org/rfc/rfc3550",
+      "https://www.rfc-editor.org/rfc/rfc8866",
+      "https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cucm/srnd/collab12/collab12.html"
+    ],
+    "limitations": [
+      "هیچ خوشه CUCM، CUBE یا تلفن SIP واقعی در این محیط اجرا نشده است.",
+      "محاسبات پایه بدون احتساب سربار اختیاری SRTP یا تونل IPsec/GRE نشان داده شده و مرز آن صریحاً ذکر گردیده است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۶ واژه و ۱۲ پرسش همراه با جدول کامل L3/L2/802.1Q/Wire Rate.",
+      "افزودن تشریح دقیق ترکیب Line CSS + Device CSS، قاعده Longest Match، ریسک Partition <None> و معماری SRST.",
+      "ارائه آزمایشگاه قابل اجرای Python Mock برای محاسبه پهنای باند و شبیه‌سازی CUCM Dial Plan."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۶ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/spec_collab-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-specializations",
+      "recommendedCourse": "spec-collaboration",
+      "blueprint": "/academy-assets/v5/blueprints/spec_collab.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/spec_collab_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۸A: اعمال _require_bool روی dot1q و include_wire_preamble_ifg، رد packetization_ms<=0 (جلوگیری از ZeroDivisionError)، رد سربار منفی و dialed_number خالی در spec_collab_lab.py."
+    ]
+  }
 }

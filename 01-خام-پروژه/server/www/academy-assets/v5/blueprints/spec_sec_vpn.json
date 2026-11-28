@@ -1,344 +1,344 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "spec_sec_vpn",
- "objectiveId": "spec_sec_vpn",
- "kind": "lesson",
- "track": "Specialist",
- "course": "spec-security",
- "title": "۷.۲ Security: Site-to-Site و Remote Access IPsec VPN با IKEv2 و VTI",
- "titleEn": "Security Deep Dive: Site-to-Site & Remote Access IPsec VPN with IKEv2, NAT-T & Route-Based VTI",
- "domain": "Network Security",
- "source": "Legacy spec_sec_vpn rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [
-  "spec_sec"
- ],
- "sections": [
-  {
-   "id": "spec_sec_vpn-section-1",
-   "title": "مسئله واقعی: چرا Crypto Mapهای قدیمی ساعت‌ها عیب‌یابی می‌طلبند و چرا ESP پشت مودم NAT عبور نمی‌کند؟",
-   "html": "<p>در تونل‌های قدیمی Policy-Based (<code>Crypto Map</code>)، کوچک‌ترین عدم تقارن در ACL آینه‌ای میان دو دفتر باعث از کار افتادن تونل می‌شد، اجرای OSPF/BGP روی آن نیازمند GRE اضافه بود، و در مسیرهای دارای NAT/PAT بسته‌های <strong>ESP (پروتکل IP شماره ۵۰)</strong> چون شماره پورت لایه ۴ ندارند در مودم NAT مسدود می‌شدند! ترکیب مدرن <strong>IKEv2 (RFC 7296)</strong> + <strong>NAT-T (UDP 4500)</strong> + <strong>Route-Based VPN (VTI)</strong> با رمزنگاری AEAD (<code>AES-256-GCM</code>) استاندارد طلایی VPN سازمانی امروز است.</p>"
-  },
-  {
-   "id": "spec_sec_vpn-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> مبانی رمزنگاری، NAT/PAT، مسیریابی OSPF/BGP و درس <code>spec_sec</code>.</p><ul><li>تبیین چهار ضمانت IPsec و مقایسه دقیق <strong>ESP (IP 50)</strong> در برابر <strong>AH (IP 51)</strong> (و چرایی شکست AH در عبور از NAT).</li><li>کالبدشکافی تبادل ۴ پیامی <strong>IKEv2 (RFC 7296)</strong> و مکانیسم <strong>NAT-Traversal (NAT-T) روی UDP 4500</strong>.</li><li>مقایسه <strong>Route-Based VTI</strong> با <strong>Policy-Based Crypto Map</strong> همراه با تنظیم حیاتی <strong><code>ip mtu</code> و <code>ip tcp adjust-mss</code></strong>.</li><li>آشنایی با معماری <strong>Remote Access VPN</strong> مدرن (Cisco Secure Client / AnyConnect روی TLS/DTLS یا IKEv2 + MFA) و عیب‌یابی شمارنده‌های <code>encaps/decaps</code>.</li></ul>"
-  },
-  {
-   "id": "spec_sec_vpn-section-3",
-   "title": "چهار ضمانت IPsec و چرا در عمل تقریباً همیشه ESP (نه AH) انتخاب می‌شود؟",
-   "html": "<p>مجموعه پروتکل‌های IPsec چهار تضمین رمزنگاری ارائه می‌دهد: (۱) <strong>محرمانگی (Confidentiality)</strong> با رمزنگاری، (۲) <strong>یکپارچگی (Integrity)</strong>، (۳) <strong>احراز اصالت مبدأ (Authentication)</strong> و (۴) <strong>ضدبازپخش (Anti-Replay)</strong> با شماره توالی.</p><ul><li><strong>AH (Authentication Header — IP Protocol 51):</strong> اصالت و یکپارچگی کل بسته شامل هدر بیرونی IP را تضمین می‌کند، اما <strong>هیچ رمزنگاری (محرمانگی) ندارد</strong> و چون آدرس IP بیرونی را امضا می‌کند، <strong>با NAT/PAT ناسازگار است</strong> و می‌شکند!</li><li><strong>ESP (Encapsulating Security Payload — IP Protocol 50):</strong> هم محرمانگی و هم یکپارچگی (به‌ویژه در حالت مدرن <strong><code>AES-256-GCM</code></strong> که هر دو را هم‌زمان در قالب AEAD سریع انجام می‌دهد) فراهم کرده و هدر بیرونی IP را امضا نمی‌کند، پس با <strong>NAT-T</strong> کاملاً سازگار است.</li></ul>"
-  },
-  {
-   "id": "spec_sec_vpn-section-4",
-   "title": "نمودار معماری IKEv2، NAT-T (UDP 4500) و Route-Based VTI",
-   "html": "<p>نمودار زیر مراحل ۴ پیامی IKEv2، سوییچ خودکار به UDP 4500 هنگام کشف NAT و مزایای VTI را نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"IKEv2 Site-to-Site Route-Based VTI IPsec Tunnel with NAT-T UDP 4500\"><rect x=\"12\" y=\"20\" width=\"212\" height=\"176\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"118\" y=\"42\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Site A Router (VTI)</text><text x=\"118\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">interface Tunnel0</text><text x=\"118\" y=\"86\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">tunnel mode ipsec ipv4</text><text x=\"118\" y=\"106\" text-anchor=\"middle\" font-size=\"10\" fill=\"#15803d\">Dynamic BGP / OSPF</text><text x=\"118\" y=\"124\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">No Crypto ACL Mirroring!</text><text x=\"118\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">AES-256-GCM (AEAD)</text><text x=\"118\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">PFS (ECDHE Group 19/20)</text><rect x=\"256\" y=\"18\" width=\"248\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">IKEv2 (RFC 7296) + NAT-T</text><text x=\"380\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">1. IKE_SA_INIT (UDP 500)</text><text x=\"380\" y=\"86\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">DH Exchange + NAT-D Hash Check</text><text x=\"380\" y=\"112\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#b91c1c\">NAT Detected? Switch to UDP 4500!</text><text x=\"380\" y=\"136\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">2. IKE_AUTH (Auth + 1st Child SA)</text><text x=\"380\" y=\"160\" text-anchor=\"middle\" font-size=\"10\" fill=\"#166534\">Data: ESP (IP 50) or UDP 4500</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">Only 4 messages (vs 9 in IKEv1)!</text><rect x=\"536\" y=\"20\" width=\"212\" height=\"176\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"642\" y=\"42\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Site B Router (VTI)</text><text x=\"642\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">interface Tunnel0</text><text x=\"642\" y=\"86\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">ip tcp adjust-mss 1360</text><text x=\"642\" y=\"112\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Diagnostic Counters:</text><text x=\"642\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">encaps &gt; 0 &amp; decaps &gt; 0 = OK</text><text x=\"642\" y=\"152\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">encaps &gt; 0, decaps = 0 =&gt;</text><text x=\"642\" y=\"168\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">Return ESP/UDP4500 blocked!</text><line x1=\"224\" y1=\"108\" x2=\"256\" y2=\"108\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"504\" y1=\"108\" x2=\"536\" y2=\"108\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
-  },
-  {
-   "id": "spec_sec_vpn-section-5",
-   "title": "کالبدشکافی IKEv2 (RFC 7296) در برابر IKEv1 و کارکرد NAT-T (UDP 4500)",
-   "html": "<p>در <strong>IKEv1</strong> قدیمی برقراری تونل نیازمند ۶ پیام Phase 1 (Main Mode) + ۳ پیام Phase 2 (Quick Mode) = ۹ پیام بود. در <strong>IKEv2 (RFC 7296)</strong> کل برقراری اولیه و اولین Child SA تنها در <strong>۴ پیام (۲ رفت‌وبرگشت)</strong> انجام می‌شود:</p><ol><li><strong><code>IKE_SA_INIT</code> (پیام ۱ و ۲ روی UDP 500):</strong> مذاکره رمزها، تبادل Diffie-Hellman (ترجیحاً ECDHE گروه ۱۹/۲۰)، Nonce و ارسال هش‌های <strong><code>NAT_DETECTION_SOURCE/DESTINATION_IP</code></strong>.</li><li><strong>سوییچ به <code>UDP 4500</code> (در صورت کشف NAT):</strong> اگر هر یک از دو سمت عدم تطابق هش NAT-D را ببیند، از پیام بعدی (<code>IKE_AUTH</code>) هم پیام‌های کنترلی IKE و هم کل بسته‌های داده <strong>ESP درون هدر UDP پورت ۴۵۰۰</strong> کپسوله می‌شوند تا NAT/PAT بتواند نشست را ترجمه کند.</li><li><strong><code>IKE_AUTH</code> (پیام ۳ و ۴):</strong> احراز هویت (ترجیحاً با گواهینامه X.509/PKI یا PSK قوی) و ایجاد هم‌زمان اولین <strong>Child SA (IPsec SA)</strong>.</li></ol>"
-  },
-  {
-   "id": "spec_sec_vpn-section-6",
-   "title": "برتری قاطع Route-Based VPN (VTI) بر Policy-Based Crypto Map",
-   "html": "<table><thead><tr><th>معیار</th><th>Crypto Map (Policy-Based)</th><th>Static/Dynamic VTI (Route-Based)</th></tr></thead><tbody><tr><td>تعیین ترافیک رمزنگاری</td><td>ACLهای آینه‌ای دستی (منبع اصلی خطا و Proxy-ID mismatch)</td><td><strong>جدول مسیریابی (Routing Table)</strong> — هر بسته‌ای به اینترفیس <code>Tunnel0</code> برود رمز می‌شود</td></tr><tr><td>مسیریابی پویا (OSPF/BGP)</td><td>پشتیبانی بومی ندارد (نیازمند GRE over IPsec)</td><td><strong>پشتیبانی بومی مستقیم</strong> روی <code>Tunnel0</code> (همراه BFD و ECMP)</td></tr><tr><td>یکپارچگی با Cloud (AWS/Azure)</td><td>دشوار و محدود به یک SA/خطا در چند ساب‌نت</td><td><strong>استاندارد پیش‌فرض</strong> اتصال VPN به AWS Transit Gateway / Azure</td></tr></tbody></table>"
-  },
-  {
-   "id": "spec_sec_vpn-section-7",
-   "title": "تله پنهان عملکرد: MTU و TCP MSS Clamping روی تونل IPsec",
-   "html": "<p>افزودن هدرهای IP بیرونی + ESP + UDP 4500 حدود ۶۰ تا ۷۶ بایت به اندازه بسته اضافه می‌کند. اگر MTU استاندارد ۱۵۰۰ باشد، بسته‌های ۱۵۰۰ بایتی کلاینت دچار <strong>Fragmentation</strong> شدید یا Drop بی‌صدا (PMTUD Blackhole وقتی ICMP مسدود باشد) می‌شوند — نشانه کلاسیک: <em>پینگ کار می‌کند اما صفحات وب/SMB باز نمی‌شوند!</em> راه‌حل استاندارد روی <code>interface Tunnel0</code> تنظیم <strong><code>ip mtu 1400</code></strong> و <strong><code>ip tcp adjust-mss 1360</code></strong> است.</p>"
-  },
-  {
-   "id": "spec_sec_vpn-section-8",
-   "title": "Remote Access VPN مدرن با Cisco Secure Client (AnyConnect) و MFA",
-   "html": "<p>برای دورکاران، <strong>Cisco Secure Client</strong> (نام جدید AnyConnect) متصل به Secure Firewall (FTD/ASA) از دو حالت پشتیبانی می‌کند: (۱) <strong>SSL/TLS (TCP 443) + DTLS (UDP 443)</strong> (سازگارترین با فایروال‌های هتل‌ها و کافه‌ها؛ DTLS از پدیده TCP-over-TCP Meltdown جلوگیری می‌کند!) و (۲) <strong>IKEv2/IPsec</strong>. در معماری امن امروز، احراز هویت Remote Access باید حتماً از طریق <strong>SAML 2.0 SSO + MFA</strong> (مانند Duo / Entra ID) و بررسی سلامت دستگاه (Posture/ISE) انجام شود.</p>"
-  },
-  {
-   "id": "spec_sec_vpn-section-9",
-   "title": "امنیت رمزنگاری مدرن و حذف الگوریتم‌های منسوخ",
-   "html": "<p>در طراحی IKEv2 امروزی، الگوریتم‌های قدیمی مانند <code>3DES</code>، <code>MD5</code>، <code>SHA-1</code> و گروه DH کوچک (Group 2/5) منسوخ و ناامن هستند. استاندارد پیشنهادی: رمزنگاری <strong><code>AES-256-GCM</code></strong> (یا <code>AES-256-CBC + SHA-384/512</code>)، تبادل کلید <strong><code>ECDH Group 19/20/21</code></strong>، فعال‌سازی <strong>PFS (Perfect Forward Secrecy)</strong> در Child SA و فعال‌سازی <strong>DPD (Dead Peer Detection)</strong> برای تشخیص سریع قطع همتا.</p>"
-  },
-  {
-   "id": "spec_sec_vpn-section-10",
-   "title": "عیب‌یابی حرفه‌ای با شمارنده‌های show crypto ipsec sa و show crypto ikev2 sa",
-   "html": "<ul><li><strong><code>IKEv2 SA</code> شکل نمی‌گیرد:</strong> مسدود بودن <code>UDP 500/4500</code>، عدم تطابق Proposal (الگوریتم رمز/Integrity/DH)، یا خطای PSK/گواهینامه X.509.</li><li><strong><code>#pkts encaps</code> زیاد می‌شود ولی <code>#pkts decaps</code> روی <code>0</code> مانده است:</strong> بسته‌های رمزنگاری‌شده از ما خارج می‌شوند، اما ترافیک برگشت رمزنگاری‌شده (<code>ESP / IP 50</code> یا <code>UDP 4500</code>) در مسیر فایروال/ISP مسدود شده یا مسیر برگشت در دفتر مقابل به تونل اشاره نمی‌کند!</li><li><strong>هر دو شمارنده صفرند:</strong> ترافیک اصلاً به سمت اینترفیس VTI روت نشده یا ACL ترافیک جالب (در Crypto Map) تطابق ندارد.</li></ul>"
-  },
-  {
-   "id": "spec_sec_vpn-section-11",
-   "title": "کژفهمی‌های رایج درباره IPsec VPN و IKEv2",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای کارکرد IPsec پشت NAT کافی است پورت UDP 500 را روی فایروال باز کنیم.»</strong> واقعیت: پس از کشف NAT در <code>IKE_SA_INIT</code>، هم ادامه IKE و هم کل داده‌های ESP به <strong><code>UDP 4500</code></strong> منتقل می‌شوند؛ باز نبودن UDP 4500 تونل را ناکام می‌گذارد.</li><li><strong>کژفهمی ۲: «برای رمزنگاری ترافیک بهتر است AH و ESP را با هم روی لینک دارای NAT فعال کنیم.»</strong> واقعیت: AH هدر IP بیرونی را امضا می‌کند و روی لینک دارای NAT می‌شکند؛ علاوه بر این <code>ESP با AES-GCM</code> به‌تنهایی هم محرمانگی و هم یکپارچگی کامل می‌دهد.</li><li><strong>کژفهمی ۳: «در Remote Access VPN اگر UDP 443 بسته باشد اصلاً وصل نمی‌شود.»</strong> واقعیت: کلاینت روی TCP 443 (TLS) وصل می‌شود، اما عملکرد روی لینک‌های پرتأخیر/دارای افت بسته به دلیل TCP-over-TCP افت می‌کند؛ باز گذاشتن UDP 443 (DTLS) برای کیفیت صدا/ویدیو بسیار بهتر است.</li></ul>"
-  },
-  {
-   "id": "spec_sec_vpn-section-12",
-   "title": "بهترین روش‌های مقاوم‌سازی تونل‌های WAN (FlexVPN / DMVPN و Multi-ISP)",
-   "html": "<p>در سازمان‌های دارای ده‌ها دفتر، ساخت دستی Mesh کامل تونل‌های VTI مقیاس‌پذیر نیست؛ از <strong>FlexVPN (مبتنی بر IKEv2)</strong>، <strong>DMVPN</strong> یا <strong>Cisco SD-WAN</strong> برای ایجاد پویا و خودکار تونل‌های Spoke-to-Spoke استفاده می‌شود.</p>"
-  },
-  {
-   "id": "spec_sec_vpn-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> روتر دفتر A با IP خصوصی <code>10.0.0.10</code> پشت یک مودم NAT به IP عمومی <code>198.51.100.10</code> ترجمه می‌شود. در <code>IKE_SA_INIT</code> هش‌های NAT-D همخوانی ندارند. تونل از کدام پورت برای <code>IKE_AUTH</code> و بسته‌های ESP استفاده خواهد کرد؟ <strong>پاسخ:</strong> <strong><code>UDP 4500 (NAT-T)</code></strong>.</p><p><strong>تمرین ۲:</strong> پس از بالا آمدن VTI، دستور <code>ping</code> کوچک موفق است ولی انتقال فایل‌های بزرگ HTTP/SMB متوقف می‌شود. محتمل‌ترین علت و فرمان اصلاحی چیست؟ <strong>پاسخ:</strong> مشکل MTU / PMTUD Blackhole به دلیل سربار هدر ESP؛ تنظیم <code>ip mtu 1400</code> و <code>ip tcp adjust-mss 1360</code> روی اینترفیس VTI.</p>"
-  },
-  {
-   "id": "spec_sec_vpn-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc7296\" target=\"_blank\" rel=\"noopener\">RFC 7296 (IKEv2 Protocol)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc4303\" target=\"_blank\" rel=\"noopener\">RFC 4303 (IPsec ESP)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc3948\" target=\"_blank\" rel=\"noopener\">RFC 3948 (UDP Encapsulation of IPsec ESP / NAT-T)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر سیسکو، فایروال FTD یا نشست واقعی رمزنگاری IPsec در این محیط اجرا نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "IKEv2 (RFC 7296)",
-   "fa": "پروتکل تبادل کلید IKEv2",
-   "simple": "نسل مدرن تبادل کلید IPsec در تنها ۴ پیام اولیه با پشتیبانی بومی از NAT-T و EAP."
-  },
-  {
-   "term": "ESP (IP Protocol 50)",
-   "fa": "پروتکل ESP",
-   "simple": "تأمین هم‌زمان محرمانگی (رمزنگاری) و یکپارچگی بسته‌های IPsec؛ سازگار با NAT-T."
-  },
-  {
-   "term": "AH (IP Protocol 51)",
-   "fa": "هدر احراز اصالت AH",
-   "simple": "تأمین یکپارچگی بدون رمزنگاری که به دلیل امضای IP بیرونی با NAT ناسازگار است."
-  },
-  {
-   "term": "NAT-T (UDP 4500)",
-   "fa": "عبور از NAT در IPsec",
-   "simple": "کپسوله‌سازی پیام‌های IKE و ESP درون UDP 4500 پس از کشف NAT در IKE_SA_INIT."
-  },
-  {
-   "term": "VTI",
-   "fa": "اینترفیس تونل مجازی",
-   "simple": "Virtual Tunnel Interface؛ مدل Route-Based VPN با پشتیبانی مستقیم از OSPF/BGP بدون ACL آینه‌ای."
-  },
-  {
-   "term": "Crypto Map",
-   "fa": "مدل Policy-Based قدیمی",
-   "simple": "روش سنتی VPN وابسته به ACLهای آینه‌ای خطاپذیر و فاقد پشتیبانی مستقیم روتینگ پویا."
-  },
-  {
-   "term": "AES-256-GCM (AEAD)",
-   "fa": "رمزنگاری مدرن GCM",
-   "simple": "الگوریتم ترکیبی سریع برای تأمین هم‌زمان محرمانگی و یکپارچگی در یک مرحله."
-  },
-  {
-   "term": "PFS",
-   "fa": "محرمانگی پیشرو",
-   "simple": "Perfect Forward Secrecy؛ اجرای مجدد Diffie-Hellman در Child SA جهت استقلال کلیدهای داده."
-  },
-  {
-   "term": "DPD",
-   "fa": "تشخیص همتای ازکارافتاده",
-   "simple": "Dead Peer Detection؛ کشف سریع قطع ارتباط همتای VPN برای پاک‌سازی SAهای مرده."
-  },
-  {
-   "term": "TCP MSS Clamping",
-   "fa": "تنظیم سقف سگمنت TCP",
-   "simple": "کاهش MSS (مثلاً ۱۳۶۰) روی اینترفیس VTI برای جلوگیری از Fragmentation و PMTUD Blackhole."
-  },
-  {
-   "term": "Cisco Secure Client",
-   "fa": "کلاینت VPN سیسکو",
-   "simple": "نام جدید AnyConnect؛ کلاینت Remote Access با پشتیبانی از TLS/DTLS و IKEv2 + SAML MFA."
-  },
-  {
-   "term": "DTLS (UDP 443)",
-   "fa": "انتقال امن UDP برای VPN",
-   "simple": "جلوگیری از افت عملکرد TCP-over-TCP در اتصال Remote Access VPN."
-  },
-  {
-   "term": "Child SA",
-   "fa": "انجمن امنیتی داده",
-   "simple": "پارامترها و کلیدهای یکپارچه رمزنگاری ترافیک داده ESP (ساخته‌شده درون IKEv2)."
-  },
-  {
-   "term": "encaps / decaps",
-   "fa": "شمارنده‌های رمز و رمزگشایی",
-   "simple": "شمارنده‌های کلیدی show crypto ipsec sa برای تشخیص قطعی یک‌طرفه مسیر برگشت."
-  },
-  {
-   "term": "FlexVPN",
-   "fa": "معماری FlexVPN سیسکو",
-   "simple": "چارچوب یکپارچه سیسکو مبتنی بر IKEv2 و VTI برای Site-to-Site، Hub-and-Spoke و Remote Access."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (کشف NAT-D -> سوییچ UDP 4500 و عیب‌یابی encaps/decaps) — روتر IPsec واقعی اجرا نشده",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر IPsec یا فایروال FTD واقعی در این محیط متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر IOS-XE، فایروال FTD یا سوکت واقعی IPsec/ESP در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی محاسبه هش <code>NAT-D</code> در <code>IKE_SA_INIT</code> (مقایسه ارتباط مستقیم روی <code>UDP 500 + IP 50</code> با ارتباط پشت NAT و سوییچ خودکار به <code>UDP 4500</code>) و موتور تشخیص شمارنده‌های <code>show crypto ipsec sa</code> را در Python 3 آزمون می‌کند.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_sec_vpn_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_sec_vpn_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — spec_sec_vpn: IKEv2 NAT-T, VTI vs Crypto Map &amp; IPsec SA\nCounter Diagnostics Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of NAT-D hash mismatch\ntriggering UDP 4500 encapsulation, VTI dynamic routing readiness, and both\nasymmetric encaps/decaps failure directions. No live IPsec routers or real crypto sockets.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport hashlib\nimport json\n\n\ndef nat_detection_hash(spi_i: str, spi_r: str, ip: str, port: int) -&gt; str:\n    return hashlib.sha1(f&quot;{spi_i}:{spi_r}:{ip}:{port}&quot;.encode(&quot;utf-8&quot;)).hexdigest()[:16]\n\n\ndef negotiate_transport(local_ip: str, seen_ip: str, local_port: int, seen_port: int) -&gt; dict:\n    h_sent = nat_detection_hash(&quot;AAA1&quot;, &quot;BBB2&quot;, local_ip, local_port)\n    h_seen = nat_detection_hash(&quot;AAA1&quot;, &quot;BBB2&quot;, seen_ip, seen_port)\n    nat_detected = h_sent != h_seen\n    return {\n        &quot;nat_detected&quot;: nat_detected,\n        &quot;ike_auth_and_esp_port&quot;: &quot;UDP 4500 (NAT-T)&quot; if nat_detected else &quot;UDP 500 + IP Protocol 50 (ESP)&quot;,\n    }\n\n\ndef diagnose_ipsec_counters(pkts_encaps: int, pkts_decaps: int) -&gt; str:\n    if pkts_encaps &lt; 0 or pkts_decaps &lt; 0:\n        raise ValueError(&quot;IPsec packet counters cannot be negative&quot;)\n    if pkts_encaps == 0 and pkts_decaps == 0:\n        return &quot;NO_INTERESTING_TRAFFIC_OR_ROUTE_NOT_POINTING_TO_VTI&quot;\n    if pkts_encaps &gt; 0 and pkts_decaps == 0:\n        return &quot;ONE_WAY_RETURN_BLOCKED_CHECK_ESP_OR_UDP4500_AND_RETURN_ROUTE&quot;\n    if pkts_encaps == 0 and pkts_decaps &gt; 0:\n        return &quot;ONE_WAY_OUTBOUND_MISSING_CHECK_LOCAL_ROUTE_OR_CRYPTO_ACL&quot;\n    return &quot;BIDIRECTIONAL_TUNNEL_HEALTHY&quot;\n\n\ndef main() -&gt; None:\n    direct = negotiate_transport(&quot;198.51.100.10&quot;, &quot;198.51.100.10&quot;, 500, 500)\n    behind_nat = negotiate_transport(&quot;10.0.0.10&quot;, &quot;198.51.100.10&quot;, 500, 41234)\n    assert direct[&quot;nat_detected&quot;] is False\n    assert behind_nat[&quot;nat_detected&quot;] is True and &quot;4500&quot; in behind_nat[&quot;ike_auth_and_esp_port&quot;]\n\n    diag_ret_blocked = diagnose_ipsec_counters(pkts_encaps=420, pkts_decaps=0)\n    diag_out_missing = diagnose_ipsec_counters(pkts_encaps=0, pkts_decaps=180)\n    diag_idle = diagnose_ipsec_counters(pkts_encaps=0, pkts_decaps=0)\n    diag_healthy = diagnose_ipsec_counters(pkts_encaps=420, pkts_decaps=418)\n    assert diag_ret_blocked == &quot;ONE_WAY_RETURN_BLOCKED_CHECK_ESP_OR_UDP4500_AND_RETURN_ROUTE&quot;\n    assert diag_out_missing == &quot;ONE_WAY_OUTBOUND_MISSING_CHECK_LOCAL_ROUTE_OR_CRYPTO_ACL&quot;\n    assert diag_idle == &quot;NO_INTERESTING_TRAFFIC_OR_ROUTE_NOT_POINTING_TO_VTI&quot;\n    assert diag_healthy == &quot;BIDIRECTIONAL_TUNNEL_HEALTHY&quot;\n\n    print(&quot;=== spec_sec_vpn IKEv2 NAT-T &amp; Counter Diagnostics Mock ===&quot;)\n    print(json.dumps({\n        &quot;direct_public_peers&quot;: direct,\n        &quot;peer_behind_nat_pat&quot;: behind_nat,\n        &quot;counter_diagnosis_enc420_dec0&quot;: diag_ret_blocked,\n        &quot;counter_diagnosis_enc0_dec180&quot;: diag_out_missing,\n        &quot;counter_diagnosis_healthy&quot;: diag_healthy,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> برای همتای مستقیم <code>nat_detected: False</code>، برای همتای پشت NAT مقدار <code>nat_detected: True</code> با انتقال به <code>UDP 4500 (NAT-T)</code>، و برای <code>encaps=420, decaps=0</code> تشخیص مسدود بودن مسیر برگشت ESP/UDP 4500.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع پیکربندی VTI روی IOS-XE (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XE IKEv2 VTI snippet (NOT executed on live router)\ninterface Tunnel0\n ip address 169.254.10.1 255.255.255.252\n ip mtu 1400\n ip tcp adjust-mss 1360\n tunnel source GigabitEthernet1\n tunnel mode ipsec ipv4\n tunnel destination 198.51.100.20\n tunnel protection ipsec profile IKEV2_PROF</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس IPsec VPN با IKEv2 و VTI",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "هنگام وجود دستگاه NAT/PAT در مسیر یک تونل Site-to-Site IPsec (IKEv2)، پس از کشف NAT در IKE_SA_INIT، پیام‌های ادامه IKE و داده‌های ESP از کدام پورت عبور می‌کنند؟",
-   "options": [
-    "UDP 4500 (NAT-Traversal)",
-    "UDP 500 برای کل داده",
-    "TCP 443",
-    "IP Protocol 51 (AH)"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>مکانیسم NAT-T (RFC 3948) پس از کشف NAT، هم کنترل IKE و هم داده ESP را درون <code>UDP 4500</code> کپسوله می‌کند.</p>"
-  },
-  {
-   "title": "برتری کلیدی Route-Based VPN (VTI) نسبت به Policy-Based Crypto Map چیست؟",
-   "options": [
-    "عدم نیاز به رمزنگاری در سمت مقصد",
-    "داشتن اینترفیس منطقی Tunnel برای اجرای مستقیم پروتکل‌های مسیریابی پویا (OSPF/BGP) و حذف ACLهای آینه‌ای خطاپذیر",
-    "جایگزینی ESP با AH",
-    "عدم نیاز به اتصال اینترنت"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>VTI انتخاب ترافیک را به جدول مسیریابی می‌سپارد و کاملاً با OSPF، BGP، BFD و کلود سازگار است.</p>"
-  },
-  {
-   "title": "در عیب‌یابی show crypto ipsec sa، اگر #pkts encaps پیوسته افزایش یابد اما #pkts decaps روی 0 بماند، محتمل‌ترین علت چیست؟",
-   "options": [
-    "اینترفیس محلی اصلاً بسته‌ای نمی‌فرستد",
-    "الگوریتم AES-GCM فقط یک‌طرفه است",
-    "بسته‌های رمزنگاری‌شده خارج می‌شوند اما ترافیک برگشت (ESP/UDP 4500) در مسیر فایروال مسدود شده یا مسیر برگشت در سمت مقابل اشتباه است",
-    "پورت کنسول قطع شده است"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>افزایش encaps یعنی ارسال از سمت ما کار می‌کند؛ صفر بودن decaps نشانه قطع مسیر برگشت یا فیلتر شدن ESP/UDP 4500 است.</p>"
-  },
-  {
-   "title": "چرا پروتکل AH (IP Protocol 51) در شبکه‌های سازمانی امروز تقریباً کنار گذاشته شده و ESP ترجیح داده می‌شود؟",
-   "options": [
-    "زیرا AH سرعت بیش از حد بالا دارد",
-    "زیرا ESP رمزنگاری ندارد",
-    "زیرا AH فقط روی وای‌فای است",
-    "زیرا AH هیچ محرمانگی (رمزنگاری) ارائه نمی‌دهد و به دلیل امضای هدر IP بیرونی با NAT/PAT ناسازگار است"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>ESP با AES-GCM هم رمزنگاری و هم یکپارچگی می‌دهد و با NAT-T کاملاً سازگار است.</p>"
-  },
-  {
-   "title": "در مقایسه با IKEv1 (که در Main + Quick Mode به ۹ پیام نیاز داشت)، IKEv2 (RFC 7296) در چند پیام اولیه هم IKE SA و هم اولین Child SA را می‌سازد؟",
-   "options": [
-    "۴ پیام (۲ رفت‌وبرگشت: IKE_SA_INIT و IKE_AUTH)",
-    "۲۰ پیام",
-    "۱ پیام بدون پاسخ",
-    "۱۲ پیام"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>طراحی ساده‌شده و سریع IKEv2 برقراری تونل را در ۴ پیام اولیه انجام می‌دهد.</p>"
-  },
-  {
-   "title": "اگر پس از برقراری تونل VTI پینگ‌های کوچک موفق باشند اما انتقال فایل‌های بزرگ HTTP/SMB متوقف شود، راه‌حل استاندارد روی interface Tunnel0 چیست؟",
-   "options": [
-    "خاموش کردن رمزنگاری",
-    "تنظیم ip mtu 1400 و ip tcp adjust-mss 1360 برای جبران سربار هدر IPsec/NAT-T و پیشگیری از Fragmentation/PMTUD Blackhole",
-    "افزایش MTU به 9000 روی اینترنت",
-    "تغییر VTI به AH"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>کاهش MTU و MSS Clamping یکی از مهم‌ترین اقدامات حرفه‌ای در هر تونل IPsec است.</p>"
-  },
-  {
-   "title": "در Remote Access VPN با Cisco Secure Client (AnyConnect)، چرا باز گذاشتن UDP 443 (DTLS) در کنار TCP 443 (TLS) اهمیت دارد؟",
-   "options": [
-    "زیرا TCP 443 رمزنگاری ندارد",
-    "زیرا بدون DTLS نمی‌توان وارد وب شد",
-    "برای جلوگیری از پدیده افت عملکرد TCP-over-TCP Meltdown به‌ویژه برای تماس صوتی، ویدیو و لینک‌های دارای افت بسته",
-    "برای غیرفعال کردن MFA"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>انتقال ترافیک حساس به تأخیر روی DTLS (UDP 443) کیفیت تماس‌ها و پایداری VPN را به‌شدت بهبود می‌بخشد.</p>"
-  },
-  {
-   "title": "مزیت الگوریتم AES-256-GCM (از خانواده AEAD) در پروفایل IPsec مدرن چیست؟",
-   "options": [
-    "فقط یکپارچگی بدون رمزنگاری می‌دهد",
-    "نیاز به کلید را حذف می‌کند",
-    "فقط در IKEv1 کار می‌کند",
-    "به‌صورت یکپارچه و با کارایی بالا هر دو محرمانگی (Encryption) و یکپارچگی (Authentication) را هم‌زمان فراهم می‌کند"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>AEAD (مانند AES-GCM) استاندارد توصیه‌شده جدید در IPsec/IKEv2 و TLS 1.3 است.</p>"
-  },
-  {
-   "title": "نقش فعال‌سازی PFS (Perfect Forward Secrecy) در Child SA چیست؟",
-   "options": [
-    "اجرای مجدد تبادل Diffie-Hellman برای هر Child SA تا حتی در صورت افشای کلید IKE SA، کلیدهای داده نشست‌های گذشته/آینده محفوظ بمانند",
-    "حذف نیاز به احراز هویت",
-    "افزایش اندازه MTU",
-    "تغییر پورت ۴۵۰۰ به ۵۰۰"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>PFS استقلال رمزنگاری میان کلیدهای نشست‌های مختلف داده را تضمین می‌کند.</p>"
-  },
-  {
-   "title": "در اتصال VPN یک سازمان به AWS Transit Gateway یا Azure VPN Gateway، چرا Route-Based VTI همراه با BGP انتخاب استاندارد است؟",
-   "options": [
-    "زیرا کلود فقط از Crypto Map پشتیبانی می‌کند",
-    "زیرا تبادل پویا و خودکار ده‌ها پیشوند (Prefix) و Failover سریع میان دو تونل افزونه را بدون ویرایش دستی ACL ممکن می‌سازد",
-    "زیرا BGP رمزنگاری را حذف می‌کند",
-    "زیرا VTI روی پورت ۸۰ است"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>اتصال دو تونل VTI با BGP روی AWS/Azure پایدارترین و مقیاس‌پذیرترین معماری Hybrid Cloud است.</p>"
-  },
-  {
-   "title": "وظیفه مکانیسم DPD (Dead Peer Detection) در یک تونل IPsec چیست؟",
-   "options": [
-    "رمزنگاری فایل‌های کاربر",
-    "کشف آدرس MAC کلاینت",
-    "تشخیص سریع از کار افتادن همتای VPN و پاک‌سازی SAهای معلق جهت تحریک سریع Failover به مسیر پشتیبان",
-    "محدود کردن سرعت اینترنت"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>بدون DPD ممکن است روتر تا پایان Lifetime چندساعته SA متوجه قطع همتا نشود و ترافیک را Blackhole کند.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "راه‌اندازی تونل واقعی روی دو فایروال FTD اینترنتی",
-    "تست زنده Cisco Secure Client روی کاربران شرکت",
-    "فقط متن نظری بدون کد",
-    "شبیه‌سازی محلی (Local Mock) در Python 3 برای کشف NAT-D، سوییچ به UDP 4500 و تشخیص شمارنده‌های نامتقارن encaps/decaps"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ روتر یا فایروال زنده متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.5",
-  "legacyId": "spec_sec_vpn",
-  "sources": [
-   "https://www.rfc-editor.org/rfc/rfc7296",
-   "https://www.rfc-editor.org/rfc/rfc4303",
-   "https://www.rfc-editor.org/rfc/rfc3948",
-   "https://datatracker.ietf.org/doc/html/rfc7296",
-   "https://datatracker.ietf.org/doc/html/rfc3948"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "spec_sec_vpn",
+  "objectiveId": "spec_sec_vpn",
+  "kind": "lesson",
+  "track": "Specialist",
+  "course": "spec-security",
+  "title": "۷.۲ Security: Site-to-Site و Remote Access IPsec VPN با IKEv2 و VTI",
+  "titleEn": "Security Deep Dive: Site-to-Site & Remote Access IPsec VPN with IKEv2, NAT-T & Route-Based VTI",
+  "domain": "Network Security",
+  "source": "Legacy spec_sec_vpn rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "spec_sec"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر IPsec یا فایروال FTD واقعی در این محیط متصل نشده است."
+  "sections": [
+    {
+      "id": "spec_sec_vpn-section-1",
+      "title": "مسئله واقعی: چرا Crypto Mapهای قدیمی ساعت‌ها عیب‌یابی می‌طلبند و چرا ESP پشت مودم NAT عبور نمی‌کند؟",
+      "html": "<p>در تونل‌های قدیمی Policy-Based (<code>Crypto Map</code>)، کوچک‌ترین عدم تقارن در ACL آینه‌ای میان دو دفتر باعث از کار افتادن تونل می‌شد، اجرای OSPF/BGP روی آن نیازمند GRE اضافه بود، و در مسیرهای دارای NAT/PAT بسته‌های <strong>ESP (پروتکل IP شماره ۵۰)</strong> چون شماره پورت لایه ۴ ندارند در مودم NAT مسدود می‌شدند! ترکیب مدرن <strong>IKEv2 (RFC 7296)</strong> + <strong>NAT-T (UDP 4500)</strong> + <strong>Route-Based VPN (VTI)</strong> با رمزنگاری AEAD (<code>AES-256-GCM</code>) استاندارد طلایی VPN سازمانی امروز است.</p>"
+    },
+    {
+      "id": "spec_sec_vpn-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> مبانی رمزنگاری، NAT/PAT، مسیریابی OSPF/BGP و درس <code>spec_sec</code>.</p><ul><li>تبیین چهار ضمانت IPsec و مقایسه دقیق <strong>ESP (IP 50)</strong> در برابر <strong>AH (IP 51)</strong> (و چرایی شکست AH در عبور از NAT).</li><li>کالبدشکافی تبادل ۴ پیامی <strong>IKEv2 (RFC 7296)</strong> و مکانیسم <strong>NAT-Traversal (NAT-T) روی UDP 4500</strong>.</li><li>مقایسه <strong>Route-Based VTI</strong> با <strong>Policy-Based Crypto Map</strong> همراه با تنظیم حیاتی <strong><code>ip mtu</code> و <code>ip tcp adjust-mss</code></strong>.</li><li>آشنایی با معماری <strong>Remote Access VPN</strong> مدرن (Cisco Secure Client / AnyConnect روی TLS/DTLS یا IKEv2 + MFA) و عیب‌یابی شمارنده‌های <code>encaps/decaps</code>.</li></ul>"
+    },
+    {
+      "id": "spec_sec_vpn-section-3",
+      "title": "چهار ضمانت IPsec و چرا در عمل تقریباً همیشه ESP (نه AH) انتخاب می‌شود؟",
+      "html": "<p>مجموعه پروتکل‌های IPsec چهار تضمین رمزنگاری ارائه می‌دهد: (۱) <strong>محرمانگی (Confidentiality)</strong> با رمزنگاری، (۲) <strong>یکپارچگی (Integrity)</strong>، (۳) <strong>احراز اصالت مبدأ (Authentication)</strong> و (۴) <strong>ضدبازپخش (Anti-Replay)</strong> با شماره توالی.</p><ul><li><strong>AH (Authentication Header — IP Protocol 51):</strong> اصالت و یکپارچگی کل بسته شامل هدر بیرونی IP را تضمین می‌کند، اما <strong>هیچ رمزنگاری (محرمانگی) ندارد</strong> و چون آدرس IP بیرونی را امضا می‌کند، <strong>با NAT/PAT ناسازگار است</strong> و می‌شکند!</li><li><strong>ESP (Encapsulating Security Payload — IP Protocol 50):</strong> هم محرمانگی و هم یکپارچگی (به‌ویژه در حالت مدرن <strong><code>AES-256-GCM</code></strong> که هر دو را هم‌زمان در قالب AEAD سریع انجام می‌دهد) فراهم کرده و هدر بیرونی IP را امضا نمی‌کند، پس با <strong>NAT-T</strong> کاملاً سازگار است.</li></ul>"
+    },
+    {
+      "id": "spec_sec_vpn-section-4",
+      "title": "نمودار معماری IKEv2، NAT-T (UDP 4500) و Route-Based VTI",
+      "html": "<p>نمودار زیر مراحل ۴ پیامی IKEv2، سوییچ خودکار به UDP 4500 هنگام کشف NAT و مزایای VTI را نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"IKEv2 Site-to-Site Route-Based VTI IPsec Tunnel with NAT-T UDP 4500\"><rect x=\"12\" y=\"20\" width=\"212\" height=\"176\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"118\" y=\"42\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">Site A Router (VTI)</text><text x=\"118\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">interface Tunnel0</text><text x=\"118\" y=\"86\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">tunnel mode ipsec ipv4</text><text x=\"118\" y=\"106\" text-anchor=\"middle\" font-size=\"10\" fill=\"#15803d\">Dynamic BGP / OSPF</text><text x=\"118\" y=\"124\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">No Crypto ACL Mirroring!</text><text x=\"118\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">AES-256-GCM (AEAD)</text><text x=\"118\" y=\"174\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">PFS (ECDHE Group 19/20)</text><rect x=\"256\" y=\"18\" width=\"248\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"40\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">IKEv2 (RFC 7296) + NAT-T</text><text x=\"380\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">1. IKE_SA_INIT (UDP 500)</text><text x=\"380\" y=\"86\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9a3412\">DH Exchange + NAT-D Hash Check</text><text x=\"380\" y=\"112\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#b91c1c\">NAT Detected? Switch to UDP 4500!</text><text x=\"380\" y=\"136\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">2. IKE_AUTH (Auth + 1st Child SA)</text><text x=\"380\" y=\"160\" text-anchor=\"middle\" font-size=\"10\" fill=\"#166534\">Data: ESP (IP 50) or UDP 4500</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">Only 4 messages (vs 9 in IKEv1)!</text><rect x=\"536\" y=\"20\" width=\"212\" height=\"176\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"642\" y=\"42\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Site B Router (VTI)</text><text x=\"642\" y=\"68\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">interface Tunnel0</text><text x=\"642\" y=\"86\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">ip tcp adjust-mss 1360</text><text x=\"642\" y=\"112\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Diagnostic Counters:</text><text x=\"642\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">encaps &gt; 0 &amp; decaps &gt; 0 = OK</text><text x=\"642\" y=\"152\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">encaps &gt; 0, decaps = 0 =&gt;</text><text x=\"642\" y=\"168\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">Return ESP/UDP4500 blocked!</text><line x1=\"224\" y1=\"108\" x2=\"256\" y2=\"108\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"504\" y1=\"108\" x2=\"536\" y2=\"108\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
+    },
+    {
+      "id": "spec_sec_vpn-section-5",
+      "title": "کالبدشکافی IKEv2 (RFC 7296) در برابر IKEv1 و کارکرد NAT-T (UDP 4500)",
+      "html": "<p>در <strong>IKEv1</strong> قدیمی برقراری تونل نیازمند ۶ پیام Phase 1 (Main Mode) + ۳ پیام Phase 2 (Quick Mode) = ۹ پیام بود. در <strong>IKEv2 (RFC 7296)</strong> کل برقراری اولیه و اولین Child SA تنها در <strong>۴ پیام (۲ رفت‌وبرگشت)</strong> انجام می‌شود:</p><ol><li><strong><code>IKE_SA_INIT</code> (پیام ۱ و ۲ روی UDP 500):</strong> مذاکره رمزها، تبادل Diffie-Hellman (ترجیحاً ECDHE گروه ۱۹/۲۰)، Nonce و ارسال هش‌های <strong><code>NAT_DETECTION_SOURCE/DESTINATION_IP</code></strong>.</li><li><strong>سوییچ به <code>UDP 4500</code> (در صورت کشف NAT):</strong> اگر هر یک از دو سمت عدم تطابق هش NAT-D را ببیند، از پیام بعدی (<code>IKE_AUTH</code>) هم پیام‌های کنترلی IKE و هم کل بسته‌های داده <strong>ESP درون هدر UDP پورت ۴۵۰۰</strong> کپسوله می‌شوند تا NAT/PAT بتواند نشست را ترجمه کند.</li><li><strong><code>IKE_AUTH</code> (پیام ۳ و ۴):</strong> احراز هویت (ترجیحاً با گواهینامه X.509/PKI یا PSK قوی) و ایجاد هم‌زمان اولین <strong>Child SA (IPsec SA)</strong>.</li></ol>"
+    },
+    {
+      "id": "spec_sec_vpn-section-6",
+      "title": "برتری قاطع Route-Based VPN (VTI) بر Policy-Based Crypto Map",
+      "html": "<table><thead><tr><th>معیار</th><th>Crypto Map (Policy-Based)</th><th>Static/Dynamic VTI (Route-Based)</th></tr></thead><tbody><tr><td>تعیین ترافیک رمزنگاری</td><td>ACLهای آینه‌ای دستی (منبع اصلی خطا و Proxy-ID mismatch)</td><td><strong>جدول مسیریابی (Routing Table)</strong> — هر بسته‌ای به اینترفیس <code>Tunnel0</code> برود رمز می‌شود</td></tr><tr><td>مسیریابی پویا (OSPF/BGP)</td><td>پشتیبانی بومی ندارد (نیازمند GRE over IPsec)</td><td><strong>پشتیبانی بومی مستقیم</strong> روی <code>Tunnel0</code> (همراه BFD و ECMP)</td></tr><tr><td>یکپارچگی با Cloud (AWS/Azure)</td><td>دشوار و محدود به یک SA/خطا در چند ساب‌نت</td><td><strong>استاندارد پیش‌فرض</strong> اتصال VPN به AWS Transit Gateway / Azure</td></tr></tbody></table>"
+    },
+    {
+      "id": "spec_sec_vpn-section-7",
+      "title": "تله پنهان عملکرد: MTU و TCP MSS Clamping روی تونل IPsec",
+      "html": "<p>افزودن هدرهای IP بیرونی + ESP + UDP 4500 حدود ۶۰ تا ۷۶ بایت به اندازه بسته اضافه می‌کند. اگر MTU استاندارد ۱۵۰۰ باشد، بسته‌های ۱۵۰۰ بایتی کلاینت دچار <strong>Fragmentation</strong> شدید یا Drop بی‌صدا (PMTUD Blackhole وقتی ICMP مسدود باشد) می‌شوند — نشانه کلاسیک: <em>پینگ کار می‌کند اما صفحات وب/SMB باز نمی‌شوند!</em> راه‌حل استاندارد روی <code>interface Tunnel0</code> تنظیم <strong><code>ip mtu 1400</code></strong> و <strong><code>ip tcp adjust-mss 1360</code></strong> است.</p>"
+    },
+    {
+      "id": "spec_sec_vpn-section-8",
+      "title": "Remote Access VPN مدرن با Cisco Secure Client (AnyConnect) و MFA",
+      "html": "<p>برای دورکاران، <strong>Cisco Secure Client</strong> (نام جدید AnyConnect) متصل به Secure Firewall (FTD/ASA) از دو حالت پشتیبانی می‌کند: (۱) <strong>SSL/TLS (TCP 443) + DTLS (UDP 443)</strong> (سازگارترین با فایروال‌های هتل‌ها و کافه‌ها؛ DTLS از پدیده TCP-over-TCP Meltdown جلوگیری می‌کند!) و (۲) <strong>IKEv2/IPsec</strong>. در معماری امن امروز، احراز هویت Remote Access باید حتماً از طریق <strong>SAML 2.0 SSO + MFA</strong> (مانند Duo / Entra ID) و بررسی سلامت دستگاه (Posture/ISE) انجام شود.</p>"
+    },
+    {
+      "id": "spec_sec_vpn-section-9",
+      "title": "امنیت رمزنگاری مدرن و حذف الگوریتم‌های منسوخ",
+      "html": "<p>در طراحی IKEv2 امروزی، الگوریتم‌های قدیمی مانند <code>3DES</code>، <code>MD5</code>، <code>SHA-1</code> و گروه DH کوچک (Group 2/5) منسوخ و ناامن هستند. استاندارد پیشنهادی: رمزنگاری <strong><code>AES-256-GCM</code></strong> (یا <code>AES-256-CBC + SHA-384/512</code>)، تبادل کلید <strong><code>ECDH Group 19/20/21</code></strong>، فعال‌سازی <strong>PFS (Perfect Forward Secrecy)</strong> در Child SA و فعال‌سازی <strong>DPD (Dead Peer Detection)</strong> برای تشخیص سریع قطع همتا.</p>"
+    },
+    {
+      "id": "spec_sec_vpn-section-10",
+      "title": "عیب‌یابی حرفه‌ای با شمارنده‌های show crypto ipsec sa و show crypto ikev2 sa",
+      "html": "<ul><li><strong><code>IKEv2 SA</code> شکل نمی‌گیرد:</strong> مسدود بودن <code>UDP 500/4500</code>، عدم تطابق Proposal (الگوریتم رمز/Integrity/DH)، یا خطای PSK/گواهینامه X.509.</li><li><strong><code>#pkts encaps</code> زیاد می‌شود ولی <code>#pkts decaps</code> روی <code>0</code> مانده است:</strong> بسته‌های رمزنگاری‌شده از ما خارج می‌شوند، اما ترافیک برگشت رمزنگاری‌شده (<code>ESP / IP 50</code> یا <code>UDP 4500</code>) در مسیر فایروال/ISP مسدود شده یا مسیر برگشت در دفتر مقابل به تونل اشاره نمی‌کند!</li><li><strong>هر دو شمارنده صفرند:</strong> ترافیک اصلاً به سمت اینترفیس VTI روت نشده یا ACL ترافیک جالب (در Crypto Map) تطابق ندارد.</li></ul>"
+    },
+    {
+      "id": "spec_sec_vpn-section-11",
+      "title": "کژفهمی‌های رایج درباره IPsec VPN و IKEv2",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای کارکرد IPsec پشت NAT کافی است پورت UDP 500 را روی فایروال باز کنیم.»</strong> واقعیت: پس از کشف NAT در <code>IKE_SA_INIT</code>، هم ادامه IKE و هم کل داده‌های ESP به <strong><code>UDP 4500</code></strong> منتقل می‌شوند؛ باز نبودن UDP 4500 تونل را ناکام می‌گذارد.</li><li><strong>کژفهمی ۲: «برای رمزنگاری ترافیک بهتر است AH و ESP را با هم روی لینک دارای NAT فعال کنیم.»</strong> واقعیت: AH هدر IP بیرونی را امضا می‌کند و روی لینک دارای NAT می‌شکند؛ علاوه بر این <code>ESP با AES-GCM</code> به‌تنهایی هم محرمانگی و هم یکپارچگی کامل می‌دهد.</li><li><strong>کژفهمی ۳: «در Remote Access VPN اگر UDP 443 بسته باشد اصلاً وصل نمی‌شود.»</strong> واقعیت: کلاینت روی TCP 443 (TLS) وصل می‌شود، اما عملکرد روی لینک‌های پرتأخیر/دارای افت بسته به دلیل TCP-over-TCP افت می‌کند؛ باز گذاشتن UDP 443 (DTLS) برای کیفیت صدا/ویدیو بسیار بهتر است.</li></ul>"
+    },
+    {
+      "id": "spec_sec_vpn-section-12",
+      "title": "بهترین روش‌های مقاوم‌سازی تونل‌های WAN (FlexVPN / DMVPN و Multi-ISP)",
+      "html": "<p>در سازمان‌های دارای ده‌ها دفتر، ساخت دستی Mesh کامل تونل‌های VTI مقیاس‌پذیر نیست؛ از <strong>FlexVPN (مبتنی بر IKEv2)</strong>، <strong>DMVPN</strong> یا <strong>Cisco SD-WAN</strong> برای ایجاد پویا و خودکار تونل‌های Spoke-to-Spoke استفاده می‌شود.</p>"
+    },
+    {
+      "id": "spec_sec_vpn-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> روتر دفتر A با IP خصوصی <code>10.0.0.10</code> پشت یک مودم NAT به IP عمومی <code>198.51.100.10</code> ترجمه می‌شود. در <code>IKE_SA_INIT</code> هش‌های NAT-D همخوانی ندارند. تونل از کدام پورت برای <code>IKE_AUTH</code> و بسته‌های ESP استفاده خواهد کرد؟ <strong>پاسخ:</strong> <strong><code>UDP 4500 (NAT-T)</code></strong>.</p><p><strong>تمرین ۲:</strong> پس از بالا آمدن VTI، دستور <code>ping</code> کوچک موفق است ولی انتقال فایل‌های بزرگ HTTP/SMB متوقف می‌شود. محتمل‌ترین علت و فرمان اصلاحی چیست؟ <strong>پاسخ:</strong> مشکل MTU / PMTUD Blackhole به دلیل سربار هدر ESP؛ تنظیم <code>ip mtu 1400</code> و <code>ip tcp adjust-mss 1360</code> روی اینترفیس VTI.</p>"
+    },
+    {
+      "id": "spec_sec_vpn-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc7296\" target=\"_blank\" rel=\"noopener\">RFC 7296 (IKEv2 Protocol)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc4303\" target=\"_blank\" rel=\"noopener\">RFC 4303 (IPsec ESP)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc3948\" target=\"_blank\" rel=\"noopener\">RFC 3948 (UDP Encapsulation of IPsec ESP / NAT-T)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر سیسکو، فایروال FTD یا نشست واقعی رمزنگاری IPsec در این محیط اجرا نشده است.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، MTU/MSS Clamping، AES-GCM/PFS، DTLS و شبیه‌ساز NAT-D / شمارنده‌های IPsec."
+  "glossary": [
+    {
+      "term": "IKEv2 (RFC 7296)",
+      "fa": "پروتکل تبادل کلید IKEv2",
+      "simple": "نسل مدرن تبادل کلید IPsec در تنها ۴ پیام اولیه با پشتیبانی بومی از NAT-T و EAP."
+    },
+    {
+      "term": "ESP (IP Protocol 50)",
+      "fa": "پروتکل ESP",
+      "simple": "تأمین هم‌زمان محرمانگی (رمزنگاری) و یکپارچگی بسته‌های IPsec؛ سازگار با NAT-T."
+    },
+    {
+      "term": "AH (IP Protocol 51)",
+      "fa": "هدر احراز اصالت AH",
+      "simple": "تأمین یکپارچگی بدون رمزنگاری که به دلیل امضای IP بیرونی با NAT ناسازگار است."
+    },
+    {
+      "term": "NAT-T (UDP 4500)",
+      "fa": "عبور از NAT در IPsec",
+      "simple": "کپسوله‌سازی پیام‌های IKE و ESP درون UDP 4500 پس از کشف NAT در IKE_SA_INIT."
+    },
+    {
+      "term": "VTI",
+      "fa": "اینترفیس تونل مجازی",
+      "simple": "Virtual Tunnel Interface؛ مدل Route-Based VPN با پشتیبانی مستقیم از OSPF/BGP بدون ACL آینه‌ای."
+    },
+    {
+      "term": "Crypto Map",
+      "fa": "مدل Policy-Based قدیمی",
+      "simple": "روش سنتی VPN وابسته به ACLهای آینه‌ای خطاپذیر و فاقد پشتیبانی مستقیم روتینگ پویا."
+    },
+    {
+      "term": "AES-256-GCM (AEAD)",
+      "fa": "رمزنگاری مدرن GCM",
+      "simple": "الگوریتم ترکیبی سریع برای تأمین هم‌زمان محرمانگی و یکپارچگی در یک مرحله."
+    },
+    {
+      "term": "PFS",
+      "fa": "محرمانگی پیشرو",
+      "simple": "Perfect Forward Secrecy؛ اجرای مجدد Diffie-Hellman در Child SA جهت استقلال کلیدهای داده."
+    },
+    {
+      "term": "DPD",
+      "fa": "تشخیص همتای ازکارافتاده",
+      "simple": "Dead Peer Detection؛ کشف سریع قطع ارتباط همتای VPN برای پاک‌سازی SAهای مرده."
+    },
+    {
+      "term": "TCP MSS Clamping",
+      "fa": "تنظیم سقف سگمنت TCP",
+      "simple": "کاهش MSS (مثلاً ۱۳۶۰) روی اینترفیس VTI برای جلوگیری از Fragmentation و PMTUD Blackhole."
+    },
+    {
+      "term": "Cisco Secure Client",
+      "fa": "کلاینت VPN سیسکو",
+      "simple": "نام جدید AnyConnect؛ کلاینت Remote Access با پشتیبانی از TLS/DTLS و IKEv2 + SAML MFA."
+    },
+    {
+      "term": "DTLS (UDP 443)",
+      "fa": "انتقال امن UDP برای VPN",
+      "simple": "جلوگیری از افت عملکرد TCP-over-TCP در اتصال Remote Access VPN."
+    },
+    {
+      "term": "Child SA",
+      "fa": "انجمن امنیتی داده",
+      "simple": "پارامترها و کلیدهای یکپارچه رمزنگاری ترافیک داده ESP (ساخته‌شده درون IKEv2)."
+    },
+    {
+      "term": "encaps / decaps",
+      "fa": "شمارنده‌های رمز و رمزگشایی",
+      "simple": "شمارنده‌های کلیدی show crypto ipsec sa برای تشخیص قطعی یک‌طرفه مسیر برگشت."
+    },
+    {
+      "term": "FlexVPN",
+      "fa": "معماری FlexVPN سیسکو",
+      "simple": "چارچوب یکپارچه سیسکو مبتنی بر IKEv2 و VTI برای Site-to-Site، Hub-and-Spoke و Remote Access."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/spec_sec_vpn-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (کشف NAT-D -> سوییچ UDP 4500 و عیب‌یابی encaps/decaps) — روتر IPsec واقعی اجرا نشده",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر IPsec یا فایروال FTD واقعی در این محیط متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر IOS-XE، فایروال FTD یا سوکت واقعی IPsec/ESP در این محیط اجرا نشده است.</p><p>این شبیه‌ساز محلی محاسبه هش <code>NAT-D</code> در <code>IKE_SA_INIT</code> (مقایسه ارتباط مستقیم روی <code>UDP 500 + IP 50</code> با ارتباط پشت NAT و سوییچ خودکار به <code>UDP 4500</code>) و موتور تشخیص شمارنده‌های <code>show crypto ipsec sa</code> را در Python 3 آزمون می‌کند.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_sec_vpn_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_sec_vpn_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — spec_sec_vpn: IKEv2 NAT-T, VTI vs Crypto Map &amp; IPsec SA\nCounter Diagnostics Local Mock.\nExecution boundary: Pure Python 3 stdlib simulation of NAT-D hash mismatch\ntriggering UDP 4500 encapsulation, VTI dynamic routing readiness, and both\nasymmetric encaps/decaps failure directions. No live IPsec routers or real crypto sockets.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport hashlib\nimport json\n\n\ndef nat_detection_hash(spi_i: str, spi_r: str, ip: str, port: int) -&gt; str:\n    return hashlib.sha1(f&quot;{spi_i}:{spi_r}:{ip}:{port}&quot;.encode(&quot;utf-8&quot;)).hexdigest()[:16]\n\n\ndef negotiate_transport(local_ip: str, seen_ip: str, local_port: int, seen_port: int) -&gt; dict:\n    h_sent = nat_detection_hash(&quot;AAA1&quot;, &quot;BBB2&quot;, local_ip, local_port)\n    h_seen = nat_detection_hash(&quot;AAA1&quot;, &quot;BBB2&quot;, seen_ip, seen_port)\n    nat_detected = h_sent != h_seen\n    return {\n        &quot;nat_detected&quot;: nat_detected,\n        &quot;ike_auth_and_esp_port&quot;: &quot;UDP 4500 (NAT-T)&quot; if nat_detected else &quot;UDP 500 + IP Protocol 50 (ESP)&quot;,\n    }\n\n\ndef diagnose_ipsec_counters(pkts_encaps: int, pkts_decaps: int) -&gt; str:\n    if pkts_encaps &lt; 0 or pkts_decaps &lt; 0:\n        raise ValueError(&quot;IPsec packet counters cannot be negative&quot;)\n    if pkts_encaps == 0 and pkts_decaps == 0:\n        return &quot;NO_INTERESTING_TRAFFIC_OR_ROUTE_NOT_POINTING_TO_VTI&quot;\n    if pkts_encaps &gt; 0 and pkts_decaps == 0:\n        return &quot;ONE_WAY_RETURN_BLOCKED_CHECK_ESP_OR_UDP4500_AND_RETURN_ROUTE&quot;\n    if pkts_encaps == 0 and pkts_decaps &gt; 0:\n        return &quot;ONE_WAY_OUTBOUND_MISSING_CHECK_LOCAL_ROUTE_OR_CRYPTO_ACL&quot;\n    return &quot;BIDIRECTIONAL_TUNNEL_HEALTHY&quot;\n\n\ndef main() -&gt; None:\n    direct = negotiate_transport(&quot;198.51.100.10&quot;, &quot;198.51.100.10&quot;, 500, 500)\n    behind_nat = negotiate_transport(&quot;10.0.0.10&quot;, &quot;198.51.100.10&quot;, 500, 41234)\n    assert direct[&quot;nat_detected&quot;] is False\n    assert behind_nat[&quot;nat_detected&quot;] is True and &quot;4500&quot; in behind_nat[&quot;ike_auth_and_esp_port&quot;]\n\n    diag_ret_blocked = diagnose_ipsec_counters(pkts_encaps=420, pkts_decaps=0)\n    diag_out_missing = diagnose_ipsec_counters(pkts_encaps=0, pkts_decaps=180)\n    diag_idle = diagnose_ipsec_counters(pkts_encaps=0, pkts_decaps=0)\n    diag_healthy = diagnose_ipsec_counters(pkts_encaps=420, pkts_decaps=418)\n    assert diag_ret_blocked == &quot;ONE_WAY_RETURN_BLOCKED_CHECK_ESP_OR_UDP4500_AND_RETURN_ROUTE&quot;\n    assert diag_out_missing == &quot;ONE_WAY_OUTBOUND_MISSING_CHECK_LOCAL_ROUTE_OR_CRYPTO_ACL&quot;\n    assert diag_idle == &quot;NO_INTERESTING_TRAFFIC_OR_ROUTE_NOT_POINTING_TO_VTI&quot;\n    assert diag_healthy == &quot;BIDIRECTIONAL_TUNNEL_HEALTHY&quot;\n\n    print(&quot;=== spec_sec_vpn IKEv2 NAT-T &amp; Counter Diagnostics Mock ===&quot;)\n    print(json.dumps({\n        &quot;direct_public_peers&quot;: direct,\n        &quot;peer_behind_nat_pat&quot;: behind_nat,\n        &quot;counter_diagnosis_enc420_dec0&quot;: diag_ret_blocked,\n        &quot;counter_diagnosis_enc0_dec180&quot;: diag_out_missing,\n        &quot;counter_diagnosis_healthy&quot;: diag_healthy,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> برای همتای مستقیم <code>nat_detected: False</code>، برای همتای پشت NAT مقدار <code>nat_detected: True</code> با انتقال به <code>UDP 4500 (NAT-T)</code>، و برای <code>encaps=420, decaps=0</code> تشخیص مسدود بودن مسیر برگشت ESP/UDP 4500.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع پیکربندی VTI روی IOS-XE (اجرا نشده روی سخت‌افزار زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XE IKEv2 VTI snippet (NOT executed on live router)\ninterface Tunnel0\n ip address 169.254.10.1 255.255.255.252\n ip mtu 1400\n ip tcp adjust-mss 1360\n tunnel source GigabitEthernet1\n tunnel mode ipsec ipv4\n tunnel destination 198.51.100.20\n tunnel protection ipsec profile IKEV2_PROF</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس IPsec VPN با IKEv2 و VTI",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-specializations",
-   "recommendedCourse": "spec-security",
-   "blueprint": "/academy-assets/v5/blueprints/spec_sec_vpn.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_sec_vpn_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۵: رفع باگ منطقی diagnose_ipsec_counters در spec_sec_vpn_lab.py (حالت نامتقارن pkts_encaps==0 و pkts_decaps>0 پیش‌تر به اشتباه BIDIRECTIONAL_TUNNEL_HEALTHY برمی‌گرداند) و افزودن رد مقادیر منفی با تست‌های منفی."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "هنگام وجود دستگاه NAT/PAT در مسیر یک تونل Site-to-Site IPsec (IKEv2)، پس از کشف NAT در IKE_SA_INIT، پیام‌های ادامه IKE و داده‌های ESP از کدام پورت عبور می‌کنند؟",
+      "options": [
+        "UDP 4500 (NAT-Traversal)",
+        "UDP 500 برای کل داده",
+        "TCP 443",
+        "IP Protocol 51 (AH)"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مکانیسم NAT-T (RFC 3948) پس از کشف NAT، هم کنترل IKE و هم داده ESP را درون <code>UDP 4500</code> کپسوله می‌کند.</p>"
+    },
+    {
+      "title": "برتری کلیدی Route-Based VPN (VTI) نسبت به Policy-Based Crypto Map چیست؟",
+      "options": [
+        "عدم نیاز به رمزنگاری در سمت مقصد",
+        "داشتن اینترفیس منطقی Tunnel برای اجرای مستقیم پروتکل‌های مسیریابی پویا (OSPF/BGP) و حذف ACLهای آینه‌ای خطاپذیر",
+        "جایگزینی ESP با AH",
+        "عدم نیاز به اتصال اینترنت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>VTI انتخاب ترافیک را به جدول مسیریابی می‌سپارد و کاملاً با OSPF، BGP، BFD و کلود سازگار است.</p>"
+    },
+    {
+      "title": "در عیب‌یابی show crypto ipsec sa، اگر #pkts encaps پیوسته افزایش یابد اما #pkts decaps روی 0 بماند، محتمل‌ترین علت چیست؟",
+      "options": [
+        "اینترفیس محلی اصلاً بسته‌ای نمی‌فرستد",
+        "الگوریتم AES-GCM فقط یک‌طرفه است",
+        "بسته‌های رمزنگاری‌شده خارج می‌شوند اما ترافیک برگشت (ESP/UDP 4500) در مسیر فایروال مسدود شده یا مسیر برگشت در سمت مقابل اشتباه است",
+        "پورت کنسول قطع شده است"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>افزایش encaps یعنی ارسال از سمت ما کار می‌کند؛ صفر بودن decaps نشانه قطع مسیر برگشت یا فیلتر شدن ESP/UDP 4500 است.</p>"
+    },
+    {
+      "title": "چرا پروتکل AH (IP Protocol 51) در شبکه‌های سازمانی امروز تقریباً کنار گذاشته شده و ESP ترجیح داده می‌شود؟",
+      "options": [
+        "زیرا AH سرعت بیش از حد بالا دارد",
+        "زیرا ESP رمزنگاری ندارد",
+        "زیرا AH فقط روی وای‌فای است",
+        "زیرا AH هیچ محرمانگی (رمزنگاری) ارائه نمی‌دهد و به دلیل امضای هدر IP بیرونی با NAT/PAT ناسازگار است"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>ESP با AES-GCM هم رمزنگاری و هم یکپارچگی می‌دهد و با NAT-T کاملاً سازگار است.</p>"
+    },
+    {
+      "title": "در مقایسه با IKEv1 (که در Main + Quick Mode به ۹ پیام نیاز داشت)، IKEv2 (RFC 7296) در چند پیام اولیه هم IKE SA و هم اولین Child SA را می‌سازد؟",
+      "options": [
+        "۴ پیام (۲ رفت‌وبرگشت: IKE_SA_INIT و IKE_AUTH)",
+        "۲۰ پیام",
+        "۱ پیام بدون پاسخ",
+        "۱۲ پیام"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>طراحی ساده‌شده و سریع IKEv2 برقراری تونل را در ۴ پیام اولیه انجام می‌دهد.</p>"
+    },
+    {
+      "title": "اگر پس از برقراری تونل VTI پینگ‌های کوچک موفق باشند اما انتقال فایل‌های بزرگ HTTP/SMB متوقف شود، راه‌حل استاندارد روی interface Tunnel0 چیست؟",
+      "options": [
+        "خاموش کردن رمزنگاری",
+        "تنظیم ip mtu 1400 و ip tcp adjust-mss 1360 برای جبران سربار هدر IPsec/NAT-T و پیشگیری از Fragmentation/PMTUD Blackhole",
+        "افزایش MTU به 9000 روی اینترنت",
+        "تغییر VTI به AH"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>کاهش MTU و MSS Clamping یکی از مهم‌ترین اقدامات حرفه‌ای در هر تونل IPsec است.</p>"
+    },
+    {
+      "title": "در Remote Access VPN با Cisco Secure Client (AnyConnect)، چرا باز گذاشتن UDP 443 (DTLS) در کنار TCP 443 (TLS) اهمیت دارد؟",
+      "options": [
+        "زیرا TCP 443 رمزنگاری ندارد",
+        "زیرا بدون DTLS نمی‌توان وارد وب شد",
+        "برای جلوگیری از پدیده افت عملکرد TCP-over-TCP Meltdown به‌ویژه برای تماس صوتی، ویدیو و لینک‌های دارای افت بسته",
+        "برای غیرفعال کردن MFA"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>انتقال ترافیک حساس به تأخیر روی DTLS (UDP 443) کیفیت تماس‌ها و پایداری VPN را به‌شدت بهبود می‌بخشد.</p>"
+    },
+    {
+      "title": "مزیت الگوریتم AES-256-GCM (از خانواده AEAD) در پروفایل IPsec مدرن چیست؟",
+      "options": [
+        "فقط یکپارچگی بدون رمزنگاری می‌دهد",
+        "نیاز به کلید را حذف می‌کند",
+        "فقط در IKEv1 کار می‌کند",
+        "به‌صورت یکپارچه و با کارایی بالا هر دو محرمانگی (Encryption) و یکپارچگی (Authentication) را هم‌زمان فراهم می‌کند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>AEAD (مانند AES-GCM) استاندارد توصیه‌شده جدید در IPsec/IKEv2 و TLS 1.3 است.</p>"
+    },
+    {
+      "title": "نقش فعال‌سازی PFS (Perfect Forward Secrecy) در Child SA چیست؟",
+      "options": [
+        "اجرای مجدد تبادل Diffie-Hellman برای هر Child SA تا حتی در صورت افشای کلید IKE SA، کلیدهای داده نشست‌های گذشته/آینده محفوظ بمانند",
+        "حذف نیاز به احراز هویت",
+        "افزایش اندازه MTU",
+        "تغییر پورت ۴۵۰۰ به ۵۰۰"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>PFS استقلال رمزنگاری میان کلیدهای نشست‌های مختلف داده را تضمین می‌کند.</p>"
+    },
+    {
+      "title": "در اتصال VPN یک سازمان به AWS Transit Gateway یا Azure VPN Gateway، چرا Route-Based VTI همراه با BGP انتخاب استاندارد است؟",
+      "options": [
+        "زیرا کلود فقط از Crypto Map پشتیبانی می‌کند",
+        "زیرا تبادل پویا و خودکار ده‌ها پیشوند (Prefix) و Failover سریع میان دو تونل افزونه را بدون ویرایش دستی ACL ممکن می‌سازد",
+        "زیرا BGP رمزنگاری را حذف می‌کند",
+        "زیرا VTI روی پورت ۸۰ است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اتصال دو تونل VTI با BGP روی AWS/Azure پایدارترین و مقیاس‌پذیرترین معماری Hybrid Cloud است.</p>"
+    },
+    {
+      "title": "وظیفه مکانیسم DPD (Dead Peer Detection) در یک تونل IPsec چیست؟",
+      "options": [
+        "رمزنگاری فایل‌های کاربر",
+        "کشف آدرس MAC کلاینت",
+        "تشخیص سریع از کار افتادن همتای VPN و پاک‌سازی SAهای معلق جهت تحریک سریع Failover به مسیر پشتیبان",
+        "محدود کردن سرعت اینترنت"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بدون DPD ممکن است روتر تا پایان Lifetime چندساعته SA متوجه قطع همتا نشود و ترافیک را Blackhole کند.</p>"
+    },
+    {
+      "title": "در مقایسه IKEv2 با IKEv1 در تونل‌های IPsec VPN، کدام مزیت کلیدی باعث استاندارد شدن IKEv2 در طراحی‌های مدرن شده است؟",
+      "options": [
+        "تعداد پیام‌های مذاکره کمتر (۴ پیام به جای ۶–۹ پیام)، پشتیبانی بومی از MOBIKE، احراز هویت انعطاف‌پذیر EAP و مقاومت بهتر در برابر DoS",
+        "عدم نیاز به رمزنگاری در Phase 2",
+        "اجرا فقط روی پورت TCP 23",
+        "حذف کامل گواهی‌های دیجیتال"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>IKEv2 (RFC 7296) مذاکره سریع‌تر، پشتیبانی بهتر از NAT-T و جابه‌جایی کلاینت (MOBIKE) و مکانیزم‌های امنیتی مدرن‌تری نسبت به IKEv1 ارائه می‌دهد.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.5",
+    "legacyId": "spec_sec_vpn",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc7296",
+      "https://www.rfc-editor.org/rfc/rfc4303",
+      "https://www.rfc-editor.org/rfc/rfc3948",
+      "https://datatracker.ietf.org/doc/html/rfc7296",
+      "https://datatracker.ietf.org/doc/html/rfc3948"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر IPsec یا فایروال FTD واقعی در این محیط متصل نشده است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، MTU/MSS Clamping، AES-GCM/PFS، DTLS و شبیه‌ساز NAT-D / شمارنده‌های IPsec."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/spec_sec_vpn-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-specializations",
+      "recommendedCourse": "spec-security",
+      "blueprint": "/academy-assets/v5/blueprints/spec_sec_vpn.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/spec_sec_vpn_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۵: رفع باگ منطقی diagnose_ipsec_counters در spec_sec_vpn_lab.py (حالت نامتقارن pkts_encaps==0 و pkts_decaps>0 پیش‌تر به اشتباه BIDIRECTIONAL_TUNNEL_HEALTHY برمی‌گرداند) و افزودن رد مقادیر منفی با تست‌های منفی."
+    ]
+  }
 }

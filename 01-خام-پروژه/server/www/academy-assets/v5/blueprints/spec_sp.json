@@ -1,349 +1,349 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "spec_sp",
- "objectiveId": "spec_sp",
- "kind": "lesson",
- "track": "FAM Specializations",
- "course": "spec-sp",
- "title": "تخصص Service Provider: معماری P/PE/CE، MPLS L3VPN و مهندسی برچسب",
- "titleEn": "Service Provider Specialization: P/PE/CE Architecture, MPLS L3VPN & Label Engineering",
- "domain": "Service Provider",
- "source": "Legacy spec_sp rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [],
- "sections": [
-  {
-   "id": "spec_sp-section-1",
-   "title": "مسئله اپراتوری: حمل ترافیک ۵۰۰ مشتری با IPهای هم‌پوشان بدون انفجار جدول هسته",
-   "html": "<p>اپراتوری را تصور کنید که به ۵۰۰ سازمان سرویس WAN ارائه می‌دهد و ده‌ها سازمان هم‌زمان در شبکه‌های داخلی خود از رنج <code>10.50.1.0/24</code> استفاده می‌کنند. اگر بخواهید در تک‌تک روترهای هسته کشور ۵۰۰ VRF و زیرینترفیس <code>802.1Q</code> بسازید (الگوی VRF-Lite)، هم هزینه عملیاتی غیرقابل مدیریت می‌شود و هم روترهای هسته ناچار به نگهداری میلیون‌ها مسیر مشتری خواهند بود.</p><p>راهکار استاندارد صنعت (<strong>RFC 4364</strong>) ترکیب سه عنصر است: تفکیک نقش‌های <strong>CE / PE / P</strong>، ایجاد هسته <strong>BGP-Free Core</strong> با سوئیچینگ برچسب <strong>MPLS</strong>، و توزیع مسیرهای ایزوله مشتریان بین PEها با <strong>MP-BGP VPNv4/VPNv6</strong>.</p>"
-  },
-  {
-   "id": "spec_sp-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازهای مفهومی:</strong> تسلط بر IGP (OSPF یا IS-IS)، BGP (از جمله iBGP و Route Reflector) و مفهوم VRF-Lite.</p><ul><li>تبیین دقیق نقش روترهای <strong>CE</strong>، <strong>PE</strong> و <strong>P</strong> و چرایی کارایی <strong>BGP-Free Core</strong>.</li><li>تشریح ساختار هدر ۳۲ بیتی MPLS و عملیات <strong>Push / Swap / Pop</strong> به همراه <strong>PHP (Implicit Null Label 3)</strong> و مقایسه آن با <strong>Explicit Null (Label 0/2)</strong>.</li><li>تفکیک بی‌ابهام <strong>RD (Route Distinguisher)</strong> از <strong>RT (Route Target)</strong> در کنترل‌پلین MP-BGP VPNv4.</li><li>تشخیص و پیشگیری از سه تله حیاتی عملیاتی: <strong>LDP-IGP Synchronization (RFC 5443)</strong>، خلاصه‌سازی <code>/32</code> لوپ‌بک PEها، و <strong>MPLS MTU</strong>.</li></ul>"
-  },
-  {
-   "id": "spec_sp-section-3",
-   "title": "معماری سه‌لایه CE / PE / P و فلسفه BGP-Free Core",
-   "html": "<ul><li><strong>CE (Customer Edge):</strong> روتر لبه مشتری که صرفاً مسیریابی IP معمولی (Static، OSPF، eBGP و...) با PE دارد و معمولاً هیچ اطلاعی از MPLS یا VRFهای اپراتور ندارد.</li><li><strong>PE (Provider Edge):</strong> مغز هوشمند لبه اپراتور. VRF هر مشتری روی PE تعریف می‌شود، نشست MP-BGP VPNv4/VPNv6 میان PEها (یا از طریق Route Reflector) برقرار می‌گردد و PE برچسب‌های دوگانه MPLS را درج (Push) یا حذف (Pop) می‌کند.</li><li><strong>P (Provider Core):</strong> روترهای پرسرعت هسته که <strong>هیچ VRF و هیچ مسیر BGP مشتری ندارند</strong>. آن‌ها فقط IGP زیرساخت (برای رسیدن به <code>/32</code> Loopback روترهای PE) و پروتکل توزیع برچسب (LDP یا Segment Routing) را اجرا می‌کنند. این همان <strong>BGP-Free Core</strong> است.</li></ul>"
-  },
-  {
-   "id": "spec_sp-section-4",
-   "title": "ساختار هدر ۴ بایتی MPLS و پشته دوبرچسبی L3VPN",
-   "html": "<p>مطابق <strong>RFC 3032</strong> و <strong>RFC 5462</strong>، هر برچسب MPLS دقیقاً <strong>۴ بایت (۳۲ بیت)</strong> است و میان هدر لایه ۲ و هدر لایه ۳ (موسوم به لایه ۲.۵) قرار می‌گیرد:</p><ul><li><strong>Label (۲۰ بیت):</strong> مقدار عددی برچسب (مقادیر ۰ تا ۱۵ رزرو شده‌اند).</li><li><strong>TC / EXP (۳ بیت):</strong> فیلد Traffic Class (پیش‌تر Experimental) برای کلاس QoS/CoS در هسته MPLS.</li><li><strong>S / BoS (۱ بیت):</strong> Bottom of Stack؛ برابر <code>1</code> برای پایین‌ترین برچسب پشته (نزدیک‌ترین به هدر IP) و <code>0</code> برای برچسب‌های بالایی.</li><li><strong>TTL (۸ بیت):</strong> جلوگیری از حلقه فورواردینگ مشابه TTL در IP.</li></ul><p>در <strong>MPLS L3VPN</strong>، دو برچسب روی هم چیده می‌شوند (۸ بایت سربار در L3VPN ساده): <strong>برچسب بیرونی (Transport Label)</strong> که توسط LDP/SR برای رساندن بسته تا Loopback روتر PE مقصد ساخته شده (<code>S=0</code>)، و <strong>برچسب درونی (VPN/Service Label)</strong> که توسط PE مقصد در MP-BGP تبلیغ شده و مشخص می‌کند بسته متعلق به کدام VRF است (<code>S=1</code>).</p>"
-  },
-  {
-   "id": "spec_sp-section-5",
-   "title": "نمودار دیتاپلین MPLS L3VPN: از Push تا PHP و تحویل به VRF",
-   "html": "<p>در نمودار زیر مشاهده می‌کنید که روتر هسته P1 در تصمیم مسیر‌یابی (Forwarding) به جدول IP مشتری نگاه نمی‌کند و فقط بر پایه پشته برچسب MPLS عمل می‌کند (در توازن بار ECMP ممکن است برخی پیاده‌سازی‌ها برای هش‌کردن به هدر زیر پشته نگاه کنند مگر Entropy Label / RFC 6790 فعال باشد) و با دریافت Implicit Null از PE2، برچسب بیرونی را حذف (PHP) می‌کند تا PE2 فقط یک Lookup روی برچسب VPN انجام دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"MPLS L3VPN Push Swap PHP Pop Data Plane\"><rect x=\"10\" y=\"75\" width=\"90\" height=\"70\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"55\" y=\"106\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#0f172a\">CE1</text><text x=\"55\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#475569\">CUST_A IP</text><rect x=\"135\" y=\"45\" width=\"145\" height=\"130\" rx=\"10\" fill=\"#dbeafe\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"207\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Ingress PE1</text><text x=\"207\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">VRF CUST_A (RT 65100:101)</text><text x=\"207\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1d4ed8\">PUSH [24 | 18001]</text><text x=\"207\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Outer: LDP | Inner: VPNv4</text><rect x=\"315\" y=\"45\" width=\"145\" height=\"130\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"387\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Core P1 (BGP-Free)</text><text x=\"387\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">No Customer VRFs/BGP</text><text x=\"387\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#b45309\">PHP POP (Label 3)</text><text x=\"387\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Forwards [18001] only</text><rect x=\"495\" y=\"45\" width=\"145\" height=\"130\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"567\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Egress PE2</text><text x=\"567\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Single LFIB Lookup</text><text x=\"567\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#15803d\">POP 18001 -&gt; VRF</text><text x=\"567\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Deliver IP to CE2</text><rect x=\"665\" y=\"75\" width=\"85\" height=\"70\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"707\" y=\"106\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#0f172a\">CE2</text><text x=\"707\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#475569\">CUST_A IP</text><line x1=\"100\" y1=\"110\" x2=\"135\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"280\" y1=\"110\" x2=\"315\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"460\" y1=\"110\" x2=\"495\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"640\" y1=\"110\" x2=\"665\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
-  },
-  {
-   "id": "spec_sp-section-6",
-   "title": "چرا PHP (Implicit Null Label 3) و چه زمانی Explicit Null (Label 0/2)؟",
-   "html": "<p>اگر روتر P ماقبل آخر بسته را با هر دو برچسب (بیرونی + VPN) به PE خروجی تحویل دهد، PE خروجی مجبور به دو بار جست‌وجو (Double Lookup) در LFIB می‌شود: یک بار برای حذف برچسب بیرونی و بار دوم برای خواندن برچسب VPN. برای حذف این سربار، PE خروجی برای Loopback خود برچسب رزرو <strong>Implicit Null (Label 3)</strong> را به همسایه P تبلیغ می‌کند. روتر P هنگام دیدن Label 3 (در صفحه کنترل، نه روی سیم!) برچسب بیرونی را <strong>Pop</strong> می‌کند و بسته را تنها با برچسب VPN به PE2 تحویل می‌دهد. به این فرآیند <strong>PHP (Penultimate Hop Popping)</strong> می‌گویند.</p><p><strong>مرز مهندسی مهم:</strong> در PHP چون برچسب بیرونی قبل از رسیدن به PE2 حذف می‌شود، بیت‌های <strong>TC (QoS)</strong> آن برچسب بیرونی نیز پاک می‌شوند. اگر در طراحی End-to-End QoS (مدل Pipe) نیاز باشد بیت‌های TC برچسب بیرونی تا خود PE خروجی حفظ شوند، به جای Implicit Null از <strong>Explicit Null</strong> (<strong>Label 0</strong> برای IPv4 و <strong>Label 2</strong> برای IPv6) استفاده می‌شود تا روتر P برچسب بیرونی را به Label 0 تغییر دهد و روی سیم بفرستد.</p>"
-  },
-  {
-   "id": "spec_sp-section-7",
-   "title": "تفکیک حیاتی RD (Route Distinguisher) در برابر RT (Route Target)",
-   "html": "<p>این دو مفهوم از پرتکرارترین نقاط سردرگمی در آزمون‌ها و محیط عملیاتی هستند. هر دو ۶۴ بیتی هستند و اغلب قالب مشابهی مانند <code>65100:101</code> دارند، اما کارکرد آن‌ها کاملاً متفاوت است:</p><table><thead><tr><th>ویژگی</th><th>RD (Route Distinguisher)</th><th>RT (Route Target)</th></tr></thead><tbody><tr><td>نقش اصلی</td><td><strong>یکتاسازی پیشوندهای هم‌پوشان</strong> در جدول MP-BGP</td><td><strong>کنترل سیاست اشتراک‌گذاری</strong> (Import/Export) بین VRFها</td></tr><tr><td>ساختار در BGP</td><td>به اول IPv4 می‌چسبد و پیشوند ۹۶ بیتی <code>VPNv4</code> می‌سازد</td><td>به‌صورت <strong>BGP Extended Community</strong> ضمیمه مسیر می‌شود</td></tr><tr><td>تعداد در هر VRF</td><td>دقیقاً یک RD به ازای هر VRF روی یک PE</td><td>می‌تواند چندین RT برای Export و چندین RT برای Import داشته باشد</td></tr><tr><td>مثال کاربردی</td><td>تمایز <code>65100:101:10.50.1.0/24</code> از <code>65100:202:10.50.1.0/24</code></td><td>ساخت توپولوژی Any-to-Any، Hub-and-Spoke یا Extranet بین دو مشتری</td></tr></tbody></table>"
-  },
-  {
-   "id": "spec_sp-section-8",
-   "title": "صفحه کنترل MP-BGP VPNv4 و یک سناریوی Extranet واقعی",
-   "html": "<p>روی PE1، پیشوند <code>10.50.1.0/24</code> از CE1 در <code>VRF CUST_A</code> دریافت می‌شود. PE1 یک برچسب VPN (مثلاً <code>18001</code>) به آن تخصیص می‌دهد، RD را به ابتدای آن می‌چسباند، <code>route-target export 65100:101</code> را به‌عنوان Extended Community اضافه می‌کند و با <code>Next-Hop = Loopback0 PE1</code> از طریق MP-BGP VPNv4 (همراه با <code>send-community extended</code>) به PE2 می‌فرستد.</p><p>در سمت PE2، هر VRF که <code>route-target import 65100:101</code> داشته باشد این مسیر را وارد جدول خود می‌کند. نکته زیبا اینجاست: حتی اگر PE1 و PE2 مقادیر RD متفاوتی برای دو سایت یک مشتری داشته باشند (که در طراحی با Route Reflector برای دید هم‌زمان چند مسیر سودمند است)، تا زمانی که RT Export/Import تطابق داشته باشد، ارتباط به‌درستی برقرار می‌شود.</p>"
-  },
-  {
-   "id": "spec_sp-section-9",
-   "title": "تله عملیاتی ۱: LDP-IGP Synchronization (RFC 5443) و سیاه‌چاله لینک تازه بالاآمده",
-   "html": "<p>فرض کنید لینک مستقیم و سریع بین P1 و PE2 پس از یک قطعی فیبر دوباره بالا می‌آید. پروتکل IGP (مثل IS-IS یا OSPF) ظرف چند صد میلی‌ثانیه همسایه شده و این لینک را دوباره به‌عنوان بهترین مسیر به <code>PE2 Loopback0</code> انتخاب می‌کند. اما جلسه <strong>LDP (TCP 646)</strong> ممکن است چند ثانیه دیرتر بالا بیاید و برچسب‌ها را تبادل کند. در این بازه زمانی کوتاه، IGP ترافیک VPN را روی لینکی می‌فرستد که هنوز برچسب MPLS برای آن وجود ندارد؛ چون روتر P جدول مسیر مشتری ندارد، بسته‌ها در هسته <strong>سیاه‌چاله (Blackhole)</strong> می‌شوند!</p><p>راهکار استاندارد <strong>RFC 5443 (LDP-IGP Synchronization)</strong> این است: تا زمانی که جلسه LDP روی آن لینک به‌طور کامل همگام نشود، IGP هزینه (Metric) لینک را در حداکثر مقدار تبلیغ می‌کند (مثلاً <code>max-metric</code> در OSPF یا <code>overload/max-metric</code> در IS-IS) تا ترافیک از مسیر پشتیبان دارای برچسب عبور کند و پس از آماده شدن LDP به مسیر اصلی بازگردد.</p>"
-  },
-  {
-   "id": "spec_sp-section-10",
-   "title": "تله عملیاتی ۲ و ۳: خلاصه‌سازی Loopback /32 و کمبود MPLS MTU",
-   "html": "<p><strong>تله خلاصه‌سازی Loopback:</strong> در LDP، نگاشت برچسب‌ها به تطابق دقیق پیشوند (FEC) وابسته است. اگر لوپ‌بک PE2 یعنی <code>198.51.100.2/32</code> در IGP به <code>198.51.100.0/24</code> خلاصه شود (یا روی Loopback ماسک <code>/24</code> با نوع شبکه OSPF پیش‌فرض Loopback مغایرت بسازد)، زنجیره LSP می‌شکند و روتر P در جدول LFIB عبارت <code>No Label / Untagged</code> نشان می‌دهد.</p><p><strong>تله MPLS MTU:</strong> هر برچسب ۴ بایت به فریم اضافه می‌کند. در L3VPN ساده ۲ برچسب = ۸ بایت (حداقل <code>1508 B</code> برای عبور بسته IP با اندازه ۱۵۰۰ بایت بدون تکه‌تکه شدن)؛ در سناریوهای دارای MPLS TE FRR، CsC یا Inter-AS Option B/C تعداد برچسب‌ها به ۳ تا ۵ عدد (۱۲ تا ۲۰ بایت) می‌رسد. بنابراین در هسته اپراتورها معمولاً MTU فیزیکی/MPLS روی مقادیر بزرگ (مثل <code>9000–9216</code> بایت، یا دست‌کم <code>1524+</code> بایت) استانداردسازی می‌شود.</p>"
-  },
-  {
-   "id": "spec_sp-section-11",
-   "title": "کژفهمی‌های رایج درباره MPLS L3VPN",
-   "html": "<ul><li><strong>کژفهمی ۱: «روترهای P هم باید همه VRFهای مشتریان را داشته باشند.»</strong> واقعیت: روترهای P هسته BGP-Free هستند و هیچ VRF مشتری ندارند؛ تنها بر پایه Transport Label به سمت Loopback روتر PE مقصد سوئیچ می‌کنند.</li><li><strong>کژفهمی ۲: «برای اینکه دو سایت مشتری همدیگر را ببینند، باید RD آن‌ها یکی باشد.»</strong> واقعیت: یکسان بودن RD لازم نیست (و در طراحی با Route Reflector گاهی عمداً RD per-VRF-per-PE متفاوت می‌گذارند تا چند مسیر موازی مخفی نشوند)؛ کنترل دیده‌شدن مسیرها منحصراً با <strong>RT</strong> است.</li><li><strong>کژفهمی ۳: «چون MPLS به نام VPN است، پس ترافیک را رمزنگاری می‌کند.»</strong> واقعیت: MPLS L3VPN جداسازی منطقی (Isolation) فراهم می‌کند، اما به‌تنهایی <strong>هیچ رمزنگاری (Encryption)</strong> انجام نمی‌دهد؛ برای محرمانگی روی زیرساخت نامطمئن باید IPsec یا MACsec اضافه شود.</li></ul>"
-  },
-  {
-   "id": "spec_sp-section-12",
-   "title": "عیب‌یابی سیستماتیک: مسیر در VRF هست ولی پینگ در P1 متوقف می‌شود",
-   "html": "<p><strong>علامت خطا:</strong> جلسه MP-BGP VPNv4 بین PE1 و PE2 برقرار است و مسیر <code>10.50.2.0/24</code> در جدول <code>show ip route vrf CUST_A</code> روی PE1 دیده می‌شود، اما پینگ از CE1 به CE2 تایم‌اوت می‌دهد و <code>traceroute</code> در روتر P1 متوقف می‌شود.</p><p><strong>روش تشخیص لایه‌به‌لایه:</strong></p><ol><li>تأیید کنترل‌پلین روی PE1: بررسی Next-Hop مسیر VPNv4 (باید Loopback <code>/32</code> روتر PE2 باشد).</li><li>تأیید زنجیره LSP روی PE1 و P1 با دستور مرجع <code>show mpls forwarding-table &lt;PE2-Lo0&gt;</code>: اگر در P1 عبارت <code>Untagged</code> یا <code>No Label</code> ببینید، یعنی LSP شکسته است (فراموشی <code>mpls ip</code>، مسدود شدن <code>UDP/TCP 646</code> برای LDP، یا خلاصه‌سازی <code>/32</code> در IGP).</li><li>تست MTU: اگر پینگ کوچک (۱۰۰ بایتی) کار می‌کند ولی پینگ <code>1500</code> با <code>df-bit</code> شکست می‌خورد، کمبود MPLS MTU روی لینک هسته علت اصلی است.</li></ol>"
-  },
-  {
-   "id": "spec_sp-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> مشتری A روی PE1 دارای <code>RD = 65100:101</code> و <code>export RT = 65100:101</code> است. مشتری B روی همان PE1 دارای <code>RD = 65100:202</code> و <code>export RT = 65100:202</code> است و هر دو ساب‌نت <code>10.50.1.0/24</code> را تبلیغ می‌کنند. اگر VRF مربوط به Shared Services روی PE2 دارای <code>import RT = 65100:101</code> و <code>import RT = 65100:202</code> باشد چه رخ می‌دهد؟ <strong>پاسخ:</strong> هر دو مسیر به دلیل تفاوت RD در جدول VPNv4 مجزا هستند، اما اگر هر دو با IP یکسان <code>10.50.1.0/24</code> وارد یک VRF واحد (Shared Services) شوند، در جدول IPv4 آن VRF با هم تداخل (Overlap) ایجاد می‌کنند! در سناریوی Extranet با IPهای هم‌پوشان باید پیش از اشتراک‌گذاری، NAT در مرز مشتری انجام شود.</p><p><strong>تمرین ۲:</strong> یک شبکه MPLS L3VPN با ۲ برچسب (Transport + VPN) و لینک هسته با MPLS MTU برابر <code>1500</code> بایت، آیا می‌تواند بسته IPv4 با اندازه ۱۵۰۰ بایت و <code>DF=1</code> را بدون Drop عبور دهد؟ <strong>پاسخ:</strong> خیر؛ بسته ۱۵۰۰ بایتی + ۸ بایت دو برچسب MPLS برابر <code>1508</code> بایت می‌شود و روی لینک <code>1500</code> بایتی با <code>DF=1</code> رد (Drop / ICMP Fragmentation Needed) می‌گردد.</p>"
-  },
-  {
-   "id": "spec_sp-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc3031\" target=\"_blank\" rel=\"noopener\">RFC 3031 (MPLS Architecture)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3032\" target=\"_blank\" rel=\"noopener\">RFC 3032 (MPLS Label Stack Encoding)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc4364\" target=\"_blank\" rel=\"noopener\">RFC 4364 (BGP/MPLS IP VPNs)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc5443\" target=\"_blank\" rel=\"noopener\">RFC 5443 (LDP IGP Synchronization)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی PE/P، جلسه LDP یا MP-BGP VPNv4 در این محیط اجرا نشده است. آزمایشگاه ارائه‌شده یک <strong>Python Mock محلی</strong> برای شبیه‌سازی منطق RT Import، عملیات Push/Swap/PHP و بررسی MPLS MTU است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "CE",
-   "fa": "روتر لبه مشتری",
-   "simple": "Customer Edge؛ روتر سمت مشتری که ارتباط IP معمولی با PE دارد."
-  },
-  {
-   "term": "PE",
-   "fa": "روتر لبه اپراتور",
-   "simple": "Provider Edge؛ میزبان VRF مشتریان، MP-BGP VPNv4 و درج/حذف برچسب‌های MPLS."
-  },
-  {
-   "term": "P Router",
-   "fa": "روتر هسته اپراتور",
-   "simple": "Provider Router در هسته BGP-Free که تنها بر اساس Transport Label سوئیچ می‌کند."
-  },
-  {
-   "term": "BGP-Free Core",
-   "fa": "هسته بدون BGP",
-   "simple": "طراحی هسته اپراتور بدون نگهداری جداول مسیر BGP مشتریان روی روترهای P."
-  },
-  {
-   "term": "MPLS Label",
-   "fa": "برچسب MPLS",
-   "simple": "هدر ۴ بایتی شامل ۲۰ بیت Label، ۳ بیت TC، ۱ بیت BoS و ۸ بیت TTL."
-  },
-  {
-   "term": "Transport Label",
-   "fa": "برچسب بیرونی حمل",
-   "simple": "برچسب توزیع‌شده توسط LDP/SR برای هدایت بسته تا Loopback روتر PE مقصد."
-  },
-  {
-   "term": "VPN Label",
-   "fa": "برچسب درونی سرویس",
-   "simple": "برچسب تبلیغ‌شده در MP-BGP که مشخص می‌کند بسته روی PE مقصد به کدام VRF تحویل شود."
-  },
-  {
-   "term": "LFIB",
-   "fa": "جدول فوروارد برچسب",
-   "simple": "Label Forwarding Information Base برای تصمیم سریع Swap/Pop در دیتاپلین."
-  },
-  {
-   "term": "LDP",
-   "fa": "پروتکل توزیع برچسب",
-   "simple": "Label Distribution Protocol روی UDP/TCP 646 برای تبادل نگاشت برچسب و پیشوند."
-  },
-  {
-   "term": "PHP",
-   "fa": "حذف ماقبل آخر",
-   "simple": "Penultimate Hop Popping؛ حذف برچسب بیرونی توسط روتر P ماقبل آخر با Implicit Null (Label 3)."
-  },
-  {
-   "term": "Explicit Null",
-   "fa": "برچسب صفر صریح",
-   "simple": "برچسب رزرو Label 0 (IPv4) یا Label 2 (IPv6) برای حفظ بیت‌های QoS TC تا PE خروجی."
-  },
-  {
-   "term": "RD",
-   "fa": "تمایزدهنده مسیر",
-   "simple": "Route Distinguisher؛ مقدار ۶۴ بیتی برای یکتاسازی پیشوندهای هم‌پوشان در MP-BGP."
-  },
-  {
-   "term": "RT",
-   "fa": "هدف مسیر",
-   "simple": "Route Target؛ Extended Community در BGP برای کنترل Import/Export مسیر بین VRFها."
-  },
-  {
-   "term": "VPNv4",
-   "fa": "نشانی ۹۶ بیتی VPNv4",
-   "simple": "ترکیب RD شصت‌وچهاربیتی و پیشوند IPv4 سی‌ودوبیتی در MP-BGP."
-  },
-  {
-   "term": "LDP-IGP Sync",
-   "fa": "همگام‌سازی LDP و IGP",
-   "simple": "مکانیسم RFC 5443 برای جلوگیری از سیاه‌چاله ترافیک هنگام بالا آمدن لینک قبل از آماده شدن LDP."
-  },
-  {
-   "term": "MPLS MTU",
-   "fa": "حداکثر اندازه فریم MPLS",
-   "simple": "حداکثر اندازه بسته IP به علاوه سربار برچسب‌های MPLS روی لینک هسته."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه Python Mock محلی پشته برچسب MPLS/RD/RT + سناریوی مرجع (تجهیز واقعی اجرا نشده)",
-   "executionStatus": "Python Mock محلی اجرا و تست شده؛ هیچ روتر PE/P، LDP یا MP-BGP واقعی اجرا نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>Python Mock محلی</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر، سوئیچ، فایروال یا کنترلر واقعی سیسکو اجرا نشده است.</p><p>در این آزمایشگاه با مدل محلی Python می‌بینید چگونه دو مشتری با پیشوند هم‌پوشان <code>10.50.1.0/24</code> با RD یکتا می‌شوند، فقط مسیر منطبق با RT وارد VRF می‌گردد، پشته دوبرچسبی در PE1 ساخته و در P1 با PHP (Label 3) یا Explicit Null (Label 0) پردازش می‌شود و کمبود MPLS MTU باعث Drop می‌گردد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_sp_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_sp_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for spec_sp (MPLS L3VPN Label Stack, PHP, RD/RT &amp; MTU).\n\nNo real Cisco IOS-XE/IOS-XR router, LDP session, or MP-BGP VPNv4 peering is run.\nModels standard 20-bit MPLS labels (0..1048575), Penultimate Hop Popping (Implicit Null = 3),\nExplicit Null (0), and non-PHP swap behavior at PE2.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\n\nIMPLICIT_NULL = 3\nEXPLICIT_NULL_IPV4 = 0\nMAX_MPLS_LABEL = (1 &lt;&lt; 20) - 1  # 1,048,575 (20-bit MPLS label field)\n\n\ndef _require_int(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int):\n        raise ValueError(f&quot;{name} must be an int (not bool), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_mpls_label(val: object, name: str, allow_special: bool = False) -&gt; int:\n    lbl = _require_int(val, name)\n    if not (0 &lt;= lbl &lt;= MAX_MPLS_LABEL):\n        raise ValueError(f&quot;{name} out of 20-bit MPLS label range 0..{MAX_MPLS_LABEL}: {lbl}&quot;)\n    if not allow_special and lbl &lt; 16:\n        raise ValueError(f&quot;{name} must be a non-reserved MPLS label (&gt;=16), got {lbl}&quot;)\n    return lbl\n\n\n@dataclass(frozen=True)\nclass Vpnv4Route:\n    rd: str\n    prefix: str\n    export_rts: tuple[str, ...]\n    vpn_label: int\n    egress_pe_loopback: str\n\n    def __post_init__(self) -&gt; None:\n        _require_mpls_label(self.vpn_label, &quot;vpn_label&quot;, allow_special=False)\n\n\ndef import_routes_into_vrf(\n    vrf_name: str,\n    import_rts: set[str],\n    bgp_vpnv4_table: list[Vpnv4Route],\n) -&gt; list[dict[str, object]]:\n    &quot;&quot;&quot;Simulate MP-BGP VPNv4 RT import matching (RD guarantees uniqueness, RT controls import).&quot;&quot;&quot;\n    if not isinstance(vrf_name, str) or not vrf_name.strip():\n        raise ValueError(&quot;vrf_name must be a non-empty str&quot;)\n    imported = []\n    for route in bgp_vpnv4_table:\n        matched_rts = sorted(import_rts &amp; set(route.export_rts))\n        if matched_rts:\n            imported.append({\n                &quot;vrf&quot;: vrf_name,\n                &quot;rd&quot;: route.rd,\n                &quot;prefix&quot;: route.prefix,\n                &quot;matched_rts&quot;: matched_rts,\n                &quot;vpn_label&quot;: route.vpn_label,\n                &quot;next_hop_pe&quot;: route.egress_pe_loopback,\n            })\n    return imported\n\n\ndef simulate_mpls_l3vpn_forwarding(\n    transport_label_pe1_to_p1: int,\n    p1_outgoing_label: int,\n    vpn_label: int,\n    ip_payload_bytes: int = 1500,\n    core_mpls_mtu: int = 1508,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Trace Push -&gt; Swap/PHP Pop -&gt; Egress PE Pop across PE1 -&gt; P1 -&gt; PE2.&quot;&quot;&quot;\n    _require_mpls_label(transport_label_pe1_to_p1, &quot;transport_label_pe1_to_p1&quot;, allow_special=False)\n    _require_mpls_label(p1_outgoing_label, &quot;p1_outgoing_label&quot;, allow_special=True)\n    _require_mpls_label(vpn_label, &quot;vpn_label&quot;, allow_special=False)\n    payload = _require_int(ip_payload_bytes, &quot;ip_payload_bytes&quot;)\n    mtu = _require_int(core_mpls_mtu, &quot;core_mpls_mtu&quot;)\n    if payload &lt;= 0 or mtu &lt;= 0:\n        raise ValueError(&quot;ip_payload_bytes and core_mpls_mtu must be positive integers&quot;)\n\n    stack = [transport_label_pe1_to_p1, vpn_label]  # index 0 = top (outer) label\n    mpls_header_bytes = len(stack) * 4\n    total_l3_frame = payload + mpls_header_bytes\n    mtu_ok = total_l3_frame &lt;= mtu\n    trace = [f&quot;PE1 (Push): stack={list(stack)} (size={total_l3_frame}B vs MPLS MTU {mtu}B)&quot;]\n\n    if not mtu_ok:\n        return {&quot;delivered&quot;: False, &quot;reason&quot;: &quot;MPLS MTU exceeded on core link&quot;, &quot;trace&quot;: trace}\n\n    if p1_outgoing_label == IMPLICIT_NULL:\n        stack.pop(0)\n        trace.append(f&quot;P1 (PHP Pop on Implicit Null Label 3): stack={list(stack)}&quot;)\n    elif p1_outgoing_label == EXPLICIT_NULL_IPV4:\n        stack[0] = EXPLICIT_NULL_IPV4\n        trace.append(f&quot;P1 (Swap to Explicit Null Label 0 — preserves TC/QoS): stack={list(stack)}&quot;)\n    else:\n        stack[0] = p1_outgoing_label\n        trace.append(f&quot;P1 (Swap outer transport label to {p1_outgoing_label} — no PHP): stack={list(stack)}&quot;)\n\n    # Egress PE2 processing: if an outer label remains (Explicit Null or non-PHP transport label), pop it first\n    if len(stack) == 2:\n        outer_popped = stack.pop(0)\n        trace.append(f&quot;PE2 (Pop outer label {outer_popped} — double lookup without PHP): stack={list(stack)}&quot;)\n\n    final_vpn_label = stack.pop(0)\n    trace.append(f&quot;PE2 (Pop VPN Label {final_vpn_label} -&gt; VRF lookup -&gt; CE): stack={list(stack)}&quot;)\n    return {&quot;delivered&quot;: True, &quot;final_vpn_label&quot;: final_vpn_label, &quot;trace&quot;: trace}\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real PE/P router, LDP, or MP-BGP session is executed.&quot;)\n    vpnv4_table = [\n        Vpnv4Route(&quot;65100:101&quot;, &quot;10.50.1.0/24&quot;, (&quot;65100:101&quot;,), 18001, &quot;198.51.100.2&quot;),\n        Vpnv4Route(&quot;65100:202&quot;, &quot;10.50.1.0/24&quot;, (&quot;65100:202&quot;,), 18002, &quot;198.51.100.2&quot;),\n    ]\n    imported = import_routes_into_vrf(&quot;CUST_A&quot;, {&quot;65100:101&quot;}, vpnv4_table)\n    php_res = simulate_mpls_l3vpn_forwarding(24, IMPLICIT_NULL, 18001, 1500, 1508)\n    swap_res = simulate_mpls_l3vpn_forwarding(24, 30, 18001, 1500, 1508)\n    mtu_fail = simulate_mpls_l3vpn_forwarding(24, IMPLICIT_NULL, 18001, 1500, 1500)\n    assert len(imported) == 1 and imported[0][&quot;vpn_label&quot;] == 18001\n    assert php_res[&quot;delivered&quot;] is True and php_res[&quot;final_vpn_label&quot;] == 18001\n    assert swap_res[&quot;delivered&quot;] is True and swap_res[&quot;final_vpn_label&quot;] == 18001\n    assert mtu_fail[&quot;delivered&quot;] is False\n    print(&quot;VRF CUST_A imports:&quot;, imported)\n    print(&quot;PHP forwarding:&quot;, php_res)\n    print(&quot;Non-PHP swap forwarding:&quot;, swap_res)\n    print(&quot;MTU failure:&quot;, mtu_fail)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> VRF <code>CUST_A</code> فقط مسیر با RT <code>65100:101</code> را Import می‌کند؛ شبیه‌سازی PHP روی MPLS MTU برابر <code>1508</code> موفق است و PE2 فقط برچسب <code>18001</code> را دریافت می‌کند؛ ولی روی MPLS MTU برابر <code>1500</code> شکست می‌خورد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>پلتفرم مرجع:</strong> Cisco IOS-XE / IOS-XR (اجرا نشده روی سخت‌افزار):</p><pre dir=\"ltr\"><code>! Reference IOS-XE PE1 snippet (NOT executed in this sandbox)\nvrf definition CUST_A\n rd 65100:101\n address-family ipv4\n  route-target export 65100:101\n  route-target import 65100:101\nrouter bgp 65100\n neighbor 198.51.100.2 remote-as 65100\n neighbor 198.51.100.2 update-source Loopback0\n address-family vpnv4\n  neighbor 198.51.100.2 activate\n  neighbor 198.51.100.2 send-community extended\n! Verify on real/CML PE/P:\n! show mpls forwarding-table | show bgp vpnv4 unicast all summary</code></pre><p>در آزمایش CML، بررسی کنید <code>Loopback0</code> با <code>/32</code> بدون خلاصه‌سازی تبلیغ شود و <code>mpls ldp sync</code> فعال باشد.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس تخصص Service Provider",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "نقش برچسب Implicit Null (Label 3) در مکانیسم PHP چیست؟",
-   "options": [
-    "درخواست از روتر P ماقبل آخر برای Pop کردن برچسب بیرونی پیش از تحویل به PE خروجی جهت حذف Double Lookup",
-    "رمزنگاری بسته IP مشتری با الگوریتم AES",
-    "اجبار روتر P به نگهداری جدول BGP همه مشتریان",
-    "تبدیل آدرس IPv4 به IPv6 در هسته"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>PE خروجی با تبلیغ Label 3 به همسایه ماقبل آخر می‌گوید برچسب بیرونی را بردارد تا PE خروجی در یک Lookup مستقیم بر اساس VPN Label تصمیم بگیرد.</p>"
-  },
-  {
-   "title": "تفاوت دقیق RD و RT در MPLS L3VPN چیست؟",
-   "options": [
-    "RD سیاست دسترسی بین VRFها را تعیین می‌کند و RT آدرس را رمزنگاری می‌کند",
-    "RD برای یکتاسازی پیشوندهای هم‌پوشان در MP-BGP است و RT (به‌عنوان Extended Community) قوانین Import/Export بین VRFها را کنترل می‌کند",
-    "هر دو دقیقاً یک کار انجام می‌دهند و صرفاً نام متفاوت در IOS و IOS-XR دارند",
-    "RD فقط در روتر CE و RT فقط در روتر P تنظیم می‌شود"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>RD پیشوند IPv4 را به پیشوند ۹۶ بیتی یکتای VPNv4 تبدیل می‌کند؛ اما ورود و خروج مسیر میان VRFها منحصراً با RT انجام می‌گیرد.</p>"
-  },
-  {
-   "title": "چرا در طراحی BGP-Free Core فعال‌سازی LDP-IGP Synchronization (RFC 5443) حیاتی است؟",
-   "options": [
-    "برای حذف نیاز به Loopback روی روترهای PE",
-    "برای کاهش تعداد بیت‌های هدر MPLS از ۳۲ به ۱۶ بیت",
-    "برای جلوگیری از سیاه‌چاله شدن ترافیک هنگام بالا آمدن لینک تازه در IGP پیش از آماده شدن جلسه و برچسب‌های LDP",
-    "برای جایگزینی کامل MP-BGP با OSPF"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>اگر IGP پیش از همگام شدن LDP ترافیک را به لینک جدید هدایت کند، روتر P بدون برچسب خروجی نمی‌تواند بسته مشتری را روت کند و ترافیک Drop می‌شود.</p>"
-  },
-  {
-   "title": "هر برچسب MPLS چند بایت است و حداقل MPLS MTU برای عبور یک بسته IP با اندازه ۱۵۰۰ بایت در L3VPN دوبرچسبی (بدون تکه‌تکه شدن) چقدر است؟",
-   "options": [
-    "هر برچسب ۲ بایت؛ حداقل ۱۵۰۴ بایت",
-    "هر برچسب ۸ بایت؛ حداقل ۱۵۱۶ بایت",
-    "هر برچسب ۲۰ بایت؛ حداقل ۱۵۴۰ بایت",
-    "هر برچسب ۴ بایت؛ حداقل ۱۵۰۸ بایت"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>مطابق RFC 3032 هر برچسب ۴ بایت (۳۲ بیت) است؛ پس ۲ برچسب ۸ بایت سربار ایجاد می‌کند (۱۵۰۰ + ۸ = ۱۵۰۸ بایت).</p>"
-  },
-  {
-   "title": "چه زمانی به جای Implicit Null (Label 3) از Explicit Null (Label 0 برای IPv4) استفاده می‌شود؟",
-   "options": [
-    "وقتی لازم است بیت‌های QoS (فیلد TC/EXP) برچسب بیرونی تا خود روتر PE خروجی حفظ شوند",
-    "وقتی بخواهیم همه روترهای P را حذف کنیم",
-    "وقتی ترافیک مشتری رمزنگاری نشده باشد",
-    "وقتی جلسه MP-BGP قطع باشد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در PHP برچسب بیرونی و همراه آن بیت‌های TC قبل از PE خروجی حذف می‌شوند؛ Explicit Null (Label 0) برچسب بیرونی را تا PE خروجی حفظ می‌کند.</p>"
-  },
-  {
-   "title": "کدام یک از موارد زیر جزو وظایف روتر P (Provider Core) در MPLS L3VPN نیست؟",
-   "options": [
-    "اجرای IGP هسته برای دسترسی به Loopbackهای PE",
-    "نگهداری VRFها و جدول مسیر BGP مشتریان",
-    "اجرای LDP یا Segment Routing برای برچسب‌های Transport",
-    "انجام عملیات Swap یا PHP Pop روی برچسب بیرونی"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>روترهای P هسته BGP-Free هستند و هیچ VRF یا مسیر BGP مشتری در آن‌ها وجود ندارد.</p>"
-  },
-  {
-   "title": "در هدر ۳۲ بیتی MPLS، بیت S (Bottom of Stack) در یک بسته L3VPN دوبرچسبی چه مقادیری دارد؟",
-   "options": [
-    "در هر دو برچسب برابر 1 است",
-    "در هر دو برچسب برابر 0 است",
-    "در برچسب بیرونی (Transport) برابر 0 و در برچسب درونی (VPN) برابر 1 است",
-    "در برچسب بیرونی برابر 1 و در برچسب درونی برابر 0 است"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>بیت S=1 نشان می‌دهد این برچسب آخرین برچسب پشته و چسبیده به هدر IP است؛ بنابراین در VPN Label برابر 1 و در Transport Label برابر 0 است.</p>"
-  },
-  {
-   "title": "اگر پیشوند /32 لوپ‌بک روتر PE2 در IGP هسته به /24 خلاصه شود، چه مشکلی در MPLS LDP رخ می‌دهد؟",
-   "options": [
-    "پهنای باند لینک هسته دو برابر می‌شود",
-    "هیچ مشکلی؛ LDP خودکار پیشوند را اصلاح می‌کند",
-    "فقط آدرس‌های IPv6 تحت تأثیر قرار می‌گیرند",
-    "زنجیره برچسب‌گذاری (LSP) تا PE2 می‌شکند و در روتر P وضعیت Untagged/No Label و سیاه‌چاله ترافیک رخ می‌دهد"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>LDP برچسب را برای تطابق دقیق پیشوند (FEC) می‌سازد؛ خلاصه‌سازی /32 لوپ‌بک PE باعث شکست LSP و قطع دیتاپلین L3VPN می‌شود.</p>"
-  },
-  {
-   "title": "آیا برای ارتباط دو سایت یک مشتری در MPLS L3VPN لازم است RD هر دو PE دقیقاً یکسان باشد؟",
-   "options": [
-    "خیر؛ تطابق Route Target (Import/Export) ملاک اشتراک‌گذاری مسیر است و RD متفاوت حتی می‌تواند در سناریوی Route Reflector مفید باشد",
-    "بله؛ بدون RD یکسان هیچ بسته‌ای مسیریابی نمی‌شود",
-    "بله؛ زیرا RD به‌عنوان کلید رمزنگاری IPsec عمل می‌کند",
-    "خیر؛ چون RD اصلاً در MP-BGP ارسال نمی‌شود"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>RD فقط یکتایی مسیر در BGP را تضمین می‌کند (و داشتن RD یکتا به ازای هر PE مانع مخفی شدن مسیرهای جایگزین در RR می‌شود)؛ کنترل دسترسی با RT است.</p>"
-  },
-  {
-   "title": "کدام گزاره درباره امنیت و رمزنگاری در MPLS L3VPN استاندارد (RFC 4364) صحیح است؟",
-   "options": [
-    "MPLS L3VPN همه بسته‌ها را به‌طور خودکار با AES-256 رمزنگاری می‌کند",
-    "MPLS L3VPN جداسازی منطقی مسیرها را فراهم می‌کند اما به‌خودی‌خود رمزنگاری (Encryption) انجام نمی‌دهد",
-    "MPLS L3VPN از گواهینامه TLS برای هر بسته استفاده می‌کند",
-    "MPLS L3VPN هیچ جداسازی میان مشتریان ایجاد نمی‌کند"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>جداسازی VRF/برچسب به معنای رمزنگاری نیست؛ برای محرمانگی داده روی شبکه اپراتور باید رمزنگاری لایه بالاتر (مثل IPsec/GETVPN) افزوده شود.</p>"
-  },
-  {
-   "title": "در عیب‌یابی، نشست MP-BGP VPNv4 برقرار است ولی هیچ مسیری وارد VRF مقصد روی PE2 نمی‌شود. کدام دو مورد را باید فوراً بررسی کرد؟",
-   "options": [
-    "کابل کنسول و سرعت فن روتر",
-    "فعال بودن RIP و نسخه HTTP مرورگر",
-    "تطابق route-target import/export و فعال بودن send-community extended روی همسایگی VPNv4",
-    "تنظیم Spanning Tree روی روتر CE"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>Route Target به‌عنوان BGP Extended Community حمل می‌شود؛ اگر <code>send-community extended</code> فعال نباشد یا RT Import/Export تطابق نداشته باشد، مسیر وارد VRF نمی‌شود.</p>"
-  },
-  {
-   "title": "آزمایشگاه Python این درس چه سطحی از شواهد را ارائه می‌دهد؟",
-   "options": [
-    "تست زنده روترهای IOS-XR در شبکه اپراتوری",
-    "اندازه‌گیری واقعی همگرایی LDP در فیبر نوری",
-    "تولید فریم واقعی MPLS روی کارت شبکه لینوکس",
-    "شبیه‌سازی محلی Python برای منطق RD/RT، پشته برچسب، PHP و بررسی MPLS MTU بدون اجرای تجهیز واقعی"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>آزمایشگاه یک Python Mock محلی است و هیچ روتر واقعی PE/P، جلسه LDP یا MP-BGP اجرا نشده است.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.8",
-  "legacyId": "spec_sp",
-  "sources": [
-   "https://www.rfc-editor.org/rfc/rfc3031",
-   "https://www.rfc-editor.org/rfc/rfc3032",
-   "https://www.rfc-editor.org/rfc/rfc4364",
-   "https://www.rfc-editor.org/rfc/rfc5443"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "spec_sp",
+  "objectiveId": "spec_sp",
+  "kind": "lesson",
+  "track": "FAM Specializations",
+  "course": "spec-sp",
+  "title": "تخصص Service Provider: معماری P/PE/CE، MPLS L3VPN و مهندسی برچسب",
+  "titleEn": "Service Provider Specialization: P/PE/CE Architecture, MPLS L3VPN & Label Engineering",
+  "domain": "Service Provider",
+  "source": "Legacy spec_sp rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [],
+  "sections": [
+    {
+      "id": "spec_sp-section-1",
+      "title": "مسئله اپراتوری: حمل ترافیک ۵۰۰ مشتری با IPهای هم‌پوشان بدون انفجار جدول هسته",
+      "html": "<p>اپراتوری را تصور کنید که به ۵۰۰ سازمان سرویس WAN ارائه می‌دهد و ده‌ها سازمان هم‌زمان در شبکه‌های داخلی خود از رنج <code>10.50.1.0/24</code> استفاده می‌کنند. اگر بخواهید در تک‌تک روترهای هسته کشور ۵۰۰ VRF و زیرینترفیس <code>802.1Q</code> بسازید (الگوی VRF-Lite)، هم هزینه عملیاتی غیرقابل مدیریت می‌شود و هم روترهای هسته ناچار به نگهداری میلیون‌ها مسیر مشتری خواهند بود.</p><p>راهکار استاندارد صنعت (<strong>RFC 4364</strong>) ترکیب سه عنصر است: تفکیک نقش‌های <strong>CE / PE / P</strong>، ایجاد هسته <strong>BGP-Free Core</strong> با سوئیچینگ برچسب <strong>MPLS</strong>، و توزیع مسیرهای ایزوله مشتریان بین PEها با <strong>MP-BGP VPNv4/VPNv6</strong>.</p>"
+    },
+    {
+      "id": "spec_sp-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازهای مفهومی:</strong> تسلط بر IGP (OSPF یا IS-IS)، BGP (از جمله iBGP و Route Reflector) و مفهوم VRF-Lite.</p><ul><li>تبیین دقیق نقش روترهای <strong>CE</strong>، <strong>PE</strong> و <strong>P</strong> و چرایی کارایی <strong>BGP-Free Core</strong>.</li><li>تشریح ساختار هدر ۳۲ بیتی MPLS و عملیات <strong>Push / Swap / Pop</strong> به همراه <strong>PHP (Implicit Null Label 3)</strong> و مقایسه آن با <strong>Explicit Null (Label 0/2)</strong>.</li><li>تفکیک بی‌ابهام <strong>RD (Route Distinguisher)</strong> از <strong>RT (Route Target)</strong> در کنترل‌پلین MP-BGP VPNv4.</li><li>تشخیص و پیشگیری از سه تله حیاتی عملیاتی: <strong>LDP-IGP Synchronization (RFC 5443)</strong>، خلاصه‌سازی <code>/32</code> لوپ‌بک PEها، و <strong>MPLS MTU</strong>.</li></ul>"
+    },
+    {
+      "id": "spec_sp-section-3",
+      "title": "معماری سه‌لایه CE / PE / P و فلسفه BGP-Free Core",
+      "html": "<ul><li><strong>CE (Customer Edge):</strong> روتر لبه مشتری که صرفاً مسیریابی IP معمولی (Static، OSPF، eBGP و...) با PE دارد و معمولاً هیچ اطلاعی از MPLS یا VRFهای اپراتور ندارد.</li><li><strong>PE (Provider Edge):</strong> مغز هوشمند لبه اپراتور. VRF هر مشتری روی PE تعریف می‌شود، نشست MP-BGP VPNv4/VPNv6 میان PEها (یا از طریق Route Reflector) برقرار می‌گردد و PE برچسب‌های دوگانه MPLS را درج (Push) یا حذف (Pop) می‌کند.</li><li><strong>P (Provider Core):</strong> روترهای پرسرعت هسته که <strong>هیچ VRF و هیچ مسیر BGP مشتری ندارند</strong>. آن‌ها فقط IGP زیرساخت (برای رسیدن به <code>/32</code> Loopback روترهای PE) و پروتکل توزیع برچسب (LDP یا Segment Routing) را اجرا می‌کنند. این همان <strong>BGP-Free Core</strong> است.</li></ul>"
+    },
+    {
+      "id": "spec_sp-section-4",
+      "title": "ساختار هدر ۴ بایتی MPLS و پشته دوبرچسبی L3VPN",
+      "html": "<p>مطابق <strong>RFC 3032</strong> و <strong>RFC 5462</strong>، هر برچسب MPLS دقیقاً <strong>۴ بایت (۳۲ بیت)</strong> است و میان هدر لایه ۲ و هدر لایه ۳ (موسوم به لایه ۲.۵) قرار می‌گیرد:</p><ul><li><strong>Label (۲۰ بیت):</strong> مقدار عددی برچسب (مقادیر ۰ تا ۱۵ رزرو شده‌اند).</li><li><strong>TC / EXP (۳ بیت):</strong> فیلد Traffic Class (پیش‌تر Experimental) برای کلاس QoS/CoS در هسته MPLS.</li><li><strong>S / BoS (۱ بیت):</strong> Bottom of Stack؛ برابر <code>1</code> برای پایین‌ترین برچسب پشته (نزدیک‌ترین به هدر IP) و <code>0</code> برای برچسب‌های بالایی.</li><li><strong>TTL (۸ بیت):</strong> جلوگیری از حلقه فورواردینگ مشابه TTL در IP.</li></ul><p>در <strong>MPLS L3VPN</strong>، دو برچسب روی هم چیده می‌شوند (۸ بایت سربار در L3VPN ساده): <strong>برچسب بیرونی (Transport Label)</strong> که توسط LDP/SR برای رساندن بسته تا Loopback روتر PE مقصد ساخته شده (<code>S=0</code>)، و <strong>برچسب درونی (VPN/Service Label)</strong> که توسط PE مقصد در MP-BGP تبلیغ شده و مشخص می‌کند بسته متعلق به کدام VRF است (<code>S=1</code>).</p>"
+    },
+    {
+      "id": "spec_sp-section-5",
+      "title": "نمودار دیتاپلین MPLS L3VPN: از Push تا PHP و تحویل به VRF",
+      "html": "<p>در نمودار زیر مشاهده می‌کنید که روتر هسته P1 در تصمیم مسیر‌یابی (Forwarding) به جدول IP مشتری نگاه نمی‌کند و فقط بر پایه پشته برچسب MPLS عمل می‌کند (در توازن بار ECMP ممکن است برخی پیاده‌سازی‌ها برای هش‌کردن به هدر زیر پشته نگاه کنند مگر Entropy Label / RFC 6790 فعال باشد) و با دریافت Implicit Null از PE2، برچسب بیرونی را حذف (PHP) می‌کند تا PE2 فقط یک Lookup روی برچسب VPN انجام دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"MPLS L3VPN Push Swap PHP Pop Data Plane\"><rect x=\"10\" y=\"75\" width=\"90\" height=\"70\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"55\" y=\"106\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#0f172a\">CE1</text><text x=\"55\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#475569\">CUST_A IP</text><rect x=\"135\" y=\"45\" width=\"145\" height=\"130\" rx=\"10\" fill=\"#dbeafe\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"207\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Ingress PE1</text><text x=\"207\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">VRF CUST_A (RT 65100:101)</text><text x=\"207\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1d4ed8\">PUSH [24 | 18001]</text><text x=\"207\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Outer: LDP | Inner: VPNv4</text><rect x=\"315\" y=\"45\" width=\"145\" height=\"130\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"387\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Core P1 (BGP-Free)</text><text x=\"387\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">No Customer VRFs/BGP</text><text x=\"387\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#b45309\">PHP POP (Label 3)</text><text x=\"387\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#78350f\">Forwards [18001] only</text><rect x=\"495\" y=\"45\" width=\"145\" height=\"130\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"567\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Egress PE2</text><text x=\"567\" y=\"96\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Single LFIB Lookup</text><text x=\"567\" y=\"118\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#15803d\">POP 18001 -&gt; VRF</text><text x=\"567\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Deliver IP to CE2</text><rect x=\"665\" y=\"75\" width=\"85\" height=\"70\" rx=\"8\" fill=\"#f1f5f9\" stroke=\"#475569\" stroke-width=\"2\"/><text x=\"707\" y=\"106\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#0f172a\">CE2</text><text x=\"707\" y=\"124\" text-anchor=\"middle\" font-size=\"10\" fill=\"#475569\">CUST_A IP</text><line x1=\"100\" y1=\"110\" x2=\"135\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"280\" y1=\"110\" x2=\"315\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"460\" y1=\"110\" x2=\"495\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"640\" y1=\"110\" x2=\"665\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
+    },
+    {
+      "id": "spec_sp-section-6",
+      "title": "چرا PHP (Implicit Null Label 3) و چه زمانی Explicit Null (Label 0/2)؟",
+      "html": "<p>اگر روتر P ماقبل آخر بسته را با هر دو برچسب (بیرونی + VPN) به PE خروجی تحویل دهد، PE خروجی مجبور به دو بار جست‌وجو (Double Lookup) در LFIB می‌شود: یک بار برای حذف برچسب بیرونی و بار دوم برای خواندن برچسب VPN. برای حذف این سربار، PE خروجی برای Loopback خود برچسب رزرو <strong>Implicit Null (Label 3)</strong> را به همسایه P تبلیغ می‌کند. روتر P هنگام دیدن Label 3 (در صفحه کنترل، نه روی سیم!) برچسب بیرونی را <strong>Pop</strong> می‌کند و بسته را تنها با برچسب VPN به PE2 تحویل می‌دهد. به این فرآیند <strong>PHP (Penultimate Hop Popping)</strong> می‌گویند.</p><p><strong>مرز مهندسی مهم:</strong> در PHP چون برچسب بیرونی قبل از رسیدن به PE2 حذف می‌شود، بیت‌های <strong>TC (QoS)</strong> آن برچسب بیرونی نیز پاک می‌شوند. اگر در طراحی End-to-End QoS (مدل Pipe) نیاز باشد بیت‌های TC برچسب بیرونی تا خود PE خروجی حفظ شوند، به جای Implicit Null از <strong>Explicit Null</strong> (<strong>Label 0</strong> برای IPv4 و <strong>Label 2</strong> برای IPv6) استفاده می‌شود تا روتر P برچسب بیرونی را به Label 0 تغییر دهد و روی سیم بفرستد.</p>"
+    },
+    {
+      "id": "spec_sp-section-7",
+      "title": "تفکیک حیاتی RD (Route Distinguisher) در برابر RT (Route Target)",
+      "html": "<p>این دو مفهوم از پرتکرارترین نقاط سردرگمی در آزمون‌ها و محیط عملیاتی هستند. هر دو ۶۴ بیتی هستند و اغلب قالب مشابهی مانند <code>65100:101</code> دارند، اما کارکرد آن‌ها کاملاً متفاوت است:</p><table><thead><tr><th>ویژگی</th><th>RD (Route Distinguisher)</th><th>RT (Route Target)</th></tr></thead><tbody><tr><td>نقش اصلی</td><td><strong>یکتاسازی پیشوندهای هم‌پوشان</strong> در جدول MP-BGP</td><td><strong>کنترل سیاست اشتراک‌گذاری</strong> (Import/Export) بین VRFها</td></tr><tr><td>ساختار در BGP</td><td>به اول IPv4 می‌چسبد و پیشوند ۹۶ بیتی <code>VPNv4</code> می‌سازد</td><td>به‌صورت <strong>BGP Extended Community</strong> ضمیمه مسیر می‌شود</td></tr><tr><td>تعداد در هر VRF</td><td>دقیقاً یک RD به ازای هر VRF روی یک PE</td><td>می‌تواند چندین RT برای Export و چندین RT برای Import داشته باشد</td></tr><tr><td>مثال کاربردی</td><td>تمایز <code>65100:101:10.50.1.0/24</code> از <code>65100:202:10.50.1.0/24</code></td><td>ساخت توپولوژی Any-to-Any، Hub-and-Spoke یا Extranet بین دو مشتری</td></tr></tbody></table>"
+    },
+    {
+      "id": "spec_sp-section-8",
+      "title": "صفحه کنترل MP-BGP VPNv4 و یک سناریوی Extranet واقعی",
+      "html": "<p>روی PE1، پیشوند <code>10.50.1.0/24</code> از CE1 در <code>VRF CUST_A</code> دریافت می‌شود. PE1 یک برچسب VPN (مثلاً <code>18001</code>) به آن تخصیص می‌دهد، RD را به ابتدای آن می‌چسباند، <code>route-target export 65100:101</code> را به‌عنوان Extended Community اضافه می‌کند و با <code>Next-Hop = Loopback0 PE1</code> از طریق MP-BGP VPNv4 (همراه با <code>send-community extended</code>) به PE2 می‌فرستد.</p><p>در سمت PE2، هر VRF که <code>route-target import 65100:101</code> داشته باشد این مسیر را وارد جدول خود می‌کند. نکته زیبا اینجاست: حتی اگر PE1 و PE2 مقادیر RD متفاوتی برای دو سایت یک مشتری داشته باشند (که در طراحی با Route Reflector برای دید هم‌زمان چند مسیر سودمند است)، تا زمانی که RT Export/Import تطابق داشته باشد، ارتباط به‌درستی برقرار می‌شود.</p>"
+    },
+    {
+      "id": "spec_sp-section-9",
+      "title": "تله عملیاتی ۱: LDP-IGP Synchronization (RFC 5443) و سیاه‌چاله لینک تازه بالاآمده",
+      "html": "<p>فرض کنید لینک مستقیم و سریع بین P1 و PE2 پس از یک قطعی فیبر دوباره بالا می‌آید. پروتکل IGP (مثل IS-IS یا OSPF) ظرف چند صد میلی‌ثانیه همسایه شده و این لینک را دوباره به‌عنوان بهترین مسیر به <code>PE2 Loopback0</code> انتخاب می‌کند. اما جلسه <strong>LDP (TCP 646)</strong> ممکن است چند ثانیه دیرتر بالا بیاید و برچسب‌ها را تبادل کند. در این بازه زمانی کوتاه، IGP ترافیک VPN را روی لینکی می‌فرستد که هنوز برچسب MPLS برای آن وجود ندارد؛ چون روتر P جدول مسیر مشتری ندارد، بسته‌ها در هسته <strong>سیاه‌چاله (Blackhole)</strong> می‌شوند!</p><p>راهکار استاندارد <strong>RFC 5443 (LDP-IGP Synchronization)</strong> این است: تا زمانی که جلسه LDP روی آن لینک به‌طور کامل همگام نشود، IGP هزینه (Metric) لینک را در حداکثر مقدار تبلیغ می‌کند (مثلاً <code>max-metric</code> در OSPF یا <code>overload/max-metric</code> در IS-IS) تا ترافیک از مسیر پشتیبان دارای برچسب عبور کند و پس از آماده شدن LDP به مسیر اصلی بازگردد.</p>"
+    },
+    {
+      "id": "spec_sp-section-10",
+      "title": "تله عملیاتی ۲ و ۳: خلاصه‌سازی Loopback /32 و کمبود MPLS MTU",
+      "html": "<p><strong>تله خلاصه‌سازی Loopback:</strong> در LDP، نگاشت برچسب‌ها به تطابق دقیق پیشوند (FEC) وابسته است. اگر لوپ‌بک PE2 یعنی <code>198.51.100.2/32</code> در IGP به <code>198.51.100.0/24</code> خلاصه شود (یا روی Loopback ماسک <code>/24</code> با نوع شبکه OSPF پیش‌فرض Loopback مغایرت بسازد)، زنجیره LSP می‌شکند و روتر P در جدول LFIB عبارت <code>No Label / Untagged</code> نشان می‌دهد.</p><p><strong>تله MPLS MTU:</strong> هر برچسب ۴ بایت به فریم اضافه می‌کند. در L3VPN ساده ۲ برچسب = ۸ بایت (حداقل <code>1508 B</code> برای عبور بسته IP با اندازه ۱۵۰۰ بایت بدون تکه‌تکه شدن)؛ در سناریوهای دارای MPLS TE FRR، CsC یا Inter-AS Option B/C تعداد برچسب‌ها به ۳ تا ۵ عدد (۱۲ تا ۲۰ بایت) می‌رسد. بنابراین در هسته اپراتورها معمولاً MTU فیزیکی/MPLS روی مقادیر بزرگ (مثل <code>9000–9216</code> بایت، یا دست‌کم <code>1524+</code> بایت) استانداردسازی می‌شود.</p>"
+    },
+    {
+      "id": "spec_sp-section-11",
+      "title": "کژفهمی‌های رایج درباره MPLS L3VPN",
+      "html": "<ul><li><strong>کژفهمی ۱: «روترهای P هم باید همه VRFهای مشتریان را داشته باشند.»</strong> واقعیت: روترهای P هسته BGP-Free هستند و هیچ VRF مشتری ندارند؛ تنها بر پایه Transport Label به سمت Loopback روتر PE مقصد سوئیچ می‌کنند.</li><li><strong>کژفهمی ۲: «برای اینکه دو سایت مشتری همدیگر را ببینند، باید RD آن‌ها یکی باشد.»</strong> واقعیت: یکسان بودن RD لازم نیست (و در طراحی با Route Reflector گاهی عمداً RD per-VRF-per-PE متفاوت می‌گذارند تا چند مسیر موازی مخفی نشوند)؛ کنترل دیده‌شدن مسیرها منحصراً با <strong>RT</strong> است.</li><li><strong>کژفهمی ۳: «چون MPLS به نام VPN است، پس ترافیک را رمزنگاری می‌کند.»</strong> واقعیت: MPLS L3VPN جداسازی منطقی (Isolation) فراهم می‌کند، اما به‌تنهایی <strong>هیچ رمزنگاری (Encryption)</strong> انجام نمی‌دهد؛ برای محرمانگی روی زیرساخت نامطمئن باید IPsec یا MACsec اضافه شود.</li></ul>"
+    },
+    {
+      "id": "spec_sp-section-12",
+      "title": "عیب‌یابی سیستماتیک: مسیر در VRF هست ولی پینگ در P1 متوقف می‌شود",
+      "html": "<p><strong>علامت خطا:</strong> جلسه MP-BGP VPNv4 بین PE1 و PE2 برقرار است و مسیر <code>10.50.2.0/24</code> در جدول <code>show ip route vrf CUST_A</code> روی PE1 دیده می‌شود، اما پینگ از CE1 به CE2 تایم‌اوت می‌دهد و <code>traceroute</code> در روتر P1 متوقف می‌شود.</p><p><strong>روش تشخیص لایه‌به‌لایه:</strong></p><ol><li>تأیید کنترل‌پلین روی PE1: بررسی Next-Hop مسیر VPNv4 (باید Loopback <code>/32</code> روتر PE2 باشد).</li><li>تأیید زنجیره LSP روی PE1 و P1 با دستور مرجع <code>show mpls forwarding-table &lt;PE2-Lo0&gt;</code>: اگر در P1 عبارت <code>Untagged</code> یا <code>No Label</code> ببینید، یعنی LSP شکسته است (فراموشی <code>mpls ip</code>، مسدود شدن <code>UDP/TCP 646</code> برای LDP، یا خلاصه‌سازی <code>/32</code> در IGP).</li><li>تست MTU: اگر پینگ کوچک (۱۰۰ بایتی) کار می‌کند ولی پینگ <code>1500</code> با <code>df-bit</code> شکست می‌خورد، کمبود MPLS MTU روی لینک هسته علت اصلی است.</li></ol>"
+    },
+    {
+      "id": "spec_sp-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> مشتری A روی PE1 دارای <code>RD = 65100:101</code> و <code>export RT = 65100:101</code> است. مشتری B روی همان PE1 دارای <code>RD = 65100:202</code> و <code>export RT = 65100:202</code> است و هر دو ساب‌نت <code>10.50.1.0/24</code> را تبلیغ می‌کنند. اگر VRF مربوط به Shared Services روی PE2 دارای <code>import RT = 65100:101</code> و <code>import RT = 65100:202</code> باشد چه رخ می‌دهد؟ <strong>پاسخ:</strong> هر دو مسیر به دلیل تفاوت RD در جدول VPNv4 مجزا هستند، اما اگر هر دو با IP یکسان <code>10.50.1.0/24</code> وارد یک VRF واحد (Shared Services) شوند، در جدول IPv4 آن VRF با هم تداخل (Overlap) ایجاد می‌کنند! در سناریوی Extranet با IPهای هم‌پوشان باید پیش از اشتراک‌گذاری، NAT در مرز مشتری انجام شود.</p><p><strong>تمرین ۲:</strong> یک شبکه MPLS L3VPN با ۲ برچسب (Transport + VPN) و لینک هسته با MPLS MTU برابر <code>1500</code> بایت، آیا می‌تواند بسته IPv4 با اندازه ۱۵۰۰ بایت و <code>DF=1</code> را بدون Drop عبور دهد؟ <strong>پاسخ:</strong> خیر؛ بسته ۱۵۰۰ بایتی + ۸ بایت دو برچسب MPLS برابر <code>1508</code> بایت می‌شود و روی لینک <code>1500</code> بایتی با <code>DF=1</code> رد (Drop / ICMP Fragmentation Needed) می‌گردد.</p>"
+    },
+    {
+      "id": "spec_sp-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc3031\" target=\"_blank\" rel=\"noopener\">RFC 3031 (MPLS Architecture)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3032\" target=\"_blank\" rel=\"noopener\">RFC 3032 (MPLS Label Stack Encoding)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc4364\" target=\"_blank\" rel=\"noopener\">RFC 4364 (BGP/MPLS IP VPNs)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc5443\" target=\"_blank\" rel=\"noopener\">RFC 5443 (LDP IGP Synchronization)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی PE/P، جلسه LDP یا MP-BGP VPNv4 در این محیط اجرا نشده است. آزمایشگاه ارائه‌شده یک <strong>Python Mock محلی</strong> برای شبیه‌سازی منطق RT Import، عملیات Push/Swap/PHP و بررسی MPLS MTU است.</p>"
+    }
   ],
-  "limitations": [
-   "هیچ روتر PE/P واقعی، جلسه LDP یا همسایگی MP-BGP VPNv4 در این محیط اجرا نشده است.",
-   "آزمایشگاه یک Python Mock محلی برای شبیه‌سازی منطق برچسب، PHP، RD/RT و MPLS MTU است."
+  "glossary": [
+    {
+      "term": "CE",
+      "fa": "روتر لبه مشتری",
+      "simple": "Customer Edge؛ روتر سمت مشتری که ارتباط IP معمولی با PE دارد."
+    },
+    {
+      "term": "PE",
+      "fa": "روتر لبه اپراتور",
+      "simple": "Provider Edge؛ میزبان VRF مشتریان، MP-BGP VPNv4 و درج/حذف برچسب‌های MPLS."
+    },
+    {
+      "term": "P Router",
+      "fa": "روتر هسته اپراتور",
+      "simple": "Provider Router در هسته BGP-Free که تنها بر اساس Transport Label سوئیچ می‌کند."
+    },
+    {
+      "term": "BGP-Free Core",
+      "fa": "هسته بدون BGP",
+      "simple": "طراحی هسته اپراتور بدون نگهداری جداول مسیر BGP مشتریان روی روترهای P."
+    },
+    {
+      "term": "MPLS Label",
+      "fa": "برچسب MPLS",
+      "simple": "هدر ۴ بایتی شامل ۲۰ بیت Label، ۳ بیت TC، ۱ بیت BoS و ۸ بیت TTL."
+    },
+    {
+      "term": "Transport Label",
+      "fa": "برچسب بیرونی حمل",
+      "simple": "برچسب توزیع‌شده توسط LDP/SR برای هدایت بسته تا Loopback روتر PE مقصد."
+    },
+    {
+      "term": "VPN Label",
+      "fa": "برچسب درونی سرویس",
+      "simple": "برچسب تبلیغ‌شده در MP-BGP که مشخص می‌کند بسته روی PE مقصد به کدام VRF تحویل شود."
+    },
+    {
+      "term": "LFIB",
+      "fa": "جدول فوروارد برچسب",
+      "simple": "Label Forwarding Information Base برای تصمیم سریع Swap/Pop در دیتاپلین."
+    },
+    {
+      "term": "LDP",
+      "fa": "پروتکل توزیع برچسب",
+      "simple": "Label Distribution Protocol روی UDP/TCP 646 برای تبادل نگاشت برچسب و پیشوند."
+    },
+    {
+      "term": "PHP",
+      "fa": "حذف ماقبل آخر",
+      "simple": "Penultimate Hop Popping؛ حذف برچسب بیرونی توسط روتر P ماقبل آخر با Implicit Null (Label 3)."
+    },
+    {
+      "term": "Explicit Null",
+      "fa": "برچسب صفر صریح",
+      "simple": "برچسب رزرو Label 0 (IPv4) یا Label 2 (IPv6) برای حفظ بیت‌های QoS TC تا PE خروجی."
+    },
+    {
+      "term": "RD",
+      "fa": "تمایزدهنده مسیر",
+      "simple": "Route Distinguisher؛ مقدار ۶۴ بیتی برای یکتاسازی پیشوندهای هم‌پوشان در MP-BGP."
+    },
+    {
+      "term": "RT",
+      "fa": "هدف مسیر",
+      "simple": "Route Target؛ Extended Community در BGP برای کنترل Import/Export مسیر بین VRFها."
+    },
+    {
+      "term": "VPNv4",
+      "fa": "نشانی ۹۶ بیتی VPNv4",
+      "simple": "ترکیب RD شصت‌وچهاربیتی و پیشوند IPv4 سی‌ودوبیتی در MP-BGP."
+    },
+    {
+      "term": "LDP-IGP Sync",
+      "fa": "همگام‌سازی LDP و IGP",
+      "simple": "مکانیسم RFC 5443 برای جلوگیری از سیاه‌چاله ترافیک هنگام بالا آمدن لینک قبل از آماده شدن LDP."
+    },
+    {
+      "term": "MPLS MTU",
+      "fa": "حداکثر اندازه فریم MPLS",
+      "simple": "حداکثر اندازه بسته IP به علاوه سربار برچسب‌های MPLS روی لینک هسته."
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۶ واژه و ۱۲ پرسش با توضیح دقیق.",
-   "افزودن مقایسه Explicit Null (Label 0/2) با Implicit Null (Label 3) برای حفظ QoS TC و تصریح نبود رمزنگاری ذاتی در MPLS.",
-   "تفکیک شفاف Python Mock محلی از سناریوی مرجع غیرشبیه‌سازی‌شده IOS-XE."
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه Python Mock محلی پشته برچسب MPLS/RD/RT + سناریوی مرجع (تجهیز واقعی اجرا نشده)",
+      "executionStatus": "Python Mock محلی اجرا و تست شده؛ هیچ روتر PE/P، LDP یا MP-BGP واقعی اجرا نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>Python Mock محلی</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر، سوئیچ، فایروال یا کنترلر واقعی سیسکو اجرا نشده است.</p><p>در این آزمایشگاه با مدل محلی Python می‌بینید چگونه دو مشتری با پیشوند هم‌پوشان <code>10.50.1.0/24</code> با RD یکتا می‌شوند، فقط مسیر منطبق با RT وارد VRF می‌گردد، پشته دوبرچسبی در PE1 ساخته و در P1 با PHP (Label 3) یا Explicit Null (Label 0) پردازش می‌شود و کمبود MPLS MTU باعث Drop می‌گردد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_sp_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_sp_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for spec_sp (MPLS L3VPN Label Stack, PHP, RD/RT &amp; MTU).\n\nNo real Cisco IOS-XE/IOS-XR router, LDP session, or MP-BGP VPNv4 peering is run.\nModels standard 20-bit MPLS labels (0..1048575), Penultimate Hop Popping (Implicit Null = 3),\nExplicit Null (0), and non-PHP swap behavior at PE2.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass\n\nIMPLICIT_NULL = 3\nEXPLICIT_NULL_IPV4 = 0\nMAX_MPLS_LABEL = (1 &lt;&lt; 20) - 1  # 1,048,575 (20-bit MPLS label field)\n\n\ndef _require_int(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int):\n        raise ValueError(f&quot;{name} must be an int (not bool), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_mpls_label(val: object, name: str, allow_special: bool = False) -&gt; int:\n    lbl = _require_int(val, name)\n    if not (0 &lt;= lbl &lt;= MAX_MPLS_LABEL):\n        raise ValueError(f&quot;{name} out of 20-bit MPLS label range 0..{MAX_MPLS_LABEL}: {lbl}&quot;)\n    if not allow_special and lbl &lt; 16:\n        raise ValueError(f&quot;{name} must be a non-reserved MPLS label (&gt;=16), got {lbl}&quot;)\n    return lbl\n\n\n@dataclass(frozen=True)\nclass Vpnv4Route:\n    rd: str\n    prefix: str\n    export_rts: tuple[str, ...]\n    vpn_label: int\n    egress_pe_loopback: str\n\n    def __post_init__(self) -&gt; None:\n        _require_mpls_label(self.vpn_label, &quot;vpn_label&quot;, allow_special=False)\n\n\ndef import_routes_into_vrf(\n    vrf_name: str,\n    import_rts: set[str],\n    bgp_vpnv4_table: list[Vpnv4Route],\n) -&gt; list[dict[str, object]]:\n    &quot;&quot;&quot;Simulate MP-BGP VPNv4 RT import matching (RD guarantees uniqueness, RT controls import).&quot;&quot;&quot;\n    if not isinstance(vrf_name, str) or not vrf_name.strip():\n        raise ValueError(&quot;vrf_name must be a non-empty str&quot;)\n    imported = []\n    for route in bgp_vpnv4_table:\n        matched_rts = sorted(import_rts &amp; set(route.export_rts))\n        if matched_rts:\n            imported.append({\n                &quot;vrf&quot;: vrf_name,\n                &quot;rd&quot;: route.rd,\n                &quot;prefix&quot;: route.prefix,\n                &quot;matched_rts&quot;: matched_rts,\n                &quot;vpn_label&quot;: route.vpn_label,\n                &quot;next_hop_pe&quot;: route.egress_pe_loopback,\n            })\n    return imported\n\n\ndef simulate_mpls_l3vpn_forwarding(\n    transport_label_pe1_to_p1: int,\n    p1_outgoing_label: int,\n    vpn_label: int,\n    ip_payload_bytes: int = 1500,\n    core_mpls_mtu: int = 1508,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Trace Push -&gt; Swap/PHP Pop -&gt; Egress PE Pop across PE1 -&gt; P1 -&gt; PE2.&quot;&quot;&quot;\n    _require_mpls_label(transport_label_pe1_to_p1, &quot;transport_label_pe1_to_p1&quot;, allow_special=False)\n    _require_mpls_label(p1_outgoing_label, &quot;p1_outgoing_label&quot;, allow_special=True)\n    _require_mpls_label(vpn_label, &quot;vpn_label&quot;, allow_special=False)\n    payload = _require_int(ip_payload_bytes, &quot;ip_payload_bytes&quot;)\n    mtu = _require_int(core_mpls_mtu, &quot;core_mpls_mtu&quot;)\n    if payload &lt;= 0 or mtu &lt;= 0:\n        raise ValueError(&quot;ip_payload_bytes and core_mpls_mtu must be positive integers&quot;)\n\n    stack = [transport_label_pe1_to_p1, vpn_label]  # index 0 = top (outer) label\n    mpls_header_bytes = len(stack) * 4\n    total_l3_frame = payload + mpls_header_bytes\n    mtu_ok = total_l3_frame &lt;= mtu\n    trace = [f&quot;PE1 (Push): stack={list(stack)} (size={total_l3_frame}B vs MPLS MTU {mtu}B)&quot;]\n\n    if not mtu_ok:\n        return {&quot;delivered&quot;: False, &quot;reason&quot;: &quot;MPLS MTU exceeded on core link&quot;, &quot;trace&quot;: trace}\n\n    if p1_outgoing_label == IMPLICIT_NULL:\n        stack.pop(0)\n        trace.append(f&quot;P1 (PHP Pop on Implicit Null Label 3): stack={list(stack)}&quot;)\n    elif p1_outgoing_label == EXPLICIT_NULL_IPV4:\n        stack[0] = EXPLICIT_NULL_IPV4\n        trace.append(f&quot;P1 (Swap to Explicit Null Label 0 — preserves TC/QoS): stack={list(stack)}&quot;)\n    else:\n        stack[0] = p1_outgoing_label\n        trace.append(f&quot;P1 (Swap outer transport label to {p1_outgoing_label} — no PHP): stack={list(stack)}&quot;)\n\n    # Egress PE2 processing: if an outer label remains (Explicit Null or non-PHP transport label), pop it first\n    if len(stack) == 2:\n        outer_popped = stack.pop(0)\n        trace.append(f&quot;PE2 (Pop outer label {outer_popped} — double lookup without PHP): stack={list(stack)}&quot;)\n\n    final_vpn_label = stack.pop(0)\n    trace.append(f&quot;PE2 (Pop VPN Label {final_vpn_label} -&gt; VRF lookup -&gt; CE): stack={list(stack)}&quot;)\n    return {&quot;delivered&quot;: True, &quot;final_vpn_label&quot;: final_vpn_label, &quot;trace&quot;: trace}\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real PE/P router, LDP, or MP-BGP session is executed.&quot;)\n    vpnv4_table = [\n        Vpnv4Route(&quot;65100:101&quot;, &quot;10.50.1.0/24&quot;, (&quot;65100:101&quot;,), 18001, &quot;198.51.100.2&quot;),\n        Vpnv4Route(&quot;65100:202&quot;, &quot;10.50.1.0/24&quot;, (&quot;65100:202&quot;,), 18002, &quot;198.51.100.2&quot;),\n    ]\n    imported = import_routes_into_vrf(&quot;CUST_A&quot;, {&quot;65100:101&quot;}, vpnv4_table)\n    php_res = simulate_mpls_l3vpn_forwarding(24, IMPLICIT_NULL, 18001, 1500, 1508)\n    swap_res = simulate_mpls_l3vpn_forwarding(24, 30, 18001, 1500, 1508)\n    mtu_fail = simulate_mpls_l3vpn_forwarding(24, IMPLICIT_NULL, 18001, 1500, 1500)\n    assert len(imported) == 1 and imported[0][&quot;vpn_label&quot;] == 18001\n    assert php_res[&quot;delivered&quot;] is True and php_res[&quot;final_vpn_label&quot;] == 18001\n    assert swap_res[&quot;delivered&quot;] is True and swap_res[&quot;final_vpn_label&quot;] == 18001\n    assert mtu_fail[&quot;delivered&quot;] is False\n    print(&quot;VRF CUST_A imports:&quot;, imported)\n    print(&quot;PHP forwarding:&quot;, php_res)\n    print(&quot;Non-PHP swap forwarding:&quot;, swap_res)\n    print(&quot;MTU failure:&quot;, mtu_fail)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> VRF <code>CUST_A</code> فقط مسیر با RT <code>65100:101</code> را Import می‌کند؛ شبیه‌سازی PHP روی MPLS MTU برابر <code>1508</code> موفق است و PE2 فقط برچسب <code>18001</code> را دریافت می‌کند؛ ولی روی MPLS MTU برابر <code>1500</code> شکست می‌خورد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>پلتفرم مرجع:</strong> Cisco IOS-XE / IOS-XR (اجرا نشده روی سخت‌افزار):</p><pre dir=\"ltr\"><code>! Reference IOS-XE PE1 snippet (NOT executed in this sandbox)\nvrf definition CUST_A\n rd 65100:101\n address-family ipv4\n  route-target export 65100:101\n  route-target import 65100:101\nrouter bgp 65100\n neighbor 198.51.100.2 remote-as 65100\n neighbor 198.51.100.2 update-source Loopback0\n address-family vpnv4\n  neighbor 198.51.100.2 activate\n  neighbor 198.51.100.2 send-community extended\n! Verify on real/CML PE/P:\n! show mpls forwarding-table | show bgp vpnv4 unicast all summary</code></pre><p>در آزمایش CML، بررسی کنید <code>Loopback0</code> با <code>/32</code> بدون خلاصه‌سازی تبلیغ شود و <code>mpls ldp sync</code> فعال باشد.</p><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس تخصص Service Provider",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "نقش برچسب Implicit Null (Label 3) در مکانیسم PHP چیست؟",
+      "options": [
+        "درخواست از روتر P ماقبل آخر برای Pop کردن برچسب بیرونی پیش از تحویل به PE خروجی جهت حذف Double Lookup",
+        "رمزنگاری بسته IP مشتری با الگوریتم AES",
+        "اجبار روتر P به نگهداری جدول BGP همه مشتریان",
+        "تبدیل آدرس IPv4 به IPv6 در هسته"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>PE خروجی با تبلیغ Label 3 به همسایه ماقبل آخر می‌گوید برچسب بیرونی را بردارد تا PE خروجی در یک Lookup مستقیم بر اساس VPN Label تصمیم بگیرد.</p>"
+    },
+    {
+      "title": "تفاوت دقیق RD و RT در MPLS L3VPN چیست؟",
+      "options": [
+        "RD سیاست دسترسی بین VRFها را تعیین می‌کند و RT آدرس را رمزنگاری می‌کند",
+        "RD برای یکتاسازی پیشوندهای هم‌پوشان در MP-BGP است و RT (به‌عنوان Extended Community) قوانین Import/Export بین VRFها را کنترل می‌کند",
+        "هر دو دقیقاً یک کار انجام می‌دهند و صرفاً نام متفاوت در IOS و IOS-XR دارند",
+        "RD فقط در روتر CE و RT فقط در روتر P تنظیم می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>RD پیشوند IPv4 را به پیشوند ۹۶ بیتی یکتای VPNv4 تبدیل می‌کند؛ اما ورود و خروج مسیر میان VRFها منحصراً با RT انجام می‌گیرد.</p>"
+    },
+    {
+      "title": "چرا در طراحی BGP-Free Core فعال‌سازی LDP-IGP Synchronization (RFC 5443) حیاتی است؟",
+      "options": [
+        "برای حذف نیاز به Loopback روی روترهای PE",
+        "برای کاهش تعداد بیت‌های هدر MPLS از ۳۲ به ۱۶ بیت",
+        "برای جلوگیری از سیاه‌چاله شدن ترافیک هنگام بالا آمدن لینک تازه در IGP پیش از آماده شدن جلسه و برچسب‌های LDP",
+        "برای جایگزینی کامل MP-BGP با OSPF"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>اگر IGP پیش از همگام شدن LDP ترافیک را به لینک جدید هدایت کند، روتر P بدون برچسب خروجی نمی‌تواند بسته مشتری را روت کند و ترافیک Drop می‌شود.</p>"
+    },
+    {
+      "title": "هر برچسب MPLS چند بایت است و حداقل MPLS MTU برای عبور یک بسته IP با اندازه ۱۵۰۰ بایت در L3VPN دوبرچسبی (بدون تکه‌تکه شدن) چقدر است؟",
+      "options": [
+        "هر برچسب ۲ بایت؛ حداقل ۱۵۰۴ بایت",
+        "هر برچسب ۸ بایت؛ حداقل ۱۵۱۶ بایت",
+        "هر برچسب ۲۰ بایت؛ حداقل ۱۵۴۰ بایت",
+        "هر برچسب ۴ بایت؛ حداقل ۱۵۰۸ بایت"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>مطابق RFC 3032 هر برچسب ۴ بایت (۳۲ بیت) است؛ پس ۲ برچسب ۸ بایت سربار ایجاد می‌کند (۱۵۰۰ + ۸ = ۱۵۰۸ بایت).</p>"
+    },
+    {
+      "title": "چه زمانی به جای Implicit Null (Label 3) از Explicit Null (Label 0 برای IPv4) استفاده می‌شود؟",
+      "options": [
+        "وقتی لازم است بیت‌های QoS (فیلد TC/EXP) برچسب بیرونی تا خود روتر PE خروجی حفظ شوند",
+        "وقتی بخواهیم همه روترهای P را حذف کنیم",
+        "وقتی ترافیک مشتری رمزنگاری نشده باشد",
+        "وقتی جلسه MP-BGP قطع باشد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در PHP برچسب بیرونی و همراه آن بیت‌های TC قبل از PE خروجی حذف می‌شوند؛ Explicit Null (Label 0) برچسب بیرونی را تا PE خروجی حفظ می‌کند.</p>"
+    },
+    {
+      "title": "کدام یک از موارد زیر جزو وظایف روتر P (Provider Core) در MPLS L3VPN نیست؟",
+      "options": [
+        "اجرای IGP هسته برای دسترسی به Loopbackهای PE",
+        "نگهداری VRFها و جدول مسیر BGP مشتریان",
+        "اجرای LDP یا Segment Routing برای برچسب‌های Transport",
+        "انجام عملیات Swap یا PHP Pop روی برچسب بیرونی"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>روترهای P هسته BGP-Free هستند و هیچ VRF یا مسیر BGP مشتری در آن‌ها وجود ندارد.</p>"
+    },
+    {
+      "title": "در هدر ۳۲ بیتی MPLS، بیت S (Bottom of Stack) در یک بسته L3VPN دوبرچسبی چه مقادیری دارد؟",
+      "options": [
+        "در هر دو برچسب برابر 1 است",
+        "در هر دو برچسب برابر 0 است",
+        "در برچسب بیرونی (Transport) برابر 0 و در برچسب درونی (VPN) برابر 1 است",
+        "در برچسب بیرونی برابر 1 و در برچسب درونی برابر 0 است"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بیت S=1 نشان می‌دهد این برچسب آخرین برچسب پشته و چسبیده به هدر IP است؛ بنابراین در VPN Label برابر 1 و در Transport Label برابر 0 است.</p>"
+    },
+    {
+      "title": "اگر پیشوند /32 لوپ‌بک روتر PE2 در IGP هسته به /24 خلاصه شود، چه مشکلی در MPLS LDP رخ می‌دهد؟",
+      "options": [
+        "پهنای باند لینک هسته دو برابر می‌شود",
+        "هیچ مشکلی؛ LDP خودکار پیشوند را اصلاح می‌کند",
+        "فقط آدرس‌های IPv6 تحت تأثیر قرار می‌گیرند",
+        "زنجیره برچسب‌گذاری (LSP) تا PE2 می‌شکند و در روتر P وضعیت Untagged/No Label و سیاه‌چاله ترافیک رخ می‌دهد"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>LDP برچسب را برای تطابق دقیق پیشوند (FEC) می‌سازد؛ خلاصه‌سازی /32 لوپ‌بک PE باعث شکست LSP و قطع دیتاپلین L3VPN می‌شود.</p>"
+    },
+    {
+      "title": "آیا برای ارتباط دو سایت یک مشتری در MPLS L3VPN لازم است RD هر دو PE دقیقاً یکسان باشد؟",
+      "options": [
+        "خیر؛ تطابق Route Target (Import/Export) ملاک اشتراک‌گذاری مسیر است و RD متفاوت حتی می‌تواند در سناریوی Route Reflector مفید باشد",
+        "بله؛ بدون RD یکسان هیچ بسته‌ای مسیریابی نمی‌شود",
+        "بله؛ زیرا RD به‌عنوان کلید رمزنگاری IPsec عمل می‌کند",
+        "خیر؛ چون RD اصلاً در MP-BGP ارسال نمی‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>RD فقط یکتایی مسیر در BGP را تضمین می‌کند (و داشتن RD یکتا به ازای هر PE مانع مخفی شدن مسیرهای جایگزین در RR می‌شود)؛ کنترل دسترسی با RT است.</p>"
+    },
+    {
+      "title": "کدام گزاره درباره امنیت و رمزنگاری در MPLS L3VPN استاندارد (RFC 4364) صحیح است؟",
+      "options": [
+        "MPLS L3VPN همه بسته‌ها را به‌طور خودکار با AES-256 رمزنگاری می‌کند",
+        "MPLS L3VPN جداسازی منطقی مسیرها را فراهم می‌کند اما به‌خودی‌خود رمزنگاری (Encryption) انجام نمی‌دهد",
+        "MPLS L3VPN از گواهینامه TLS برای هر بسته استفاده می‌کند",
+        "MPLS L3VPN هیچ جداسازی میان مشتریان ایجاد نمی‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>جداسازی VRF/برچسب به معنای رمزنگاری نیست؛ برای محرمانگی داده روی شبکه اپراتور باید رمزنگاری لایه بالاتر (مثل IPsec/GETVPN) افزوده شود.</p>"
+    },
+    {
+      "title": "در عیب‌یابی، نشست MP-BGP VPNv4 برقرار است ولی هیچ مسیری وارد VRF مقصد روی PE2 نمی‌شود. کدام دو مورد را باید فوراً بررسی کرد؟",
+      "options": [
+        "کابل کنسول و سرعت فن روتر",
+        "فعال بودن RIP و نسخه HTTP مرورگر",
+        "تطابق route-target import/export و فعال بودن send-community extended روی همسایگی VPNv4",
+        "تنظیم Spanning Tree روی روتر CE"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Route Target به‌عنوان BGP Extended Community حمل می‌شود؛ اگر <code>send-community extended</code> فعال نباشد یا RT Import/Export تطابق نداشته باشد، مسیر وارد VRF نمی‌شود.</p>"
+    },
+    {
+      "title": "در شبکه MPLS L3VPN اپراتوری، نقش اصلی دو برچسب (Label Stack) که روی بسته مشتری هنگام عبور از هسته P قرار می‌گیرد چیست؟",
+      "options": [
+        "هر دو برچسب فقط برای شماره VLAN هستند",
+        "برچسب بیرونی (Transport Label) بسته را از میان روترهای P تا PE مقصد هدایت می‌کند و برچسب درونی (VPN Label) به PE مقصد می‌گوید بسته متعلق به کدام VRF مشتری است",
+        "برچسب درونی توسط روترهای P تعویض می‌شود",
+        "فقط یک برچسب برای همه مشتریان کافی است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>به لطف ساختار دولایه برچسب، روترهای هسته P نیازی به دانستن مسیرهای مشتریان (BGP-Free Core) ندارند و فقط بر اساس Transport Label سوئیچ می‌کنند.</p>"
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۶ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/spec_sp-review-fa.md"
-  },
-  "integration": {
-   "recommendedPath": "fam-specializations",
-   "recommendedCourse": "spec-sp",
-   "blueprint": "/academy-assets/v5/blueprints/spec_sp.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_sp_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح بازبینی فاز ۸A: رفع باگ واقعی پروتکلی در simulate_mpls_l3vpn_forwarding (حذف برچسب Transport پیش از VPN در حالت غیر-PHP)، اعتبارسنجی برچسب ۲۰ بیتی MPLS و MTU/Payload مثبت + تعدیل جمله مطلق P1 در بخش ۵ با اشاره به ECMP/RFC 6790."
-  ]
- }
+  "meta": {
+    "version": "reviewed.8",
+    "legacyId": "spec_sp",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc3031",
+      "https://www.rfc-editor.org/rfc/rfc3032",
+      "https://www.rfc-editor.org/rfc/rfc4364",
+      "https://www.rfc-editor.org/rfc/rfc5443"
+    ],
+    "limitations": [
+      "هیچ روتر PE/P واقعی، جلسه LDP یا همسایگی MP-BGP VPNv4 در این محیط اجرا نشده است.",
+      "آزمایشگاه یک Python Mock محلی برای شبیه‌سازی منطق برچسب، PHP، RD/RT و MPLS MTU است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش از ۳ بخش و ۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۶ واژه و ۱۲ پرسش با توضیح دقیق.",
+      "افزودن مقایسه Explicit Null (Label 0/2) با Implicit Null (Label 3) برای حفظ QoS TC و تصریح نبود رمزنگاری ذاتی در MPLS.",
+      "تفکیک شفاف Python Mock محلی از سناریوی مرجع غیرشبیه‌سازی‌شده IOS-XE."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۶ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/spec_sp-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-specializations",
+      "recommendedCourse": "spec-sp",
+      "blueprint": "/academy-assets/v5/blueprints/spec_sp.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/spec_sp_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح بازبینی فاز ۸A: رفع باگ واقعی پروتکلی در simulate_mpls_l3vpn_forwarding (حذف برچسب Transport پیش از VPN در حالت غیر-PHP)، اعتبارسنجی برچسب ۲۰ بیتی MPLS و MTU/Payload مثبت + تعدیل جمله مطلق P1 در بخش ۵ با اشاره به ECMP/RFC 6790."
+    ]
+  }
 }

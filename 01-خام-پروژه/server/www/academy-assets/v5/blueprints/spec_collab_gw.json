@@ -1,342 +1,342 @@
 {
- "schema": "fam-app-blueprint-v1",
- "lessonId": "spec_collab_gw",
- "objectiveId": "spec_collab_gw",
- "kind": "lesson",
- "track": "Specialist",
- "course": "spec-collab",
- "title": "۷.۶ Collaboration: دروازه‌های صوتی (Voice Gateways)، Cisco CUBE (SBC)، Dial-Peer و SRST",
- "titleEn": "Collaboration Deep Dive: Enterprise Voice Gateways, Cisco CUBE (SBC), SIP Dial-Peers, DTMF & SRST",
- "domain": "Enterprise Collaboration",
- "source": "Legacy spec_collab_gw rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
- "estimatedMinutes": 55,
- "prerequisites": [
-  "spec_collab"
- ],
- "sections": [
-  {
-   "id": "spec_collab_gw-section-1",
-   "title": "مسئله واقعی: چرا هرگز نباید سرور تماس داخلی (CUCM) را مستقیم به SIP Trunk اپراتور وصل کرد — و اگر WAN شعبه قطع شود چه می‌شود؟",
-   "html": "<p>اتصال مستقیم سرور <strong>CUCM</strong> به شبکه مخابراتی (ITSP) دو فاجعه به همراه دارد: افشای توپولوژی داخلی، نبود محافظت در برابر تقلب تلفنی (<strong>Toll Fraud</strong>) و ناسازگاری هدرهای SIP اپراتورها با سیستم داخلی. از سوی دیگر، اگر لینک WAN یک شعبه قطع شود و تلفن‌های IP دسترسی به CUCM مرکز را از دست بدهند، بدون <strong>SRST</strong> حتی امکان گرفتن شماره اضطراری (اورژانس/آتش‌نشانی) هم وجود ندارد! راه‌حل مهندسی سیسکو ترکیبی از <strong>Cisco CUBE (Enterprise SBC)</strong> و <strong>SRST</strong> روی روترهای IOS-XE است.</p>"
-  },
-  {
-   "id": "spec_collab_gw-section-2",
-   "title": "هدف یادگیری و پیش‌نیازها",
-   "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با SIP، RTP، Codecها و CUCM در درس <code>spec_collab</code>.</p><ul><li>تبیین نقش <strong>Cisco CUBE (Cisco Unified Border Element)</strong> به عنوان <strong>B2BUA / Enterprise SBC</strong> در مرز میان CUCM و ITSP.</li><li>تسلط بر منطق مسیریابی تماس دوپایی <strong>Inbound و Outbound Dial-Peer</strong> (قانون Longest-Match، <code>preference</code>، <code>huntstop</code> و ترجمه شماره).</li><li>حل مشکلات کلاسیک میان‌کنش‌پذیری SIP با <strong>SIP Profiles</strong>، انتخاب صحیح <strong>DTMF Relay (<code>rtp-nte</code> / RFC 2833)</strong> و جلوگیری از <strong>Toll Fraud</strong>.</li><li>طراحی <strong>SRST (Survivable Remote Site Telephony)</strong> و تضمین تماس‌های اضطراری (<strong>E911 / Emergency</strong>) در هنگام قطعی WAN شعب.</li></ul>"
-  },
-  {
-   "id": "spec_collab_gw-section-3",
-   "title": "Cisco CUBE (SBC): چرا مدل B2BUA برای مرز شبکه صوتی حیاتی است؟",
-   "html": "<p><strong>Cisco CUBE</strong> یک <strong>B2BUA (Back-to-Back User Agent)</strong> است: به جای آنکه پیام SIP اپراتور را مستقیم رد کند، تماس ورودی (Leg 1) را روی خود خاتمه می‌دهد و یک تماس SIP کاملاً جدید و تمیز (Leg 2) به سمت CUCM (یا برعکس) ایجاد می‌کند! پنج مزیت حیاتی آن:</p><ul><li><strong>مخفی‌سازی توپولوژی و امنیت (Topology Hiding + Toll-Fraud Prevention):</strong> IP سرورهای داخلی CUCM از دید اپراتور/اینترنت پنهان می‌ماند و فهرست IPهای مجاز (<code>ip address trusted list</code>) جلوی تماس‌های کلاهبرداری بین‌المللی را می‌گیرد.</li><li><strong>نرمال‌سازی هدرهای SIP (SIP Profiles):</strong> تطبیق هدرهای غیرمعمول اپراتورها (مثل <code>Diversion</code>، <code>P-Asserted-Identity</code> یا فرمت شماره <code>E.164</code>) با انتظار CUCM.</li><li><strong>مدیریت رسانه (Media Anchoring / Transcoding / Early Offer):</strong> تبدیل کدک (مثلاً G.711 به G.729) و رفع مشکل صدای یک‌طرفه (One-Way Audio).</li></ul>"
-  },
-  {
-   "id": "spec_collab_gw-section-4",
-   "title": "نمودار معماری Voice Gateway: Cisco CUBE (SBC)، Dial-Peer و بقای تماس SRST",
-   "html": "<p>نمودار زیر جایگاه CUBE بین CUCM و SIP Trunk اپراتور، منطق Dial-Peer و نقش حیاتی SRST هنگام قطعی WAN را نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Enterprise Voice Gateway: Cisco CUBE SBC, SIP Dial-Peers, DTMF Relay and Branch SRST Survivability\"><rect x=\"14\" y=\"20\" width=\"166\" height=\"84\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"97\" y=\"44\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">HQ CUCM Cluster</text><text x=\"97\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Enterprise Call Control</text><text x=\"97\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">SIP Trunk to CUBE</text><rect x=\"220\" y=\"14\" width=\"248\" height=\"96\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"344\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Cisco CUBE (Enterprise SBC)</text><text x=\"344\" y=\"56\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">B2BUA: Hides Internal Topology</text><text x=\"344\" y=\"74\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Inbound/Outbound Dial-Peers (Longest Match)</text><text x=\"344\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">SIP Profiles | DTMF rtp-nte | Toll-Fraud Block</text><rect x=\"514\" y=\"20\" width=\"232\" height=\"84\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"630\" y=\"44\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">ITSP SIP Trunk / PSTN</text><text x=\"630\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Primary + Backup SIP Trunks</text><text x=\"630\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">Emergency E911 / Local PSTN</text><rect x=\"14\" y=\"136\" width=\"732\" height=\"68\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"380\" y=\"160\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">Branch WAN Outage Protection: Cisco SRST (Survivable Remote Site Telephony)</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">WAN to HQ CUCM Down =&gt; Branch IP Phones Auto-Register to Local ISR Router SRST =&gt; Local Calls &amp; E911/PSTN Survive!</text><line x1=\"180\" y1=\"62\" x2=\"220\" y2=\"62\" stroke=\"#1d4ed8\" stroke-width=\"3\"/><line x1=\"468\" y1=\"62\" x2=\"514\" y2=\"62\" stroke=\"#15803d\" stroke-width=\"3\"/></svg>"
-  },
-  {
-   "id": "spec_collab_gw-section-5",
-   "title": "منطق مسیریابی تماس در IOS-XE: کالبدشکافی Inbound و Outbound Dial-Peer",
-   "html": "<p>در روتر صوتی سیسکو (CUBE / Voice Gateway)، هر تماس دقیقاً از دو <code>dial-peer</code> عبور می‌کند:</p><ol><li><strong>Inbound Dial-Peer:</strong> تعیین می‌کند تماس ورودی از کدام سمت آمده (بر اساس <code>incoming uri via</code>، <code>incoming called-number</code> یا <code>answer-address</code>). <strong>هشدار:</strong> اگر هیچ Dial-Peer ورودی تطبیق پیدا نکند، تماس روی <code>Dial-Peer 0</code> (پیش‌فرض با تنظیمات محدود و بدون DTMF <code>rtp-nte</code>!) می‌افتد که علت شماره ۱ خرابی IVR و کدک است!</li><li><strong>Outbound Dial-Peer:</strong> بر اساس <strong>بلندترین تطابق (Longest Match)</strong> روی <code>destination-pattern</code> (مثلاً <code>911</code> یا <code>9021T</code>) انتخاب می‌شود و در صورت وجود دو مسیر با طول یکسان (Primary و Backup Trunk)، گزینه با <strong><code>preference</code> عددی کمتر</strong> (پیش‌فرض ۰) اولویت دارد و در صورت قطعی Primary (مثلاً خطای <code>503</code> یا تایمر <code>options-keepalive</code>) به Backup با <code>preference 1</code> سوییچ می‌کند!</li></ol>"
-  },
-  {
-   "id": "spec_collab_gw-section-6",
-   "title": "حل معمای کار نکردن کلیدهای تلفن گویا (IVR): استاندارد DTMF Relay (rtp-nte)",
-   "html": "<p>یکی از پرتکرارترین شکایات کاربران در سیستم‌های VoIP این است: «تماس برقرار می‌شود و صدا واضح است، اما وقتی برای اتصال به واحد مالی عدد ۲ را می‌زنیم، سیستم گویا هیچ واکنشی نشان نمی‌دهد!» علت: <strong>عدم تطابق روش ارسال DTMF</strong> (مثلاً یک سمت <code>In-Band Audio</code> روی کدک فشرده G.729 می‌فرستد که صدا را خراب می‌کند، و سمت دیگر منتظر <code>Out-of-Band</code> است). استاندارد جهانی در SIP Trunk و CUBE، تنظیم صریح <strong><code>dtmf-relay rtp-nte</code> (RFC 2833 / RFC 4733)</strong> روی هر دو پای Dial-Peer (ورودی و خروجی) است.</p>"
-  },
-  {
-   "id": "spec_collab_gw-section-7",
-   "title": "بقای تماس در شعب (SRST) و ضرورت قانونی تماس اضطراری (E911 / Emergency)",
-   "html": "<p>در معماری متمرکز، تمام تلفن‌های IP شعب از طریق WAN روی خوشه CUCM دفتر مرکزی ثبت (Register) می‌شوند. <strong>اگر لینک WAN قطع شود چه می‌شود؟</strong> تلفن‌ها پس از از دست دادن Keepalive، به‌طور خودکار آدرس پشتیبان موجود در تنظیمات خود (<strong>SRST Reference</strong>) را گرفته و روی <strong>روتر محلی شعبه (Cisco ISR با SRST فعال)</strong> ثبت می‌شوند! در حالت <strong>SRST (Survivable Remote Site Telephony)</strong>، کارمندان همچنان می‌توانند تماس‌های داخلی شعبه، تماس‌های شهری/ملی از طریق خط محلی PSTN/SIP و مهم‌تر از همه <strong>تماس‌های اضطراری (۱۱۵/۱۲۵/۹۱۱)</strong> را برقرار کنند؛ و به محض وصل شدن WAN، تلفن‌ها به‌طور خودکار به CUCM بازمی‌گردند.</p>"
-  },
-  {
-   "id": "spec_collab_gw-section-8",
-   "title": "امنیت CUBE: پیشگیری از Toll Fraud و احراز هویت SIP Trunk",
-   "html": "<p>یکی از گران‌ترین رخدادهای امنیتی در شرکت‌ها، هک شدن CUBE و برقراری هزاران دقیقه تماس بین‌المللی گران‌قیمت در نیمه‌شب (<strong>Toll Fraud</strong>) است! برای پیشگیری، در IOS-XE CUBE قابلیت داخلی <strong><code>ip address trusted authenticate</code></strong> به همراه <strong><code>ip address trusted list</code></strong> به‌طور پیش‌فرض تنها سیگنالینگ SIP از IPهای مجاز CUCM و ITSP را می‌پذیرد و سایر درخواست‌های ناشناس را در نطفه Drop می‌کند؛ همچنین استفاده از <strong>SIP TLS + SRTP</strong> از شنود مکالمات جلوگیری می‌نماید.</p>"
-  },
-  {
-   "id": "spec_collab_gw-section-9",
-   "title": "پایش سلامت SIP Trunk با SIP OPTIONS Ping و HA در CUBE",
-   "html": "<p>اگر SIP Trunk اول اپراتور قطع شود ولی CUBE تا زمان آمدن تماس بعدی از آن بی‌خبر باشد، اولین تماس‌ها با تاخیر ۱۰–۳۰ ثانیه‌ای شکست می‌خورند. با فعال کردن <strong><code>voice-class sip options-keepalive</code></strong> روی Dial-Peer، روتر CUBE به‌طور دوره‌ای پیام سبک <code>SIP OPTIONS</code> می‌فرستد و به محض دریافت نکردن پاسخ <code>200 OK</code>، وضعیت آن Trunk را <code>busyout</code> می‌کند تا تماس‌ها فوری روی <code>preference 1</code> (ترانک پشتیبان) هدایت شوند!</p>"
-  },
-  {
-   "id": "spec_collab_gw-section-10",
-   "title": "مقایسه پیوندهای قدیمی TDM (E1/T1 PRI) با SIP Trunk مدرن",
-   "html": "<p>تا سال‌ها شعب از خطوط فیزیکی <code>E1 PRI (30 کانال صوتی)</code> یا <code>FXO/FXS</code> استفاده می‌کردند؛ امروز اکثریت سازمان‌ها به <strong>SIP Trunk</strong> مهاجرت کرده‌اند (انعطاف‌پذیری کانال‌های هم‌زمان بدون کارت سخت‌افزاری، پشتیبانی مستقیم از ویدیو و کدک‌های پهن‌باند). البته در شعب حیاتی داشتن یک خط پشتیبان مجزا (مثلاً SIP روی لینک دوم یا خط شهری FXO برای SRST) همچنان توصیه می‌شود.</p>"
-  },
-  {
-   "id": "spec_collab_gw-section-11",
-   "title": "کژفهمی‌های رایج درباره CUBE، Dial-Peer و SRST",
-   "html": "<ul><li><strong>کژفهمی ۱: «برای اتصال CUCM به اپراتور فقط یک خط NAT روی فایروال کافی است و به CUBE نیازی نیست.»</strong> واقعیت: NAT روی SIP (SIP ALG) یکی از مشهورترین منابع خرابی صدای یک‌طرفه و قطع تماس است؛ CUBE به عنوان B2BUA این مرز را به‌صورت استاندارد، ایمن و قابل عیب‌یابی مدیریت می‌کند.</li><li><strong>کژفهمی ۲: «وقتی فقط یک Outbound Dial-Peer بسازیم، Inbound به‌طور خودکار با کیفیت کامل کار می‌کند.»</strong> واقعیت: خیر! در نبود Inbound Dial-Peer مشخص، تماس روی <code>Dial-Peer 0</code> می‌افتد و بسیاری از ویژگی‌ها از جمله <code>dtmf-relay rtp-nte</code>، کدک دلخواه و SIP Profile اعمال نمی‌شوند!</li><li><strong>کژفهمی ۳: «SRST تمام امکانات پیشرفته CUCM (مثل کانتکت‌سنتر و ضبط متمرکز) را حین قطعی WAN نگه می‌دارد.»</strong> واقعیت: SRST برای «بقای تماس‌های حیاتی» (داخلی، شهری و اضطراری) طراحی شده و امکانات پایه صوتی را تا بازگشت WAN زنده نگه می‌دارد.</li></ul>"
-  },
-  {
-   "id": "spec_collab_gw-section-12",
-   "title": "عیب‌یابی پرتکرار در Cisco CUBE (debug ccsip messages و صدای یک‌طرفه)",
-   "html": "<p><strong>تله ۱ — صدای یک‌طرفه (One-Way Audio) یا سکوت کامل پس از وصل تماس:</strong> سیگنالینگ SIP روی پورت 5060/5061 عبور کرده اما بسته‌های <strong>RTP (پورت‌های UDP 16384–32767)</strong> روی فایروال بسته است یا آدرس IP موجود در بدنه <strong>SDP (خط <code>c=IN IP4 ...</code>)</strong> یک IP خصوصی غیرقابل دسترس برای اپراتور است! ابزار طلایی تشخیص: <code>debug ccsip messages</code> (در محیط تست/با فیلتر) و <code>show call active voice compact</code>.</p><p><strong>تله ۲ — تماس بلافاصله با <code>403 Forbidden</code> یا <code>404 Not Found</code> رد می‌شود:</strong> بررسی قالب شماره ارسالی (<code>voice translation-rule</code>) و فهرست <code>ip address trusted list</code> در CUBE.</p>"
-  },
-  {
-   "id": "spec_collab_gw-section-13",
-   "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> کاربری شماره <code>902188776655</code> را می‌گیرد؛ سه Outbound Dial-Peer وجود دارد: تگ 200 با الگوی <code>9021</code> و <code>preference 0</code> (ترانک اول)، تگ 201 با الگوی <code>9021</code> و <code>preference 1</code> (ترانک پشتیبان) و تگ 300 با الگوی <code>9</code> و <code>preference 0</code>. اگر ترانک اول قطع باشد، کدام Dial-Peer انتخاب می‌شود؟ <strong>پاسخ:</strong> ابتدا Longest Match الگوی ۴رقمی <code>9021</code> را بر <code>9</code> ترجیح می‌دهد؛ چون ترانک اول (تگ 200) قطع است، تماس به تگ <strong><code>201</code> (ترانک پشتیبان با <code>preference 1</code>)</strong> سوییچ می‌کند.</p><p><strong>تمرین ۲:</strong> لینک WAN یک شعبه قطع می‌شود. تفاوت داشتن یا نداشتن SRST برای تماس اضطراری (E911) چیست؟ <strong>پاسخ:</strong> بدون SRST تمام تلفن‌های شعبه <code>UNREGISTERED</code> شده و حتی تماس اضطراری غیرممکن است؛ با SRST تلفن‌ها روی روتر محلی ثبت شده و تماس‌های داخلی و E911/PSTN زنده می‌مانند.</p>"
-  },
-  {
-   "id": "spec_collab_gw-section-14",
-   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
-   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/voice/cube/configuration/cube-book.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی پیکربندی Cisco Unified Border Element (CUBE)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc4733\" target=\"_blank\" rel=\"noopener\">RFC 4733 (RTP Payload for DTMF Digits / rtp-nte)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی Cisco CUBE / ISR، خوشه CUCM یا SIP Trunk اپراتور در این محیط اجرا نشده است.</p>"
-  }
- ],
- "glossary": [
-  {
-   "term": "Cisco CUBE",
-   "fa": "دروازه مرزی یکپارچه سیسکو",
-   "simple": "Cisco Unified Border Element؛ SBC سازمانی (B2BUA) میان CUCM داخلی و SIP Trunk اپراتور."
-  },
-  {
-   "term": "B2BUA",
-   "fa": "عامل کاربر پشت‌به‌پشت",
-   "simple": "Back-to-Back User Agent؛ خاتمه کامل Leg ورودی و ایجاد Leg خروجی مستقل برای امنیت و نرمال‌سازی SIP."
-  },
-  {
-   "term": "Dial-Peer (Inbound/Outbound)",
-   "fa": "قانون مسیریابی تماس IOS-XE",
-   "simple": "سازه اصلی تطبیق ورودی و مسیریابی خروجی تماس‌های VoIP/PSTN بر اساس Longest Match و Preference."
-  },
-  {
-   "term": "Dial-Peer 0",
-   "fa": "دایل‌پیر پیش‌فرض خطرساز",
-   "simple": "پشتیبانی پیش‌فرض در نبود Inbound Dial-Peer منطبق که فاقد DTMF rtp-nte و تنظیمات کامل است."
-  },
-  {
-   "term": "DTMF Relay (rtp-nte)",
-   "fa": "ارسال کلیدهای شماره‌گیر IVR",
-   "simple": "استاندارد RFC 2833/4733 برای ارسال مطمئن کلیدهای فشرده‌شده تلفن در بسته RTP خارج از باند صدا."
-  },
-  {
-   "term": "SRST",
-   "fa": "بقای تلفن شعب از راه دور",
-   "simple": "Survivable Remote Site Telephony؛ ثبت خودکار تلفن‌های IP روی روتر محلی شعبه هنگام قطعی WAN."
-  },
-  {
-   "term": "SIP Profiles",
-   "fa": "پروفایل‌های دست‌کاری هدر SIP",
-   "simple": "قواعد Regex در CUBE برای اصلاح هدرهای SIP/SDP و حل ناسازگاری میان CUCM و اپراتور."
-  },
-  {
-   "term": "SIP OPTIONS Keepalive",
-   "fa": "پایش زنده بودن SIP Trunk",
-   "simple": "ارسال دوره‌ای پیام OPTIONS توسط CUBE برای تشخیص سریع قطعی Trunk و Failover آنی."
-  },
-  {
-   "term": "Toll Fraud Prevention",
-   "fa": "پیشگیری از تقلب تلفنی",
-   "simple": "محدودسازی سیگنالینگ SIP به فهرست IPهای مجاز (ip address trusted list) در CUBE."
-  },
-  {
-   "term": "Early Offer",
-   "fa": "ارسال SDP در INVITE اول",
-   "simple": "ارسال فهرست کدک و پورت RTP در اولین پیام SIP INVITE (الزامی برای بسیاری از ITSPها)."
-  },
-  {
-   "term": "SDP",
-   "fa": "پروتکل توصیف نشست رسانه",
-   "simple": "Session Description Protocol؛ بخش داخلی پیام SIP که IP، پورت RTP و کدک صوتی را مذاکره می‌کند."
-  },
-  {
-   "term": "One-Way Audio",
-   "fa": "صدای یک‌طرفه در تماس",
-   "simple": "خطای رایج VoIP ناشی از مسدود شدن پورت‌های RTP یا نادرست بودن IP در بدنه SDP."
-  },
-  {
-   "term": "Voice Translation Rule",
-   "fa": "قانون بازنویسی شماره تماس",
-   "simple": "حذف پیش‌شماره خروجی (مثلاً ۹) یا تبدیل شماره داخلی به فرمت بین‌المللی E.164 در Gateway."
-  },
-  {
-   "term": "E911 / Emergency Routing",
-   "fa": "مسیریابی تماس‌های اضطراری",
-   "simple": "اطمینان از دسترسی مستقیم و بدون تاخیر به خدمات اورژانس حتی در شرایط قطعی WAN."
-  },
-  {
-   "term": "ITSP",
-   "fa": "ارائه‌دهنده سرویس SIP Trunk",
-   "simple": "Internet Telephony Service Provider؛ اپراتور متصل‌کننده سازمان به شبکه تلفن عمومی (PSTN) روی IP."
-  }
- ],
- "stages": {
-  "lab": {
-   "title": "آزمایشگاه شبیه‌سازی محلی Python (مسیریابی Longest-Match و Failover در CUBE Dial-Peer، DTMF rtp-nte و بقای SRST) — روتر CUBE واقعی اجرا نشده",
-   "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر واقعی Cisco CUBE، ISR یا خوشه CUCM متصل نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر واقعی Cisco CUBE / ISR، خوشه CUCM یا SIP Trunk اپراتور در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی دو منطق کلیدی دروازه صوتی سیسکو را آزمون می‌کند: (۱) انتخاب <code>Outbound Dial-Peer</code> بر اساس <strong>Longest Match + Preference</strong> همراه Failover خودکار به SIP Trunk پشتیبان و تنظیم <code>dtmf-relay rtp-nte</code>، و (۲) مقایسه وضعیت تلفن‌های شعبه هنگام قطعی WAN با و بدون <strong>SRST</strong> (حفظ E911).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_collab_gw_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_collab_gw_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — spec_collab_gw (Collaboration Voice Gateways: CUBE/SBC, SIP Dial-Peers &amp; SRST Failover)\nSimulates inbound/outbound SIP Dial-Peer longest-match routing on a Cisco CUBE/IOS-XE Voice Gateway,\nDTMF relay negotiation (rtp-nte), and branch SRST survivability when WAN to HQ CUCM fails.\nStrict validation rejects non-bool trunk/WAN/SRST flags and empty dialed numbers.\nNo real Cisco CUBE, ISR Voice Gateway, or CUCM cluster is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\nDIAL_PEERS = [\n    {&quot;tag&quot;: 100, &quot;pattern&quot;: &quot;911&quot;, &quot;target&quot;: &quot;ITSP-SIP-TRUNK-PRIMARY&quot;, &quot;preference&quot;: 0, &quot;dtmf&quot;: &quot;rtp-nte&quot;, &quot;emergency&quot;: True},\n    {&quot;tag&quot;: 200, &quot;pattern&quot;: &quot;9021&quot;, &quot;target&quot;: &quot;ITSP-SIP-TRUNK-PRIMARY&quot;, &quot;preference&quot;: 0, &quot;dtmf&quot;: &quot;rtp-nte&quot;, &quot;emergency&quot;: False},\n    {&quot;tag&quot;: 201, &quot;pattern&quot;: &quot;9021&quot;, &quot;target&quot;: &quot;ITSP-SIP-TRUNK-BACKUP&quot;, &quot;preference&quot;: 1, &quot;dtmf&quot;: &quot;rtp-nte&quot;, &quot;emergency&quot;: False},\n    {&quot;tag&quot;: 300, &quot;pattern&quot;: &quot;9&quot;, &quot;target&quot;: &quot;ITSP-SIP-TRUNK-PRIMARY&quot;, &quot;preference&quot;: 0, &quot;dtmf&quot;: &quot;rtp-nte&quot;, &quot;emergency&quot;: False},\n]\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef match_outbound_dial_peer(dialed_number: str, primary_trunk_up: bool = True) -&gt; dict:\n    if not isinstance(dialed_number, str) or not dialed_number.strip():\n        raise ValueError(f&quot;dialed_number must be a non-empty str, got {dialed_number!r}&quot;)\n    primary_up = _require_bool(primary_trunk_up, &quot;primary_trunk_up&quot;)\n\n    candidates = [dp for dp in DIAL_PEERS if dialed_number.startswith(dp[&quot;pattern&quot;])]\n    # Longest match first, then lowest preference\n    candidates.sort(key=lambda d: (-len(d[&quot;pattern&quot;]), d[&quot;preference&quot;]))\n    for dp in candidates:\n        if dp[&quot;target&quot;] == &quot;ITSP-SIP-TRUNK-PRIMARY&quot; and not primary_up:\n            continue\n        return {\n            &quot;dialed&quot;: dialed_number,\n            &quot;matched_dial_peer&quot;: dp[&quot;tag&quot;],\n            &quot;pattern&quot;: dp[&quot;pattern&quot;],\n            &quot;routed_to&quot;: dp[&quot;target&quot;],\n            &quot;dtmf_relay&quot;: dp[&quot;dtmf&quot;],\n            &quot;emergency&quot;: dp[&quot;emergency&quot;],\n        }\n    return {&quot;dialed&quot;: dialed_number, &quot;matched_dial_peer&quot;: None, &quot;error&quot;: &quot;503 Service Unavailable&quot;}\n\n\ndef evaluate_branch_phone_state(wan_to_cucm_up: bool, srst_configured: bool) -&gt; dict:\n    wan_up = _require_bool(wan_to_cucm_up, &quot;wan_to_cucm_up&quot;)\n    srst_on = _require_bool(srst_configured, &quot;srst_configured&quot;)\n\n    if wan_up:\n        return {&quot;registered_with&quot;: &quot;HQ-CUCM-Cluster&quot;, &quot;call_survivability&quot;: &quot;FULL_FEATURES&quot;, &quot;e911_ok&quot;: True}\n    if srst_on:\n        return {\n            &quot;registered_with&quot;: &quot;Branch-Local-Router-SRST&quot;,\n            &quot;call_survivability&quot;: &quot;SURVIVABLE_LOCAL_AND_PSTN_E911&quot;,\n            &quot;e911_ok&quot;: True,\n        }\n    return {\n        &quot;registered_with&quot;: &quot;UNREGISTERED&quot;,\n        &quot;call_survivability&quot;: &quot;TOTAL_VOICE_OUTAGE&quot;,\n        &quot;e911_ok&quot;: False,\n    }\n\n\ndef main() -&gt; None:\n    em = match_outbound_dial_peer(&quot;911&quot;, primary_trunk_up=True)\n    pri = match_outbound_dial_peer(&quot;902188776655&quot;, primary_trunk_up=True)\n    bkp = match_outbound_dial_peer(&quot;902188776655&quot;, primary_trunk_up=False)\n    assert em[&quot;matched_dial_peer&quot;] == 100 and em[&quot;emergency&quot;] is True\n    assert pri[&quot;matched_dial_peer&quot;] == 200 and bkp[&quot;matched_dial_peer&quot;] == 201\n\n    w_up = evaluate_branch_phone_state(wan_to_cucm_up=True, srst_configured=True)\n    w_srst = evaluate_branch_phone_state(wan_to_cucm_up=False, srst_configured=True)\n    w_out = evaluate_branch_phone_state(wan_to_cucm_up=False, srst_configured=False)\n    assert w_up[&quot;e911_ok&quot;] is True and w_srst[&quot;e911_ok&quot;] is True and w_out[&quot;e911_ok&quot;] is False\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_CUBE_OR_CUCM_HARDWARE&quot;,\n        &quot;dial_peer_routing&quot;: {\n            &quot;emergency_911&quot;: em,\n            &quot;tehran_primary_up&quot;: pri,\n            &quot;tehran_primary_down_failover&quot;: bkp,\n        },\n        &quot;srst_wan_outage_comparison&quot;: {\n            &quot;wan_up&quot;: w_up,\n            &quot;wan_down_with_srst&quot;: w_srst,\n            &quot;wan_down_without_srst&quot;: w_out,\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> تطابق <code>911</code> با تگ <code>100</code>، Failover تماس تهران از تگ <code>200</code> به تگ <code>201</code> هنگام قطعی Primary Trunk، و بقای <code>SURVIVABLE_LOCAL_AND_PSTN_E911</code> با SRST در برابر <code>TOTAL_VOICE_OUTAGE</code> بدون آن.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع Outbound Dial-Peer با OPTIONS Keepalive و DTMF rtp-nte روی Cisco CUBE (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XE CUBE Dial-Peer snippet (NOT executed on live CUBE)\ndial-peer voice 200 voip\n destination-pattern 9021T\n session protocol sipv2\n session target ipv4:203.0.113.10\n dtmf-relay rtp-nte\n voice-class sip options-keepalive\n codec g711ulaw\n preference 0</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
-  },
-  "quiz": {
-   "title": "آزمون درس دروازه‌های صوتی، Cisco CUBE (SBC)، Dial-Peer و SRST",
-   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
-  }
- },
- "interactiveQuiz": [
-  {
-   "title": "نقش اصلی Cisco CUBE (Enterprise SBC) به عنوان یک B2BUA در مرز میان خوشه داخلی CUCM و SIP Trunk اپراتور چیست؟",
-   "options": [
-    "مخفی‌سازی توپولوژی داخلی، نرمال‌سازی هدرهای SIP (با SIP Profiles)، مدیریت رسانه/کدک و جلوگیری از تقلب تلفنی (Toll Fraud)",
-    "جایگزینی سوئیچ PoE تلفن‌ها",
-    "تخصیص آدرس DHCP به گوشی‌ها",
-    "خاموش کردن رمزنگاری TLS"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>CUBE تماس SIP را به دو Leg مستقل می‌شکند تا مرز میان شبکه داخلی سازمان و اپراتور کاملاً ایمن و قابل کنترل باشد.</p>"
-  },
-  {
-   "title": "اگر لینک WAN میان یک شعبه و دفتر مرکزی (محل استقرار CUCM) قطع شود، کدام قابلیت روی روتر محلی شعبه اجازه می‌دهد تلفن‌های IP همچنان تماس داخلی و اضطراری (E911) برقرار کنند؟",
-   "options": [
-    "VTP",
-    "SRST (Survivable Remote Site Telephony)",
-    "Spanning Tree",
-    "SNMPv3"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>SRST به تلفن‌های IP اجازه می‌دهد در نبود CUCM موقتاً روی روتر محلی ثبت شده و تماس‌های حیاتی و اضطراری را زنده نگه دارند.</p>"
-  },
-  {
-   "title": "در یک روتر CUBE، تماس صوتی برقرار است و صدا کاملاً واضح است، اما فشردن کلیدهای عددی در تلفن گویا (IVR) هیچ واکنشی ندارد. محتمل‌ترین علت و استاندارد اصلاحی چیست؟",
-   "options": [
-    "قطعی کابل برق",
-    "نبود VLAN صدا",
-    "عدم تطابق تنظیمات DTMF (یا افتادن روی Dial-Peer 0)؛ باید dtmf-relay rtp-nte (RFC 2833/4733) روی هر دو Dial-Peer ورودی و خروجی تنظیم شود",
-    "کم بودن پهنای باند اینترنت"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p><code>dtmf-relay rtp-nte</code> استاندارد طلایی ارسال قابل اعتماد کلیدهای شماره‌گیر روی SIP Trunk است.</p>"
-  },
-  {
-   "title": "در انتخاب Outbound Dial-Peer در Cisco IOS-XE، اگر شماره 902188776655 گرفته شود و دو Dial-Peer با الگوهای 9021 (تگ 200) و 9 (تگ 300) موجود باشد، کدام انتخاب می‌شود؟",
-   "options": [
-    "تگ 300 چون کوتاه‌تر است",
-    "انتخاب تصادفی",
-    "هیچ‌کدام",
-    "تگ 200 بر اساس قانون Longest Match (تطابق بلندترین پیشوند)"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>روتر صوتی همیشه Dial-Peer با بلندترین تطابق (Longest Match) را برمی‌گزیند و در صورت تساوی طول، به سراغ <code>preference</code> کمتر می‌رود.</p>"
-  },
-  {
-   "title": "چرا افتادن تماس‌های ورودی روی Dial-Peer 0 پیش‌فرض در Cisco CUBE یک ضدالگوی جدی محسوب می‌شود؟",
-   "options": [
-    "زیرا Dial-Peer 0 فاقد تنظیمات صریح مانند dtmf-relay rtp-nte، انتخاب دقیق کدک و SIP Profiles است و موجب خطاهای عجیب صوتی/IVR می‌شود",
-    "زیرا Dial-Peer 0 سرعت ۱۰۰ گیگابیت دارد",
-    "زیرا فقط روی خط آنالوگ کار می‌کند",
-    "زیرا باعث ریبوت روتر می‌شود"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>در طراحی استاندارد CUBE، تعریف صریح Inbound Dial-Peer (مثلاً با <code>incoming uri via</code>) بهترین رویه عملیاتی است تا هیچ تماسی به‌طور ناخواسته روی Dial-Peer 0 نیفتد.</p>"
-  },
-  {
-   "title": "قابلیت voice-class sip options-keepalive روی Dial-Peer خروجی CUBE چه فایده‌ای دارد؟",
-   "options": [
-    "ضبط مکالمات صوتی",
-    "پایش دوره‌ای زنده بودن SIP Trunk اپراتور تا در صورت قطعی Primary، تماس‌ها بدون تاخیر ۱۰–۳۰ ثانیه‌ای فوراً به Backup (preference 1) هدایت شوند",
-    "تغییر کدک به MP3",
-    "افزایش صدای بوق آزاد"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>OPTIONS Ping وضعیت Up/Down ترانک اپراتور را به‌صورت پیش‌فعال پایش کرده و زمان Failover را به زیر یک ثانیه می‌رساند.</p>"
-  },
-  {
-   "title": "در Cisco CUBE کدام مکانیسم داخلی به عنوان خط دفاعی اول در برابر حملات Toll Fraud (برقراری تماس‌های بین‌المللی غیرمجاز) عمل می‌کند؟",
-   "options": [
-    "خاموش کردن DHCP",
-    "استفاده از کدک G.729",
-    "فهرست IPهای مجاز سیگنالینگ (ip address trusted list / authenticate) تا فقط ترافیک SIP از IPهای تاییدشده CUCM و ITSP پذیرفته شود",
-    "حذف Dial-Peer خروجی"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>مسدودسازی درخواست‌های SIP از IPهای ناشناس در CUBE جلوی بخش عمده حملات Toll Fraud را می‌گیرد.</p>"
-  },
-  {
-   "title": "محتمل‌ترین علت فنی پدیده «صدای یک‌طرفه (One-Way Audio)» پس از برقراری موفق تماس SIP چیست؟",
-   "options": [
-    "بسته بودن پورت TCP 80",
-    "قطع بودن DNS",
-    "نبود لیبل MPLS",
-    "مسدود بودن پورت‌های UDP رسانه RTP (مثلاً 16384-32767) در یک جهت روی فایروال یا وجود IP خصوصی غیرقابل دسترس در بدنه SDP"
-   ],
-   "correctIndex": 3,
-   "explanationHtml": "<p>در VoIP سیگنالینگ (SIP) و رسانه (RTP) مسیرها و پورت‌های جدا دارند؛ بنابراین تماس می‌تواند زنگ بخورد ولی RTP در یک جهت Drop شود.</p>"
-  },
-  {
-   "title": "کاربرد SIP Profiles در Cisco CUBE چیست؟",
-   "options": [
-    "دست‌کاری و نرمال‌سازی هدرهای SIP/SDP (مانند Diversion، From یا E.164) برای حل ناسازگاری میان استاندارد CUCM و اپراتور",
-    "ذخیره شماره تماس مدیران",
-    "تنظیم رنگ صفحه تلفن IP",
-    "تعویض سیستم‌عامل IOS-XE"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>هر اپراتور مخابراتی جزئیات متفاوتی در هدر SIP می‌خواهد و SIP Profiles ابزار جراحی دقیق CUBE برای انطباق آن‌هاست.</p>"
-  },
-  {
-   "title": "در صورت وجود دو Outbound Dial-Peer با الگوی دقیقاً هم‌طول (9021)، یکی با preference 0 و دیگری با preference 1، کدام اولویت بالاتر دارد؟",
-   "options": [
-    "preference 1 (عدد بزرگ‌تر)",
-    "preference 0 (عدد کوچک‌تر اولویت بالاتر دارد)",
-    "هر دو هم‌زمان زنگ می‌خورند",
-    "هیچ‌کدام"
-   ],
-   "correctIndex": 1,
-   "explanationHtml": "<p>در Dial-Peer سیسکو، عدد <code>preference</code> کوچک‌تر (از ۰ تا ۱۰) به معنی اولویت بالاتر است.</p>"
-  },
-  {
-   "title": "کدام دستور CLI در IOS-XE CUBE برای مشاهده خام پیام‌های متنی SIP (INVITE، 200 OK، SDP و خطاهای 4xx/5xx) هنگام عیب‌یابی به کار می‌رود؟",
-   "options": [
-    "show ip ospf neighbor",
-    "show spanning-tree",
-    "debug ccsip messages",
-    "show mac address-table"
-   ],
-   "correctIndex": 2,
-   "explanationHtml": "<p>بررسی پیام‌های SIP با <code>debug ccsip messages</code> (ترجیحاً با فیلتر تماس) سریع‌ترین راه عیب‌یابی کدهای خطا و SDP است.</p>"
-  },
-  {
-   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
-   "options": [
-    "شبیه‌سازی محلی (Local Mock) در Python 3 برای مسیریابی Longest-Match و Failover در Dial-Peer، DTMF rtp-nte و مقایسه SRST در قطعی WAN",
-    "برقراری تماس واقعی با ۹۱۱ روی CUBE تولیدی",
-    "اتصال به اپراتور مخابراتی واقعی",
-    "فقط متن نظری بدون کد"
-   ],
-   "correctIndex": 0,
-   "explanationHtml": "<p>آزمایشگاه به‌صورت Local Mock در Python 3 اجرا و تست شده و هیچ روتر CUBE یا CUCM واقعی متصل نیست.</p>"
-  }
- ],
- "meta": {
-  "version": "reviewed.8",
-  "legacyId": "spec_collab_gw",
-  "sources": [
-   "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/voice/cube/configuration/cube-book.html",
-   "https://www.rfc-editor.org/rfc/rfc4733"
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "spec_collab_gw",
+  "objectiveId": "spec_collab_gw",
+  "kind": "lesson",
+  "track": "Specialist",
+  "course": "spec-collab",
+  "title": "۷.۶ Collaboration: دروازه‌های صوتی (Voice Gateways)، Cisco CUBE (SBC)، Dial-Peer و SRST",
+  "titleEn": "Collaboration Deep Dive: Enterprise Voice Gateways, Cisco CUBE (SBC), SIP Dial-Peers, DTMF & SRST",
+  "domain": "Enterprise Collaboration",
+  "source": "Legacy spec_collab_gw rewritten and audited",
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "spec_collab"
   ],
-  "limitations": [
-   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی Cisco CUBE/ISR، خوشه CUCM یا SIP Trunk اپراتور متصل نشده است."
+  "sections": [
+    {
+      "id": "spec_collab_gw-section-1",
+      "title": "مسئله واقعی: چرا هرگز نباید سرور تماس داخلی (CUCM) را مستقیم به SIP Trunk اپراتور وصل کرد — و اگر WAN شعبه قطع شود چه می‌شود؟",
+      "html": "<p>اتصال مستقیم سرور <strong>CUCM</strong> به شبکه مخابراتی (ITSP) دو فاجعه به همراه دارد: افشای توپولوژی داخلی، نبود محافظت در برابر تقلب تلفنی (<strong>Toll Fraud</strong>) و ناسازگاری هدرهای SIP اپراتورها با سیستم داخلی. از سوی دیگر، اگر لینک WAN یک شعبه قطع شود و تلفن‌های IP دسترسی به CUCM مرکز را از دست بدهند، بدون <strong>SRST</strong> حتی امکان گرفتن شماره اضطراری (اورژانس/آتش‌نشانی) هم وجود ندارد! راه‌حل مهندسی سیسکو ترکیبی از <strong>Cisco CUBE (Enterprise SBC)</strong> و <strong>SRST</strong> روی روترهای IOS-XE است.</p>"
+    },
+    {
+      "id": "spec_collab_gw-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با SIP، RTP، Codecها و CUCM در درس <code>spec_collab</code>.</p><ul><li>تبیین نقش <strong>Cisco CUBE (Cisco Unified Border Element)</strong> به عنوان <strong>B2BUA / Enterprise SBC</strong> در مرز میان CUCM و ITSP.</li><li>تسلط بر منطق مسیریابی تماس دوپایی <strong>Inbound و Outbound Dial-Peer</strong> (قانون Longest-Match، <code>preference</code>، <code>huntstop</code> و ترجمه شماره).</li><li>حل مشکلات کلاسیک میان‌کنش‌پذیری SIP با <strong>SIP Profiles</strong>، انتخاب صحیح <strong>DTMF Relay (<code>rtp-nte</code> / RFC 2833)</strong> و جلوگیری از <strong>Toll Fraud</strong>.</li><li>طراحی <strong>SRST (Survivable Remote Site Telephony)</strong> و تضمین تماس‌های اضطراری (<strong>E911 / Emergency</strong>) در هنگام قطعی WAN شعب.</li></ul>"
+    },
+    {
+      "id": "spec_collab_gw-section-3",
+      "title": "Cisco CUBE (SBC): چرا مدل B2BUA برای مرز شبکه صوتی حیاتی است؟",
+      "html": "<p><strong>Cisco CUBE</strong> یک <strong>B2BUA (Back-to-Back User Agent)</strong> است: به جای آنکه پیام SIP اپراتور را مستقیم رد کند، تماس ورودی (Leg 1) را روی خود خاتمه می‌دهد و یک تماس SIP کاملاً جدید و تمیز (Leg 2) به سمت CUCM (یا برعکس) ایجاد می‌کند! پنج مزیت حیاتی آن:</p><ul><li><strong>مخفی‌سازی توپولوژی و امنیت (Topology Hiding + Toll-Fraud Prevention):</strong> IP سرورهای داخلی CUCM از دید اپراتور/اینترنت پنهان می‌ماند و فهرست IPهای مجاز (<code>ip address trusted list</code>) جلوی تماس‌های کلاهبرداری بین‌المللی را می‌گیرد.</li><li><strong>نرمال‌سازی هدرهای SIP (SIP Profiles):</strong> تطبیق هدرهای غیرمعمول اپراتورها (مثل <code>Diversion</code>، <code>P-Asserted-Identity</code> یا فرمت شماره <code>E.164</code>) با انتظار CUCM.</li><li><strong>مدیریت رسانه (Media Anchoring / Transcoding / Early Offer):</strong> تبدیل کدک (مثلاً G.711 به G.729) و رفع مشکل صدای یک‌طرفه (One-Way Audio).</li></ul>"
+    },
+    {
+      "id": "spec_collab_gw-section-4",
+      "title": "نمودار معماری Voice Gateway: Cisco CUBE (SBC)، Dial-Peer و بقای تماس SRST",
+      "html": "<p>نمودار زیر جایگاه CUBE بین CUCM و SIP Trunk اپراتور، منطق Dial-Peer و نقش حیاتی SRST هنگام قطعی WAN را نشان می‌دهد.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Enterprise Voice Gateway: Cisco CUBE SBC, SIP Dial-Peers, DTMF Relay and Branch SRST Survivability\"><rect x=\"14\" y=\"20\" width=\"166\" height=\"84\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"97\" y=\"44\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">HQ CUCM Cluster</text><text x=\"97\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Enterprise Call Control</text><text x=\"97\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e40af\">SIP Trunk to CUBE</text><rect x=\"220\" y=\"14\" width=\"248\" height=\"96\" rx=\"10\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"344\" y=\"36\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">Cisco CUBE (Enterprise SBC)</text><text x=\"344\" y=\"56\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">B2BUA: Hides Internal Topology</text><text x=\"344\" y=\"74\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">Inbound/Outbound Dial-Peers (Longest Match)</text><text x=\"344\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">SIP Profiles | DTMF rtp-nte | Toll-Fraud Block</text><rect x=\"514\" y=\"20\" width=\"232\" height=\"84\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"630\" y=\"44\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">ITSP SIP Trunk / PSTN</text><text x=\"630\" y=\"64\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Primary + Backup SIP Trunks</text><text x=\"630\" y=\"82\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b45309\">Emergency E911 / Local PSTN</text><rect x=\"14\" y=\"136\" width=\"732\" height=\"68\" rx=\"10\" fill=\"#e0e7ff\" stroke=\"#4338ca\" stroke-width=\"2\"/><text x=\"380\" y=\"160\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#312e81\">Branch WAN Outage Protection: Cisco SRST (Survivable Remote Site Telephony)</text><text x=\"380\" y=\"182\" text-anchor=\"middle\" font-size=\"9\" fill=\"#3730a3\">WAN to HQ CUCM Down =&gt; Branch IP Phones Auto-Register to Local ISR Router SRST =&gt; Local Calls &amp; E911/PSTN Survive!</text><line x1=\"180\" y1=\"62\" x2=\"220\" y2=\"62\" stroke=\"#1d4ed8\" stroke-width=\"3\"/><line x1=\"468\" y1=\"62\" x2=\"514\" y2=\"62\" stroke=\"#15803d\" stroke-width=\"3\"/></svg>"
+    },
+    {
+      "id": "spec_collab_gw-section-5",
+      "title": "منطق مسیریابی تماس در IOS-XE: کالبدشکافی Inbound و Outbound Dial-Peer",
+      "html": "<p>در روتر صوتی سیسکو (CUBE / Voice Gateway)، هر تماس دقیقاً از دو <code>dial-peer</code> عبور می‌کند:</p><ol><li><strong>Inbound Dial-Peer:</strong> تعیین می‌کند تماس ورودی از کدام سمت آمده (بر اساس <code>incoming uri via</code>، <code>incoming called-number</code> یا <code>answer-address</code>). <strong>هشدار:</strong> اگر هیچ Dial-Peer ورودی تطبیق پیدا نکند، تماس روی <code>Dial-Peer 0</code> (پیش‌فرض با تنظیمات محدود و بدون DTMF <code>rtp-nte</code>!) می‌افتد که علت شماره ۱ خرابی IVR و کدک است!</li><li><strong>Outbound Dial-Peer:</strong> بر اساس <strong>بلندترین تطابق (Longest Match)</strong> روی <code>destination-pattern</code> (مثلاً <code>911</code> یا <code>9021T</code>) انتخاب می‌شود و در صورت وجود دو مسیر با طول یکسان (Primary و Backup Trunk)، گزینه با <strong><code>preference</code> عددی کمتر</strong> (پیش‌فرض ۰) اولویت دارد و در صورت قطعی Primary (مثلاً خطای <code>503</code> یا تایمر <code>options-keepalive</code>) به Backup با <code>preference 1</code> سوییچ می‌کند!</li></ol>"
+    },
+    {
+      "id": "spec_collab_gw-section-6",
+      "title": "حل معمای کار نکردن کلیدهای تلفن گویا (IVR): استاندارد DTMF Relay (rtp-nte)",
+      "html": "<p>یکی از پرتکرارترین شکایات کاربران در سیستم‌های VoIP این است: «تماس برقرار می‌شود و صدا واضح است، اما وقتی برای اتصال به واحد مالی عدد ۲ را می‌زنیم، سیستم گویا هیچ واکنشی نشان نمی‌دهد!» علت: <strong>عدم تطابق روش ارسال DTMF</strong> (مثلاً یک سمت <code>In-Band Audio</code> روی کدک فشرده G.729 می‌فرستد که صدا را خراب می‌کند، و سمت دیگر منتظر <code>Out-of-Band</code> است). استاندارد جهانی در SIP Trunk و CUBE، تنظیم صریح <strong><code>dtmf-relay rtp-nte</code> (RFC 2833 / RFC 4733)</strong> روی هر دو پای Dial-Peer (ورودی و خروجی) است.</p>"
+    },
+    {
+      "id": "spec_collab_gw-section-7",
+      "title": "بقای تماس در شعب (SRST) و ضرورت قانونی تماس اضطراری (E911 / Emergency)",
+      "html": "<p>در معماری متمرکز، تمام تلفن‌های IP شعب از طریق WAN روی خوشه CUCM دفتر مرکزی ثبت (Register) می‌شوند. <strong>اگر لینک WAN قطع شود چه می‌شود؟</strong> تلفن‌ها پس از از دست دادن Keepalive، به‌طور خودکار آدرس پشتیبان موجود در تنظیمات خود (<strong>SRST Reference</strong>) را گرفته و روی <strong>روتر محلی شعبه (Cisco ISR با SRST فعال)</strong> ثبت می‌شوند! در حالت <strong>SRST (Survivable Remote Site Telephony)</strong>، کارمندان همچنان می‌توانند تماس‌های داخلی شعبه، تماس‌های شهری/ملی از طریق خط محلی PSTN/SIP و مهم‌تر از همه <strong>تماس‌های اضطراری (۱۱۵/۱۲۵/۹۱۱)</strong> را برقرار کنند؛ و به محض وصل شدن WAN، تلفن‌ها به‌طور خودکار به CUCM بازمی‌گردند.</p>"
+    },
+    {
+      "id": "spec_collab_gw-section-8",
+      "title": "امنیت CUBE: پیشگیری از Toll Fraud و احراز هویت SIP Trunk",
+      "html": "<p>یکی از گران‌ترین رخدادهای امنیتی در شرکت‌ها، هک شدن CUBE و برقراری هزاران دقیقه تماس بین‌المللی گران‌قیمت در نیمه‌شب (<strong>Toll Fraud</strong>) است! برای پیشگیری، در IOS-XE CUBE قابلیت داخلی <strong><code>ip address trusted authenticate</code></strong> به همراه <strong><code>ip address trusted list</code></strong> به‌طور پیش‌فرض تنها سیگنالینگ SIP از IPهای مجاز CUCM و ITSP را می‌پذیرد و سایر درخواست‌های ناشناس را در نطفه Drop می‌کند؛ همچنین استفاده از <strong>SIP TLS + SRTP</strong> از شنود مکالمات جلوگیری می‌نماید.</p>"
+    },
+    {
+      "id": "spec_collab_gw-section-9",
+      "title": "پایش سلامت SIP Trunk با SIP OPTIONS Ping و HA در CUBE",
+      "html": "<p>اگر SIP Trunk اول اپراتور قطع شود ولی CUBE تا زمان آمدن تماس بعدی از آن بی‌خبر باشد، اولین تماس‌ها با تاخیر ۱۰–۳۰ ثانیه‌ای شکست می‌خورند. با فعال کردن <strong><code>voice-class sip options-keepalive</code></strong> روی Dial-Peer، روتر CUBE به‌طور دوره‌ای پیام سبک <code>SIP OPTIONS</code> می‌فرستد و به محض دریافت نکردن پاسخ <code>200 OK</code>، وضعیت آن Trunk را <code>busyout</code> می‌کند تا تماس‌ها فوری روی <code>preference 1</code> (ترانک پشتیبان) هدایت شوند!</p>"
+    },
+    {
+      "id": "spec_collab_gw-section-10",
+      "title": "مقایسه پیوندهای قدیمی TDM (E1/T1 PRI) با SIP Trunk مدرن",
+      "html": "<p>تا سال‌ها شعب از خطوط فیزیکی <code>E1 PRI (30 کانال صوتی)</code> یا <code>FXO/FXS</code> استفاده می‌کردند؛ امروز اکثریت سازمان‌ها به <strong>SIP Trunk</strong> مهاجرت کرده‌اند (انعطاف‌پذیری کانال‌های هم‌زمان بدون کارت سخت‌افزاری، پشتیبانی مستقیم از ویدیو و کدک‌های پهن‌باند). البته در شعب حیاتی داشتن یک خط پشتیبان مجزا (مثلاً SIP روی لینک دوم یا خط شهری FXO برای SRST) همچنان توصیه می‌شود.</p>"
+    },
+    {
+      "id": "spec_collab_gw-section-11",
+      "title": "کژفهمی‌های رایج درباره CUBE، Dial-Peer و SRST",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای اتصال CUCM به اپراتور فقط یک خط NAT روی فایروال کافی است و به CUBE نیازی نیست.»</strong> واقعیت: NAT روی SIP (SIP ALG) یکی از مشهورترین منابع خرابی صدای یک‌طرفه و قطع تماس است؛ CUBE به عنوان B2BUA این مرز را به‌صورت استاندارد، ایمن و قابل عیب‌یابی مدیریت می‌کند.</li><li><strong>کژفهمی ۲: «وقتی فقط یک Outbound Dial-Peer بسازیم، Inbound به‌طور خودکار با کیفیت کامل کار می‌کند.»</strong> واقعیت: خیر! در نبود Inbound Dial-Peer مشخص، تماس روی <code>Dial-Peer 0</code> می‌افتد و بسیاری از ویژگی‌ها از جمله <code>dtmf-relay rtp-nte</code>، کدک دلخواه و SIP Profile اعمال نمی‌شوند!</li><li><strong>کژفهمی ۳: «SRST تمام امکانات پیشرفته CUCM (مثل کانتکت‌سنتر و ضبط متمرکز) را حین قطعی WAN نگه می‌دارد.»</strong> واقعیت: SRST برای «بقای تماس‌های حیاتی» (داخلی، شهری و اضطراری) طراحی شده و امکانات پایه صوتی را تا بازگشت WAN زنده نگه می‌دارد.</li></ul>"
+    },
+    {
+      "id": "spec_collab_gw-section-12",
+      "title": "عیب‌یابی پرتکرار در Cisco CUBE (debug ccsip messages و صدای یک‌طرفه)",
+      "html": "<p><strong>تله ۱ — صدای یک‌طرفه (One-Way Audio) یا سکوت کامل پس از وصل تماس:</strong> سیگنالینگ SIP روی پورت 5060/5061 عبور کرده اما بسته‌های <strong>RTP (پورت‌های UDP 16384–32767)</strong> روی فایروال بسته است یا آدرس IP موجود در بدنه <strong>SDP (خط <code>c=IN IP4 ...</code>)</strong> یک IP خصوصی غیرقابل دسترس برای اپراتور است! ابزار طلایی تشخیص: <code>debug ccsip messages</code> (در محیط تست/با فیلتر) و <code>show call active voice compact</code>.</p><p><strong>تله ۲ — تماس بلافاصله با <code>403 Forbidden</code> یا <code>404 Not Found</code> رد می‌شود:</strong> بررسی قالب شماره ارسالی (<code>voice translation-rule</code>) و فهرست <code>ip address trusted list</code> در CUBE.</p>"
+    },
+    {
+      "id": "spec_collab_gw-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> کاربری شماره <code>902188776655</code> را می‌گیرد؛ سه Outbound Dial-Peer وجود دارد: تگ 200 با الگوی <code>9021</code> و <code>preference 0</code> (ترانک اول)، تگ 201 با الگوی <code>9021</code> و <code>preference 1</code> (ترانک پشتیبان) و تگ 300 با الگوی <code>9</code> و <code>preference 0</code>. اگر ترانک اول قطع باشد، کدام Dial-Peer انتخاب می‌شود؟ <strong>پاسخ:</strong> ابتدا Longest Match الگوی ۴رقمی <code>9021</code> را بر <code>9</code> ترجیح می‌دهد؛ چون ترانک اول (تگ 200) قطع است، تماس به تگ <strong><code>201</code> (ترانک پشتیبان با <code>preference 1</code>)</strong> سوییچ می‌کند.</p><p><strong>تمرین ۲:</strong> لینک WAN یک شعبه قطع می‌شود. تفاوت داشتن یا نداشتن SRST برای تماس اضطراری (E911) چیست؟ <strong>پاسخ:</strong> بدون SRST تمام تلفن‌های شعبه <code>UNREGISTERED</code> شده و حتی تماس اضطراری غیرممکن است؛ با SRST تلفن‌ها روی روتر محلی ثبت شده و تماس‌های داخلی و E911/PSTN زنده می‌مانند.</p>"
+    },
+    {
+      "id": "spec_collab_gw-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/voice/cube/configuration/cube-book.html\" target=\"_blank\" rel=\"noopener\">راهنمای رسمی پیکربندی Cisco Unified Border Element (CUBE)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc4733\" target=\"_blank\" rel=\"noopener\">RFC 4733 (RTP Payload for DTMF Digits / rtp-nte)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی Cisco CUBE / ISR، خوشه CUCM یا SIP Trunk اپراتور در این محیط اجرا نشده است.</p>"
+    }
   ],
-  "legacyAuditFixes": [
-   "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Dial-Peer 0 trap، OPTIONS Keepalive، Toll Fraud، One-Way Audio و شبیه‌ساز Dial-Peer/SRST."
+  "glossary": [
+    {
+      "term": "Cisco CUBE",
+      "fa": "دروازه مرزی یکپارچه سیسکو",
+      "simple": "Cisco Unified Border Element؛ SBC سازمانی (B2BUA) میان CUCM داخلی و SIP Trunk اپراتور."
+    },
+    {
+      "term": "B2BUA",
+      "fa": "عامل کاربر پشت‌به‌پشت",
+      "simple": "Back-to-Back User Agent؛ خاتمه کامل Leg ورودی و ایجاد Leg خروجی مستقل برای امنیت و نرمال‌سازی SIP."
+    },
+    {
+      "term": "Dial-Peer (Inbound/Outbound)",
+      "fa": "قانون مسیریابی تماس IOS-XE",
+      "simple": "سازه اصلی تطبیق ورودی و مسیریابی خروجی تماس‌های VoIP/PSTN بر اساس Longest Match و Preference."
+    },
+    {
+      "term": "Dial-Peer 0",
+      "fa": "دایل‌پیر پیش‌فرض خطرساز",
+      "simple": "پشتیبانی پیش‌فرض در نبود Inbound Dial-Peer منطبق که فاقد DTMF rtp-nte و تنظیمات کامل است."
+    },
+    {
+      "term": "DTMF Relay (rtp-nte)",
+      "fa": "ارسال کلیدهای شماره‌گیر IVR",
+      "simple": "استاندارد RFC 2833/4733 برای ارسال مطمئن کلیدهای فشرده‌شده تلفن در بسته RTP خارج از باند صدا."
+    },
+    {
+      "term": "SRST",
+      "fa": "بقای تلفن شعب از راه دور",
+      "simple": "Survivable Remote Site Telephony؛ ثبت خودکار تلفن‌های IP روی روتر محلی شعبه هنگام قطعی WAN."
+    },
+    {
+      "term": "SIP Profiles",
+      "fa": "پروفایل‌های دست‌کاری هدر SIP",
+      "simple": "قواعد Regex در CUBE برای اصلاح هدرهای SIP/SDP و حل ناسازگاری میان CUCM و اپراتور."
+    },
+    {
+      "term": "SIP OPTIONS Keepalive",
+      "fa": "پایش زنده بودن SIP Trunk",
+      "simple": "ارسال دوره‌ای پیام OPTIONS توسط CUBE برای تشخیص سریع قطعی Trunk و Failover آنی."
+    },
+    {
+      "term": "Toll Fraud Prevention",
+      "fa": "پیشگیری از تقلب تلفنی",
+      "simple": "محدودسازی سیگنالینگ SIP به فهرست IPهای مجاز (ip address trusted list) در CUBE."
+    },
+    {
+      "term": "Early Offer",
+      "fa": "ارسال SDP در INVITE اول",
+      "simple": "ارسال فهرست کدک و پورت RTP در اولین پیام SIP INVITE (الزامی برای بسیاری از ITSPها)."
+    },
+    {
+      "term": "SDP",
+      "fa": "پروتکل توصیف نشست رسانه",
+      "simple": "Session Description Protocol؛ بخش داخلی پیام SIP که IP، پورت RTP و کدک صوتی را مذاکره می‌کند."
+    },
+    {
+      "term": "One-Way Audio",
+      "fa": "صدای یک‌طرفه در تماس",
+      "simple": "خطای رایج VoIP ناشی از مسدود شدن پورت‌های RTP یا نادرست بودن IP در بدنه SDP."
+    },
+    {
+      "term": "Voice Translation Rule",
+      "fa": "قانون بازنویسی شماره تماس",
+      "simple": "حذف پیش‌شماره خروجی (مثلاً ۹) یا تبدیل شماره داخلی به فرمت بین‌المللی E.164 در Gateway."
+    },
+    {
+      "term": "E911 / Emergency Routing",
+      "fa": "مسیریابی تماس‌های اضطراری",
+      "simple": "اطمینان از دسترسی مستقیم و بدون تاخیر به خدمات اورژانس حتی در شرایط قطعی WAN."
+    },
+    {
+      "term": "ITSP",
+      "fa": "ارائه‌دهنده سرویس SIP Trunk",
+      "simple": "Internet Telephony Service Provider؛ اپراتور متصل‌کننده سازمان به شبکه تلفن عمومی (PSTN) روی IP."
+    }
   ],
-  "semanticReview": {
-   "date": "2026-11-27",
-   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
-   "reviewer": "author-agent-self-review-not-independent",
-   "evidence": "academy-labs/reviews/spec_collab_gw-review-fa.md"
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه شبیه‌سازی محلی Python (مسیریابی Longest-Match و Failover در CUBE Dial-Peer، DTMF rtp-nte و بقای SRST) — روتر CUBE واقعی اجرا نشده",
+      "executionStatus": "اسکریپت شبیه‌سازی محلی (Local Mock) با Python 3 اجرا و تست شده؛ هیچ روتر واقعی Cisco CUBE، ISR یا خوشه CUCM متصل نشده است.",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ روتر واقعی Cisco CUBE / ISR، خوشه CUCM یا SIP Trunk اپراتور در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی دو منطق کلیدی دروازه صوتی سیسکو را آزمون می‌کند: (۱) انتخاب <code>Outbound Dial-Peer</code> بر اساس <strong>Longest Match + Preference</strong> همراه Failover خودکار به SIP Trunk پشتیبان و تنظیم <code>dtmf-relay rtp-nte</code>، و (۲) مقایسه وضعیت تلفن‌های شعبه هنگام قطعی WAN با و بدون <strong>SRST</strong> (حفظ E911).</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/spec_collab_gw_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/spec_collab_gw_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nLocal Mock Lab — spec_collab_gw (Collaboration Voice Gateways: CUBE/SBC, SIP Dial-Peers &amp; SRST Failover)\nSimulates inbound/outbound SIP Dial-Peer longest-match routing on a Cisco CUBE/IOS-XE Voice Gateway,\nDTMF relay negotiation (rtp-nte), and branch SRST survivability when WAN to HQ CUCM fails.\nStrict validation rejects non-bool trunk/WAN/SRST flags and empty dialed numbers.\nNo real Cisco CUBE, ISR Voice Gateway, or CUCM cluster is connected.\n&quot;&quot;&quot;\n\nimport json\n\n\nDIAL_PEERS = [\n    {&quot;tag&quot;: 100, &quot;pattern&quot;: &quot;911&quot;, &quot;target&quot;: &quot;ITSP-SIP-TRUNK-PRIMARY&quot;, &quot;preference&quot;: 0, &quot;dtmf&quot;: &quot;rtp-nte&quot;, &quot;emergency&quot;: True},\n    {&quot;tag&quot;: 200, &quot;pattern&quot;: &quot;9021&quot;, &quot;target&quot;: &quot;ITSP-SIP-TRUNK-PRIMARY&quot;, &quot;preference&quot;: 0, &quot;dtmf&quot;: &quot;rtp-nte&quot;, &quot;emergency&quot;: False},\n    {&quot;tag&quot;: 201, &quot;pattern&quot;: &quot;9021&quot;, &quot;target&quot;: &quot;ITSP-SIP-TRUNK-BACKUP&quot;, &quot;preference&quot;: 1, &quot;dtmf&quot;: &quot;rtp-nte&quot;, &quot;emergency&quot;: False},\n    {&quot;tag&quot;: 300, &quot;pattern&quot;: &quot;9&quot;, &quot;target&quot;: &quot;ITSP-SIP-TRUNK-PRIMARY&quot;, &quot;preference&quot;: 0, &quot;dtmf&quot;: &quot;rtp-nte&quot;, &quot;emergency&quot;: False},\n]\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef match_outbound_dial_peer(dialed_number: str, primary_trunk_up: bool = True) -&gt; dict:\n    if not isinstance(dialed_number, str) or not dialed_number.strip():\n        raise ValueError(f&quot;dialed_number must be a non-empty str, got {dialed_number!r}&quot;)\n    primary_up = _require_bool(primary_trunk_up, &quot;primary_trunk_up&quot;)\n\n    candidates = [dp for dp in DIAL_PEERS if dialed_number.startswith(dp[&quot;pattern&quot;])]\n    # Longest match first, then lowest preference\n    candidates.sort(key=lambda d: (-len(d[&quot;pattern&quot;]), d[&quot;preference&quot;]))\n    for dp in candidates:\n        if dp[&quot;target&quot;] == &quot;ITSP-SIP-TRUNK-PRIMARY&quot; and not primary_up:\n            continue\n        return {\n            &quot;dialed&quot;: dialed_number,\n            &quot;matched_dial_peer&quot;: dp[&quot;tag&quot;],\n            &quot;pattern&quot;: dp[&quot;pattern&quot;],\n            &quot;routed_to&quot;: dp[&quot;target&quot;],\n            &quot;dtmf_relay&quot;: dp[&quot;dtmf&quot;],\n            &quot;emergency&quot;: dp[&quot;emergency&quot;],\n        }\n    return {&quot;dialed&quot;: dialed_number, &quot;matched_dial_peer&quot;: None, &quot;error&quot;: &quot;503 Service Unavailable&quot;}\n\n\ndef evaluate_branch_phone_state(wan_to_cucm_up: bool, srst_configured: bool) -&gt; dict:\n    wan_up = _require_bool(wan_to_cucm_up, &quot;wan_to_cucm_up&quot;)\n    srst_on = _require_bool(srst_configured, &quot;srst_configured&quot;)\n\n    if wan_up:\n        return {&quot;registered_with&quot;: &quot;HQ-CUCM-Cluster&quot;, &quot;call_survivability&quot;: &quot;FULL_FEATURES&quot;, &quot;e911_ok&quot;: True}\n    if srst_on:\n        return {\n            &quot;registered_with&quot;: &quot;Branch-Local-Router-SRST&quot;,\n            &quot;call_survivability&quot;: &quot;SURVIVABLE_LOCAL_AND_PSTN_E911&quot;,\n            &quot;e911_ok&quot;: True,\n        }\n    return {\n        &quot;registered_with&quot;: &quot;UNREGISTERED&quot;,\n        &quot;call_survivability&quot;: &quot;TOTAL_VOICE_OUTAGE&quot;,\n        &quot;e911_ok&quot;: False,\n    }\n\n\ndef main() -&gt; None:\n    em = match_outbound_dial_peer(&quot;911&quot;, primary_trunk_up=True)\n    pri = match_outbound_dial_peer(&quot;902188776655&quot;, primary_trunk_up=True)\n    bkp = match_outbound_dial_peer(&quot;902188776655&quot;, primary_trunk_up=False)\n    assert em[&quot;matched_dial_peer&quot;] == 100 and em[&quot;emergency&quot;] is True\n    assert pri[&quot;matched_dial_peer&quot;] == 200 and bkp[&quot;matched_dial_peer&quot;] == 201\n\n    w_up = evaluate_branch_phone_state(wan_to_cucm_up=True, srst_configured=True)\n    w_srst = evaluate_branch_phone_state(wan_to_cucm_up=False, srst_configured=True)\n    w_out = evaluate_branch_phone_state(wan_to_cucm_up=False, srst_configured=False)\n    assert w_up[&quot;e911_ok&quot;] is True and w_srst[&quot;e911_ok&quot;] is True and w_out[&quot;e911_ok&quot;] is False\n\n    report = {\n        &quot;mode&quot;: &quot;LOCAL_MOCK_NO_REAL_CUBE_OR_CUCM_HARDWARE&quot;,\n        &quot;dial_peer_routing&quot;: {\n            &quot;emergency_911&quot;: em,\n            &quot;tehran_primary_up&quot;: pri,\n            &quot;tehran_primary_down_failover&quot;: bkp,\n        },\n        &quot;srst_wan_outage_comparison&quot;: {\n            &quot;wan_up&quot;: w_up,\n            &quot;wan_down_with_srst&quot;: w_srst,\n            &quot;wan_down_without_srst&quot;: w_out,\n        },\n    }\n    print(json.dumps(report, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> تطابق <code>911</code> با تگ <code>100</code>، Failover تماس تهران از تگ <code>200</code> به تگ <code>201</code> هنگام قطعی Primary Trunk، و بقای <code>SURVIVABLE_LOCAL_AND_PSTN_E911</code> با SRST در برابر <code>TOTAL_VOICE_OUTAGE</code> بدون آن.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع Outbound Dial-Peer با OPTIONS Keepalive و DTMF rtp-nte روی Cisco CUBE (اجرا نشده روی روتر زنده):</strong></p><pre dir=\"ltr\"><code># Reference IOS-XE CUBE Dial-Peer snippet (NOT executed on live CUBE)\ndial-peer voice 200 voip\n destination-pattern 9021T\n session protocol sipv2\n session target ipv4:203.0.113.10\n dtmf-relay rtp-nte\n voice-class sip options-keepalive\n codec g711ulaw\n preference 0</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "title": "آزمون درس دروازه‌های صوتی، Cisco CUBE (SBC)، Dial-Peer و SRST",
+      "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+    }
   },
-  "integration": {
-   "recommendedPath": "fam-specializations",
-   "recommendedCourse": "spec-collab",
-   "blueprint": "/academy-assets/v5/blueprints/spec_collab_gw.json",
-   "labScript": "01-خام-پروژه/academy-labs/agent3/spec_collab_gw_lab.py"
-  },
-  "technicalAuditFixes": [
-   "اصلاح عبارت مطلق «همیشه باید» در توضیح پرسش ۵ به بیان بهترین رویه طراحی استاندارد Cisco CUBE.",
-   "اصلاح بازبینی فاز ۸B: اعمال _require_bool روی primary_trunk_up، wan_to_cucm_up و srst_configured و بررسی dialed_number غیرخالی در spec_collab_gw_lab.py."
-  ]
- }
+  "interactiveQuiz": [
+    {
+      "title": "نقش اصلی Cisco CUBE (Enterprise SBC) به عنوان یک B2BUA در مرز میان خوشه داخلی CUCM و SIP Trunk اپراتور چیست؟",
+      "options": [
+        "مخفی‌سازی توپولوژی داخلی، نرمال‌سازی هدرهای SIP (با SIP Profiles)، مدیریت رسانه/کدک و جلوگیری از تقلب تلفنی (Toll Fraud)",
+        "جایگزینی سوئیچ PoE تلفن‌ها",
+        "تخصیص آدرس DHCP به گوشی‌ها",
+        "خاموش کردن رمزنگاری TLS"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>CUBE تماس SIP را به دو Leg مستقل می‌شکند تا مرز میان شبکه داخلی سازمان و اپراتور کاملاً ایمن و قابل کنترل باشد.</p>"
+    },
+    {
+      "title": "اگر لینک WAN میان یک شعبه و دفتر مرکزی (محل استقرار CUCM) قطع شود، کدام قابلیت روی روتر محلی شعبه اجازه می‌دهد تلفن‌های IP همچنان تماس داخلی و اضطراری (E911) برقرار کنند؟",
+      "options": [
+        "VTP",
+        "SRST (Survivable Remote Site Telephony)",
+        "Spanning Tree",
+        "SNMPv3"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>SRST به تلفن‌های IP اجازه می‌دهد در نبود CUCM موقتاً روی روتر محلی ثبت شده و تماس‌های حیاتی و اضطراری را زنده نگه دارند.</p>"
+    },
+    {
+      "title": "در یک روتر CUBE، تماس صوتی برقرار است و صدا کاملاً واضح است، اما فشردن کلیدهای عددی در تلفن گویا (IVR) هیچ واکنشی ندارد. محتمل‌ترین علت و استاندارد اصلاحی چیست؟",
+      "options": [
+        "قطعی کابل برق",
+        "نبود VLAN صدا",
+        "عدم تطابق تنظیمات DTMF (یا افتادن روی Dial-Peer 0)؛ باید dtmf-relay rtp-nte (RFC 2833/4733) روی هر دو Dial-Peer ورودی و خروجی تنظیم شود",
+        "کم بودن پهنای باند اینترنت"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p><code>dtmf-relay rtp-nte</code> استاندارد طلایی ارسال قابل اعتماد کلیدهای شماره‌گیر روی SIP Trunk است.</p>"
+    },
+    {
+      "title": "در انتخاب Outbound Dial-Peer در Cisco IOS-XE، اگر شماره 902188776655 گرفته شود و دو Dial-Peer با الگوهای 9021 (تگ 200) و 9 (تگ 300) موجود باشد، کدام انتخاب می‌شود؟",
+      "options": [
+        "تگ 300 چون کوتاه‌تر است",
+        "انتخاب تصادفی",
+        "هیچ‌کدام",
+        "تگ 200 بر اساس قانون Longest Match (تطابق بلندترین پیشوند)"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>روتر صوتی همیشه Dial-Peer با بلندترین تطابق (Longest Match) را برمی‌گزیند و در صورت تساوی طول، به سراغ <code>preference</code> کمتر می‌رود.</p>"
+    },
+    {
+      "title": "چرا افتادن تماس‌های ورودی روی Dial-Peer 0 پیش‌فرض در Cisco CUBE یک ضدالگوی جدی محسوب می‌شود؟",
+      "options": [
+        "زیرا Dial-Peer 0 فاقد تنظیمات صریح مانند dtmf-relay rtp-nte، انتخاب دقیق کدک و SIP Profiles است و موجب خطاهای عجیب صوتی/IVR می‌شود",
+        "زیرا Dial-Peer 0 سرعت ۱۰۰ گیگابیت دارد",
+        "زیرا فقط روی خط آنالوگ کار می‌کند",
+        "زیرا باعث ریبوت روتر می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در طراحی استاندارد CUBE، تعریف صریح Inbound Dial-Peer (مثلاً با <code>incoming uri via</code>) بهترین رویه عملیاتی است تا هیچ تماسی به‌طور ناخواسته روی Dial-Peer 0 نیفتد.</p>"
+    },
+    {
+      "title": "قابلیت voice-class sip options-keepalive روی Dial-Peer خروجی CUBE چه فایده‌ای دارد؟",
+      "options": [
+        "ضبط مکالمات صوتی",
+        "پایش دوره‌ای زنده بودن SIP Trunk اپراتور تا در صورت قطعی Primary، تماس‌ها بدون تاخیر ۱۰–۳۰ ثانیه‌ای فوراً به Backup (preference 1) هدایت شوند",
+        "تغییر کدک به MP3",
+        "افزایش صدای بوق آزاد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>OPTIONS Ping وضعیت Up/Down ترانک اپراتور را به‌صورت پیش‌فعال پایش کرده و زمان Failover را به زیر یک ثانیه می‌رساند.</p>"
+    },
+    {
+      "title": "در Cisco CUBE کدام مکانیسم داخلی به عنوان خط دفاعی اول در برابر حملات Toll Fraud (برقراری تماس‌های بین‌المللی غیرمجاز) عمل می‌کند؟",
+      "options": [
+        "خاموش کردن DHCP",
+        "استفاده از کدک G.729",
+        "فهرست IPهای مجاز سیگنالینگ (ip address trusted list / authenticate) تا فقط ترافیک SIP از IPهای تاییدشده CUCM و ITSP پذیرفته شود",
+        "حذف Dial-Peer خروجی"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>مسدودسازی درخواست‌های SIP از IPهای ناشناس در CUBE جلوی بخش عمده حملات Toll Fraud را می‌گیرد.</p>"
+    },
+    {
+      "title": "محتمل‌ترین علت فنی پدیده «صدای یک‌طرفه (One-Way Audio)» پس از برقراری موفق تماس SIP چیست؟",
+      "options": [
+        "بسته بودن پورت TCP 80",
+        "قطع بودن DNS",
+        "نبود لیبل MPLS",
+        "مسدود بودن پورت‌های UDP رسانه RTP (مثلاً 16384-32767) در یک جهت روی فایروال یا وجود IP خصوصی غیرقابل دسترس در بدنه SDP"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>در VoIP سیگنالینگ (SIP) و رسانه (RTP) مسیرها و پورت‌های جدا دارند؛ بنابراین تماس می‌تواند زنگ بخورد ولی RTP در یک جهت Drop شود.</p>"
+    },
+    {
+      "title": "کاربرد SIP Profiles در Cisco CUBE چیست؟",
+      "options": [
+        "دست‌کاری و نرمال‌سازی هدرهای SIP/SDP (مانند Diversion، From یا E.164) برای حل ناسازگاری میان استاندارد CUCM و اپراتور",
+        "ذخیره شماره تماس مدیران",
+        "تنظیم رنگ صفحه تلفن IP",
+        "تعویض سیستم‌عامل IOS-XE"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر اپراتور مخابراتی جزئیات متفاوتی در هدر SIP می‌خواهد و SIP Profiles ابزار جراحی دقیق CUBE برای انطباق آن‌هاست.</p>"
+    },
+    {
+      "title": "در صورت وجود دو Outbound Dial-Peer با الگوی دقیقاً هم‌طول (9021)، یکی با preference 0 و دیگری با preference 1، کدام اولویت بالاتر دارد؟",
+      "options": [
+        "preference 1 (عدد بزرگ‌تر)",
+        "preference 0 (عدد کوچک‌تر اولویت بالاتر دارد)",
+        "هر دو هم‌زمان زنگ می‌خورند",
+        "هیچ‌کدام"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در Dial-Peer سیسکو، عدد <code>preference</code> کوچک‌تر (از ۰ تا ۱۰) به معنی اولویت بالاتر است.</p>"
+    },
+    {
+      "title": "کدام دستور CLI در IOS-XE CUBE برای مشاهده خام پیام‌های متنی SIP (INVITE، 200 OK، SDP و خطاهای 4xx/5xx) هنگام عیب‌یابی به کار می‌رود؟",
+      "options": [
+        "show ip ospf neighbor",
+        "show spanning-tree",
+        "debug ccsip messages",
+        "show mac address-table"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بررسی پیام‌های SIP با <code>debug ccsip messages</code> (ترجیحاً با فیلتر تماس) سریع‌ترین راه عیب‌یابی کدهای خطا و SDP است.</p>"
+    },
+    {
+      "title": "وظیفه اصلی Cisco Unified Border Element (CUBE) در مرز بین شبکه تلفنی داخلی سازمان (CUCM) و سرویس‌دهنده SIP Trunk بیرونی چیست؟",
+      "options": [
+        "جایگزینی کامل سوئیچ‌های دسترسی PoE",
+        "عمل به‌عنوان Session Border Controller (SBC) برای جداسازی توپولوژی، نرمال‌سازی هدرهای SIP، تبدیل کدک (Transcoding) و اعمال امنیت مرزی",
+        "ذخیره پیام‌های ایمیل کاربران",
+        "پخش ترافیک Broadcast بین شعب"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>CUBE مرز کنترلی و امنیتی بین شبکه صوتی داخلی و اپراتور بیرونی است و از افشای آدرس‌های داخلی و ناسازگاری‌های پروتکل SIP جلوگیری می‌کند.</p>"
+    }
+  ],
+  "meta": {
+    "version": "reviewed.8",
+    "legacyId": "spec_collab_gw",
+    "sources": [
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/voice/cube/configuration/cube-book.html",
+      "https://www.rfc-editor.org/rfc/rfc4733"
+    ],
+    "limitations": [
+      "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ روتر واقعی Cisco CUBE/ISR، خوشه CUCM یا SIP Trunk اپراتور متصل نشده است."
+    ],
+    "legacyAuditFixes": [
+      "گسترش نسخه قدیمی به ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG، Dial-Peer 0 trap، OPTIONS Keepalive، Toll Fraud، One-Way Audio و شبیه‌ساز Dial-Peer/SRST."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/spec_collab_gw-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-specializations",
+      "recommendedCourse": "spec-collab",
+      "blueprint": "/academy-assets/v5/blueprints/spec_collab_gw.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/spec_collab_gw_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح عبارت مطلق «همیشه باید» در توضیح پرسش ۵ به بیان بهترین رویه طراحی استاندارد Cisco CUBE.",
+      "اصلاح بازبینی فاز ۸B: اعمال _require_bool روی primary_trunk_up، wan_to_cucm_up و srst_configured و بررسی dialed_number غیرخالی در spec_collab_gw_lab.py."
+    ]
+  }
 }
