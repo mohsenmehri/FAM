@@ -20,3 +20,8 @@
 - افزودن بررسی `nbf` و اختیاری `iss`/`aud`/`typ`، رد کلید تکراری JSON و رد Wildcard روی IP literal در SAN.
 - اصلاح بخش‌های ۶، ۱۰ و ۱۴ و آزمون برای تصریح وابستگی بررسی ابطال گواهینامه (CRL/OCSP) به کلاینت/سیاست، ارجاع صریح به RFC 8725 و مرز غیرتولیدی آزمایشگاه.
 - **وضعیت بازبینی:** همچنان خودبازبینی نویسنده (`author-agent-self-review-not-independent`) — آماده بازبینی مجدد یکپارچه‌ساز/انسان مستقل.
+
+## به‌روزرسانی فاز ۱۴ (رفع ایرادهای باقی‌مانده `batch-auto-07-09-intake-fa.md` @ `ffd6a320ca`)
+- گرفتن `RecursionError` روی JSON تودرتوی عمیق (۱۱۰۰ لایه) و محدود کردن طول کل توکن (`MAX_TOKEN_CHARS = 16384`).
+- جایگزینی `checks_performed` با دو فیلد دقیق `checks_configured` و `checks_executed` تا در رد زودهنگام مراحل اجراشده به‌دقت گزارش شوند.
+- سخت‌سازی `verify_san_match` (رد برچسب جزئی `f*.example.com` و `*.*.example.com`) و تکمیل متن HTTP/3، TLS 1.3 0-RTT (RFC 8446/8470) و SAN (PSL و تفکیک DNS/IP).

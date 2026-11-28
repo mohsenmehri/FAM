@@ -38,8 +38,13 @@ def evaluate_dtp_link(
     sw2_nonegotiate: bool = False,
 ) -> dict[str, object]:
     """Model Catalyst DTP negotiation and explicitly distinguish mode vs nonegotiate."""
-    if sw1_mode not in VALID_PORT_MODES or sw2_mode not in VALID_PORT_MODES:
-        raise ValueError(f"modes must be in {sorted(VALID_PORT_MODES)}")
+    if (
+        not isinstance(sw1_mode, str)
+        or not isinstance(sw2_mode, str)
+        or sw1_mode not in VALID_PORT_MODES
+        or sw2_mode not in VALID_PORT_MODES
+    ):
+        raise ValueError(f"modes must be str in {sorted(VALID_PORT_MODES)}")
     n1 = _require_bool(sw1_nonegotiate, "sw1_nonegotiate")
     n2 = _require_bool(sw2_nonegotiate, "sw2_nonegotiate")
 
@@ -101,6 +106,10 @@ def audit_trunk_pair(
     req_nat_allowed = _require_bool(require_native_in_allowed, "require_native_in_allowed")
 
     issues: list[str] = []
+    if nat1 not in db1:
+        issues.append(f"SW1_NATIVE_MISSING_IN_DB: native VLAN {nat1} not present in SW1 VLAN database")
+    if nat2 not in db2:
+        issues.append(f"SW2_NATIVE_MISSING_IN_DB: native VLAN {nat2} not present in SW2 VLAN database")
     if nat1 != nat2:
         issues.append(f"NATIVE_VLAN_MISMATCH: SW1={nat1} vs SW2={nat2}")
     if tag1 != tag2:
@@ -122,12 +131,17 @@ def audit_trunk_pair(
             issues.append(f"VLAN_{vid}_NOT_ALLOWED_ON_SW2_TRUNK")
 
     native_frame_format = "tagged_8021q" if (tag1 and tag2) else ("untagged_default" if (not tag1 and not tag2) else "mismatched")
+    common_vlans = sorted(db1 & db2 & all1 & all2)
+    checks_ok = len(issues) == 0
     return {
-        "end_to_end_ok": len(issues) == 0,
+        "model_checks_ok": checks_ok,
+        "end_to_end_ok": checks_ok,
         "native_vlan_sw1": nat1,
         "native_vlan_sw2": nat2,
         "native_frame_format": native_frame_format,
-        "effective_forwarding_vlans": sorted(db1 & db2 & all1 & all2),
+        "configured_common_vlans": common_vlans,
+        "effective_forwarding_vlans": common_vlans,
+        "model_scope_note": "Configuration intersection check only; does NOT prove live physical link, STP forwarding, or ACL/filtering.",
         "issues": issues,
     }
 

@@ -358,5 +358,21 @@
   - `auto_13`: افزودن بررسی `isinstance(..., str)` پیش از جست‌وجو در دیکشنری برای `fail_on_device` و `device` (رد `list`/`dict` با `ValueError` به‌جای `TypeError`).
 - **تطابق کد embedded:** تمامی ۷ بلوپرینت ویرایش‌شده byte-for-byte با فایل `*_lab.py` متناظر همگام و با تست `test_phase13_handoff_9cdaf84b_auto07_09_and_proactive_audit` تأیید شدند (`38/38 OK`، `SHARED_FILES_TOUCHED=0`).
 
+## ۱۴. همگام‌سازی با دفتر هماهنگی و گزارش دسته `auto_07`–`auto_09` @ `ffd6a320ca` — رفع کامل ایرادهای باقی‌مانده
+
+- **رفع ایرادهای باقی‌مانده `auto_07` (`batch-auto-07-09-intake-fa.md` @ `ffd6a320ca`):**
+  - گرفتن `RecursionError` روی JSON تودرتوی عمیق (۱۱۰۰ لایه) و محدود کردن اندازه کل توکن (`MAX_TOKEN_CHARS = 16384`) تا به‌جای کرش، پاسخ رد تمیز `malformed_jwt_encoding_or_json` برگردد.
+  - جایگزینی `checks_performed` با دو فیلد دقیق و تفکیکی `checks_configured` (بررسی‌های پیکربندی‌شده) و `checks_executed` (صرفاً مراحلی که پیش از رد زودهنگام واقعاً اجرا شده‌اند).
+  - سخت‌سازی `verify_san_match` (رد برچسب جزئی `f*.example.com`، Wildcard تودرتو `*.*.example.com` و نقطه‌های متوالی) و تکمیل دقیق متن HTTP/3 (محدودیت UDP/Middlebox و fallback)، TLS 1.3 0-RTT (RFC 8446 بخش 8 و RFC 8470) و SAN (DNS در برابر IP و Public Suffix List).
+- **رفع ایرادهای باقی‌مانده `auto_09` (`batch-auto-07-09-intake-fa.md` @ `ffd6a320ca`):**
+  - پیاده‌سازی پارسر RFC 9110 بخش 12.5.1 برای پارامترهای کیفیت `q` در هدر `Accept` با اولویت اختصاصیت (`application/yang-data+json` > `application/*` > `*/*`) — اکنون `Accept: application/yang-data+json;q=0` (حتی همراه با `*/*;q=0.5`) و `*/*;q=0` دقیقاً کد **`406 Not Acceptable`** برمی‌گردانند.
+  - ارتقای سرور به `ThreadingHTTPServer` (`daemon_threads=True`) با `self.timeout = self.server.request_timeout_sec` روی هر اتصال و مدیریت `TimeoutError`/`socket.timeout` و خوانش ناقص (پاسخ **`408 Request Timeout`** / `400` بدون تغییر store و بدون قفل کردن `server.shutdown()`).
+  - اعتبارسنجی percent-encoding کلید URI (رد `%ZZ` و کاراکترهای کنترلی)، رد `Transfer-Encoding` (`501`)، رد `Content-Length` تکراری (`400`) و گرفتن `RecursionError` در JSON (`400`).
+- **همگام‌سازی نکات تکمیلی `auto_08`، `ccna_02_vlan`، `ccna_v1` و `ccna_v6` @ `ffd6a320ca`:**
+  - `auto_08`: قرار دادن `]]>]]>` درون کامنت معتبر XML 1.0، بستن دور زدن قفل با `session_id=None` و رد `commit_confirmed` هم‌پوشان، اصلاح `lock-id` به `session-id` و تصریح شخص‌ثالث بودن `ncclient` و اختیاری بودن Capabilities.
+  - `ccna_02_vlan`: رفع تایپوی «تگ ۴بیتی» به «تگ ۴بایتی»، تصریح اینکه VLAN جایگزین ACL نیست، کنترل وجود Native VLAN در پایگاه داده هر دو سوئیچ و اعتبارسنجی `isinstance(..., str)` برای حالت پورت.
+  - `ccna_v1` و `ccna_v6`: اعمال یافته‌های مقدماتی `agent3-new-transfer-intake-fa.md` (مشروط‌سازی جداسازی VM/کانتینر، مرز مسئولیت SaaS/PaaS و رفتار فریم تگ‌دار روی پورت Access در `ccna_v1`؛ تفکیک صریح Control Plane RIB [AD/Metric/ECMP] از Data Plane FIB [LPM و استثنای PBR] و شرطی کردن Router-ID دستی OSPFv3 بر پایه پیاده‌سازی در `ccna_v6`).
+- **نتیجه آزمون و انطباق:** `39/39 OK` در تست‌های محتوا (`61` تست کل مخزن، `OK`)، تطابق byte-for-byte همه کدهای embedded، و `SHARED_FILES_TOUCHED=0`.
+
 
 

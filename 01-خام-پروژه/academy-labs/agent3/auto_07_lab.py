@@ -1,10 +1,10 @@
 """Educational Local Crypto / JWT-Demo / X.509 SAN Lab for auto_07.
 
 Execution boundary & scope disclaimer:
-- Runs pure Python 3 stdlib HMAC-SHA256 / Base64URL and simplified SAN matching locally.
+- Runs pure Python 3 stdlib HMAC-SHA256 / Base64URL and simplified DNS/IP SAN matching locally.
 - This is strictly an EDUCATIONAL DEMO — NOT a production RFC 8725 JWT verifier and NOT
   a TLS/X.509 verification stack. No live TLS 1.3 handshake, OCSP/CRL revocation server,
-  or production OAuth 2.0 / OIDC authorization server is contacted.
+  Public Suffix List, or production OAuth 2.0 / OIDC authorization server is contacted.
 - Features intentionally NOT implemented here (required in production): JWKS/kid key
   management and rotation, asymmetric JWS (RS256/ES256/EdDSA), jti replay cache, token
   revocation, and OAuth scope/policy enforcement.
@@ -19,6 +19,7 @@ import json
 import re
 
 _BASE64URL_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+MAX_TOKEN_CHARS = 16384
 
 
 def b64url_encode(raw: bytes) -> str:
@@ -44,7 +45,7 @@ def b64url_decode_strict(segment: str) -> bytes:
 
 
 def _loads_strict_json_object(raw: bytes) -> dict[str, object]:
-    """Parse UTF-8 JSON object rejecting duplicate keys and non-standard NaN/Infinity constants."""
+    """Parse UTF-8 JSON object rejecting duplicate keys, NaN/Infinity, and excessive nesting (RecursionError)."""
     def _reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
         obj: dict[str, object] = {}
         for k, v in pairs:
@@ -56,11 +57,14 @@ def _loads_strict_json_object(raw: bytes) -> dict[str, object]:
     def _reject_constants(tok: str) -> object:
         raise ValueError(f"non-standard JSON constant: {tok!r}")
 
-    parsed = json.loads(
-        raw.decode("utf-8"),
-        object_pairs_hook=_reject_duplicates,
-        parse_constant=_reject_constants,
-    )
+    try:
+        parsed = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_reject_duplicates,
+            parse_constant=_reject_constants,
+        )
+    except RecursionError as exc:
+        raise ValueError("JSON nesting depth exceeded") from exc
     if not isinstance(parsed, dict):
         raise ValueError("JSON segment must decode to an object")
     return parsed
@@ -93,11 +97,11 @@ def evaluate_hs256_jwt_demo(
 ) -> dict[str, object]:
     """Educational HS256 JWS inspector with explicit scope boundaries (NOT a production verifier).
 
-    Always validates compact 3-part ASCII Base64URL syntax, strict JSON objects, pinned
-    alg=='HS256', constant-time bytes HMAC-SHA256 comparison (never raising TypeError on
-    non-ASCII tokens), exp (required int > now_ts), and nbf (if present, int <= now_ts).
-    Optionally validates iss/aud/typ when expected_* values are supplied, and reports every
-    performed and unimplemented check explicitly in the returned dict.
+    Reports `checks_configured` (policy enabled for this call), `checks_executed` (exact steps
+    actually reached before any early rejection), and `checks_not_implemented` (production
+    requirements intentionally absent from this local demo). Deeply nested JSON (e.g. 1100
+    levels) and non-ASCII signatures (e.g. '☃') are caught and returned as clean rejections,
+    never raising RecursionError or TypeError.
     """
     if not isinstance(token, str) or not isinstance(secret, (bytes, bytearray)) or not secret:
         raise ValueError("token must be str and secret must be non-empty bytes")
@@ -111,9 +115,10 @@ def evaluate_hs256_jwt_demo(
         if opt_val is not None and (not isinstance(opt_val, str) or not opt_val.strip()):
             raise ValueError(f"{opt_name} must be None or a non-empty str")
 
-    checks_performed = [
+    checks_configured = [
+        "token_size_limit",
         "compact_3_part_ascii_base64url",
-        "strict_json_no_duplicate_keys",
+        "strict_json_no_duplicate_keys_or_deep_recursion",
         "alg_pinned_hs256",
         "hmac_sha256_bytes_constant_time",
         "exp_required_and_unexpired",
@@ -127,17 +132,19 @@ def evaluate_hs256_jwt_demo(
         "oauth_scope_policy_enforcement",
     ]
     if expected_iss is not None:
-        checks_performed.append("iss_exact_match")
+        checks_configured.append("iss_exact_match")
     else:
         checks_not_implemented.append("iss_claim_not_configured")
     if expected_aud is not None:
-        checks_performed.append("aud_exact_or_list_match")
+        checks_configured.append("aud_exact_or_list_match")
     else:
         checks_not_implemented.append("aud_claim_not_configured")
     if expected_typ is not None:
-        checks_performed.append("typ_header_match")
+        checks_configured.append("typ_header_match")
     else:
         checks_not_implemented.append("typ_header_not_configured")
+
+    checks_executed: list[str] = []
 
     def _fail(reason: str, header: dict | None = None, payload: dict | None = None, **flags: bool) -> dict[str, object]:
         return {
@@ -151,16 +158,23 @@ def evaluate_hs256_jwt_demo(
             "signature_valid": flags.get("signature_valid", False),
             "not_expired": flags.get("not_expired", False),
             "nbf_satisfied": flags.get("nbf_satisfied", False),
-            "checks_performed": checks_performed,
+            "checks_configured": checks_configured,
+            "checks_executed": list(checks_executed),
             "checks_not_implemented": checks_not_implemented,
         }
 
+    checks_executed.append("token_size_limit")
+    if len(token) > MAX_TOKEN_CHARS:
+        return _fail("token_too_large")
+
+    checks_executed.append("compact_3_part_ascii_base64url")
     parts = token.split(".")
     if len(parts) != 3:
         return _fail("malformed_jwt_segment_count")
     h_b64, p_b64, s_b64 = parts
 
-    # Reject non-ASCII / invalid Base64URL header & payload cleanly before any crypto call
+    # Reject non-ASCII / invalid Base64URL / duplicate JSON keys / deep nesting (RecursionError)
+    checks_executed.append("strict_json_no_duplicate_keys_or_deep_recursion")
     try:
         header = _loads_strict_json_object(b64url_decode_strict(h_b64))
         payload = _loads_strict_json_object(b64url_decode_strict(p_b64))
@@ -168,14 +182,18 @@ def evaluate_hs256_jwt_demo(
         return _fail("malformed_jwt_encoding_or_json")
 
     # RFC 8725: pin allowed algorithm explicitly to block alg="none" / algorithm confusion
+    checks_executed.append("alg_pinned_hs256")
     alg_ok = header.get("alg") == "HS256"
     if not alg_ok:
         return _fail(f"disallowed_alg:{header.get('alg')}", header=header, payload=payload, alg_pinned_hs256=False)
 
-    if expected_typ is not None and header.get("typ") != expected_typ:
-        return _fail("invalid_typ", header=header, payload=payload, alg_pinned_hs256=True)
+    if expected_typ is not None:
+        checks_executed.append("typ_header_match")
+        if header.get("typ") != expected_typ:
+            return _fail("invalid_typ", header=header, payload=payload, alg_pinned_hs256=True)
 
-    # Decode signature bytes strictly; non-ASCII signatures like "☃" return malformed_signature (never TypeError!)
+    # Decode signature bytes strictly; non-ASCII signatures like "☃" return malformed_signature_encoding
+    checks_executed.append("hmac_sha256_bytes_constant_time")
     try:
         actual_sig_bytes = b64url_decode_strict(s_b64)
     except ValueError:
@@ -187,6 +205,7 @@ def evaluate_hs256_jwt_demo(
     if not sig_ok:
         return _fail("invalid_signature", header=header, payload=payload, alg_pinned_hs256=True, signature_valid=False)
 
+    checks_executed.append("exp_required_and_unexpired")
     exp = payload.get("exp")
     not_expired = (not isinstance(exp, bool)) and isinstance(exp, int) and exp > now_ts
     if not not_expired:
@@ -199,6 +218,7 @@ def evaluate_hs256_jwt_demo(
             not_expired=False,
         )
 
+    checks_executed.append("nbf_if_present_not_before_now")
     nbf_ok = True
     if "nbf" in payload:
         nbf = payload["nbf"]
@@ -214,18 +234,21 @@ def evaluate_hs256_jwt_demo(
             nbf_satisfied=False,
         )
 
-    if expected_iss is not None and payload.get("iss") != expected_iss:
-        return _fail(
-            "invalid_issuer",
-            header=header,
-            payload=payload,
-            alg_pinned_hs256=True,
-            signature_valid=True,
-            not_expired=True,
-            nbf_satisfied=True,
-        )
+    if expected_iss is not None:
+        checks_executed.append("iss_exact_match")
+        if payload.get("iss") != expected_iss:
+            return _fail(
+                "invalid_issuer",
+                header=header,
+                payload=payload,
+                alg_pinned_hs256=True,
+                signature_valid=True,
+                not_expired=True,
+                nbf_satisfied=True,
+            )
 
     if expected_aud is not None:
+        checks_executed.append("aud_exact_or_list_match")
         aud = payload.get("aud")
         aud_ok = (aud == expected_aud) or (
             isinstance(aud, list) and all(isinstance(x, str) for x in aud) and expected_aud in aud
@@ -252,7 +275,8 @@ def evaluate_hs256_jwt_demo(
         "signature_valid": True,
         "not_expired": True,
         "nbf_satisfied": True,
-        "checks_performed": checks_performed,
+        "checks_configured": checks_configured,
+        "checks_executed": list(checks_executed),
         "checks_not_implemented": checks_not_implemented,
     }
 
@@ -266,21 +290,46 @@ def _is_ip_literal(value: str) -> bool:
 
 
 def verify_san_match(target_host: str, cert_sans: list[str]) -> bool:
-    """Simplified educational RFC 6125/9525 DNS/IP SAN match (exact or single-label left wildcard for DNS only)."""
+    """Simplified educational RFC 6125/9525 DNS/IP SAN match (does not consult Public Suffix List).
+
+    Allows exact DNS/IP match or entire-leftmost-label wildcard (*.example.com) for DNS names only;
+    rejects IP wildcards, partial-label wildcards (f*.example.com), multi-label wildcards, and empty labels.
+    """
     if not isinstance(target_host, str) or not isinstance(cert_sans, list) or not all(isinstance(s, str) for s in cert_sans):
         raise ValueError("target_host must be str and cert_sans must be list[str]")
     host = target_host.lower().strip()
-    if not host or not host.isascii() or any(ch.isspace() for ch in host) or host.startswith(".") or host.endswith("."):
+    if (
+        not host
+        or not host.isascii()
+        or any(ch.isspace() for ch in host)
+        or host.startswith(".")
+        or host.endswith(".")
+        or ".." in host
+    ):
         return False
     host_is_ip = _is_ip_literal(host)
     for san in cert_sans:
         pattern = san.lower().strip()
-        if not pattern or not pattern.isascii() or any(ch.isspace() for ch in pattern):
+        if (
+            not pattern
+            or not pattern.isascii()
+            or any(ch.isspace() for ch in pattern)
+            or pattern.startswith(".")
+            or pattern.endswith(".")
+            or ".." in pattern
+        ):
             continue
         if pattern == host:
             return True
-        # RFC 6125/9525: wildcards are NOT valid for IP literals and match exactly one left DNS label
-        if not host_is_ip and pattern.startswith("*.") and pattern.count(".") >= 2 and host.endswith(pattern[1:]):
+        # RFC 6125/9525: wildcards are NOT valid for IP literals, must be whole leftmost label only,
+        # and cannot contain additional '*' characters in the remainder.
+        if (
+            not host_is_ip
+            and pattern.startswith("*.")
+            and "*" not in pattern[2:]
+            and pattern.count(".") >= 2
+            and host.endswith(pattern[1:])
+        ):
             left_label = host[: -len(pattern[1:])]
             if left_label and "." not in left_label:
                 return True
@@ -326,13 +375,19 @@ def main() -> None:
     assert non_ascii_res["demo_checks_passed"] is False and non_ascii_res["reason"] == "malformed_signature_encoding"
     print("Non-ASCII signature rejected cleanly:", non_ascii_res["reason"])
 
-    # Negative 3: alg="none" attack rejected explicitly
+    # Negative 3: Deeply nested JSON (1100 levels) must return clean rejection, NEVER RecursionError
+    deep_payload = b64url_encode(('{"a":' * 1100 + "1" + "}" * 1100).encode("ascii"))
+    deep_res = evaluate_hs256_jwt_demo(f"{parts[0]}.{deep_payload}.{parts[2]}", secret, now_ts=now_ts)
+    assert deep_res["demo_checks_passed"] is False and deep_res["reason"] == "malformed_jwt_encoding_or_json"
+    print("Deeply nested JSON rejected cleanly:", deep_res["reason"])
+
+    # Negative 4: alg="none" attack rejected explicitly
     none_hdr = b64url_encode(json.dumps({"alg": "none", "typ": "JWT"}).encode("utf-8"))
     none_res = evaluate_hs256_jwt_demo(f"{none_hdr}.{parts[1]}.", secret, now_ts=now_ts)
     assert none_res["demo_checks_passed"] is False and none_res["alg_pinned_hs256"] is False
     print("alg=none attack rejected:", none_res["reason"])
 
-    # Negative 4: Expired token rejected
+    # Negative 5: Expired token rejected
     expired_tok = build_hs256_jwt_demo({"sub": "netops-bot", "scope": "read:interfaces", "exp": 1700000000}, secret)
     expired_res = evaluate_hs256_jwt_demo(expired_tok, secret, now_ts=now_ts)
     assert expired_res["demo_checks_passed"] is False and expired_res["reason"] == "token_expired_or_missing_exp"

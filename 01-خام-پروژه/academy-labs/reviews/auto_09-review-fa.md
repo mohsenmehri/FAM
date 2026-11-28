@@ -19,3 +19,8 @@
 - اعتبارسنجی دقیق مسیر (`POST /wrong` -> `404` بدون تغییر وضعیت)، الزام `Content-Type: application/yang-data+json` (`application/json` -> `415`)، بررسی `Accept` (`406`)، سقف اندازه بدنه (`413`)، رد کلید تکراری JSON و قالب RFC 7951 (`{"ietf-interfaces:interface": [...]}`).
 - تصریح صریح شبیه‌ساز آموزشی حداقلی روی HTTP محلی (نه پیاده‌سازی کامل RFC 8040، بدون TLS/احراز هویت و بدون تجهیز زنده).
 - **وضعیت بازبینی:** همچنان خودبازبینی نویسنده (`author-agent-self-review-not-independent`) — آماده بازبینی مجدد یکپارچه‌ساز/انسان مستقل.
+
+## به‌روزرسانی فاز ۱۴ (رفع ایرادهای باقی‌مانده `batch-auto-07-09-intake-fa.md` @ `ffd6a320ca`)
+- پیاده‌سازی پارسر RFC 9110 بخش 12.5.1 برای هدر `Accept` با اولویت اختصاصیت و `q=0` (`Accept: application/yang-data+json;q=0` -> `406`).
+- ارتقا به `ThreadingHTTPServer` (`daemon_threads=True`) با `self.timeout = self.server.request_timeout_sec` و مدیریت `TimeoutError` (`408`) و خوانش ناقص (`400`) تا کلاینت نیمه‌کاره سرور یا `shutdown()` را قفل نکند.
+- اعتبارسنجی percent-encoding کلید URI (`%ZZ` -> `404`)، رد `Transfer-Encoding` (`501`) و `Content-Length` تکراری (`400`) و گرفتن `RecursionError` در JSON.

@@ -20,3 +20,7 @@
 ### آزمون و پوشش
 - تست مرتبط: `test_phase12a_transferred_ccna_core_batch` و تست‌های پایه در `01-خام-پروژه/tests/test_agent3_content.py`.
 - **محدودیت:** خودبازبینی نویسنده (نه بازبینی مستقل انسانی) و منتظر بازبینی/ادغام انتخابی توسط Agent 2.
+
+## به‌روزرسانی فاز ۱۴ (اعمال یافته‌های مقدماتی `agent3-new-transfer-intake-fa.md` @ `ffd6a320ca`)
+- تفکیک صریح Control Plane RIB (انتخاب با AD میان منابع متفاوت برای پیشوند یکسان و Metric درون یک پروتکل + شرایط ECMP) از Data Plane FIB (Longest Prefix Match و استثنای Policy-Based Routing).
+- مشروط‌سازی الزام تنظیم دستی `router-id` در OSPFv3 برای روتر IPv6-only به پیاده‌سازی (مانند Cisco IOS/IOS-XE) و روش پیکربندی.

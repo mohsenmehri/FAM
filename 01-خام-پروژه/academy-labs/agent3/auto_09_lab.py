@@ -3,11 +3,13 @@
 FAM Academy Lab — auto_09: RESTCONF Educational Loopback Simulator.
 
 Execution boundary & honest limitations:
-- Spins up an ephemeral local HTTP server on 127.0.0.1 with per-server isolated state
-  (no global mutable store), strict URI routing (/restconf/data/ietf-interfaces:interfaces
-  and .../interface=<name>), strict Content-Type enforcement (application/yang-data+json),
-  Accept validation, bounded request body size, duplicate-key JSON rejection, RFC 7951-style
-  interface payloads, and a client NoRedirectHandler.
+- Spins up an ephemeral local ThreadingHTTPServer on 127.0.0.1 with per-server isolated
+  state (no global mutable store), per-connection socket timeout (preventing stalled
+  half-body clients from hanging request handling or shutdown), strict URI routing and
+  percent-encoding validation, strict Content-Type enforcement (application/yang-data+json),
+  RFC 9110 Accept quality-value (`q=0`) enforcement, bounded request body size, duplicate-key
+  and recursion-depth JSON rejection, RFC 7951-style interface payloads, and a client
+  NoRedirectHandler.
 - This is strictly a MINIMAL EDUCATIONAL SIMULATOR, NOT a full RFC 8040 implementation and
   NOT production-ready: no TLS/HTTPS, no real authentication/RBAC enforcement, no full YANG
   schema validator, and no live IOS-XE / network device is contacted.
@@ -16,17 +18,24 @@ Execution boundary & honest limitations:
 from __future__ import annotations
 
 import json
+import math
+import re
+import socket
 import threading
 import urllib.error
 import urllib.parse
 import urllib.request
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 YANG_JSON = "application/yang-data+json"
 COLLECTION_PATH = "/restconf/data/ietf-interfaces:interfaces"
 ITEM_PREFIX = "/restconf/data/ietf-interfaces:interfaces/interface="
 REDIRECT_TRAP_PATH = "/restconf/redirect-trap"
 DEFAULT_MAX_BODY_BYTES = 65536
+DEFAULT_REQUEST_TIMEOUT_SEC = 2.0
+
+_PCT_ESCAPE_RE = re.compile(r"%(?![0-9A-Fa-f]{2})")
+_QVALUE_RE = re.compile(r"^(?:0(?:\.[0-9]{1,3})?|1(?:\.0{1,3})?)$")
 
 
 def _restconf_error(error_type: str, error_tag: str, message: str) -> dict:
@@ -55,7 +64,10 @@ def _loads_strict_json(raw: str) -> object:
     def _reject_constants(tok: str) -> object:
         raise ValueError(f"non-standard JSON constant: {tok!r}")
 
-    return json.loads(raw, object_pairs_hook=_reject_duplicates, parse_constant=_reject_constants)
+    try:
+        return json.loads(raw, object_pairs_hook=_reject_duplicates, parse_constant=_reject_constants)
+    except RecursionError as exc:
+        raise ValueError("JSON nesting depth exceeded") from exc
 
 
 def _extract_interface_payload(body: object) -> dict | None:
@@ -84,14 +96,87 @@ def _extract_interface_payload(body: object) -> dict | None:
     return dict(iface)
 
 
-class EducationalRestconfServer(HTTPServer):
-    """Per-instance isolated RESTCONF educational simulator (no module-level mutable state)."""
+def accept_allows_yang_json(accept_header: str | None) -> bool:
+    """Evaluate RFC 9110 Accept header with quality values (q=0 explicitly rejects media range).
 
-    def __init__(self, server_address: tuple[str, int], handler_cls, max_body_bytes: int = DEFAULT_MAX_BODY_BYTES):
+    Specificity precedence: exact `application/yang-data+json` > `application/*` > `*/*`.
+    If the most-specific matching media range has q=0 (e.g. `application/yang-data+json;q=0`),
+    returns False even when a less-specific wildcard is also present.
+    """
+    if accept_header is None or not accept_header.strip():
+        return True
+
+    best_by_specificity: dict[int, float] = {}
+    for raw_item in accept_header.split(","):
+        item = raw_item.strip()
+        if not item:
+            continue
+        parts = [p.strip() for p in item.split(";")]
+        media_range = parts[0].lower()
+        q = 1.0
+        q_valid = True
+        for param in parts[1:]:
+            if not param:
+                continue
+            if "=" not in param:
+                q_valid = False
+                break
+            k, v = [x.strip() for x in param.split("=", 1)]
+            if k.lower() == "q":
+                if not _QVALUE_RE.fullmatch(v):
+                    q_valid = False
+                    break
+                q = float(v)
+        if not q_valid:
+            return False
+
+        if media_range == YANG_JSON:
+            spec = 3
+        elif media_range == "application/*":
+            spec = 2
+        elif media_range == "*/*":
+            spec = 1
+        else:
+            continue
+
+        # Within the same specificity, if any entry sets q=0 or higher q, resolve deterministically:
+        # RFC 9110: highest q among identical-specificity entries, unless exact media range is explicitly 0
+        if spec not in best_by_specificity:
+            best_by_specificity[spec] = q
+        else:
+            best_by_specificity[spec] = max(best_by_specificity[spec], q)
+
+    if not best_by_specificity:
+        return False
+    highest_spec = max(best_by_specificity)
+    return best_by_specificity[highest_spec] > 0.0
+
+
+class EducationalRestconfServer(ThreadingHTTPServer):
+    """Per-instance isolated RESTCONF educational simulator with bounded request timeout."""
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(
+        self,
+        server_address: tuple[str, int],
+        handler_cls,
+        max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
+        request_timeout_sec: float = DEFAULT_REQUEST_TIMEOUT_SEC,
+    ):
         if isinstance(max_body_bytes, bool) or not isinstance(max_body_bytes, int) or max_body_bytes <= 0:
             raise ValueError("max_body_bytes must be a positive int")
+        if (
+            isinstance(request_timeout_sec, bool)
+            or not isinstance(request_timeout_sec, (int, float))
+            or not math.isfinite(float(request_timeout_sec))
+            or float(request_timeout_sec) <= 0
+        ):
+            raise ValueError("request_timeout_sec must be a positive finite number")
         super().__init__(server_address, handler_cls)
         self.max_body_bytes = max_body_bytes
+        self.request_timeout_sec = float(request_timeout_sec)
         self.store_lock = threading.Lock()
         self.config_store: dict[str, dict] = {
             "GigabitEthernet1": {"name": "GigabitEthernet1", "description": "WAN", "enabled": True}
@@ -102,30 +187,34 @@ class EducationalRestconfServer(HTTPServer):
 
 
 class RestconfHandler(BaseHTTPRequestHandler):
+    def setup(self) -> None:
+        self.timeout = self.server.request_timeout_sec
+        super().setup()
+
     def log_message(self, fmt: str, *args) -> None:
         pass
 
     def _send(self, code: int, body: dict | None = None, extra_headers: dict | None = None) -> None:
         raw = json.dumps(body).encode("utf-8") if body is not None else b""
-        self.send_response(code)
-        if body is not None:
-            self.send_header("Content-Type", YANG_JSON)
-        self.send_header("Content-Length", str(len(raw)))
-        if extra_headers:
-            for k, v in extra_headers.items():
-                self.send_header(k, v)
-        self.end_headers()
-        if raw:
-            self.wfile.write(raw)
+        try:
+            self.send_response(code)
+            if body is not None:
+                self.send_header("Content-Type", YANG_JSON)
+            self.send_header("Content-Length", str(len(raw)))
+            if extra_headers:
+                for k, v in extra_headers.items():
+                    self.send_header(k, v)
+            self.end_headers()
+            if raw:
+                self.wfile.write(raw)
+        except OSError:
+            pass
 
     def _check_accept(self) -> bool:
         accept = self.headers.get("Accept")
-        if not accept:
+        if accept_allows_yang_json(accept):
             return True
-        media_types = [part.split(";", 1)[0].strip().lower() for part in accept.split(",")]
-        if YANG_JSON in media_types or "*/*" in media_types:
-            return True
-        self._send(406, _restconf_error("protocol", "invalid-value", f"Accept must allow {YANG_JSON}"))
+        self._send(406, _restconf_error("protocol", "invalid-value", f"Accept must allow {YANG_JSON} with q>0"))
         return False
 
     def _check_content_type(self) -> bool:
@@ -143,17 +232,22 @@ class RestconfHandler(BaseHTTPRequestHandler):
         if not path.startswith(ITEM_PREFIX):
             return None
         encoded_key = path[len(ITEM_PREFIX) :]
-        if not encoded_key or "/" in encoded_key:
+        if not encoded_key or "/" in encoded_key or _PCT_ESCAPE_RE.search(encoded_key):
             return None
         key = urllib.parse.unquote(encoded_key)
-        return key if key.strip() else None
+        if not key.strip() or any(ord(ch) < 32 or ord(ch) == 127 for ch in key):
+            return None
+        return key
 
     def _read_bounded_interface(self) -> tuple[dict | None, int | None]:
-        raw_len = self.headers.get("Content-Length")
-        if raw_len is None or not raw_len.strip().isdigit():
-            self._send(400, _restconf_error("protocol", "malformed-message", "Missing or invalid Content-Length"))
+        if self.headers.get("Transfer-Encoding"):
+            self._send(501, _restconf_error("protocol", "operation-not-supported", "Transfer-Encoding not supported in simulator"))
+            return None, 501
+        cl_headers = self.headers.get_all("Content-Length") or []
+        if len(cl_headers) != 1 or not cl_headers[0].strip().isascii() or not cl_headers[0].strip().isdigit():
+            self._send(400, _restconf_error("protocol", "malformed-message", "Missing, duplicate, or invalid Content-Length"))
             return None, 400
-        length = int(raw_len.strip())
+        length = int(cl_headers[0].strip())
         if length <= 0:
             self._send(400, _restconf_error("protocol", "malformed-message", "Empty request body"))
             return None, 400
@@ -161,8 +255,17 @@ class RestconfHandler(BaseHTTPRequestHandler):
             self._send(413, _restconf_error("protocol", "too-big", f"Body exceeds limit ({self.server.max_body_bytes} bytes)"))
             return None, 413
         try:
-            raw = self.rfile.read(length).decode("utf-8")
-            parsed = _loads_strict_json(raw)
+            raw_bytes = self.rfile.read(length)
+        except (TimeoutError, socket.timeout):
+            self._send(408, _restconf_error("protocol", "operation-failed", "Timed out reading request body"))
+            return None, 408
+        except OSError:
+            return None, 400
+        if len(raw_bytes) != length:
+            self._send(400, _restconf_error("protocol", "malformed-message", "Truncated request body"))
+            return None, 400
+        try:
+            parsed = _loads_strict_json(raw_bytes.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             self._send(400, _restconf_error("protocol", "malformed-message", "Invalid UTF-8 or strict JSON payload"))
             return None, 400
@@ -334,7 +437,7 @@ def main() -> None:
         assert "oper-status" in nonconfig_body["ietf-interfaces:interfaces"]["interface"][0]
         assert "description" not in nonconfig_body["ietf-interfaces:interfaces"]["interface"][0]
 
-        # 2. Negative checks: POST /wrong -> 404 (no store mutation); application/json -> 415; Accept text/plain -> 406
+        # 2. Negative checks: POST /wrong -> 404; application/json -> 415; Accept q=0 -> 406
         lo0 = json.dumps({"ietf-interfaces:interface": [{"name": "Loopback0", "description": "Router-ID", "enabled": True}]}).encode("utf-8")
         wrong_path_code = _http_status(opener, urllib.request.Request(f"{base}/wrong", data=lo0, headers=headers, method="POST"))
         assert wrong_path_code == 404 and "Loopback0" not in server.config_store
@@ -348,11 +451,11 @@ def main() -> None:
             ),
         )
         assert wrong_ctype_code == 415 and "Loopback0" not in server.config_store
-        wrong_accept_code = _http_status(
+        q0_accept_code = _http_status(
             opener,
-            urllib.request.Request(f"{base}{COLLECTION_PATH}", headers={"Accept": "text/plain"}),
+            urllib.request.Request(f"{base}{COLLECTION_PATH}", headers={"Accept": f"{YANG_JSON};q=0"}),
         )
-        assert wrong_accept_code == 406
+        assert q0_accept_code == 406
 
         # 3. POST creates child (201) with RFC 7951 payload; duplicate POST returns 409 Conflict
         post_create_code = _http_status(opener, urllib.request.Request(f"{base}{COLLECTION_PATH}", data=lo0, headers=headers, method="POST"))
@@ -381,7 +484,7 @@ def main() -> None:
         "nonconfig_oper_status": nonconfig_body["ietf-interfaces:interfaces"]["interface"][0]["oper-status"],
         "wrong_path_post_status": wrong_path_code,
         "wrong_content_type_status": wrong_ctype_code,
-        "wrong_accept_status": wrong_accept_code,
+        "accept_q0_status": q0_accept_code,
         "post_create_status": post_create_code,
         "post_duplicate_status": post_dup_code,
         "put_replace_status": put_replace_code,

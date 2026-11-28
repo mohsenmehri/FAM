@@ -2239,6 +2239,125 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             cat_t.join(timeout=5)
             cat_srv.server_close()
 
+    def test_phase14_handoff_ffd6a320_auto07_09_and_ccna_fixes(self):
+        """Phase 14: resolve remaining findings in AGENT-HANDOFF-fa.md & batch-auto-07-09-intake-fa.md @ ffd6a320ca."""
+        import socket
+        import threading
+        import time
+        import urllib.error
+        import urllib.request
+
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        # 1. auto_07: 1100-level nested JSON never raises RecursionError; checks_configured vs checks_executed
+        a07 = load_module(AGENT3_LAB_DIR / "auto_07_lab.py", "auto_07_p14")
+        secret = b"p14-secret"
+        now_ts = 1764201600
+        tok = a07.build_hs256_jwt_demo({"sub": "u", "exp": now_ts + 600}, secret)
+        h, p, s = tok.split(".")
+        deep_p = a07.b64url_encode(('{"a":' * 1100 + "1" + "}" * 1100).encode("ascii"))
+        deep_res = a07.evaluate_hs256_jwt_demo(f"{h}.{deep_p}.{s}", secret, now_ts=now_ts)
+        self.assertFalse(deep_res["demo_checks_passed"])
+        self.assertEqual(deep_res["reason"], "malformed_jwt_encoding_or_json")
+        self.assertNotIn("checks_performed", deep_res)
+        self.assertIn("checks_configured", deep_res)
+        self.assertIn("checks_executed", deep_res)
+        # Early failure must NOT claim later steps (signature/exp) were executed
+        self.assertNotIn("hmac_sha256_bytes_constant_time", deep_res["checks_executed"])
+        self.assertNotIn("exp_required_and_unexpired", deep_res["checks_executed"])
+        self.assertFalse(a07.verify_san_match("foo.netops.example", ["f*.netops.example"]))
+        self.assertFalse(a07.verify_san_match("a.b.netops.example", ["*.*.netops.example"]))
+        self.assertIn("RFC 8470", (BLUEPRINT_DIR / "auto_07.json").read_text(encoding="utf-8"))
+
+        # 2. auto_08: unlocked session_id=None cannot bypass lock; overlapping confirmed-commit rejected; session-id in prose
+        a08 = load_module(AGENT3_LAB_DIR / "auto_08_lab.py", "auto_08_p14")
+        ds = a08.NetconfDatastoreMock()
+        with self.assertRaises(ValueError):
+            ds.edit_candidate(None, ["permit 10.0.0.0/24"])
+        with self.assertRaises(ValueError):
+            ds.commit_confirmed(None)
+        ds.lock("s1")
+        ds.edit_candidate("s1", ["permit 10.1.0.0/24"])
+        ds.commit_confirmed("s1")
+        with self.assertRaises(RuntimeError):
+            ds.commit_confirmed("s1")  # overlapping pending confirmed-commit must fail
+        bp08_txt = (BLUEPRINT_DIR / "auto_08.json").read_text(encoding="utf-8")
+        self.assertNotIn("lock-id", bp08_txt)
+        self.assertIn("session-id", bp08_txt)
+
+        # 3. auto_09: Accept q=0 -> 406, stalled half-body client times out (408) & shutdown completes cleanly
+        a09 = load_module(AGENT3_LAB_DIR / "auto_09_lab.py", "auto_09_p14")
+        self.assertFalse(a09.accept_allows_yang_json(f"{a09.YANG_JSON};q=0"))
+        self.assertFalse(a09.accept_allows_yang_json(f"{a09.YANG_JSON};q=0, */*;q=0.5"))
+        self.assertFalse(a09.accept_allows_yang_json("*/*;q=0"))
+        self.assertTrue(a09.accept_allows_yang_json(f"{a09.YANG_JSON};q=0.8"))
+
+        srv = a09.EducationalRestconfServer(("127.0.0.1", 0), a09.RestconfHandler, request_timeout_sec=0.25)
+        port = srv.server_address[1]
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
+        try:
+            base = f"http://127.0.0.1:{port}"
+            for bad_accept in (f"{a09.YANG_JSON};q=0", f"{a09.YANG_JSON};q=0, */*;q=0.5", "*/*;q=0"):
+                with self.assertRaises(urllib.error.HTTPError) as ctx_406:
+                    urllib.request.urlopen(
+                        urllib.request.Request(f"{base}{a09.COLLECTION_PATH}", headers={"Accept": bad_accept}),
+                        timeout=5,
+                    )
+                self.assertEqual(ctx_406.exception.code, 406)
+
+            # Stalled half-body client must receive 408 timeout and MUST NOT hang server or mutate store
+            with socket.create_connection(("127.0.0.1", port), timeout=3.0) as sock:
+                sock.settimeout(3.0)
+                partial_req = (
+                    f"POST {a09.COLLECTION_PATH} HTTP/1.1\r\n"
+                    f"Host: 127.0.0.1:{port}\r\n"
+                    f"Content-Type: {a09.YANG_JSON}\r\n"
+                    f"Accept: {a09.YANG_JSON}\r\n"
+                    f"Content-Length: 200\r\n"
+                    f"\r\n"
+                    "{\"ietf"
+                ).encode("ascii")
+                sock.sendall(partial_req)
+                resp_head = sock.recv(512).decode("latin1")
+            self.assertIn("408", resp_head)
+            self.assertEqual(list(srv.config_store.keys()), ["GigabitEthernet1"])
+
+            # Malformed percent-encoding in item URI -> 404
+            with self.assertRaises(urllib.error.HTTPError) as ctx_pct:
+                urllib.request.urlopen(
+                    urllib.request.Request(f"{base}{a09.ITEM_PREFIX}Loopback%ZZ", headers={"Accept": a09.YANG_JSON}),
+                    timeout=5,
+                )
+            self.assertEqual(ctx_pct.exception.code, 404)
+        finally:
+            t0 = time.monotonic()
+            srv.shutdown()
+            t.join(timeout=5)
+            srv.server_close()
+            self.assertLess(time.monotonic() - t0, 2.0)
+
+        # 4. ccna_02_vlan, ccna_v1, ccna_v6 sync fixes from ffd6a320ca
+        bp_vlan_txt = (BLUEPRINT_DIR / "ccna_02_vlan.json").read_text(encoding="utf-8")
+        self.assertNotIn("تگ ۴بیتی", bp_vlan_txt)
+        self.assertIn("تگ ۴بایتی", bp_vlan_txt)
+        m_vlan = load_module(AGENT3_LAB_DIR / "ccna_02_vlan_lab.py", "ccna_02_vlan_p14")
+        with self.assertRaises(ValueError):
+            m_vlan.evaluate_dtp_link([], "trunk")
+        missing_nat = m_vlan.audit_trunk_pair([1, 10], [1, 10, 999], [10, 999], [10, 999], 999, 999, [10])
+        self.assertFalse(missing_nat["model_checks_ok"])
+        self.assertTrue(any("SW1_NATIVE_MISSING_IN_DB" in i for i in missing_nat["issues"]))
+
+        bp_v6_txt = (BLUEPRINT_DIR / "ccna_v6.json").read_text(encoding="utf-8")
+        self.assertIn("Policy-Based Routing", bp_v6_txt)
+        self.assertIn("FIB", bp_v6_txt)
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
         self.assertEqual(len(scripts), 81)

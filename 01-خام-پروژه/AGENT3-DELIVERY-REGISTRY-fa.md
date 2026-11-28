@@ -3,7 +3,7 @@
 - **شاخه Agent 3:** `arena/941b9e62-fam` (منشعب از `430b4212d1edd4a290c7da578c3372c604d983dd`)
 - **آخرین شاخه Agent 2 خوانده‌شده:** `arena/ab96c97c-fam` @ `847b16fbf5` (`AGENT-HANDOFF-fa.md`، `ccna_02_vlan-intake-fa.md`، `inspect_agent3_bundle.py` و `curriculum-catalog.json`)
 - **محدوده فعلی تحویل‌شده (تکمیل ۱۰۰٪):** ۸۱ درس (`64` درس اصلی + **تمام `17` درس انتقالی سابق Agent 1** در دسته‌های ۱۲A، ۱۲B و ۱۲C) — **۰ فایل مشترک تغییریافته**
-- **وضعیت ادغام انتخابی شناخته‌شده روی شاخه Agent 2 (`9cdaf84b4e`):** `auto_01`, `auto_02`, `auto_03`, `auto_04`, `auto_05`, `auto_06`, `auto_10`, `auto_20` (۸ درس با اصلاحات محلی یکپارچه‌ساز ادغام شده‌اند — بدون بازنویسی نسخه‌های محلی Agent 2)؛ دسته `auto_07` تا `auto_09` پس از دریافت گزارش مقدماتی `batch-auto-07-09-intake-fa.md` به‌طور کامل اصلاح و آماده بازبینی مجدد شد.
+- **وضعیت ادغام انتخابی شناخته‌شده روی شاخه Agent 2 (`ffd6a320ca`):** `auto_01`, `auto_02`, `auto_03`, `auto_04`, `auto_05`, `auto_06`, `auto_08`, `auto_10`, `auto_20`, `ccna_02_vlan` (۱۰ درس با اصلاحات محلی یکپارچه‌ساز ادغام شده‌اند — بدون بازنویسی نسخه‌های محلی Agent 2)؛ ایرادهای باقی‌مانده `auto_07` (RecursionError و `checks_configured`/`checks_executed`) و `auto_09` (`Accept q=0 -> 406` و timeout اتصال در سرور loopback) و نیز یافته‌های مقدماتی `ccna_v1`/`ccna_v6` در فاز ۱۴ رفع شدند.
 - **تفکیک صادقانه اجرای ۸۱ آزمایشگاه (صفر تجهیز زنده یا سرویس بیرونی):**
   - ۱ آزمایشگاه CLI محلی واقعی (`auto_04`)
   - ۳ آزمایشگاه سرور HTTP محلی Loopback (`auto_06`, `auto_09`, `auto_14`)
@@ -37,7 +37,8 @@
 | Phase 12A | ممیزی مستقل و تحویل ۵ درس نخست انتقالی CCNA (`ccna_02_vlan` با رفع کامل تناقض، `ccna_v1`, `ccna_v6`, `ccna_03`, `ccna_04`) + همگام‌سازی `AGENT-HANDOFF-fa.md` @ `847b16fbf5` | `35/35 OK` | `af133c67ee57fc7799d97c4e086c776fcd5a2d9a` |
 | Phase 12B | ممیزی مستقل و تحویل ۷ درس باقی‌مانده انتقالی CCNA (`ccna_dhcp`, `ccna_nat`, `ccna_05`, `ccna_acl`, `ccna_qos_ssh`, `ccna_wl` با رفع باگ معکوس Q2، `ccna_06`) | `36/36 OK` | `7b0f8a3759398c4d86e407e42202d97b71b1741b` |
 | Phase 12C | ممیزی مستقل و تحویل ۵ درس پایانی انتقالی پیشرفته (`adv_01`, `adv_02`, `adv_03`, `adv_04`, `adv_bfd`) — تکمیل کل ۸۱ درس با `SHARED_FILES_TOUCHED=0` | `37/37 OK` | `1fcd2f0efd29d1ed97596ae76e67a1aeb1e00da2` |
-| Phase 13 (جاری) | همگام‌سازی با دفتر هماهنگی `9cdaf84b4e`: رفع کامل ایرادهای `auto_07` تا `auto_09` (`batch-auto-07-09-intake-fa.md`)، تکمیل ارجاع Broadcom KB 326979 و نوع پروفایل در `ccde_18` و ممیزی پیشگیرانه `auto_11`/`auto_13`/`auto_14` | `38/38 OK` | *(آخرین HEAD شاخه `arena/941b9e62-fam`)* |
+| Phase 13 | همگام‌سازی با دفتر هماهنگی `9cdaf84b4e`: رفع کامل ایرادهای `auto_07` تا `auto_09` (`batch-auto-07-09-intake-fa.md`)، تکمیل ارجاع Broadcom KB 326979 و نوع پروفایل در `ccde_18` و ممیزی پیشگیرانه `auto_11`/`auto_13`/`auto_14` | `38/38 OK` | `993f50877232481fb24d99bfd771b178f15ba7ce` |
+| Phase 14 (جاری) | همگام‌سازی با دفتر هماهنگی و گزارش دسته `auto_07`–`auto_09` @ `ffd6a320ca`: رفع `RecursionError` و `checks_configured`/`checks_executed` در `auto_07`، رفع `Accept q=0 -> 406` و timeout/ThreadingHTTPServer در `auto_09`، همگام‌سازی `auto_08`/`ccna_02_vlan` و اصلاح یافته‌های مقدماتی `ccna_v1`/`ccna_v6` | `39/39 OK` | *(آخرین HEAD شاخه `arena/941b9e62-fam`)* |
 
 ## جدول ثابت هر ۸۱ درس (۶۴ اصلی + ۱۷ انتقالی کامل دسته‌های ۱۲A، ۱۲B و ۱۲C)
 
