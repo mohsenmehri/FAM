@@ -119,10 +119,17 @@
     const profile = window.FamAcademyBridge?.progress?.profile || {};
     const all = paths.flatMap(p => (p.courses || []).flatMap(c => c.lessons || []));
     const chosen = paths.find(p => p.id === profile.goal) || paths[0];
-    const target = (chosen?.courses || []).flatMap(c => c.lessons || []);
+    const focusedCourse = chosen?.id === 'fam-c5' && profile.focusStage && profile.focusStage !== 'all'
+      ? (chosen.courses || []).find(c => c.id === profile.focusStage)
+      : null;
+    const target = focusedCourse
+      ? (focusedCourse.lessons || [])
+      : (chosen?.courses || []).flatMap(c => c.lessons || []);
     const assessed = new Set(window.FamAcademyBridge?.progress?.selfAssessed || []);
     const ready = item => (item.prerequisites || []).every(id => completed.has(id) || assessed.has(id));
-    const next = target.find(l => !completed.has(l.id) && l.blueprint && ready(l)) || all.find(l => !completed.has(l.id) && l.blueprint && ready(l));
+    const next = target.find(l => !completed.has(l.id) && l.blueprint && ready(l))
+      || target.find(l => !completed.has(l.id) && l.blueprint)
+      || all.find(l => !completed.has(l.id) && l.blueprint && ready(l));
     const doneAll = all.filter(l => completed.has(l.id)).length;
     const doneTarget = target.filter(l => completed.has(l.id)).length;
     const pctTarget = target.length ? Math.round(doneTarget / target.length * 100) : 0;
@@ -183,7 +190,7 @@
 
         <section class="reference-track">
           <div class="journey-heading">
-            <div><h2>نمای سریع مسیر یادگیری</h2><p>${esc(chosen?.title || '')}</p></div>
+            <div><h2>نمای سریع مسیر یادگیری</h2><p>${esc(focusedCourse ? focusedCourse.title : (chosen?.title || ''))}</p></div>
             <button class="journey-link" data-journey-path="${esc(chosen?.id || '')}" type="button">مشاهده تمام درس‌ها ←</button>
           </div>
           <div class="journey-track" aria-label="نمایی از مسیر یادگیری">

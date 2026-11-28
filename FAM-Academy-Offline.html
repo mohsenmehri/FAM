@@ -3127,10 +3127,17 @@ dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px);
     const profile = window.FamAcademyBridge?.progress?.profile || {};
     const all = paths.flatMap(p => (p.courses || []).flatMap(c => c.lessons || []));
     const chosen = paths.find(p => p.id === profile.goal) || paths[0];
-    const target = (chosen?.courses || []).flatMap(c => c.lessons || []);
+    const focusedCourse = chosen?.id === 'fam-c5' && profile.focusStage && profile.focusStage !== 'all'
+      ? (chosen.courses || []).find(c => c.id === profile.focusStage)
+      : null;
+    const target = focusedCourse
+      ? (focusedCourse.lessons || [])
+      : (chosen?.courses || []).flatMap(c => c.lessons || []);
     const assessed = new Set(window.FamAcademyBridge?.progress?.selfAssessed || []);
     const ready = item => (item.prerequisites || []).every(id => completed.has(id) || assessed.has(id));
-    const next = target.find(l => !completed.has(l.id) && l.blueprint && ready(l)) || all.find(l => !completed.has(l.id) && l.blueprint && ready(l));
+    const next = target.find(l => !completed.has(l.id) && l.blueprint && ready(l))
+      || target.find(l => !completed.has(l.id) && l.blueprint)
+      || all.find(l => !completed.has(l.id) && l.blueprint && ready(l));
     const doneAll = all.filter(l => completed.has(l.id)).length;
     const doneTarget = target.filter(l => completed.has(l.id)).length;
     const pctTarget = target.length ? Math.round(doneTarget / target.length * 100) : 0;
@@ -3191,7 +3198,7 @@ dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px);
 
         <section class="reference-track">
           <div class="journey-heading">
-            <div><h2>نمای سریع مسیر یادگیری</h2><p>${esc(chosen?.title || '')}</p></div>
+            <div><h2>نمای سریع مسیر یادگیری</h2><p>${esc(focusedCourse ? focusedCourse.title : (chosen?.title || ''))}</p></div>
             <button class="journey-link" data-journey-path="${esc(chosen?.id || '')}" type="button">مشاهده تمام درس‌ها ←</button>
           </div>
           <div class="journey-track" aria-label="نمایی از مسیر یادگیری">
@@ -3504,7 +3511,27 @@ dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px);
   'use strict';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const days = [['sat','شنبه'],['sun','یکشنبه'],['mon','دوشنبه'],['tue','سه‌شنبه'],['wed','چهارشنبه'],['thu','پنج‌شنبه'],['fri','جمعه']];
-  const topics = [['switching','Switching'],['routing','Routing'],['security','Security'],['automation','Automation']];
+  const topics = [
+    ['switching','Switching & L2'],
+    ['routing','Routing & BGP'],
+    ['security','Security & Zero Trust'],
+    ['sdwan','SD-WAN & Enterprise'],
+    ['dc-sp','Data Center & SP'],
+    ['wireless-collab','Wireless & Collab'],
+    ['ccie-ccde','CCIE / CCDE Design'],
+    ['automation','Automation & NetDevOps']
+  ];
+  const focusStages = [
+    ['all', 'کل مسیر از ابتدا تا CCDE (۱۰۷ درس)'],
+    ['c5-stage-zero', 'Stage Zero — مبانی از صفر (۱۳ درس)'],
+    ['c5-ccna-v11-d1', 'CCNA 200-301 v1.1 (۲۶ درس)'],
+    ['c5-advanced-eng', 'مهندسی پیشرفته شبکه (۱۲ درس)'],
+    ['c5-ccnp-enterprise', 'CCNP Enterprise — ENCOR / ENARSI / SD-WAN (۱۱ درس)'],
+    ['c5-specialties', 'تخصص‌ها — DC / Security / SP / Wireless / Collab (۱۸ درس)'],
+    ['c5-ccie-expert', 'سطح خبره CCIE Tracks (۷ درس)'],
+    ['c5-ccde-design', 'طراحی معماری کلان CCDE 400-007 (۲۰ درس)']
+  ];
+  const stageLabelMap = Object.fromEntries(focusStages);
   let catalog = null;
   const current = () => window.FamAcademyBridge?.progress || { completed: [], labs: {} };
   const profile = () => current().profile || {};
@@ -3519,17 +3546,30 @@ dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px);
   function openProfile({first = false} = {}) {
     if (document.getElementById('journey-profile-dialog')) return;
     const p = profile(), selectedDays = Array.isArray(p.studyDays) ? p.studyDays : ['sat','sun','mon','tue','wed'];
+    const currentGoal = p.goal === 'fam-automation' ? 'fam-automation' : 'fam-c5';
+    const currentFocus = stageLabelMap[p.focusStage] ? p.focusStage : 'all';
     const d = document.createElement('dialog'); d.id='journey-profile-dialog'; d.className='journey-dialog';
     d.setAttribute('aria-labelledby','journey-profile-title');
     d.innerHTML = `<form id="journey-profile-form"><div class="journey-dialog-head"><span class="journey-kicker">YOUR LEARNING JOURNEY</span>${first ? '' : '<button type="button" class="journey-close" aria-label="بستن">×</button>'}</div>
-      <h2 id="journey-profile-title">${first ? 'مسیر یادگیری‌ات را بساز' : 'هدف و برنامهٔ یادگیری'}</h2><p class="journey-form-intro">چند انتخاب کوتاه کمک می‌کند قدم بعدی مناسب‌تری ببینی. هر زمان می‌توانی آن‌ها را تغییر بدهی.</p>
-      <fieldset><legend>۱. کدام مسیر را دنبال می‌کنی؟</legend><div class="journey-choice-grid">${[['fam-c5','Curriculum 5.0','از صفر تا CCNA کامل'],['fam-automation','Automation','زیرساخت به صورت کد']].map(([v,t,sub]) => `<label class="journey-choice"><input type="radio" name="goal" value="${v}" ${((p.goal || 'CCNA')===v)?'checked':''}><span><b>${t}</b><small>${sub}</small></span></label>`).join('')}</div></fieldset>
-      <fieldset><legend>۲. چقدر با شبکه آشنایی داری؟</legend><div class="journey-choice-grid three">${[['beginner','تازه شروع می‌کنم'],['intermediate','مبانی را می‌دانم'],['advanced','تجربهٔ عملی دارم']].map(([v,t]) => `<label class="journey-choice"><input type="radio" name="level" value="${v}" ${((p.level || 'beginner')===v)?'checked':''}><span><b>${t}</b></span></label>`).join('')}</div></fieldset>
+      <h2 id="journey-profile-title">${first ? 'مسیر یادگیری‌ات را بساز' : 'هدف و برنامهٔ یادگیری'}</h2><p class="journey-form-intro">مسیر اصلی و مرحله هدف (از Stage Zero و CCNA تا CCNP، تخصص‌ها، CCIE، CCDE یا اتوماسیون) را انتخاب کن تا پیشنهاد درس بعدی دقیق تنظیم شود.</p>
+      <fieldset><legend>۱. کدام مسیر اصلی را دنبال می‌کنی؟</legend><div class="journey-choice-grid">${[
+        ['fam-c5','Curriculum 5.0 (۱۰۷ درس)','از صفر تا CCNA، Advanced، CCNP، تخصص‌ها، CCIE و CCDE'],
+        ['fam-automation','Automation / NetDevOps (۲۰ درس)','Linux، Python، API، YANG، Ansible، Docker و Terraform']
+      ].map(([v,t,sub]) => `<label class="journey-choice"><input type="radio" name="goal" value="${v}" ${(currentGoal===v)?'checked':''}><span><b>${t}</b><small>${sub}</small></span></label>`).join('')}</div></fieldset>
+      <fieldset id="journey-focus-stage-fieldset"><legend>۲. تمرکز فعلی روی کدام دوره باشد؟ (در Curriculum 5.0)</legend><select name="focusStage" style="width:100%;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--text)">${focusStages.map(([v,t]) => `<option value="${v}" ${currentFocus===v?'selected':''}>${t}</option>`).join('')}</select></fieldset>
+      <fieldset><legend>۳. چقدر با شبکه آشنایی داری؟</legend><div class="journey-choice-grid three">${[['beginner','تازه شروع می‌کنم'],['intermediate','مبانی را می‌دانم'],['advanced','تجربهٔ عملی دارم']].map(([v,t]) => `<label class="journey-choice"><input type="radio" name="level" value="${v}" ${((p.level || 'beginner')===v)?'checked':''}><span><b>${t}</b></span></label>`).join('')}</div></fieldset>
       <div class="journey-form-row"><label>زمان مطالعه در روز <select name="minutes"><option value="15" ${Number(p.minutesPerDay)===15?'selected':''}>۱۵ دقیقه</option><option value="30" ${Number(p.minutesPerDay)===30?'selected':''}>۳۰ دقیقه</option><option value="45" ${!p.minutesPerDay||Number(p.minutesPerDay)===45?'selected':''}>۴۵ دقیقه</option><option value="60" ${Number(p.minutesPerDay)===60?'selected':''}>۶۰ دقیقه</option><option value="90" ${Number(p.minutesPerDay)===90?'selected':''}>۹۰ دقیقه</option></select></label><label>تاریخ هدف <span class="muted">(اختیاری)</span><input type="date" name="targetDate" value="${esc(p.targetDate || '')}"></label></div>
       <fieldset><legend>روزهای پیشنهادی مطالعه</legend><div class="journey-days">${days.map(([v,t])=>`<label><input type="checkbox" name="studyDay" value="${v}" ${selectedDays.includes(v)?'checked':''}><span>${t}</span></label>`).join('')}</div></fieldset>
       <fieldset><legend>موضوعاتی که می‌خواهی بیشتر مرور کنی <span class="muted">(اختیاری)</span></legend><div class="journey-days">${topics.map(([v,t])=>`<label><input type="checkbox" name="topic" value="${v}" ${(p.reviewTopics || []).includes(v)?'checked':''}><span dir="ltr">${t}</span></label>`).join('')}</div><small>این انتخاب خودارزیابی است و به‌معنای تکمیل درس یا قبولی در آزمون نیست.</small></fieldset>
       <p class="journey-form-error" role="alert"></p><div class="journey-form-actions"><button class="journey-primary" type="submit">${first?'شروع مسیر یادگیری':'ذخیرهٔ تغییرات'} ←</button>${first?'<button type="button" class="journey-skip">بعداً تنظیم می‌کنم</button>':''}</div></form>`;
     document.body.appendChild(d);
+    const focusFieldset = d.querySelector('#journey-focus-stage-fieldset');
+    const syncFocusVis = () => {
+      const chosenGoal = d.querySelector('input[name="goal"]:checked')?.value || 'fam-c5';
+      if (focusFieldset) focusFieldset.hidden = chosenGoal !== 'fam-c5';
+    };
+    d.querySelectorAll('input[name="goal"]').forEach(r => r.addEventListener('change', syncFocusVis));
+    syncFocusVis();
     const close = () => { d.close(); d.remove(); };
     d.querySelector('.journey-close')?.addEventListener('click',close);
     d.querySelector('.journey-skip')?.addEventListener('click', close);
@@ -3539,7 +3579,9 @@ dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px);
       const f = new FormData(event.currentTarget), selected = f.getAll('studyDay').map(String);
       const err = d.querySelector('.journey-form-error');
       if (!selected.length) { err.textContent='حداقل یک روز مطالعه انتخاب کن.'; return; }
-      const updated = { ...p, onboardingComplete:true, goal:String(f.get('goal')), level:String(f.get('level')), minutesPerDay:Number(f.get('minutes')), studyDays:selected, daysPerWeek:selected.length, targetDate:String(f.get('targetDate') || ''), reviewTopics:f.getAll('topic').map(String) };
+      const goalVal = String(f.get('goal') || 'fam-c5');
+      const focusVal = goalVal === 'fam-c5' ? String(f.get('focusStage') || 'all') : 'all';
+      const updated = { ...p, onboardingComplete:true, goal:goalVal, focusStage:focusVal, level:String(f.get('level')), minutesPerDay:Number(f.get('minutes')), studyDays:selected, daysPerWeek:selected.length, targetDate:String(f.get('targetDate') || ''), reviewTopics:f.getAll('topic').map(String) };
       const button=d.querySelector('[type=submit]'); button.disabled=true; err.textContent='در حال ذخیره…';
       const state={ ...current(), completed: [...window.FamAcademyCatalog.getCompletedSet()] };
       const ok=await window.FamAcademyBridge?.saveProgress({ ...state, profile:updated });
@@ -3563,9 +3605,12 @@ dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px);
       const done=all.filter(l=>completed.has(l.id));
       const count=all.length, pct=count?Math.round(done.length*100/count):0;
       const selected=topics.filter(([v])=>(p.reviewTopics||[]).includes(v));
+      const goalTitle = p.goal === 'fam-automation' ? 'Automation (۲۰ درس)' : 'Curriculum 5.0 (۱۰۷ درس)';
+      const focusTitle = p.goal !== 'fam-automation' && p.focusStage && p.focusStage !== 'all' && stageLabelMap[p.focusStage]
+        ? stageLabelMap[p.focusStage] : '';
       root.innerHTML=`<div class="journey-progress-page"><div class="journey-progress-head"><div><span class="journey-kicker">YOUR LEARNING PROFILE</span><h1>پیشرفت و مسیر من</h1><p>یادگیری یک سفر است؛ اینجا می‌توانی قدم‌های ثبت‌شده‌ات را ببینی.</p></div><button class="journey-primary small" id="journey-edit-profile">ویرایش هدف و برنامه ←</button></div>
         <div class="journey-progress-grid"><article class="journey-panel"><span class="journey-kicker">LESSONS COMPLETED</span><h2>درس‌های تکمیل‌شده</h2><div class="journey-stat">${done.length}<small>از ${count} درس</small></div><div class="fa-progress journey-meter"><span style="width:${pct}%"></span></div><p>بر اساس علامت‌گذاری دستی درس‌ها</p></article>
-        <article class="journey-panel"><span class="journey-kicker">YOUR PLAN</span><h2>هدف و برنامه</h2><div class="journey-stat">${esc(p.goal === 'fam-c5' || !p.goal ? 'Curriculum 5.0' : p.goal)}<small>هدف فعلی</small></div><p>${Number(p.minutesPerDay)||45} دقیقه در روز · ${Number(p.daysPerWeek)||5} روز در هفته</p><p>${p.targetDate ? `تاریخ هدف: <bdi dir="ltr">${esc(p.targetDate)}</bdi>` : 'تاریخ هدف تنظیم نشده است.'}</p></article>
+        <article class="journey-panel"><span class="journey-kicker">YOUR PLAN</span><h2>هدف و برنامه</h2><div class="journey-stat" style="font-size:22px">${esc(goalTitle)}</div>${focusTitle ? `<p style="color:var(--cyan);font-weight:700">تمرکز مرحله: ${esc(focusTitle)}</p>` : ''}<p>${Number(p.minutesPerDay)||45} دقیقه در روز · ${Number(p.daysPerWeek)||5} روز در هفته</p><p>${p.targetDate ? `تاریخ هدف: <bdi dir="ltr">${esc(p.targetDate)}</bdi>` : 'تاریخ هدف تنظیم نشده است.'}</p></article>
         <article class="journey-panel"><span class="journey-kicker">REVIEW FOCUS</span><h2>موضوعات برای مرور</h2><p>${selected.length ? selected.map(([,t])=>esc(t)).join(' · ') : 'هنوز موضوعی برای مرور انتخاب نکرده‌ای.'}</p><p class="journey-note">این فهرست انتخاب خودت است، نه سنجش خودکار تسلط.</p></article></div>
         <section class="journey-history"><div class="journey-heading"><div><span class="journey-kicker">YOUR MILESTONES</span><h2>درس‌های ثبت‌شده</h2><p>برای هر درس تکمیل‌شده می‌توانی دوباره مطالعه را باز کنی.</p></div></div>${done.length?`<div class="journey-history-list">${done.map(l=>`<button class="journey-history-item" data-open-lesson="${esc(l.id)}"><span>✓</span><strong>${esc(l.title)}</strong><small>تکمیل‌شده ←</small></button>`).join('')}</div>`:'<div class="journey-empty">هنوز درسی را تکمیل‌شده علامت نزده‌ای. با اولین قدم شروع کن.</div>'}</section></div>`;
       root.querySelector('#journey-edit-profile').onclick=()=>openProfile();
@@ -3782,8 +3827,8 @@ dialog::backdrop { background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px);
       <div class="s4-title"><span>برنامه‌ریزی مطالعه</span></div>
       <form id="s4-ob-form" style="display:grid; gap:8px;">
         <select id="s4-goal" style="padding:7px; border-radius:6px;">
-          <option value="fam-c5">Curriculum 5.0 — از صفر تا CCNA</option>
-          <option value="fam-automation">اتوماسیون — زیرساخت به صورت کد</option>
+          <option value="fam-c5">Curriculum 5.0 — از صفر تا CCNA / CCNP / CCIE / CCDE (۱۰۷ درس)</option>
+          <option value="fam-automation">اتوماسیون — NetDevOps و IaC (۲۰ درس)</option>
         </select>
         <select id="s4-level" style="padding:7px; border-radius:6px;">
           <option value="beginner">مبتدی (۱.۰x)</option>
