@@ -89,6 +89,23 @@
           loginLink.textContent = 'ورود مجدد به حساب ←';
           loginLink.style.cssText = 'color:var(--cyan);font-weight:800;text-decoration:underline;margin-inline-start:6px';
           err.append(loginLink);
+        } else if (bridge.lastCode === 'shared_progress_locked' && !bridge.offline) {
+          const unlockBtn = document.createElement('button');
+          unlockBtn.type = 'button';
+          unlockBtn.className = 'journey-primary small';
+          unlockBtn.textContent = 'بررسی و باز کردن قفل پیشرفت قدیمی ←';
+          unlockBtn.style.cssText = 'margin-inline-start:8px;padding:4px 12px;font-size:12px';
+          unlockBtn.addEventListener('click', () => {
+            close();
+            const tools = document.getElementById('academy-account-tools');
+            const previewBtn = document.getElementById('academy-legacy-preview');
+            if (tools) {
+              tools.classList.add('is-locked');
+              tools.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            if (previewBtn && !previewBtn.hidden) previewBtn.click();
+          });
+          err.append(unlockBtn);
         } else if ((bridge.lastStatus === 403 || bridge.lastStatus === 409) && !bridge.offline) {
           const reloadBtn = document.createElement('button');
           reloadBtn.type = 'button';

@@ -84,8 +84,37 @@ async function testReadOnlyLegacyArchiveViewer() {
   domBad.window.close();
 }
 
+async function testEmptyLegacyArchiveUnlockFlow() {
+  const dom=new JSDOM('<!doctype html><div id="academy-save-status"></div><button id="academy-legacy-preview" hidden></button><button id="academy-legacy-migrate" hidden></button><button id="academy-legacy-archive-unlock" hidden></button><button id="academy-legacy-reload" hidden></button>',{url:'https://fam.test/',runScripts:'outside-only'});
+  const w=dom.window, requests=[]; let confirmed=true;
+  w.confirm=()=>confirmed;
+  w.fetch=async(url,opts)=>{
+    requests.push({url,opts});
+    if(url.endsWith('legacy-preview')) return {ok:true,json:async()=>({revision:2,uniqueCompletedCount:0,unmappedCount:0,blockedReason:'no_eligible',eligible:[],migrationAvailable:false})};
+    if(url.endsWith('/archive-legacy')) return {ok:true,json:async()=>({ok:true,revision:3,archived:true})};
+    throw Error('unexpected '+url);
+  };
+  w.eval(script.replace('__FAM_ACADEMY_BOOTSTRAP__',JSON.stringify({csrf:'tok',progressRevision:2,progress:{'fam4.learn.v1':JSON.stringify({completedLessons:[],notes:{}})}})));
+  await tick();
+  const preview=w.document.getElementById('academy-legacy-preview');
+  const migrate=w.document.getElementById('academy-legacy-migrate');
+  const unlock=w.document.getElementById('academy-legacy-archive-unlock');
+  const reloadBtn=w.document.getElementById('academy-legacy-reload');
+  assert.equal(preview.hidden,false);
+  preview.click(); await tick(); await tick();
+  assert.equal(migrate.hidden,true,'migrate must stay hidden when 0 eligible');
+  assert.equal(unlock.hidden,false,'archive-unlock button must appear when 0 eligible');
+  unlock.click(); await tick(); await tick();
+  assert.equal(requests.length,2);
+  assert.equal(requests[1].url,'/api/academy/progress/archive-legacy');
+  assert.deepEqual(JSON.parse(requests[1].opts.body),{expectedRevision:2});
+  assert.equal(reloadBtn.hidden,false,'reload CTA must appear after archive unlock');
+  dom.window.close();
+}
+
 (async()=>{
   await testMigrationFlow();
   await testReadOnlyLegacyArchiveViewer();
-  console.log('jsdom migration + read-only legacy archive viewer (XSS-safe, zero writes, malformed fallback) passed');
+  await testEmptyLegacyArchiveUnlockFlow();
+  console.log('jsdom migration + archive-unlock + read-only legacy archive viewer passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

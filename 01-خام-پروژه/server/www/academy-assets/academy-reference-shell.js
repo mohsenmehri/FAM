@@ -331,8 +331,12 @@
   root.removeAttribute('style');
   appMain.append(topbar);
   if (offlineNote) appMain.append(offlineHost);
+  if (accountTools && window.FamAcademyBridge?.sharedProgressLocked) {
+    accountTools.classList.add('is-locked');
+    appMain.append(accountTools);
+  }
   appMain.append(root, hiddenTools);
-  if (accountTools) appMain.append(accountTools);
+  if (accountTools && !window.FamAcademyBridge?.sharedProgressLocked) appMain.append(accountTools);
   for (const node of [searchWrap, stageBar, planner]) if (node) appMain.append(node);
 
   // Mobile Bottom Nav

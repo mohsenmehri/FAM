@@ -57,40 +57,88 @@
       document.addEventListener('DOMContentLoaded', () => {
         const preview = document.getElementById('academy-legacy-preview');
         const migrate = document.getElementById('academy-legacy-migrate');
+        const archiveUnlock = document.getElementById('academy-legacy-archive-unlock');
+        const reloadBtn = document.getElementById('academy-legacy-reload');
         if (!preview || !migrate || !sharedProgressLocked || !csrf) return;
         preview.hidden = false;
+        if (reloadBtn) reloadBtn.addEventListener('click', () => window.location.reload());
         let plan = null;
+        let archiveRevision = progressRevision;
         preview.addEventListener('click', async () => {
           preview.disabled = true; migrate.hidden = true; plan = null;
+          if (archiveUnlock) archiveUnlock.hidden = true;
           try {
             const response = await fetch('/api/academy/progress/legacy-preview', {credentials:'same-origin', headers:{'X-FAM-CSRF':csrf}});
-            if (!response.ok) throw new Error('unrecognized');
+            if (!response.ok) {
+              if (response.status === 409 && archiveUnlock && Number.isSafeInteger(progressRevision)) {
+                archiveRevision = progressRevision;
+                archiveUnlock.hidden = false;
+                saveStatus('قالب داده قدیمی با الگوی استاندارد همخوانی ندارد؛ می‌توانید با دکمه «بایگانی امن نسخه قدیمی و فعال‌سازی ذخیره جدید»، نسخه خام فعلی را در پشتیبان قابل بازگشت ذخیره کرده و قفل ذخیره نسخه ۵ را باز کنید.');
+                return;
+              }
+              throw new Error('unrecognized');
+            }
             const info = await response.json();
             if (!Number.isSafeInteger(info.revision) || !Array.isArray(info.eligible) ||
                 info.eligible.some(id => typeof id !== 'string' || !/^[a-z0-9_-]{1,64}$/.test(id))) throw new Error('unsupported plan');
             if (!Number.isSafeInteger(info.uniqueCompletedCount) || info.uniqueCompletedCount < 0 ||
                 !Number.isSafeInteger(info.unmappedCount) || info.unmappedCount < 0 || info.unmappedCount > info.uniqueCompletedCount ||
                 ![null, 'archive_exists', 'no_eligible'].includes(info.blockedReason)) throw new Error('unsupported plan');
+            archiveRevision = info.revision;
             const blocked = info.blockedReason === 'archive_exists' ? ' بایگانی موجود است و برای جلوگیری از بازنویسی انتقال مسدود شد.' : '';
             const eligiblePreview = info.eligible.length > 8
               ? info.eligible.slice(0, 8).join('، ') + ' و ' + (info.eligible.length - 8) + ' مورد دیگر'
               : (info.eligible.join('، ') || 'هیچ‌کدام');
-            saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ بدون نگاشت: ' + info.unmappedCount + '؛ قابل انتقال (' + info.eligible.length + ' مورد): ' + eligiblePreview + '. نمره‌ها و یادداشت‌های قدیمی به نمره نسخه ۵ تبدیل نمی‌شوند و پس از انتقال به‌صورت خواندنی در آرشیو حساب قابل مشاهده‌اند.' + blocked);
-            if (info.migrationAvailable && info.eligible.length) { plan=info; migrate.hidden=false; }
-          } catch (_) { saveStatus('قالب قدیمی قابل تشخیص نیست یا نشست تغییر کرده است؛ داده تغییر نکرد.'); }
+            if (info.migrationAvailable && info.eligible.length) {
+              plan = info;
+              migrate.hidden = false;
+              saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ بدون نگاشت: ' + info.unmappedCount + '؛ قابل انتقال (' + info.eligible.length + ' مورد): ' + eligiblePreview + '. نمره‌ها و یادداشت‌های قدیمی به نمره نسخه ۵ تبدیل نمی‌شوند و پس از انتقال به‌صورت خواندنی در آرشیو حساب قابل مشاهده‌اند.' + blocked);
+            } else {
+              if (archiveUnlock) archiveUnlock.hidden = false;
+              saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ بدون نگاشت: ' + info.unmappedCount + '؛ قابل انتقال (' + info.eligible.length + ' مورد): ' + eligiblePreview + '. برای باز کردن قفل ذخیره نسخه جدید (همراه با حفظ نسخه خام در پشتیبان و آرشیو خواندنی)، دکمه «بایگانی امن نسخه قدیمی و فعال‌سازی ذخیره جدید» را بزنید.' + blocked);
+            }
+          } catch (_) {
+            if (archiveUnlock && Number.isSafeInteger(progressRevision)) {
+              archiveRevision = progressRevision;
+              archiveUnlock.hidden = false;
+            }
+            saveStatus('قالب قدیمی قابل تشخیص نیست یا نشست تغییر کرده است؛ داده تغییر نکرد.');
+          }
           finally { preview.disabled = false; }
         });
         migrate.addEventListener('click', async () => {
           if (!plan || !window.confirm('تکمیل ' + plan.eligible.length + ' درس تأییدشده منتقل می‌شود؛ نسخه خام کامل (شامل نمره‌ها، یادداشت‌ها و شناسه‌های بدون نگاشت) در بایگانی و پشتیبان قابل بازگشت حفظ می‌شود. ادامه می‌دهید؟')) return;
           revisionConflict=true; preview.disabled=true; migrate.disabled=true;
+          if (archiveUnlock) archiveUnlock.disabled = true;
           try {
             const response=await fetch('/api/academy/progress/migrate', {method:'POST', credentials:'same-origin',
               headers:{'Content-Type':'application/json','X-FAM-CSRF':csrf},
               body:JSON.stringify({expectedRevision:plan.revision,selectedLessons:plan.eligible})});
             if (!response.ok) throw new Error('migration failed');
             saveStatus('انتقال انتخاب‌شده انجام شد؛ برای جلوگیری از بازنویسی صفحه را بازخوانی کنید.');
+            if (reloadBtn) reloadBtn.hidden = false;
           } catch (_) { saveStatus('انتقال انجام نشد یا نتیجه نامشخص است؛ صفحه را بازخوانی و نسخه‌ها را بررسی کنید.'); }
         });
+        if (archiveUnlock) {
+          archiveUnlock.addEventListener('click', async () => {
+            if (!Number.isSafeInteger(archiveRevision)) return;
+            if (!window.confirm('نسخه خام فعلی در پشتیبان قابل بازگشت حساب و آرشیو خواندنی حفظ شده و ذخیره نسخه ۵ آکادمی باز می‌شود. ادامه می‌دهید؟')) return;
+            revisionConflict = true; preview.disabled = true; migrate.disabled = true; archiveUnlock.disabled = true;
+            try {
+              const response = await fetch('/api/academy/progress/archive-legacy', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+                body: JSON.stringify({ expectedRevision: archiveRevision })
+              });
+              if (!response.ok) throw new Error('archive unlock failed');
+              saveStatus('بایگانی امن انجام شد و قفل ذخیره باز شد؛ روی «بازخوانی صفحه» کلیک کنید تا ذخیره تغییرات فعال شود.');
+              if (reloadBtn) reloadBtn.hidden = false;
+            } catch (_) {
+              saveStatus('بایگانی انجام نشد یا نتیجه نامشخص است؛ صفحه را بازخوانی و نسخه‌ها را بررسی کنید.');
+              if (reloadBtn) reloadBtn.hidden = false;
+            }
+          });
+        }
       });
       document.addEventListener('DOMContentLoaded', () => {
         const load = document.getElementById('academy-backups-load');
@@ -2195,6 +2243,35 @@ figure figcaption {
 .quiz-inline-warning {
   color: var(--amber);
 }
+.account-tools-bar.is-locked {
+  margin-top: 14px;
+  margin-bottom: 4px;
+}
+.account-tools-bar.is-locked .account-tools-card {
+  border: 1.5px solid var(--amber);
+  background: color-mix(in srgb, var(--amber) 10%, var(--panel));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+}
+.account-tools-bar.is-locked #academy-save-status {
+  color: var(--text);
+  font-weight: 800;
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+#academy-legacy-preview,
+#academy-legacy-migrate,
+#academy-legacy-archive-unlock,
+#academy-legacy-reload {
+  font-weight: 800;
+  border-color: var(--cyan);
+}
+#academy-legacy-migrate,
+#academy-legacy-archive-unlock,
+#academy-legacy-reload {
+  background: var(--grad-accent);
+  color: #06101f;
+  border: 0;
+}
 
 @media (max-width: 480px) {
   .topbar { padding: 0 8px; gap: 6px; }
@@ -2232,7 +2309,7 @@ figure figcaption {
     <div class="account-tools-card">
       <div id="academy-save-status" role="status" aria-live="polite"></div>
       <div class="account-tools-row"><button id="academy-export-progress" type="button" hidden>دریافت نسخه خام پیشرفت حساب</button><small>نسخه ممکن است یادداشت و اطلاعات حساس داشته باشد؛ در محل امن نگهداری کنید. این دریافت، مهاجرت یا بازیابی نیست.</small></div>
-      <div class="account-tools-row"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-legacy-migrate" type="button" hidden>انتقال تکمیل درس‌های تأییدشده</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button><button id="academy-legacy-archive-toggle" type="button" aria-expanded="false" hidden>مشاهده خواندنی آرشیو نسخه قدیمی (نمره‌ها و یادداشت‌ها)</button></div>
+      <div class="account-tools-row"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-legacy-migrate" type="button" hidden>انتقال تکمیل درس‌های تأییدشده</button><button id="academy-legacy-archive-unlock" type="button" hidden>بایگانی امن نسخه قدیمی و فعال‌سازی ذخیره جدید</button><button id="academy-legacy-reload" type="button" hidden>بازخوانی صفحه</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button><button id="academy-legacy-archive-toggle" type="button" aria-expanded="false" hidden>مشاهده خواندنی آرشیو نسخه قدیمی (نمره‌ها و یادداشت‌ها)</button></div>
       <section id="academy-legacy-archive-panel" aria-label="آرشیو خواندنی نسخه قدیمی" hidden style="margin:10px 0 0;padding:14px 16px;border:1px solid #475569;border-radius:10px;"></section>
     </div>
   </section>
@@ -4769,6 +4846,23 @@ figure figcaption {
           loginLink.textContent = 'ورود مجدد به حساب ←';
           loginLink.style.cssText = 'color:var(--cyan);font-weight:800;text-decoration:underline;margin-inline-start:6px';
           err.append(loginLink);
+        } else if (bridge.lastCode === 'shared_progress_locked' && !bridge.offline) {
+          const unlockBtn = document.createElement('button');
+          unlockBtn.type = 'button';
+          unlockBtn.className = 'journey-primary small';
+          unlockBtn.textContent = 'بررسی و باز کردن قفل پیشرفت قدیمی ←';
+          unlockBtn.style.cssText = 'margin-inline-start:8px;padding:4px 12px;font-size:12px';
+          unlockBtn.addEventListener('click', () => {
+            close();
+            const tools = document.getElementById('academy-account-tools');
+            const previewBtn = document.getElementById('academy-legacy-preview');
+            if (tools) {
+              tools.classList.add('is-locked');
+              tools.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            if (previewBtn && !previewBtn.hidden) previewBtn.click();
+          });
+          err.append(unlockBtn);
         } else if ((bridge.lastStatus === 403 || bridge.lastStatus === 409) && !bridge.offline) {
           const reloadBtn = document.createElement('button');
           reloadBtn.type = 'button';
@@ -6046,8 +6140,12 @@ figure figcaption {
   root.removeAttribute('style');
   appMain.append(topbar);
   if (offlineNote) appMain.append(offlineHost);
+  if (accountTools && window.FamAcademyBridge?.sharedProgressLocked) {
+    accountTools.classList.add('is-locked');
+    appMain.append(accountTools);
+  }
   appMain.append(root, hiddenTools);
-  if (accountTools) appMain.append(accountTools);
+  if (accountTools && !window.FamAcademyBridge?.sharedProgressLocked) appMain.append(accountTools);
   for (const node of [searchWrap, stageBar, planner]) if (node) appMain.append(node);
 
   // Mobile Bottom Nav

@@ -984,6 +984,50 @@ def create_app(config=None):
                        (payload,revision,now,user['id']))
         return jsonify(ok=True,revision=revision,migrated=selected)
 
+    @app.post('/api/academy/progress/archive-legacy')
+    def archive_academy_legacy():
+        body = data()
+        if (not isinstance(body, dict) or set(body) != {'expectedRevision'} or
+            type(body['expectedRevision']) is not int or not 0 <= body['expectedRevision'] < 2**63 - 1):
+            fail(400, 'نسخه فعلی پیشرفت معتبر نیست.')
+        legacy_keys = {'completedLessons', 'quizScores', 'notes', 'missions', 'examScore', 'activeLesson'}
+        with transaction() as db:
+            user, _ = user_and_session(db)
+            row = db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
+            if not row or row['revision'] != body['expectedRevision']:
+                fail(409, 'پیشرفت تغییر کرده است؛ صفحه را بازخوانی کنید.')
+            try:
+                outer = strict_progress_json(row['payload'])
+            except (ValueError, TypeError, RecursionError):
+                fail(409, 'قالب کلی داده پیشرفت معتبر نیست؛ ابتدا نسخه خام را دریافت کنید.')
+            if not isinstance(outer, dict) or 'fam4.learn.v1' not in outer:
+                fail(409, 'داده قدیمی برای بایگانی یافت نشد.')
+            raw_val = outer['fam4.learn.v1']
+            is_clean_v5 = False
+            if isinstance(raw_val, str):
+                try:
+                    parsed = strict_progress_json(raw_val)
+                    if (isinstance(parsed, dict) and isinstance(parsed.get('completed'), list)
+                        and not any(k in parsed for k in legacy_keys)):
+                        is_clean_v5 = True
+                except (ValueError, TypeError, RecursionError):
+                    is_clean_v5 = False
+            if is_clean_v5:
+                fail(409, 'پیشرفت فعلی از قبل در قالب جدید است و قفل نیست.')
+            if legacy_archive_key not in outer and isinstance(raw_val, str):
+                outer[legacy_archive_key] = raw_val
+            outer['fam4.learn.v1'] = packed({'completed': [], 'labs': {}})
+            payload = packed(outer)
+            if len(payload.encode('utf-8')) > 8 * 1024 * 1024:
+                fail(413, 'برای نگهداری نسخه قدیمی فضای مجاز کافی نیست؛ هیچ داده‌ای تغییر نکرد.')
+            now = int(time.time() * 1000)
+            db.execute('INSERT INTO academy_progress_backups(user_id,revision,payload,saved_at) VALUES(?,?,?,?)',
+                       (user['id'], row['revision'], row['payload'], now))
+            revision = row['revision'] + 1
+            db.execute('UPDATE academy_progress SET payload=?,revision=?,updated_at=? WHERE user_id=?',
+                       (payload, revision, now, user['id']))
+        return jsonify(ok=True, revision=revision, archived=True)
+
     @app.get('/api/academy/progress/backups')
     def list_academy_progress_backups():
         with connect() as db:

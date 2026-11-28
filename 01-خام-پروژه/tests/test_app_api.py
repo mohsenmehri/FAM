@@ -647,6 +647,41 @@ class FamAppApiTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as db:
             payload,revision=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
             self.assertEqual(payload,raw);self.assertEqual(revision,8)
+
+    def test_archive_legacy_unlocks_empty_unmapped_and_malformed_progress_reversibly(self):
+        url='/api/academy/progress/archive-legacy'
+        self.assertEqual(self.client.post(url,json={'expectedRevision':0},headers={'Origin':self.ORIGIN},environ_base=self.https_env).status_code,401)
+        csrf=self._login_admin().json['csrf']; h={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+        old=json.dumps({'completedLessons':[],'notes':{'s01':'old note'},'activeLesson':'s01'})
+        raw=json.dumps({'fam4.learn.v1':old,'keep-me':'yes'})
+        with sqlite3.connect(self.db_path) as db:
+            db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,1,3))
+        # Stale revision fails closed with 409; invalid body fails with 400
+        self.assertEqual(self.client.post(url,json={'expectedRevision':2},headers=h,environ_base=self.https_env).status_code,409)
+        self.assertEqual(self.client.post(url,json={'expectedRevision':3,'extra':1},headers=h,environ_base=self.https_env).status_code,400)
+        # Valid unlock archives raw legacy, backs it up, and unlocks v5 writes
+        res=self.client.post(url,json={'expectedRevision':3},headers=h,environ_base=self.https_env)
+        self.assertEqual(res.status_code,200); self.assertEqual(res.json['revision'],4)
+        # Already-clean v5 payload cannot be overwritten by archive-legacy
+        self.assertEqual(self.client.post(url,json={'expectedRevision':4},headers=h,environ_base=self.https_env).status_code,409)
+        with sqlite3.connect(self.db_path) as db:
+            payload,rev=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
+            backup=db.execute('SELECT payload FROM academy_progress_backups WHERE user_id=? AND revision=3',(uid,)).fetchone()[0]
+        self.assertEqual(rev,4); self.assertEqual(backup,raw)
+        state=json.loads(payload)
+        self.assertEqual(state['fam.academy.legacy.archive.v1'],old)
+        self.assertEqual(state['keep-me'],'yes')
+        self.assertEqual(json.loads(state['fam4.learn.v1']),{'completed':[],'labs':{}})
+        # Normal v5 profile save now succeeds cleanly!
+        save=self.client.post('/api/academy/progress',json={'expectedRevision':4,'changes':{'fam4.learn.v1':json.dumps({'completed':[],'labs':{},'profile':{'goal':'fam-c5'}})}},headers=h,environ_base=self.https_env)
+        self.assertEqual(save.status_code,200)
+        # And restore brings back exact original legacy payload verbatim
+        restored=self.client.post('/api/academy/progress/restore',json={'backupRevision':3,'expectedRevision':5},headers=h,environ_base=self.https_env)
+        self.assertEqual(restored.status_code,200)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute('SELECT payload FROM academy_progress WHERE user_id=?',(uid,)).fetchone()[0],raw)
         self.assertEqual(self.client.post('/api/academy/progress',json={'expectedRevision':8,'changes':{'fam4.learn.v1':'{}'}},headers=h,environ_base=self.https_env).status_code,409)
 
     def test_migration_rejects_archive_collision_and_cross_account_request(self):
