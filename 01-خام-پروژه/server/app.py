@@ -907,13 +907,15 @@ def create_app(config=None):
         if not row:
             fail(404, 'پیشرفت ذخیره‌شده‌ای وجود ندارد.')
         outer,_,legacy=parse_legacy_progress(row['payload'])
-        eligible=sorted(set(legacy['completedLessons']) & legacy_completion_map.keys())
+        completed=set(legacy['completedLessons'])
+        eligible=sorted(completed & legacy_completion_map.keys())
         available=bool(eligible) and legacy_archive_key not in outer
+        blocked_reason = 'archive_exists' if legacy_archive_key in outer else ('no_eligible' if not eligible else None)
         return jsonify(revision=row['revision'], completedCount=len(legacy['completedLessons']),
-                       uniqueCompletedCount=len(set(legacy['completedLessons'])),
+                       uniqueCompletedCount=len(completed), unmappedCount=len(completed - legacy_completion_map.keys()),
                        retainedFields=[k for k in ('activeLesson','quizScores','notes','missions','examScore') if k in legacy],
                        mappedCount=len(eligible) if available else 0, eligible=eligible if available else [],
-                       migrationAvailable=available)
+                       migrationAvailable=available, blockedReason=blocked_reason)
 
     @app.post('/api/academy/progress/migrate')
     def migrate_academy_legacy():

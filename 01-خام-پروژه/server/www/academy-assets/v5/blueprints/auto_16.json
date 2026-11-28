@@ -1,0 +1,346 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_16",
+ "objectiveId": "auto_16",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۱۶ از ۲۰): CI/CD Pipeline برای تغییرات شبکه",
+ "titleEn": "Automation 16: Network CI/CD Pipelines, GitOps, Canary Rollout & Automated Verification",
+ "domain": "Network Automation",
+ "source": "Legacy auto_16 rewritten and audited",
+ "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+ "reviewStatus": "بازبینی فنی توسط یکپارچه‌ساز انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+ "estimatedMinutes": 55,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_16-section-1",
+   "title": "مسئله واقعی: چرا پنجره تغییرات شبانه (Maintenance Window) بدون CI/CD به خطای انسانی و Rollback دستی ختم می‌شود؟",
+   "html": "<p>تغییر دستی یا خودکار بدون بررسی و برنامه بازیابی می‌تواند اختلال ایجاد کند. یک طراحی CI/CD شبکه ممکن است PR، بررسی خودکار، تأیید، استقرار محدود و سنجش پس از تغییر داشته باشد؛ هیچ ابزار یا گیت به‌تنهایی سلامت سرویس یا موفقیت بازگشت را تضمین نمی‌کند.</p>"
+  },
+  {
+   "id": "auto_16-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> Git و PR (درس <code>auto_04</code>)، Ansible/IaC (درس <code>auto_11</code> و <code>auto_15</code>).</p><ul><li>تفکیک دقیق <strong>CI (Continuous Integration)</strong>، <strong>Continuous Delivery</strong> و <strong>Continuous Deployment</strong> در شبکه‌های تولیدی.</li><li>طراحی مراحل کلیدی یک Network CI/CD Pipeline با اصل <strong>Fail-Fast</strong> (توقف فوری در شکست Lint/Test/Security).</li><li>پیاده‌سازی ایمنی‌های تولیدی: <strong>Change Approval Gate</strong>، استقرار تدریجی (<strong>Canary / Rolling</strong>)، تست پس از استقرار و <strong>Rollback خودکار</strong>.</li><li>تنظیم امنیت Runnerها و اسرار در <strong>GitLab CI</strong> و <strong>GitHub Actions</strong> (به‌ویژه Self-Hosted Runner در شبکه داخلی).</li></ul>"
+  },
+  {
+   "id": "auto_16-section-3",
+   "title": "تفاوت دقیق CI، Continuous Delivery و Continuous Deployment در شبکه",
+   "html": "<p><strong>CI:</strong> ادغام مکرر تغییرات با build و تست خودکار. <strong>Continuous Delivery:</strong> تغییرات در وضعیتی قابل استقرار نگه داشته می‌شوند و زمان انتشار می‌تواند تصمیم جداگانه باشد. <strong>Continuous Deployment:</strong> تغییرات عبورکرده از pipeline به‌طور خودکار به تولید می‌رسند. وجود تأیید انسانی، دامنه تست و سطح خودکارسازی از طراحی و ریسک سازمان پیروی می‌کند، نه یک تضمین همگانی.</p>"
+  },
+  {
+   "id": "auto_16-section-4",
+   "title": "نمودار معماری Network CI/CD Pipeline با اصل Fail-Fast و Rollback خودکار",
+   "html": "<p>نمودار زیر جریان عبور یک تغییر شبکه از Commit تا Verify پس از استقرار را نشان می‌دهد.</p><svg viewBox=\"0 0 760 205\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"5-Stage Network CI/CD Pipeline with Security Gate, Canary Deploy and Recovery plan\"><rect x=\"12\" y=\"42\" width=\"128\" height=\"96\" rx=\"8\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"76\" y=\"68\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#1e3a8a\">1. Commit &amp; Lint</text><text x=\"76\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">PR + yamllint</text><text x=\"76\" y=\"108\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">ansible-lint / fmt</text><rect x=\"164\" y=\"42\" width=\"128\" height=\"96\" rx=\"8\" fill=\"#e0f2fe\" stroke=\"#0284c7\" stroke-width=\"2\"/><text x=\"228\" y=\"68\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#0369a1\">2. Validate/Test</text><text x=\"228\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Schema + Batfish</text><text x=\"228\" y=\"108\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Digital Twin Lab</text><rect x=\"316\" y=\"42\" width=\"128\" height=\"96\" rx=\"8\" fill=\"#fee2e2\" stroke=\"#b91c1c\" stroke-width=\"2\"/><text x=\"380\" y=\"68\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#991b1b\">3. Security Gate</text><text x=\"380\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Secret Scan (gitleaks)</text><text x=\"380\" y=\"108\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7f1d1d\">Policy-as-Code (OPA)</text><rect x=\"468\" y=\"42\" width=\"128\" height=\"96\" rx=\"8\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"532\" y=\"68\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">4. Canary Deploy</text><text x=\"532\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Approval Gate</text><text x=\"532\" y=\"108\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">1-2% Fleet First</text><rect x=\"620\" y=\"42\" width=\"128\" height=\"96\" rx=\"8\" fill=\"#dcfce7\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"684\" y=\"68\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#166534\">5. Verify/Guard</text><text x=\"684\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">pyATS Post-Check</text><text x=\"684\" y=\"108\" text-anchor=\"middle\" font-size=\"9\" fill=\"#b91c1c\">Fail =&gt; Stop / Assess</text><line x1=\"140\" y1=\"90\" x2=\"164\" y2=\"90\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"292\" y1=\"90\" x2=\"316\" y2=\"90\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"444\" y1=\"90\" x2=\"468\" y2=\"90\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"596\" y1=\"90\" x2=\"620\" y2=\"90\" stroke=\"#0f172a\" stroke-width=\"2\"/><text x=\"380\" y=\"176\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#b91c1c\">Example policy: failed gates block deployment when correctly enforced</text></svg>"
+  },
+  {
+   "id": "auto_16-section-5",
+   "title": "اصل Fail-Fast و دروازه‌های پیش از استقرار (Lint، Test، Security Scan)",
+   "html": "<p>در یک Pipeline حرفه‌ای، سریع‌ترین و ارزان‌ترین بررسی‌ها اول اجرا می‌شوند تا خطا در چند ثانیه گرفته شود:</p><ol><li><strong>Lint &amp; Format:</strong> اجرای <code>yamllint</code>، <code>ansible-lint</code>، <code>terraform fmt -check</code> و <code>ruff</code>.</li><li><strong>Validation &amp; Simulation:</strong> اعتبارسنجی JSON Schema / YANG، تست با <strong>Batfish</strong> یا دوقلوی دیجیتال (<strong>Containerlab / CML</strong>).</li><li><strong>Security Scan:</strong> اسکن نشت رمز عبور (<code>gitleaks / trufflehog</code>) و Policy-as-Code (<code>OPA / Checkov</code>). <strong>اگر هر یک از این سه مرحله شکست بخورد، Pipeline فوراً متوقف می‌شود و مرحله Deploy اصلاً اجرا نمی‌گردد!</strong></li></ol><p>این یک سیاست پیشنهادی است: تنظیمات، وابستگی jobها، دسترسی ادمین و راه‌های خارج از pipeline باید کنترل شوند. هیچ اسکن یا تستی همه خطاها و اسرار را تشخیص نمی‌دهد.</p>"
+  },
+  {
+   "id": "auto_16-section-6",
+   "title": "استقرار تدریجی (Canary / Wave Rollout) و دروازه تأیید انسانی",
+   "html": "<p>حتی پس از عبور از تمام تست‌های CI، هرگز تغییر را یک‌باره روی همه ۵۰۰ روتر اعمال نمی‌کنیم! در استراتژی <strong>Canary Rollout</strong> ابتدا تغییر روی ۱ یا ۲ روتر کم‌ریسک (یا یک شعبه آزمایشی) اعمال می‌شود، سلامت BGP/OSPF و ترافیک بررسی می‌گردد و سپس در موج‌های تدریجی (Wave 1: 10%، Wave 2: 30%، Wave 3: باقی شبکه) گسترش می‌یابد.</p><p>درصد canary و نمایندگی آن به توپولوژی و ریسک بستگی دارد؛ موفقیت canary کشف همه خطاها را تضمین نمی‌کند.</p>"
+  },
+  {
+   "id": "auto_16-section-7",
+   "title": "تست پس از استقرار (Post-Deploy Verification) و Rollback خودکار",
+   "html": "<p>پذیرش دستور به معنی سلامت سرویس نیست؛ داده قبل/بعد، معیار سلامت و پنجره مشاهده را طراحی کنید. پس از شکست، ادامه rollout را متوقف کنید و طبق playbook بازگشت خودکار یا دستی را آغاز و نتیجه را جداگانه راستی‌آزمایی کنید. rollback ممکن است شکست بخورد یا برای تغییر ناسازگار کافی نباشد؛ confirmed-commit وابسته به قابلیت و پیاده‌سازی تجهیز است.</p>"
+  },
+  {
+   "id": "auto_16-section-8",
+   "title": "GitLab CI و GitHub Actions در شبکه‌های سازمانی: چرا Self-Hosted Runner لازم است؟",
+   "html": "<p>Self-hosted runner یکی از گزینه‌ها برای دسترسی به شبکه داخلی است؛ اتصال خصوصی runner مدیریت‌شده یا سایر معماری‌ها نیز ممکن‌اند. runner داخلی ذاتاً امن نیست: کد غیرقابل اعتماد PR، اعتبارنامه‌ها و دسترسی به شبکه باید با جداسازی، حداقل مجوز، runner موقت، به‌روزرسانی و سیاست سازمان کنترل شوند. توکن کوتاه‌عمر و OIDC در صورت پشتیبانی کمک می‌کنند.</p>"
+  },
+  {
+   "id": "auto_16-section-9",
+   "title": "پایش زمان‌بندی‌شده انحراف (Scheduled Drift Detection Pipeline)",
+   "html": "<p>Drift detection دوره‌ای می‌تواند وضعیت واقعی را با وضعیت مورد انتظار مقایسه و اختلاف را گزارش کند. <code>ansible --check --diff</code> به پشتیبانی ماژول وابسته است و ممکن است داده حساس نمایش دهد. <code>terraform plan -refresh-only</code> تفاوت وضعیت ذخیره‌شده و اشیای از راه دور را در محدوده provider نشان می‌دهد، نه همه اختلاف‌های desired config و production؛ خروجی و مجوز و هزینه خواندن را ارزیابی کنید.</p>"
+  },
+  {
+   "id": "auto_16-section-10",
+   "title": "تنظیم Branch Protection و ممیزی کامل (Auditability) تغییرات شبکه",
+   "html": "<p>Branch protection می‌تواند بررسی PR و موفقیت jobها را الزام کند، اما استثناهای ادمین، bypass، تغییرات خارج از Git و عملیات واقعی را باید جداگانه کنترل کرد. ثبت هویت، تأیید و deployment، حفاظت log و زمان نگهداری برای ممیزی لازم است؛ تاریخچه Git به‌تنهایی سند کامل اجرا نیست.</p>"
+  },
+  {
+   "id": "auto_16-section-11",
+   "title": "کژفهمی‌های رایج درباره CI/CD شبکه",
+   "html": "<ul><li>CI/CD الزاماً انتشار بدون تأیید نیست؛ سیاست release به ریسک بستگی دارد.</li><li>Self-hosted runner تنها راه دسترسی خصوصی نیست و خود به کنترل امنیت نیاز دارد.</li><li>موفقیت ارسال دستور اثبات سلامت سرویس نیست؛ verify مستقل لازم است.</li></ul>"
+  },
+  {
+   "id": "auto_16-section-12",
+   "title": "عیب‌یابی خطاهای رایج در Network Pipelines",
+   "html": "<p><strong>خطای ۱ — شکست متناوب (Flaky) پایپ‌لاین به دلیل Timeout اتصال:</strong> کم بودن <code>command_timeout</code> یا نوسان شبکه مدیریتی؛ از Retry کنترل‌شده برای خواندن وضعیت و لاگ‌های Artifact دقیق استفاده کنید.</p><p><strong>خطای ۲ — افشای تصادفی اسرار در لاگ Job:</strong> همیشه متغیرهای حساس را در CI به عنوان <strong>Masked Secret</strong> علامت‌گذاری کنید و از <code>no_log: true</code> در Taskهای حساس Ansible بهره ببرید.</p><p>Mask و <code>no_log</code> دفاع کامل در برابر نشت نیستند؛ artifact، diff، shell tracing، PR غیرقابل‌اعتماد و log دیگر نیز بررسی و دسترسی‌ها محدود شوند. در صورت نشت واقعی، revoke و rotation لازم است.</p>"
+  },
+  {
+   "id": "auto_16-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> در یک Pull Request فایل YAML از مرحله Lint و Schema Test عبور می‌کند، اما اسکنر امنیتی خط <code>password: SuperSecret123</code> را پیدا می‌کند. آیا مرحله Canary Deploy اجرا می‌شود؟ <strong>پاسخ:</strong> خیر؛ مطابق اصل <strong>Fail-Fast</strong>، شکست Security Gate پایپ‌لاین را فوراً متوقف کرده و <code>deploy_simulated=False</code> باقی می‌ماند.</p><p><strong>تمرین ۲:</strong> یک PR سالم تمام مراحل پیش از استقرار را می‌گذراند و روی گره Canary مستقر می‌شود، اما تست <code>Verify</code> افت یک همسایه BGP را تشخیص می‌دهد. واکنش صحیح Pipeline چیست؟ <strong>پاسخ:</strong> توقف ادامه Rollout به سایر موج‌ها و آغاز برنامه بازگشت مناسب روی Canary و راستی‌آزمایی نتیجه همراه اعلان فوری به تیم.</p>"
+  },
+  {
+   "id": "auto_16-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://docs.gitlab.com/ee/ci/\" target=\"_blank\" rel=\"noopener\">مستندات رسمی GitLab CI/CD</a> و <a href=\"https://docs.github.com/en/actions\" target=\"_blank\" rel=\"noopener\">مستندات رسمی GitHub Actions</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک شبیه‌ساز محلی (Local Mock) در Python 3 است و هیچ Runner واقعی GitLab/GitHub یا تجهیز شبکه زنده متصل نشده است.</p><p>مدل YAML واقعی را parse نمی‌کند؛ مقدار VLAN جداگانه است، regexها اسکن اسرار کامل نیستند، تأیید و verify ورودی فرضی‌اند و بازگشت یا استقرار شبکه‌ای وجود ندارد.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "CI (Continuous Integration)",
+   "fa": "ادغام پیوسته",
+   "simple": "ادغام مکرر تغییرات همراه build و آزمون خودکار؛ محدوده pipeline باید جداگانه طراحی شود."
+  },
+  {
+   "term": "Continuous Delivery",
+   "fa": "تحویل پیوسته",
+   "simple": "آماده نگه داشتن تغییرات قابل انتشار؛ تصمیم انتشار می‌تواند جداگانه باشد."
+  },
+  {
+   "term": "Continuous Deployment",
+   "fa": "استقرار پیوسته",
+   "simple": "استقرار کاملاً خودکار تغییرات پس از عبور از همه تست‌ها بدون تأیید دستی."
+  },
+  {
+   "term": "Fail-Fast",
+   "fa": "توقف سریع در خطا",
+   "simple": "متوقف کردن فوری پایپ‌لاین در اولین خطای Lint/Test/Security تا Deploy اجرا نشود."
+  },
+  {
+   "term": "Secret Scanning",
+   "fa": "اسکن نشت اسرار",
+   "simple": "جست‌وجوی خودکار رمزها و کلیدهای API در PR (با ابزارهایی مثل gitleaks) پیش از ادغام."
+  },
+  {
+   "term": "Canary Rollout",
+   "fa": "استقرار قناری (تدریجی)",
+   "simple": "اعمال تغییر ابتدا روی درصد کوچکی از تجهیزات برای محدودسازی ریسک پیش از تعمیم."
+  },
+  {
+   "term": "Approval Gate",
+   "fa": "دروازه تأیید تغییر",
+   "simple": "نقطه توقف نیازمند تأیید مهندس ارشد/CAB پیش از استقرار روی شبکه تولیدی."
+  },
+  {
+   "term": "Post-Deploy Verification",
+   "fa": "راستی‌آزمایی پس از استقرار",
+   "simple": "مقایسه خودکار سلامت شبکه (BGP/OSPF/اینترفیس‌ها) پس از Deploy (مثلاً با pyATS)."
+  },
+  {
+   "term": "Automated Rollback",
+   "fa": "بازگشت خودکار",
+   "simple": "تلاش خودکار برای بازگشت؛ نتیجه نیاز به تأیید دارد و ممکن است شکست بخورد."
+  },
+  {
+   "term": "Self-Hosted Runner",
+   "fa": "اجراگر داخلی امن",
+   "simple": "اجراگر تحت مدیریت سازمان؛ امنیت و دسترسی آن باید جداگانه طراحی شود."
+  },
+  {
+   "term": "GitOps",
+   "fa": "عملیات مبتنی بر Git",
+   "simple": "مدل عملیاتی که Git منبع یگانه تغییرات است و پایپ‌لاین وضعیت شبکه را با آن همگام می‌کند."
+  },
+  {
+   "term": "Scheduled Drift Check",
+   "fa": "پایش زمان‌بندی‌شده انحراف",
+   "simple": "مقایسه دوره‌ای محدود به منابع و ماژول‌هایی که ابزار پشتیبانی می‌کند."
+  },
+  {
+   "term": "Branch Protection",
+   "fa": "محافظت شاخه اصلی",
+   "simple": "ممنوعیت Push مستقیم به main و الزام به Review و عبور از تست‌های CI."
+  },
+  {
+   "term": "Masked Secrets",
+   "fa": "مخفی‌سازی اسرار در لاگ",
+   "simple": "پوشاندن برخی مقادیر در log؛ تضمین عدم نشت در تمام خروجی‌ها نیست."
+  },
+  {
+   "term": "Digital Twin Lab",
+   "fa": "آزمایشگاه دوقلوی دیجیتال",
+   "simple": "توپولوژی مجازی (Containerlab/CML) درون CI برای تست تغییر پیش از تولید."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه شبیه‌سازی محلی Python (مدل فرضی CI/CD با Security Gate و بازگشت شبیه‌سازی‌شده) — GitLab/GitHub واقعی اجرا نشده",
+   "executionStatus": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌سازی محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سرور GitLab/GitHub Runner یا تجهیز شبکه واقعی در این محیط متصل نشده است.</p><p>این شبیه‌ساز محلی چند سناریوی فرضی را از یک پایپ‌لاین فرضی (<code>lint -> test -> security_scan -> canary_deploy -> verify</code>) عبور می‌دهد: (۱) PR حاوی رمز عبور که در Security Gate متوقف می‌شود، (۲) PR با شکست <code>verify</code> که بازگشت شبیه‌سازی‌شده را نشان می‌دهد، و (۳) PR سالم که کامل موفق می‌شود.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_16_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_16_lab.py</code></pre><pre dir=\"ltr\"><code>#!/usr/bin/env python3\n&quot;&quot;&quot;\nFAM Academy Lab — auto_16: Network CI/CD Pipeline &amp; Security Gate Local Mock.\nExecution boundary: Toy Python 3 stdlib simulation; raw_yaml is not parsed or checked against vlan_id,\nregexes do not establish secret safety, and approval/verify/rollback are model inputs or outputs.\nPure Python 3 stdlib simulation of a simplified network CI/CD\npipeline (lint -&gt; strict schema test rejecting bool/out-of-range VLAN -&gt; secret scan -&gt;\ncanary deploy -&gt; post-verify + auto-rollback). No live GitHub Actions/GitLab Runner or network gear connected.\n&quot;&quot;&quot;\n\nfrom __future__ import annotations\n\nimport json\nimport re\n\nSECRET_PATTERNS = [\n    re.compile(r&quot;password\\s*[:=]\\s*[&#x27;\\&quot;]?[^&#x27;\\&quot;\\s]+&quot;, re.IGNORECASE),\n    re.compile(r&quot;AKIA[0-9A-Z]{16}&quot;),\n]\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool (True/False), got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef run_pipeline(change_cfg: dict, post_verify_ok: bool = True, approved: bool = False) -&gt; dict:\n    if not isinstance(change_cfg, dict):\n        raise ValueError(f&quot;change_cfg must be a dict, got {type(change_cfg).__name__}&quot;)\n    verify_ok = _require_bool(post_verify_ok, &quot;post_verify_ok&quot;)\n    approved = _require_bool(approved, &quot;approved&quot;)\n    raw_text = change_cfg.get(&quot;raw_yaml&quot;, &quot;&quot;)\n    if not isinstance(raw_text, str):\n        raise ValueError(f&quot;change_cfg[&#x27;raw_yaml&#x27;] must be str, got {raw_text!r}&quot;)\n    stages: list[dict] = []\n    # Stage 1: Lint (no tabs in raw YAML text)\n    lint_ok = &quot;\\t&quot; not in raw_text\n    stages.append({&quot;stage&quot;: &quot;lint&quot;, &quot;passed&quot;: lint_ok})\n    if not lint_ok:\n        return {&quot;status&quot;: &quot;blocked_at_lint&quot;, &quot;deploy_simulated&quot;: False, &quot;stages&quot;: stages}\n\n    # Stage 2: Schema / policy test (IEEE 802.1Q valid VLAN range 1..4094; explicitly reject Python bool!)\n    vlan_id = change_cfg.get(&quot;vlan_id&quot;, -1)\n    test_ok = isinstance(vlan_id, int) and not isinstance(vlan_id, bool) and 1 &lt;= vlan_id &lt;= 4094\n    stages.append({&quot;stage&quot;: &quot;test&quot;, &quot;passed&quot;: test_ok})\n    if not test_ok:\n        return {&quot;status&quot;: &quot;blocked_at_test&quot;, &quot;deploy_simulated&quot;: False, &quot;stages&quot;: stages}\n\n    # Stage 3: Security scan (detect hardcoded credentials)\n    secret_hit = any(p.search(raw_text) for p in SECRET_PATTERNS)\n    sec_ok = not secret_hit\n    stages.append({&quot;stage&quot;: &quot;security_scan&quot;, &quot;passed&quot;: sec_ok})\n    if not sec_ok:\n        return {&quot;status&quot;: &quot;blocked_at_security_scan&quot;, &quot;deploy_simulated&quot;: False, &quot;stages&quot;: stages}\n\n    # Approval is a model input, not evidence of human authorization.\n    stages.append({&quot;stage&quot;: &quot;approval&quot;, &quot;passed&quot;: approved})\n    if not approved:\n        return {&quot;status&quot;: &quot;blocked_at_approval&quot;, &quot;deploy_simulated&quot;: False, &quot;stages&quot;: stages}\n\n    # Stage 4: simulated Canary deploy\n    stages.append({&quot;stage&quot;: &quot;canary_deploy&quot;, &quot;passed&quot;: True})\n\n    # Stage 5: Post-deploy verification (triggers rollback if failed)\n    stages.append({&quot;stage&quot;: &quot;verify&quot;, &quot;passed&quot;: verify_ok})\n    if not verify_ok:\n        return {&quot;status&quot;: &quot;rollback_simulated&quot;, &quot;deploy_simulated&quot;: True, &quot;rollback_simulated&quot;: True, &quot;stages&quot;: stages}\n    return {&quot;status&quot;: &quot;succeeded&quot;, &quot;deploy_simulated&quot;: True, &quot;rollback_simulated&quot;: False, &quot;stages&quot;: stages}\n\n\ndef main() -&gt; None:\n    tab_lint_pr = run_pipeline({&quot;raw_yaml&quot;: &quot;vlan:\\t30\\n&quot;, &quot;vlan_id&quot;: 30})\n    assert tab_lint_pr[&quot;status&quot;] == &quot;blocked_at_lint&quot; and tab_lint_pr[&quot;deploy_simulated&quot;] is False\n\n    bool_vlan_pr = run_pipeline({&quot;raw_yaml&quot;: &quot;vlan: true\\n&quot;, &quot;vlan_id&quot;: True})\n    assert bool_vlan_pr[&quot;status&quot;] == &quot;blocked_at_test&quot; and bool_vlan_pr[&quot;deploy_simulated&quot;] is False\n\n    out_of_range_pr = run_pipeline({&quot;raw_yaml&quot;: &quot;vlan: 5000\\n&quot;, &quot;vlan_id&quot;: 5000})\n    assert out_of_range_pr[&quot;status&quot;] == &quot;blocked_at_test&quot; and out_of_range_pr[&quot;deploy_simulated&quot;] is False\n\n    leaked_secret_pr = run_pipeline({&quot;raw_yaml&quot;: &quot;vlan: 30\\npassword: SuperSecret123\\n&quot;, &quot;vlan_id&quot;: 30})\n    assert leaked_secret_pr[&quot;status&quot;] == &quot;blocked_at_security_scan&quot;\n    assert leaked_secret_pr[&quot;deploy_simulated&quot;] is False\n\n    failed_verify_pr = run_pipeline({&quot;raw_yaml&quot;: &quot;vlan: 30\\nname: DMZ\\n&quot;, &quot;vlan_id&quot;: 30}, post_verify_ok=False, approved=True)\n    assert failed_verify_pr[&quot;status&quot;] == &quot;rollback_simulated&quot;\n    assert failed_verify_pr[&quot;rollback_simulated&quot;] is True\n\n    clean_pr = run_pipeline({&quot;raw_yaml&quot;: &quot;vlan: 30\\nname: DMZ\\n&quot;, &quot;vlan_id&quot;: 30}, post_verify_ok=True, approved=True)\n    assert clean_pr[&quot;status&quot;] == &quot;succeeded&quot;\n\n    print(&quot;=== auto_16 Network CI/CD Pipeline Local Mock ===&quot;)\n    print(json.dumps({\n        &quot;tab_lint_pr&quot;: tab_lint_pr,\n        &quot;bool_vlan_rejected_pr&quot;: bool_vlan_pr,\n        &quot;secret_leak_pr&quot;: leaked_secret_pr,\n        &quot;failed_post_verify_pr&quot;: failed_verify_pr,\n        &quot;clean_pr&quot;: clean_pr,\n    }, indent=2, ensure_ascii=False))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> در PR اول <code>deploy_simulated: False</code>؛ در PR دوم <code>status: 'rollback_simulated'</code> و <code>rollback_simulated: True</code>؛ در PR سوم <code>status: 'succeeded'</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع یک Workflow در GitHub Actions / GitLab CI (اجرا نشده روی Runner زنده):</strong></p><pre dir=\"ltr\"><code># Reference CI stages snippet (NOT executed on live GitLab/GitHub Runner)\nstages: [lint, test, security_scan, canary_deploy, verify]\n# Production deploy job uses environment: production (manual approval) + self-hosted runner tag</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p><p>این مدل فقط tab، یک عدد جداگانه VLAN و دو الگوی ساده را چک می‌کند؛ YAML را parse و با VLAN تطبیق نمی‌دهد. approval یک bool فرضی است، نه تأیید واقعی، و هیچ استقرار یا بازگشت اجرا نمی‌شود.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس CI/CD Pipeline برای تغییرات شبکه",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "تفاوت دقیق میان CI، Continuous Delivery و Continuous Deployment در اتوماسیون شبکه چیست؟",
+   "options": [
+    "CI ادغام و تست مکرر را پشتیبانی می‌کند؛ Delivery تغییر را آماده انتشار نگه می‌دارد؛ Deployment آن را پس از عبور از pipeline خودکار منتشر می‌کند",
+    "CI تغییرات را بدون تست روی تولید می‌زند",
+    "هر سه دقیقاً یک معنی دارند",
+    "CD فقط برای فایل‌های متنی است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>در شبکه‌های سازمانی معمولاً Continuous Delivery (دارای Approval Gate انسانی) برای کنترل ریسک ترجیح داده می‌شود.</p>"
+  },
+  {
+   "title": "اگر در یک پایپ‌لاین شبکه، مرحله تست یا Security Scan (مثلاً کشف رمز عبور هاردکدشده) شکست بخورد، چه اتفاقی باید بیفتد؟",
+   "options": [
+    "مرحله Deploy همچنان اجرا شود",
+    "پایپ‌لاین مطابق اصل Fail-Fast فوراً متوقف می‌شود و هیچ تغییری روی تجهیزات تولیدی اعمال نمی‌گردد",
+    "فقط مرحله Verify اجرا شود",
+    "شاخه main حذف شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در یک pipeline با گیت درست enforce‌شده، خطا باید انتشار را متوقف کند؛ هیچ اسکن یا تستی کشف تمام خطاها را تضمین نمی‌کند.</p>"
+  },
+  {
+   "title": "چرا در شبکه‌های سازمانی برای اجرای پایپ‌لاین‌های GitHub Actions یا GitLab CI از Self-Hosted Runner استفاده می‌شود؟",
+   "options": [
+    "زیرا Cloud Runner رایگان نیست",
+    "زیرا Self-Hosted Runner نیازی به Git ندارد",
+    "برای دسترسی کنترل‌شده به شبکه داخلی بدون نیاز به عرضه مستقیم تجهیز؛ runner داخلی نیز باید امن و محدود باشد",
+    "تا رمزنگاری TLS غیرفعال شود"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>runner داخلی یکی از گزینه‌هاست؛ شبکه خصوصی و کنترل کد، اسرار و دسترسی ضروری‌اند.</p>"
+  },
+  {
+   "title": "هدف اصلی استراتژی Canary Rollout در استقرار تغییرات روی یک شبکه بزرگ چیست؟",
+   "options": [
+    "اعمال هم‌زمان تغییر روی ۱۰۰٪ تجهیزات در یک ثانیه",
+    "حذف مرحله Lint",
+    "غیرفعال کردن Rollback",
+    "محدود کردن شعاع انفجار (Blast Radius) با استقرار و بررسی اولیه روی یک زیرمجموعه کوچک (۱–۲ تجهیز) پیش از گسترش موجی"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>Canary شعاع اثر اولیه را محدود می‌کند ولی کشف همه خطاها را تضمین نمی‌کند.</p>"
+  },
+  {
+   "title": "چرا حتی پس از موفقیت کامل ارسال دستورات در مرحله Deploy، وجود مرحله Post-Deploy Verify (مثلاً با pyATS) ضروری است؟",
+   "options": [
+    "زیرا پذیرش دستور سلامت سرویس را تضمین نمی‌کند؛ در شکست باید توقف و برنامه بازیابی بررسی و نتیجه آن تأیید شود",
+    "زیرا Verify فایل YAML را فرمت می‌کند",
+    "زیرا Verify رمز عبور را در لاگ چاپ می‌کند",
+    "زیرا بدون Verify نمی‌توان Commit کرد"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>بازگشت می‌تواند خودکار یا دستی باشد و خود نیز نیازمند verify است.</p>"
+  },
+  {
+   "title": "کاربرد اجرای زمان‌بندی‌شده (Scheduled Pipeline) با ansible --check --diff یا terraform plan -refresh-only چیست؟",
+   "options": [
+    "حذف تاریخچه Git",
+    "کشف منظم انحراف پیکربندی (Drift) ناشی از تغییرات دستی خارج از پایپ‌لاین و اعلان به تیم",
+    "افزایش سرعت لینک فیبر",
+    "تغییر رمز عبور کاربران"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Drift check فقط محدوده‌ای را که provider یا ماژول و ورودی‌هایش پشتیبانی می‌کنند می‌بیند؛ از انحراف جلوگیری قطعی نمی‌کند.</p>"
+  },
+  {
+   "title": "نقش قوانین Branch Protection روی شاخه main در یک پروژه Network GitOps چیست؟",
+   "options": [
+    "اجازه Push مستقیم به همه کاربران بدون بررسی",
+    "غیرفعال کردن تست‌های خودکار",
+    "ممنوعیت Push مستقیم، الزام به Pull Request با بررسی همکار و الزام به سبز شدن تمام تست‌های CI پیش از ادغام",
+    "پاک کردن شاخه‌های قدیمی بدون مجوز"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>این قوانین بسته به تنظیمات و استثناها اعمال می‌شوند؛ ثبت استقرار و تغییرات خارج از Git نیز مهم است.</p>"
+  },
+  {
+   "title": "برای جلوگیری از نشت رمزهای عبور در خروجی لاگ‌های کنسول CI/CD چه اقداماتی لازم است؟",
+   "options": [
+    "چاپ کردن تمام متغیرها با printenv برای دیباگ",
+    "قرار دادن رمزها در فایل README",
+    "حذف تمام لاگ‌های سیستمی",
+    "تعریف اسرار به عنوان Masked Secrets در CI، استفاده از Vault/OIDC و تنظیم no_log: true در Taskهای حساس Ansible"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>Mask و no_log کافی نیستند؛ log، diff، artifact و rotation و کنترل دسترسی را نیز در نظر بگیرید.</p>"
+  },
+  {
+   "title": "مثال یک ابزار تخصصی برای مرحله Security Scan در کشف رمزهای عبور و توکن‌های هاردکدشده در PR چیست؟",
+   "options": [
+    "gitleaks یا trufflehog",
+    "ping",
+    "traceroute",
+    "arp"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>اسکنرها شناسایی کامل همه اسرار را تضمین نمی‌کنند.</p>"
+  },
+  {
+   "title": "در محیط‌های پیشرفته NetOps، دوقلوی دیجیتال (Digital Twin) در مرحله Test پایپ‌لاین با کدام ابزارها ساخته می‌شود؟",
+   "options": [
+    "فقط Notepad",
+    "Containerlab یا Cisco Modeling Labs (CML) و تحلیل استاتیک Batfish",
+    "فقط SNMPv1",
+    "فقط DHCP"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>شبیه‌سازی و تحلیل مدل ریسک را کاهش می‌دهد، نه اثبات بی‌خطایی تولید.</p>"
+  },
+  {
+   "title": "تفاوت یک تغییر شبکه تحت GitOps با تغییر دستی سنتی از نظر ممیزی (Audit) چیست؟",
+   "options": [
+    "در GitOps هیچ سابقه‌ای ثبت نمی‌شود",
+    "در تغییر دستی همیشه Rollback خودکار وجود دارد",
+    "در GitOps هر تغییر دارای تاریخچه دقیق (چه کسی، چه زمانی، با کدام PR و کدام تأییدکننده) و خروجی تست‌های CI است",
+    "هر دو کاملاً یکسان‌اند"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>ردپای ممیزی باید شامل اجرای واقعی و مسیرهای خارج از Git هم باشد.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چه چیزی را محلی اجرا و اثبات کرده است؟",
+   "options": [
+    "اجرای زنده روی GitHub Cloud و تغییر Core Router",
+    "نصب GitLab Runner روی سوئیچ Nexus",
+    "فقط متن نظری بدون کد",
+    "مدل محلی Python از گیت‌ها، تأیید فرضی و نتیجه شبیه‌سازی بازگشت بدون اجرای Runner یا تغییر شبکه"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>هیچ deploy یا rollback واقعی و هیچ ابزار lint یا secret scan واقعی اجرا نشده است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "integration-review.1",
+  "legacyId": "auto_16",
+  "sources": [
+   "https://docs.gitlab.com/ee/ci/",
+   "https://docs.github.com/en/actions"
+  ],
+  "limitations": [
+   "آزمایشگاه این درس یک Local Mock در Python 3 است و هیچ Runner واقعی GitLab/GitHub یا تجهیز شبکه متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "رفع غلط تایپی نسخه قدیمی («دریت» -> «Drift») و حذف پرسش خودارجاعی ضعیف («در مثال pipeline این درس چند مرحله دارد؟»).",
+   "افزودن Self-Hosted Runner، Canary Rollout، Scheduled Drift Check، Branch Protection و شبیه‌ساز محلی پایپ‌لاین با Security Gate و Rollback."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و شبیه‌ساز محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_16-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_16.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_16_lab.py"
+  },
+  "technicalAuditFixes": [
+   "اصلاح بازبینی فاز ۵: رفع باگ isinstance(True, int) در auto_16_lab.py (پیش‌تر vlan_id=True از گیت schema عبور می‌کرد) با افزودن not isinstance(vlan_id, bool) و افزودن تست‌های منفی برای کاراکتر Tab در Stage 1 و VLAN بولین/خارج از بازه 1..4094 در Stage 2."
+  ],
+  "integrationReview": {
+   "date": "2026-11-27",
+   "reviewer": "integrator-agent-not-human",
+   "sourceCommit": "993f50877232481fb24d99bfd771b178f15ba7ce",
+   "evidence": "academy-labs/reviews/auto_16-integration-review-fa.md"
+  }
+ }
+}

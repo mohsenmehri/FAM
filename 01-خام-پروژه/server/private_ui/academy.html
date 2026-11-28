@@ -68,7 +68,11 @@
             const info = await response.json();
             if (!Number.isSafeInteger(info.revision) || !Array.isArray(info.eligible) ||
                 info.eligible.some(id => id !== 's02')) throw new Error('unsupported plan');
-            saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ قابل انتقال: ' + (info.eligible.join('، ') || 'هیچ‌کدام') + '. سایر تکمیل‌ها، نمره‌ها و یادداشت‌ها نمایش جدید ندارند اما نسخه خام حفظ می‌شود.');
+            if (!Number.isSafeInteger(info.uniqueCompletedCount) || info.uniqueCompletedCount < 0 ||
+                !Number.isSafeInteger(info.unmappedCount) || info.unmappedCount < 0 || info.unmappedCount > info.uniqueCompletedCount ||
+                ![null, 'archive_exists', 'no_eligible'].includes(info.blockedReason)) throw new Error('unsupported plan');
+            const blocked = info.blockedReason === 'archive_exists' ? ' بایگانی موجود است و برای جلوگیری از بازنویسی انتقال مسدود شد.' : '';
+            saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ بدون نگاشت: ' + info.unmappedCount + '؛ قابل انتقال: ' + (info.eligible.join('، ') || 'هیچ‌کدام') + '. سایر تکمیل‌ها، نمره‌ها و یادداشت‌ها نمایش جدید ندارند اما نسخه خام حفظ می‌شود.' + blocked);
             if (info.migrationAvailable && info.eligible.length) { plan=info; migrate.hidden=false; }
           } catch (_) { saveStatus('قالب قدیمی قابل تشخیص نیست یا نشست تغییر کرده است؛ داده تغییر نکرد.'); }
           finally { preview.disabled = false; }

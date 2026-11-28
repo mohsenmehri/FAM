@@ -557,7 +557,7 @@ class FamAppApiTests(unittest.TestCase):
             db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,10,7))
         result=self.client.get(preview,headers=h,environ_base=self.https_env)
         self.assertEqual(result.status_code,200);self.assertEqual(result.json['completedCount'],3)
-        self.assertEqual(result.json['uniqueCompletedCount'],2);self.assertEqual(result.json['mappedCount'],1)
+        self.assertEqual(result.json['uniqueCompletedCount'],2);self.assertEqual(result.json['mappedCount'],1);self.assertEqual(result.json['unmappedCount'],1);self.assertIsNone(result.json['blockedReason'])
         self.assertTrue(result.json['migrationAvailable']);self.assertEqual(result.json['eligible'],['s02']);self.assertNotIn('private',str(result.json))
         with sqlite3.connect(self.db_path) as db:
             self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,7))
@@ -591,6 +591,20 @@ class FamAppApiTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress').fetchone()[0],0)
             self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups').fetchone()[0],0)
+
+    def test_preview_unmapped_only_reports_counts_not_contents(self):
+        csrf=self._login_admin().json['csrf'];headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+            legacy=json.dumps({'completedLessons':['unmapped-secret','unmapped-secret','s01'],'notes':{'s01':'private note'}})
+            payload=json.dumps({'fam4.learn.v1':legacy})
+            db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,payload,1,2))
+        result=self.client.get('/api/academy/progress/legacy-preview',headers=headers,environ_base=self.https_env)
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json['uniqueCompletedCount'],2);self.assertEqual(result.json['unmappedCount'],2)
+        self.assertEqual(result.json['blockedReason'],'no_eligible');self.assertEqual(result.json['eligible'],[])
+        self.assertNotIn('unmapped-secret',str(result.json));self.assertNotIn('private note',str(result.json))
+        with sqlite3.connect(self.db_path) as db:self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(payload,2))
 
     def test_selected_legacy_migration_is_atomic_explicit_and_reversible(self):
         url='/api/academy/progress/migrate'; preview='/api/academy/progress/legacy-preview'
@@ -645,6 +659,9 @@ class FamAppApiTests(unittest.TestCase):
             db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',('other','other-secret',1,5))
         bad=self.client.post(url,json={'expectedRevision':5,'selectedLessons':['s02'],'user_id':'other'},headers=h,environ_base=self.https_env)
         self.assertEqual(bad.status_code,400)
+        preview=self.client.get('/api/academy/progress/legacy-preview',headers=h,environ_base=self.https_env)
+        self.assertEqual(preview.status_code,200);self.assertEqual(preview.json['blockedReason'],'archive_exists')
+        self.assertFalse(preview.json['migrationAvailable']);self.assertEqual(preview.json['eligible'],[])
         collision=self.client.post(url,json={'expectedRevision':5,'selectedLessons':['s02']},headers=h,environ_base=self.https_env)
         self.assertEqual(collision.status_code,409)
         with sqlite3.connect(self.db_path) as db:
