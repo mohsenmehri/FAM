@@ -3,17 +3,23 @@
 
   const STORAGE_KEY = 'fam_academy_progress_v1';
   const SEC_STORAGE_KEY = 'fam_academy_sections_v1';
+  const QUIZ_STORAGE_KEY = 'fam_academy_quiz_v1';
 
   function getSectionsMap() {
-    let local = {};
+    // A bridge identifies the authenticated account. Never read or write
+    // the browser-wide standalone keys during that session.
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      const remote = bridge.progress?.labs?.sections;
+      return remote && typeof remote === 'object' && !Array.isArray(remote)
+        ? { ...remote } : {};
+    }
     try {
       const raw = localStorage.getItem(SEC_STORAGE_KEY);
       const obj = raw ? JSON.parse(raw) : {};
-      if (obj && typeof obj === 'object' && !Array.isArray(obj)) local = obj;
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj;
     } catch {}
-    const remote = window.FamAcademyBridge?.progress?.labs?.sections;
-    return remote && typeof remote === 'object' && !Array.isArray(remote)
-      ? { ...remote, ...local } : local;
+    return {};
   }
 
   function persistProgress(completed, labsOverride) {
@@ -28,6 +34,30 @@
     });
   }
 
+  function getQuizAttempts() {
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      const attempts = bridge.progress?.labs?.quizAttempts;
+      return attempts && typeof attempts === 'object' && !Array.isArray(attempts) ? { ...attempts } : {};
+    }
+    try {
+      const value = JSON.parse(localStorage.getItem(QUIZ_STORAGE_KEY) || '{}');
+      if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+    } catch {}
+    return {};
+  }
+
+  function saveQuizAttempt(lessonId, attempt) {
+    const attempts = getQuizAttempts();
+    attempts[lessonId] = attempt;
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      persistProgress(getCompletedList(), { ...(bridge.progress?.labs || {}), quizAttempts: attempts });
+    } else {
+      try { localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(attempts)); } catch {}
+    }
+  }
+
   function isSectionDone(lessonId, secId) {
     const map = getSectionsMap();
     return Array.isArray(map[lessonId]) && map[lessonId].includes(secId);
@@ -40,21 +70,28 @@
     if (idx >= 0) list.splice(idx, 1);
     else list.push(secId);
     map[lessonId] = list;
-    try { localStorage.setItem(SEC_STORAGE_KEY, JSON.stringify(map)); } catch {}
+    // The signed-in bridge is account-specific; never put its progress in
+    // the browser-wide standalone key, even as a fallback on save failure.
+    if (!window.FamAcademyBridge) {
+      try { localStorage.setItem(SEC_STORAGE_KEY, JSON.stringify(map)); } catch {}
+    }
     const labs = { ...(window.FamAcademyBridge?.progress?.labs || {}), sections: map };
     persistProgress(getCompletedList(), labs);
     return idx < 0;
   }
 
   function getCompletedList() {
-    let local = [];
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      const remote = bridge.progress?.completed;
+      return [...new Set(Array.isArray(remote) ? remote : [])];
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const arr = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(arr)) local = arr;
+      if (Array.isArray(arr)) return [...new Set(arr)];
     } catch {}
-    const remote = window.FamAcademyBridge?.progress?.completed;
-    return [...new Set([...(Array.isArray(remote) ? remote : []), ...local])];
+    return [];
   }
 
   function isLessonDone(lessonId) {
@@ -66,7 +103,9 @@
     const idx = list.indexOf(lessonId);
     if (idx >= 0) list.splice(idx, 1);
     else list.push(lessonId);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+    if (!window.FamAcademyBridge) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+    }
     persistProgress(list);
     return idx < 0;
   }
@@ -390,6 +429,15 @@
     const stageLabels = { concept: 'مفهوم', example: 'مثال', practice: 'تمرین', lab: 'آزمایشگاه', quiz: 'آزمون', summary: 'جمع‌بندی' };
     const stageIcons = { concept:'M12 2a7 7 0 0 0-4 12.7V18h8v-3.3A7 7 0 0 0 12 2ZM9 21h6', example:'M5 3h14v18H5z M8 7h8M8 11h8M8 15h5', practice:'M4 20l4-1 11-11-3-3L5 16z M14 7l3 3', lab:'M9 3v7l-5 8a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-8V3 M8 3h8 M7 16h10', quiz:'M9 9a3 3 0 1 1 5 2c-1 .8-2 1-2 3 M12 18h.01 M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20', summary:'M5 4h14v17H5z M8 8h8 M8 12h8 M8 16h5' };
     const stageIcon = (id, index) => stageIcons[id] ? `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${stageIcons[id]}"/></svg>` : String(index + 1);
+    // Absence or an unfamiliar status is never presented as an approval.
+    const review = typeof bp.reviewStatus === 'string' ? bp.reviewStatus.trim() : '';
+    const pending = /\b(draft|pending)\b/i.test(review);
+    const reviewLabel = !review ? 'وضعیت بازبینی مشخص نیست' : pending
+      ? 'پیش‌نویس؛ در انتظار بازبینی فنی و محتوایی' : `وضعیت ثبت‌شده: ${review}`;
+    const evidence = typeof bp.evidence === 'string' ? bp.evidence.trim() : '';
+    const evidenceLabel = /^Designed\s*[—–-]\s*Not Run$/i.test(evidence)
+      ? 'آزمایشگاه طراحی شده است؛ اجرای واقعی آن تأیید نشده است.'
+      : evidence ? `وضعیت اجرای ثبت‌شده: ${evidence}` : 'وضعیت اجرای آزمایشگاه مشخص نیست.';
 
     container.innerHTML = `
       <div class="lesson-layout lesson-reference-unit">
@@ -408,6 +456,9 @@
             </div>
           </div>
         </header>
+        <aside class="lesson-review-status" role="status" aria-label="وضعیت بازبینی و آزمایش درس" style="margin:12px 0;padding:12px 16px;border:1px solid #b45309;border-radius:10px;background:#fff7ed;color:#7c2d12;line-height:1.7">
+          <strong>${escapeHtml(reviewLabel)}</strong><br><span>${escapeHtml(evidenceLabel)}</span>
+        </aside>
         ${hasStages(bp) ? `
           <nav id="le-stage-bar" class="stepper lesson-stepper" aria-label="بخش‌های درس">
             ${sections.map((s, idx) => `<button type="button" id="side-sec-${escapeHtml(s.id)}" class="stepper-item le-stage-pill" data-stage-idx="${idx}" data-stage-id="${escapeHtml(s.id)}" aria-label="بخش ${idx + 1}: ${escapeHtml(s.title)}"><span class="stepper-dot">${stageIcon(s.id, idx)}</span><span class="stepper-label">${escapeHtml(stageLabels[s.id] || s.title)}</span></button>`).join('')}
@@ -503,6 +554,10 @@
     const quizQuestions = getQuizQuestions(bp);
     if (quiz && Array.isArray(quizQuestions)) {
       const result = quiz.querySelector('.lesson-quiz-result');
+      const previous = getQuizAttempts()[bp.lessonId];
+      if (previous && Number.isInteger(previous.correct) && Number.isInteger(previous.total) && previous.total > 0) {
+        result.textContent = `آخرین نتیجه ثبت‌شده: ${previous.correct} از ${previous.total} پاسخ درست`;
+      }
       quiz.querySelector('[data-quiz-grade]').onclick = () => {
         let correct = 0, incorrect = 0, unanswered = 0;
         quizQuestions.forEach((q, i) => {
@@ -517,6 +572,7 @@
           feedback.hidden = false;
         });
         result.textContent = `نمره: ${Number((correct * 10 / quizQuestions.length).toFixed(2))} از ۱۰ | پاسخ درست: ${correct} از ${quizQuestions.length} | غلط: ${incorrect} | بدون پاسخ: ${unanswered}`;
+        saveQuizAttempt(bp.lessonId, { correct, incorrect, unanswered, total: quizQuestions.length });
       };
       quiz.querySelector('[data-quiz-retry]').onclick = () => {
         quiz.querySelectorAll('input:checked').forEach(input => { input.checked = false; });

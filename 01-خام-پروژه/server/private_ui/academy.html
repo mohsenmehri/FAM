@@ -17,6 +17,21 @@
       const boot = window.FAM_ACADEMY_BOOTSTRAP || {};
       const csrf = boot.csrf || '';
       const stored = boot.progress || {};
+      // The historic academy used this same server key for a different schema.
+      // Never overwrite a legacy, mixed, malformed, or unrecognized value.
+      function unsafeSharedProgress() {
+        // Offline uses its own isolated storage key and has no server write.
+        if (boot.offline === true) return false;
+        if (!Object.prototype.hasOwnProperty.call(stored, 'fam4.learn.v1')) return false;
+        try {
+          const value = stored['fam4.learn.v1'];
+          const parsed = typeof value === 'string' ? JSON.parse(value) : null;
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return true;
+          const legacyKeys = ['completedLessons', 'quizScores', 'notes', 'missions', 'examScore', 'activeLesson'];
+          return legacyKeys.some(key => Object.prototype.hasOwnProperty.call(parsed, key)) || !Array.isArray(parsed.completed);
+        } catch (_) { return true; }
+      }
+      const sharedProgressLocked = unsafeSharedProgress();
       function readProgress() {
         if (Array.isArray(stored.completed)) return stored;
         for (const key of ['fam4.learn.v1', 'fam3.progress.v1']) {
@@ -28,10 +43,128 @@
         }
         return { completed: [], labs: {} };
       }
+      // Serialize writes so a slow earlier request cannot overwrite a newer state.
+      let saveQueue = Promise.resolve();
+      let saveSequence = 0;
+      let progressRevision = Number.isSafeInteger(boot.progressRevision) && boot.progressRevision >= 0 ? boot.progressRevision : null;
+      let revisionConflict = false;
+      function saveStatus(message) {
+        const node = document.getElementById('academy-save-status');
+        if (node) node.textContent = message;
+      }
+      const lockedMessage = 'پیشرفت قدیمی یا ناشناخته شناسایی شد؛ برای جلوگیری از بازنویسی، ذخیره غیرفعال است. مهاجرت هنوز انجام نشده است.';
+      if (sharedProgressLocked) document.addEventListener('DOMContentLoaded', () => saveStatus(lockedMessage));
+      document.addEventListener('DOMContentLoaded', () => {
+        const preview = document.getElementById('academy-legacy-preview');
+        const migrate = document.getElementById('academy-legacy-migrate');
+        if (!preview || !migrate || !sharedProgressLocked || !csrf) return;
+        preview.hidden = false;
+        let plan = null;
+        preview.addEventListener('click', async () => {
+          preview.disabled = true; migrate.hidden = true; plan = null;
+          try {
+            const response = await fetch('/api/academy/progress/legacy-preview', {credentials:'same-origin', headers:{'X-FAM-CSRF':csrf}});
+            if (!response.ok) throw new Error('unrecognized');
+            const info = await response.json();
+            if (!Number.isSafeInteger(info.revision) || !Array.isArray(info.eligible) ||
+                info.eligible.some(id => id !== 's02')) throw new Error('unsupported plan');
+            if (!Number.isSafeInteger(info.uniqueCompletedCount) || info.uniqueCompletedCount < 0 ||
+                !Number.isSafeInteger(info.unmappedCount) || info.unmappedCount < 0 || info.unmappedCount > info.uniqueCompletedCount ||
+                ![null, 'archive_exists', 'no_eligible'].includes(info.blockedReason)) throw new Error('unsupported plan');
+            const blocked = info.blockedReason === 'archive_exists' ? ' بایگانی موجود است و برای جلوگیری از بازنویسی انتقال مسدود شد.' : '';
+            saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ بدون نگاشت: ' + info.unmappedCount + '؛ قابل انتقال: ' + (info.eligible.join('، ') || 'هیچ‌کدام') + '. سایر تکمیل‌ها، نمره‌ها و یادداشت‌ها نمایش جدید ندارند اما نسخه خام حفظ می‌شود.' + blocked);
+            if (info.migrationAvailable && info.eligible.length) { plan=info; migrate.hidden=false; }
+          } catch (_) { saveStatus('قالب قدیمی قابل تشخیص نیست یا نشست تغییر کرده است؛ داده تغییر نکرد.'); }
+          finally { preview.disabled = false; }
+        });
+        migrate.addEventListener('click', async () => {
+          if (!plan || !window.confirm('فقط تکمیل درس s02 منتقل می‌شود؛ سایر تکمیل‌ها، نمره‌ها و یادداشت‌ها در نسخه خام حفظ می‌شوند اما در رابط جدید نمایش داده نمی‌شوند. ادامه می‌دهید؟')) return;
+          revisionConflict=true; preview.disabled=true; migrate.disabled=true;
+          try {
+            const response=await fetch('/api/academy/progress/migrate', {method:'POST', credentials:'same-origin',
+              headers:{'Content-Type':'application/json','X-FAM-CSRF':csrf},
+              body:JSON.stringify({expectedRevision:plan.revision,selectedLessons:plan.eligible})});
+            if (!response.ok) throw new Error('migration failed');
+            saveStatus('انتقال انتخاب‌شده انجام شد؛ برای جلوگیری از بازنویسی صفحه را بازخوانی کنید.');
+          } catch (_) { saveStatus('انتقال انجام نشد یا نتیجه نامشخص است؛ صفحه را بازخوانی و نسخه‌ها را بررسی کنید.'); }
+        });
+      });
+      document.addEventListener('DOMContentLoaded', () => {
+        const load = document.getElementById('academy-backups-load');
+        const restore = document.getElementById('academy-backups-restore');
+        const select = document.getElementById('academy-backups-select');
+        if (!load || !restore || !select || boot.offline === true || !csrf) return;
+        load.hidden = false;
+        let listedRevision = null;
+        load.addEventListener('click', async () => {
+          load.disabled = true; restore.hidden = true; select.hidden = true; listedRevision = null;
+          try {
+            const response = await fetch('/api/academy/progress/backups', {credentials:'same-origin', headers:{'X-FAM-CSRF':csrf}});
+            if (!response.ok) throw new Error('list failed');
+            const data = await response.json();
+            if (!Number.isSafeInteger(data.currentRevision) || !Array.isArray(data.backups) ||
+                data.backups.some(b => !Number.isSafeInteger(b.revision) || b.revision < 0)) throw new Error('unsafe revision');
+            select.replaceChildren();
+            for (const backup of data.backups) {
+              const option = document.createElement('option');
+              option.value = String(backup.revision);
+              option.textContent = 'نسخه ' + backup.revision + ' — ' + new Date(backup.saved_at).toLocaleString('fa-IR');
+              select.appendChild(option);
+            }
+            if (!data.backups.length) { saveStatus('نسخه پشتیبانی برای این حساب وجود ندارد.'); return; }
+            listedRevision = data.currentRevision; select.hidden = false; restore.hidden = false;
+            saveStatus('حداکثر ۵۰ نسخه اخیر نمایش داده می‌شود؛ بازیابی کل وضعیت فعلی را جایگزین می‌کند.');
+          } catch (_) { saveStatus('دریافت فهرست نسخه‌ها ممکن نشد.'); }
+          finally { load.disabled = false; }
+        });
+        restore.addEventListener('click', async () => {
+          if (listedRevision === null || !select.value || !window.confirm('کل وضعیت آکادمی با نسخه انتخابی جایگزین می‌شود. وضعیت فعلی ابتدا پشتیبان می‌شود. ادامه می‌دهید؟')) return;
+          // Stop new writes from this stale page before the restore request.
+          // An already in-flight write either wins the server CAS or loses it.
+          revisionConflict = true; restore.disabled = true; load.disabled = true;
+          try {
+            const response = await fetch('/api/academy/progress/restore', {
+              method:'POST', credentials:'same-origin', headers:{'X-FAM-CSRF':csrf,'Content-Type':'application/json'},
+              body:JSON.stringify({backupRevision:Number(select.value),expectedRevision:listedRevision})
+            });
+            if (!response.ok) throw new Error('restore failed');
+            saveStatus('نسخه بازیابی شد؛ برای جلوگیری از بازنویسی، صفحه را بازخوانی کنید.');
+          } catch (_) {
+            saveStatus('بازیابی انجام نشد یا نتیجه آن نامشخص است؛ صفحه را بازخوانی و نسخه‌ها را بررسی کنید.');
+          }
+        });
+      });
+      document.addEventListener('DOMContentLoaded', () => {
+        const button = document.getElementById('academy-export-progress');
+        if (!button || boot.offline === true || !csrf) return;
+        button.hidden = false;
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          try {
+            const response = await fetch('/api/academy/progress/export', {
+              credentials: 'same-origin', headers: {'X-FAM-CSRF': csrf}
+            });
+            if (!response.ok) throw new Error('export failed');
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl; anchor.download = 'fam-academy-progress.json';
+            document.body.appendChild(anchor); anchor.click(); anchor.remove();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          } catch (_) {
+            saveStatus('دریافت نسخه خام ممکن نشد؛ نشست و اتصال را بررسی کنید.');
+          } finally { button.disabled = false; }
+        });
+      });
       window.FamAcademyBridge = {
         user: boot.user || (boot.userName ? { username: boot.userName } : null),
         progress: readProgress(),
+        sharedProgressLocked,
         async saveProgress(payload) {
+          if (sharedProgressLocked) {
+            saveStatus(lockedMessage);
+            return false;
+          }
           const safe = {
             completed: Array.isArray(payload?.completed) ? payload.completed.filter(x => typeof x === 'string') : [],
             labs: payload?.labs && typeof payload.labs === 'object' && !Array.isArray(payload.labs) ? payload.labs : {},
@@ -45,22 +178,46 @@
               daysPerWeek: Number.isFinite(Number(payload.profile.daysPerWeek)) ? Number(payload.profile.daysPerWeek) : 5
             } : undefined
           };
-          try {
-            localStorage.setItem('fam_academy_progress_v1', JSON.stringify(safe.completed));
-          } catch (_) {}
-          try {
-            const response = await fetch('/api/academy/progress', {
-              method: 'POST',
-              credentials: 'same-origin',
-              headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
-              body: JSON.stringify({ changes: { 'fam4.learn.v1': JSON.stringify(safe) } })
-            });
-            if (!response.ok) return false;
-            this.progress = safe;
-            return true;
-          } catch (e) {
-            return false;
+          // Keep the latest snapshot visible immediately, including removals.
+          // It is only durable on the server after a successful response.
+          const serialized = JSON.stringify(safe);
+          this.progress = JSON.parse(serialized);
+          const sequence = ++saveSequence;
+          saveStatus('در حال ذخیرهٔ پیشرفت…');
+          const save = async () => {
+            try {
+              if (revisionConflict || progressRevision === null) { revisionConflict = true; return false; }
+              const expectedRevision = progressRevision;
+              const response = await fetch('/api/academy/progress', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+                body: JSON.stringify({ changes: { 'fam4.learn.v1': serialized }, expectedRevision })
+              });
+              if (response.status === 409) { revisionConflict = true; return false; }
+              if (!response.ok) return false;
+              const result = await response.json();
+              if (!Number.isSafeInteger(result.revision) || result.revision !== expectedRevision + 1) {
+                revisionConflict = true;
+                return false;
+              }
+              progressRevision = result.revision;
+              return true;
+            } catch (_) {
+              // The server may have committed before a response was lost;
+              // the next write keeps the old revision and will safely conflict.
+              return false;
+            }
+          };
+          const result = saveQueue.then(save, save);
+          saveQueue = result;
+          const ok = await result;
+          if (sequence === saveSequence) {
+            saveStatus(ok ? 'پیشرفت ذخیره شد.' : revisionConflict
+              ? 'تعارض نسخه پیشرفت؛ ذخیره متوقف شد. تغییرات این نشست ذخیره نشده‌اند؛ پیش از بازخوانی از آنها یادداشت بردارید.'
+              : 'ذخیره نشد؛ اتصال را بررسی کنید. برای تلاش دوباره تغییری ثبت کنید.');
           }
+          return ok;
         }
       };
     })();
@@ -220,6 +377,9 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   </div>
 </header>
 
+  <div id="academy-save-status" role="status" aria-live="polite" style="padding:0 20px;color:var(--warn)"></div>
+  <div style="padding:0 20px"><button id="academy-export-progress" type="button" hidden>دریافت نسخه خام پیشرفت حساب</button><small> نسخه ممکن است یادداشت و اطلاعات حساس داشته باشد؛ در محل امن نگهداری کنید. این دریافت، مهاجرت یا بازیابی نیست.</small></div>
+  <div style="padding:0 20px"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-legacy-migrate" type="button" hidden>انتقال تکمیل s02 پس از تأیید</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button></div>
   <main class="container" id="app-root"></main>
 
   <script src="/academy-assets/lesson-engine.js?v=20261123c"></script>
@@ -399,6 +559,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       <select id="s4-filter-track" style="padding:10px 12px;border-radius:10px;border:1px solid rgba(139,92,246,0.35);background:rgba(15,23,42,0.85);color:#f8fafc;font-family:inherit;">
         <option value="ALL">همه مسیرها</option>
         <option value="fam-c5">فقط Curriculum 5.0</option>
+        <option value="fam-automation">فقط اتوماسیون</option>
       </select>
     </div>
     <div id="s4-search-results" style="display:none;margin-top:8px;background:rgba(15,23,42,0.95);border:1px solid rgba(139,92,246,0.35);border-radius:10px;padding:10px;"></div>
@@ -419,6 +580,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       <form id="s4-ob-form" style="display:grid; gap:8px;">
         <select id="s4-goal" style="padding:7px; border-radius:6px;">
           <option value="fam-c5">Curriculum 5.0 — از صفر تا CCNA</option>
+          <option value="fam-automation">اتوماسیون — زیرساخت به صورت کد</option>
         </select>
         <select id="s4-level" style="padding:7px; border-radius:6px;">
           <option value="beginner">مبتدی (۱.۰x)</option>
@@ -808,12 +970,12 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
       if (mapCount) mapCount.textContent = faCount(totalLessons);
       const mapTitle = document.querySelector('.s4-map-heading h2');
       if (mapTitle) mapTitle.textContent = `نقشهٔ گرافیکی ${faCount(totalLessons)} درس`;
-      const trackNames = { ALL: 'همه مسیرها', 'fam-c5': 'فقط Curriculum 5.0' };
+      const trackNames = { ALL: 'همه مسیرها', 'fam-c5': 'فقط Curriculum 5.0', 'fam-automation': 'فقط اتوماسیون' };
       document.querySelectorAll('#s4-filter-track option').forEach(option => {
         const count = option.value === 'ALL' ? totalLessons : (trackCounts[option.value] || 0);
         option.textContent = `${trackNames[option.value] || option.value} (${faCount(count)} درس)`;
       });
-      const goalTrackIds = { 'fam-c5': 'fam-c5' };
+      const goalTrackIds = { 'fam-c5': 'fam-c5', 'fam-automation': 'fam-automation' };
       document.querySelectorAll('#s4-goal option').forEach(option => {
         const trackId = goalTrackIds[option.value];
         if (trackId) option.textContent = `${option.value} (${faCount(trackCounts[trackId] || 0)} درس)`;

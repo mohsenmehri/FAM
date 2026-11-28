@@ -80,10 +80,10 @@ class MockNetmikoConnection:
         return {"host": self.host, "applied": True, "commands_count": len(commands)}
 
     def save_config(self) -> dict[str, object]:
-        """Platform-dependent save_config(): works on running/startup OSes, not commit-based OSes."""
+        """Illustrative platform grouping, not a guarantee about any driver or version."""
         if self.platform in COMMIT_BASED_PLATFORMS:
             raise NotImplementedError(
-                f"save_config() is not used on commit-based platform {self.platform!r}; use commit() instead."
+                f"mock save_config() is not modeled on commit-based platform {self.platform!r}; use commit() instead."
             )
         self.dirty_running_config = False
         self.saved_to_startup = True
@@ -108,17 +108,16 @@ def run_nornir_style_pilot(
     if not isinstance(commands, list) or not all(isinstance(c, str) and c.strip() for c in commands):
         raise ValueError("commands must be a list of non-empty strings")
 
+    if not isinstance(inventory, list):
+        raise ValueError("inventory must be a list")
+    if is_dry_run and not honors_dry_run:
+        raise RuntimeError("dry-run guard absent in mock task")
     targets = [dev for dev in inventory if _host_role(dev) == role_filter]
 
     def task(dev: dict[str, object]) -> dict[str, object]:
         host = dev.get("host")
         platform = str(dev.get("platform", "cisco_ios"))
-        if is_dry_run and not honors_dry_run:
-            raise RuntimeError(
-                "dry_run=True requested, but task/plugin does not implement task.is_dry_run() "
-                "(e.g., raw nornir_netmiko netmiko_send_config); wrap explicitly or use nornir_napalm."
-            )
-        with MockNetmikoConnection(str(host), platform=platform) as conn:
+        with MockNetmikoConnection(host, platform=platform) as conn:
             if is_dry_run:
                 res: dict[str, object] = {
                     "host": conn.host,

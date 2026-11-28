@@ -38,13 +38,8 @@ def evaluate_dtp_link(
     sw2_nonegotiate: bool = False,
 ) -> dict[str, object]:
     """Model Catalyst DTP negotiation and explicitly distinguish mode vs nonegotiate."""
-    if (
-        not isinstance(sw1_mode, str)
-        or not isinstance(sw2_mode, str)
-        or sw1_mode not in VALID_PORT_MODES
-        or sw2_mode not in VALID_PORT_MODES
-    ):
-        raise ValueError(f"modes must be str in {sorted(VALID_PORT_MODES)}")
+    if not isinstance(sw1_mode, str) or not isinstance(sw2_mode, str) or sw1_mode not in VALID_PORT_MODES or sw2_mode not in VALID_PORT_MODES:
+        raise ValueError(f"modes must be in {sorted(VALID_PORT_MODES)}")
     n1 = _require_bool(sw1_nonegotiate, "sw1_nonegotiate")
     n2 = _require_bool(sw2_nonegotiate, "sw2_nonegotiate")
 
@@ -93,7 +88,7 @@ def audit_trunk_pair(
     sw2_tag_native: bool = False,
     require_native_in_allowed: bool = True,
 ) -> dict[str, object]:
-    """Audit end-to-end 802.1Q trunk consistency across SW1 and SW2."""
+    """Check supplied configuration sets only; does not test link, STP or traffic."""
     db1 = _require_vlan_set(sw1_vlans, "sw1_vlans")
     db2 = _require_vlan_set(sw2_vlans, "sw2_vlans")
     all1 = _require_vlan_set(sw1_allowed, "sw1_allowed")
@@ -106,15 +101,15 @@ def audit_trunk_pair(
     req_nat_allowed = _require_bool(require_native_in_allowed, "require_native_in_allowed")
 
     issues: list[str] = []
-    if nat1 not in db1:
-        issues.append(f"SW1_NATIVE_MISSING_IN_DB: native VLAN {nat1} not present in SW1 VLAN database")
-    if nat2 not in db2:
-        issues.append(f"SW2_NATIVE_MISSING_IN_DB: native VLAN {nat2} not present in SW2 VLAN database")
     if nat1 != nat2:
         issues.append(f"NATIVE_VLAN_MISMATCH: SW1={nat1} vs SW2={nat2}")
     if tag1 != tag2:
         issues.append(f"NATIVE_TAGGING_MISMATCH: SW1 tag_native={tag1} vs SW2 tag_native={tag2}")
     if req_nat_allowed:
+        if nat1 not in db1:
+            issues.append(f"SW1_NATIVE_MISSING: native VLAN {nat1} missing from SW1 database")
+        if nat2 not in db2:
+            issues.append(f"SW2_NATIVE_MISSING: native VLAN {nat2} missing from SW2 database")
         if nat1 not in all1:
             issues.append(f"SW1_NATIVE_PRUNED: native VLAN {nat1} missing from SW1 allowed list {sorted(all1)}")
         if nat2 not in all2:
@@ -131,17 +126,12 @@ def audit_trunk_pair(
             issues.append(f"VLAN_{vid}_NOT_ALLOWED_ON_SW2_TRUNK")
 
     native_frame_format = "tagged_8021q" if (tag1 and tag2) else ("untagged_default" if (not tag1 and not tag2) else "mismatched")
-    common_vlans = sorted(db1 & db2 & all1 & all2)
-    checks_ok = len(issues) == 0
     return {
-        "model_checks_ok": checks_ok,
-        "end_to_end_ok": checks_ok,
+        "model_checks_ok": len(issues) == 0,
         "native_vlan_sw1": nat1,
         "native_vlan_sw2": nat2,
         "native_frame_format": native_frame_format,
-        "configured_common_vlans": common_vlans,
-        "effective_forwarding_vlans": common_vlans,
-        "model_scope_note": "Configuration intersection check only; does NOT prove live physical link, STP forwarding, or ACL/filtering.",
+        "configured_common_vlans": sorted(db1 & db2 & all1 & all2),
         "issues": issues,
     }
 
@@ -158,7 +148,7 @@ def main() -> None:
         sw2_native=999,
         required_vlans=[10, 20, 50],
     )
-    assert broken_legacy["end_to_end_ok"] is False
+    assert broken_legacy["model_checks_ok"] is False
     assert any("SW1_NATIVE_PRUNED" in i for i in broken_legacy["issues"])
     assert any("VLAN_50_MISSING" in i for i in broken_legacy["issues"])
     print("Legacy broken scenario caught:", broken_legacy["issues"])
@@ -173,7 +163,7 @@ def main() -> None:
         sw2_native=999,
         required_vlans=[10, 20, 50],
     )
-    assert reconciled["end_to_end_ok"] is True
+    assert reconciled["model_checks_ok"] is True
     assert reconciled["native_frame_format"] == "untagged_default"
     print("Reconciled SW1<->SW2 trunk:", reconciled)
 

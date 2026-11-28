@@ -9,15 +9,15 @@
  "titleEn": "Automation 04: Version Control with Git & GitHub for Network Teams",
  "domain": "Network Automation",
  "source": "Legacy auto_04 rewritten and audited",
- "evidence": "Designed — Not Run",
- "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "evidence": "اجرای واقعی Git محلی در مخزن موقت با محیط محدودشده آزموده شده؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+ "reviewStatus": "بازبینی فنی توسط یکپارچه‌ساز انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
  "estimatedMinutes": 45,
  "prerequisites": [],
  "sections": [
   {
    "id": "auto_04-section-1",
    "title": "مسئله واقعی: چرا فایل‌های router-final-v2-REAL.cfg تیم شبکه را فلج می‌کنند؟",
-   "html": "<p>در تیم‌های سنتی شبکه، اسکریپت‌ها و فایل‌های پیکربندی در پوشه‌های مشترک با نام‌هایی مانند <code>acl-v3-new-FINAL.txt</code> پخش می‌شوند. هنگام بروز قطعی، هیچ‌کس نمی‌داند چه کسی، دقیقاً در چه ساعتی، به چه دلیلی و کدام خط ACL را تغییر داده است و چطور باید تمیز به وضعیت سالم قبلی برگشت. <strong>Git</strong> تاریخچه تغییرناپذیر مبتنی بر هش رمزنگاری (Cryptographic Hash / SHA — برای یکپارچگی محتوا، نه رمزنگاری محرمانگی) و دقیق هر تغییر را ثبت می‌کند و پایه همکاری تیمی، <strong>Peer Review (Pull Request)</strong> و <strong>Infrastructure as Code</strong> است.</p>"
+   "html": "<p>در تیم‌های سنتی شبکه، اسکریپت‌ها و فایل‌های پیکربندی در پوشه‌های مشترک با نام‌هایی مانند <code>acl-v3-new-FINAL.txt</code> پخش می‌شوند. هنگام بروز قطعی، هیچ‌کس نمی‌داند چه کسی، دقیقاً در چه ساعتی، به چه دلیلی و کدام خط ACL را تغییر داده است و چطور باید تمیز به وضعیت سالم قبلی برگشت. <strong>Git</strong> اشیای محتوامحور مبتنی بر هش رمزنگاری (Cryptographic Hash / SHA — برای یکپارچگی محتوا، نه رمزنگاری محرمانگی) را نگه می‌دارد؛ اشاره‌گرهای شاخه و تاریخچه قابل بازنویسی‌اند و هویت نویسنده به‌تنهایی اثبات نمی‌شود و پایه همکاری تیمی، <strong>Peer Review (Pull Request)</strong> و <strong>Infrastructure as Code</strong> است.</p>"
   },
   {
    "id": "auto_04-section-2",
@@ -72,12 +72,12 @@
   {
    "id": "auto_04-section-12",
    "title": "عیب‌یابی خطاهای پرتکرار Git در تیم شبکه",
-   "html": "<p><strong>خطای ۱ — <code>rejected (non-fast-forward)</code> هنگام <code>git push</code>:</strong> همکارتان کامیت جدیدی روی همان شاخه پوش کرده است. به جای استفاده خطرناک از <code>--force</code>، ابتدا با <code>git pull --rebase</code> یا <code>git fetch</code> و ادغام تمیز تغییرات را همگام کنید.</p><p><strong>خطای ۲ — کامیت تصادفی فایل‌های سنگین یا <code>.venv</code> قبل از پوش:</strong> قبل از ارسال به Remote می‌توانید با <code>git reset --soft HEAD~1</code> کامیت محلی را باز کنید، فایل ناخواسته را از Staging بیرون بیاورید و دوباره تمیز کامیت کنید.</p>"
+   "html": "<p><strong>خطای ۱ — <code>rejected (non-fast-forward)</code> هنگام <code>git push</code>:</strong> همکارتان کامیت جدیدی روی همان شاخه پوش کرده است. به جای force، ابتدا تغییرات محلی و تاریخچه remote را با <code>git status</code> و <code>git fetch</code> بررسی کنید؛ سپس طبق سیاست تیم merge یا rebase آگاهانه و با رسیدگی به تعارض‌ها انجام دهید.</p><p><strong>خطای ۲ — کامیت تصادفی فایل‌های سنگین یا <code>.venv</code> قبل از پوش:</strong> قبل از ارسال به Remote می‌توانید با <code>git reset --soft HEAD~1</code> کامیت محلی را باز کنید، فایل ناخواسته را از Staging بیرون بیاورید و دوباره تمیز کامیت کنید.</p>"
   },
   {
    "id": "auto_04-section-13",
    "title": "تمرین تحلیلی با پاسخ تشریحی",
-   "html": "<p><strong>تمرین ۱:</strong> کامیتی با تغییر اشتباه <code>no ntp authenticate</code> وارد شاخه مشترک <code>main</code> شده و همه اعضای تیم آن را <code>pull</code> کرده‌اند. برای بازگردانی ایمن کدام دستور را می‌زنید و تعداد کل کامیت‌ها چه تغییری می‌کند؟ <strong>پاسخ:</strong> از <code>git revert &lt;bad-sha&gt;</code> استفاده می‌کنیم؛ یک کامیت جدید به تاریخچه اضافه می‌شود (مثلاً از ۲ کامیت به ۳ کامیت)، محتوای فایل به حالت سالم برمی‌گردد و سابقه خطا برای ممیزی حفظ می‌شود.</p><p><strong>تمرین ۲:</strong> اگر فایلی در <code>.gitignore</code> لیست شده باشد اما هنوز در خروجی <code>git status</code> به‌عنوان <code>modified</code> دیده شود، علت چیست؟ <strong>پاسخ:</strong> آن فایل قبلاً در مخزن Track/Commit شده بوده است؛ <code>.gitignore</code> فقط بر فایل‌های Untracked اثر می‌گذارد و باید با <code>git rm --cached</code> از ردیابی خارج شود.</p>"
+   "html": "<p><strong>تمرین ۱:</strong> کامیتی با تغییر اشتباه <code>no ntp authenticate</code> وارد شاخه مشترک <code>main</code> شده و همه اعضای تیم آن را <code>pull</code> کرده‌اند. برای بازگردانی ایمن کدام دستور را می‌زنید و تعداد کل کامیت‌ها چه تغییری می‌کند؟ <strong>پاسخ:</strong> از <code>git revert &lt;bad-sha&gt;</code> استفاده می‌کنیم؛ یک کامیت جدید به تاریخچه اضافه می‌شود (مثلاً از ۲ کامیت به ۳ کامیت)، در نبود تعارض و تغییرات بعدی ناسازگار می‌تواند اثر خطا را برگرداند؛ نتیجه و تست‌ها باید بررسی شوند و سابقه خطا حفظ می‌شود.</p><p><strong>تمرین ۲:</strong> اگر فایلی در <code>.gitignore</code> لیست شده باشد اما هنوز در خروجی <code>git status</code> به‌عنوان <code>modified</code> دیده شود، علت چیست؟ <strong>پاسخ:</strong> آن فایل قبلاً در مخزن Track/Commit شده بوده است؛ <code>.gitignore</code> فقط بر فایل‌های Untracked اثر می‌گذارد و باید با <code>git rm --cached</code> از ردیابی خارج شود.</p>"
   },
   {
    "id": "auto_04-section-14",
@@ -165,8 +165,8 @@
  "stages": {
   "lab": {
    "title": "آزمایشگاه واقعی Git محلی در پوشه موقت ایزوله (مخزن تولیدی و تجهیز شبکه اجرا نشده)",
-   "executionStatus": "باینری واقعی git محلی در پوشه موقت ایزوله اجرا و تست شده؛ روی مخزن Remote تولیدی یا تجهیز واقعی اجرا نشده است.",
-   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اجرای واقعی git محلی درون پوشه موقت ایزوله</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ مخزن Remote، حساب GitHub تولیدی یا تجهیز شبکه واقعی در این آزمایشگاه تغییر داده نشده است.</p><p>در این آزمایشگاه، اسکریپت پایتون باینری واقعی <code>git</code> سیستم شما را در یک پوشه موقت کاملاً ایزوله اجرا می‌کند: مخزن می‌سازد، نادیده‌گرفتن <code>.env</code> توسط <code>.gitignore</code> را می‌آزماید، شاخه جدید می‌سازد، یک تغییر اشتباه کامیت می‌کند و سپس با <code>git revert</code> به‌طور ایمن بدون تخریب تاریخچه به حالت سالم برمی‌گردد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_04_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_04_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Real Git Workflow Lab for auto_04 (runs real git commands inside a temporary directory).\n\nModifies ONLY an isolated temporary directory; never touches your project repository or remotes.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom pathlib import Path\nimport subprocess\nimport tempfile\n\n\ndef run_git(repo: Path, *args: str) -&gt; str:\n    res = subprocess.run(\n        [&quot;git&quot;, *args],\n        cwd=repo,\n        capture_output=True,\n        text=True,\n        check=True,\n    )\n    return res.stdout.strip()\n\n\ndef simulate_safe_git_workflow() -&gt; dict[str, object]:\n    &quot;&quot;&quot;Execute real git init, .gitignore check, branching, commit, and non-destructive git revert.&quot;&quot;&quot;\n    with tempfile.TemporaryDirectory() as tmp:\n        repo = Path(tmp)\n        run_git(repo, &quot;init&quot;, &quot;-b&quot;, &quot;main&quot;)\n        run_git(repo, &quot;config&quot;, &quot;user.name&quot;, &quot;FAM Lab Learner&quot;)\n        run_git(repo, &quot;config&quot;, &quot;user.email&quot;, &quot;learner@example.invalid&quot;)\n\n        (repo / &quot;.gitignore&quot;).write_text(&quot;.env\\n*.key\\n&quot;, encoding=&quot;utf-8&quot;)\n        (repo / &quot;.env&quot;).write_text(&quot;ROUTER_PASS=never-commit-me\\n&quot;, encoding=&quot;utf-8&quot;)\n        (repo / &quot;ntp.cfg&quot;).write_text(&quot;ntp server 192.0.2.123\\n&quot;, encoding=&quot;utf-8&quot;)\n\n        run_git(repo, &quot;add&quot;, &quot;.gitignore&quot;, &quot;ntp.cfg&quot;)\n        run_git(repo, &quot;commit&quot;, &quot;-m&quot;, &quot;Add baseline NTP config and .gitignore&quot;)\n\n        ignored_check = run_git(repo, &quot;status&quot;, &quot;--porcelain&quot;)\n        env_ignored = &quot;.env&quot; not in ignored_check\n\n        # Feature branch + intentional bad commit + safe revert\n        run_git(repo, &quot;switch&quot;, &quot;-c&quot;, &quot;feature/acl-change&quot;)\n        (repo / &quot;ntp.cfg&quot;).write_text(&quot;ntp server 192.0.2.123\\nno ntp authenticate\\n&quot;, encoding=&quot;utf-8&quot;)\n        run_git(repo, &quot;add&quot;, &quot;ntp.cfg&quot;)\n        run_git(repo, &quot;commit&quot;, &quot;-m&quot;, &quot;Bad config change to revert&quot;)\n        bad_sha = run_git(repo, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;)\n\n        run_git(repo, &quot;revert&quot;, &quot;--no-edit&quot;, &quot;HEAD&quot;)\n        log_lines = run_git(repo, &quot;log&quot;, &quot;--oneline&quot;).splitlines()\n        final_content = (repo / &quot;ntp.cfg&quot;).read_text(encoding=&quot;utf-8&quot;).strip()\n\n        return {\n            &quot;env_ignored_by_gitignore&quot;: env_ignored,\n            &quot;bad_commit_short_sha&quot;: bad_sha,\n            &quot;commit_count_after_revert&quot;: len(log_lines),\n            &quot;history_preserved_with_revert&quot;: len(log_lines) == 3,\n            &quot;restored_ntp_cfg&quot;: final_content,\n        }\n\n\ndef main() -&gt; None:\n    print(&quot;Real local git executed ONLY in an isolated temporary directory; no remote or router touched.&quot;)\n    print(simulate_safe_git_workflow())\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>env_ignored_by_gitignore: True</code>، <code>commit_count_after_revert: 3</code>، <code>history_preserved_with_revert: True</code> و بازگشت دقیق محتوای <code>ntp.cfg</code> به <code>ntp server 192.0.2.123</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>جریان مرجع Pull Request در تیم شبکه (اجرا نشده روی GitHub تولیدی):</strong></p><pre dir=\"ltr\"><code># Reference team workflow (NOT pushed to production remote)\ngit switch -c chg-2048-ntp-policy\n# edit files, verify with: git diff &amp;&amp; git diff --staged\ngit add ntp.cfg &amp;&amp; git commit -m \"Update NTP baseline per CHG-2048\"\ngit push -u origin chg-2048-ntp-policy  # then open Pull Request for review</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
+   "executionStatus": "اجرای واقعی Git محلی در مخزن موقت با محیط محدودشده آزموده شده؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اجرای واقعی git محلی درون پوشه موقت ایزوله</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ مخزن Remote، حساب GitHub تولیدی یا تجهیز شبکه واقعی در این آزمایشگاه تغییر داده نشده است.</p><p>در این آزمایشگاه، اسکریپت پایتون باینری واقعی <code>git</code> سیستم شما را در یک مخزن موقت با محیط Git محدودشده (نه sandbox سیستم‌عامل) اجرا می‌کند: مخزن می‌سازد، نادیده‌گرفتن <code>.env</code> توسط <code>.gitignore</code> را می‌آزماید، شاخه جدید می‌سازد، یک تغییر اشتباه کامیت می‌کند و سپس با <code>git revert</code> به‌طور ایمن بدون تخریب تاریخچه به حالت سالم برمی‌گردد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+ و باینری Git قابل‌اعتماد، نسخه ۲٫۲۳ یا جدیدتر. از محیط امن استفاده کنید؛ این برنامه sandbox سیستم‌عامل نیست. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_04_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_04_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Real Git Workflow Lab for auto_04 (runs real git commands inside a temporary directory).\n\nUses a temporary repository and restricted Git environment; no remote or network device is used.\nNot an OS-level sandbox: run only a trusted local Git binary in a trusted environment.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom pathlib import Path\nimport os\nimport subprocess\nimport tempfile\n\n\ndef run_git(repo: Path, *args: str) -&gt; str:\n    # Do not inherit GIT_DIR, GIT_CONFIG_*, hooks, user config or templates.\n    env = {\n        &quot;PATH&quot;: os.defpath, &quot;HOME&quot;: str(repo), &quot;XDG_CONFIG_HOME&quot;: str(repo / &quot;xdg&quot;),\n        &quot;GIT_CONFIG_NOSYSTEM&quot;: &quot;1&quot;, &quot;GIT_CONFIG_GLOBAL&quot;: str(repo / &quot;no-global-config&quot;),\n        &quot;GIT_TEMPLATE_DIR&quot;: str(repo / &quot;empty-template&quot;), &quot;GIT_TERMINAL_PROMPT&quot;: &quot;0&quot;,\n        &quot;GIT_CONFIG_COUNT&quot;: &quot;2&quot;, &quot;GIT_CONFIG_KEY_0&quot;: &quot;core.hooksPath&quot;,\n        &quot;GIT_CONFIG_VALUE_0&quot;: str(repo / &quot;empty-hooks&quot;),\n        &quot;GIT_CONFIG_KEY_1&quot;: &quot;commit.gpgsign&quot;, &quot;GIT_CONFIG_VALUE_1&quot;: &quot;false&quot;,\n        &quot;LC_ALL&quot;: &quot;C&quot;,\n    }\n    res = subprocess.run(\n        [&quot;git&quot;, *args], cwd=repo, env=env, capture_output=True,\n        text=True, check=True, timeout=15,\n    )\n    return res.stdout.strip()\n\n\ndef simulate_safe_git_workflow() -&gt; dict[str, object]:\n    &quot;&quot;&quot;Execute real git init, .gitignore check, branching, commit, and non-destructive git revert.&quot;&quot;&quot;\n    with tempfile.TemporaryDirectory() as tmp:\n        repo = Path(tmp)\n        (repo / &quot;empty-template&quot;).mkdir()\n        (repo / &quot;empty-hooks&quot;).mkdir()\n        run_git(repo, &quot;init&quot;, &quot;-b&quot;, &quot;main&quot;)\n        run_git(repo, &quot;config&quot;, &quot;user.name&quot;, &quot;FAM Lab Learner&quot;)\n        run_git(repo, &quot;config&quot;, &quot;user.email&quot;, &quot;learner@example.invalid&quot;)\n\n        (repo / &quot;.gitignore&quot;).write_text(&quot;.env\\n*.key\\n&quot;, encoding=&quot;utf-8&quot;)\n        (repo / &quot;.env&quot;).write_text(&quot;ROUTER_PASS=never-commit-me\\n&quot;, encoding=&quot;utf-8&quot;)\n        (repo / &quot;ntp.cfg&quot;).write_text(&quot;ntp server 192.0.2.123\\n&quot;, encoding=&quot;utf-8&quot;)\n\n        run_git(repo, &quot;add&quot;, &quot;.gitignore&quot;, &quot;ntp.cfg&quot;)\n        run_git(repo, &quot;commit&quot;, &quot;-m&quot;, &quot;Add baseline NTP config and .gitignore&quot;)\n\n        ignored_check = run_git(repo, &quot;check-ignore&quot;, &quot;--&quot;, &quot;.env&quot;)\n        env_ignored = ignored_check == &quot;.env&quot;\n\n        # Feature branch + intentional bad commit + safe revert\n        run_git(repo, &quot;switch&quot;, &quot;-c&quot;, &quot;feature/acl-change&quot;)\n        (repo / &quot;ntp.cfg&quot;).write_text(&quot;ntp server 192.0.2.123\\nno ntp authenticate\\n&quot;, encoding=&quot;utf-8&quot;)\n        run_git(repo, &quot;add&quot;, &quot;ntp.cfg&quot;)\n        run_git(repo, &quot;commit&quot;, &quot;-m&quot;, &quot;Bad config change to revert&quot;)\n        bad_sha = run_git(repo, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;)\n\n        run_git(repo, &quot;revert&quot;, &quot;--no-edit&quot;, &quot;HEAD&quot;)\n        log_lines = run_git(repo, &quot;log&quot;, &quot;--oneline&quot;).splitlines()\n        final_content = (repo / &quot;ntp.cfg&quot;).read_text(encoding=&quot;utf-8&quot;).strip()\n\n        return {\n            &quot;env_ignored_by_gitignore&quot;: env_ignored,\n            &quot;bad_commit_short_sha&quot;: bad_sha,\n            &quot;commit_count_after_revert&quot;: len(log_lines),\n            &quot;history_preserved_with_revert&quot;: len(log_lines) == 3,\n            &quot;restored_ntp_cfg&quot;: final_content,\n        }\n\n\ndef main() -&gt; None:\n    print(&quot;Real local git runs in a temporary repository with a restricted Git environment; no remote or router used.&quot;)\n    print(simulate_safe_git_workflow())\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>env_ignored_by_gitignore: True</code>، <code>commit_count_after_revert: 3</code>، <code>history_preserved_with_revert: True</code> و بازگشت دقیق محتوای <code>ntp.cfg</code> به <code>ntp server 192.0.2.123</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>جریان مرجع Pull Request در تیم شبکه (اجرا نشده روی GitHub تولیدی):</strong></p><pre dir=\"ltr\"><code># Reference team workflow (NOT pushed to production remote)\ngit switch -c chg-2048-ntp-policy\n# edit files, verify with: git diff &amp;&amp; git diff --staged\ngit add ntp.cfg &amp;&amp; git commit -m \"Update NTP baseline per CHG-2048\"\ngit push -u origin chg-2048-ntp-policy  # then open Pull Request for review</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p>"
   },
   "quiz": {
    "title": "آزمون درس کنترل نسخه با Git و GitHub",
@@ -183,7 +183,7 @@
     "زیرا Git همه فایل‌ها را خودکار رمزنگاری می‌کند"
    ],
    "correctIndex": 0,
-   "explanationHtml": "<p>کامیت‌های قبلی بخشی دائمی از تاریخچه مخزن هستند؛ افشای رمز در Git نیازمند ابطال و تعویض فوری (Rotate) رمز است.</p>"
+   "explanationHtml": "<p>کامیت‌های قبلی ممکن است در تاریخچه و cloneها باقی بمانند؛ افشای رمز در Git نیازمند ابطال و تعویض فوری (Rotate) رمز است.</p>"
   },
   {
    "title": "تفاوت اصلی git revert و git reset چیست؟",
@@ -205,7 +205,7 @@
     "افزایش پهنای باند اتصال SSH"
    ],
    "correctIndex": 2,
-   "explanationHtml": "<p><code>.gitignore</code> مانع ورود فایل‌های محلی، باینری‌های موقت و اسرار به مخزن Git می‌شود.</p>"
+   "explanationHtml": "<p><code>.gitignore</code> فایل‌های ردیابی‌نشده منطبق را معمولاً نادیده می‌گیرد؛ فایل ردیابی‌شده یا افزودن اجباری را مسدود نمی‌کند.</p>"
   },
   {
    "title": "کدام دستور تفاوت تغییراتی را نشان می‌دهد که با git add وارد Staging Area شده‌اند و آماده کامیت بعدی هستند؟",
@@ -263,7 +263,7 @@
    "explanationHtml": "<p>انتخاب کورکورانه یکی از دو سمت در Merge Conflict شبکه می‌تواند منجر به حذف سرویس همکار و قطعی واقعی شود.</p>"
   },
   {
-   "title": "کارکرد Branch Protection روی شاخه main در GitHub چیست؟",
+   "title": "Branch Protection با تنظیم قواعد مناسب و بدون bypass چه امکانی برای main فراهم می‌کند؟",
    "options": [
     "جلوگیری از پوش مستقیم و force-push روی main و الزام بازبینی همکار (PR) و عبور از تست‌های CI پیش از ادغام",
     "خاموش کردن رمزنگاری HTTPS",
@@ -271,7 +271,7 @@
     "تبدیل مخزن خصوصی به عمومی"
    ],
    "correctIndex": 0,
-   "explanationHtml": "<p>Branch Protection تضمین می‌کند تغییرات زیرساخت شبکه پیش از ورود به شاخه تولیدی بازبینی و آزمایش شوند.</p>"
+   "explanationHtml": "<p>Branch Protection در صورت تنظیم قواعد مناسب و بدون bypass اجازه الزام بازبینی و CI را می‌دهد؛ رفتار به تنظیمات و سطح دسترسی وابسته است.</p>"
   },
   {
    "title": "چرا Staging Area (Index) برای ساخت کامیت‌های اتمی در کار مهندس شبکه مفید است؟",
@@ -301,14 +301,14 @@
     "پوش مستقیم به مخزن تولیدی شرکت",
     "پیکربندی واقعی روتر از طریق GitHub Actions",
     "فقط متن نظری بدون هیچ اجرای محلی",
-    "اجرای واقعی دستورات محلی git (init، .gitignore، branch، commit و revert) درون یک پوشه موقت کاملاً ایزوله بدون دستکاری مخزن اصلی یا تجهیز شبکه"
+    "اجرای واقعی دستورات محلی git (init، .gitignore، branch، commit و revert) درون یک مخزن موقت با محیط Git محدودشده بدون دستکاری مخزن اصلی یا تجهیز شبکه"
    ],
    "correctIndex": 3,
    "explanationHtml": "<p>آزمایشگاه واقعی <code>git</code> را فقط درون <code>TemporaryDirectory</code> اجرا می‌کند و هیچ مخزن Remote یا تجهیز شبکه‌ای را لمس نمی‌کند.</p>"
   }
  ],
  "meta": {
-  "version": "reviewed.4",
+  "version": "integration-review.1",
   "legacyId": "auto_04",
   "sources": [
    "https://git-scm.com/book/en/v2",
@@ -316,7 +316,8 @@
    "https://git-scm.com/docs/gitignore"
   ],
   "limitations": [
-   "اجرای واقعی git صرفاً درون پوشه موقت محلی انجام شده و هیچ مخزن GitHub تولیدی یا تجهیز شبکه متصل نشده است."
+   "اجرای واقعی git صرفاً درون پوشه موقت محلی انجام شده و هیچ مخزن GitHub تولیدی یا تجهیز شبکه متصل نشده است.",
+   "محیط Git محدود می‌شود اما sandbox سیستم‌عامل نیست؛ Git محلی باید معتبر و محیط قابل اعتماد باشد."
   ],
   "legacyAuditFixes": [
    "بازنویسی و اصلاح کامل جمله‌بندی‌های نادرست آزمون نسخه قدیمی (مانند «چرا فایل .env حاوی رمز عبور نباشد در Git commit شود؟» و «چه تفاوتی بین git revert و git reset دارد؟»).",
@@ -336,6 +337,12 @@
   },
   "technicalAuditFixes": [
    "اصلاح بازبینی فاز ۴ (پاسخ به بازبینی همتای Agent 2): اصلاح عبارت «تاریخچه رمزنگاری‌شده (SHA)» به «تاریخچه تغییرناپذیر مبتنی بر هش رمزنگاری (Cryptographic Hash / SHA — برای یکپارچگی محتوا، نه رمزنگاری محرمانگی)» طبق مستندات Git Internals."
-  ]
+  ],
+  "integrationReview": {
+   "date": "2026-11-27",
+   "reviewer": "integrator-agent-not-human",
+   "sourceCommit": "837fad64c25e2307675c576cad733ac0bdd99299",
+   "evidence": "academy-labs/reviews/auto_04-integration-review-fa.md"
+  }
  }
 }

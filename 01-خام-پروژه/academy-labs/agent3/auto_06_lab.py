@@ -8,6 +8,7 @@ from __future__ import annotations
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import threading
+import re
 import urllib.error
 import urllib.request
 
@@ -19,6 +20,10 @@ def run_local_rest_lab() -> dict[str, object]:
     }
 
     class VlanHandler(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(3)
+
         def log_message(self, format, *args):  # noqa: A002
             return
 
@@ -30,13 +35,31 @@ def run_local_rest_lab() -> dict[str, object]:
                 self.wfile.write(json.dumps(payload).encode("utf-8"))
 
         def _read_json(self) -> dict[str, object] | None:
+            # Constrained educational parser, not a production HTTP server.
+            def unique(pairs):
+                out = {}
+                for key, value in pairs:
+                    if key in out:
+                        raise ValueError("duplicate JSON key")
+                    out[key] = value
+                return out
+            def invalid_constant(_):
+                raise ValueError("non-finite number")
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                raw = self.rfile.read(length).decode("utf-8") if length else "{}"
-                obj = json.loads(raw)
+                if length <= 0 or length > 4096:
+                    return None
+                raw = self.rfile.read(length).decode("utf-8")
+                obj = json.loads(raw, object_pairs_hook=unique, parse_constant=invalid_constant)
                 return obj if isinstance(obj, dict) else None
-            except (ValueError, UnicodeDecodeError):
+            except (ValueError, UnicodeDecodeError, TimeoutError):
                 return None
+
+        def _resource_id(self):
+            match = re.fullmatch(r"/api/vlans/([1-9][0-9]{0,3})", self.path)
+            if not match or int(match.group(1)) > 4094:
+                return None
+            return match.group(1)
 
         def do_GET(self):
             parts = self.path.strip("/").split("/")
@@ -49,15 +72,19 @@ def run_local_rest_lab() -> dict[str, object]:
                 self._send_json(404, {"error": "unknown_path"})
 
         def do_POST(self):
+            if self.path != "/api/vlans":
+                self._send_json(404, {"error": "unknown_path"})
+                return
             body = self._read_json()
-            if body is None or "id" not in body or "name" not in body:
+            if body is None or "id" not in body or "name" not in body or set(body) - {"id", "name", "state"}:
                 self._send_json(400, {"error": "invalid_or_incomplete_payload"})
                 return
-            if isinstance(body["id"], bool) or not isinstance(body["name"], str) or not body["name"].strip():
+            if (type(body["id"]) not in (str, int) or not isinstance(body["name"], str)
+                    or not body["name"].strip() or not isinstance(body.get("state", "active"), str)):
                 self._send_json(400, {"error": "invalid_field_types"})
                 return
             vid = str(body["id"]).strip()
-            if not vid.isdigit() or not (1 <= int(vid) <= 4094):
+            if not re.fullmatch(r"[1-9][0-9]{0,3}", vid) or not (1 <= int(vid) <= 4094):
                 self._send_json(400, {"error": "invalid_vlan_id_range"})
                 return
             if vid in store:
@@ -67,32 +94,38 @@ def run_local_rest_lab() -> dict[str, object]:
             self._send_json(201, store[vid])
 
         def do_PUT(self):
-            vid = self.path.strip("/").split("/")[-1]
+            vid = self._resource_id()
+            if vid is None:
+                self._send_json(404, {"error": "unknown_path"})
+                return
             body = self._read_json()
-            if body is None or "name" not in body or not isinstance(body["name"], str) or not body["name"].strip():
+            if (body is None or set(body) - {"name", "state"} or "name" not in body
+                    or not isinstance(body["name"], str) or not body["name"].strip()
+                    or not isinstance(body.get("state", "active"), str)):
                 self._send_json(400, {"error": "invalid_or_incomplete_payload"})
                 return
-            if not vid.isdigit() or not (1 <= int(vid) <= 4094):
+            if not re.fullmatch(r"[1-9][0-9]{0,3}", vid) or not (1 <= int(vid) <= 4094):
                 self._send_json(400, {"error": "invalid_vlan_id_range"})
                 return
             store[vid] = {"id": vid, "name": body["name"], "state": str(body.get("state", "active"))}
             self._send_json(200, store[vid])
 
         def do_PATCH(self):
-            vid = self.path.strip("/").split("/")[-1]
-            if vid not in store:
+            vid = self._resource_id()
+            if vid is None or vid not in store:
                 self._send_json(404, {"error": "not_found"})
                 return
             body = self._read_json()
-            if body is None or not body or any(k not in ("name", "state") for k in body):
+            if (body is None or not body or any(k not in ("name", "state") for k in body)
+                    or any(not isinstance(v, str) or not v.strip() for v in body.values())):
                 self._send_json(400, {"error": "invalid_or_unsupported_patch_fields"})
                 return
             store[vid].update({k: str(v) for k, v in body.items()})
             self._send_json(200, store[vid])
 
         def do_DELETE(self):
-            vid = self.path.strip("/").split("/")[-1]
-            if vid in store:
+            vid = self._resource_id()
+            if vid is not None and vid in store:
                 del store[vid]
                 self.send_response(204)
                 self.end_headers()
@@ -116,9 +149,13 @@ def run_local_rest_lab() -> dict[str, object]:
 
     try:
         r_bad = call("POST", "/api/vlans", {"name": "NO_ID"})
+        r_wrong_path = call("POST", "/wrong", {"id": "20", "name": "VOICE"})
+        r_bad_type = call("POST", "/api/vlans", {"id": True, "name": "VOICE"})
         r_post = call("POST", "/api/vlans", {"id": "20", "name": "VOICE"})
         r_dup = call("POST", "/api/vlans", {"id": "20", "name": "VOICE_DUP"})
         r_patch = call("PATCH", "/api/vlans/20", {"name": "VOICE_CORP"})
+        r_invalid_patch = call("PATCH", "/api/vlans/20", {"state": None})
+        r_wrong_delete = call("DELETE", "/wrong/20")
         r_put_1 = call("PUT", "/api/vlans/20", {"name": "VOICE_FINAL", "state": "active"})
         r_put_2 = call("PUT", "/api/vlans/20", {"name": "VOICE_FINAL", "state": "active"})
         r_del = call("DELETE", "/api/vlans/20")
@@ -126,6 +163,10 @@ def run_local_rest_lab() -> dict[str, object]:
         return {
             "bad_post_status": r_bad[0],
             "post_status": r_post[0],
+            "wrong_path_status": r_wrong_path[0],
+            "bad_type_status": r_bad_type[0],
+            "invalid_patch_status": r_invalid_patch[0],
+            "wrong_delete_status": r_wrong_delete[0],
             "duplicate_post_status": r_dup[0],
             "patch_status": r_patch[0],
             "put_idempotent_same_result": r_put_1 == r_put_2 and r_put_1[0] == 200,
@@ -135,6 +176,9 @@ def run_local_rest_lab() -> dict[str, object]:
     finally:
         server.shutdown()
         server.server_close()
+        thread.join(timeout=5)
+        if thread.is_alive():
+            raise RuntimeError("HTTP lab server thread failed to stop")
 
 
 def main() -> None:

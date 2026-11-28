@@ -1,8 +1,7 @@
 """Local Linux & Log-Processing Lab for auto_01 (runs locally in a temporary directory).
 
 No production Linux server, root privilege, or real Cisco/network device is modified.
-Uses anchored regex + ipaddress.ip_address validation to avoid SSH username log-injection bugs
-(e.g. a username containing the word 'from').
+Parses only an illustrative sshd suffix; this is not a trusted production log parser.
 """
 from __future__ import annotations
 
@@ -21,11 +20,11 @@ Nov 27 02:10:07 bastion sshd[104]: Failed password for root from 203.0.113.77 po
 Nov 27 02:10:09 bastion sshd[105]: Failed password for invalid user test from 198.51.100.10 port 51239 ssh2
 """
 
-SSH_FAILED_IP_RE = re.compile(r"Failed password .*? from (\S+) port \d+\b")
+SSH_FAILED_IP_RE = re.compile(r"Failed password .* from (\S+) port \d+ ssh2$")
 
 
 def parse_failed_ssh_counts(log_text: str) -> list[tuple[str, int]]:
-    """Extract validated source IPs from sshd 'Failed password' lines, immune to 'from' in usernames."""
+    """Extract validated source IPs from sshd 'Failed password' lines, for the limited sample suffix; input is not authenticated."""
     if not isinstance(log_text, str):
         raise ValueError(f"log_text must be str, got {type(log_text).__name__}")
     ips = []

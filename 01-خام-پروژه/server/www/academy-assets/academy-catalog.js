@@ -3,15 +3,19 @@
   const STORAGE_KEY = 'fam_academy_progress_v1';
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   function getCompletedSet() {
-    let local = [];
+    const bridge = window.FamAcademyBridge;
+    if (bridge) {
+      const server = bridge.progress?.completed;
+      return new Set(Array.isArray(server) ? server : []);
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const arr = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(arr)) local = arr;
+      if (Array.isArray(arr)) return new Set(arr);
     } catch {}
-    const server = window.FamAcademyBridge?.progress?.completed;
-    return new Set([...(Array.isArray(server) ? server : []), ...local]);
+    return new Set();
   }
+
   function lessonIcon() {
     // Generic academy glyph; the catalog no longer carries per-lesson icons.
     const d = 'M12 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM5 16a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM19 16a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM10 9 7 16 M14 9l3 7 M8 19h8';

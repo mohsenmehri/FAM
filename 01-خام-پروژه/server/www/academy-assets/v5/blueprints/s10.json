@@ -1,0 +1,322 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "s10",
+ "objectiveId": "s10",
+ "kind": "lesson",
+ "track": "FAM Curriculum 5.0",
+ "course": "c5-stage-zero",
+ "title": "VLAN و Trunk 802.1Q و مسیریابی بین VLANها",
+ "titleEn": "VLAN, 802.1Q trunk and inter-VLAN routing",
+ "domain": "Network fundamentals",
+ "source": "Legacy s10 rewritten",
+ "evidence": "Designed — Not Run",
+ "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+ "estimatedMinutes": 45,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "s10-section-1",
+   "title": "مسئله",
+   "html": "<p>دو گروه روی یک سوئیچ باید جدا باشند، ولی هر دو به یک سرور دسترسی کنترل‌شده داشته باشند. چگونه VLAN، trunk و یک دروازه لایه ۳ را ترکیب کنیم و چه چیزی را واقعاً بررسی کنیم؟</p>"
+  },
+  {
+   "id": "s10-section-2",
+   "title": "هدف",
+   "html": "<p>مرز VLAN، تفاوت access و trunk، tag و native VLAN و نیاز به مسیریابی بین VLANها را بیان کنید. خروجی آزمایشگاه مدل ساده است و رفتار دستگاه واقعی و سیاست امنیت را تضمین نمی‌کند.</p>"
+  },
+  {
+   "id": "s10-section-3",
+   "title": "دامنه لایه ۲",
+   "html": "<p>VLAN تقسیم منطقی شبکه سوئیچ‌شده به دامنه‌های لایه ۲ است. فریم broadcast معمولاً در همان VLAN و پورت‌های مجاز انتشار می‌یابد؛ توپولوژی، STP و تنظیمات بر دامنه واقعی اثر دارند.</p>"
+  },
+  {
+   "id": "s10-section-4",
+   "title": "پورت access",
+   "html": "<p>پورت access معمولی ترافیک بدون tag میزبان را به VLAN پیکربندی‌شده نسبت می‌دهد و خروجی آن VLAN را بدون tag به میزبان می‌فرستد. قابلیت‌هایی مانند voice VLAN و سیاست‌های vendor می‌توانند حالت‌های بیشتری ایجاد کنند.</p>"
+  },
+  {
+   "id": "s10-section-5",
+   "title": "پورت trunk",
+   "html": "<p>trunk می‌تواند چند VLAN را روی یک پیوند حمل کند. این به معنای عبور خودکار همه VLANها نیست: لیست مجاز، وضعیت پورت، وجود VLAN و STP همگی بر ارسال اثر دارند.</p>"
+  },
+  {
+   "id": "s10-section-6",
+   "title": "802.1Q tag",
+   "html": "<p>در یک فریم tagged معمولی، tag دارای اطلاعاتی از جمله VLAN ID و priority است. VLAN IDهای 1 تا 4094 در مدل ساده استفاده می‌شوند؛ VID 0 کاربرد priority tagging دارد و 4095 رزرو است و در مدل ما پشتیبانی نمی‌شوند.</p>"
+  },
+  {
+   "id": "s10-section-7",
+   "title": "Native VLAN",
+   "html": "<p>در یک تنظیم متداول trunk، فریم‌های untagged به native VLAN نسبت داده و ترافیک native بدون tag فرستاده می‌شود. قابلیت tag کردن native و جزئیات رفتار به تجهیز و تنظیمات وابسته است؛ طرفین باید سازگار باشند.</p>"
+  },
+  {
+   "id": "s10-section-8",
+   "title": "عدم تطابق native",
+   "html": "<p>اگر یک طرف untagged را VLAN 10 و طرف دیگر VLAN 20 بداند، ترافیک ممکن است به VLAN ناخواسته نسبت داده شود. صرف وجود هشدار یا نبود آن تشخیص کامل نیست؛ تنظیم هر دو سمت و امنیت پیوند بررسی شود.</p>"
+  },
+  {
+   "id": "s10-section-9",
+   "title": "Allowed VLAN",
+   "html": "<p>اگر VLAN 20 در trunk مجاز نباشد، ارتباط همان VLAN از آن مسیر عبور نمی‌کند. در مدل درس allowed={10,20} و native=10 است: فریم untagged به 10، tag 20 به 20 و tag 30 به drop منجر می‌شود.</p>"
+  },
+  {
+   "id": "s10-section-10",
+   "title": "ارتباط میان VLANها",
+   "html": "<p>VLANهای جدا برای ارتباط IP با یکدیگر معمولاً به gateway لایه ۳ و route و سیاست مناسب نیاز دارند؛ یک سوئیچ لایه ۲ به تنهایی بین subnetها route نمی‌کند. router-on-a-stick یا رابط‌های VLAN در سوئیچ لایه ۳ الگوهای رایج‌اند.</p>"
+  },
+  {
+   "id": "s10-section-11",
+   "title": "پیکربندی فقط مفهومی",
+   "html": "<p>در router-on-a-stick یک پیوند trunk و subinterfaceهای متناظر با VLANها استفاده می‌شود؛ در سوئیچ لایه ۳ از SVI و فعال بودن routing مناسب می‌توان بهره برد. نحو و پیش‌نیاز و وضعیت عملیاتی وابسته به پلتفرم‌اند.</p>"
+  },
+  {
+   "id": "s10-section-12",
+   "title": "امنیت",
+   "html": "<p>VLAN به تنهایی جایگزین فایروال یا سیاست کنترل دسترسی نیست. پورت‌های بلااستفاده، محدوده مجاز trunk، پیکربندی native و دسترسی به مدیریت باید مطابق طراحی و مدل تهدید کنترل شوند.</p>"
+  },
+  {
+   "id": "s10-section-13",
+   "title": "عیب‌یابی مرحله‌ای",
+   "html": "<p>وضعیت فیزیکی، access VLAN میزبان، trunk و allowed VLAN دو سمت، native، STP، جدول MAC و سپس gateway، route و ACL را بررسی کنید. تغییر قبل از جمع‌آوری شواهد می‌تواند دامنه خرابی را افزایش دهد.</p>"
+  },
+  {
+   "id": "s10-section-14",
+   "title": "آزمایشگاه و محدودیت",
+   "html": "<p>در مدل تنها دسته‌بندی ورودی و خروجی access/trunk برای یک VLAN نمایش داده می‌شود. هیچ STP، voice VLAN، priority tag، QinQ، inter-VLAN routing یا فریم واقعی پیاده نشده است.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "VLAN",
+   "fa": "VLAN",
+   "simple": "بخش‌بندی منطقی دامنه لایه ۲."
+  },
+  {
+   "term": "Access",
+   "fa": "Access",
+   "simple": "نوع پورت متداول اتصال میزبان به یک VLAN."
+  },
+  {
+   "term": "Trunk",
+   "fa": "Trunk",
+   "simple": "پیوند حامل چند VLAN."
+  },
+  {
+   "term": "802.1Q",
+   "fa": "802.1Q",
+   "simple": "استاندارد tagging و پل‌زنی VLAN."
+  },
+  {
+   "term": "Tag",
+   "fa": "Tag",
+   "simple": "اطلاعات VLAN و کنترل در فریم tagged."
+  },
+  {
+   "term": "VID",
+   "fa": "VID",
+   "simple": "شناسه VLAN در tag."
+  },
+  {
+   "term": "Native VLAN",
+   "fa": "Native VLAN",
+   "simple": "VLAN متناظر با untagged در تنظیم متداول trunk."
+  },
+  {
+   "term": "Allowed VLAN",
+   "fa": "Allowed VLAN",
+   "simple": "VLAN مجاز بر یک trunk."
+  },
+  {
+   "term": "STP",
+   "fa": "STP",
+   "simple": "پروتکل کنترل حلقه لایه ۲."
+  },
+  {
+   "term": "SVI",
+   "fa": "SVI",
+   "simple": "رابط مجازی لایه ۳ برای VLAN."
+  },
+  {
+   "term": "Subinterface",
+   "fa": "Subinterface",
+   "simple": "رابط منطقی روی رابط فیزیکی."
+  },
+  {
+   "term": "Gateway",
+   "fa": "Gateway",
+   "simple": "گره مسیر بعدی برای شبکه‌های دیگر."
+  },
+  {
+   "term": "Broadcast",
+   "fa": "Broadcast",
+   "simple": "فریم ارسالی در دامنه پخش مرتبط."
+  },
+  {
+   "term": "ACL",
+   "fa": "ACL",
+   "simple": "قوانین کنترل دسترسی ترافیک."
+  },
+  {
+   "term": "QinQ",
+   "fa": "QinQ",
+   "simple": "حمل tag در tag که خارج از مدل است."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "کاربرگ Python Mock — تجهیز واقعی اجرا نشده",
+   "executionStatus": "Designed — Not Run — تجهیز واقعی اجرا نشده است.",
+   "html": "<p><strong>Python Mock / محاسبه محلی:</strong> تجهیز واقعی و ترافیک شبکه اجرا نشده است. در مدل native=10 و allowed={10,20}، ورودی untagged برابر 10، tag 20 برابر 20 و tag 30 رد می‌شود؛ VLAN 20 روی trunk با tag خارج می‌شود. هیچ تجهیز یا فریمی اجرا نمی‌شود.</p><p>Python 3 لازم است؛ کد زیر را در پوشه آزمایشی به نام <code>vlan_trunk_mock.py</code> ذخیره و اجرا کنید.</p><pre dir=\"ltr\"><code>python3 vlan_trunk_mock.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Single-port 802.1Q classification exercise; no frames or device access.&quot;&quot;&quot;\n\n\ndef classify(allowed, native, tagged_vlan):\n    &quot;&quot;&quot;Assume native VLAN maps untagged traffic; return VLAN or None if denied.\n\n    Deliberately excludes priority tags (VID 0), double tags and vendor options.\n    &quot;&quot;&quot;\n    allowed = set(allowed)\n    if not all(isinstance(v, int) and 1 &lt;= v &lt;= 4094 for v in allowed | {native}):\n        raise ValueError(&#x27;VLAN IDs must be in 1..4094&#x27;)\n    if tagged_vlan is not None and (not isinstance(tagged_vlan, int) or not 1 &lt;= tagged_vlan &lt;= 4094):\n        raise ValueError(&#x27;tagged VLAN must be in 1..4094&#x27;)\n    vlan = native if tagged_vlan is None else tagged_vlan\n    return vlan if vlan in allowed else None\n\n\ndef forward(ingress_vlan, egress_kind, egress_vlan, allowed=()):\n    &quot;&quot;&quot;Simplified egress: native traffic untagged; access permits one VLAN.&quot;&quot;&quot;\n    if egress_kind == &#x27;access&#x27;:\n        return &#x27;untagged&#x27; if ingress_vlan == egress_vlan else &#x27;drop&#x27;\n    if egress_kind == &#x27;trunk&#x27;:\n        if ingress_vlan not in allowed:\n            return &#x27;drop&#x27;\n        return &#x27;untagged&#x27; if ingress_vlan == egress_vlan else f&#x27;tag:{ingress_vlan}&#x27;\n    raise ValueError(&#x27;unknown egress kind&#x27;)\n\n\nif __name__ == &#x27;__main__&#x27;:\n    allowed, native = {10, 20}, 10\n    for tag in (None, 20, 30):\n        vlan = classify(allowed, native, tag)\n        print(&#x27;ingress tag:&#x27;, tag, &#x27;classified VLAN:&#x27;, vlan)\n    print(&#x27;VLAN 20 out trunk:&#x27;, forward(20, &#x27;trunk&#x27;, native, allowed))\n    print(&#x27;No switch or Ethernet frame accessed&#x27;)\n</code></pre><p>اگر خروجی متفاوت بود، ورودی و نسخه Python را بررسی کنید. خروجی شاهد اجرای تجهیز یا packet capture نیست.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس",
+   "instructions": "پاسخ‌ها و توضیحات را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "VLAN معمولاً چه چیزی را بخش‌بندی می‌کند؟",
+   "options": [
+    "دامنه لایه ۲",
+    "شماره AS اینترنت",
+    "لایه TLS",
+    "سرعت CPU"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>VLAN بخش‌بندی منطقی دامنه لایه ۲ است.</p>"
+  },
+  {
+   "title": "پورت access معمولی فریم untagged میزبان را چگونه طبقه‌بندی می‌کند؟",
+   "options": [
+    "به همه VLANها",
+    "به VLAN access پیکربندی‌شده",
+    "همیشه به VLAN مقصد IP",
+    "همیشه حذف می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در مدل معمول، VLAN پورت access تعیین‌کننده است.</p>"
+  },
+  {
+   "title": "trunk برای چه به کار می‌رود؟",
+   "options": [
+    "فقط یک IP روی اینترنت",
+    "رمزنگاری frame",
+    "حمل چند VLAN بر یک پیوند",
+    "جایگزینی route برگشت"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>trunk می‌تواند چند VLAN را حمل کند.</p>"
+  },
+  {
+   "title": "آیا صرف trunk بودن عبور همه VLANها را تضمین می‌کند؟",
+   "options": [
+    "بله همیشه",
+    "فقط با IPv6",
+    "فقط با DNS",
+    "خیر؛ allowed VLAN و وضعیت پورت و STP مهم‌اند"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>trunk بودن به تنهایی کافی نیست.</p>"
+  },
+  {
+   "title": "در مدل با native=10، فریم untagged به کدام VLAN می‌رود؟",
+   "options": [
+    "10",
+    "20",
+    "30",
+    "هیچ‌کدام در همه شرایط"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>مدل فرض می‌کند native در allowed است.</p>"
+  },
+  {
+   "title": "در مدل با allowed={10,20} فریم tagged VLAN 30 چه می‌شود؟",
+   "options": [
+    "به VLAN 10 می‌رود",
+    "drop",
+    "به VLAN 20 می‌رود",
+    "به همه VLANها flood می‌شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>VLAN 30 در لیست مجاز این مثال نیست.</p>"
+  },
+  {
+   "title": "native VLAN mismatch چه خطری دارد؟",
+   "options": [
+    "همیشه خاموشی فیزیکی",
+    "تغییر خودکار IP سرور",
+    "نسبت‌دادن ترافیک untagged به VLAN متفاوت",
+    "تضمین رمزنگاری"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>طبقه‌بندی untagged دو سمت ممکن است متفاوت شود.</p>"
+  },
+  {
+   "title": "برای ارتباط IP میان دو VLAN چه چیزی عموماً لازم است؟",
+   "options": [
+    "فقط یک کابل access",
+    "فقط جدول MAC",
+    "فقط DHCP",
+    "gateway لایه ۳ و مسیر و سیاست مناسب"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>ارتباط میان subnetها به مسیریابی و سیاست مناسب نیاز دارد.</p>"
+  },
+  {
+   "title": "VID صفر در مدل این آزمایشگاه چگونه است؟",
+   "options": [
+    "پشتیبانی نمی‌شود؛ priority tagging خارج از مدل است",
+    "همیشه VLAN کاربری صفر است",
+    "همیشه native VLAN است",
+    "به معنای همه VLANهاست"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>VID صفر کاربرد خاص priority tagging دارد که مدل نکرده‌ایم.</p>"
+  },
+  {
+   "title": "آیا VLAN به تنهایی جایگزین فایروال است؟",
+   "options": [
+    "بله همیشه",
+    "خیر؛ کنترل دسترسی جداگانه لازم است",
+    "فقط برای DNS",
+    "فقط روی trunk"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>جداسازی VLAN و سیاست امنیتی وظایف یکسانی ندارند.</p>"
+  },
+  {
+   "title": "Router-on-a-stick در سطح مفهومی شامل چیست؟",
+   "options": [
+    "فقط کابل بدون VLAN",
+    "فقط DNS",
+    "trunk و subinterfaceهای متناظر",
+    "همیشه حذف روتر"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>روتر از پیوند trunk و رابط‌های منطقی متناظر استفاده می‌کند.</p>"
+  },
+  {
+   "title": "کدام قابلیت در مدل Python نیست؟",
+   "options": [
+    "دسته‌بندی untagged",
+    "فیلتر allowed",
+    "خروجی tagged نمونه",
+    "STP و مسیریابی بین VLANها"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>مدل صرفاً تصمیم ساده پورت در حافظه است.</p>"
+  }
+ ],
+ "meta": {
+  "version": "reviewed.1",
+  "sources": [
+   "https://www.cisco.com/c/en/us/support/docs/lan-switching/8021q/17056-741-4.html",
+   "https://www.cisco.com/c/en/us/support/docs/lan-switching/inter-vlan-routing/41260-189.html"
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "۱۴ بخش، واژه‌نامه، ۱۲ سؤال و همه گزینه‌ها، مثال و آزمایشگاه؛ بازبینی نویسنده نه مستقل",
+   "evidence": "academy-labs/reviews/s10-review-fa.md"
+  }
+ }
+}

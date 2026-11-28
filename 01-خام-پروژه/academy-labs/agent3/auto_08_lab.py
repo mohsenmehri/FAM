@@ -8,13 +8,10 @@ Execution boundary & honest limitations:
   UTF-8 sequences (e.g., Persian text like 'سلام') split across chunk boundaries
   frame and reassemble cleanly without UnicodeDecodeError, with UTF-8 decoding
   performed only at the complete reassembled message boundary.
-- The sample delimiter payload places `]]>]]>` inside a valid XML 1.0 comment
-  (since `]]>` is illegal inside ordinary XML character data).
 - The datastore class (NetconfDatastoreMock) is a MINIMAL EDUCATIONAL STATE MACHINE:
-  it requires a non-empty lock-holder session_id and rejects overlapping pending
-  confirmed-commits, but does NOT model real concurrent NETCONF sessions, real
-  YANG/XML schema validation, real wall-clock confirm-timeout timers, persist /
-  persist-id cross-session handoff, or live SSH-830 network devices.
+  it does NOT model real concurrent NETCONF sessions, real YANG/XML schema validation,
+  real wall-clock confirm-timeout timers, persist/persist-id cross-session handoff,
+  or live SSH-830 network devices.
 """
 
 from __future__ import annotations
@@ -128,27 +125,22 @@ class NetconfDatastoreMock:
         self.locked_by: str | None = None
         self.pending_backup: dict | None = None
 
-    @staticmethod
-    def _require_session_id(session_id: object) -> str:
+    def lock(self, session_id: str) -> None:
         if not isinstance(session_id, str) or not session_id.strip():
             raise ValueError("session_id must be a non-empty str")
-        return session_id
-
-    def lock(self, session_id: str) -> None:
-        sid = self._require_session_id(session_id)
-        if self.locked_by and self.locked_by != sid:
+        if self.locked_by and self.locked_by != session_id:
             raise RuntimeError(f"Datastore already locked by {self.locked_by}")
-        self.locked_by = sid
+        self.locked_by = session_id
 
     def unlock(self, session_id: str) -> None:
-        sid = self._require_session_id(session_id)
-        if self.locked_by is not None and self.locked_by != sid:
-            raise RuntimeError(f"Session {sid!r} cannot unlock lock held by {self.locked_by!r}")
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("session_id must be a non-empty str")
+        if self.locked_by is not None and self.locked_by != session_id:
+            raise RuntimeError(f"Session {session_id!r} cannot unlock lock held by {self.locked_by!r}")
         self.locked_by = None
 
     def edit_candidate(self, session_id: str, new_acl: list[str]) -> None:
-        sid = self._require_session_id(session_id)
-        if self.locked_by is None or self.locked_by != sid:
+        if not isinstance(session_id, str) or not session_id.strip() or self.locked_by != session_id:
             raise RuntimeError("Must hold <lock> before edit")
         if not isinstance(new_acl, list) or not all(isinstance(rule, str) and rule.strip() for rule in new_acl):
             raise ValueError("new_acl must be a list of non-empty str")
@@ -158,11 +150,10 @@ class NetconfDatastoreMock:
         return bool(self.candidate.get("acl_mgmt"))
 
     def commit_confirmed(self, session_id: str) -> None:
-        sid = self._require_session_id(session_id)
-        if self.locked_by is None or self.locked_by != sid:
+        if not isinstance(session_id, str) or not session_id.strip() or self.locked_by != session_id:
             raise RuntimeError("Must hold <lock> before confirmed-commit")
         if self.pending_backup is not None:
-            raise RuntimeError("A confirmed-commit is already pending; confirm or roll back first")
+            raise RuntimeError("This minimal model does not support repeated confirmed commits")
         if not self.validate_candidate():
             raise ValueError("Candidate datastore validation failed (empty acl_mgmt)")
         self.pending_backup = copy.deepcopy(self.running)
@@ -174,13 +165,14 @@ class NetconfDatastoreMock:
             self.candidate = copy.deepcopy(self.pending_backup)
             self.pending_backup = None
 
-    def confirm_commit(self) -> None:
+    def confirm_commit(self, session_id: str) -> None:
+        if not isinstance(session_id, str) or not session_id.strip() or self.locked_by != session_id or self.pending_backup is None:
+            raise RuntimeError("Model confirmation requires owner and pending change")
         self.pending_backup = None
 
 
 def main() -> None:
-    # Place `]]>]]>` inside an XML comment so the document itself remains valid XML 1.0
-    tricky_xml = "<rpc><!-- Contains delimiter ]]>]]> and فارسی سلام --><ok/></rpc>"
+    tricky_xml = "<rpc><!-- valid XML comment ]]>]]> --><description>فارسی سلام</description></rpc>"
     v10 = frame_netconf_1_0(tricky_xml)
     v10_split_pieces = v10.split("]]>]]>")  # breaks prematurely!
     v11 = frame_netconf_1_1_chunked(tricky_xml)
@@ -204,7 +196,7 @@ def main() -> None:
     # Safe change with explicit confirming <commit/>
     ds.edit_candidate("sess-101", ["permit 10.0.0.0/24", "permit 10.1.0.0/24"])
     ds.commit_confirmed("sess-101")
-    ds.confirm_commit()
+    ds.confirm_commit("sess-101")
     ds.unlock("sess-101")
     assert len(ds.running["acl_mgmt"]) == 2
 

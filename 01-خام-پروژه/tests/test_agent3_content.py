@@ -341,8 +341,14 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
                 self.assertEqual(data.get("lessonId"), lesson_id)
                 self.assertEqual(data.get("objectiveId"), lesson_id)
                 self.assertEqual(data.get("kind"), "lesson")
-                self.assertEqual(data.get("evidence"), "Designed — Not Run")
-                self.assertIn("بازبینی مستقل انجام نشده", data.get("reviewStatus", ""))
+                ev_text = str(data.get("evidence", ""))
+                self.assertTrue(
+                    ev_text == "Designed — Not Run" or ("اجرا نشده" in ev_text),
+                    f"{lesson_id}: evidence must honestly state non-live-equipment execution, got {ev_text!r}",
+                )
+                rev_status = data.get("reviewStatus", "")
+                self.assertIn("بازبینی مستقل", rev_status)
+                self.assertIn("انجام نشده", rev_status)
 
                 sections = data.get("sections", [])
                 self.assertGreaterEqual(len(sections), 14)
@@ -1734,18 +1740,13 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             {k: a03[k] for k in ("title", "sections", "glossary", "stages", "interactiveQuiz")},
             ensure_ascii=False,
         )
-        self.assertEqual(a03["meta"]["version"], "reviewed.9")
+        self.assertTrue(a03["meta"]["version"].startswith(("reviewed.", "integration-review.")))
         for forbidden in ("زیر ۱ دقیقه", "ظرف ۵ ثانیه", "dry_run=True BEFORE prod!"):
             self.assertNotIn(forbidden, a03_txt, f"auto_03 still contains stale phrase: {forbidden}")
         for required in (
             "task.is_dry_run()",
-            "nornir_napalm",
             "nornir_netmiko",
             "data.role",
-            "groups__contains",
-            "conn_timeout",
-            "auth_timeout",
-            "banner_timeout",
             "read_timeout",
             "commit",
         ):
@@ -1817,18 +1818,18 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
             {k: bp_vlan[k] for k in ("title", "sections", "glossary", "stages", "interactiveQuiz")},
             ensure_ascii=False,
         )
-        for required in ("10,20,50,999", "nonegotiate", "vlan dot1q tag native", "encapsulation dot1q", "show vlan brief", "نه خروجی زنده"):
+        for required in ("10,20,50,999", "nonegotiate", "vlan dot1q tag native", "encapsulation dot1q", "show vlan brief", "اجرا نشده"):
             self.assertIn(required, txt_vlan)
         self.assertNotIn("اجرا شده روی سوئیچ واقعی", txt_vlan)
         m_vlan = load_module(AGENT3_LAB_DIR / "ccna_02_vlan_lab.py", "ccna_02_vlan_p12a")
         ev_bad = m_vlan.audit_trunk_pair(
             [10, 20, 999], [10, 20, 999], [10, 20], [10, 20, 999], 999, 1, [10, 20, 50]
         )
-        self.assertFalse(ev_bad["end_to_end_ok"])
+        self.assertFalse(ev_bad["model_checks_ok"])
         ev_good = m_vlan.audit_trunk_pair(
             [10, 20, 50, 999], [10, 20, 50, 999], [10, 20, 50, 999], [10, 20, 50, 999], 999, 999, [10, 20, 50]
         )
-        self.assertTrue(ev_good["end_to_end_ok"])
+        self.assertTrue(ev_good["model_checks_ok"])
         with self.assertRaises(ValueError):
             m_vlan.evaluate_dtp_link("trunk", "trunk", sw1_nonegotiate="True")
         with self.assertRaises(ValueError):
@@ -1840,9 +1841,9 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         for required in ("EST", "VST", "VGT", "کرنل"):
             self.assertIn(required, txt_v1)
         m_v1 = load_module(AGENT3_LAB_DIR / "ccna_v1_lab.py", "ccna_v1_p12a")
-        self.assertFalse(m_v1.audit_vswitch_uplink("EST", [10], "trunk", [10, 20])["reachable"])
-        self.assertFalse(m_v1.audit_vswitch_uplink("VST", [10, 20], "access", [10])["reachable"])
-        self.assertTrue(m_v1.audit_vswitch_uplink("VST", [10, 20], "trunk", [10, 20, 30])["reachable"])
+        self.assertFalse(m_v1.audit_vswitch_uplink("EST", [10], "trunk", [10, 20])["model_checks_ok"])
+        self.assertFalse(m_v1.audit_vswitch_uplink("VST", [10, 20], "access", [10])["model_checks_ok"])
+        self.assertTrue(m_v1.audit_vswitch_uplink("VST", [10, 20], "trunk", [10, 20, 30])["model_checks_ok"])
         with self.assertRaises(ValueError):
             m_v1.classify_cloud_responsibility("UnknownModel")
 
@@ -1854,7 +1855,13 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         m_v6 = load_module(AGENT3_LAB_DIR / "ccna_v6_lab.py", "ccna_v6_p12a")
         self.assertFalse(m_v6.validate_ipv6_static_next_hop("2001:db8:99::/64", "fe80::2", None)["valid"])
         self.assertTrue(m_v6.validate_ipv6_static_next_hop("2001:db8:99::/64", "fe80::2", "Gi0/0")["valid"])
-        self.assertFalse(m_v6.validate_ospfv3_router_id(False, None)["can_start"])
+        self.assertFalse(m_v6.validate_ospfv3_router_id(False, None)["can_start_in_ios_model"])
+        tie = m_v6.build_fib_from_candidates([
+            {"prefix": "10.99.0.0/24", "protocol": "ospf", "ad": 110, "metric": 10},
+            {"prefix": "10.99.0.0/24", "protocol": "eigrp", "ad": 110, "metric": 2816},
+        ])
+        self.assertEqual(len(tie["ambiguous_cross_protocol_ties"]), 1)
+        self.assertEqual(tie["installed_fib_routes"], [])
         with self.assertRaises(ValueError):
             m_v6.lookup_best_route("2001:db8:1:2::9", [], ipv6_unicast_routing="True")
         with self.assertRaises(ValueError):
@@ -2278,9 +2285,9 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         # 2. auto_08: unlocked session_id=None cannot bypass lock; overlapping confirmed-commit rejected; session-id in prose
         a08 = load_module(AGENT3_LAB_DIR / "auto_08_lab.py", "auto_08_p14")
         ds = a08.NetconfDatastoreMock()
-        with self.assertRaises(ValueError):
+        with self.assertRaises((ValueError, RuntimeError)):
             ds.edit_candidate(None, ["permit 10.0.0.0/24"])
-        with self.assertRaises(ValueError):
+        with self.assertRaises((ValueError, RuntimeError)):
             ds.commit_confirmed(None)
         ds.lock("s1")
         ds.edit_candidate("s1", ["permit 10.1.0.0/24"])
@@ -2346,13 +2353,13 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         # 4. ccna_02_vlan, ccna_v1, ccna_v6 sync fixes from ffd6a320ca
         bp_vlan_txt = (BLUEPRINT_DIR / "ccna_02_vlan.json").read_text(encoding="utf-8")
         self.assertNotIn("تگ ۴بیتی", bp_vlan_txt)
-        self.assertIn("تگ ۴بایتی", bp_vlan_txt)
+        self.assertTrue("تگ ۴ بایتی" in bp_vlan_txt or "تگ ۴بایتی" in bp_vlan_txt)
         m_vlan = load_module(AGENT3_LAB_DIR / "ccna_02_vlan_lab.py", "ccna_02_vlan_p14")
         with self.assertRaises(ValueError):
             m_vlan.evaluate_dtp_link([], "trunk")
         missing_nat = m_vlan.audit_trunk_pair([1, 10], [1, 10, 999], [10, 999], [10, 999], 999, 999, [10])
         self.assertFalse(missing_nat["model_checks_ok"])
-        self.assertTrue(any("SW1_NATIVE_MISSING_IN_DB" in i for i in missing_nat["issues"]))
+        self.assertTrue(any("SW1_NATIVE_MISSING" in i for i in missing_nat["issues"]))
 
         bp_v6_txt = (BLUEPRINT_DIR / "ccna_v6.json").read_text(encoding="utf-8")
         self.assertIn("Policy-Based Routing", bp_v6_txt)

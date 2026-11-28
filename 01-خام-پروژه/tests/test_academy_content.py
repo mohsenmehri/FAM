@@ -9,6 +9,8 @@ import json
 from html.parser import HTMLParser
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import unittest
 import xml.etree.ElementTree as ET
 
@@ -54,6 +56,17 @@ class AcademyContentTests(unittest.TestCase):
             for course in path.get("courses", []):
                 for lesson in course.get("lessons", []):
                     cls.records.append((path, course, lesson))
+
+    def test_progress_bridge_and_engines_behavior_in_node(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required for the JavaScript behavior test")
+        result = subprocess.run(
+            [node, str(PACKAGE_ROOT / "tests" / "academy_progress_behavior.js")],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("progress behavior passed", result.stdout)
 
     def test_catalog_has_unique_ids_and_resolvable_prerequisites(self):
         lesson_ids = [lesson["id"] for _, _, lesson in self.records]
@@ -147,20 +160,47 @@ class AcademyContentTests(unittest.TestCase):
                 self.assertIn(WEB_ROOT.resolve(), local_path.parents)
                 self.assertTrue(local_path.is_file())
 
-    def test_served_curriculum_is_curriculum_5_0_only(self):
-        prefixes = ("ccna-v11-", "ccna-v20-", "academy-stage-zero-")
-        self.assertEqual([p["id"] for p in self.catalog["paths"]], ["fam-c5"])
-        for _, _, lesson in self.records:
+    def test_curriculum_five_and_automation_are_separate(self):
+        paths = {path["id"]: path for path in self.catalog["paths"]}
+        self.assertEqual(set(paths), {"fam-c5", "fam-automation"})
+        for path, _, lesson in self.records:
             with self.subTest(lesson=lesson["id"]):
-                self.assertTrue(lesson["id"].startswith(prefixes), lesson["id"])
+                if path["id"] == "fam-c5":
+                    self.assertTrue(lesson["id"].startswith(("ccna-v11-", "ccna-v20-", "academy-stage-zero-")) or lesson["id"] in {"s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "ccna_01", "ccna_02", "ccna_02_vlan", "ccna_v1"})
+                else:
+                    self.assertIn(lesson["id"], {"academy-automation-terraform", "auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_07", "auto_08", "auto_10", "auto_16", "auto_20"})
                 self.assertTrue(lesson["blueprint"].startswith("/academy-assets/v5/blueprints/"))
+
+    def test_terraform_blueprint_embeds_the_actual_mock_source(self):
+        from html import unescape
+        blueprint = json.loads((ASSET_ROOT / "v5/blueprints/academy-automation-terraform.json").read_text(encoding="utf-8"))
+        lab = unescape(blueprint["stages"]["lab"]["html"])
+        source = (PACKAGE_ROOT / "academy-labs/terraform_mock.py").read_text(encoding="utf-8")
+        self.assertIn(source, lab)
+        self.assertIn("terraform_data", lab)
+        self.assertIn("اجرا نشده", lab)
+        self.assertEqual(len(blueprint["interactiveQuiz"]), 12)
+
+    def test_osi_blueprint_embeds_executable_mock_not_ios(self):
+        from html import unescape
+        blueprint = json.loads((ASSET_ROOT / "v5/blueprints/academy-stage-zero-osi-fa.json").read_text(encoding="utf-8"))
+        lab = unescape(blueprint["stages"]["lab"]["html"])
+        source = (PACKAGE_ROOT / "academy-labs/osi_hop_mock.py").read_text(encoding="utf-8")
+        self.assertIn(source, lab)
+        self.assertIn("هیچ بسته یا فرمان IOS ارسال نمی‌کند", lab)
+        self.assertEqual(blueprint["objectiveId"], "s01")
+        self.assertEqual(len(blueprint["interactiveQuiz"]), 12)
 
     def test_every_lesson_carries_the_sixteen_section_contract(self):
         for _, _, lesson in self.records:
             blueprint = json.loads(blueprint_path(lesson).read_text(encoding="utf-8"))
             with self.subTest(lesson=lesson["id"]):
                 self.assertGreaterEqual(len(blueprint.get("sections", [])), 14, lesson["id"])
-                self.assertEqual(blueprint.get("evidence"), "Designed — Not Run", lesson["id"])
+                if lesson["id"] in {"auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_07", "auto_08", "auto_10", "auto_16", "auto_20", "ccna_02_vlan", "ccna_v1"}:
+                    self.assertIn("محلی", blueprint.get("evidence", ""))
+                    self.assertIn("روی تجهیز اجرا نشده", blueprint["evidence"])
+                else:
+                    self.assertEqual(blueprint.get("evidence"), "Designed — Not Run", lesson["id"])
                 self.assertGreaterEqual(len(blueprint.get("glossary", [])), 15, lesson["id"])
                 quiz = blueprint.get("interactiveQuiz", [])
                 self.assertEqual(len(quiz), 12, lesson["id"])

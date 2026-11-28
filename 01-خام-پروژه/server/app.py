@@ -3,6 +3,7 @@ All authorisation is server-side. Browser snapshots use optimistic revisions and
 idempotent receipts; no last-writer-wins or automatic conflict overwrite.
 """
 import copy
+import decimal
 import hashlib
 import hmac
 import ipaddress
@@ -614,9 +615,20 @@ def create_app(config=None):
         CREATE TABLE IF NOT EXISTS academy_progress(
           user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
           payload TEXT NOT NULL,
-          updated_at INTEGER NOT NULL
+          updated_at INTEGER NOT NULL,
+          revision INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS academy_progress_backups(
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          revision INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          saved_at INTEGER NOT NULL,
+          PRIMARY KEY(user_id, revision)
         );
         ''')
+        progress_columns={r['name'] for r in db.execute('PRAGMA table_info(academy_progress)')}
+        if 'revision' not in progress_columns:
+            db.execute('ALTER TABLE academy_progress ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
         # SQLite only supports additive migrations. NULL deliberately means an
         # untouched legacy role account; custom rows always carry both arrays.
         columns={row['name'] for row in db.execute('PRAGMA table_info(users)')}
@@ -676,7 +688,7 @@ def create_app(config=None):
         # without a header remain compatible; writes always require one.
         supplied=request.headers.get('X-FAM-CSRF')
         if request.method not in ('GET','HEAD') or supplied is not None:
-            if not hmac.compare_digest(supplied or '',g.session['csrf']):
+            if not supplied or not supplied.isascii() or not hmac.compare_digest(supplied,g.session['csrf']):
                 if supplied:return jsonify(error='نشست این صفحه تغییر کرده است؛ دوباره وارد شوید.',code='session_changed'),403
                 fail(403,'توکن درخواست معتبر نیست.')
     @app.after_request
@@ -825,11 +837,12 @@ def create_app(config=None):
         # the main app. Progress is looked up by the server-derived user id.
         with connect() as db:
             user, session = user_and_session(db)
-            row = db.execute('SELECT payload FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
+            row = db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
         progress = json.loads(row['payload']) if row else {}
         if not isinstance(progress, dict):
             fail(500, 'وضعیت آکادمی معتبر نیست؛ با مدیر سامانه تماس بگیرید.')
-        bootstrap = {'userName': user['name'], 'csrf': session['csrf'], 'progress': progress}
+        bootstrap = {'userName': user['name'], 'csrf': session['csrf'], 'progress': progress,
+                     'progressRevision': row['revision'] if row else 0}
         encoded = json.dumps(bootstrap, ensure_ascii=True, separators=(',', ':'))
         encoded = encoded.replace('<', r'\u003c').replace('>', r'\u003e').replace('&', r'\u0026')
         page = (ROOT/'private_ui'/'academy.html').read_text(encoding='utf-8')
@@ -837,6 +850,157 @@ def create_app(config=None):
         if page.count(marker) != 1:
             raise RuntimeError('FAM Academy bootstrap marker missing or duplicated.')
         return private_html_response(page.replace(marker, encoded))
+
+    @app.get('/api/academy/progress/export')
+    def export_academy_progress():
+        # The page token is mandatory even for GET: if another tab changes the
+        # shared session cookie, a stale page must not export the new user's data.
+        with connect() as db:
+            user, session = user_and_session(db)
+            supplied = request.headers.get('X-FAM-CSRF', '')
+            if not hmac.compare_digest(supplied, session['csrf']):
+                fail(403, 'توکن نشست برای دریافت پیشرفت لازم است.')
+            row = db.execute('SELECT payload,revision,updated_at FROM academy_progress WHERE user_id=?',
+                             (user['id'],)).fetchone()
+        # Export the stored outer payload as a string, including malformed and
+        # unknown values; do not reinterpret or claim that this is migration.
+        response = jsonify(format='fam-academy-progress-export-v1', revision=row['revision'] if row else 0,
+                           updatedAt=row['updated_at'] if row else None,
+                           payloadRaw=row['payload'] if row else None)
+        response.headers['Content-Disposition'] = 'attachment; filename="fam-academy-progress.json"'
+        return response
+
+    # Explicitly reviewed equivalence: only completion, never scores/notes/labs.
+    # An identical ID or alias alone must never grant migration rights.
+    legacy_completion_map = {'s02': 's02'}
+    legacy_archive_key = 'fam.academy.legacy.archive.v1'
+
+    def strict_progress_json(payload):
+        def unique_object(pairs):
+            result={}
+            for key,value in pairs:
+                if key in result: raise ValueError('duplicate key')
+                result[key]=value
+            return result
+        def reject_constant(_): raise ValueError('non-finite number')
+        def finite_float(token):
+            value=float(token)
+            if not math.isfinite(value): raise ValueError('float overflow')
+            try:
+                if decimal.Decimal(token) != decimal.Decimal(str(value)):
+                    raise ValueError('float precision loss')
+            except decimal.InvalidOperation as exc:
+                raise ValueError('invalid decimal') from exc
+            return value
+        return json.loads(payload, object_pairs_hook=unique_object, parse_constant=reject_constant, parse_float=finite_float)
+
+    def parse_legacy_progress(payload):
+        try:
+            outer=strict_progress_json(payload)
+            raw=outer.get('fam4.learn.v1') if isinstance(outer,dict) else None
+            legacy=strict_progress_json(raw) if isinstance(raw,str) else None
+            if (not isinstance(legacy,dict) or any(k in legacy for k in ('completed','labs','profile','selfAssessed')) or
+                not isinstance(legacy.get('completedLessons'),list) or
+                not all(isinstance(x,str) for x in legacy['completedLessons'])):
+                raise ValueError('unknown or mixed schema')
+        except (ValueError,TypeError,RecursionError):
+            fail(409, 'قالب قدیمی قابل تشخیص نیست؛ هیچ تبدیلی انجام نشده است.')
+        return outer,raw,legacy
+
+    @app.get('/api/academy/progress/legacy-preview')
+    def preview_academy_legacy():
+        with connect() as db:
+            user, session = user_and_session(db)
+            if not hmac.compare_digest(request.headers.get('X-FAM-CSRF', ''), session['csrf']):
+                fail(403, 'توکن نشست برای بررسی پیشرفت لازم است.')
+            row=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
+        if not row:
+            fail(404, 'پیشرفت ذخیره‌شده‌ای وجود ندارد.')
+        outer,_,legacy=parse_legacy_progress(row['payload'])
+        completed=set(legacy['completedLessons'])
+        eligible=sorted(completed & legacy_completion_map.keys())
+        available=bool(eligible) and legacy_archive_key not in outer
+        blocked_reason = 'archive_exists' if legacy_archive_key in outer else ('no_eligible' if not eligible else None)
+        return jsonify(revision=row['revision'], completedCount=len(legacy['completedLessons']),
+                       uniqueCompletedCount=len(completed), unmappedCount=len(completed - legacy_completion_map.keys()),
+                       retainedFields=[k for k in ('activeLesson','quizScores','notes','missions','examScore') if k in legacy],
+                       mappedCount=len(eligible) if available else 0, eligible=eligible if available else [],
+                       migrationAvailable=available, blockedReason=blocked_reason)
+
+    @app.post('/api/academy/progress/migrate')
+    def migrate_academy_legacy():
+        body=data()
+        if (not isinstance(body,dict) or set(body)!={'expectedRevision','selectedLessons'} or
+            type(body['expectedRevision']) is not int or not 0 <= body['expectedRevision'] < 2**63-1 or
+            not isinstance(body['selectedLessons'],list) or not body['selectedLessons'] or
+            len(body['selectedLessons']) > len(legacy_completion_map) or
+            any(not isinstance(x,str) for x in body['selectedLessons']) or
+            len(set(body['selectedLessons'])) != len(body['selectedLessons'])):
+            fail(400, 'انتخاب درس و نسخه پیشرفت معتبر لازم است.')
+        with transaction() as db:
+            user,_=user_and_session(db)
+            row=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
+            if not row or row['revision'] != body['expectedRevision']:
+                fail(409, 'پیشرفت تغییر کرده است؛ دوباره پیش‌نمایش بگیرید.')
+            outer,raw,legacy=parse_legacy_progress(row['payload'])
+            if legacy_archive_key in outer:
+                fail(409, 'بایگانی قدیمی موجود است؛ برای پیشگیری از بازنویسی مهاجرت متوقف شد.')
+            selected=body['selectedLessons']
+            if any(x not in legacy_completion_map or x not in legacy['completedLessons'] for x in selected):
+                fail(400, 'انتخاب شامل درس تأییدنشده یا تکمیل‌نشده است.')
+            # Archive exact old value alongside unrelated keys; no quiz, note or
+            # lab data is reinterpreted. The full prior payload is also backed up.
+            outer[legacy_archive_key]=raw
+            outer['fam4.learn.v1']=packed({'completed':[legacy_completion_map[x] for x in selected], 'labs':{}})
+            payload=packed(outer)
+            if len(payload.encode('utf-8'))>8*1024*1024:
+                fail(413, 'برای نگهداری نسخه قدیمی فضای مجاز کافی نیست؛ هیچ داده‌ای تغییر نکرد.')
+            now=int(time.time()*1000)
+            db.execute('INSERT INTO academy_progress_backups(user_id,revision,payload,saved_at) VALUES(?,?,?,?)',
+                       (user['id'],row['revision'],row['payload'],now))
+            revision=row['revision']+1
+            db.execute('UPDATE academy_progress SET payload=?,revision=?,updated_at=? WHERE user_id=?',
+                       (payload,revision,now,user['id']))
+        return jsonify(ok=True,revision=revision,migrated=selected)
+
+    @app.get('/api/academy/progress/backups')
+    def list_academy_progress_backups():
+        with connect() as db:
+            user, session = user_and_session(db)
+            if not hmac.compare_digest(request.headers.get('X-FAM-CSRF', ''), session['csrf']):
+                fail(403, 'توکن نشست برای مشاهده نسخه‌ها لازم است.')
+            current = db.execute('SELECT revision FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
+            rows = db.execute('''SELECT revision,saved_at FROM academy_progress_backups
+                                 WHERE user_id=? ORDER BY revision DESC LIMIT 50''', (user['id'],)).fetchall()
+        return jsonify(currentRevision=current['revision'] if current else 0,
+                       backups=[dict(row) for row in rows], limit=50)
+
+    @app.post('/api/academy/progress/restore')
+    def restore_academy_progress():
+        body=data()
+        if (not isinstance(body,dict) or set(body)!={'backupRevision','expectedRevision'} or
+            any(type(body[k]) is not int or not 0 <= body[k] <= 2**63-1 for k in body)):
+            fail(400, 'شناسه نسخه و نسخه فعلی معتبر لازم است.')
+        with transaction() as db:
+            user,_=user_and_session(db)
+            current=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
+            if not current or current['revision'] != body['expectedRevision']:
+                fail(409, 'پیشرفت تغییر کرده است؛ فهرست نسخه‌ها را دوباره دریافت کنید.')
+            if current['revision'] >= 2**63-1:
+                fail(409, 'نسخه پیشرفت به سقف رسیده است؛ با مدیر سامانه تماس بگیرید.')
+            saved=db.execute('SELECT payload FROM academy_progress_backups WHERE user_id=? AND revision=?',
+                             (user['id'],body['backupRevision'])).fetchone()
+            if not saved:
+                fail(404, 'نسخه پشتیبان این حساب یافت نشد.')
+            # Save even an unknown current payload verbatim before replacing it.
+            # A historical/unknown restored value remains locked by normal writes.
+            now=int(time.time()*1000)
+            db.execute('INSERT INTO academy_progress_backups(user_id,revision,payload,saved_at) VALUES(?,?,?,?)',
+                       (user['id'],current['revision'],current['payload'],now))
+            new_revision=current['revision']+1
+            db.execute('UPDATE academy_progress SET payload=?,revision=?,updated_at=? WHERE user_id=?',
+                       (saved['payload'],new_revision,now,user['id']))
+        return jsonify(ok=True, revision=new_revision)
 
     @app.get('/api/real/status')
     def real_device_status():
@@ -857,9 +1021,14 @@ def create_app(config=None):
     @app.post('/api/academy/progress')
     def save_academy_progress():
         body=data()
-        changes=body.get('changes') if isinstance(body,dict) and set(body)=={'changes'} else None
+        changes=body.get('changes') if isinstance(body,dict) and set(body) <= {'changes','expectedRevision'} else None
         if not isinstance(changes,dict) or not changes or len(changes)>len(ACADEMY_STORAGE_KEYS):
             fail(400,'تغییرات پیشرفت آکادمی معتبر نیست.')
+        expected=body.get('expectedRevision')
+        if 'fam4.learn.v1' in changes and (isinstance(expected,bool) or not isinstance(expected,int) or expected < 0):
+            fail(409,'نسخه پیشرفت لازم است؛ صفحه را بازخوانی کنید.')
+        if expected is not None and (isinstance(expected,bool) or not isinstance(expected,int) or expected < 0):
+            fail(400,'نسخه پیشرفت معتبر نیست.')
         total=0
         for key,value in changes.items():
             if key not in ACADEMY_STORAGE_KEYS or (value is not None and not isinstance(value,str)):
@@ -868,19 +1037,40 @@ def create_app(config=None):
         if total>8*1024*1024:fail(413,'حجم پیشرفت آکادمی بیش از حد مجاز است.')
         with transaction() as db:
             user,_=user_and_session(db)
-            row=db.execute('SELECT payload FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
-            progress=json.loads(row['payload']) if row else {}
-            if not isinstance(progress,dict):fail(500,'وضعیت آکادمی معتبر نیست؛ با مدیر سامانه تماس بگیرید.')
-            progress={key:value for key,value in progress.items() if key in ACADEMY_STORAGE_KEYS and isinstance(value,str)}
+            row=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(user['id'],)).fetchone()
+            revision=row['revision'] if row else 0
+            if expected is not None and expected != revision:
+                fail(409,'پیشرفت در نشست دیگری تغییر کرده است؛ پیش از تلاش دوباره داده‌ها را بررسی کنید.')
+            try:
+                progress=strict_progress_json(row['payload']) if row else {}
+                if not isinstance(progress,dict): raise ValueError('invalid outer progress')
+            except (TypeError,ValueError,RecursionError):
+                fail(409,'پیشرفت ذخیره‌شده مبهم یا خراب است؛ برای حفظ داده، ذخیره متوقف شد.')
+            if 'fam4.learn.v1' in changes and 'fam4.learn.v1' in progress:
+                try:
+                    existing=strict_progress_json(progress['fam4.learn.v1'])
+                    legacy={'completedLessons','quizScores','notes','missions','examScore','activeLesson'}
+                    safe=(isinstance(existing,dict) and isinstance(existing.get('completed'),list)
+                          and not (legacy & existing.keys()))
+                except (TypeError,ValueError,RecursionError):
+                    safe=False
+                if not safe:
+                    fail(409,'پیشرفت قدیمی یا ناشناخته قابل بازنویسی نیست؛ مهاجرت هنوز فعال نشده است.')
+            # Persist the entire previous payload in the same transaction before
+            # a shared-key replacement or deletion. Never discard unknown keys.
+            if 'fam4.learn.v1' in changes and row and progress.get('fam4.learn.v1') != changes['fam4.learn.v1']:
+                db.execute('INSERT INTO academy_progress_backups(user_id,revision,payload,saved_at) VALUES(?,?,?,?)',
+                           (user['id'],revision,row['payload'],int(time.time()*1000)))
             for key,value in changes.items():
                 if value is None:progress.pop(key,None)
                 else:progress[key]=value
             payload=packed(progress)
             if len(payload.encode('utf-8'))>8*1024*1024:fail(413,'حجم پیشرفت آکادمی بیش از حد مجاز است.')
-            db.execute('''INSERT INTO academy_progress(user_id,payload,updated_at) VALUES(?,?,?)
-                          ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at''',
-                       (user['id'],payload,int(time.time()*1000)))
-        return jsonify(ok=True)
+            new_revision=revision+1
+            db.execute('''INSERT INTO academy_progress(user_id,payload,updated_at,revision) VALUES(?,?,?,?)
+                          ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at,revision=excluded.revision''',
+                       (user['id'],payload,int(time.time()*1000),new_revision))
+        return jsonify(ok=True,revision=new_revision)
     @app.post('/api/login')
     def login():
         value=data();name=str(value.get('username','')).strip().lower();pw=value.get('password','')

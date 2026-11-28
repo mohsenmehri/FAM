@@ -4,12 +4,13 @@ FAM Academy Lab — auto_10: YANG (RFC 7950) Local Data-Model Validator.
 Execution boundary: Pure Python 3 stdlib educational validator checking
 YANG leaf types (including strict boolean for dhcp), string length/pattern,
 uint16 range, list key uniqueness, config false immutability, and choice
-mandatory=false/true semantics. Does NOT replace pyang or libyang.
+one optional choice with no default case. Does NOT replace pyang or libyang.
 """
 
 from __future__ import annotations
 
 import json
+import ipaddress
 import re
 
 
@@ -18,6 +19,8 @@ def validate_vlan_payload(payload: dict) -> list[str]:
     if not isinstance(payload, dict):
         return ["root payload must be a JSON object/dict"]
     errors: list[str] = []
+    for key in payload.keys() - {"vlans"}:
+        errors.append(f"unknown root field: {key!r}")
     seen_keys: set[int] = set()
     vlans = payload.get("vlans", [])
     if not isinstance(vlans, list):
@@ -27,6 +30,17 @@ def validate_vlan_payload(payload: dict) -> list[str]:
         if not isinstance(item, dict):
             errors.append(f"vlans[{idx}] must be a YANG list entry object")
             continue
+
+        for key in item.keys() - {"vlan-id", "name", "static-ip", "dhcp", "oper-packet-count"}:
+            errors.append(f"vlans[{idx}] unknown field: {key!r}")
+        if "static-ip" in item:
+            value = item["static-ip"]
+            try:
+                if not isinstance(value, str) or "/" not in value:
+                    raise ValueError("expected IPv4 address/prefix")
+                ipaddress.IPv4Interface(value)
+            except ValueError:
+                errors.append(f"vlans[{idx}].static-ip must be an IPv4 address/prefix")
 
         # leaf vlan-id { type uint16 { range "1..4094"; } } (list key)
         vid = item.get("vlan-id")
@@ -85,7 +99,7 @@ def main() -> None:
         "valid_payload_errors": valid_errs,
         "invalid_payload_error_count": len(invalid_errs),
         "invalid_payload_errors": invalid_errs,
-        "boundary_note": "Educational Python validator only; full RFC 7950 checks require pyang/libyang.",
+        "boundary_note": "Educational Python validator only; Use appropriate YANG schema and instance validation tools separately; this is not full YANG validation.",
     }, indent=2, ensure_ascii=False))
 
 

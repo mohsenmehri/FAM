@@ -24,7 +24,7 @@ SAMPLE_NETCONF_XML = """
 </interfaces>
 """.strip()
 
-YAML_11_BOOL_LITERALS = frozenset({"yes", "no", "on", "off", "true", "false", "y", "n"})
+YAML_11_EXAMPLE_LITERALS = frozenset({"yes", "no", "on", "off", "true", "false"})
 
 
 def _reject_non_rfc8259_constant(token: str) -> object:
@@ -46,7 +46,9 @@ def _reject_duplicate_object_keys(pairs: list[tuple[str, object]]) -> dict[str, 
 
 
 def parse_json_strict(raw_json: str, *, reject_duplicate_keys: bool = True) -> object:
-    """Parse JSON strictly per RFC 8259: rejects NaN/Infinity/-Infinity and (by default) duplicate keys.
+    """Parse JSON with selected interoperability checks, not a complete security validator.
+
+    Rejects NaN/Infinity/-Infinity and (by default) duplicate keys.
 
     Note on RFC 8259 Section 4:
     - NaN, Infinity, and -Infinity are NOT valid JSON tokens in RFC 8259 (Python's default json.loads
@@ -86,13 +88,20 @@ def demonstrate_duplicate_key_behavior(raw_json: str) -> dict[str, object]:
 
 
 def detect_yaml_11_norway_trap(unquoted_scalar: str) -> dict[str, object]:
-    """Demonstrate why unquoted country code 'NO' or port state 'on' becomes boolean in YAML 1.1."""
-    lowered = unquoted_scalar.strip().lower()
-    trapped = lowered in YAML_11_BOOL_LITERALS
+    """Recognize only a few common plain scalar examples, not parse YAML.
+
+    Only lower, upper, and initial-capital variants are modeled. Input is
+    assumed to be an unquoted scalar without indentation or whitespace.
+    """
+    if not isinstance(unquoted_scalar, str):
+        raise TypeError("scalar example must be a string")
+    lowered = unquoted_scalar.lower()
+    trapped = (lowered in YAML_11_EXAMPLE_LITERALS and
+               unquoted_scalar in {lowered, lowered.upper(), lowered.capitalize()})
     return {
         "raw_value": unquoted_scalar,
         "yaml_1_1_coerced_to_bool": trapped,
-        "safe_representation": f'"{unquoted_scalar}"',
+        "safe_representation": json.dumps(unquoted_scalar, ensure_ascii=False),
     }
 
 

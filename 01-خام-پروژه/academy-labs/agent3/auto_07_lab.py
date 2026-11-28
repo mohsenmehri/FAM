@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import math
 import re
 
 _BASE64URL_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -57,11 +58,18 @@ def _loads_strict_json_object(raw: bytes) -> dict[str, object]:
     def _reject_constants(tok: str) -> object:
         raise ValueError(f"non-standard JSON constant: {tok!r}")
 
+    def _finite_float(token: str) -> float:
+        value = float(token)
+        if not math.isfinite(value):
+            raise ValueError("non-finite float")
+        return value
+
     try:
         parsed = json.loads(
             raw.decode("utf-8"),
             object_pairs_hook=_reject_duplicates,
             parse_constant=_reject_constants,
+            parse_float=_finite_float,
         )
     except RecursionError as exc:
         raise ValueError("JSON nesting depth exceeded") from exc
@@ -82,7 +90,7 @@ def build_hs256_jwt_demo(
         raise ValueError("typ must be a non-empty str")
     header = {"alg": "HS256", "typ": typ}
     h_b64 = b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
-    p_b64 = b64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    p_b64 = b64url_encode(json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8"))
     sig = hmac.new(bytes(secret), f"{h_b64}.{p_b64}".encode("ascii"), hashlib.sha256).digest()
     return f"{h_b64}.{p_b64}.{b64url_encode(sig)}"
 
@@ -117,9 +125,10 @@ def evaluate_hs256_jwt_demo(
 
     checks_configured = [
         "token_size_limit",
-        "compact_3_part_ascii_base64url",
+        "compact_3_part_count",
         "strict_json_no_duplicate_keys_or_deep_recursion",
         "alg_pinned_hs256",
+        "signature_base64url",
         "hmac_sha256_bytes_constant_time",
         "exp_required_and_unexpired",
         "nbf_if_present_not_before_now",
@@ -167,7 +176,7 @@ def evaluate_hs256_jwt_demo(
     if len(token) > MAX_TOKEN_CHARS:
         return _fail("token_too_large")
 
-    checks_executed.append("compact_3_part_ascii_base64url")
+    checks_executed.append("compact_3_part_count")
     parts = token.split(".")
     if len(parts) != 3:
         return _fail("malformed_jwt_segment_count")
@@ -193,12 +202,13 @@ def evaluate_hs256_jwt_demo(
             return _fail("invalid_typ", header=header, payload=payload, alg_pinned_hs256=True)
 
     # Decode signature bytes strictly; non-ASCII signatures like "☃" return malformed_signature_encoding
-    checks_executed.append("hmac_sha256_bytes_constant_time")
+    checks_executed.append("signature_base64url")
     try:
         actual_sig_bytes = b64url_decode_strict(s_b64)
     except ValueError:
         return _fail("malformed_signature_encoding", header=header, payload=payload, alg_pinned_hs256=True)
 
+    checks_executed.append("hmac_sha256_bytes_constant_time")
     signing_input = f"{h_b64}.{p_b64}".encode("ascii")
     expected_sig_bytes = hmac.new(bytes(secret), signing_input, hashlib.sha256).digest()
     sig_ok = hmac.compare_digest(actual_sig_bytes, expected_sig_bytes)

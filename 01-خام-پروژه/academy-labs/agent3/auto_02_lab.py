@@ -17,12 +17,18 @@ Loopback0              203.0.113.10    YES manual up                    up
 
 
 def parse_interfaces(raw_output: str) -> list[dict[str, str]]:
-    """Parse simplified 'show ip interface brief' lines into structured dictionaries."""
+    """Parse the stated simplified table, failing closed on malformed input.
+
+    This is not a general IOS parser; validate platform output separately.
+    """
+    lines = [line for line in raw_output.splitlines() if line.strip()]
+    if not lines or lines[0].split() != ["Interface", "IP-Address", "OK?", "Method", "Status", "Protocol"]:
+        raise ValueError("missing or unsupported table header")
     results: list[dict[str, str]] = []
-    for line in raw_output.splitlines()[1:]:
+    for line in lines[1:]:
         parts = line.strip().split()
         if len(parts) < 6:
-            continue
+            raise ValueError(f"malformed interface row: {line!r}")
         interface, ip_addr, ok_flag, method = parts[0], parts[1], parts[2], parts[3]
         protocol = parts[-1]
         status = " ".join(parts[4:-1])
@@ -67,7 +73,7 @@ def main() -> None:
         out_file = Path(tmp) / "interfaces.json"
         with open(out_file, "w", encoding="utf-8") as fh:
             json.dump(parsed, fh, indent=2)
-        print("Saved JSON safely via 'with open':", out_file.stat().st_size, "bytes")
+        print("Saved JSON to temporary file via 'with open':", out_file.stat().st_size, "bytes")
 
 
 if __name__ == "__main__":
