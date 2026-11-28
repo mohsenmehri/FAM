@@ -1,0 +1,343 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_02",
+  "objectiveId": "adv_02",
+  "kind": "lesson",
+  "track": "Advanced Switching & Routing (Transferred & Audited)",
+  "course": "adv-switching-routing",
+  "domain": "Enterprise Routing",
+  "title": "مسیریابی پیشرفته (Advanced Routing): OSPF Multi-Area، انواع LSA (۱ تا ۷)، نواحی Stub/NSSA و خلاصه‌سازی",
+  "titleEn": "Advanced Routing: Multi-Area OSPF, LSA Types 1-7, Stub/NSSA Special Areas, Summarization & E1/E2",
+  "estimatedMinutes": 50,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy adv_02 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "adv_02",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc2328",
+      "https://www.rfc-editor.org/rfc/rfc3101",
+      "https://www.cisco.com/c/en/us/support/docs/ip/open-shortest-path-first-ospf/7039-1.html"
+    ],
+    "limitations": [
+      "هیچ توپولوژی چندروتری OSPF یا LSDB زنده در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای آزمون فیلتر LSA در نواحی Stub/Totally Stubby/NSSA/Totally NSSA، سلسله‌مراتب انتخاب مسیر RFC 2328 و محل خلاصه‌سازی ABR/ASBR است."
+    ],
+    "legacyAuditFixes": [
+      "تصریح تفاوت کلیدی Standard NSSA (عدم تزریق خودکار مسیر پیش‌فرض مگر با default-information-originate روی ABR) در برابر Stub، Totally Stubby و Totally NSSA.",
+      "تصریح ترتیب قطعی انتخاب مسیر RFC 2328 (O > O IA > E1/N1 > E2/N2 پیش از مقایسه عددی Cost) و ایجاد خودکار مسیر Null0 هنگام خلاصه‌سازی برای جلوگیری از حلقه.",
+      "توسعه از ۳ بخش/۳ سؤال قدیمی به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با adv_02_lab.py بدون import پرچم‌دار."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_02-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-advanced",
+      "recommendedCourse": "adv-switching-routing",
+      "blueprint": "/academy-assets/v5/blueprints/adv_02.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_02_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲C: ساخت adv_02_lab.py بدون import پرچم‌دار با اعتبارسنجی منع Stub/NSSA برای Area 0 و آزمون قطعی O > O IA و E1 > E2."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_02-section-1",
+      "title": "مسئله واقعی: چرا تک‌ناحیه‌ای نگه داشتن OSPF در مقیاس بزرگ باعث طوفان SPF و رشد LSDB می‌شود؟",
+      "html": "<p>در یک Area بزرگ با صدها روتر، هر بار که یک لینک دسترسی قطع و وصل شود، تمام روترها LSA Type 1 جدید دریافت کرده و کل الگوریتم Dijkstra (SPF) را دوباره اجرا می‌کنند. <strong>OSPF Multi-Area</strong> با شکستن شبکه به <strong>Area 0 (Backbone)</strong> و نواحی پیرامونی، دامنه سیلاب LSAهای ۱ و ۲ و محاسبه SPF را محلی کرده و اجازه خلاصه‌سازی پیشوندها در مرز <strong>ABR</strong> را می‌دهد.</p>"
+    },
+    {
+      "id": "adv_02-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> OSPF Single-Area (Area 0)، محاسبه Cost و انتخاب DR/BDR.</p><ul><li>شناخت دقیق نقش‌های <strong>Area 0</strong>، <strong>ABR</strong>، <strong>ASBR</strong> و <strong>LSAهای Type 1، 2، 3، 4، 5 و 7</strong>.</li><li>طراحی و تفکیک چهار ناحیه ویژه: <strong>Stub</strong>، <strong>Totally Stubby</strong>، <strong>NSSA</strong> و <strong>Totally NSSA</strong> (با نکته مسیر پیش‌فرض در Standard NSSA!).</li><li>تسلط بر محل و دستور دقیق خلاصه‌سازی: <code>area range</code> روی ABR در برابر <code>summary-address</code> روی ASBR.</li><li>تسلط بر اولویت قطعی انتخاب مسیر RFC 2328 (<code>O &gt; O IA &gt; E1/N1 &gt; E2/N2</code>).</li></ul>"
+    },
+    {
+      "id": "adv_02-section-3",
+      "title": "ساختار سلسله‌مراتبی Multi-Area، نقش ABR و ASBR و قواعد Area 0",
+      "html": "<p>تمام نواحی غیرصفر باید مستقیماً به <strong>Area 0 (Backbone)</strong> متصل باشند تا ترافیک بین‌ناحیه‌ای بدون حلقه از طریق Backbone عبور کند (<code>Virtual-Link</code> صرفاً راه‌حل موقت اضطراری است و هرگز از ناحیه Stub/NSSA عبور نمی‌کند). <strong>ABR</strong> حداقل یک اینترفیس فعال در Area 0 و یک اینترفیس در ناحیه‌ای دیگر دارد؛ <strong>ASBR</strong> مسیرهای بیرونی (مانند BGP، Static یا EIGRP) را به OSPF تزریق (Redistribute) می‌کند.</p>"
+    },
+    {
+      "id": "adv_02-section-4",
+      "title": "جدول کامل ۶ نوع کلیدی LSA در show ip ospf database",
+      "html": "<table><thead><tr><th>نوع LSA</th><th>تولیدکننده</th><th>محدوده انتشار</th><th>کد جدول مسیر</th></tr></thead><tbody><tr><td><strong>Type 1 (Router)</strong></td><td>هر روتر OSPF</td><td>فقط داخل همان Area</td><td><code>O</code></td></tr><tr><td><strong>Type 2 (Network)</strong></td><td>DR (روی Broadcast/NBMA؛ نه P2P)</td><td>فقط داخل همان Area</td><td><code>O</code></td></tr><tr><td><strong>Type 3 (Summary)</strong></td><td>ABR</td><td>بین نواحی (Areaهای دیگر)</td><td><code>O IA</code></td></tr><tr><td><strong>Type 4 (ASBR Summary)</strong></td><td>ABR</td><td>اطلاع‌رسانی مسیر تا ASBR به Areaهای دیگر</td><td>(کمکی برای Type 5)</td></tr><tr><td><strong>Type 5 (External)</strong></td><td>ASBR</td><td>کل دامنه OSPF به‌جز Stub/NSSA</td><td><code>O E1</code> / <code>O E2</code></td></tr><tr><td><strong>Type 7 (NSSA External)</strong></td><td>ASBR درون NSSA</td><td>فقط درون NSSA؛ تبدیل به Type 5 توسط ABR</td><td><code>O N1</code> / <code>O N2</code></td></tr></tbody></table>"
+    },
+    {
+      "id": "adv_02-section-5",
+      "title": "مقایسه دقیق نواحی ویژه: Stub، Totally Stubby، NSSA و Totally NSSA",
+      "html": "<p>توجه: <strong>Area 0 هرگز نمی‌تواند Stub یا NSSA باشد</strong> و پرچم Stub/NSSA باید روی همه روترهای داخل آن ناحیه یکسان باشد تا همسایگی تشکیل شود:</p><table><thead><tr><th>نوع ناحیه</th><th>LSAهای مسدودشده</th><th>ASBR محلی</th><th>تزریق خودکار Default 0/0 توسط ABR</th></tr></thead><tbody><tr><td><strong>Stub</strong></td><td>4 و 5</td><td>خیر</td><td>بله (<code>O*IA</code>)</td></tr><tr><td><strong>Totally Stubby (سیسکو)</strong></td><td>3، 4 و 5</td><td>خیر</td><td>بله (<code>O*IA</code>)</td></tr><tr><td><strong>NSSA (RFC 3101)</strong></td><td>4 و 5 (از بیرون)</td><td><strong>بله (Type 7)</strong></td><td><strong>خیر!</strong> (نیازمند <code>default-information-originate</code>)</td></tr><tr><td><strong>Totally NSSA (سیسکو)</strong></td><td>3، 4 و 5</td><td><strong>بله (Type 7)</strong></td><td><strong>بله (<code>O*IA</code>)</strong></td></tr></tbody></table>"
+    },
+    {
+      "id": "adv_02-section-6",
+      "title": "نمودار معماری: توپولوژی Multi-Area OSPF، فیلتر LSAها و سلسله‌مراتب انتخاب مسیر",
+      "html": "<p>در نمودار زیر نحوه فیلتر LSAها در Totally Stubby و NSSA و سلسله‌مراتب انتخاب مسیر RFC 2328 دیده می‌شود.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Multi-Area OSPF Architecture, LSA Types 1-7 and Special Area Filtering\"><rect x=\"16\" y=\"20\" width=\"212\" height=\"180\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"122\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">Area 1 (Totally Stubby)</text><text x=\"122\" y=\"70\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Allowed: LSA 1, 2</text><text x=\"122\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#dc2626\">Blocked: LSA 3, 4, 5</text><text x=\"122\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">ABR injects O*IA 0.0.0.0/0</text><text x=\"122\" y=\"140\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">ABR Summary (Type 3):</text><text x=\"122\" y=\"156\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#1d4ed8\">area 1 range &lt;net&gt; &lt;mask&gt;</text><line x1=\"228\" y1=\"110\" x2=\"262\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><rect x=\"262\" y=\"20\" width=\"236\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">Area 0 (Backbone) + ABRs</text><text x=\"380\" y=\"70\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Cannot be Stub or NSSA!</text><text x=\"380\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">LSAs: 1 (Rtr), 2 (Net/DR),</text><text x=\"380\" y=\"108\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">3 (Sum), 4 (ASBR), 5 (Ext)</text><rect x=\"276\" y=\"124\" width=\"208\" height=\"62\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"380\" y=\"142\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#92400e\">Path Preference (RFC 2328):</text><text x=\"380\" y=\"160\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">O &gt; O IA &gt; E1/N1 &gt; E2/N2</text><text x=\"380\" y=\"176\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">(Always before comparing Cost!)</text><line x1=\"498\" y1=\"110\" x2=\"532\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><rect x=\"532\" y=\"20\" width=\"212\" height=\"180\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"638\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Area 2 (NSSA / Totally)</text><text x=\"638\" y=\"70\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Local ASBR =&gt; LSA Type 7</text><text x=\"638\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">ABR translates Type 7 -&gt; 5</text><text x=\"638\" y=\"110\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">Std NSSA: NO auto default!</text><text x=\"638\" y=\"128\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#15803d\">Totally NSSA: Auto O*IA 0/0</text><text x=\"638\" y=\"154\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">ASBR External Summary:</text><text x=\"638\" y=\"170\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#1d4ed8\">summary-address &lt;n&gt; &lt;m&gt;</text></svg>"
+    },
+    {
+      "id": "adv_02-section-7",
+      "title": "محل دقیق خلاصه‌سازی (Summarization) و نقش خودکار Null0",
+      "html": "<p>در OSPF به دلیل ساختار Link-State، خلاصه‌سازی در هر روتر دلخواهی ممکن نیست و فقط در دو نقطه مجاز است: (۱) خلاصه‌سازی <strong>بین‌ناحیه‌ای (LSA Type 3)</strong> صرفاً روی <strong>ABR</strong> با دستور <code>area &lt;id&gt; range &lt;net&gt; &lt;mask&gt;</code>، و (۲) خلاصه‌سازی <strong>مسیرهای خارجی (LSA Type 5/7)</strong> صرفاً روی <strong>ASBR</strong> (یا ABR مترجم 7->5) با دستور <code>summary-address &lt;net&gt; &lt;mask&gt;</code>. هر دو به‌طور خودکار یک مسیر <code>Null0</code> روی همان روتر می‌سازند تا از حلقه مسیریابی برای زیرشبکه‌های غیرموجود درون خلاصه جلوگیری کنند.</p>"
+    },
+    {
+      "id": "adv_02-section-8",
+      "title": "سلسله‌مراتب انتخاب مسیر RFC 2328 و تفاوت O E1 با O E2",
+      "html": "<p>OSPF همیشه مسیرها را به این ترتیب قطعی برمی‌گزیند (حتی اگر Cost مسیر پایین‌تر عدداً کمتر باشد!): (۱) <strong><code>O</code> (Intra-Area)</strong>، (۲) <strong><code>O IA</code> (Inter-Area)</strong>، (۳) <strong><code>O E1 / O N1</code></strong>، و (۴) <strong><code>O E2 / O N2</code></strong>. در <code>O E2</code> (پیش‌فرض سیسکو با Seed Metric=20)، فقط هزینه بیرونی لحاظ شده و Cost داخلی تا ASBR جمع نمی‌شود (مگر در تساوی که Forward Metric گره‌گشاست)؛ اما در <code>O E1</code> مجموع Cost داخلی + Seed خارجی محاسبه شده و <strong>همواره بر <code>O E2</code> اولویت دارد</strong>.</p>"
+    },
+    {
+      "id": "adv_02-section-9",
+      "title": "ترجمه Type 7 به Type 5 در NSSA دارای چند ABR",
+      "html": "<p>اگر یک ناحیه NSSA دارای دو ABR باشد، طبق RFC 3101 تنها ABR دارای <strong>بالاترین Router-ID</strong> مسئول ترجمه LSAهای Type 7 به Type 5 و انتشار آن‌ها به Area 0 است تا از تولید تکراری جلوگیری شود.</p>"
+    },
+    {
+      "id": "adv_02-section-10",
+      "title": "طراحی مقیاس‌پذیر آدرس‌دهی برای Multi-Area OSPF",
+      "html": "<p>موفقیت Multi-Area به طرح آدرس‌دهی پیوسته (Contiguous IP Addressing) در هر Area وابسته است تا هر ABR بتواند کل زیرشبکه‌های یک ناحیه را با یک یا دو پیشوند خلاصه به Area 0 معرفی کند و نوسان لینک‌های داخلی از سایر نواحی پنهان بماند.</p>"
+    },
+    {
+      "id": "adv_02-section-11",
+      "title": "کژفهمی‌های رایج در Multi-Area OSPF",
+      "html": "<ul><li><strong>کژفهمی ۱: «در Standard NSSA هم مثل Stub، روتر ABR خودکار مسیر پیش‌فرض <code>0.0.0.0/0</code> می‌فرستد.»</strong> واقعیت: خیر! در Standard NSSA مسیر پیش‌فرض خودکار تزریق نمی‌شود و باید روی ABR دستور <code>area X nssa default-information-originate</code> (یا <code>no-summary</code> برای Totally NSSA) نوشت.</li><li><strong>کژفهمی ۲: «مسیر <code>O IA</code> با Cost=10 بر مسیر <code>O</code> با Cost=500 پیروز می‌شود.»</strong> واقعیت: طبق RFC 2328 مسیر درون‌ناحیه‌ای <code>O</code> همیشه بر <code>O IA</code> مقدم است.</li><li><strong>کژفهمی ۳: «خلاصه‌سازی بین‌ناحیه‌ای با <code>summary-address</code> انجام می‌شود.»</strong> واقعیت: <code>summary-address</code> برای مسیرهای خارجی روی ASBR است؛ ABR از <code>area range</code> استفاده می‌کند.</li></ul>"
+    },
+    {
+      "id": "adv_02-section-12",
+      "title": "عیب‌یابی خطاهای کلاسیک Multi-Area و NSSA",
+      "html": "<p>اگر همسایگی پس از تنظیم <code>area 1 stub</code> قطع شد، بررسی کنید همه روترهای Area 1 فرمان <code>stub</code> را داشته باشند (تطابق پرچم E-bit در Hello). اگر کاربران داخل Standard NSSA به اینترنت دسترسی ندارند، نبود <code>default-information-originate</code> یا <code>no-summary</code> روی ABR را بررسی کنید.</p>"
+    },
+    {
+      "id": "adv_02-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> می‌خواهیم ۴ زیرشبکه <code>10.1.0.0/24</code> تا <code>10.1.3.0/24</code> داخل Area 1 را به یک پیشوند <code>10.1.0.0/22</code> در Area 0 خلاصه کنیم. کجا و با چه دستوری؟ <strong>پاسخ:</strong> فقط روی ABR متصل به Area 1 با دستور <code>area 1 range 10.1.0.0 255.255.252.0</code>.</p><p><strong>تمرین ۲:</strong> روتر یک مقصد را هم با <code>O E2</code> (Seed=20، داخلی=1) و هم با <code>O E1</code> (Seed=20، داخلی=50، جمع=70) دریافت می‌کند. کدام نصب می‌شود؟ <strong>پاسخ:</strong> <code>O E1</code>، زیرا نوع E1 همیشه بر E2 اولویت دارد.</p>"
+    },
+    {
+      "id": "adv_02-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc2328\" target=\"_blank\" rel=\"noopener\">RFC 2328 (OSPFv2)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3101\" target=\"_blank\" rel=\"noopener\">RFC 3101 (OSPF NSSA)</a> و <a href=\"https://www.cisco.com/c/en/us/support/docs/ip/open-shortest-path-first-ospf/7039-1.html\" target=\"_blank\" rel=\"noopener\">راهنمای طراحی OSPF سیسکو (Doc ID 7039)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی سیسکو یا LSDB زنده در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Area 0 (Backbone)",
+      "fa": "ناحیه ستون فقرات OSPF",
+      "simple": "ناحیه مرکزی که تمام نواحی غیرصفر باید به آن متصل باشند (هرگز Stub/NSSA نمی‌شود)."
+    },
+    {
+      "term": "ABR",
+      "fa": "روتر مرزی ناحیه",
+      "simple": "روتر متصل به Area 0 و حداقل یک ناحیه دیگر؛ مسئول LSA Type 3/4 و area range."
+    },
+    {
+      "term": "ASBR",
+      "fa": "روتر مرزی سیستم مستقل",
+      "simple": "روتر تزریق‌کننده مسیرهای بیرونی به OSPF؛ مسئول LSA Type 5/7 و summary-address."
+    },
+    {
+      "term": "LSA Type 1 & 2",
+      "fa": "LSAهای درون‌ناحیه‌ای",
+      "simple": "Type 1 از هر روتر و Type 2 از DR روی Broadcast؛ محدود به همان Area (کد O)."
+    },
+    {
+      "term": "LSA Type 3 (Summary)",
+      "fa": "LSA خلاصه بین‌ناحیه‌ای",
+      "simple": "تولیدشده توسط ABR برای معرفی شبکه‌های یک Area به Areaهای دیگر (کد O IA)."
+    },
+    {
+      "term": "LSA Type 4 & 5",
+      "fa": "LSAهای خارجی OSPF",
+      "simple": "Type 4 مسیر تا ASBR (توسط ABR) و Type 5 پیشوندهای خارجی (توسط ASBR؛ O E1/E2)."
+    },
+    {
+      "term": "LSA Type 7",
+      "fa": "LSA خارجی درون NSSA",
+      "simple": "تولیدشده توسط ASBR محلی داخل NSSA و ترجمه‌شونده به Type 5 توسط ABR."
+    },
+    {
+      "term": "Stub Area",
+      "fa": "ناحیه انتهایی استاندارد",
+      "simple": "مسدودسازی Type 4/5 و تزریق خودکار مسیر پیش‌فرض O*IA توسط ABR."
+    },
+    {
+      "term": "Totally Stubby Area",
+      "fa": "ناحیه کاملاً انتهایی (سیسکو)",
+      "simple": "مسدودسازی Type 3/4/5 با دستور no-summary روی ABR؛ فقط O و O*IA 0/0."
+    },
+    {
+      "term": "NSSA (RFC 3101)",
+      "fa": "ناحیه نه‌چندان انتهایی",
+      "simple": "مسدودسازی Type 4/5 بیرونی ولی مجازسازی ASBR محلی (Type 7)؛ بدون Default خودکار!"
+    },
+    {
+      "term": "Totally NSSA",
+      "fa": "ناحیه کاملاً NSSA (سیسکو)",
+      "simple": "مسدودسازی Type 3/4/5 + اجازه Type 7 محلی + تزریق خودکار O*IA 0/0 توسط ABR."
+    },
+    {
+      "term": "area range",
+      "fa": "خلاصه‌سازی بین‌ناحیه‌ای",
+      "simple": "دستور ABR برای خلاصه‌سازی LSAهای Type 3 به همراه مسیر خودکار Null0."
+    },
+    {
+      "term": "summary-address",
+      "fa": "خلاصه‌سازی مسیرهای خارجی",
+      "simple": "دستور ASBR برای خلاصه‌سازی LSAهای Type 5/7 به همراه مسیر خودکار Null0."
+    },
+    {
+      "term": "O E1 vs O E2",
+      "fa": "انواع متریک خارجی OSPF",
+      "simple": "E1 مجموع Cost داخلی+خارجی را حساب کرده و همیشه بر E2 (فقط Seed) اولویت دارد."
+    },
+    {
+      "term": "Virtual-Link",
+      "fa": "لینک مجازی اضطراری OSPF",
+      "simple": "اتصال موقت ناحیه جداافتاده به Area 0 از طریق یک ناحیه Transit غیر-Stub."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، سیاست فیلتر LSA و تزریق Default در <code>Totally NSSA</code> در برابر <code>Standard NSSA</code>، تقدم قطعی <code>O</code> بر <code>O IA</code> و <code>E1</code> بر <code>E2</code> و محل خلاصه‌سازی ABR/ASBR را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_02_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_02_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for adv_02 (Multi-Area OSPF, LSA Types 1-7, Stub/NSSA &amp; E1/E2).\n\nBoundary: Pure in-memory simulation using Python stdlib only.\nNo real Cisco router or live OSPF LSDB is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport math\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _require_nonneg_int(val: object, name: str) -&gt; int:\n    if type(val) is not int or val &lt; 0:\n        raise ValueError(f&quot;{name} must be an integer &gt;= 0&quot;)\n    return val\n\n\ndef evaluate_ospf_area_policy(\n    area_id: int,\n    area_type: str,\n    nssa_default_info_originate: bool = False,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Return exact LSA filtering and automatic default-route injection behavior for OSPF area types.&quot;&quot;&quot;\n    if type(area_id) is not int or area_id &lt; 0:\n        raise ValueError(&quot;area_id must be a non-negative integer&quot;)\n    _require_bool(nssa_default_info_originate, &quot;nssa_default_info_originate&quot;)\n    if area_type not in (&quot;backbone&quot;, &quot;standard&quot;, &quot;stub&quot;, &quot;totally_stubby&quot;, &quot;nssa&quot;, &quot;totally_nssa&quot;):\n        raise ValueError(f&quot;Unsupported area_type: {area_type}&quot;)\n    if area_id == 0 and area_type != &quot;backbone&quot;:\n        raise ValueError(&quot;Area 0 (Backbone) cannot be configured as Stub or NSSA&quot;)\n    if area_id != 0 and area_type == &quot;backbone&quot;:\n        raise ValueError(&quot;Only Area 0 can have area_type=&#x27;backbone&#x27;&quot;)\n\n    rules = {\n        &quot;backbone&quot;: {&quot;allowed_lsas&quot;: [1, 2, 3, 4, 5], &quot;blocked_lsas&quot;: [], &quot;local_asbr_allowed&quot;: True, &quot;auto_default_route&quot;: False},\n        &quot;standard&quot;: {&quot;allowed_lsas&quot;: [1, 2, 3, 4, 5], &quot;blocked_lsas&quot;: [], &quot;local_asbr_allowed&quot;: True, &quot;auto_default_route&quot;: False},\n        &quot;stub&quot;: {&quot;allowed_lsas&quot;: [1, 2, 3], &quot;blocked_lsas&quot;: [4, 5], &quot;local_asbr_allowed&quot;: False, &quot;auto_default_route&quot;: True},\n        &quot;totally_stubby&quot;: {&quot;allowed_lsas&quot;: [1, 2], &quot;blocked_lsas&quot;: [3, 4, 5], &quot;local_asbr_allowed&quot;: False, &quot;auto_default_route&quot;: True},\n        &quot;nssa&quot;: {&quot;allowed_lsas&quot;: [1, 2, 3, 7], &quot;blocked_lsas&quot;: [4, 5], &quot;local_asbr_allowed&quot;: True, &quot;auto_default_route&quot;: nssa_default_info_originate},\n        &quot;totally_nssa&quot;: {&quot;allowed_lsas&quot;: [1, 2, 7], &quot;blocked_lsas&quot;: [3, 4, 5], &quot;local_asbr_allowed&quot;: True, &quot;auto_default_route&quot;: True},\n    }\n    return {&quot;area_id&quot;: area_id, &quot;area_type&quot;: area_type, **rules[area_type]}\n\n\ndef select_ospf_path(candidates: list[dict[str, object]]) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Select best OSPF path following strict RFC 2328 preference: O &gt; O IA &gt; E1/N1 &gt; E2/N2.&quot;&quot;&quot;\n    if not candidates:\n        raise ValueError(&quot;candidates must be non-empty&quot;)\n    rank = {&quot;O&quot;: 1, &quot;O IA&quot;: 2, &quot;O E1&quot;: 3, &quot;O N1&quot;: 3, &quot;O E2&quot;: 4, &quot;O N2&quot;: 4}\n\n    def sort_key(item: dict[str, object]) -&gt; tuple[int, int, int]:\n        code = str(item[&quot;code&quot;])\n        if code not in rank:\n            raise ValueError(f&quot;Unsupported OSPF route code: {code}&quot;)\n        internal = _require_nonneg_int(item[&quot;internal_cost&quot;], &quot;internal_cost&quot;)\n        external = _require_nonneg_int(item.get(&quot;external_seed&quot;, 0), &quot;external_seed&quot;)\n        if code in (&quot;O&quot;, &quot;O IA&quot;):\n            return (rank[code], internal, 0)\n        if code in (&quot;O E1&quot;, &quot;O N1&quot;):\n            return (rank[code], internal + external, 0)\n        # O E2 / O N2 compare seed metric first, then internal forward cost to ASBR\n        return (rank[code], external, internal)\n\n    best = min(candidates, key=sort_key)\n    eff_metric = (\n        int(best[&quot;internal_cost&quot;]) + int(best.get(&quot;external_seed&quot;, 0))\n        if best[&quot;code&quot;] in (&quot;O E1&quot;, &quot;O N1&quot;)\n        else (int(best.get(&quot;external_seed&quot;, 0)) if best[&quot;code&quot;] in (&quot;O E2&quot;, &quot;O N2&quot;) else int(best[&quot;internal_cost&quot;]))\n    )\n    return {&quot;winner&quot;: best[&quot;name&quot;], &quot;code&quot;: best[&quot;code&quot;], &quot;effective_metric&quot;: eff_metric}\n\n\ndef summarization_location(summary_scope: str) -&gt; dict[str, str]:\n    &quot;&quot;&quot;Identify the exact router role and IOS command for OSPF summarization.&quot;&quot;&quot;\n    if summary_scope == &quot;inter_area_type3&quot;:\n        return {&quot;role&quot;: &quot;ABR&quot;, &quot;command&quot;: &quot;area &lt;area-id&gt; range &lt;network&gt; &lt;mask&gt;&quot;, &quot;loop_guard&quot;: &quot;Auto Null0 route on ABR&quot;}\n    if summary_scope == &quot;external_type5_or_7&quot;:\n        return {&quot;role&quot;: &quot;ASBR (or translating ABR for Type 7-&gt;5)&quot;, &quot;command&quot;: &quot;summary-address &lt;network&gt; &lt;mask&gt;&quot;, &quot;loop_guard&quot;: &quot;Auto Null0 route on ASBR&quot;}\n    raise ValueError(&quot;summary_scope must be &#x27;inter_area_type3&#x27; or &#x27;external_type5_or_7&#x27;&quot;)\n\n\ndef main() -&gt; None:\n    tot_nssa = evaluate_ospf_area_policy(10, &quot;totally_nssa&quot;)\n    std_nssa = evaluate_ospf_area_policy(10, &quot;nssa&quot;, nssa_default_info_originate=False)\n    assert tot_nssa[&quot;local_asbr_allowed&quot;] is True and tot_nssa[&quot;auto_default_route&quot;] is True and 3 in tot_nssa[&quot;blocked_lsas&quot;]\n    assert std_nssa[&quot;auto_default_route&quot;] is False\n\n    # Intra-area (O) ALWAYS beats Inter-area (O IA) even with higher cost!\n    intra_vs_inter = select_ospf_path([\n        {&quot;name&quot;: &quot;Via_Backbone&quot;, &quot;code&quot;: &quot;O IA&quot;, &quot;internal_cost&quot;: 10},\n        {&quot;name&quot;: &quot;Direct_IntraArea&quot;, &quot;code&quot;: &quot;O&quot;, &quot;internal_cost&quot;: 500},\n    ])\n    assert intra_vs_inter[&quot;winner&quot;] == &quot;Direct_IntraArea&quot;\n\n    # E1 always beats E2 regardless of metric!\n    e1_vs_e2 = select_ospf_path([\n        {&quot;name&quot;: &quot;Path_E2&quot;, &quot;code&quot;: &quot;O E2&quot;, &quot;internal_cost&quot;: 1, &quot;external_seed&quot;: 20},\n        {&quot;name&quot;: &quot;Path_E1&quot;, &quot;code&quot;: &quot;O E1&quot;, &quot;internal_cost&quot;: 50, &quot;external_seed&quot;: 20},\n    ])\n    assert e1_vs_e2[&quot;winner&quot;] == &quot;Path_E1&quot; and e1_vs_e2[&quot;effective_metric&quot;] == 70\n\n    print(&quot;Totally NSSA vs Standard NSSA:&quot;, tot_nssa, std_nssa)\n    print(&quot;Intra vs Inter-Area (O beats O IA):&quot;, intra_vs_inter)\n    print(&quot;E1 vs E2 (E1 beats E2):&quot;, e1_vs_e2)\n    print(&quot;Inter-Area Summarization:&quot;, summarization_location(&quot;inter_area_type3&quot;))\n    assert math.isfinite(float(e1_vs_e2[&quot;effective_metric&quot;]))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>Totally NSSA</code> مسیر پیش‌فرض خودکار و ASBR محلی را هم‌زمان می‌دهد اما <code>Standard NSSA</code> بدون <code>default-information-originate</code> مسیر پیش‌فرض خودکار ندارد؛ <code>O</code> با Cost=500 بر <code>O IA</code> با Cost=10 پیروز می‌شود؛ و <code>O E1</code> با جمع 70 بر <code>O E2</code> با Seed=20 پیروز می‌گردد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع ABR با Totally NSSA و خلاصه‌سازی بین‌ناحیه‌ای در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE Multi-Area OSPF ABR config (NOT executed on real router)\nconfigure terminal\n router ospf 1\n  router-id 2.2.2.2\n  area 1 range 10.1.0.0 255.255.252.0\n  area 1 stub no-summary\n  area 2 nssa no-summary\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "برای خلاصه‌سازی ۴ زیرشبکه داخل <code>Area 1</code> و ارسال یک پیشوند واحد به <code>Area 0</code>، دستور را کجا و چگونه می‌نویسیم؟",
+      "options": [
+        "روی همه روترهای Area 1 با summary-address",
+        "فقط روی ABR بین Area 1 و Area 0 با دستور area 1 range <network> <mask>",
+        "فقط روی ASBR با ip route Null0",
+        "روی سوئیچ لایه ۲"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>خلاصه‌سازی بین‌ناحیه‌ای (LSA Type 3) صرفاً روی ABR و با دستور <code>area &lt;id&gt; range</code> انجام می‌شود.</p>"
+    },
+    {
+      "title": "کدام نوع ناحیه ویژه OSPF هم از دریافت LSA Type 3/4/5 از بیرون جلوگیری می‌کند (و خودکار <code>0.0.0.0/0</code> تزریق می‌کند) و هم به یک ASBR محلی اجازه تزریق مسیر بیرونی می‌دهد؟",
+      "options": [
+        "Standard Stub Area",
+        "Totally Stubby Area",
+        "Totally NSSA",
+        "Backbone Area 0"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Totally NSSA تمام Type 3/4/5 را مسدود و <code>O*IA 0.0.0.0/0</code> تزریق می‌کند و هم‌زمان به ASBR محلی اجازه تولید Type 7 می‌دهد.</p>"
+    },
+    {
+      "title": "تفاوت کلیدی مسیرهای <code>O E1</code> و <code>O E2</code> در جدول مسیریابی OSPF چیست؟",
+      "options": [
+        "هیچ تفاوتی ندارند",
+        "O E1 دارای AD 200 است",
+        "O E2 فقط در IPv6 است",
+        "O E2 (پیش‌فرض) تنها Seed Metric خارجی را نگه می‌دارد، اما O E1 مجموع Cost داخلی تا ASBR و Seed خارجی را جمع می‌کند و همواره بر O E2 اولویت دارد"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>در RFC 2328 نوع E1 همواره بر E2 مقدم است و هزینه داخلی مسیر تا ASBR را نیز در متریک لحاظ می‌کند.</p>"
+    },
+    {
+      "title": "کدام نکته درباره <strong>Standard NSSA</strong> (بدون کلمه <code>no-summary</code>) صحیح است؟",
+      "options": [
+        "ABR به‌طور خودکار مسیر پیش‌فرض 0.0.0.0/0 را تزریق می‌کند",
+        "برخلاف Stub، روتر ABR به‌طور خودکار مسیر پیش‌فرض تزریق نمی‌کند مگر آنکه default-information-originate (یا no-summary) اضافه شود",
+        "امکان داشتن ASBR محلی در آن وجود ندارد",
+        "روی Area 0 اجرا می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>نبود مسیر پیش‌فرض خودکار در Standard NSSA یکی از پرتکرارترین تله‌های آزمون و طراحی OSPF است.</p>"
+    },
+    {
+      "title": "کدام ترتیب اولویت انتخاب مسیر در استاندارد <strong>RFC 2328</strong> (پیش از مقایسه عددی Cost) صحیح است؟",
+      "options": [
+        "O E2 > O E1 > O IA > O",
+        "O (Intra-Area) > O IA (Inter-Area) > O E1/N1 > O E2/N2",
+        "کمترین Cost بدون توجه به نوع مسیر",
+        "O IA > O > O E2 > O E1"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مسیر درون‌ناحیه‌ای <code>O</code> همیشه بر <code>O IA</code> و <code>E1/N1</code> همیشه بر <code>E2/N2</code> اولویت دارند.</p>"
+    },
+    {
+      "title": "کدام LSA توسط <strong>DR</strong> روی شبکه‌های Broadcast تولید می‌شود و روی لینک Point-to-Point اصلاً ساخته نمی‌شود؟",
+      "options": [
+        "LSA Type 1",
+        "LSA Type 2 (Network LSA)",
+        "LSA Type 3",
+        "LSA Type 5"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>LSA Type 2 مختص سگمنت‌های دارای DR (Broadcast/NBMA) است.</p>"
+    },
+    {
+      "title": "در یک ناحیه NSSA دارای دو ABR، کدام روتر مسئول ترجمه LSAهای <strong>Type 7 به Type 5</strong> برای Area 0 است؟",
+      "options": [
+        "ABR دارای بالاترین Router-ID",
+        "ABR دارای پایین‌ترین IP",
+        "خود ASBR",
+        "هیچ‌کدام؛ Type 7 بدون تغییر به Area 0 می‌رود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مطابق RFC 3101، تنها ABR دارای بالاترین Router-ID نقش مترجم Type 7->5 را بر عهده می‌گیرد.</p>"
+    },
+    {
+      "title": "چرا هنگام اجرای <code>area 1 range</code> روی ABR یا <code>summary-address</code> روی ASBR، روتر سیسکو خودکار یک مسیر به سمت <strong>Null0</strong> می‌سازد؟",
+      "options": [
+        "برای قطع کردن کل ترافیک Area 1",
+        "برای جلوگیری از حلقه مسیریابی در قبال بسته‌هایی که مقصدشان در بازه خلاصه قرار دارد ولی زیرشبکه جزئی آن وجود ندارد",
+        "برای افزایش سرعت لینک",
+        "به‌خاطر خطای نرم‌افزاری"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مسیر Discard به <code>Null0</code> بسته‌های مقاصد غیرموجود درون خلاصه را به‌جای چرخش روی Default Route دور می‌ریزد.</p>"
+    },
+    {
+      "title": "کدام دستور برای خلاصه‌سازی مسیرهای <strong>خارجی (LSA Type 5)</strong> روی <strong>ASBR</strong> استفاده می‌شود؟",
+      "options": [
+        "area 0 range",
+        "summary-address <network> <mask>",
+        "passive-interface default",
+        "ip ospf priority"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>summary-address</code> مخصوص ASBR (و ABR مترجم 7->5) برای پیشوندهای خارجی است.</p>"
+    },
+    {
+      "title": "آیا می‌توان <strong>Area 0 (Backbone)</strong> را به‌عنوان Stub یا NSSA پیکربندی کرد؟",
+      "options": [
+        "بله، در شبکه‌های بزرگ",
+        "خیر، Area 0 هرگز نمی‌تواند Stub یا NSSA باشد",
+        "فقط در Totally NSSA",
+        "فقط با Virtual-Link"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ستون فقرات Area 0 باید قادر به حمل همه اطلاعات مسیریابی بین‌ناحیه‌ای و خارجی باشد و نمی‌تواند Stub/NSSA شود.</p>"
+    },
+    {
+      "title": "وظیفه <strong>LSA Type 4 (ASBR Summary)</strong> چیست؟",
+      "options": [
+        "تبلیغ مستقیم زیرشبکه‌های BGP",
+        "معرفی مسیر رسیدن به Router-ID یک ASBR توسط ABR به سایر نواحی که آن ASBR در آن‌ها قرار ندارد",
+        "انتخاب DR در Area 0",
+        "حذف مسیر پیش‌فرض"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>چون LSA Type 5 هنگام عبور از ABR تغییر نمی‌کند، روترهای سایر نواحی برای یافتن ASBR به LSA Type 4 تولیدشده توسط ABR نیاز دارند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده OSPF Multi-Area روی ۶ روتر سیسکو",
+        "پایش واقعی LSDB در شبکه سازمانی",
+        "شبیه‌ساز محلی Python 3 برای آزمون سیاست فیلتر LSA در نواحی ویژه، انتخاب مسیر RFC 2328 و محل خلاصه‌سازی بدون روتر واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ روتر واقعی متصل نیست.</p>"
+    }
+  ]
+}

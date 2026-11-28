@@ -1,0 +1,344 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_bfd",
+  "objectiveId": "adv_bfd",
+  "kind": "lesson",
+  "track": "Advanced Switching & Routing (Transferred & Audited)",
+  "course": "adv-switching-routing",
+  "domain": "Enterprise Resiliency & Telemetry",
+  "title": "همگرایی میلی‌ثانیه‌ای و تله‌متری پیشرفته: پروتکل BFD (RFC 5880) و Flexible NetFlow (v9 / IPFIX)",
+  "titleEn": "Sub-Second Failure Detection & Flow Telemetry: BFD (RFC 5880) & Flexible NetFlow (v9 / IPFIX)",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy adv_bfd (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "adv_bfd",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc5880",
+      "https://www.rfc-editor.org/rfc/rfc5881",
+      "https://www.rfc-editor.org/rfc/rfc5883",
+      "https://www.rfc-editor.org/rfc/rfc7011"
+    ],
+    "limitations": [
+      "هیچ روتر واقعی سیسکو، شتاب‌دهنده سخت‌افزاری BFD یا سرور Collector در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای محاسبه زمان کشف مذاکره‌شده BFD (از جمله تایمرهای نامتقارن)، اثر cache timeout active 60 در Flexible NetFlow و ممیزی معماری سه‌جزئی FNF است."
+    ],
+    "legacyAuditFixes": [
+      "افزودن فرمول دقیق مذاکره BFD طبق RFC 5880: زمان کشف برابر Multiplier * max(local_min_rx, peer_desired_min_tx) است (در تنظیم نامتقارن 50ms در برابر 200ms، نرخ مؤثر کندتر یعنی 200ms حاکم می‌شود!).",
+      "تفکیک دقیق پورت‌های BFD (Single-Hop Control UDP 3784، Echo UDP 3785 و Multihop Control RFC 5883 روی UDP 4784 بدون Echo) و توضیح چرایی استفاده از source Loopback0 در flow exporter.",
+      "توسعه از ۳ بخش/۳ سؤال قدیمی به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با adv_bfd_lab.py بدون import پرچم‌دار."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_bfd-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-advanced",
+      "recommendedCourse": "adv-switching-routing",
+      "blueprint": "/academy-assets/v5/blueprints/adv_bfd.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_bfd_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲C: ساخت adv_bfd_lab.py بدون import پرچم‌دار با اعتبارسنجی دقیق تایمرهای مثبت، مذاکره نامتقارن RFC 5880 و شبیه‌سازی بازه‌های Export در FNF."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_bfd-section-1",
+      "title": "مسئله واقعی: چرا کم کردن تایمرهای Hello در OSPF/BGP روتر را ناپایدار می‌کند؟",
+      "html": "<p>اگر برای رسیدن به همگرایی زیر یک ثانیه، تایمرهای Hello/Dead پروتکل‌های سنگین Control Plane مانند OSPF و BGP را تا حد میلی‌ثانیه پایین بیاورید، هنگام اولین جهش CPU (مثلاً محاسبه جدول BGP)، پردازنده جا می‌ماند و همسایگی‌های سالم به‌اشتباه سقوط می‌کنند! راه‌حل مهندسی جداسازی کشف خرابی مسیر با پروتکل سبک <strong>BFD (RFC 5880)</strong> و ترکیب آن با دیده‌پذیری دقیق <strong>Flexible NetFlow (v9 / IPFIX)</strong> است.</p>"
+    },
+    {
+      "id": "adv_bfd-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> OSPF/BGP، Static Route و مفاهیم پایه NetFlow.</p><ul><li>درک معماری <strong>BFD (RFC 5880/5881/5883)</strong>، پورت‌های <strong>UDP 3784، 3785 و 4784</strong> و فرمول دقیق مذاکره تایمرها.</li><li>اتصال یک نشست واحد BFD به چند مشتری هم‌زمان (<strong>OSPF، BGP و Static Route</strong>).</li><li>طراحی معماری ۳جزئی <strong>Flexible NetFlow</strong> (<code>flow record</code>، <code>flow exporter</code>، <code>flow monitor</code>).</li><li>درک علت حیاتی بودن <strong><code>cache timeout active 60</code></strong> و <strong><code>source Loopback0</code></strong> در عملیات واقعی.</li></ul>"
+    },
+    {
+      "id": "adv_bfd-section-3",
+      "title": "معماری BFD (RFC 5880): یک خبرچین میلی‌ثانیه‌ای مستقل از پروتکل مسیریابی",
+      "html": "<p><strong>BFD</strong> خودش هیچ مسیر یا جدول مسیریابی نمی‌سازد؛ بلکه یک پروتکل سبک و تک‌وظیفه است (که در بسیاری از روترها روی کارت خط یا ASIC خارج از CPU اصلی اجرا می‌شود) و به محض کشف قطع ارتباط مسیر، ظرف کسری از ثانیه به تمام پروتکل‌های ثبت‌نام‌شده (OSPF، BGP، EIGRP، Static Route و HSRP) اطلاع می‌دهد تا فوراً مسیر جایگزین را فعال کنند.</p>"
+    },
+    {
+      "id": "adv_bfd-section-4",
+      "title": "پورت‌های BFD و فرمول دقیق مذاکره زمان کشف (RFC 5880)",
+      "html": "<p>در <strong>Single-Hop BFD (RFC 5881)</strong> پیام‌های کنترلی روی <strong>UDP 3784</strong> و حالت شتاب‌یافته <strong>Echo</strong> (بازگشت سخت‌افزاری بدون درگیری CPU همسایه) روی <strong>UDP 3785</strong> کار می‌کنند. در <strong>Multihop BFD (RFC 5883)</strong> (مثلاً میان همسایگان eBGP چندگامی) از <strong>UDP 4784</strong> استفاده شده و مد Echo وجود ندارد. <strong>فرمول مذاکره:</strong> هر طرف با نرخ <strong>بیشینه (کندتر)</strong> بین <code>min_rx</code> خودش و <code>desired_min_tx</code> همسایه کار می‌کند؛ یعنی <code>Detection_Time = Multiplier * max(local_min_rx, peer_tx)</code>. بنابراین با <code>50ms x 3</code> دوطرفه زمان کشف <strong>150ms</strong> است، اما اگر یک سمت <code>50ms</code> و سمت دیگر <code>200ms</code> باشد، زمان کشف <strong>600ms</strong> خواهد شد!</p>"
+    },
+    {
+      "id": "adv_bfd-section-5",
+      "title": "اتصال BFD به OSPF، BGP و Static Route در Cisco IOS-XE",
+      "html": "<p>پیاده‌سازی در دو گام انجام می‌شود: (۱) تنظیم تایمرها زیر اینترفیس (<code>bfd interval 50 min_rx 50 multiplier 3</code>)، و (۲) ثبت‌نام پروتکل‌های مشتری (<code>bfd all-interfaces</code> زیر <code>router ospf</code> یا <code>ip ospf bfd</code> زیر اینترفیس؛ <code>neighbor &lt;ip&gt; fall-over bfd</code> زیر <code>router bgp</code>؛ و <code>ip route static bfd ...</code> برای مسیرهای Static). یک نشست واحد BFD روی لینک به‌طور هم‌زمان به همه این پروتکل‌ها سرویس می‌دهد.</p>"
+    },
+    {
+      "id": "adv_bfd-section-6",
+      "title": "نمودار معماری: مذاکره BFD (RFC 5880) و ساختار سه‌مرحله‌ای Flexible NetFlow",
+      "html": "<p>در نمودار زیر پورت‌ها و فرمول مذاکره BFD در کنار سه جزء ماژولار Flexible NetFlow نمایش داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"BFD RFC 5880 Sub-Second Failure Detection and Flexible NetFlow 3-Stage Pipeline\"><rect x=\"16\" y=\"18\" width=\"354\" height=\"184\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"193\" y=\"42\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">BFD (RFC 5880 / 5881 / 5883)</text><rect x=\"30\" y=\"56\" width=\"144\" height=\"58\" rx=\"6\" fill=\"#ffffff\" stroke=\"#2563eb\"/><text x=\"102\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1e40af\">Single-Hop BFD</text><text x=\"102\" y=\"90\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#0f172a\">Control: UDP 3784</text><text x=\"102\" y=\"104\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#15803d\">Echo: UDP 3785</text><rect x=\"192\" y=\"56\" width=\"164\" height=\"58\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#3b82f6\"/><text x=\"274\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1e3a8a\">Multihop BFD (RFC 5883)</text><text x=\"274\" y=\"90\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#0f172a\">Control: UDP 4784</text><text x=\"274\" y=\"104\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">(No Echo mode)</text><text x=\"193\" y=\"136\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">Detect = Mult * max(local_rx, peer_tx)</text><text x=\"193\" y=\"156\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#334155\">50ms x 3 = 150ms | Asym 50 vs 200 =&gt; 600ms!</text><text x=\"193\" y=\"178\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#1d4ed8\">1 BFD session notifies OSPF + BGP + Static</text><rect x=\"390\" y=\"18\" width=\"354\" height=\"184\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"567\" y=\"42\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Flexible NetFlow (v9 / IPFIX)</text><rect x=\"404\" y=\"56\" width=\"102\" height=\"62\" rx=\"6\" fill=\"#ffffff\" stroke=\"#15803d\"/><text x=\"455\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#166534\">1. flow record</text><text x=\"455\" y=\"92\" text-anchor=\"middle\" font-size=\"8\" fill=\"#14532d\">match (Key)</text><text x=\"455\" y=\"106\" text-anchor=\"middle\" font-size=\"8\" fill=\"#14532d\">collect (Stats)</text><rect x=\"516\" y=\"56\" width=\"102\" height=\"62\" rx=\"6\" fill=\"#ffffff\" stroke=\"#15803d\"/><text x=\"567\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#166534\">2. flow exporter</text><text x=\"567\" y=\"92\" text-anchor=\"middle\" font-size=\"8\" fill=\"#14532d\">dst Collector</text><text x=\"567\" y=\"106\" text-anchor=\"middle\" font-size=\"8\" fill=\"#1d4ed8\">src Loopback0</text><rect x=\"628\" y=\"56\" width=\"102\" height=\"62\" rx=\"6\" fill=\"#ffffff\" stroke=\"#15803d\"/><text x=\"679\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#166534\">3. flow monitor</text><text x=\"679\" y=\"92\" text-anchor=\"middle\" font-size=\"8\" fill=\"#14532d\">binds 1 + 2</text><text x=\"679\" y=\"106\" text-anchor=\"middle\" font-size=\"8\" fill=\"#dc2626\">active 60s!</text><text x=\"567\" y=\"142\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">NetFlow v9 (UDP 2055) | IPFIX (UDP 4739)</text><text x=\"567\" y=\"162\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">cache timeout active 60 prevents 25-min backup</text><text x=\"567\" y=\"178\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">from causing a single false spike at end of flow!</text></svg>"
+    },
+    {
+      "id": "adv_bfd-section-7",
+      "title": "معماری ۳جزئی Flexible NetFlow (FNF — NetFlow v9 و IPFIX)",
+      "html": "<table><thead><tr><th>جزء FNF</th><th>وظیفه اصلی</th><th>کلیدواژه‌های شاخص</th></tr></thead><tbody><tr><td><strong>۱. <code>flow record</code></strong></td><td>تعیین فیلدهای استخراجی (Key) و شمارنده‌ها (Non-Key)</td><td><code>match ipv4 ...</code> و <code>collect counter bytes/packets</code></td></tr><tr><td><strong>۲. <code>flow exporter</code></strong></td><td>تعیین مقصد Collector، اینترفیس مبدأ و پروتکل صادرات</td><td><code>destination</code>، <code>source Loopback0</code>، <code>export-protocol netflow-v9 | ipfix</code></td></tr><tr><td><strong>۳. <code>flow monitor</code></strong></td><td>اتصال Record و Exporter + تایمرهای کش + اعمال روی اینترفیس</td><td><code>record</code>، <code>exporter</code>، <code>cache timeout active 60</code>، <code>inactive 15</code></td></tr></tbody></table>"
+    },
+    {
+      "id": "adv_bfd-section-8",
+      "title": "چرا cache timeout active 60 در Flexible NetFlow حیاتی است؟",
+      "html": "<p>مقدار پیش‌فرض <code>cache timeout active</code> معمولاً ۱۸۰۰ ثانیه (۳۰ دقیقه) است! اگر یک نسخه پشتیبان (Backup) ۲۵ دقیقه‌ای با سرعت ۱۰۰ مگابیت در حال انتقال باشد، تا پایان اتصال در کش حبس می‌ماند و ناگهان در دقیقه ۲۵ کل حجم یک‌جا صادر می‌شود که در نمودار SIEM/Collector یک <strong>قله کاذب و گمراه‌کننده</strong> می‌سازد. تنظیم <strong><code>cache timeout active 60</code></strong> باعث می‌شود جریان‌های طولانی هر ۶۰ ثانیه به‌طور منظم گزارش شوند. <code>cache timeout inactive 15</code> نیز جریان‌های تمام‌شده را سریع‌تر آزاد می‌کند.</p>"
+    },
+    {
+      "id": "adv_bfd-section-9",
+      "title": "چرا source Loopback0 روی flow exporter بهترین روش است؟",
+      "html": "<p>اگر مبدأ صادرات NetFlow یک اینترفیس فیزیکی باشد، هنگام تغییر مسیر یا افت لینک فیزیکی، IP فرستنده تغییر کرده و Collector آن را یک روتر جدید می‌بیند یا فایروال آن را رد می‌کند. قفل کردن <code>source Loopback0</code> هویت Exporter را همیشه ثابت نگه می‌دارد.</p>"
+    },
+    {
+      "id": "adv_bfd-section-10",
+      "title": "تفاوت NetFlow v5 قدیمی با NetFlow v9 و IPFIX (RFC 7011)",
+      "html": "<p>NetFlow v5 قالب ثابت و صرفاً IPv4 داشت؛ اما <strong>NetFlow v9 (RFC 3954)</strong> و استاندارد باز <strong>IPFIX (RFC 7011 / UDP 4739)</strong> مبتنی بر الگو (Template-Based) هستند و از IPv6، MPLS، لایه ۲ (MAC/VLAN) و برچسب‌های امنیتی (SGT/VRF) پشتیبانی می‌کنند.</p>"
+    },
+    {
+      "id": "adv_bfd-section-11",
+      "title": "کژفهمی‌های رایج در BFD و Flexible NetFlow",
+      "html": "<ul><li><strong>کژفهمی ۱: «BFD فقط نیاز به تنظیم روی یک سمت لینک دارد.»</strong> واقعیت: BFD یک پروتکل دوطرفه (Bidirectional) است و هر دو سر لینک باید آن را فعال کنند (هرچند اگر یک سمت تایمر کندتر داشته باشد نرخ کندتر مذاکره می‌شود).</li><li><strong>کژفهمی ۲: «برای OSPF و BGP روی یک لینک باید دو نشست BFD جداگانه ساخت.»</strong> واقعیت: یک نشست BFD واحد هر دو پروتکل را هم‌زمان مطلع می‌سازد.</li><li><strong>کژفهمی ۳: «<code>flow exporter</code> مشخص می‌کند چه فیلدهایی از بسته استخراج شوند.»</strong> واقعیت: تعریف فیلدها و شمارنده‌ها وظیفه <code>flow record</code> است؛ <code>flow exporter</code> فقط نحوه ارسال به Collector را تعیین می‌کند.</li></ul>"
+    },
+    {
+      "id": "adv_bfd-section-12",
+      "title": "عیب‌یابی نشست‌های BFD و صادرات Flexible NetFlow",
+      "html": "<p>برای BFD از <code>show bfd neighbors details</code> (بررسی وضعیت <code>Up</code>، زمان‌های مذاکره‌شده، و فهرست پروتکل‌های Registered مانند OSPF/BGP) استفاده کنید. برای FNF از <code>show flow monitor &lt;NAME&gt; statistics</code>، <code>show flow exporter statistics</code> و <code>show flow monitor &lt;NAME&gt; cache</code> بهره ببرید.</p>"
+    },
+    {
+      "id": "adv_bfd-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> R1 روی <code>50ms x 3</code> و R2 روی <code>200ms x 3</code> تنظیم شده‌اند. R1 خرابی R2 را در چند میلی‌ثانیه کشف می‌کند؟ <strong>پاسخ:</strong> در <strong>600ms</strong>؛ زیرا نرخ مؤثر برابر <code>max(50, 200) = 200ms</code> ضربدر <code>Multiplier = 3</code> است.</p><p><strong>تمرین ۲:</strong> کدام جزء FNF تعیین می‌کند که IP مبدأ/مقصد و پورت‌ها کلید جریان باشند و شمارنده بایت جمع‌آوری شود؟ <strong>پاسخ:</strong> <code>flow record</code>.</p>"
+    },
+    {
+      "id": "adv_bfd-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc5880\" target=\"_blank\" rel=\"noopener\">RFC 5880 (BFD Core)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc5881\" target=\"_blank\" rel=\"noopener\">RFC 5881 (Single-Hop BFD)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc5883\" target=\"_blank\" rel=\"noopener\">RFC 5883 (Multihop BFD)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc7011\" target=\"_blank\" rel=\"noopener\">RFC 7011 (IPFIX)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی سیسکو، شتاب‌دهنده سخت‌افزاری BFD یا Collector واقعی در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "BFD (RFC 5880)",
+      "fa": "تشخیص دوطرفه خرابی فوروارد",
+      "simple": "پروتکل سبک میلی‌ثانیه‌ای برای کشف سریع قطع مسیر و اطلاع‌رسانی به OSPF/BGP/Static."
+    },
+    {
+      "term": "UDP 3784 / 3785",
+      "fa": "پورت‌های Single-Hop BFD",
+      "simple": "3784 برای کنترل BFD تک‌گامی و 3785 برای مد Echo شتاب‌یافته (RFC 5881)."
+    },
+    {
+      "term": "UDP 4784",
+      "fa": "پورت Multihop BFD",
+      "simple": "کنترل BFD چندگامی طبق RFC 5883 (بدون مد Echo)."
+    },
+    {
+      "term": "BFD Detection Time",
+      "fa": "زمان کشف خرابی BFD",
+      "simple": "برابر Multiplier * max(local_min_rx, peer_desired_min_tx) — نرخ کندتر حاکم است."
+    },
+    {
+      "term": "BFD Echo Mode",
+      "fa": "حالت بازتاب سخت‌افزاری BFD",
+      "simple": "بازگرداندن بسته UDP 3785 توسط Data Plane همسایه بدون درگیر کردن CPU آن."
+    },
+    {
+      "term": "BFD Registered Clients",
+      "fa": "پروتکل‌های مشتری BFD",
+      "simple": "پروتکل‌هایی (OSPF/BGP/Static/HSRP) که به یک نشست BFD واحد متصل می‌شوند."
+    },
+    {
+      "term": "Flexible NetFlow (FNF)",
+      "fa": "نت‌فلو ماژولار و قابل‌تنظیم",
+      "simple": "ساختار سه‌جزئی Record/Exporter/Monitor با پشتیبانی IPv4/IPv6/L2/SGT."
+    },
+    {
+      "term": "flow record",
+      "fa": "تعریف الگوی جریان FNF",
+      "simple": "تعیین فیلدهای Key (match) و فیلدهای آماری Non-Key (collect)."
+    },
+    {
+      "term": "flow exporter",
+      "fa": "تنظیم ارسال‌کننده FNF",
+      "simple": "تعیین IP/پورت Collector، پروتکل v9/IPFIX و اینترفیس مبدأ پایدار (Loopback0)."
+    },
+    {
+      "term": "flow monitor",
+      "fa": "ناظر و کش جریان FNF",
+      "simple": "پیونددهنده Record و Exporter همراه با تایمرهای active/inactive و اعمال روی اینترفیس."
+    },
+    {
+      "term": "cache timeout active 60",
+      "fa": "تایمر صادرات جریان‌های فعال",
+      "simple": "ارسال منظم جریان‌های طولانی (مثل بکاپ ۲۵دقیقه‌ای) هر ۶۰ ثانیه برای جلوگیری از قله کاذب."
+    },
+    {
+      "term": "cache timeout inactive 15",
+      "fa": "تایمر آزادسازی جریان خاموش",
+      "simple": "صادرات و آزادسازی سریع جریان‌هایی که ۱۵ ثانیه بسته‌ای دریافت نکرده‌اند."
+    },
+    {
+      "term": "NetFlow v9 (RFC 3954)",
+      "fa": "نسخه ۹ مبتنی بر الگو",
+      "simple": "انتقال Template و داده با پشتیبانی از IPv6 و فیلدهای سفارشی (رایج: UDP 2055)."
+    },
+    {
+      "term": "IPFIX (RFC 7011)",
+      "fa": "استاندارد باز صادرات جریان",
+      "simple": "استاندارد IETF مبتنی بر NetFlow v9 روی پورت رسمی UDP 4739."
+    },
+    {
+      "term": "Source Loopback0",
+      "fa": "مبدأ پایدار Exporter",
+      "simple": "تضمین ثبات آدرس IP فرستنده NetFlow در برابر افت لینک‌های فیزیکی."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، محاسبه زمان کشف BFD در حالت متقارن (<code>50ms x 3 = 150ms</code>)، حالت نامتقارن (<code>50ms</code> در برابر <code>200ms -> 600ms</code>)، حالت Multihop (<code>UDP 4784</code>)، اثر <code>cache timeout active 60</code> روی جریان ۲۵دقیقه‌ای، و ممیزی معماری سه‌جزئی FNF را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_bfd_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_bfd_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for adv_bfd (BFD RFC 5880 Negotiation &amp; Flexible NetFlow v9/IPFIX).\n\nBoundary: Pure in-memory simulation using Python stdlib only.\nNo real Cisco router, BFD ASIC offload, or NetFlow collector is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _require_pos_int(val: object, name: str) -&gt; int:\n    if type(val) is not int or val &lt;= 0:\n        raise ValueError(f&quot;{name} must be a positive integer&quot;)\n    return val\n\n\ndef negotiate_bfd_detection(\n    r1_tx_ms: int,\n    r1_min_rx_ms: int,\n    r1_mult: int,\n    r2_tx_ms: int,\n    r2_min_rx_ms: int,\n    r2_mult: int,\n    multihop: bool = False,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compute RFC 5880 BFD negotiated detection times (effective interval = max(local_rx, peer_tx)).&quot;&quot;&quot;\n    for name, val in (\n        (&quot;r1_tx_ms&quot;, r1_tx_ms),\n        (&quot;r1_min_rx_ms&quot;, r1_min_rx_ms),\n        (&quot;r1_mult&quot;, r1_mult),\n        (&quot;r2_tx_ms&quot;, r2_tx_ms),\n        (&quot;r2_min_rx_ms&quot;, r2_min_rx_ms),\n        (&quot;r2_mult&quot;, r2_mult),\n    ):\n        _require_pos_int(val, name)\n    _require_bool(multihop, &quot;multihop&quot;)\n\n    # R1 detects R2 failure based on R1&#x27;s multiplier * max(R1_min_rx, R2_desired_tx)\n    r1_effective_rx_ms = max(r1_min_rx_ms, r2_tx_ms)\n    r1_detect_ms = r1_mult * r1_effective_rx_ms\n    r2_effective_rx_ms = max(r2_min_rx_ms, r1_tx_ms)\n    r2_detect_ms = r2_mult * r2_effective_rx_ms\n\n    return {\n        &quot;udp_control_port&quot;: 4784 if multihop else 3784,\n        &quot;udp_echo_port&quot;: None if multihop else 3785,\n        &quot;r1_detects_r2_down_ms&quot;: r1_detect_ms,\n        &quot;r2_detects_r1_down_ms&quot;: r2_detect_ms,\n        &quot;sub_second_both_sides&quot;: r1_detect_ms &lt; 1000 and r2_detect_ms &lt; 1000,\n    }\n\n\ndef simulate_fnf_active_timeout(\n    flow_duration_sec: int,\n    active_timeout_sec: int,\n    total_mb: int,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Demonstrate why Flexible NetFlow &#x27;cache timeout active 60&#x27; prevents delayed spike reporting.&quot;&quot;&quot;\n    _require_pos_int(flow_duration_sec, &quot;flow_duration_sec&quot;)\n    _require_pos_int(active_timeout_sec, &quot;active_timeout_sec&quot;)\n    _require_pos_int(total_mb, &quot;total_mb&quot;)\n\n    export_events = (flow_duration_sec + active_timeout_sec - 1) // active_timeout_sec\n    mb_per_export = round(total_mb / export_events, 2)\n    return {\n        &quot;flow_duration_sec&quot;: flow_duration_sec,\n        &quot;active_timeout_sec&quot;: active_timeout_sec,\n        &quot;export_buckets&quot;: export_events,\n        &quot;avg_mb_per_export&quot;: mb_per_export,\n        &quot;avoids_single_end_of_flow_spike&quot;: export_events &gt; 1,\n    }\n\n\ndef validate_fnf_architecture(\n    has_flow_record: bool,\n    has_flow_exporter: bool,\n    has_flow_monitor: bool,\n    exporter_uses_loopback: bool,\n    protocol: str = &quot;ipfix&quot;,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Audit the 3 mandatory Flexible NetFlow components and Loopback source best practice.&quot;&quot;&quot;\n    for name, val in (\n        (&quot;has_flow_record&quot;, has_flow_record),\n        (&quot;has_flow_exporter&quot;, has_flow_exporter),\n        (&quot;has_flow_monitor&quot;, has_flow_monitor),\n        (&quot;exporter_uses_loopback&quot;, exporter_uses_loopback),\n    ):\n        _require_bool(val, name)\n    if protocol not in (&quot;netflow-v9&quot;, &quot;ipfix&quot;):\n        raise ValueError(&quot;protocol must be &#x27;netflow-v9&#x27; or &#x27;ipfix&#x27;&quot;)\n\n    issues = []\n    if not has_flow_record:\n        issues.append(&quot;MISSING_FLOW_RECORD&quot;)\n    if not has_flow_exporter:\n        issues.append(&quot;MISSING_FLOW_EXPORTER&quot;)\n    if not has_flow_monitor:\n        issues.append(&quot;MISSING_FLOW_MONITOR&quot;)\n    if not exporter_uses_loopback:\n        issues.append(&quot;EXPORTER_SOURCE_NOT_LOOPBACK_FLAP_RISK&quot;)\n\n    return {\n        &quot;fnf_valid&quot;: len(issues) == 0,\n        &quot;protocol&quot;: protocol,\n        &quot;standard_udp_port&quot;: 4739 if protocol == &quot;ipfix&quot; else 2055,\n        &quot;issues&quot;: issues,\n    }\n\n\ndef main() -&gt; None:\n    sym = negotiate_bfd_detection(50, 50, 3, 50, 50, 3)\n    asym = negotiate_bfd_detection(50, 50, 3, 200, 200, 3)\n    mhop = negotiate_bfd_detection(100, 100, 3, 100, 100, 3, multihop=True)\n    assert sym[&quot;r1_detects_r2_down_ms&quot;] == 150 and sym[&quot;udp_control_port&quot;] == 3784\n    assert asym[&quot;r1_detects_r2_down_ms&quot;] == 600  # Negotiated slower interval!\n    assert mhop[&quot;udp_control_port&quot;] == 4784 and mhop[&quot;udp_echo_port&quot;] is None\n\n    fnf_60 = simulate_fnf_active_timeout(1500, 60, 1500)\n    fnf_default = simulate_fnf_active_timeout(1500, 1800, 1500)\n    assert fnf_60[&quot;export_buckets&quot;] == 25 and fnf_60[&quot;avoids_single_end_of_flow_spike&quot;] is True\n    assert fnf_default[&quot;export_buckets&quot;] == 1\n\n    audit_ok = validate_fnf_architecture(True, True, True, True, &quot;ipfix&quot;)\n    assert audit_ok[&quot;fnf_valid&quot;] is True and audit_ok[&quot;standard_udp_port&quot;] == 4739\n\n    print(&quot;BFD Symmetric 50msx3:&quot;, sym)\n    print(&quot;BFD Asymmetric 50ms vs 200ms:&quot;, asym)\n    print(&quot;BFD Multihop:&quot;, mhop)\n    print(&quot;FNF Active Timeout (60s vs 1800s):&quot;, fnf_60, fnf_default)\n    print(&quot;FNF Audit:&quot;, audit_ok)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> تنظیم متقارن زمان کشف <code>150ms</code> و نامتقارن <code>600ms</code> می‌دهد؛ Multihop پورت <code>4784</code> بدون Echo انتخاب می‌کند؛ جریان 1500ثانیه‌ای با <code>active 60</code> به 25 بسته منظم شکسته می‌شود (در برابر 1 بسته با 1800)؛ و معماری IPFIX پورت <code>4739</code> تأیید می‌گردد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع BFD (OSPF/BGP) و Flexible NetFlow IPFIX در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE BFD &amp; Flexible NetFlow (IPFIX) config (NOT executed on real router)\nconfigure terminal\n interface GigabitEthernet0/0\n  bfd interval 50 min_rx 50 multiplier 3\n  ip ospf bfd\n  ip flow monitor FNF_MON input\n router bgp 65001\n  neighbor 10.10.0.2 fall-over bfd\n flow record FNF_REC\n  match ipv4 source address\n  match ipv4 destination address\n  match ipv4 protocol\n  match transport source-port\n  match transport destination-port\n  collect counter bytes\n  collect counter packets\n flow exporter FNF_EXP\n  destination 10.99.0.200\n  source Loopback0\n  transport udp 4739\n  export-protocol ipfix\n flow monitor FNF_MON\n  record FNF_REC\n  exporter FNF_EXP\n  cache timeout active 60\n  cache timeout inactive 15\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "مزیت بنیادین استفاده از <strong>BFD</strong> به‌جای کاهش تایمر Hello/Dead خود پروتکل‌های OSPF و BGP تا زیر یک ثانیه چیست؟",
+      "options": [
+        "BFD پهنای باند فیبر را ۱۰ برابر می‌کند",
+        "BFD به‌جای IP از MAC استفاده می‌کند",
+        "BFD یک پروتکل سبک و تک‌وظیفه است که خارج از سربار سنگین Control Plane مسیریابی خرابی را در حد میلی‌ثانیه کشف و به همه پروتکل‌ها اطلاع می‌دهد",
+        "BFD فقط یک طرف لینک لازم دارد"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>جداسازی کشف خرابی در BFD از سقوط کاذب همسایگی‌های OSPF/BGP هنگام جهش CPU جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "در <strong>Flexible NetFlow</strong> چرا تنظیم دستور <code>cache timeout active 60</code> در <code>flow monitor</code> بسیار مهم است؟",
+      "options": [
+        "تا بسته‌های IPv6 حذف شوند",
+        "تا پورت 2055 بسته شود",
+        "تا SSH فعال شود",
+        "تا جریان‌های طولانی (مثل بکاپ ۲۵دقیقه‌ای) هر ۶۰ ثانیه منظم گزارش شوند و تا پایان اتصال در کش حبس نمانند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>پیش‌فرض ۱۸۰۰ ثانیه‌ای باعث حبس جریان‌های طولانی و ایجاد قله‌های کاذب در نمودار پایش می‌شود.</p>"
+    },
+    {
+      "title": "در معماری سه‌جزئی <strong>Flexible NetFlow</strong>، کدام بخش تعیین می‌کند چه فیلدهایی از بسته استخراج (<code>match</code>) و چه آمارهایی شمرده (<code>collect</code>) شوند؟",
+      "options": [
+        "flow record",
+        "flow monitor",
+        "flow exporter",
+        "bfd interval"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p><code>flow record</code> الگوی فیلدهای Key و Non-Key را تعریف می‌کند.</p>"
+    },
+    {
+      "title": "اگر در یک لینک BFD، روتر R1 روی <code>50ms x 3</code> و روتر R2 روی <code>200ms x 3</code> تنظیم شده باشند، زمان کشف خرابی R2 توسط R1 طبق RFC 5880 چقدر است؟",
+      "options": [
+        "150ms",
+        "600ms (زیرا نرخ مؤثر برابر بیشینه یعنی 200ms ضربدر Multiplier=3 است)",
+        "50ms",
+        "همسایگی اصلاً برقرار نمی‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در BFD نرخ مؤثر برابر <code>max(local_min_rx, peer_desired_tx)</code> است تا روتر کندتر غرق نشود.</p>"
+    },
+    {
+      "title": "پورت‌های UDP استاندارد برای <strong>Single-Hop Control</strong>، <strong>Echo</strong> و <strong>Multihop Control</strong> در BFD به‌ترتیب کدام‌اند؟",
+      "options": [
+        "UDP 3784، UDP 3785 و UDP 4784",
+        "TCP 179، IP 89 و UDP 123",
+        "UDP 2055، UDP 4739 و UDP 514",
+        "UDP 500، UDP 4500 و UDP 5246"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Single-Hop از 3784 (کنترل) و 3785 (Echo) و Multihop (RFC 5883) از 4784 استفاده می‌کند.</p>"
+    },
+    {
+      "title": "چرا در پیکربندی <code>flow exporter</code> استفاده از دستور <code>source Loopback0</code> به‌جای اینترفیس فیزیکی توصیه می‌شود؟",
+      "options": [
+        "تا IP فرستنده NetFlow هنگام افت یا تغییر لینک فیزیکی ثابت بماند و Collector/فایروال دچار خطا نشوند",
+        "چون Loopback0 رمزنگاری AES دارد",
+        "چون اینترفیس فیزیکی IP ندارد",
+        "برای افزایش MTU"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>پایداری آدرس Loopback0 از تغییر هویت Exporter در ابزارهای SIEM و Collector جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "اگر روی یک لینک هم OSPF و هم eBGP فعال باشند، برای هر دو چند نشست BFD لازم است؟",
+      "options": [
+        "دو نشست مستقل روی پورت‌های متفاوت",
+        "یک نشست BFD واحد کافی است که هم‌زمان به هر دو پروتکل ثبت‌نام‌شده اطلاع می‌دهد",
+        "BFD فقط از OSPF پشتیبانی می‌کند",
+        "باید BFD را خاموش کرد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>یکی از مزایای کلیدی BFD اشتراک یک نشست سبک واحد بین همه پروتکل‌های مشتری است.</p>"
+    },
+    {
+      "title": "تفاوت اصلی <strong>NetFlow v9 / IPFIX</strong> با NetFlow v5 قدیمی چیست؟",
+      "options": [
+        "v9 و IPFIX مبتنی بر Template و انعطاف‌پذیرند و از IPv6، MPLS، لایه ۲ و فیلدهای سفارشی پشتیبانی می‌کنند اما v5 قالب ثابت و صرفاً IPv4 داشت",
+        "v5 سریع‌تر از IPFIX است",
+        "IPFIX فقط روی لایه ۱ است",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>معماری Template-Based در v9 و IPFIX (RFC 7011) پایه Flexible NetFlow مدرن است.</p>"
+    },
+    {
+      "title": "در <strong>Multihop BFD (RFC 5883)</strong> کدام ویژگی نسبت به Single-Hop BFD وجود ندارد؟",
+      "options": [
+        "مد Echo (UDP 3785)",
+        "تنظیم Multiplier",
+        "پشتیبانی از BGP",
+        "استفاده از UDP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مد Echo تنها در لینک مستقیم Single-Hop (RFC 5881) کاربرد دارد و در Multihop غیرفعال است.</p>"
+    },
+    {
+      "title": "نقش دستور <code>cache timeout inactive 15</code> در <code>flow monitor</code> چیست؟",
+      "options": [
+        "خاموش کردن BFD پس از ۱۵ ثانیه",
+        "صادرات و آزادسازی جریان‌هایی که به‌مدت ۱۵ ثانیه هیچ بسته جدیدی در آن‌ها دیده نشده است",
+        "توقف جمع‌آوری NetFlow",
+        "حذف Loopback0"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تایمر inactive جریان‌های پایان‌یافته را سریع‌تر از کش خارج و به Collector ارسال می‌کند.</p>"
+    },
+    {
+      "title": "کدام دستور وضعیت نشست‌های BFD و فهرست پروتکل‌های ثبت‌نام‌شده (مانند OSPF/BGP) را نشان می‌دهد؟",
+      "options": [
+        "show bfd neighbors details",
+        "show vlan brief",
+        "show ip nat statistics",
+        "show spanning-tree"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p><code>show bfd neighbors details</code> تایمرهای مذاکره‌شده، وضعیت و پروتکل‌های مشتری BFD را نشان می‌دهد.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده BFD 150ms روی دو روتر هسته و Collector واقعی",
+        "اندازه‌گیری سخت‌افزاری ASIC",
+        "شبیه‌ساز محلی Python 3 برای محاسبه مذاکره تایمرهای BFD (متقارن/نامتقارن)، اثر active timeout 60 و ممیزی معماری FNF بدون روتر واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ روتر یا Collector واقعی متصل نیست.</p>"
+    }
+  ]
+}

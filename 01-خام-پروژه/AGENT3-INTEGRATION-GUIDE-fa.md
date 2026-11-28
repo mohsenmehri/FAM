@@ -1,10 +1,10 @@
-# راهنمای ادغام محتوای ایجنت ۳ (Agent 3 Integration Guide — ۷۶ درس: ۶۴ اصلی + ۱۲ انتقالی CCNA دسته‌های ۱۲A و ۱۲B)
+# راهنمای ادغام محتوای ایجنت ۳ (Agent 3 Integration Guide — ۸۱ درس: ۶۴ اصلی + ۱۷ انتقالی کامل دسته‌های ۱۲A/۱۲B/۱۲C)
 
 تاریخ تولید و اعتبارسنجی: **۲۰۲۶-۱۱-۲۷** | شاخه کاری: `arena/941b9e62-fam` | مبنای مقایسه قدیمی: `5a7474902c8d729950288198953686702cfd85dc` (و منبع خام ایجنت ۱ @ `641d02ee`)
 
 ## ۱. خلاصه دامنه و سیاست بدون تعارض (Zero-Conflict Scope)
 
-- **تعداد دقیق درس‌های تحویلی ایجنت ۳ تا پایان دسته ۱۲B:** **۷۶ درس** شامل ۶۴ درس اصلی (۶ Specialist پایه، ۱۲ Specialist عمیق، ۱۹ Automation به‌جز `auto_12`، ۷ CCIE و ۲۰ CCDE) + **۱۲ درس کامل CCNA انتقالی سابق ایجنت ۱** (دسته ۱۲A: ۵ درس هسته + دسته ۱۲B: ۷ درس سرویس‌ها، امنیت، بی‌سیم و اتوماسیون). ۵ درس باقی‌مانده (`adv_*`) در دسته ۱۲C تحویل می‌شوند.
+- **تعداد دقیق درس‌های تحویلی ایجنت ۳ (تکمیل ۱۰۰٪):** **۸۱ درس** شامل ۶۴ درس اصلی (۶ Specialist پایه، ۱۲ Specialist عمیق، ۱۹ Automation به‌جز `auto_12`، ۷ CCIE و ۲۰ CCDE) + **تمام ۱۷ درس انتقالی سابق ایجنت ۱** (دسته ۱۲A: ۵ درس هسته CCNA + دسته ۱۲B: ۷ درس سرویس‌ها/امنیت/بی‌سیم/SDN CCNA + دسته ۱۲C: ۵ درس پیشرفته `adv_*`).
 - **بدون دست‌کاری فایل‌های مشترک هسته:** فایل‌های مشترک `curriculum-catalog.json`، `lesson-engine.js`، `server/app.py` و `tests/test_academy_content.py` دست‌نخورده باقی مانده‌اند (`SHARED_FILES_TOUCHED=0`) و نسخه‌های محلی ادغام‌شده توسط Agent 2 روی `arena/ab96c97c-fam` بازنویسی نمی‌شوند.
 - **استاندارد فنی هر ۶۴ درس:** قالب رسمی `fam-app-blueprint-v1`، حداقل **۱۴ بخش آموزشی فارسی** (با حداقل ۱ نمودار SVG معتبر XML دارای `viewBox`)، حداقل **۱۵ واژه تخصصی**، دقیقاً **۱۲ پرسش چهارگزینه‌ای با گزینه‌های یکتا و پاسخ تشریحی**، **اسکریپت آزمایشگاه مستقل Python 3 (stdlib-only)** به‌صورت Verbatim HTML-Escaped در `stages.lab.html` و فایل ثبت بازبینی معنایی اختصاصی.
 
@@ -130,7 +130,17 @@
 | `ccna_wl` | CCNA (شبکه‌های بی‌سیم): مبانی Wi-Fi، کانال‌های RF، معماری AP/WLC (CAPWAP) و امنیت WPA2/WPA3 | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_wl.json` | `academy-labs/agent3/ccna_wl_lab.py` | `academy-labs/reviews/ccna_wl-review-fa.md` |
 | `ccna_06` | CCNA (اتوماسیون و برنامه‌پذیری): معماری SDN، Cisco Catalyst Center، REST API و ابزارهای Ansible/Puppet/Chef | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_06.json` | `academy-labs/agent3/ccna_06_lab.py` | `academy-labs/reviews/ccna_06-review-fa.md` |
 
-**جمع کل درس‌های احصاشده و تاییدشده:** `76` درس (`64` اصلی + `12` انتقالی CCNA دسته‌های ۱۲A و ۱۲B).
+### مسیر پیشرفته انتقالی (دسته ۱۲C — ۵ درس `adv_*` سابق ایجنت ۱)
+
+| شناسه | عنوان فارسی | مسیر / دوره پیشنهادی | Blueprint | Lab Script | گزارش بازبینی |
+|---|---|---|---|---|---|
+| `adv_01` | سوئیچینگ پیشرفته (Advanced Switching): MST (802.1s)، مکانیزم‌های Guard، تله BPDU Filter، UDLD و StackWise/SVL | `fam-advanced` / `adv-switching-routing` | `/academy-assets/v5/blueprints/adv_01.json` | `academy-labs/agent3/adv_01_lab.py` | `academy-labs/reviews/adv_01-review-fa.md` |
+| `adv_02` | مسیریابی پیشرفته (Advanced Routing): OSPF Multi-Area، انواع LSA (۱ تا ۷)، نواحی Stub/NSSA و خلاصه‌سازی | `fam-advanced` / `adv-switching-routing` | `/academy-assets/v5/blueprints/adv_02.json` | `academy-labs/agent3/adv_02_lab.py` | `academy-labs/reviews/adv_02-review-fa.md` |
+| `adv_03` | سرویس‌های پیشرفته (Advanced Services): جداسازی لایه ۳ با VRF-Lite، پایش فعال IP SLA + Track و NetFlow | `fam-advanced` / `adv-switching-routing` | `/academy-assets/v5/blueprints/adv_03.json` | `academy-labs/agent3/adv_03_lab.py` | `academy-labs/reviews/adv_03-review-fa.md` |
+| `adv_04` | عیب‌یابی پیشرفته (Advanced Troubleshooting): تفکیک Control/Data Plane (CEF)، تله MTU/MSS و Asymmetric Routing | `fam-advanced` / `adv-switching-routing` | `/academy-assets/v5/blueprints/adv_04.json` | `academy-labs/agent3/adv_04_lab.py` | `academy-labs/reviews/adv_04-review-fa.md` |
+| `adv_bfd` | همگرایی میلی‌ثانیه‌ای و تله‌متری پیشرفته: پروتکل BFD (RFC 5880) و Flexible NetFlow (v9 / IPFIX) | `fam-advanced` / `adv-switching-routing` | `/academy-assets/v5/blueprints/adv_bfd.json` | `academy-labs/agent3/adv_bfd_lab.py` | `academy-labs/reviews/adv_bfd-review-fa.md` |
+
+**جمع کل درس‌های احصاشده و تاییدشده:** `81` درس (`64` اصلی + `17` انتقالی کامل دسته‌های ۱۲A، ۱۲B و ۱۲C).
 
 ## ۴. خلاصه مهم‌ترین اصلاحات ممیزی نسخه قدیمی (Legacy Audit Fixes)
 

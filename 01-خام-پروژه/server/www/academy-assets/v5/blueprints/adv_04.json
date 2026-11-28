@@ -1,0 +1,343 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_04",
+  "objectiveId": "adv_04",
+  "kind": "lesson",
+  "track": "Advanced Switching & Routing (Transferred & Audited)",
+  "course": "adv-switching-routing",
+  "domain": "Enterprise Troubleshooting",
+  "title": "عیب‌یابی پیشرفته (Advanced Troubleshooting): تفکیک Control/Data Plane (CEF)، تله MTU/MSS و Asymmetric Routing",
+  "titleEn": "Advanced Troubleshooting: Control vs Data Plane (CEF), MTU/MSS PMTUD Blackhole & Asymmetric Routing",
+  "estimatedMinutes": 50,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy adv_04 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "adv_04",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc1191",
+      "https://www.rfc-editor.org/rfc/rfc2784",
+      "https://www.cisco.com/c/en/us/support/docs/ip/generic-routing-encapsulation-gre/25885-pmtud-ipfrag.html"
+    ],
+    "limitations": [
+      "هیچ روتر واقعی، تونل GRE/IPsec یا فایروال Stateful در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای محاسبه دقیق MTU/MSS و اندازه پینگ DF (IOS در برابر Linux/Windows)، شبیه‌سازی PMTUD Blackhole و تحلیل Asymmetric Routing روی Stateful Firewall و uRPF است."
+    ],
+    "legacyAuditFixes": [
+      "افزودن تفکیک عملیاتی حیاتی اندازه بسته در تست پینگ DF: در Cisco IOS عدد size کل بسته IP (1500) است اما در Linux (-s 1472) و Windows (-l 1472) فقط اندازه Payload ICMP است (+28 بایت هدر IP/ICMP).",
+      "تصریح پیام دقیق PMTUD (ICMP Type 3 Code 4 در IPv4 و ICMPv6 Type 2 در IPv6)، تفاوت uRPF Strict و Loose Mode، و بودجه امن GRE over IPsec (MTU 1400 / MSS 1360).",
+      "توسعه از ۳ بخش/۳ سؤال قدیمی به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با adv_04_lab.py بدون import پرچم‌دار."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_04-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-advanced",
+      "recommendedCourse": "adv-switching-routing",
+      "blueprint": "/academy-assets/v5/blueprints/adv_04.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_04_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲C: ساخت adv_04_lab.py بدون import پرچم‌دار با اعتبارسنجی دقیق بازه MTU، bool و سناریوهای PMTUD و Asymmetric Routing."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_04-section-1",
+      "title": "مسئله واقعی: چرا پینگ برقرار است اما صفحات HTTPS و SSH باز نمی‌شوند؟",
+      "html": "<p>یکی از مشهورترین و گیج‌کننده‌ترین تیکت‌های شبکه این است: «مسیر در <code>show ip route</code> وجود دارد و پینگ کاملاً برقرار است، اما صفحات HTTPS یا نشست SSH پس از اتصال قفل می‌شوند!» دو متهم اصلی این سناریوهای کلاسیک، <strong>PMTUD Blackhole (تله MTU/MSS روی تونل‌ها)</strong> و <strong>Asymmetric Routing روی فایروال‌های Stateful یا uRPF Strict</strong> هستند.</p>"
+    },
+    {
+      "id": "adv_04-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> TCP 3-Way Handshake، هدر IP/TCP، تونل GRE/IPsec و فایروال Stateful.</p><ul><li>تفکیک سیستماتیک خطای <strong>Control Plane (RIB)</strong> از خطای <strong>Data Plane (FIB/CEF/Adjacency)</strong>.</li><li>محاسبه دقیق <strong>MTU</strong> و <strong>TCP MSS</strong> روی اترنت، <strong>GRE خالص</strong> (<code>1476/1436</code>) و <strong>GRE over IPsec</strong> (<code>1400/1360</code>).</li><li>اجرای صحیح تست <strong>DF-bit Ping</strong> با دانستن تفاوت اندازه در Cisco IOS در برابر Linux/Windows.</li><li>کشف و رفع شکست TCP در <strong>Asymmetric Routing</strong> کنار فایروال‌های Stateful و <strong>uRPF Strict Mode</strong>.</li></ul>"
+    },
+    {
+      "id": "adv_04-section-3",
+      "title": "گام اول عیب‌یابی سیستماتیک: Control Plane (RIB) در برابر Data Plane (FIB/CEF)",
+      "html": "<p>در <strong>Control Plane</strong> پروتکل‌های OSPF/BGP جدول <strong>RIB</strong> (<code>show ip route</code>) را می‌سازند. اما فوروارد واقعی بسته در <strong>Data Plane</strong> با جداول <strong>FIB (<code>show ip cef</code>)</strong> و <strong>Adjacency (<code>show adjacency</code>)</strong> انجام می‌شود. اگر مسیر در RIB هست اما ترافیک نمی‌رسد، خطا در Data Plane است: ACL، فیلتر فایروال، MTU/Fragmentation، CoPP/Policer، عدم تطابق CEF یا uRPF.</p>"
+    },
+    {
+      "id": "adv_04-section-4",
+      "title": "ریاضیات دقیق MTU، TCP MSS و سربار تونل‌های GRE و IPsec",
+      "html": "<table><thead><tr><th>بستر / تونل</th><th>سربار اضافه</th><th><code>ip mtu</code> استاندارد</th><th><code>ip tcp adjust-mss</code></th></tr></thead><tbody><tr><td>اترنت استاندارد</td><td>۰ بایت</td><td><code>1500</code></td><td><code>1460</code> (1500 − 40)</td></tr><tr><td><strong>GRE خالص (IPv4)</strong></td><td>۲۴ بایت (20 IP + 4 GRE)</td><td><strong><code>1476</code></strong></td><td><strong><code>1436</code></strong> (1476 − 40)</td></tr><tr><td><strong>GRE over IPsec (امن)</strong></td><td>۵۰ تا ۷۶+ بایت (ESP/AES/HMAC)</td><td><strong><code>1400</code></strong> (مقدار ایمن رایج)</td><td><strong><code>1360</code></strong> (1400 − 40)</td></tr></tbody></table>"
+    },
+    {
+      "id": "adv_04-section-5",
+      "title": "تله PMTUD Blackhole: چرا پینگ کار می‌کند اما HTTPS قفل می‌شود؟",
+      "html": "<p>بسته پینگ عادی کمتر از ۱۰۰ بایت است و حتی با سربار تونل از ۱۵۰۰ بایت کوچک‌تر است. اما کلاینت و سرور روی MSS=1460 (بسته ۱۵۰۰ بایتی) با پرچم <strong><code>DF=1</code> (Don't Fragment)</strong> توافق می‌کنند. وقتی بسته ۱۵۰۰بایتی به تونل GRE با MTU=1476 می‌رسد، روتر آن را Drop کرده و پیام <strong>ICMP Type 3 Code 4 (Fragmentation Needed)</strong> (یا در IPv6 پیام <strong>ICMPv6 Type 2 Packet Too Big</strong>) برمی‌گرداند تا فرستنده طبق <strong>PMTUD (RFC 1191)</strong> اندازه بسته را کم کند. اگر فایروالی بین راه همه ICMPها را کورکورانه مسدود کرده باشد، این پیام به فرستنده نمی‌رسد و نشست TCP در <strong>PMTUD Blackhole</strong> قفل می‌ماند! راه‌حل: باز گذاشتن ICMP Fragmentation Needed + تنظیم <code>ip mtu</code> و <code>ip tcp adjust-mss</code> روی اینترفیس تونل.</p>"
+    },
+    {
+      "id": "adv_04-section-6",
+      "title": "نمودار معماری: Control/Data Plane، محاسبه MTU/MSS و Asymmetric Routing",
+      "html": "<p>در نمودار زیر روابط Control/Data Plane، اعداد GRE/IPsec و شکست Asymmetric Routing روی Stateful Firewall دیده می‌شود.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Control vs Data Plane CEF, GRE/IPsec MTU/MSS PMTUD Blackhole and Asymmetric Routing\"><rect x=\"16\" y=\"20\" width=\"212\" height=\"180\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"122\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">Control vs Data Plane</text><text x=\"122\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1d4ed8\">Control Plane (RIB):</text><text x=\"122\" y=\"88\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#0f172a\">show ip route | OSPF/BGP</text><text x=\"122\" y=\"116\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">Data Plane (FIB / CEF):</text><text x=\"122\" y=\"132\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#0f172a\">show ip cef | show adjacency</text><text x=\"122\" y=\"158\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">Route in RIB != Packet passes</text><text x=\"122\" y=\"174\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">(ACL, MTU, uRPF, FW state!)</text><rect x=\"246\" y=\"20\" width=\"266\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"379\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">MTU / MSS &amp; PMTUD Blackhole</text><text x=\"379\" y=\"68\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Eth 1500B = 20 IP + 20 TCP + 1460 MSS</text><text x=\"379\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">Pure GRE (-24B): MTU 1476 | MSS 1436</text><text x=\"379\" y=\"106\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1d4ed8\">GRE+IPsec Safe: MTU 1400 | MSS 1360</text><text x=\"379\" y=\"130\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">DF=1 + Blocked ICMP Type 3 Code 4</text><text x=\"379\" y=\"146\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">=&gt; Small Ping OK, HTTPS Hangs!</text><text x=\"379\" y=\"172\" text-anchor=\"middle\" font-size=\"8\" fill=\"#475569\">IOS ping size=total (1500) | Linux/Win=payload (1472)</text><rect x=\"530\" y=\"20\" width=\"214\" height=\"180\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"637\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Asymmetric Routing</text><text x=\"637\" y=\"72\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">SYN goes via FW-A</text><text x=\"637\" y=\"90\" text-anchor=\"middle\" font-size=\"9\" fill=\"#dc2626\">SYN-ACK returns via FW-B</text><text x=\"637\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#dc2626\">Unsynced Stateful FW Drops!</text><text x=\"637\" y=\"142\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">uRPF Strict Mode also drops</text><text x=\"637\" y=\"158\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">asymmetric ingress packets!</text><text x=\"637\" y=\"176\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#15803d\">Fix: Symmetric routing / HA sync</text></svg>"
+    },
+    {
+      "id": "adv_04-section-7",
+      "title": "تله عملیاتی پینگ DF-bit: تفاوت اندازه در Cisco IOS با Linux و Windows!",
+      "html": "<p>برای کشف مستقیم Path MTU از تست پینگ با پرچم DF استفاده می‌کنیم، اما مراقب تعریف عدد اندازه باشید: در <strong>Cisco IOS</strong> (<code>ping 10.1.1.2 size 1500 df-bit</code>) عدد <code>1500</code> <strong>کل اندازه بسته IP</strong> است (20 IP + 8 ICMP + 1472 داده). اما در <strong>Linux</strong> (<code>ping -M do -s 1472</code>) و <strong>Windows</strong> (<code>ping -f -l 1472</code>) عدد ورودی <strong>فقط اندازه Payload ICMP</strong> است و ۲۸ بایت هدر به آن اضافه می‌شود (<code>1472 + 28 = 1500</code>؛ برای MTU=1476 باید <code>1448</code> تست شود)!</p>"
+    },
+    {
+      "id": "adv_04-section-8",
+      "title": "عارضه Asymmetric Routing در کنار Stateful Firewall و uRPF Strict Mode",
+      "html": "<p>در شبکه دو-مسیره، اگر بسته <code>SYN</code> از <strong>FW-A</strong> خارج شود اما پاسخ <code>SYN-ACK</code> به‌دلیل اختلاف OSPF Cost یا BGP Local Preference از <strong>FW-B</strong> برگردد (<strong>Asymmetric Routing</strong>)، فایروال FW-B (در نبود همگام‌سازی کلاستر HA) هیچ نشستی برای آن در State Table خود نمی‌بیند و بسته را <strong>Drop</strong> می‌کند! همچنین اگر روی روتر <strong>uRPF Strict Mode</strong> (<code>ip verify unicast source reachable-via rx</code>) فعال باشد، بسته برگشتی روی اینترفیسی که بهترین مسیر بازگشت به مبدأ نیست بلافاصله Drop می‌گردد (برخلاف <strong>uRPF Loose Mode</strong> که فقط وجود هر مسیری در FIB را بررسی می‌کند).</p>"
+    },
+    {
+      "id": "adv_04-section-9",
+      "title": "تنظیم ip tcp adjust-mss چگونه MSS clamping انجام می‌دهد؟",
+      "html": "<p>دستور <code>ip tcp adjust-mss 1436</code> روی اینترفیس تونل، هنگام عبور بسته‌های <code>TCP SYN</code> و <code>SYN-ACK</code> فیلد MSS را در پرواز (On-the-fly) به ۱۴۳۶ کاهش می‌دهد تا هر دو طرف از ابتدا بسته‌های حداکثر ۱۴۷۶ بایتی تولید کنند و اصلاً نیازی به Fragmentation یا PMTUD نباشد.</p>"
+    },
+    {
+      "id": "adv_04-section-10",
+      "title": "روش‌شناسی لایه‌به‌لایه عیب‌یابی (Divide and Conquer)",
+      "html": "<p>به جای حدس زدن، از میانه شبکه (یا لایه ۳ به بالا/پایین) تست کنید: ۱) سلامت فیزیکی و ARP، ۲) وجود مسیر رفت‌وبرگشت در RIB و FIB/CEF، ۳) تست DF Ping با اندازه‌های کاهشی، و ۴) بررسی شمارنده‌های Drop در ACL، Stateful Firewall و uRPF.</p>"
+    },
+    {
+      "id": "adv_04-section-11",
+      "title": "کژفهمی‌های رایج در عیب‌یابی پیشرفته",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای امنیت، همه بسته‌های ICMP را روی فایروال مسدود کنیم!»</strong> واقعیت: مسدود کردن <code>ICMP Type 3 Code 4</code> (و ICMPv6 Type 2) باعث PMTUD Blackhole و اختلال گسترده HTTPS/VPN می‌شود.</li><li><strong>کژفهمی ۲: «اگر پینگ موفق است، پس مشکل قطعاً از برنامه کاربردی سرور است.»</strong> واقعیت: پینگ کوچک مشکلات MTU/MSS و قوانین TCP/پورت فایروال را آشکار نمی‌کند.</li><li><strong>کژفهمی ۳: «<code>uRPF Strict Mode</code> روی لینک‌های چندمسیره نامتقارن امن و بی‌دردسر است.»</strong> واقعیت: ترافیک نامتقارن مشروع را Drop می‌کند و در لینک‌های Multi-homed معمولاً باید Loose Mode به کار برد.</li></ul>"
+    },
+    {
+      "id": "adv_04-section-12",
+      "title": "چک‌لیست دستورات کلیدی عیب‌یابی در Cisco IOS-XE",
+      "html": "<p><code>show ip route</code> و <code>show ip cef &lt;prefix&gt; detail</code> برای مقایسه RIB/FIB؛ <code>show interface Tunnel0</code> برای بررسی MTU؛ <code>ping &lt;ip&gt; size 1476 df-bit</code> برای تست Path MTU؛ و <code>show ip interface</code> برای بررسی وضعیت uRPF و ACLهای ورودی/خروجی.</p>"
+    },
+    {
+      "id": "adv_04-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> روی تونل GRE خالص با بستر اترنت ۱۵۰۰ بایتی، چه مقادیری برای <code>ip mtu</code> و <code>ip tcp adjust-mss</code> تنظیم می‌شود؟ <strong>پاسخ:</strong> <code>ip mtu 1476</code> (1500−24) و <code>ip tcp adjust-mss 1436</code> (1476−40).</p><p><strong>تمرین ۲:</strong> از یک لپ‌تاپ Linux برای آزمون عبور بسته ۱۵۰۰بایتی بدون Fragmentation چه اندازه Payload باید در <code>ping -M do -s</code> داد؟ <strong>پاسخ:</strong> <code>1472</code> بایت (زیرا ۲۰ بایت IP + ۸ بایت ICMP به آن افزوده می‌شود).</p>"
+    },
+    {
+      "id": "adv_04-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc1191\" target=\"_blank\" rel=\"noopener\">RFC 1191 (Path MTU Discovery)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc2784\" target=\"_blank\" rel=\"noopener\">RFC 2784 (GRE)</a> و <a href=\"https://www.cisco.com/c/en/us/support/docs/ip/generic-routing-encapsulation-gre/25885-pmtud-ipfrag.html\" target=\"_blank\" rel=\"noopener\">مستند سیسکو درباره PMTUD، GRE و Fragmentation (Doc ID 25885)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی، تونل GRE یا فایروال Stateful در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "RIB vs FIB (CEF)",
+      "fa": "جدول Control Plane در برابر Data Plane",
+      "simple": "RIB خروجی پروتکل‌های مسیریابی است و FIB/CEF جدول فوروارد سخت‌افزاری واقعی."
+    },
+    {
+      "term": "MTU",
+      "fa": "حداکثر واحد انتقال",
+      "simple": "بزرگ‌ترین اندازه بسته لایه ۳ قابل عبور از یک لینک بدون Fragmentation (اترنت: 1500B)."
+    },
+    {
+      "term": "TCP MSS",
+      "fa": "حداکثر اندازه سگمنت TCP",
+      "simple": "بزرگ‌ترین داده TCP در یک بسته بدون هدرهای IP/TCP (MTU − 40 بایت = 1460 در اترنت)."
+    },
+    {
+      "term": "GRE Overhead (24B)",
+      "fa": "سربار تونل GRE خالص",
+      "simple": "۲۰ بایت هدر IPv4 بیرونی + ۴ بایت هدر GRE => MTU=1476 و MSS=1436."
+    },
+    {
+      "term": "GRE over IPsec MTU/MSS",
+      "fa": "تنظیم ایمن تونل رمزنگاری‌شده",
+      "simple": "به دلیل ۵۰ تا ۷۶+ بایت سربار ESP/GRE معمولاً MTU=1400 و MSS=1360 تنظیم می‌شود."
+    },
+    {
+      "term": "DF-Bit (Don't Fragment)",
+      "fa": "بیت منع قطعه‌بندی IP",
+      "simple": "پرچم هدر IPv4 که به روترها دستور می‌دهد بسته بزرگ‌تر از MTU را تکه‌تکه نکنند."
+    },
+    {
+      "term": "PMTUD (RFC 1191)",
+      "fa": "کشف خودکار Path MTU",
+      "simple": "کاهش اندازه بسته توسط فرستنده پس از دریافت ICMP Type 3 Code 4 (Fragmentation Needed)."
+    },
+    {
+      "term": "PMTUD Blackhole",
+      "fa": "سیاه‌چاله کشف MTU",
+      "simple": "قفل شدن HTTPS/SSH با وجود پینگ سالم به‌دلیل مسدود بودن ICMP Type 3 Code 4."
+    },
+    {
+      "term": "ip tcp adjust-mss",
+      "fa": "کاهش MSS در پرواز",
+      "simple": "بازنویسی فیلد MSS در بسته‌های SYN/SYN-ACK روی اینترفیس تونل برای پیشگیری از Fragmentation."
+    },
+    {
+      "term": "DF Ping Size (IOS vs OS)",
+      "fa": "تفاوت اندازه پینگ DF",
+      "simple": "در IOS کل بسته IP (1500) و در Linux/Windows فقط Payload ICMP (1472) وارد می‌شود."
+    },
+    {
+      "term": "Asymmetric Routing",
+      "fa": "مسیریابی نامتقارن رفت‌وبرگشت",
+      "simple": "عبور بسته رفت و برگشت یک نشست از دو مسیر یا دو فایروال متفاوت."
+    },
+    {
+      "term": "Stateful Firewall Drop",
+      "fa": "حذف بسته در فایروال باحالت",
+      "simple": "رد SYN-ACK یا داده برگشتی روی فایروال دوم به دلیل نبود نشست در State Table."
+    },
+    {
+      "term": "uRPF Strict Mode",
+      "fa": "بازرسی سخت‌گیرانه مسیر معکوس",
+      "simple": "حذف بسته‌ای که بهترین مسیر بازگشت به IP مبدأش از همان اینترفیس ورودی نباشد."
+    },
+    {
+      "term": "uRPF Loose Mode",
+      "fa": "بازرسی منعطف مسیر معکوس",
+      "simple": "فقط وجود هر مسیری به IP مبدأ در FIB را چک می‌کند (سازگار با مسیرهای نامتقارن)."
+    },
+    {
+      "term": "Adjacency Table (CEF)",
+      "fa": "جدول همسایگی لایه ۲ CEF",
+      "simple": "نگهداری هدرهای آماده لایه ۲ (MAC) برای فوروارد سریع در کنار FIB."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، محاسبه دقیق <code>ip mtu</code> و <code>ip tcp adjust-mss</code> (و اندازه پینگ DF در IOS در برابر Linux/Windows)، تفاوت عبور پینگ کوچک با قفل HTTPS در <code>PMTUD Blackhole</code> و حذف نشست TCP در <code>Asymmetric Routing</code> روی فایروال Stateful و uRPF Strict را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_04_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_04_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for adv_04 (Control/Data Plane CEF, MTU/MSS PMTUD &amp; Asymmetric Routing).\n\nBoundary: Pure in-memory simulation using Python stdlib only.\nNo real Cisco router, GRE/IPsec tunnel, stateful firewall, or ICMP probe is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef compute_tunnel_mtu_mss(\n    underlay_mtu: int,\n    encapsulation: str,\n    ipv4_tcp_header_bytes: int = 40,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Calculate exact tunnel IP MTU, TCP MSS, and IOS vs Linux/Windows DF ping payload sizes.&quot;&quot;&quot;\n    if type(underlay_mtu) is not int or not (576 &lt;= underlay_mtu &lt;= 9216):\n        raise ValueError(&quot;underlay_mtu must be an integer in 576..9216&quot;)\n    if type(ipv4_tcp_header_bytes) is not int or ipv4_tcp_header_bytes &lt; 40:\n        raise ValueError(&quot;ipv4_tcp_header_bytes must be &gt;= 40&quot;)\n\n    overheads = {\n        &quot;none_ethernet&quot;: 0,\n        &quot;gre_ipv4&quot;: 24,            # 20B outer IPv4 + 4B GRE\n        &quot;gre_over_ipsec_safe&quot;: 100,  # Conservative operational budget (typical 50-76+B -&gt; MTU 1400 / MSS 1360)\n    }\n    if encapsulation not in overheads:\n        raise ValueError(f&quot;Unsupported encapsulation: {encapsulation}&quot;)\n\n    ip_mtu = underlay_mtu - overheads[encapsulation]\n    tcp_mss = ip_mtu - ipv4_tcp_header_bytes\n    icmp_payload_linux_win = ip_mtu - 28  # 20B IPv4 + 8B ICMP\n    return {\n        &quot;encapsulation&quot;: encapsulation,\n        &quot;underlay_mtu&quot;: underlay_mtu,\n        &quot;ip_mtu&quot;: ip_mtu,\n        &quot;ip_tcp_adjust_mss&quot;: tcp_mss,\n        &quot;ios_ping_df_total_size&quot;: ip_mtu,\n        &quot;linux_win_ping_df_payload&quot;: icmp_payload_linux_win,\n    }\n\n\ndef simulate_pmtud_packet(\n    packet_size_bytes: int,\n    path_mtu_bytes: int,\n    df_bit: bool,\n    icmp_frag_needed_allowed: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate why small pings succeed while large HTTPS packets hit a PMTUD Blackhole.&quot;&quot;&quot;\n    if type(packet_size_bytes) is not int or packet_size_bytes &lt;= 0:\n        raise ValueError(&quot;packet_size_bytes must be a positive integer&quot;)\n    if type(path_mtu_bytes) is not int or path_mtu_bytes &lt; 576:\n        raise ValueError(&quot;path_mtu_bytes must be an integer &gt;= 576&quot;)\n    _require_bool(df_bit, &quot;df_bit&quot;)\n    _require_bool(icmp_frag_needed_allowed, &quot;icmp_frag_needed_allowed&quot;)\n\n    if packet_size_bytes &lt;= path_mtu_bytes:\n        return {&quot;outcome&quot;: &quot;DELIVERED&quot;, &quot;reason&quot;: &quot;PACKET_FITS_PATH_MTU&quot;}\n    if not df_bit:\n        return {&quot;outcome&quot;: &quot;FRAGMENTED_AND_DELIVERED&quot;, &quot;reason&quot;: &quot;DF_ZERO_ALLOWED_ROUTER_FRAGMENTATION&quot;}\n    if icmp_frag_needed_allowed:\n        return {&quot;outcome&quot;: &quot;PMTUD_CONVERGED&quot;, &quot;reason&quot;: &quot;ICMP_TYPE3_CODE4_LOWERED_SENDER_MSS&quot;}\n    return {&quot;outcome&quot;: &quot;PMTUD_BLACKHOLE_HANG&quot;, &quot;reason&quot;: &quot;DF_1_DROPPED_AND_ICMP_TYPE3_CODE4_BLOCKED&quot;}\n\n\ndef evaluate_asymmetric_flow(\n    outbound_fw: str,\n    return_fw: str,\n    fw_state_synced: bool,\n    urpf_strict_on_return: bool = False,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate TCP flow across symmetric vs asymmetric Stateful Firewalls and uRPF Strict Mode.&quot;&quot;&quot;\n    if not isinstance(outbound_fw, str) or not outbound_fw.strip():\n        raise ValueError(&quot;outbound_fw must be a non-empty string&quot;)\n    if not isinstance(return_fw, str) or not return_fw.strip():\n        raise ValueError(&quot;return_fw must be a non-empty string&quot;)\n    _require_bool(fw_state_synced, &quot;fw_state_synced&quot;)\n    _require_bool(urpf_strict_on_return, &quot;urpf_strict_on_return&quot;)\n\n    asymmetric = outbound_fw != return_fw\n    if not asymmetric:\n        return {&quot;tcp_established&quot;: True, &quot;asymmetric&quot;: False, &quot;reason&quot;: &quot;SYMMETRIC_PATH_OK&quot;}\n    if urpf_strict_on_return:\n        return {&quot;tcp_established&quot;: False, &quot;asymmetric&quot;: True, &quot;reason&quot;: &quot;DROPPED_BY_URPF_STRICT_MODE_ON_ASYMMETRIC_PATH&quot;}\n    if not fw_state_synced:\n        return {&quot;tcp_established&quot;: False, &quot;asymmetric&quot;: True, &quot;reason&quot;: &quot;STATEFUL_FW_B_DROPPED_SYN_ACK_NO_SESSION_STATE&quot;}\n    return {&quot;tcp_established&quot;: True, &quot;asymmetric&quot;: True, &quot;reason&quot;: &quot;ALLOWED_BY_CLUSTERED_STATE_SYNC&quot;}\n\n\ndef main() -&gt; None:\n    gre = compute_tunnel_mtu_mss(1500, &quot;gre_ipv4&quot;)\n    gre_ipsec = compute_tunnel_mtu_mss(1500, &quot;gre_over_ipsec_safe&quot;)\n    assert gre[&quot;ip_mtu&quot;] == 1476 and gre[&quot;ip_tcp_adjust_mss&quot;] == 1436\n    assert gre_ipsec[&quot;ip_mtu&quot;] == 1400 and gre_ipsec[&quot;ip_tcp_adjust_mss&quot;] == 1360\n\n    small_ping = simulate_pmtud_packet(100, 1476, True, False)\n    https_hang = simulate_pmtud_packet(1500, 1476, True, False)\n    https_fixed = simulate_pmtud_packet(1476, 1476, True, False)\n    assert small_ping[&quot;outcome&quot;] == &quot;DELIVERED&quot;\n    assert https_hang[&quot;outcome&quot;] == &quot;PMTUD_BLACKHOLE_HANG&quot;\n    assert https_fixed[&quot;outcome&quot;] == &quot;DELIVERED&quot;\n\n    asym_drop = evaluate_asymmetric_flow(&quot;FW-A&quot;, &quot;FW-B&quot;, fw_state_synced=False)\n    urpf_drop = evaluate_asymmetric_flow(&quot;FW-A&quot;, &quot;FW-B&quot;, fw_state_synced=True, urpf_strict_on_return=True)\n    assert asym_drop[&quot;tcp_established&quot;] is False and urpf_drop[&quot;tcp_established&quot;] is False\n\n    print(&quot;GRE MTU/MSS:&quot;, gre)\n    print(&quot;GRE+IPsec Safe MTU/MSS:&quot;, gre_ipsec)\n    print(&quot;PMTUD (Small Ping vs HTTPS Blackhole):&quot;, small_ping, https_hang)\n    print(&quot;Asymmetric Stateful FW / uRPF Strict:&quot;, asym_drop, urpf_drop)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> برای GRE خالص <code>1476/1436</code> و برای GRE+IPsec مقدار ایمن <code>1400/1360</code> محاسبه می‌شود؛ بسته 1500B با <code>DF=1</code> و مسدودیت ICMP به <code>PMTUD_BLACKHOLE_HANG</code> می‌خورد؛ و مسیر نامتقارن بدون HA Sync یا با uRPF Strict اتصال TCP را قطع می‌کند.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع تنظیم MTU و TCP MSS Clamping روی تونل GRE در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE GRE Tunnel MTU &amp; MSS Clamping (NOT executed on real router)\nconfigure terminal\n interface Tunnel0\n  ip address 172.16.0.1 255.255.255.252\n  ip mtu 1476\n  ip tcp adjust-mss 1436\n  tunnel source GigabitEthernet0/0\n  tunnel destination 203.0.113.2\nend\n! Verify DF Ping on IOS: ping 172.16.0.2 size 1476 df-bit</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "کاربری از پشت تونل GRE گزارش می‌دهد پینگ برقرار است اما صفحات HTTPS باز نمی‌شوند. بهترین آزمون مستقیم برای کشف ریشه مشکل چیست؟",
+      "options": [
+        "تعویض کابل پچ‌کورد",
+        "تست پینگ با پرچم Don't Fragment (DF) و اندازه بزرگ (مثلاً 1472 بایت Payload در Linux/Win یا size 1500 در IOS) برای کشف PMTUD Blackhole",
+        "تغییر VLAN به 99",
+        "خاموش کردن CEF"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پینگ بزرگ با پرچم DF فوراً آستانه Path MTU و شکست PMTUD را آشکار می‌کند.</p>"
+    },
+    {
+      "title": "در یک تونل <strong>GRE خالص</strong> (۲۴ بایت سربار) روی بستر اترنت ۱۵۰۰بایتی، مقادیر استاندارد <code>ip mtu</code> و <code>ip tcp adjust-mss</code> به‌ترتیب کدام‌اند؟",
+      "options": [
+        "1500 و 1500",
+        "1400 و 1460",
+        "1476 و 1436",
+        "1524 و 1480"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p><code>1500 - 24 = 1476</code> برای IP MTU و <code>1476 - 40 = 1436</code> برای TCP MSS.</p>"
+    },
+    {
+      "title": "چرا <strong>Asymmetric Routing</strong> میان دو فایروال Stateful مستقل و غیرهمگام باعث شکست ارتباط TCP می‌شود؟",
+      "options": [
+        "چون TTL دو برابر می‌شود",
+        "چون فایروال IPv4 ندارد",
+        "چون ARP پخش نمی‌شود",
+        "چون SYN از فایروال A عبور می‌کند و فایروال B هنگام رسیدن SYN-ACK هیچ نشستی در State Table خود نمی‌بیند و آن را Drop می‌کند"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>فایروال Stateful برای عبور بسته برگشتی نیازمند وجود وضعیت نشست از بسته SYN اولیه است.</p>"
+    },
+    {
+      "title": "کدام پیام ICMP اگر توسط فایروال مسدود شود، باعث بروز <strong>PMTUD Blackhole</strong> در IPv4 می‌شود؟",
+      "options": [
+        "ICMP Echo Request (Type 8)",
+        "ICMP Destination Unreachable — Fragmentation Needed (Type 3, Code 4)",
+        "ICMP Redirect",
+        "ICMP Timestamp"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پیام <code>Type 3 Code 4</code> (و در IPv6 پیام <code>ICMPv6 Type 2 Packet Too Big</code>) برای کارکرد PMTUD حیاتی است.</p>"
+    },
+    {
+      "title": "تفاوت عدد اندازه در تست پینگ DF بین <strong>Cisco IOS</strong> و <strong>Linux/Windows</strong> چیست؟",
+      "options": [
+        "در IOS عدد size کل بسته IP (مثلاً 1500) است اما در Linux (-s) و Windows (-l) فقط Payload ICMP است (مثلاً 1472 + 28 هدر = 1500)",
+        "هر دو دقیقاً Payload هستند",
+        "در IOS فقط بر حسب کیلوبایت است",
+        "در Linux پرچم DF وجود ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>اشتباه گرفتن 1500 و 1472 یکی از خطاهای رایج هنگام عیب‌یابی Path MTU است.</p>"
+    },
+    {
+      "title": "روی تونل <strong>GRE over IPsec</strong> (با سربار ۵۰ تا ۷۶+ بایت)، کدام جفت مقدار ایمن عملیاتی برای <code>ip mtu</code> و <code>ip tcp adjust-mss</code> رایج است؟",
+      "options": [
+        "MTU 1500 و MSS 1460",
+        "MTU 1400 و MSS 1360",
+        "MTU 9000 و MSS 8960",
+        "MTU 576 و MSS 1460"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تنظیم <code>ip mtu 1400</code> و <code>ip tcp adjust-mss 1360</code> حاشیه امن مناسب برای سربار متغیر ESP/AES/NAT-T فراهم می‌کند.</p>"
+    },
+    {
+      "title": "اگر مسیری در <code>show ip route</code> وجود دارد اما بسته در مسیر واقعی Drop می‌شود، کدام دستور جدول فوروارد واقعی <strong>Data Plane</strong> را در Cisco IOS نشان می‌دهد؟",
+      "options": [
+        "show ip cef <prefix> detail",
+        "show vlan brief",
+        "show cdp neighbors",
+        "show clock"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p><code>show ip cef</code> وضعیت FIB و Adjacency واقعی Data Plane را نمایش می‌دهد.</p>"
+    },
+    {
+      "title": "چه تفاوتی میان <strong>uRPF Strict Mode</strong> و <strong>uRPF Loose Mode</strong> در شبکه‌های دارای Asymmetric Routing وجود دارد؟",
+      "options": [
+        "Strict Mode بسته ورودی نامتقارن را Drop می‌کند زیرا بهترین مسیر بازگشت به مبدأ از همان اینترفیس ورودی نیست، اما Loose Mode فقط وجود هر مسیری در FIB را می‌سنجد",
+        "Loose Mode همیشه همه بسته‌ها را Drop می‌کند",
+        "Strict Mode فقط روی Wi-Fi است",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در لینک‌های Multi-homed نامتقارن، فعال‌سازی uRPF Strict Mode ترافیک مشروع را قطع می‌کند.</p>"
+    },
+    {
+      "title": "دستور <code>ip tcp adjust-mss 1436</code> روی کدام بسته‌های TCP اثر می‌گذارد؟",
+      "options": [
+        "روی بسته‌های داده پس از اتصال",
+        "روی بسته‌های اولیه TCP SYN و SYN-ACK در حین Handshake (MSS Clamping)",
+        "روی بسته‌های UDP",
+        "روی پیام‌های ARP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>MSS در مرحله 3-Way Handshake (بسته‌های SYN/SYN-ACK) مذاکره می‌شود و روتر آن را پیش از عبور کاهش می‌دهد.</p>"
+    },
+    {
+      "title": "چگونه می‌توان مشکل Asymmetric Routing را میان دو فایروال موازی حل کرد؟",
+      "options": [
+        "ایجاد تقارن مسیریابی (هم‌راستاسازی OSPF Cost / BGP Local Pref / MED) یا پیکربندی کلاستر Stateful HA با همگام‌سازی State Table",
+        "خاموش کردن فایروال‌ها",
+        "افزایش MTU به 9000",
+        "حذف Default Route"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>یا مسیر رفت‌وبرگشت باید متقارن شود یا دو فایروال باید State Table خود را همگام (Sync) کنند.</p>"
+    },
+    {
+      "title": "چرا پینگ ۱۰۰بایتی در شبکه دارای PMTUD Blackhole همچنان موفق است؟",
+      "options": [
+        "زیرا بسته ۱۰۰بایتی حتی پس از افزودن سربار GRE/IPsec بسیار کوچک‌تر از MTU=1500 است و هرگز به Fragmentation نیاز پیدا نمی‌کند",
+        "زیرا پینگ از لایه ۳ عبور نمی‌کند",
+        "زیرا پینگ رمزنگاری است",
+        "زیرا پینگ MSS=1460 دارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مشکل MTU تنها در بسته‌های بزرگ (مانند TLS Handshake با گواهی بزرگ یا انتقال داده HTTPS/SSH) آشکار می‌شود.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده روی تونل GRE/IPsec و دو فایروال FTD واقعی",
+        "پکت‌کپچر واقعی روی اینترنت",
+        "شبیه‌ساز محلی Python 3 برای محاسبه MTU/MSS، تست DF، شبیه‌سازی PMTUD Blackhole و تحلیل Asymmetric Routing بدون تجهیز واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ روتر یا فایروال واقعی متصل نیست.</p>"
+    }
+  ]
+}

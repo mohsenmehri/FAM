@@ -1,0 +1,343 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_01",
+  "objectiveId": "adv_01",
+  "kind": "lesson",
+  "track": "Advanced Switching & Routing (Transferred & Audited)",
+  "course": "adv-switching-routing",
+  "domain": "Enterprise Switching",
+  "title": "سوئیچینگ پیشرفته (Advanced Switching): MST (802.1s)، مکانیزم‌های Guard، تله BPDU Filter، UDLD و StackWise/SVL",
+  "titleEn": "Advanced Switching: MST (802.1s), STP Guards, BPDU Filter Trap, UDLD & StackWise/SVL",
+  "estimatedMinutes": 50,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy adv_01 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "adv_01",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc5171",
+      "https://www.cisco.com/c/en/us/products/collateral/switches/catalyst-9000/nb-06-cat-9k-stack-wp-cte-en.html",
+      "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/configuration_guide/lyr2/b_179_lyr2_9300_cg/configuring_mstp.html"
+    ],
+    "limitations": [
+      "هیچ سوئیچ واقعی Cisco Catalyst، لینک فیبر یا پشته StackWise/SVL در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای آزمون تطابق ۳کلیدی MST Region، مقایسه Guardها با تله Interface BPDU Filter و رفتار UDLD Aggressive است."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق Global BPDU Filter (ایمن؛ بازگشت به STP در دریافت BPDU) از Interface-level BPDU Filter (خطرناک؛ حذف کامل STP و ایجاد حلقه لایه ۲).",
+      "تصریح ناسازگاری هم‌زمان Root Guard و Loop Guard روی یک پورت واحد و تفکیک سخت‌افزاری StackWise (C9200/C9300) از StackWise Virtual (C9400/C9500/C9600 با لایسنس Network Advantage و DAD).",
+      "توسعه از ۳ بخش/۳ سؤال قدیمی به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با adv_01_lab.py بدون import پرچم‌دار."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_01-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-advanced",
+      "recommendedCourse": "adv-switching-routing",
+      "blueprint": "/academy-assets/v5/blueprints/adv_01.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_01_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲C: ساخت adv_01_lab.py بدون import پرچم‌دار با اعتبارسنجی سخت‌گیرانه ناسازگاری Root/Loop Guard، محدوده Revision و bool."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_01-section-1",
+      "title": "مسئله واقعی: چرا Rapid PVST+ با صدها VLAN سربار سنگین CPU می‌سازد و چرا یک رشته فیبر قطع‌شده شبکه را فلج می‌کند؟",
+      "html": "<p>در <strong>Rapid PVST+</strong> سیسکو، برای هر VLAN یک نمونه STP جداگانه محاسبه می‌شود؛ ۳۰۰ VLAN روی ۱۰ ترانک یعنی ۳۰۰۰ جریان BPDU در هر ۲ ثانیه! افزون بر این، در شبکه‌های تولیدی بدون Guardها و <strong>UDLD</strong>، اتصال یک سوئیچ رومیزی توسط کاربر یا قطع شدن تنها رشته RX یک لینک فیبر می‌تواند طی ثانیه‌ای طوفان Broadcast و حلقه لایه ۲ ایجاد کند.</p>"
+    },
+    {
+      "id": "adv_01-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> STP/RSTP، پورت‌های Access/Trunk و EtherChannel.</p><ul><li>مقیاس‌پذیری لایه ۲ با <strong>MST (IEEE 802.1s)</strong> و کنترل سه شرط هم‌ناحیه‌بودن (<strong>MST Region</strong>).</li><li>جایگذاری دقیق <strong>BPDU Guard</strong>، <strong>Root Guard</strong>، <strong>Loop Guard</strong> و اجتناب از تله <strong>Interface-level BPDU Filter</strong>.</li><li>کشف لینک یک‌طرفه فیبر با <strong>UDLD Normal در برابر Aggressive</strong> (RFC 5171).</li><li>حذف لینک‌های مسدود STP با <strong>StackWise</strong> و <strong>StackWise Virtual (SVL)</strong>.</li></ul>"
+    },
+    {
+      "id": "adv_01-section-3",
+      "title": "معماری MST (IEEE 802.1s) و سه شرط اجباری MST Region",
+      "html": "<p>استاندارد <strong>MST (IEEE 802.1s / 802.1Q)</strong> از همگرایی زیرثانیه‌ای RSTP ارث می‌برد اما صدها VLAN را به تعداد محدودی <strong>Instance</strong> نگاشت می‌کند (مثلاً Instance 1 برای VLANهای زوج با Root روی Dist-A و Instance 2 برای فرد روی Dist-B؛ تمام VLANهای نگاشت‌نشده عضو <strong>Instance 0 / IST</strong> می‌مانند). برای عضویت دو سوئیچ در یک <strong>MST Region</strong> مشترک، هر سه پارامتر زیر باید دقیقاً یکسان باشند: (۱) <strong>Region Name</strong> (حساس به حروف بزرگ/کوچک)، (۲) <strong>Revision Number</strong>، و (۳) <strong>جدول نگاشت VLAN-to-Instance</strong>. اختلاف در هر یک، دو سوئیچ را به دو Region مجزا می‌شکند که تنها روی <strong>CIST (Instance 0)</strong> همگرا می‌شوند.</p>"
+    },
+    {
+      "id": "adv_01-section-4",
+      "title": "ماتریس جعبه‌ابزار STP Guards: BPDU Guard، Root Guard و Loop Guard",
+      "html": "<table><thead><tr><th>مکانیزم</th><th>محل اعمال</th><th>رخداد تحریک‌کننده</th><th>وضعیت پورت و بازیابی</th></tr></thead><tbody><tr><td><strong>BPDU Guard</strong></td><td>پورت‌های لبه PortFast کاربر</td><td>دریافت هر BPDU</td><td><code>err-disabled</code> (نیازمند بازیابی دستی یا errdisable recovery)</td></tr><tr><td><strong>Root Guard</strong></td><td>پورت‌های Distribution رو به Access/مشتری</td><td>دریافت BPDU برتر (Superior)</td><td><code>root-inconsistent</code> (مسدود؛ بازیابی خودکار پس از توقف BPDU برتر)</td></tr><tr><td><strong>Loop Guard</strong></td><td>پورت‌های Non-Designated (Root/Alternate)</td><td>توقف ناگهانی دریافت BPDU</td><td><code>loop-inconsistent</code> (مسدود؛ مانع تبدیل به Forwarding و حلقه)</td></tr></tbody></table><p><strong>نکته طراحی:</strong> <code>Root Guard</code> و <code>Loop Guard</code> روی یک پورت واحد <strong>ناسازگار (Mutually Exclusive)</strong> هستند.</p>"
+    },
+    {
+      "id": "adv_01-section-5",
+      "title": "تله خطرناک: تفاوت Global BPDU Filter با Interface-Level BPDU Filter",
+      "html": "<p>فعال‌سازی <strong>سراسری</strong> (<code>spanning-tree portfast bpdufilter default</code>) روی پورت‌های PortFast تا زمانی که BPDU نرسد از ارسال BPDU جلوگیری می‌کند، اما به محض دریافت یک BPDU، فیلتر را غیرفعال کرده و پورت را به STP عادی برمی‌گرداند. در مقابل، دستور <strong>سطح اینترفیس</strong> (<code>spanning-tree bpdufilter enable</code>) تمام BPDUهای ورودی و خروجی را <strong>بی‌قیدوشرط Drop می‌کند</strong> و عملاً STP را خاموش می‌سازد؛ اگر کاربری دو پورت را با یک سوئیچ کوچک وصل کند، <strong>حلقه لایه ۲ فوری</strong> شکل می‌گیرد!</p>"
+    },
+    {
+      "id": "adv_01-section-6",
+      "title": "نمودار معماری: MST Region، ماتریس STP Guards، UDLD و StackWise/SVL",
+      "html": "<p>در نمودار زیر سه شرط MST Region، تفاوت Guardها با تله BPDU Filter، و نقش UDLD و StackWise نمایش داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"MST 802.1s Regions, STP Guards, UDLD Aggressive and StackWise/SVL\"><rect x=\"16\" y=\"20\" width=\"216\" height=\"180\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"124\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">MST (IEEE 802.1s)</text><text x=\"124\" y=\"70\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">3 Must-Match Region Keys:</text><text x=\"124\" y=\"90\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1d4ed8\">1) Region Name</text><text x=\"124\" y=\"108\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1d4ed8\">2) Revision Number</text><text x=\"124\" y=\"126\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1d4ed8\">3) VLAN-to-Instance Map</text><text x=\"124\" y=\"152\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">Mismatch =&gt; Separate Regions</text><text x=\"124\" y=\"168\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">(Interoperate via CIST / Inst 0)</text><rect x=\"250\" y=\"20\" width=\"260\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">STP Guards &amp; Filter Trap</text><text x=\"380\" y=\"70\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">BPDU Guard (PortFast) =&gt; err-disabled</text><text x=\"380\" y=\"90\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1d4ed8\">Root Guard (Downlink) =&gt; root-inconsistent</text><text x=\"380\" y=\"110\" text-anchor=\"middle\" font-size=\"9\" fill=\"#7c3aed\">Loop Guard (Non-Des) =&gt; loop-inconsistent</text><text x=\"380\" y=\"132\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#78350f\">(Root Guard &amp; Loop Guard mutually exclusive!)</text><rect x=\"264\" y=\"144\" width=\"232\" height=\"44\" rx=\"6\" fill=\"#fee2e2\" stroke=\"#dc2626\"/><text x=\"380\" y=\"162\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#991b1b\">TRAP: Interface BPDU Filter</text><text x=\"380\" y=\"178\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#991b1b\">Silently drops BPDUs =&gt; Instant L2 Loop!</text><rect x=\"528\" y=\"20\" width=\"216\" height=\"180\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"636\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">UDLD &amp; StackWise / SVL</text><text x=\"636\" y=\"70\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">UDLD (RFC 5171 — Cisco):</text><text x=\"636\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Aggressive: 8 probes -&gt; err-dis</text><text x=\"636\" y=\"106\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">(Works on EtherChannel/L3 too!)</text><text x=\"636\" y=\"136\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">StackWise (C9200/9300)</text><text x=\"636\" y=\"154\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">SVL (C9400/9500/9600 Adv)</text><text x=\"636\" y=\"174\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#1d4ed8\">MEC eliminates STP blocked links</text></svg>"
+    },
+    {
+      "id": "adv_01-section-7",
+      "title": "پروتکل UDLD (RFC 5171): Normal Mode در برابر Aggressive Mode",
+      "html": "<p>روی فیبر نوری دو-رشته (TX/RX)، قطع شدن رشته RX باعث <strong>لینک یک‌طرفه</strong> می‌شود: سوئیچ محلی لینک را Up می‌بیند، BPDU دریافت نمی‌کند و ممکن است پورت مسدود را به Forwarding ببرد! <strong>UDLD</strong> بسته‌های لایه ۲ می‌فرستد و منتظر Echo همسایه می‌ماند: در <strong>Normal Mode</strong> تنها هنگام اثبات قطعی لینک یک‌طرفه پورت را err-disable می‌کند (در حالت نامشخص فقط لاگ می‌دهد)، اما در <strong>Aggressive Mode</strong> پس از قطع Echo، ۸ بار پشت‌سرهم (هر ۱ ثانیه) کاوشگر می‌فرستد و در نبود پاسخ پورت را در وضعیت <strong><code>err-disabled</code></strong> قفل می‌کند. مزیت مهم UDLD نسبت به Loop Guard این است که روی لینک‌های فاقد STP (مانند لینک‌های لایه ۳ یا اعضای EtherChannel) نیز عمل می‌کند.</p>"
+    },
+    {
+      "id": "adv_01-section-8",
+      "title": "حذف گلوگاه STP با StackWise و StackWise Virtual (SVL)",
+      "html": "<p>با تجمیع چند سوئیچ فیزیکی در یک صفحه کنترل واحد (<strong>Control Plane</strong> واحد)، می‌توان از <strong>Multi-Chassis EtherChannel (MEC)</strong> بهره برد تا تمام آپلینک‌ها هم‌زمان Active باشند و هیچ پورتی توسط STP مسدود نشود. <strong>StackWise</strong> با کابل‌های پشتی اختصاصی در سری‌های دسترسی مانند Catalyst 9200/9300 کار می‌کند؛ در حالی که <strong>StackWise Virtual (SVL)</strong> برای سوئیچ‌های توزیع/هسته <strong>Catalyst 9400، 9500 و 9600 (با لایسنس Network Advantage)</strong> طراحی شده و برای جلوگیری از Split-Brain نیازمند لینک <strong>Dual-Active Detection (DAD)</strong> است.</p>"
+    },
+    {
+      "id": "adv_01-section-9",
+      "title": "تعامل MST با شبکه‌های PVST+ قدیمی (PVST Simulation)",
+      "html": "<p>هنگام اتصال یک ناحیه MST به سوئیچ‌های Rapid PVST+، مرز MST از مکانیزم PVST Simulation استفاده می‌کند. سوئیچ‌های MST باید Root Bridge ناحیه CIST باشند یا قوانین سازگاری مرزی رعایت شود تا پورت مرزی وارد حالت <code>PVST_Inc</code> (مسدود) نشود.</p>"
+    },
+    {
+      "id": "adv_01-section-10",
+      "title": "بهترین روش‌های عملیاتی پایداری لایه ۲",
+      "html": "<p>توصیه استاندارد پردیسی: استفاده از Rapid PVST+ در شبکه‌های کوچک/متوسط و MST در شبکه‌های با VLANهای پرشمار؛ فعال‌سازی <code>bpduguard default</code> روی کل پورت‌های Access/PortFast؛ فعال‌سازی <code>udld aggressive</code> روی تمام لینک‌های فیبر؛ و حرکت به سمت طراحی Routed Access یا SVL/MEC در هسته.</p>"
+    },
+    {
+      "id": "adv_01-section-11",
+      "title": "کژفهمی‌های رایج در Advanced Switching",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای امنیت پورت کاربر، <code>spanning-tree bpdufilter enable</code> زیر اینترفیس معادل BPDU Guard است.»</strong> واقعیت: کاملاً خطرناک است؛ این دستور STP را خاموش کرده و باعث حلقه لایه ۲ می‌شود.</li><li><strong>کژفهمی ۲: «فقط یکسان بودن نام Region در MST کافی است.»</strong> واقعیت: نام، Revision و جدول نگاشت VLAN-to-Instance هر سه باید دقیقاً یکسان باشند.</li><li><strong>کژفهمی ۳: «StackWise Virtual روی Catalyst 9200/9300 هم پشتیبانی می‌شود.»</strong> واقعیت: SVL مختص سری‌های C9400/C9500/C9600 (لایسنس Network Advantage) است.</li></ul>"
+    },
+    {
+      "id": "adv_01-section-12",
+      "title": "عیب‌یابی خطاهای MST، Guardها و UDLD",
+      "html": "<p>برای عیب‌یابی از <code>show spanning-tree mst configuration</code> (مقایسه دقیق Digest هگز جدول VLANها بین دو سوئیچ)، <code>show spanning-tree inconsistentports</code> (دیدن پورت‌های <code>root-inconsistent</code> / <code>loop-inconsistent</code>)، <code>show udld neighbors</code> و <code>show interfaces status err-disabled</code> استفاده کنید.</p>"
+    },
+    {
+      "id": "adv_01-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> روی پورت کاربر <code>Gi0/3</code> دستور <code>spanning-tree bpdufilter enable</code> زیر اینترفیس اجرا شده و کاربری دو پورت را با سوئیچ کوچک وصل می‌کند. چه رخ می‌دهد؟ <strong>پاسخ:</strong> BPDUها نادیده گرفته می‌شوند و حلقه لایه ۲ شکل می‌گیرد (در حالی که با BPDU Guard پورت فوراً <code>err-disabled</code> می‌شد).</p><p><strong>تمرین ۲:</strong> چرا UDLD Aggressive روی اعضای یک EtherChannel فیبری مکمل حیاتی Loop Guard است؟ <strong>پاسخ:</strong> چون Loop Guard روی کل Port-Channel منطقی عمل می‌کند و افت یک‌طرفه یک عضو را نمی‌بیند، اما UDLD تک‌تک لینک‌های فیزیکی را پایش و err-disable می‌کند.</p>"
+    },
+    {
+      "id": "adv_01-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc5171\" target=\"_blank\" rel=\"noopener\">RFC 5171 (Cisco UDLD)</a>، <a href=\"https://www.cisco.com/c/en/us/products/collateral/switches/catalyst-9000/nb-06-cat-9k-stack-wp-cte-en.html\" target=\"_blank\" rel=\"noopener\">وایت‌پیپر Catalyst 9000 StackWise و SVL</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/configuration_guide/lyr2/b_179_lyr2_9300_cg/configuring_mstp.html\" target=\"_blank\" rel=\"noopener\">راهنمای MST سیسکو Catalyst 9300</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ سوئیچ واقعی Catalyst یا لینک فیبر در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "MST (IEEE 802.1s)",
+      "fa": "درخت پوشای چندگانه",
+      "simple": "نگاشت صدها VLAN به چند Instance محدود برای کاهش بار CPU و ترافیک BPDU."
+    },
+    {
+      "term": "MST Region",
+      "fa": "ناحیه مشترک MST",
+      "simple": "گروه سوئیچ‌های دارای Region Name، Revision Number و جدول VLAN-to-Instance دقیقاً یکسان."
+    },
+    {
+      "term": "IST / CIST (Instance 0)",
+      "fa": "نمونه پیش‌فرض MST",
+      "simple": "درخت پیش‌فرض حامل VLANهای نگاشت‌نشده و رابط میان Regionهای مختلف."
+    },
+    {
+      "term": "BPDU Guard",
+      "fa": "محافظ BPDU روی PortFast",
+      "simple": "ورود فوری پورت Access به err-disabled هنگام دریافت هر BPDU."
+    },
+    {
+      "term": "Root Guard",
+      "fa": "محافظ Root Bridge",
+      "simple": "ورود پورت رو به پایین‌دست به حالت root-inconsistent در دریافت BPDU برتر."
+    },
+    {
+      "term": "Loop Guard",
+      "fa": "محافظ حلقه یک‌طرفه STP",
+      "simple": "ورود پورت Non-Designated به loop-inconsistent هنگام توقف ناگهانی BPDUها."
+    },
+    {
+      "term": "Interface BPDU Filter",
+      "fa": "تله خاموش‌سازی STP",
+      "simple": "دستور سطح اینترفیس که BPDUها را بی‌قیدوشرط Drop کرده و خطر حلقه فوری ایجاد می‌کند."
+    },
+    {
+      "term": "Global BPDU Filter",
+      "fa": "فیلتر سراسری PortFast",
+      "simple": "ارسال BPDU را متوقف می‌کند ولی با دریافت اولین BPDU به STP عادی بازمی‌گردد."
+    },
+    {
+      "term": "UDLD (RFC 5171)",
+      "fa": "تشخیص لینک یک‌طرفه سیسکو",
+      "simple": "پروتکل لایه ۲ برای کشف قطع یک‌طرفه رشته TX/RX روی فیبر نوری."
+    },
+    {
+      "term": "UDLD Aggressive",
+      "fa": "مد تهاجمی UDLD",
+      "simple": "ارسال ۸ کاوشگر متوالی در قطع Echo و قفل کردن پورت در err-disabled."
+    },
+    {
+      "term": "StackWise",
+      "fa": "پشته فیزیکی کاتالیست",
+      "simple": "تجمیع سوئیچ‌های C9200/C9300 با کابل Backplane در یک Control Plane واحد."
+    },
+    {
+      "term": "StackWise Virtual (SVL)",
+      "fa": "پشته مجازی فیبری",
+      "simple": "تجمیع ۲ سوئیچ C9400/C9500/C9600 (Network Advantage) با لینک DAD و MEC."
+    },
+    {
+      "term": "MEC",
+      "fa": "اترچنل چندشاسی",
+      "simple": "تجمیع لینک به دو سوئیچ فیزیکی مجزا بدون مسدودسازی پورت توسط STP."
+    },
+    {
+      "term": "DAD",
+      "fa": "تشخیص دو-فعال SVL",
+      "simple": "لینک کمکی پیشگیری از Split-Brain هنگام قطع لینک VSL در StackWise Virtual."
+    },
+    {
+      "term": "Digest (MST)",
+      "fa": "چکیده MD5 جدول نگاشت MST",
+      "simple": "مقدار هگز مبادله‌شده در BPDUهای MST برای راستی‌آزمایی همسانی جدول VLANها."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، تطابق ۳پارامتری MST Region، خطر حلقه در <code>Interface BPDU Filter</code> در برابر <code>BPDU Guard</code>، رفتار <code>Root Guard</code> و <code>Loop Guard</code> (و ناسازگاری هم‌زمانشان) و قفل <code>err-disabled</code> در <code>UDLD Aggressive</code> را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_01_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_01_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for adv_01 (MST 802.1s, STP Guards, BPDU Filter Trap, UDLD &amp; SVL).\n\nBoundary: Pure in-memory simulation using Python stdlib only.\nNo real Cisco Catalyst switch, live STP domain, or fiber link is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _require_non_empty_str(val: object, name: str) -&gt; str:\n    if not isinstance(val, str) or not val.strip():\n        raise ValueError(f&quot;{name} must be a non-empty string&quot;)\n    return val.strip()\n\n\ndef evaluate_mst_region_match(\n    sw1: dict[str, object],\n    sw2: dict[str, object],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Check whether two switches belong to the same IEEE 802.1s MST Region.&quot;&quot;&quot;\n    mismatches = []\n    for key in (&quot;region_name&quot;, &quot;revision&quot;, &quot;vlan_to_instance&quot;):\n        if key not in sw1 or key not in sw2:\n            raise ValueError(f&quot;Missing required MST parameter: {key}&quot;)\n    _require_non_empty_str(sw1[&quot;region_name&quot;], &quot;sw1.region_name&quot;)\n    _require_non_empty_str(sw2[&quot;region_name&quot;], &quot;sw2.region_name&quot;)\n    for side, rev in ((&quot;sw1&quot;, sw1[&quot;revision&quot;]), (&quot;sw2&quot;, sw2[&quot;revision&quot;])):\n        if type(rev) is not int or not (0 &lt;= rev &lt;= 65535):\n            raise ValueError(f&quot;{side}.revision must be an int in 0..65535&quot;)\n    if sw1[&quot;region_name&quot;] != sw2[&quot;region_name&quot;]:\n        mismatches.append(&quot;REGION_NAME_MISMATCH&quot;)\n    if sw1[&quot;revision&quot;] != sw2[&quot;revision&quot;]:\n        mismatches.append(&quot;REVISION_NUMBER_MISMATCH&quot;)\n    if sw1[&quot;vlan_to_instance&quot;] != sw2[&quot;vlan_to_instance&quot;]:\n        mismatches.append(&quot;VLAN_TO_INSTANCE_MAP_MISMATCH&quot;)\n    return {\n        &quot;same_mst_region&quot;: len(mismatches) == 0,\n        &quot;mismatches&quot;: mismatches,\n        &quot;fallback_behavior&quot;: &quot;Separate regions interoperate only via CIST (Instance 0)&quot; if mismatches else &quot;Full multi-instance MST region&quot;,\n    }\n\n\ndef evaluate_stp_port_protection(\n    port_role: str,\n    event: str,\n    bpdu_guard: bool = False,\n    root_guard: bool = False,\n    loop_guard: bool = False,\n    interface_bpdu_filter: bool = False,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate STP Guard and interface-level BPDU Filter outcomes.&quot;&quot;&quot;\n    for name, val in (\n        (&quot;bpdu_guard&quot;, bpdu_guard),\n        (&quot;root_guard&quot;, root_guard),\n        (&quot;loop_guard&quot;, loop_guard),\n        (&quot;interface_bpdu_filter&quot;, interface_bpdu_filter),\n    ):\n        _require_bool(val, name)\n    if root_guard and loop_guard:\n        raise ValueError(&quot;root_guard and loop_guard are mutually exclusive on the same port&quot;)\n    if port_role not in (&quot;access_portfast&quot;, &quot;distribution_downlink&quot;, &quot;non_designated_uplink&quot;):\n        raise ValueError(f&quot;Unsupported port_role: {port_role}&quot;)\n    if event not in (&quot;bpdu_received&quot;, &quot;superior_bpdu_received&quot;, &quot;bpdus_stopped_rx_dead&quot;):\n        raise ValueError(f&quot;Unsupported event: {event}&quot;)\n\n    if interface_bpdu_filter and event in (&quot;bpdu_received&quot;, &quot;superior_bpdu_received&quot;):\n        return {\n            &quot;port_state&quot;: &quot;forwarding_unsafe&quot;,\n            &quot;l2_loop_risk&quot;: True,\n            &quot;reason&quot;: &quot;INTERFACE_BPDU_FILTER_DROPS_BPDUS_AND_DISABLES_STP&quot;,\n        }\n    if event == &quot;bpdu_received&quot; and bpdu_guard:\n        return {&quot;port_state&quot;: &quot;err-disabled&quot;, &quot;l2_loop_risk&quot;: False, &quot;reason&quot;: &quot;BPDU_GUARD_SHUTDOWN&quot;}\n    if event == &quot;superior_bpdu_received&quot; and root_guard:\n        return {&quot;port_state&quot;: &quot;root-inconsistent&quot;, &quot;l2_loop_risk&quot;: False, &quot;reason&quot;: &quot;ROOT_GUARD_BLOCKED_SUPERIOR_BPDU&quot;}\n    if event == &quot;bpdus_stopped_rx_dead&quot; and loop_guard:\n        return {&quot;port_state&quot;: &quot;loop-inconsistent&quot;, &quot;l2_loop_risk&quot;: False, &quot;reason&quot;: &quot;LOOP_GUARD_PREVENTED_UNIDIRECTIONAL_LOOP&quot;}\n    return {&quot;port_state&quot;: &quot;forwarding_or_reconverged&quot;, &quot;l2_loop_risk&quot;: event == &quot;bpdus_stopped_rx_dead&quot;, &quot;reason&quot;: &quot;NO_MATCHING_GUARD_ACTIVE&quot;}\n\n\ndef evaluate_udld_fiber_fault(mode: str, rx_fiber_cut: bool, missed_echoes: int) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate Cisco UDLD Normal vs Aggressive behavior on an RX-cut unidirectional fiber.&quot;&quot;&quot;\n    if mode not in (&quot;disabled&quot;, &quot;normal&quot;, &quot;aggressive&quot;):\n        raise ValueError(&quot;mode must be &#x27;disabled&#x27;, &#x27;normal&#x27;, or &#x27;aggressive&#x27;&quot;)\n    _require_bool(rx_fiber_cut, &quot;rx_fiber_cut&quot;)\n    if type(missed_echoes) is not int or missed_echoes &lt; 0:\n        raise ValueError(&quot;missed_echoes must be a non-negative integer&quot;)\n    if not rx_fiber_cut:\n        return {&quot;mode&quot;: mode, &quot;port_state&quot;: &quot;up&quot;, &quot;action&quot;: &quot;HEALTHY_BIDIRECTIONAL_LINK&quot;}\n    if mode == &quot;aggressive&quot; and missed_echoes &gt;= 8:\n        return {&quot;mode&quot;: mode, &quot;port_state&quot;: &quot;err-disabled&quot;, &quot;action&quot;: &quot;UDLD_AGGRESSIVE_LOCKED_PORT_AFTER_8_PROBES&quot;}\n    if mode == &quot;normal&quot;:\n        return {&quot;mode&quot;: mode, &quot;port_state&quot;: &quot;undetermined_up_risk&quot;, &quot;action&quot;: &quot;UDLD_NORMAL_LOGS_ONLY_ON_UNKNOWN_LINK_LOSS&quot;}\n    return {&quot;mode&quot;: mode, &quot;port_state&quot;: &quot;up_l2_loop_risk&quot;, &quot;action&quot;: &quot;UNIDIRECTIONAL_FAULT_UNDETECTED&quot;}\n\n\ndef main() -&gt; None:\n    sw1 = {&quot;region_name&quot;: &quot;CORP_MST&quot;, &quot;revision&quot;: 2, &quot;vlan_to_instance&quot;: {1: [10, 20], 2: [30, 40]}}\n    sw2_ok = {&quot;region_name&quot;: &quot;CORP_MST&quot;, &quot;revision&quot;: 2, &quot;vlan_to_instance&quot;: {1: [10, 20], 2: [30, 40]}}\n    sw2_bad = {&quot;region_name&quot;: &quot;CORP_MST&quot;, &quot;revision&quot;: 3, &quot;vlan_to_instance&quot;: {1: [10, 20], 2: [30, 40]}}\n    assert evaluate_mst_region_match(sw1, sw2_ok)[&quot;same_mst_region&quot;] is True\n    assert evaluate_mst_region_match(sw1, sw2_bad)[&quot;same_mst_region&quot;] is False\n\n    filt_trap = evaluate_stp_port_protection(&quot;access_portfast&quot;, &quot;bpdu_received&quot;, interface_bpdu_filter=True)\n    guard_ok = evaluate_stp_port_protection(&quot;access_portfast&quot;, &quot;bpdu_received&quot;, bpdu_guard=True)\n    root_ok = evaluate_stp_port_protection(&quot;distribution_downlink&quot;, &quot;superior_bpdu_received&quot;, root_guard=True)\n    loop_ok = evaluate_stp_port_protection(&quot;non_designated_uplink&quot;, &quot;bpdus_stopped_rx_dead&quot;, loop_guard=True)\n    assert filt_trap[&quot;l2_loop_risk&quot;] is True\n    assert guard_ok[&quot;port_state&quot;] == &quot;err-disabled&quot;\n    assert root_ok[&quot;port_state&quot;] == &quot;root-inconsistent&quot;\n    assert loop_ok[&quot;port_state&quot;] == &quot;loop-inconsistent&quot;\n\n    udld_agg = evaluate_udld_fiber_fault(&quot;aggressive&quot;, True, 8)\n    assert udld_agg[&quot;port_state&quot;] == &quot;err-disabled&quot;\n\n    print(&quot;MST Match vs Mismatch:&quot;, evaluate_mst_region_match(sw1, sw2_ok), evaluate_mst_region_match(sw1, sw2_bad))\n    print(&quot;Interface BPDU Filter Trap:&quot;, filt_trap)\n    print(&quot;Guards (BPDU/Root/Loop):&quot;, guard_ok, root_ok, loop_ok)\n    print(&quot;UDLD Aggressive:&quot;, udld_agg)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> اختلاف Revision به جدایی MST Region می‌انجامد؛ <code>interface_bpdu_filter=True</code> پرچم <code>l2_loop_risk=True</code> برمی‌گرداند؛ <code>BPDU/Root/Loop Guard</code> به‌ترتیب <code>err-disabled</code>، <code>root-inconsistent</code> و <code>loop-inconsistent</code> می‌دهند؛ و <code>UDLD Aggressive</code> پس از ۸ کاوشگر پورت را <code>err-disabled</code> می‌کند.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع MST، STP Guards و UDLD Aggressive در Cisco Catalyst IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco Catalyst MST, STP Guards &amp; UDLD config (NOT executed on real hardware)\nconfigure terminal\n spanning-tree mode mst\n spanning-tree mst configuration\n  name CORP_MST\n  revision 2\n  instance 1 vlan 10,20\n  instance 2 vlan 30,40\n spanning-tree portfast bpduguard default\n udld aggressive\n interface GigabitEthernet0/1\n  spanning-tree guard root\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "برای اینکه دو سوئیچ سیسکو در یک <strong>MST Region</strong> مشترک قرار بگیرند، کدام سه پارامتر باید دقیقاً یکسان باشند؟",
+      "options": [
+        "Region Name، Revision Number و جدول نگاشت VLAN-to-Instance",
+        "فقط Region Name و IP مدیریتی",
+        "مدل سخت‌افزاری و نسخه IOS",
+        "تعداد پورت‌های Access"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر سه پارامتر (نام حساس به حروف، Revision و جدول نگاشت VLANها) باید کاملاً یکسان باشند تا سوئیچ‌ها در یک Region بمانند.</p>"
+    },
+    {
+      "title": "اگر روی پورت کاربر <code>Gi0/3</code> به‌جای BPDU Guard دستور <code>spanning-tree bpdufilter enable</code> در سطح اینترفیس اجرا شود و کاربری دو پورت را با یک سوئیچ کوچک وصل کند، نتیجه چیست؟",
+      "options": [
+        "پورت فوراً err-disabled می‌شود",
+        "پورت BPDUهای ورودی/خروجی را نادیده می‌گیرد (STP عملاً خاموش می‌شود) و حلقه لایه ۲ ایجاد می‌گردد",
+        "OSPF حلقه را می‌بندد",
+        "سوئیچ خودکار Root می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>برخلاف BPDU Guard یا حالت سراسری، <code>bpdufilter enable</code> در سطح اینترفیس تمام BPDUها را دور می‌ریزد و خطر حلقه فوری دارد.</p>"
+    },
+    {
+      "title": "کدام ابزار برای کشف لینک فیبر یک‌طرفه‌قطع‌شده (TX سالم، RX قطع) حتی روی لینک‌های فاقد STP (مانند اعضای یک EtherChannel یا لینک لایه ۳) طراحی شده است؟",
+      "options": [
+        "VTP Pruning",
+        "PortFast",
+        "UDLD (به‌ویژه در مد Aggressive)",
+        "DHCP Snooping"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>UDLD Aggressive پس از ۸ کاوشگر بی‌پاسخ، پورت فیزیکی یک‌طرفه را وارد <code>err-disabled</code> می‌کند.</p>"
+    },
+    {
+      "title": "در دریافت یک BPDU برتر (Superior) روی پورتی که <strong>Root Guard</strong> دارد، وضعیت پورت چه می‌شود و چه زمانی بازیابی می‌گردد؟",
+      "options": [
+        "به حالت root-inconsistent (مسدود) می‌رود و به محض توقف BPDUهای برتر به‌صورت خودکار بازیابی می‌شود",
+        "برای همیشه می‌سوزد",
+        "تبدیل به Trunk می‌شود",
+        "هیچ تغییری نمی‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>برخلاف BPDU Guard که به <code>err-disabled</code> می‌رود، Root Guard حالت موقت <code>root-inconsistent</code> با بازیابی خودکار دارد.</p>"
+    },
+    {
+      "title": "آیا می‌توان <strong>Root Guard</strong> و <strong>Loop Guard</strong> را هم‌زمان روی یک پورت واحد فعال کرد؟",
+      "options": [
+        "بله، همیشه با هم فعال می‌شوند",
+        "خیر، این دو مکانیزم روی یک پورت واحد ناسازگار (Mutually Exclusive) هستند",
+        "فقط در MST",
+        "فقط روی پورت Access"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Root Guard برای پورت‌های Designated رو به پایین‌دست است و Loop Guard برای پورت‌های Non-Designated؛ فعال‌سازی یکی دیگری را لغو می‌کند.</p>"
+    },
+    {
+      "title": "کدام سری سوئیچ‌های Catalyst 9000 از <strong>StackWise Virtual (SVL)</strong> پشتیبانی می‌کنند؟",
+      "options": [
+        "فقط Catalyst 9200",
+        "Catalyst 9400، 9500 و 9600 (با لایسنس Network Advantage)",
+        "فقط Catalyst 2960",
+        "همه سوئیچ‌های غیرمدیریتی"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>طبق مستند رسمی Catalyst 9000 سیسکو، SVL روی C9400/C9500/C9600 با Network Advantage پشتیبانی می‌شود (C9200/C9300 از StackWise فیزیکی استفاده می‌کنند).</p>"
+    },
+    {
+      "title": "اگر روی یک پورت Alternate/Root که <strong>Loop Guard</strong> فعال دارد ناگهان دریافت BPDUها متوقف شود، چه رخ می‌دهد؟",
+      "options": [
+        "پورت به Forwarding رفته و حلقه می‌سازد",
+        "پورت وارد حالت loop-inconsistent (مسدود) می‌شود تا از تشکیل حلقه لایه ۲ جلوگیری گردد",
+        "VLAN 1 حذف می‌شود",
+        "پورت به Access تبدیل می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Loop Guard مانع تبدیل پورت‌های Non-Designated به Designated Forwarding هنگام از دست رفتن یک‌طرفه BPDU می‌شود.</p>"
+    },
+    {
+      "title": "در MST، تمام VLANهایی که به هیچ Instance مشخصی نگاشت نشده‌اند به‌طور پیش‌فرض عضو کدام Instance هستند؟",
+      "options": [
+        "Instance 0 (IST / CIST)",
+        "Instance 999",
+        "هیچ درخت STP ندارند",
+        "Instance 4094"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>همه VLANهای نگاشت‌نشده به‌طور پیش‌فرض در Instance 0 (IST) قرار می‌گیرند.</p>"
+    },
+    {
+      "title": "تفاوت کلیدی <strong>UDLD Normal Mode</strong> و <strong>UDLD Aggressive Mode</strong> چیست؟",
+      "options": [
+        "در Aggressive پس از قطع Echo سوئیچ ۸ کاوشگر در فواصل ۱ثانیه‌ای می‌فرستد و در نبود پاسخ پورت را err-disable می‌کند، اما Normal در حالات نامشخص صرفاً لاگ می‌دهد",
+        "Normal فقط روی کابل مسی کار می‌کند",
+        "Aggressive سرعت فیبر را نصف می‌کند",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>به همین دلیل در لینک‌های فیبر سازمانی مد <code>udld aggressive</code> توصیه استاندارد است.</p>"
+    },
+    {
+      "title": "مزیت کلیدی <strong>Multi-Chassis EtherChannel (MEC)</strong> در StackWise/SVL نسبت به توپولوژی سنتی دو سوئیچ مجزا چیست؟",
+      "options": [
+        "تمام آپلینک‌ها هم‌زمان Active/Forwarding می‌مانند و هیچ لینکی توسط STP مسدود (Blocked) نمی‌شود",
+        "نیازی به آدرس MAC نیست",
+        "جایگزین کل لایه ۳ می‌شود",
+        "کابل فیبر را بی‌نیاز می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>MEC دو سوئیچ فیزیکی را به‌صورت یک همسایه منطقی EtherChannel نشان داده و پهنای باند کل آپلینک‌ها را فعال می‌کند.</p>"
+    },
+    {
+      "title": "اگر دو سوئیچ MST فقط در مقدار <strong>Revision Number</strong> اختلاف داشته باشند چه اتفاقی می‌افتد؟",
+      "options": [
+        "در دو MST Region جداگانه قرار می‌گیرند و تنها روی CIST (Instance 0) با هم ارتباط STP دارند",
+        "هیچ اثری ندارد",
+        "پورت‌ها err-disabled می‌شوند",
+        "به صورت خودکار Revision همگام می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>حتی تفاوت یک عددی در Revision Number باعث جدایی MST Regionها می‌شود.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده روی سوئیچ‌های Catalyst 9500 SVL",
+        "تست قطع فیبر واقعی در دیتاسنتر",
+        "شبیه‌ساز محلی Python 3 برای آزمون تطابق MST Region، ماتریس STP Guards، تله BPDU Filter و UDLD Aggressive بدون تجهیز واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ سوئیچ واقعی متصل نیست.</p>"
+    }
+  ]
+}

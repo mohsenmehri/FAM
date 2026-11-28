@@ -33,6 +33,8 @@ AGENT3_ALLOWED_IDS = {
     "ccna_02_vlan", "ccna_v1", "ccna_v6", "ccna_03", "ccna_04",
     # Phase 12B — Transferred CCNA Services/Security/Wireless/SDN Batch (7 of 17 former Agent 1 lessons)
     "ccna_dhcp", "ccna_nat", "ccna_05", "ccna_acl", "ccna_qos_ssh", "ccna_wl", "ccna_06",
+    # Phase 12C — Transferred Advanced Switching/Routing/Troubleshooting/BFD Batch (5 of 17 former Agent 1 lessons)
+    "adv_01", "adv_02", "adv_03", "adv_04", "adv_bfd",
 }
 
 FORBIDDEN_LEGACY_TYPOS = (
@@ -77,7 +79,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
     def test_discovered_lessons_are_strictly_within_agent3_scope(self):
         discovered = discover_agent3_blueprints()
         discovered_ids = {lesson_id for lesson_id, _ in discovered}
-        self.assertEqual(len(AGENT3_ALLOWED_IDS), 76)
+        self.assertEqual(len(AGENT3_ALLOWED_IDS), 81)
         self.assertEqual(
             discovered_ids,
             AGENT3_ALLOWED_IDS,
@@ -1974,9 +1976,89 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             m_06.validate_json_and_yaml_indent('{"a": 1}', ["a: 1"], allow_tabs="False")
 
+    def test_phase12c_transferred_advanced_batch(self):
+        """Phase 12C: independent technical audit & strict lab validation for 5 transferred adv_* lessons."""
+        batch_ids = ("adv_01", "adv_02", "adv_03", "adv_04", "adv_bfd")
+        flagged_imports = {"socket", "http", "urllib", "requests", "subprocess", "os"}
+
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        for lid in batch_ids:
+            lab_path = AGENT3_LAB_DIR / f"{lid}_lab.py"
+            tree = ast.parse(lab_path.read_text(encoding="utf-8"))
+            mods = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    mods.update(n.name.split(".")[0] for n in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    mods.add(node.module.split(".")[0])
+            self.assertEqual(mods & flagged_imports, set(), f"{lid}_lab.py uses flagged import: {mods & flagged_imports}")
+
+        # 1. adv_01: MST 3-key match, Interface BPDU Filter loop trap, Root/Loop mutual exclusion, UDLD Aggressive
+        m_a01 = load_module(AGENT3_LAB_DIR / "adv_01_lab.py", "adv_01_p12c")
+        with self.assertRaises(ValueError):
+            m_a01.evaluate_stp_port_protection("distribution_downlink", "superior_bpdu_received", root_guard=True, loop_guard=True)
+        self.assertTrue(
+            m_a01.evaluate_stp_port_protection("access_portfast", "bpdu_received", interface_bpdu_filter=True)["l2_loop_risk"]
+        )
+        self.assertEqual(m_a01.evaluate_udld_fiber_fault("aggressive", True, 8)["port_state"], "err-disabled")
+        with self.assertRaises(ValueError):
+            m_a01.evaluate_udld_fiber_fault("aggressive", "True", 8)
+
+        # 2. adv_02: Area 0 cannot be stub/nssa, Standard NSSA has no auto-default, O > O IA & E1 > E2
+        m_a02 = load_module(AGENT3_LAB_DIR / "adv_02_lab.py", "adv_02_p12c")
+        with self.assertRaises(ValueError):
+            m_a02.evaluate_ospf_area_policy(0, "stub")
+        self.assertFalse(m_a02.evaluate_ospf_area_policy(10, "nssa")["auto_default_route"])
+        self.assertTrue(m_a02.evaluate_ospf_area_policy(10, "totally_nssa")["auto_default_route"])
+        self.assertEqual(
+            m_a02.select_ospf_path([
+                {"name": "Inter", "code": "O IA", "internal_cost": 5},
+                {"name": "Intra", "code": "O", "internal_cost": 999},
+            ])["winner"],
+            "Intra",
+        )
+        with self.assertRaises(ValueError):
+            m_a02.evaluate_ospf_area_policy(10, "nssa", nssa_default_info_originate="True")
+
+        # 3. adv_03: vrf forwarding strips existing IP, IP SLA detects indirect WAN outage, NetFlow 5-tuple
+        m_a03 = load_module(AGENT3_LAB_DIR / "adv_03_lab.py", "adv_03_p12c")
+        res_vrf = m_a03.apply_vrf_forwarding("Gi0/0.20", "192.168.10.1/24", "GUEST", {}, None)
+        self.assertTrue(res_vrf["previous_ip_stripped_by_ios"])
+        self.assertIsNone(res_vrf["active_ip"])
+        self.assertEqual(
+            m_a03.evaluate_ip_sla_failover(True, False, True, "udp-jitter", False)["active_path"],
+            "INVALID_PROBE_CONFIG",
+        )
+        with self.assertRaises(ValueError):
+            m_a03.evaluate_ip_sla_failover("True", False, True)
+
+        # 4. adv_04: GRE 1476/1436, GRE+IPsec 1400/1360, IOS vs Linux/Win DF ping sizes, PMTUD & Asymmetric FW/uRPF
+        m_a04 = load_module(AGENT3_LAB_DIR / "adv_04_lab.py", "adv_04_p12c")
+        gre = m_a04.compute_tunnel_mtu_mss(1500, "gre_ipv4")
+        self.assertEqual((gre["ip_mtu"], gre["ip_tcp_adjust_mss"], gre["linux_win_ping_df_payload"]), (1476, 1436, 1448))
+        self.assertEqual(m_a04.simulate_pmtud_packet(1500, 1476, True, False)["outcome"], "PMTUD_BLACKHOLE_HANG")
+        self.assertFalse(m_a04.evaluate_asymmetric_flow("FW-A", "FW-B", False)["tcp_established"])
+        with self.assertRaises(ValueError):
+            m_a04.simulate_pmtud_packet(1500, 1476, "True", False)
+
+        # 5. adv_bfd: RFC 5880 asymmetric negotiation (max(local_rx, peer_tx)), Multihop 4784, FNF active timeout 60
+        m_bfd = load_module(AGENT3_LAB_DIR / "adv_bfd_lab.py", "adv_bfd_p12c")
+        self.assertEqual(m_bfd.negotiate_bfd_detection(50, 50, 3, 200, 200, 3)["r1_detects_r2_down_ms"], 600)
+        self.assertEqual(m_bfd.negotiate_bfd_detection(100, 100, 3, 100, 100, 3, multihop=True)["udp_control_port"], 4784)
+        self.assertEqual(m_bfd.simulate_fnf_active_timeout(1500, 60, 1500)["export_buckets"], 25)
+        with self.assertRaises(ValueError):
+            m_bfd.negotiate_bfd_detection(50, 50, 3, 50, 50, 3, multihop="True")
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
-        self.assertEqual(len(scripts), 76)
+        self.assertEqual(len(scripts), 81)
         for script in scripts:
             with self.subTest(script=script.name):
                 proc = subprocess.run(

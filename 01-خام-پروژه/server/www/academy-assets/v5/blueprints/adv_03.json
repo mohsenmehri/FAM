@@ -1,0 +1,343 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_03",
+  "objectiveId": "adv_03",
+  "kind": "lesson",
+  "track": "Advanced Switching & Routing (Transferred & Audited)",
+  "course": "adv-switching-routing",
+  "domain": "Enterprise Services",
+  "title": "سرویس‌های پیشرفته (Advanced Services): جداسازی لایه ۳ با VRF-Lite، پایش فعال IP SLA + Track و NetFlow",
+  "titleEn": "Advanced Services: VRF-Lite Isolation, IP SLA + Object Tracking & NetFlow Flow Telemetry",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy adv_03 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "adv_03",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc7011",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/configuration/xe-16/iri-xe-16-book/iri-vrf-lite.html",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipsla/configuration/xe-16/sla-xe-16-book.html"
+    ],
+    "limitations": [
+      "هیچ روتر واقعی سیسکو، جدول VRF، کاوشگر زنده IP SLA یا سرور NetFlow Collector در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 (کتابخانه ipaddress) برای آزمون حذف خودکار IP هنگام vrf forwarding، کشف خرابی غیرمستقیم WAN با IP SLA و تجمیع ۵تایی NetFlow است."
+    ],
+    "legacyAuditFixes": [
+      "افزودن جزئیات کلیدی delay down/up روی Object Tracking برای جلوگیری از Flapping، الزام IP SLA Responder برای سنجش udp-jitter، و استاندارد IPFIX (RFC 7011 / UDP 4739).",
+      "تصریح تفکیک هم‌زمان جدول‌های RIB، FIB/CEF و ARP در VRF-Lite و استفاده از ساب‌اینترفیس‌های 802.1Q برای حمل چند VRF روی یک لینک مشترک.",
+      "توسعه از ۳ بخش/۳ سؤال قدیمی به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با adv_03_lab.py بدون import پرچم‌دار."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_03-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-advanced",
+      "recommendedCourse": "adv-switching-routing",
+      "blueprint": "/academy-assets/v5/blueprints/adv_03.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_03_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲C: ساخت adv_03_lab.py بدون import پرچم‌دار با اعتبارسنجی دقیق IPv4Interface، bool و تجمیع جریان‌های NetFlow."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_03-section-1",
+      "title": "مسئله واقعی: سه نیاز عملیاتی که ابزارهای پایه CCNA به تنهایی پاسخگو نیستند",
+      "html": "<p>چگونه روی یک روتر واحد دو واحد مجزا (مالی و مهمان) با آدرس‌های هم‌پوشان <code>192.168.10.0/24</code> را بدون تداخل جدا کنیم؟ چگونه هنگام قطع فیبر پشت مودم ISP (در حالی که پورت اترنت هنوز <code>up/up</code> است) ترافیک را خودکار به لینک پشتیبان ببریم؟ و وقتی لینک WAN ۸۵٪ پر است، چگونه بفهمیم دقیقاً کدام IP و پورت عامل ازدحام است؟ پاسخ این سه نیاز به‌ترتیب <strong>VRF-Lite</strong>، <strong>IP SLA + Track</strong> و <strong>NetFlow</strong> است.</p>"
+    },
+    {
+      "id": "adv_03-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> VLAN/802.1Q، Static/Floating Static، HSRP و SNMP.</p><ul><li>مجازی‌سازی لایه ۳ با <strong>VRF-Lite</strong> و مدیریت تله حذف خودکار آدرس IP هنگام <code>vrf forwarding</code>.</li><li>طراحی Failover هوشمند برای خرابی‌های غیرمستقیم WAN با <strong>IP SLA + Object Tracking</strong> و <code>delay down/up</code>.</li><li>تفکیک دقیق دیده‌پذیری <strong>NetFlow / IPFIX (RFC 7011)</strong> از شمارنده‌های کلی <strong>SNMP</strong>.</li></ul>"
+    },
+    {
+      "id": "adv_03-section-3",
+      "title": "معماری VRF-Lite: جداسازی RIB، FIB/CEF و ARP در یک روتر فیزیکی",
+      "html": "<p><strong>VRF-Lite</strong> همان جداسازی است که VLAN در لایه ۲ انجام می‌دهد، اما در <strong>لایه ۳</strong> بدون نیاز به MPLS/MP-BGP: هر VRF جدول مسیریابی (RIB)، جدول CEF و جدول ARP کاملاً مستقل دارد؛ بنابراین استفاده هم‌زمان از <code>192.168.10.0/24</code> در دو VRF مختلف بدون هیچ تعارضی ممکن است. برای عبور چند VRF بین دو روتر پردیسی از ساب‌اینترفیس‌های 802.1Q (هر VLAN متصل به یک VRF) استفاده می‌شود.</p>"
+    },
+    {
+      "id": "adv_03-section-4",
+      "title": "تله کلاسیک Cisco IOS در پیکربندی VRF: پاک شدن فوری آدرس IP!",
+      "html": "<p>به محض آنکه زیر یک اینترفیس دارای آدرس IP دستور <code>vrf forwarding CORP</code> را اجرا کنید، <strong>سیستم‌عامل IOS به‌طور خودکار آدرس IP قبلی آن اینترفیس را حذف می‌کند</strong> (تا از نشت ناخواسته آدرس میان جدول Global و VRF جلوگیری شود). پس همیشه باید پس از <code>vrf forwarding</code> دوباره دستور <code>ip address ...</code> را وارد کنید! همچنین هنگام تست ارتباط باید از <code>ping vrf CORP ...</code> و <code>show ip route vrf CORP</code> استفاده کرد.</p>"
+    },
+    {
+      "id": "adv_03-section-5",
+      "title": "IP SLA و Object Tracking: کشف خرابی غیرمستقیم پشت مودم ISP",
+      "html": "<p>اگر لینک فیبر پشت مودم ISP قطع شود، پورت اترنت روتر شما همچنان <code>up/up</code> می‌ماند و مسیر Static یا HSRP متوجه قطعی نمی‌شود. با <strong>IP SLA</strong> روتر به‌طور دوره‌ای کاوشگر <code>icmp-echo</code>، <code>tcp-connect</code>، <code>dns</code> یا <code>udp-jitter</code> (نیازمند <strong>IP SLA Responder</strong> در روتر مقابل برای سنجش دقیق تأخیر/لرزش) می‌فرستد. خروجی SLA به یک شیء <code>track</code> متصل شده و آن <code>track</code> به <strong>Floating Static</strong> (<code>ip route 0.0.0.0 0.0.0.0 ... track 1</code>) یا <strong>HSRP</strong> (<code>standby 10 track 1 decrement 60</code>) وصل می‌شود. افزودن <code>delay down 10 up 30</code> روی <code>track</code> از نوسان پی‌درپی (Flapping) جلوگیری می‌کند.</p>"
+    },
+    {
+      "id": "adv_03-section-6",
+      "title": "نمودار معماری: VRF-Lite، Failover غیرمستقیم با IP SLA و تفکیک NetFlow از SNMP",
+      "html": "<p>در نمودار زیر سه سرویس پیشرفته VRF-Lite، IP SLA و NetFlow کنار هم مقایسه شده‌اند.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"VRF-Lite Isolation, IP SLA Indirect WAN Failover and NetFlow Top Talkers\"><rect x=\"16\" y=\"20\" width=\"232\" height=\"180\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"132\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">VRF-Lite (L3 Isolation)</text><rect x=\"30\" y=\"58\" width=\"96\" height=\"58\" rx=\"6\" fill=\"#ffffff\" stroke=\"#2563eb\"/><text x=\"78\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1e40af\">VRF FINANCE</text><text x=\"78\" y=\"92\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#0f172a\">192.168.10.0/24</text><text x=\"78\" y=\"106\" text-anchor=\"middle\" font-size=\"8\" fill=\"#15803d\">Own RIB/CEF/ARP</text><rect x=\"138\" y=\"58\" width=\"96\" height=\"58\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#3b82f6\"/><text x=\"186\" y=\"76\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1e3a8a\">VRF GUEST</text><text x=\"186\" y=\"92\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#0f172a\">192.168.10.0/24</text><text x=\"186\" y=\"106\" text-anchor=\"middle\" font-size=\"8\" fill=\"#15803d\">Overlap OK!</text><text x=\"132\" y=\"142\" text-anchor=\"middle\" font-size=\"8.5\" font-weight=\"bold\" fill=\"#dc2626\">IOS Trap: vrf forwarding</text><text x=\"132\" y=\"158\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">STRIPS existing IP address!</text><text x=\"132\" y=\"178\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">Test: ping vrf &lt;NAME&gt;</text><rect x=\"266\" y=\"20\" width=\"228\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">IP SLA + Object Tracking</text><text x=\"380\" y=\"70\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Eth to ISP Modem: UP/UP</text><text x=\"380\" y=\"88\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#dc2626\">Fiber BEHIND modem: CUT!</text><text x=\"380\" y=\"114\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Probe: icmp-echo / udp-jitter*</text><text x=\"380\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">Track Down =&gt; Backup WAN</text><text x=\"380\" y=\"154\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#78350f\">+ delay down/up (anti-flap)</text><text x=\"380\" y=\"174\" text-anchor=\"middle\" font-size=\"8\" fill=\"#475569\">(*udp-jitter needs SLA Responder)</text><rect x=\"512\" y=\"20\" width=\"232\" height=\"180\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"628\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">NetFlow vs SNMP</text><text x=\"628\" y=\"70\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">SNMP: Total port Mbps only</text><text x=\"628\" y=\"92\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">NetFlow: 5/7-Tuple Flows</text><text x=\"628\" y=\"114\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#14532d\">Src/Dst IP | Src/Dst Port</text><text x=\"628\" y=\"130\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#14532d\">Proto | ToS/DSCP | In-If</text><text x=\"628\" y=\"154\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1d4ed8\">Exports to Collector:</text><text x=\"628\" y=\"172\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#334155\">UDP 2055 / 9995 / IPFIX 4739</text></svg>"
+    },
+    {
+      "id": "adv_03-section-7",
+      "title": "NetFlow و IPFIX (RFC 7011) در برابر شمارنده‌های SNMP",
+      "html": "<table><thead><tr><th>ویژگی</th><th>SNMP Interface Counters</th><th>NetFlow / IPFIX (RFC 7011)</th></tr></thead><tbody><tr><td>سطح دیده‌پذیری</td><td>مجموع کل بایت/بسته روی اینترفیس (چه مقدار؟)</td><td>تفکیک جریان‌های ۵ تا ۷تایی (چه کسی، به کجا، کدام پورت و چقدر؟)</td></tr><tr><td>کلیدهای اصلی جریان</td><td>شناسه اینترفیس (ifIndex)</td><td>Src/Dst IP، Src/Dst Port، Protocol، ToS/DSCP، Input Interface</td></tr><tr><td>انتقال و پورت</td><td>Polling روی UDP 161</td><td>ارسال Push به Collector روی <strong>UDP 2055 / 9995 / IPFIX 4739</strong></td></tr><tr><td>کاربرد امنیتی</td><td>تشخیص افزایش کلی ترافیک</td><td>کشف Top Talker، نشت داده، اسکن پورت و DDoS</td></tr></tbody></table>"
+    },
+    {
+      "id": "adv_03-section-8",
+      "title": "نکته مقیاس‌پذیری: Sampled NetFlow در لینک‌های پرسرعت",
+      "html": "<p>روی لینک‌های ۱۰ تا ۱۰۰ گیگابیتی هسته که پردازش تک‌تک بسته‌ها بار CPU/حافظه ایجاد می‌کند، از <strong>Sampled NetFlow</strong> (مثلاً نمونه‌برداری ۱ از هر ۱۰۰۰ بسته) برای توازن بین دقت آماری Top Talker و مصرف منابع استفاده می‌شود.</p>"
+    },
+    {
+      "id": "adv_03-section-9",
+      "title": "ترکیب عملی VRF-Lite با OSPF/BGP",
+      "html": "<p>در VRF-Lite هر VRF می‌تواند فرایند OSPF مجزا (<code>router ospf 10 vrf FINANCE</code>) یا خانواده آدرس BGP مستقل (<code>address-family ipv4 vrf FINANCE</code>) داشته باشد تا جداسازی سرتاسری میان پردیس‌ها برقرار بماند.</p>"
+    },
+    {
+      "id": "adv_03-section-10",
+      "title": "امنیت صادرات NetFlow و پایداری IP SLA",
+      "html": "<p>هدف پینگ IP SLA بهتر است بیش از یک مقصد معتبر (یا ترکیب <code>track list boolean or</code>) باشد تا با افت یک سرور DNS عمومی لینک سالم قطع نشود. صادرات NetFlow نیز باید از طریق VRF مدیریتی یا IP پایدار <code>Loopback0</code> انجام گیرد.</p>"
+    },
+    {
+      "id": "adv_03-section-11",
+      "title": "کژفهمی‌های رایج در VRF-Lite، IP SLA و NetFlow",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای داشتن VRF روی روتر پردیسی حتماً باید MPLS و LDP فعال کنیم.»</strong> واقعیت: VRF-Lite کاملاً بدون MPLS و فقط با 802.1Q روی روترهای عادی کار می‌کند.</li><li><strong>کژفهمی ۲: «سنجش <code>udp-jitter</code> در IP SLA مثل پینگ ساده بدون تنظیم سمت مقابل کار می‌کند.»</strong> واقعیت: <code>udp-jitter</code> نیازمند فعال بودن <code>ip sla responder</code> در تجهیز مقابل است.</li><li><strong>کژفهمی ۳: «SNMP می‌تواند فهرست Top Talker بر اساس IP و پورت را گزارش دهد.»</strong> واقعیت: این وظیفه NetFlow/IPFIX است نه شمارنده‌های استاندارد SNMP.</li></ul>"
+    },
+    {
+      "id": "adv_03-section-12",
+      "title": "عیب‌یابی خطاهای VRF-Lite، IP SLA و NetFlow",
+      "html": "<p>اگر پس از افزودن <code>vrf forwarding</code> دسترسی پورت قطع شد، با <code>show ip interface brief</code> نبود IP را بررسی و مجدداً تنظیم کنید. وضعیت IP SLA را با <code>show ip sla statistics</code> و <code>show track</code>، و جریان‌های فعال کش NetFlow را با <code>show flow monitor ... cache</code> بررسی کنید.</p>"
+    },
+    {
+      "id": "adv_03-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> بلافاصله پس از وارد کردن <code>vrf forwarding SECURE</code> روی <code>Gi0/0.10</code> دارای IP، چه رخ می‌دهد؟ <strong>پاسخ:</strong> IOS آدرس IP را به‌طور خودکار پاک می‌کند و باید دوباره وارد شود.</p><p><strong>تمرین ۲:</strong> لینک اترنت بین روتر و مودم ISP همچنان <code>up/up</code> است ولی اینترنت قطع شده؛ چرا Floating Static معمولی فعال نمی‌شود؟ <strong>پاسخ:</strong> چون مسیر اصلی هنوز اینترفیس خروجی را Up می‌بیند؛ اتصال <code>IP SLA + Track</code> به مسیر اصلی این خرابی غیرمستقیم را کشف و مسیر پشتیبان را فعال می‌کند.</p>"
+    },
+    {
+      "id": "adv_03-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc7011\" target=\"_blank\" rel=\"noopener\">RFC 7011 (IPFIX)</a>، <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/configuration/xe-16/iri-xe-16-book/iri-vrf-lite.html\" target=\"_blank\" rel=\"noopener\">راهنمای VRF-Lite سیسکو IOS-XE</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipsla/configuration/xe-16/sla-xe-16-book.html\" target=\"_blank\" rel=\"noopener\">راهنمای IP SLA سیسکو IOS-XE</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی سیسکو، کاوشگر زنده IP SLA یا Collector واقعی در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "VRF-Lite",
+      "fa": "جداسازی جدول مسیر بدون MPLS",
+      "simple": "ساخت چندین جدول مستقل RIB، CEF و ARP روی یک روتر فیزیکی پردیسی/شعبه‌ای."
+    },
+    {
+      "term": "vrf forwarding",
+      "fa": "اتصال اینترفیس به VRF",
+      "simple": "دستور IOS که اینترفیس را عضو VRF کرده و آدرس IP قبلی آن را خودکار پاک می‌کند."
+    },
+    {
+      "term": "Overlapping IP Subnets",
+      "fa": "زیرشبکه‌های هم‌پوشان",
+      "simple": "امکان استفاده هم‌زمان از یک پیشوند یکسان (مثل 192.168.10.0/24) در دو VRF مجزا."
+    },
+    {
+      "term": "IP SLA",
+      "fa": "تضمین سطح سرویس فعال",
+      "simple": "ارسال دوره‌ای کاوشگرهای فعال (ICMP/TCP/DNS/UDP-Jitter) برای سنجش سلامت مسیر."
+    },
+    {
+      "term": "IP SLA Responder",
+      "fa": "پاسخگوی IP SLA در مقصد",
+      "simple": "قابلیت مورد نیاز سمت مقابل برای سنجش دقیق UDP-Jitter و تأخیر یک‌طرفه."
+    },
+    {
+      "term": "Object Tracking (track)",
+      "fa": "ردیابی وضعیت اشیا",
+      "simple": "پل اتصال نتیجه IP SLA به مسیر Static یا HSRP برای Failover خودکار."
+    },
+    {
+      "term": "Track Delay Down/Up",
+      "fa": "تأخیر ضدنوسان Track",
+      "simple": "جلوگیری از تغییر مسیر مکرر (Flapping) روی لینک‌های ناپایدار."
+    },
+    {
+      "term": "Indirect WAN Failure",
+      "fa": "خرابی غیرمستقیم WAN",
+      "simple": "قطع اینترنت پشت مودم ISP در حالی که پورت اترنت روتر همچنان up/up باقی مانده است."
+    },
+    {
+      "term": "NetFlow",
+      "fa": "تله‌متری جریان ترافیک",
+      "simple": "گروه‌بندی بسته‌ها بر اساس کلیدهای ۵ تا ۷تایی برای تحلیل Top Talker و امنیت."
+    },
+    {
+      "term": "IPFIX (RFC 7011)",
+      "fa": "استاندارد باز صادرات جریان",
+      "simple": "استاندارد IETF مبتنی بر NetFlow v9 روی پورت استاندارد UDP 4739."
+    },
+    {
+      "term": "5-Tuple / 7-Tuple Flow",
+      "fa": "کلید شناسایی جریان",
+      "simple": "ترکیب Src/Dst IP، Src/Dst Port، Protocol (و ToS/Input Interface)."
+    },
+    {
+      "term": "NetFlow Collector",
+      "fa": "سرور جمع‌آوری جریان‌ها",
+      "simple": "سرور مرکزی تحلیلگر دریافت‌کننده رکوردهای NetFlow روی UDP 2055/9995/4739."
+    },
+    {
+      "term": "Sampled NetFlow",
+      "fa": "نت‌فلو نمونه‌برداری‌شده",
+      "simple": "بررسی ۱ از هر N بسته در لینک‌های پرسرعت هسته برای کاهش بار CPU."
+    },
+    {
+      "term": "SNMP vs NetFlow",
+      "fa": "شمارنده کل در برابر جریان جزئی",
+      "simple": "SNMP حجم کل پورت را می‌دهد؛ NetFlow مشخص می‌کند چه کسی و کدام سرویس مصرف‌کننده است."
+    },
+    {
+      "term": "ping vrf",
+      "fa": "پینگ درون جدول VRF",
+      "simple": "اجرای عیب‌یابی ICMP از درون جدول مسیریابی یک VRF مشخص به‌جای Global."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی با ماژول <code>ipaddress</code>، رفتار حذف خودکار IP هنگام <code>vrf forwarding</code> و جداسازی زیرشبکه هم‌پوشان، کشف خرابی غیرمستقیم WAN با <code>IP SLA + Track</code> و استخراج Top Talker با تجمیع ۵تایی <code>NetFlow</code> را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_03_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_03_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for adv_03 (VRF-Lite Isolation, IP SLA + Track &amp; NetFlow vs SNMP).\n\nBoundary: Pure in-memory simulation using Python stdlib only (ipaddress).\nNo real Cisco router, VRF table, ICMP/UDP probe, or NetFlow collector is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _require_non_empty_str(val: object, name: str) -&gt; str:\n    if not isinstance(val, str) or not val.strip():\n        raise ValueError(f&quot;{name} must be a non-empty string&quot;)\n    return val.strip()\n\n\ndef apply_vrf_forwarding(\n    interface_name: str,\n    existing_ip: str | None,\n    target_vrf: str,\n    vrf_tables: dict[str, list[str]],\n    reconfigure_ip: str | None = None,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate Cisco IOS behavior: applying &#x27;vrf forwarding&#x27; removes existing IP until re-entered.&quot;&quot;&quot;\n    _require_non_empty_str(interface_name, &quot;interface_name&quot;)\n    vrf = _require_non_empty_str(target_vrf, &quot;target_vrf&quot;)\n    if existing_ip is not None:\n        ipaddress.IPv4Interface(existing_ip)\n    if reconfigure_ip is not None:\n        ipaddress.IPv4Interface(reconfigure_ip)\n\n    ip_removed = existing_ip is not None\n    final_ip = reconfigure_ip\n    overlap_allowed = False\n    if final_ip is not None:\n        new_net = str(ipaddress.IPv4Interface(final_ip).network)\n        overlap_allowed = any(\n            new_net in nets for other_vrf, nets in vrf_tables.items() if other_vrf != vrf\n        )\n        vrf_tables.setdefault(vrf, []).append(new_net)\n\n    return {\n        &quot;interface&quot;: interface_name,\n        &quot;vrf&quot;: vrf,\n        &quot;previous_ip_stripped_by_ios&quot;: ip_removed,\n        &quot;active_ip&quot;: final_ip,\n        &quot;overlapping_subnet_isolated_across_vrfs&quot;: overlap_allowed,\n    }\n\n\ndef evaluate_ip_sla_failover(\n    wan_port_up: bool,\n    sla_probe_success: bool,\n    track_attached: bool,\n    probe_type: str = &quot;icmp-echo&quot;,\n    responder_configured: bool = False,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate indirect WAN failure detection behind an ISP modem using IP SLA + Object Tracking.&quot;&quot;&quot;\n    _require_bool(wan_port_up, &quot;wan_port_up&quot;)\n    _require_bool(sla_probe_success, &quot;sla_probe_success&quot;)\n    _require_bool(track_attached, &quot;track_attached&quot;)\n    _require_bool(responder_configured, &quot;responder_configured&quot;)\n    if probe_type not in (&quot;icmp-echo&quot;, &quot;tcp-connect&quot;, &quot;dns&quot;, &quot;udp-jitter&quot;):\n        raise ValueError(f&quot;Unsupported probe_type: {probe_type}&quot;)\n    if probe_type == &quot;udp-jitter&quot; and not responder_configured:\n        return {\n            &quot;active_path&quot;: &quot;INVALID_PROBE_CONFIG&quot;,\n            &quot;blackhole_avoided&quot;: False,\n            &quot;reason&quot;: &quot;UDP_JITTER_REQUIRES_REMOTE_IP_SLA_RESPONDER&quot;,\n        }\n\n    if not wan_port_up:\n        return {&quot;active_path&quot;: &quot;BACKUP_WAN&quot;, &quot;blackhole_avoided&quot;: True, &quot;reason&quot;: &quot;DIRECT_L1_LINK_DOWN&quot;}\n    if wan_port_up and not sla_probe_success:\n        if track_attached:\n            return {&quot;active_path&quot;: &quot;BACKUP_WAN&quot;, &quot;blackhole_avoided&quot;: True, &quot;reason&quot;: &quot;IP_SLA_TRACK_DETECTED_INDIRECT_OUTAGE&quot;}\n        return {&quot;active_path&quot;: &quot;PRIMARY_BLACKHOLE&quot;, &quot;blackhole_avoided&quot;: False, &quot;reason&quot;: &quot;ETH_UP_UP_WITHOUT_IP_SLA_BLACKHOLES_TRAFFIC&quot;}\n    return {&quot;active_path&quot;: &quot;PRIMARY_WAN&quot;, &quot;blackhole_avoided&quot;: True, &quot;reason&quot;: &quot;PRIMARY_HEALTHY&quot;}\n\n\ndef aggregate_netflow_records(packets: list[dict[str, object]]) -&gt; list[dict[str, object]]:\n    &quot;&quot;&quot;Aggregate raw packet metadata into 5-tuple NetFlow records (identifying top talkers vs SNMP).&quot;&quot;&quot;\n    if not isinstance(packets, list) or not packets:\n        raise ValueError(&quot;packets must be a non-empty list&quot;)\n    flows: dict[tuple[str, str, int, int, str], dict[str, object]] = {}\n    for pkt in packets:\n        src = str(ipaddress.IPv4Address(str(pkt[&quot;src_ip&quot;])))\n        dst = str(ipaddress.IPv4Address(str(pkt[&quot;dst_ip&quot;])))\n        sport = pkt[&quot;src_port&quot;]\n        dport = pkt[&quot;dst_port&quot;]\n        bcount = pkt[&quot;bytes&quot;]\n        if type(sport) is not int or not (1 &lt;= sport &lt;= 65535):\n            raise ValueError(&quot;src_port must be int 1..65535&quot;)\n        if type(dport) is not int or not (1 &lt;= dport &lt;= 65535):\n            raise ValueError(&quot;dst_port must be int 1..65535&quot;)\n        if type(bcount) is not int or bcount &lt;= 0:\n            raise ValueError(&quot;bytes must be positive int&quot;)\n        proto = _require_non_empty_str(pkt[&quot;proto&quot;], &quot;proto&quot;).upper()\n        key = (src, dst, sport, dport, proto)\n        if key not in flows:\n            flows[key] = {&quot;src_ip&quot;: src, &quot;dst_ip&quot;: dst, &quot;src_port&quot;: sport, &quot;dst_port&quot;: dport, &quot;proto&quot;: proto, &quot;packets&quot;: 0, &quot;bytes&quot;: 0}\n        flows[key][&quot;packets&quot;] = int(flows[key][&quot;packets&quot;]) + 1\n        flows[key][&quot;bytes&quot;] = int(flows[key][&quot;bytes&quot;]) + bcount\n    return sorted(flows.values(), key=lambda r: int(r[&quot;bytes&quot;]), reverse=True)\n\n\ndef main() -&gt; None:\n    vrfs: dict[str, list[str]] = {&quot;FINANCE&quot;: [&quot;192.168.10.0/24&quot;]}\n    # Applying vrf forwarding strips IP if not re-entered\n    stripped = apply_vrf_forwarding(&quot;Gi0/0.20&quot;, &quot;192.168.10.1/24&quot;, &quot;GUEST&quot;, vrfs, reconfigure_ip=None)\n    assert stripped[&quot;previous_ip_stripped_by_ios&quot;] is True and stripped[&quot;active_ip&quot;] is None\n    # Re-entering overlapping 192.168.10.1/24 in GUEST VRF succeeds with full L3 isolation\n    re_ok = apply_vrf_forwarding(&quot;Gi0/0.20&quot;, None, &quot;GUEST&quot;, vrfs, reconfigure_ip=&quot;192.168.10.1/24&quot;)\n    assert re_ok[&quot;overlapping_subnet_isolated_across_vrfs&quot;] is True\n\n    # Indirect ISP failure: Ethernet stays up/up!\n    bh = evaluate_ip_sla_failover(True, False, track_attached=False)\n    ok_fo = evaluate_ip_sla_failover(True, False, track_attached=True)\n    assert bh[&quot;blackhole_avoided&quot;] is False and ok_fo[&quot;active_path&quot;] == &quot;BACKUP_WAN&quot;\n\n    top_flows = aggregate_netflow_records([\n        {&quot;src_ip&quot;: &quot;10.10.10.50&quot;, &quot;dst_ip&quot;: &quot;198.51.100.90&quot;, &quot;src_port&quot;: 51000, &quot;dst_port&quot;: 443, &quot;proto&quot;: &quot;TCP&quot;, &quot;bytes&quot;: 1500},\n        {&quot;src_ip&quot;: &quot;10.10.10.50&quot;, &quot;dst_ip&quot;: &quot;198.51.100.90&quot;, &quot;src_port&quot;: 51000, &quot;dst_port&quot;: 443, &quot;proto&quot;: &quot;TCP&quot;, &quot;bytes&quot;: 1500},\n        {&quot;src_ip&quot;: &quot;10.10.10.22&quot;, &quot;dst_ip&quot;: &quot;198.51.100.53&quot;, &quot;src_port&quot;: 52001, &quot;dst_port&quot;: 53, &quot;proto&quot;: &quot;UDP&quot;, &quot;bytes&quot;: 96},\n    ])\n    assert top_flows[0][&quot;src_ip&quot;] == &quot;10.10.10.50&quot; and top_flows[0][&quot;bytes&quot;] == 3000\n\n    print(&quot;VRF IP Strip Trap:&quot;, stripped)\n    print(&quot;VRF Overlap Isolation OK:&quot;, re_ok)\n    print(&quot;IP SLA Failover (No Track vs Tracked):&quot;, bh, ok_fo)\n    print(&quot;NetFlow Top Talker:&quot;, top_flows[0])\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>vrf forwarding</code> بدون وارد کردن مجدد IP آن را <code>None</code> می‌کند و پس از تنظیم مجدد، هم‌پوشانی <code>192.168.10.0/24</code> در دو VRF مجاز می‌شود؛ خرابی پشت مودم بدون Track سیاه‌چاله و با Track به <code>BACKUP_WAN</code> منتقل می‌شود؛ و NetFlow جریان ۳۰۰۰بایتی <code>10.10.10.50:443</code> را به‌عنوان Top Talker می‌یابد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع VRF-Lite و IP SLA + Track در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE VRF-Lite &amp; IP SLA Track config (NOT executed on real router)\nconfigure terminal\n vrf definition GUEST\n  address-family ipv4\n interface GigabitEthernet0/0.20\n  encapsulation dot1Q 20\n  vrf forwarding GUEST\n  ip address 192.168.10.1 255.255.255.0\n ip sla 1\n  icmp-echo 198.51.100.1 source-interface GigabitEthernet0/1\n  frequency 5\n ip sla schedule 1 life forever start-time now\n track 1 ip sla 1 reachability\n  delay down 10 up 30\n ip route 0.0.0.0 0.0.0.0 203.0.113.1 track 1\n ip route 0.0.0.0 0.0.0.0 203.0.113.5 120\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "بلافاصله پس از وارد کردن دستور <code>vrf forwarding CORP</code> زیر یک اینترفیس دارای آدرس IP در Cisco IOS چه اتفاقی می‌افتد؟",
+      "options": [
+        "پورت به طور دائم err-disabled می‌شود",
+        "آدرس IP قبلی اینترفیس به طور خودکار پاک می‌شود و باید دوباره وارد شود",
+        "تمام VLANها پاک می‌شوند",
+        "آدرس به IPv6 تبدیل می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>IOS برای جلوگیری از نشت ناخواسته آدرس میان جدول Global و VRF، آدرس IP موجود را حذف می‌کند تا مجدداً درون VRF تنظیم شود.</p>"
+    },
+    {
+      "title": "برای تشخیص قطع شدن مسیر اینترنتی <strong>پشت</strong> مودم ISP (در حالتی که پورت اترنت روتر همچنان <code>up/up</code> است)، کدام قابلیت مناسب است؟",
+      "options": [
+        "BPDU Guard",
+        "Port Security Sticky",
+        "IP SLA + Object Tracking",
+        "VTP Pruning"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>IP SLA با ارسال کاوشگر فعال به مقصدی فراتر از مودم، خرابی غیرمستقیم را تشخیص داده و از طریق Track مسیر را عوض می‌کند.</p>"
+    },
+    {
+      "title": "تفاوت اساسی اطلاعات گزارش‌شده توسط <strong>NetFlow</strong> در مقایسه با شمارنده‌های ترافیکی <strong>SNMP</strong> چیست؟",
+      "options": [
+        "SNMP فقط برای وایرلس است",
+        "NetFlow فقط حجم کل پورت را می‌دهد",
+        "SNMP فقط TCP دارد",
+        "NetFlow ترافیک را به جریان‌های ۵ تا ۷تایی (IP مبدأ/مقصد، پورت، پروتکل) تفکیک می‌کند تا دقیقاً مشخص شود چه کسی چقدر مصرف کرده است"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>SNMP حجم کلی اینترفیس را نشان می‌دهد اما NetFlow جزئیات Top Talker و سرویس‌ها را استخراج می‌نماید.</p>"
+    },
+    {
+      "title": "چرا <strong>VRF-Lite</strong> به دو واحد مجزا اجازه می‌دهد هم‌زمان از زیرشبکه یکسان <code>192.168.10.0/24</code> روی یک روتر استفاده کنند؟",
+      "options": [
+        "زیرا هر VRF دارای جدول‌های RIB، FIB/CEF و ARP کاملاً جداگانه است",
+        "زیرا NAT را خاموش می‌کند",
+        "زیرا فقط لایه ۲ است",
+        "زیرا آدرس‌ها را به MAC تبدیل می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>جداسازی کامل جداول لایه ۳ مانع بروز تعارض Overlap میان VRFهای مختلف می‌شود.</p>"
+    },
+    {
+      "title": "کدام نوع کاوشگر IP SLA برای اندازه‌گیری دقیق تأخیر یک‌طرفه و Jitter (مانند شبیه‌سازی VoIP) نیازمند فعال بودن <strong>IP SLA Responder</strong> در تجهیز مقصد است؟",
+      "options": [
+        "icmp-echo ساده",
+        "udp-jitter",
+        "ping عادی",
+        "arp"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>udp-jitter</code> از برچسب‌های زمانی دقیق Responder برای محاسبه Jitter و تأخیر بهره می‌برد.</p>"
+    },
+    {
+      "title": "برای جلوگیری از تغییر مسیر پیاپی (Flapping) هنگام ناپایداری لحظه‌ای لینک WAN در Object Tracking، چه تنظیمی توصیه می‌شود؟",
+      "options": [
+        "تنظیم delay down و delay up روی دستور track",
+        "حذف مسیر پشتیبان",
+        "تنظیم MTU روی 500",
+        "خاموش کردن CEF"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تأخیرهای <code>delay down/up</code> (مثلاً 10s down و 30s up) از نوسان مکرر مسیر جلوگیری می‌کنند.</p>"
+    },
+    {
+      "title": "پورت استاندارد IETF برای پروتکل <strong>IPFIX (RFC 7011)</strong> و پورت‌های رایج سنتی NetFlow کدام‌اند؟",
+      "options": [
+        "UDP 4739 برای IPFIX و UDP 2055 / 9995 برای NetFlow سنتی",
+        "TCP 22",
+        "UDP 67 و 68",
+        "TCP 49"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>IPFIX از پورت استاندارد <code>UDP 4739</code> و پیاده‌سازی‌های رایج NetFlow از <code>UDP 2055</code> یا <code>9995</code> استفاده می‌کنند.</p>"
+    },
+    {
+      "title": "چگونه می‌توان از روی روتر سیسکو دسترسی به آدرس <code>192.168.10.50</code> را صرفاً از درون جدول مسیریابی <code>VRF FINANCE</code> آزمایش کرد؟",
+      "options": [
+        "ping 192.168.10.50",
+        "ping vrf FINANCE 192.168.10.50",
+        "show vlan brief",
+        "traceroute global"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پینگ ساده فقط جدول Global را بررسی می‌کند؛ برای آزمون درون VRF ذکر صریح <code>vrf &lt;NAME&gt;</code> الزامی است.</p>"
+    },
+    {
+      "title": "چرا روی لینک‌های بسیار پرسرعت هسته (مانند 100G) گاهی از <strong>Sampled NetFlow</strong> استفاده می‌شود؟",
+      "options": [
+        "تا با نمونه‌برداری ۱ از N بسته، بار CPU/حافظه کنترل شده و هم‌زمان تصویر آماری Top Talkerها حفظ شود",
+        "چون NetFlow غیرنمونه‌ای فقط IPv6 می‌فهمد",
+        "برای رمزنگاری بسته‌ها",
+        "برای حذف جدول VRF"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>نمونه‌برداری توازن عملی بین دیده‌پذیری ترافیک و مصرف منابع سخت‌افزاری ایجاد می‌کند.</p>"
+    },
+    {
+      "title": "چگونه دو روتر پردیسی می‌توانند ترافیک ۳ VRF مجزا را روی یک لینک فیزیکی مشترک بین خود عبور دهند (در VRF-Lite بدون MPLS)؟",
+      "options": [
+        "با ساخت ۳ ساب‌اینترفیس 802.1Q (هر VLAN متصل به یک VRF مجزا)",
+        "با قرار دادن هر ۳ VRF روی یک اینترفیس بدون ساب‌اینترفیس",
+        "با استفاده از Hub",
+        "اصلاً ممکن نیست"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هر ساب‌اینترفیس 802.1Q به یک VLAN و یک VRF نگاشت می‌شود تا جداسازی لایه ۳ در طول لینک حفظ گردد.</p>"
+    },
+    {
+      "title": "اگر IP SLA فقط یک سرور واحد را پینگ کند و آن سرور برای نگهداری خاموش شود (در حالی که لینک WAN سالم است)، چه ریسکی پیش می‌آید؟",
+      "options": [
+        "False Failover — روتر لینک WAN سالم را خراب تلقی کرده و ترافیک را بی‌دلیل منحرف می‌کند (راه‌حل: ترکیب track list با دو مقصد مستقل)",
+        "هیچ ریسکی ندارد",
+        "VRF پاک می‌شود",
+        "پورت err-disabled می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>استفاده از <code>track list boolean or</code> روی دو مقصد مستقل از Failover کاذب جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده VRF-Lite و NetFlow روی روترهای هسته واقعی",
+        "تولید ترافیک واقعی به Collector",
+        "شبیه‌ساز محلی Python 3 (کتابخانه ipaddress) برای آزمون حذف IP در vrf forwarding، Failover غیرمستقیم IP SLA و تجمیع ۵تایی NetFlow بدون روتر واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ روتر یا Collector واقعی متصل نیست.</p>"
+    }
+  ]
+}

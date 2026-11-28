@@ -327,5 +327,21 @@
   - `ccna_06_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `json` + سناریوی مرجع YAML/JSON
 - **وضعیت بازبینی:** خودبازبینی نویسنده (`author-agent-self-review-not-independent`) — بازبینی مستقل انسانی یا intake توسط Agent 2 هنوز انجام نشده است.
 
+## ۱۲C. ممیزی مستقل و تحویل دسته سوم (پایانی) درس‌های انتقالی پیشرفته (`adv_*` — ۵ درس؛ تکمیل ۱۷/۱۷ و ۸۱/۸۱)
+
+- **اصلاحات و ارتقاهای ممیزی مستقل در ۵ درس `adv_*` (تبدیل همه از ۳ بخش/۳ سؤال به ۱۴ بخش/۱۵ واژه/۱۲ پرسش v5):**
+  - `adv_01`: تفکیک دقیق Global BPDU Filter از تله Interface-level BPDU Filter (حذف کامل STP و حلقه لایه ۲)، تصریح ناسازگاری هم‌زمان Root/Loop Guard، UDLD Aggressive (RFC 5171) و مرزبندی سخت‌افزاری StackWise (C9200/C9300) از StackWise Virtual (C9400/C9500/C9600 با لایسنس Network Advantage و DAD).
+  - `adv_02`: تصریح عدم تزریق خودکار مسیر پیش‌فرض در Standard NSSA (برخلاف Stub، Totally Stubby و Totally NSSA)، سلسله‌مراتب قطعی انتخاب مسیر RFC 2328 (`O > O IA > E1/N1 > E2/N2` پیش از مقایسه Cost)، ترجمه Type 7->5 توسط ABR با بالاترین Router-ID و مسیر خودکار `Null0` در خلاصه‌سازی.
+  - `adv_03`: جداسازی کامل RIB/FIB/ARP در VRF-Lite و تله حذف فوری IP هنگام `vrf forwarding`، خرابی غیرمستقیم WAN پشت مودم با `IP SLA + Track` (`delay down/up`، الزام IP SLA Responder برای `udp-jitter`، جلوگیری از False Failover با `track list`) و مقایسه NetFlow/IPFIX (RFC 7011 / UDP 4739) با SNMP.
+  - `adv_04`: تفکیک Control Plane (RIB) از Data Plane (FIB/CEF)، ریاضیات دقیق GRE (`1476/1436`) و GRE+IPsec (`1400/1360`)، تفکیک عملیاتی اندازه پینگ DF میان Cisco IOS (`size 1500` کل بسته) و Linux/Windows (`-s/-l 1472` فقط Payload)، پیام `ICMP Type 3 Code 4` / `ICMPv6 Type 2` در PMTUD Blackhole، و شکست TCP در Asymmetric Routing روی Stateful Firewall و uRPF Strict Mode.
+  - `adv_bfd`: فرمول دقیق مذاکره BFD طبق RFC 5880 (`Multiplier * max(local_min_rx, peer_desired_min_tx)` برای نرخ کندتر نامتقارن)، تفکیک پورت‌های Single-Hop (`3784/3785`) و Multihop (`4784` RFC 5883 بدون Echo)، معماری ۳جزئی Flexible NetFlow (`flow record`/`flow exporter`/`flow monitor`) و اهمیت `cache timeout active 60` و `source Loopback0`.
+- **طبقه‌بندی صادقانه اجرای ۵ آزمایشگاه جدید دسته ۱۲C (صفر تجهیز زنده، صفر import پرچم‌دار):**
+  - `adv_01_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI
+  - `adv_02_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `math` + سناریوی مرجع CLI
+  - `adv_03_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `ipaddress` + سناریوی مرجع CLI
+  - `adv_04_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI
+  - `adv_bfd_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI
+- **جمع‌بندی تکمیل فاز ۱۲ (۱۷/۱۷ درس انتقالی):** تمام ۱۷ درس سابق ایجنت ۱ (`12 ccna_*` + `5 adv_*`) به‌صورت مستقل ممیزی، به بسته کامل v5 ارتقا و در ۳ دسته قابل ادغام (`12A`، `12B`، `12C`) با `SHARED_FILES_TOUCHED=0` تحویل شدند؛ تمام بازبینی‌ها **خودبازبینی نویسنده (`author-agent-self-review-not-independent`)** هستند و در انتظار بازبینی مستقل Agent 2 / SME می‌باشند.
+
 
 
