@@ -1,0 +1,344 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_qos_ssh",
+  "objectiveId": "ccna_qos_ssh",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "IP Services",
+  "title": "CCNA (سرویس‌های IP و مدیریت): مبانی QoS (DiffServ/DSCP/LLQ)، مدیریت امن SSHv2 و انتقال فایل (TFTP/FTP/SCP)",
+  "titleEn": "CCNA IP Services & Mgmt: DiffServ QoS (DSCP/CoS/LLQ), SSHv2 & Secure File Transfer (TFTP/FTP/SCP)",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_qos_ssh (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_qos_ssh",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc2474",
+      "https://www.rfc-editor.org/rfc/rfc3246",
+      "https://www.rfc-editor.org/rfc/rfc4251",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/qos_conmgt/configuration/xe-16/qos-conmgt-xe-16-book.html"
+    ],
+    "limitations": [
+      "هیچ روتر سیسکو، صف QoS، سرویس SSH یا انتقال فایل زنده در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای آزمون اهداف VoIP SLA، نگاشت DSCP/CoS، ممیزی پیش‌نیازهای SSHv2 و مقایسه امنیتی TFTP/FTP/SCP است."
+    ],
+    "legacyAuditFixes": [
+      "تصریح اینکه آستانه‌های VoIP (Delay <=150ms، Jitter <=30ms، Loss <=1%) اهداف مهندسی ITU-T G.114 / Cisco QoS SRND هستند و نقش Policing داخلی LLQ برای جلوگیری از گرسنگی صف‌های دیگر (Starvation).",
+      "توضیح دقیق مرز اعتماد (Trust Boundary)، از بین رفتن L2 CoS در عبور از روتر لایه ۳ بدون نگاشت به DSCP، و تفاوت Policing (حذف/بازبرچسب‌گذاری) با Shaping (بافرینگ خروجی).",
+      "توسعه از ۳ بخش/۳ سؤال قدیمی به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با ccna_qos_ssh_lab.py بدون import پرچم‌دار."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_qos_ssh-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_qos_ssh.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_qos_ssh_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲B: ساخت ccna_qos_ssh_lab.py با اعتبارسنجی سخت‌گیرانه اعداد متناهی/سرریز (`10**500 -> ValueError`)، bool و قوانین SSHv2/QoS/SCP."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_qos_ssh-section-1",
+      "title": "مسئله واقعی: چرا صدای VoIP هنگام دانلود فایل تکه‌تکه می‌شود و چرا Telnet/FTP تهدید امنیتی‌اند؟",
+      "html": "<p>روی یک لینک WAN شلوغ با صف پیش‌فرض <strong>FIFO</strong>، بسته‌های کوچک و حساس به زمان صدای VoIP پشت بسته‌های ۱۵۰۰بایتی دانلود گیر می‌کنند و مکالمه قطع‌ووصلی می‌شود. هم‌زمان، مدیریت روتر با <strong>Telnet (TCP 23)</strong> یا پشتیبان‌گیری پیکربندی با <strong>FTP/TFTP</strong> کل اعتبارنامه و فایل پیکربندی را به‌صورت متن ساده در شبکه افشا می‌کند.</p>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> VLAN/Voice VLAN، هدر IP/802.1Q و مفاهیم پایه TCP/UDP.</p><ul><li>درک اهداف مهندسی VoIP (<strong>Delay <=150ms</strong>، <strong>Jitter <=30ms</strong>، <strong>Loss <=1%</strong>) و معماری <strong>DiffServ QoS</strong>.</li><li>تمایز <strong>L2 CoS (0..7)</strong> و <strong>L3 DSCP (0..63)</strong> (مانند <code>EF/46</code> و <code>CoS 5</code>)، <strong>LLQ/CBWFQ</strong>، <strong>Policing</strong> و <strong>Shaping</strong>.</li><li>پیکربندی کامل و سخت‌سازی <strong>SSHv2 (TCP 22)</strong> با تمام پیش‌نیازهای اجباری IOS.</li><li>مقایسه دقیق امنیتی و عملیاتی <strong>TFTP</strong>، <strong>FTP</strong> و <strong>SCP/SFTP</strong>.</li></ul>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-3",
+      "title": "سه معیار کیفیت سرویس (QoS) و اهداف مهندسی VoIP",
+      "html": "<p>کیفیت ترافیک بلادرنگ با سه شاخص سنجیده می‌شود: <strong>Delay</strong> (تأخیر یک‌طرفه)، <strong>Jitter</strong> (نوسان زمان رسیدن بسته‌ها که صدای مکالمه را رباتیک می‌کند) و <strong>Packet Loss</strong> (افت بسته). مطابق راهنمای Cisco Enterprise QoS SRND و ITU-T G.114، اهداف مهندسی برای صدای باکیفیت عبارت‌اند از: تأخیر یک‌طرفه <code><= 150 ms</code>، لرزش <code><= 30 ms</code> و افت بسته <code><= 1%</code>.</p>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-4",
+      "title": "مدل DiffServ: Classification، Trust Boundary و Marking (CoS در برابر DSCP)",
+      "html": "<p>در مدل استاندارد <strong>DiffServ (RFC 2474)</strong>، ترافیک در لبه شبکه دسته‌بندی و علامت‌گذاری می‌شود: <strong>Trust Boundary</strong> معمولاً روی تلفن IP یا پورت سوئیچ دسترسی قرار می‌گیرد (هرگز به برچسب‌های کامپیوتر کاربر اعتماد نکنید!). در لایه ۲ (فریم 802.1Q) فیلد ۳بیتی <strong>CoS (0..7)</strong> (صدا=<code>5</code>) و در لایه ۳ فیلد ۶بیتی <strong>DSCP (0..63)</strong> (صدا=<strong>EF / DSCP 46</strong> طبق RFC 3246، سیگنالینگ=<code>CS3/24</code>، ویدئوی تعاملی=<code>AF41/34</code>، عادی=<code>0</code>) به کار می‌رود. توجه: برچسب لایه ۲ CoS در عبور از روتر حذف می‌شود، پس نگاشت به DSCP در لایه ۳ برای حفظ اولویت سرتاسری حیاتی است.</p>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-5",
+      "title": "صف‌بندی (CBWFQ / LLQ)، پیشگیری از ازدحام (WRED) و Policing در برابر Shaping",
+      "html": "<p>در <strong>CBWFQ</strong> برای هر کلاس پهنای باند تضمینی تعریف می‌شود و <strong>LLQ (Low Latency Queuing)</strong> یک صف اولویت مطلق (Strict Priority) برای صدا اضافه می‌کند که دارای <strong>Policer داخلی</strong> است تا صدای بیش‌ازحد باعث گرسنگی سایر صف‌ها (Starvation) نشود. <strong>WRED</strong> با افت زودهنگام تصادفی برخی بسته‌های TCP جلوی TCP Global Synchronization را می‌گیرد. <strong>Policing</strong> ترافیک مازاد بر نرخ را Drop یا Re-mark می‌کند (ورودی/خروجی)، اما <strong>Shaping</strong> ترافیک مازاد را در بافر نگه داشته و با نرخ هموار ارسال می‌کند (فقط خروجی، همراه با افزودن مقداری تأخیر).</p>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-6",
+      "title": "نمودار معماری: زنجیره DiffServ QoS، پیش‌نیازهای SSHv2 و امنیت انتقال فایل",
+      "html": "<p>در نمودار زیر نگاشت DSCP/CoS، ۵ پیش‌نیاز اجباری SSHv2 و مقایسه امنیتی پروتکل‌های انتقال فایل دیده می‌شود.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"DiffServ QoS Pipeline, VoIP SLA, SSHv2 and Secure File Transfer\"><rect x=\"16\" y=\"20\" width=\"246\" height=\"180\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"139\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">DiffServ QoS &amp; VoIP SLA</text><text x=\"139\" y=\"68\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Voice: DSCP EF (46) | CoS 5</text><text x=\"139\" y=\"86\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Signaling: CS3 (24) | Video: AF41 (34)</text><text x=\"139\" y=\"106\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">LLQ = Strict Priority + Policer</text><text x=\"139\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1d4ed8\">Targets (G.114 / Cisco SRND):</text><text x=\"139\" y=\"150\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Delay &lt;=150ms | Jitter &lt;=30ms | Loss &lt;=1%</text><text x=\"139\" y=\"174\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#64748b\">Shaping buffers | Policing drops/remarks</text><rect x=\"280\" y=\"20\" width=\"224\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"392\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">SSHv2 Prerequisites (TCP 22)</text><text x=\"392\" y=\"70\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">1) Non-default hostname</text><text x=\"392\" y=\"90\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">2) ip domain-name &lt;dom&gt;</text><text x=\"392\" y=\"110\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">3) RSA modulus &gt;=2048 bits</text><text x=\"392\" y=\"130\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">4) ip ssh version 2</text><text x=\"392\" y=\"150\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">5) VTY: transport input ssh</text><text x=\"392\" y=\"172\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">Block cleartext Telnet (TCP 23)!</text><rect x=\"522\" y=\"20\" width=\"222\" height=\"180\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"633\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">File Transfer Security</text><text x=\"633\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">TFTP (UDP 69): No Auth, No Enc</text><text x=\"633\" y=\"100\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#d97706\">FTP (TCP 21/20): Cleartext Auth!</text><text x=\"633\" y=\"128\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">SCP / SFTP (TCP 22 over SSH):</text><text x=\"633\" y=\"148\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">Authenticated + Encrypted</text><text x=\"633\" y=\"172\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#334155\">Recommended for IOS images/configs</text></svg>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-7",
+      "title": "پنج پیش‌نیاز اجباری فعال‌سازی و سخت‌سازی SSHv2 در Cisco IOS",
+      "html": "<ol><li>تغییر نام پیش‌فرض دستگاه (<code>hostname R1-EDGE</code>؛ نام پیش‌فرض <code>Router</code>/<code>Switch</code> اجازه ساخت کلید RSA را نمی‌دهد).</li><li>تنظیم نام دامنه (<code>ip domain-name corp.example</code>).</li><li>تولید کلید RSA با طول حداقل 768 بیت برای SSHv2 و <strong>حداقل 2048 بیت</strong> طبق استاندارد امنیتی روز (<code>crypto key generate rsa modulus 2048</code>).</li><li>اجبار نسخه امن ۲ با <code>ip ssh version 2</code> (نسخه ۱ آسیب‌پذیر است).</li><li>تعریف احراز هویت محلی/AAA و قفل کردن خطوط VTY روی SSH با <code>transport input ssh</code> و <code>login local</code> (حذف کامل Telnet!).</li></ol>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-8",
+      "title": "مقایسه امنیتی پروتکل‌های انتقال فایل: TFTP، FTP و SCP/SFTP",
+      "html": "<table><thead><tr><th>پروتکل</th><th>پورت</th><th>احراز هویت</th><th>رمزنگاری</th><th>کاربرد و ارزیابی</th></tr></thead><tbody><tr><td><strong>TFTP</strong></td><td>UDP 69</td><td>ندارد</td><td>ندارد</td><td>فقط در محیط ایزوله بازیابی؛ <strong>ناامن</strong></td></tr><tr><td><strong>FTP</strong></td><td>TCP 21 + TCP 20/پورت پویا</td><td>دارد (متن ساده)</td><td>ندارد</td><td>افشای رمز و پیکربندی؛ <strong>ناامن</strong></td></tr><tr><td><strong>SCP / SFTP</strong></td><td><strong>TCP 22 (روی SSH)</strong></td><td><strong>دارد</strong></td><td><strong>بله (رمزنگاری کامل)</strong></td><td><strong>انتخاب استاندارد</strong> برای کپی IOS و بک‌آپ</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-9",
+      "title": "ابزارهای پیکربندی MQC در IOS (class-map، policy-map و service-policy)",
+      "html": "<p>پیکربندی QoS در Cisco IOS با معماری ماژولار <strong>MQC</strong> سه گام دارد: (۱) تعریف ترافیک در <code>class-map</code>، (۲) تعیین اقدام (<code>priority</code>، <code>bandwidth</code>، <code>set dscp ef</code>، <code>shape</code>) در <code>policy-map</code>، و (۳) اعمال روی اینترفیس با <code>service-policy output/input</code>.</p>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-10",
+      "title": "فعال‌سازی SCP Server و بررسی امنیت مدیریت",
+      "html": "<p>برای پذیرش کپی مستقیم فایل روی فلش روتر از طریق SCP، علاوه بر SSHv2 باید دستور <code>ip scp server enable</code> و کاربر دارای سطح دسترسی <code>privilege 15</code> (یا مجوز AAA معادل) تنظیم شود. وضعیت نشست‌های SSH با <code>show ip ssh</code> و <code>show ssh</code> بررسی می‌شود.</p>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-11",
+      "title": "کژفهمی‌های رایج در QoS، SSH و انتقال فایل",
+      "html": "<ul><li><strong>کژفهمی ۱: «QoS پهنای باند لینک را افزایش می‌دهد.»</strong> واقعیت: QoS پهنای باند نمی‌سازد، بلکه هنگام ازدحام پهنای باند موجود را هوشمندانه مدیریت و اولویت‌بندی می‌کند.</li><li><strong>کژفهمی ۲: «FTP چون نام کاربری و رمز دارد امن است.»</strong> واقعیت: هر دو رمز و محتوای فایل در FTP عادی به‌صورت متن ساده ارسال می‌شوند.</li><li><strong>کژفهمی ۳: «علامت‌گذاری L2 CoS تا آن‌سوی اینترنت حفظ می‌شود.»</strong> واقعیت: CoS درون هدر 802.1Q است و در هر گام لایه ۳ بازنویسی/حذف می‌شود؛ DSCP لایه ۳ است که در مسیر IP باقی می‌ماند.</li></ul>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-12",
+      "title": "عیب‌یابی شکست ساخت کلید RSA یا رد اتصال SSH",
+      "html": "<p>اگر <code>crypto key generate rsa</code> خطا می‌دهد، بررسی کنید <code>hostname</code> دیگر <code>Router</code> نباشد و <code>ip domain-name</code> تنظیم شده باشد. اگر اتصال SSH رد می‌شود، بررسی کنید <code>ip ssh version 2</code> فعال است، طول کلید >=768 (توصیه 2048) بوده و روی <code>line vty 0 15</code> دستور <code>transport input ssh</code> و <code>login local</code> (یا AAA) اعمال شده باشد.</p>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> برای ترافیک VoIP چه مقدار DSCP و CoS استاندارد است و در کدام صف قرار می‌گیرد؟ <strong>پاسخ:</strong> <code>DSCP EF (46)</code> در لایه ۳، <code>CoS 5</code> در لایه ۲، و صف اولویت مطلق <code>LLQ</code> (همراه با Policer داخلی برای پیشگیری از Starvation).</p><p><strong>تمرین ۲:</strong> چرا هنگام انتقال فایل <code>running-config</code> روی شبکه سازمانی باید SCP را جایگزین TFTP و FTP کرد؟ <strong>پاسخ:</strong> زیرا SCP روی بستر SSHv2 (TCP 22) هم احراز هویت و هم رمزنگاری کامل دارد.</p>"
+    },
+    {
+      "id": "ccna_qos_ssh-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc2474\" target=\"_blank\" rel=\"noopener\">RFC 2474 (DiffServ DSCP)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3246\" target=\"_blank\" rel=\"noopener\">RFC 3246 (Expedited Forwarding — EF)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc4251\" target=\"_blank\" rel=\"noopener\">RFC 4251 (معماری SSHv2)</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/qos_conmgt/configuration/xe-16/qos-conmgt-xe-16-book.html\" target=\"_blank\" rel=\"noopener\">راهنمای مدیریت ازدحام QoS سیسکو IOS-XE</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی سیسکو، صف QoS یا سرویس SSH در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "QoS (DiffServ)",
+      "fa": "کیفیت سرویس متمایز",
+      "simple": "مدیریت هوشمند ازدحام با دسته‌بندی، علامت‌گذاری و صف‌بندی بسته‌ها (RFC 2474)."
+    },
+    {
+      "term": "DSCP EF (46)",
+      "fa": "ارسال شتاب‌یافته برای صدا",
+      "simple": "مقدار استاندارد ۶بیتی لایه ۳ برای ترافیک صدای زنده VoIP (RFC 3246)."
+    },
+    {
+      "term": "CoS (802.1p)",
+      "fa": "کلاس سرویس لایه ۲",
+      "simple": "فیلد ۳بیتی (0..7) درون تگ 802.1Q؛ مقدار 5 برای صدا (محدود به لایه ۲)."
+    },
+    {
+      "term": "Trust Boundary",
+      "fa": "مرز اعتماد QoS",
+      "simple": "نقطه‌ای که شبکه به برچسب‌های QoS ورودی اعتماد می‌کند (تلفن IP یا سوئیچ Access، نه PC)."
+    },
+    {
+      "term": "LLQ",
+      "fa": "صف‌بندی کم‌تأخیر",
+      "simple": "صف اولویت مطلق (Strict Priority) برای صدا همراه با Policer داخلی ضد گرسنگی."
+    },
+    {
+      "term": "CBWFQ",
+      "fa": "صف‌بندی عادلانه مبتنی بر کلاس",
+      "simple": "تضمین حداقل پهنای باند برای کلاس‌های مختلف ترافیک هنگام ازدحام."
+    },
+    {
+      "term": "Policing vs Shaping",
+      "fa": "محدودسازی نرخ با Drop در برابر Buffer",
+      "simple": "Policing مازاد را Drop/Remark می‌کند؛ Shaping مازاد را در بافر هموار می‌سازد (خروجی)."
+    },
+    {
+      "term": "WRED",
+      "fa": "افت تصادفی وزن‌دار",
+      "simple": "پیشگیری از ازدحام و TCP Global Synchronization پیش از پر شدن کامل بافر."
+    },
+    {
+      "term": "VoIP SLA Targets",
+      "fa": "اهداف مهندسی کیفیت صدا",
+      "simple": "تأخیر یک‌طرفه <=150ms، لرزش <=30ms و افت بسته <=1% (راهنمای G.114/SRND)."
+    },
+    {
+      "term": "MQC",
+      "fa": "رابط خط فرمان ماژولار QoS",
+      "simple": "ساختار سه‌بخشی class-map، policy-map و service-policy در Cisco IOS."
+    },
+    {
+      "term": "SSHv2 (TCP 22)",
+      "fa": "پوسته امن نسخه ۲",
+      "simple": "پروتکل مدیریت از راه دور رمزنگاری‌شده جایگزین Telnet متن‌ساده (TCP 23)."
+    },
+    {
+      "term": "RSA Modulus 2048",
+      "fa": "طول کلید RSA",
+      "simple": "حداقل 768 بیت برای SSHv2 و حداقل 2048 بیت طبق استاندارد امنیتی مدرن."
+    },
+    {
+      "term": "TFTP (UDP 69)",
+      "fa": "پروتکل انتقال فایل ساده",
+      "simple": "بدون احراز هویت و بدون رمزنگاری؛ صرفاً برای محیط ایزوله."
+    },
+    {
+      "term": "FTP (TCP 21/20)",
+      "fa": "پروتکل انتقال فایل کلاسیک",
+      "simple": "دارای احراز هویت ولی کاملاً متن‌ساده (رمز و داده بدون رمزنگاری)."
+    },
+    {
+      "term": "SCP / SFTP (TCP 22)",
+      "fa": "انتقال فایل امن روی SSH",
+      "simple": "هم احراز هویت و هم رمزنگاری کامل برای فایل‌های پیکربندی و سیستم‌عامل."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، پایش اهداف مهندسی VoIP SLA (تأخیر/لرزش/افت بسته)، نگاشت DSCP/CoS، ممیزی خودکار پیش‌نیازهای SSHv2 و مقایسه امنیتی TFTP/FTP/SCP را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_qos_ssh_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_qos_ssh_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for ccna_qos_ssh (DiffServ QoS, VoIP SLA, SSHv2 &amp; SCP/FTP/TFTP).\n\nBoundary: Pure in-memory simulation using Python stdlib only.\nNo real Cisco device, packet queue, SSH daemon, or file transfer occurs.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport math\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _require_finite_nonneg(val: object, name: str) -&gt; float:\n    if type(val) is bool or not isinstance(val, (int, float)):\n        raise ValueError(f&quot;{name} must be a real number&quot;)\n    try:\n        fval = float(val)\n    except OverflowError as exc:\n        raise ValueError(f&quot;{name} overflowed float range&quot;) from exc\n    if not math.isfinite(fval) or fval &lt; 0:\n        raise ValueError(f&quot;{name} must be finite and &gt;= 0&quot;)\n    return fval\n\n\ndef evaluate_voip_qos_sla(\n    one_way_delay_ms: float,\n    jitter_ms: float,\n    packet_loss_pct: float,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate VoIP path against Cisco Enterprise QoS SRND / ITU-T G.114 target thresholds.&quot;&quot;&quot;\n    delay = _require_finite_nonneg(one_way_delay_ms, &quot;one_way_delay_ms&quot;)\n    jitter = _require_finite_nonneg(jitter_ms, &quot;jitter_ms&quot;)\n    loss = _require_finite_nonneg(packet_loss_pct, &quot;packet_loss_pct&quot;)\n    if loss &gt; 100.0:\n        raise ValueError(&quot;packet_loss_pct cannot exceed 100&quot;)\n\n    breaches = []\n    if delay &gt; 150.0:\n        breaches.append(f&quot;ONE_WAY_DELAY_EXCEEDS_150MS ({delay}ms)&quot;)\n    if jitter &gt; 30.0:\n        breaches.append(f&quot;JITTER_EXCEEDS_30MS ({jitter}ms)&quot;)\n    if loss &gt; 1.0:\n        breaches.append(f&quot;PACKET_LOSS_EXCEEDS_1PCT ({loss}%)&quot;)\n    return {&quot;voip_sla_met&quot;: len(breaches) == 0, &quot;breaches&quot;: breaches}\n\n\ndef classify_dscp_marking(traffic_class: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Return standard DiffServ DSCP (L3) and 802.1p CoS (L2) markings.&quot;&quot;&quot;\n    table = {\n        &quot;voice&quot;: {&quot;dscp_name&quot;: &quot;EF&quot;, &quot;dscp_decimal&quot;: 46, &quot;cos_8021p&quot;: 5, &quot;queue&quot;: &quot;LLQ (Strict Priority + Policer)&quot;},\n        &quot;call_signaling&quot;: {&quot;dscp_name&quot;: &quot;CS3&quot;, &quot;dscp_decimal&quot;: 24, &quot;cos_8021p&quot;: 3, &quot;queue&quot;: &quot;CBWFQ Guaranteed&quot;},\n        &quot;interactive_video&quot;: {&quot;dscp_name&quot;: &quot;AF41&quot;, &quot;dscp_decimal&quot;: 34, &quot;cos_8021p&quot;: 4, &quot;queue&quot;: &quot;CBWFQ / Priority Video&quot;},\n        &quot;best_effort&quot;: {&quot;dscp_name&quot;: &quot;BE/DF&quot;, &quot;dscp_decimal&quot;: 0, &quot;cos_8021p&quot;: 0, &quot;queue&quot;: &quot;Class-Default&quot;},\n    }\n    if traffic_class not in table:\n        raise ValueError(f&quot;Unknown traffic_class: {traffic_class}&quot;)\n    return {&quot;traffic_class&quot;: traffic_class, **table[traffic_class]}\n\n\ndef audit_ssh_prerequisites(\n    hostname: str,\n    domain_name: str,\n    rsa_modulus_bits: int,\n    ssh_version: int,\n    vty_transport_input: list[str],\n    local_or_aaa_auth: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Verify Cisco IOS SSHv2 prerequisites and detect insecure Telnet exposure.&quot;&quot;&quot;\n    if not isinstance(hostname, str) or not hostname.strip():\n        raise ValueError(&quot;hostname must be a non-empty string&quot;)\n    if not isinstance(domain_name, str):\n        raise ValueError(&quot;domain_name must be a string&quot;)\n    if type(rsa_modulus_bits) is not int or rsa_modulus_bits &lt; 0:\n        raise ValueError(&quot;rsa_modulus_bits must be a non-negative integer&quot;)\n    if type(ssh_version) is not int or ssh_version not in (1, 2):\n        raise ValueError(&quot;ssh_version must be 1 or 2&quot;)\n    _require_bool(local_or_aaa_auth, &quot;local_or_aaa_auth&quot;)\n\n    issues = []\n    if hostname.strip() in (&quot;Router&quot;, &quot;Switch&quot;):\n        issues.append(&quot;DEFAULT_HOSTNAME_BLOCKS_RSA_KEYGEN&quot;)\n    if not domain_name.strip():\n        issues.append(&quot;MISSING_IP_DOMAIN_NAME&quot;)\n    if rsa_modulus_bits &lt; 768:\n        issues.append(&quot;RSA_KEY_TOO_SMALL_FOR_SSHV2_MIN_768_REC_2048&quot;)\n    elif rsa_modulus_bits &lt; 2048:\n        issues.append(&quot;RSA_KEY_BELOW_MODERN_2048_BIT_RECOMMENDATION&quot;)\n    if ssh_version != 2:\n        issues.append(&quot;SSH_VERSION_1_INSECURE&quot;)\n    if &quot;telnet&quot; in [t.lower() for t in vty_transport_input] or &quot;all&quot; in [t.lower() for t in vty_transport_input]:\n        issues.append(&quot;CLEARTEXT_TELNET_ALLOWED_ON_VTY&quot;)\n    if &quot;ssh&quot; not in [t.lower() for t in vty_transport_input]:\n        issues.append(&quot;SSH_NOT_ENABLED_ON_VTY&quot;)\n    if not local_or_aaa_auth:\n        issues.append(&quot;MISSING_LOCAL_OR_AAA_LOGIN_AUTH&quot;)\n\n    return {&quot;ssh_ready_and_hardened&quot;: len(issues) == 0, &quot;issues&quot;: issues}\n\n\ndef audit_file_transfer_protocol(protocol: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compare TFTP, FTP, and SCP/SFTP security properties.&quot;&quot;&quot;\n    p = protocol.upper() if isinstance(protocol, str) else &quot;&quot;\n    profiles = {\n        &quot;TFTP&quot;: {&quot;port&quot;: &quot;UDP/69&quot;, &quot;authenticated&quot;: False, &quot;encrypted&quot;: False, &quot;recommended&quot;: False},\n        &quot;FTP&quot;: {&quot;port&quot;: &quot;TCP/21 (control) + TCP/20 or passive&quot;, &quot;authenticated&quot;: True, &quot;encrypted&quot;: False, &quot;recommended&quot;: False},\n        &quot;SCP&quot;: {&quot;port&quot;: &quot;TCP/22 (over SSH)&quot;, &quot;authenticated&quot;: True, &quot;encrypted&quot;: True, &quot;recommended&quot;: True},\n        &quot;SFTP&quot;: {&quot;port&quot;: &quot;TCP/22 (over SSH)&quot;, &quot;authenticated&quot;: True, &quot;encrypted&quot;: True, &quot;recommended&quot;: True},\n    }\n    if p not in profiles:\n        raise ValueError(f&quot;Unsupported file transfer protocol: {protocol}&quot;)\n    return {&quot;protocol&quot;: p, **profiles[p]}\n\n\ndef main() -&gt; None:\n    sla_ok = evaluate_voip_qos_sla(85.0, 12.0, 0.2)\n    sla_bad = evaluate_voip_qos_sla(190.0, 45.0, 2.5)\n    assert sla_ok[&quot;voip_sla_met&quot;] is True\n    assert sla_bad[&quot;voip_sla_met&quot;] is False and len(sla_bad[&quot;breaches&quot;]) == 3\n\n    ef = classify_dscp_marking(&quot;voice&quot;)\n    assert ef[&quot;dscp_decimal&quot;] == 46 and ef[&quot;cos_8021p&quot;] == 5\n\n    ssh_fail = audit_ssh_prerequisites(&quot;Router&quot;, &quot;&quot;, 0, 2, [&quot;telnet&quot;], False)\n    ssh_ok = audit_ssh_prerequisites(&quot;R1-EDGE&quot;, &quot;corp.example&quot;, 2048, 2, [&quot;ssh&quot;], True)\n    assert ssh_fail[&quot;ssh_ready_and_hardened&quot;] is False\n    assert ssh_ok[&quot;ssh_ready_and_hardened&quot;] is True\n    assert audit_file_transfer_protocol(&quot;SCP&quot;)[&quot;recommended&quot;] is True\n    assert audit_file_transfer_protocol(&quot;FTP&quot;)[&quot;encrypted&quot;] is False\n\n    print(&quot;VoIP QoS SLA (OK vs Breach):&quot;, sla_ok, sla_bad)\n    print(&quot;Voice Marking:&quot;, ef)\n    print(&quot;SSH Audit (Fail vs Hardened):&quot;, ssh_fail, ssh_ok)\n    print(&quot;File Transfer (FTP vs SCP):&quot;, audit_file_transfer_protocol(&quot;FTP&quot;), audit_file_transfer_protocol(&quot;SCP&quot;))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> مسیر با 85ms/12ms/0.2% در SLA قبول و مسیر 190ms/45ms/2.5% با ۳ نقض رد می‌شود؛ صدای VoIP به <code>EF (46) / CoS 5</code> نگاشت می‌شود؛ روتر با نام <code>Router</code> و Telnet رد و روتر سخت‌سازی‌شده با کلید 2048 و <code>transport input ssh</code> قبول می‌گردد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع SSHv2، SCP و MQC LLQ در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE SSHv2, SCP &amp; LLQ QoS config (NOT executed on real router)\nconfigure terminal\n hostname R1-EDGE\n ip domain-name corp.example\n crypto key generate rsa modulus 2048\n ip ssh version 2\n ip scp server enable\n line vty 0 15\n  login local\n  transport input ssh\n class-map match-any VOICE_EF\n  match dscp ef\n policy-map WAN_EGRESS\n  class VOICE_EF\n   priority percent 20\n  class class-default\n   fair-queue\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در QoS، مقدار استاندارد علامت‌گذاری DSCP در لایه ۳ برای ترافیک صدای زنده (VoIP) چیست؟",
+      "options": [
+        "Best Effort (DSCP 0)",
+        "CS1 (DSCP 8)",
+        "Expedited Forwarding — EF (DSCP 46)",
+        "DF (Don't Fragment)"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>مطابق RFC 3246، صدای زنده VoIP با <code>EF (DSCP 46)</code> در لایه ۳ و <code>CoS 5</code> در لایه ۲ علامت‌گذاری می‌شود.</p>"
+    },
+    {
+      "title": "کدام پروتکل انتقال فایل هم احراز هویت دارد و هم اعتبارنامه و داده را روی بستر رمزنگاری‌شده جابه‌جا می‌کند؟",
+      "options": [
+        "TFTP",
+        "FTP عادی",
+        "Telnet",
+        "SCP (یا SFTP روی SSHv2 TCP 22)"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>SCP و SFTP روی نشست رمزنگاری‌شده SSH (TCP 22) عمل می‌کنند و جایگزین امن FTP/TFTP هستند.</p>"
+    },
+    {
+      "title": "اگر پیش از اجرای <code>crypto key generate rsa</code> فراموش کنیم <code>ip domain-name</code> و نام غیراستاندارد <code>hostname</code> را تنظیم کنیم چه رخ می‌دهد؟",
+      "options": [
+        "کلید RSA ساخته نمی‌شود و سرویس SSH فعال نخواهد شد",
+        "روتر خودکار به TFTP سوییچ می‌کند",
+        "پورت‌ها خاموش می‌شوند",
+        "مد enable حذف می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>نام میزبان غیراستاندارد و نام دامنه دو پیش‌نیاز اجباری ساخت کلید RSA در Cisco IOS هستند.</p>"
+    },
+    {
+      "title": "اهداف مهندسی استاندارد (Cisco SRND / ITU-T G.114) برای تأخیر یک‌طرفه، Jitter و افت بسته صدای VoIP کدام‌اند؟",
+      "options": [
+        "Delay <= 500ms, Jitter <= 100ms, Loss <= 10%",
+        "Delay <= 150ms, Jitter <= 30ms, Loss <= 1%",
+        "Delay <= 1000ms, Jitter <= 200ms, Loss <= 5%",
+        "هیچ محدودیتی وجود ندارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تجاوز از این سه آستانه باعث افت محسوس کیفیت مکالمه و رباتیک شدن صدا می‌گردد.</p>"
+    },
+    {
+      "title": "تفاوت کلیدی <strong>Traffic Shaping</strong> و <strong>Traffic Policing</strong> چیست؟",
+      "options": [
+        "Shaping ترافیک مازاد را در بافر نگه داشته و با نرخ هموار ارسال می‌کند (خروجی)، اما Policing ترافیک مازاد را Drop یا Re-mark می‌نماید",
+        "Policing فقط روی Wi-Fi است",
+        "Shaping بسته‌ها را رمزنگاری می‌کند",
+        "هر دو دقیقاً یکی هستند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Shaping نرخ خروجی را هموار کرده و افت بسته را کاهش می‌دهد (با کمی تأخیر)، در حالی که Policing مازاد را Drop/Remark می‌کند.</p>"
+    },
+    {
+      "title": "چرا صف اولویت مطلق <strong>LLQ</strong> برای ترافیک صدا به یک Policer داخلی مجهز است؟",
+      "options": [
+        "برای افزایش Jitter",
+        "تا ترافیک صف اولویت نتواند کل پهنای باند لینک را ببلعد و باعث گرسنگی (Starvation) سایر صف‌ها شود",
+        "برای تبدیل صدا به FTP",
+        "برای غیرفعال کردن DSCP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون محدودیت در LLQ، ترافیک اولویت مطلق می‌تواند ترافیک کنترلی و سایر کلاس‌ها را به‌کل متوقف کند.</p>"
+    },
+    {
+      "title": "چرا علامت‌گذاری صرفاً در لایه ۲ با <strong>CoS (802.1p)</strong> برای حفظ اولویت سرتاسری در یک شبکه چندروتری کافی نیست؟",
+      "options": [
+        "چون CoS درون هدر 802.1Q است و در عبور از هر گام لایه ۳ (روتر) حذف می‌شود؛ پس باید به DSCP لایه ۳ نگاشت گردد",
+        "چون CoS فقط روی UDP 69 کار می‌کند",
+        "چون CoS مقدار 46 دارد",
+        "چون روترها IP ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>DSCP در هدر IP باقی می‌ماند و در تمام مسیر WAN/LAN قابل اتکا است.</p>"
+    },
+    {
+      "title": "در طراحی QoS سازمانی، <strong>Trust Boundary</strong> معمولاً کجا قرار می‌گیرد؟",
+      "options": [
+        "روی کامپیوترهای شخصی کاربران بدون کنترل",
+        "روی تلفن IP سازمانی یا پورت سوئیچ دسترسی (نه روی PC نامطمئن)",
+        "فقط روی اینترنت عمومی",
+        "روی سرور TFTP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اعتماد مستقیم به علامت‌گذاری PC کاربران به هر برنامه‌ای اجازه می‌دهد خودش را EF (46) علامت‌گذاری کند.</p>"
+    },
+    {
+      "title": "کدام دستور روی <code>line vty 0 15</code> دسترسی متن‌ساده Telnet را مسدود و صرفاً SSH را مجاز می‌کند؟",
+      "options": [
+        "transport input all",
+        "transport input telnet",
+        "transport input ssh",
+        "no ip ssh version 2"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p><code>transport input ssh</code> از پذیرش نشست‌های Telnet جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "پورت و پروتکل انتقال <strong>TFTP</strong> کدام است؟",
+      "options": [
+        "TCP 22",
+        "TCP 21",
+        "UDP 69",
+        "UDP 53"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>TFTP روی UDP 69 و بدون هیچ‌گونه احراز هویت یا رمزنگاری کار می‌کند.</p>"
+    },
+    {
+      "title": "نقش مکانیزم <strong>WRED</strong> در QoS چیست؟",
+      "options": [
+        "تولید کلید RSA",
+        "افت تصادفی زودهنگام برخی بسته‌های کم‌اولویت پیش از پر شدن کامل صف برای جلوگیری از TCP Global Synchronization",
+        "مسدودسازی SSHv2",
+        "تبدیل FTP به SCP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>WRED با کاهش تدریجی پنجره TCP در جریان‌های جداگانه، از افت هم‌زمان همه جریان‌ها (Tail Drop) جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده QoS و SSH روی روتر سیسکو واقعی",
+        "تست واقعی مکالمه VoIP روی WAN",
+        "شبیه‌ساز محلی Python 3 برای آزمون VoIP SLA، نگاشت DSCP/CoS، پیش‌نیازهای SSHv2 و ممیزی TFTP/FTP/SCP بدون تجهیز واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 است و بخش ۲ سناریوی مرجع CLI اجرا نشده می‌باشد.</p>"
+    }
+  ]
+}

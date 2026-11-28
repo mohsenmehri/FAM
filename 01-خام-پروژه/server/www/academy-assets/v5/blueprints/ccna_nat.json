@@ -1,0 +1,343 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_nat",
+  "objectiveId": "ccna_nat",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "IP Services",
+  "title": "CCNA (سرویس‌های IP): Static NAT، Dynamic NAT، PAT (NAT Overload) و ترتیب پردازش بسته",
+  "titleEn": "CCNA IP Services: Static NAT, Dynamic NAT, PAT (NAT Overload) & Order of Operations",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_nat (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_nat",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc1918",
+      "https://www.rfc-editor.org/rfc/rfc3022",
+      "https://www.cisco.com/c/en/us/support/docs/ip/network-address-translation-nat/6209-5.html"
+    ],
+    "limitations": [
+      "هیچ روتر Cisco IOS/IOS-XE یا ترافیک اینترنتی واقعی در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 (کتابخانه ipaddress) برای آزمون ترتیب Routing/NAT، اتمام Pool در Dynamic NAT، مالتی‌پلکس پورت در PAT و بازگشت Outside-to-Inside است."
+    ],
+    "legacyAuditFixes": [
+      "تصریح تفاوت دقیق RFC 1918 (10/8، 172.16/12، 192.168/16) با CGNAT (RFC 6598: 100.64/10) و بازه‌های مستندسازی RFC 5737.",
+      "بیان شفاف علت یکسان بودن Outside Local و Outside Global در سناریوهای معمول (در نبود Destination/Overlapping NAT) و الزام clear ip nat translation * پس از تغییر پیکربندی.",
+      "توسعه از ۳ بخش/۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش همراه با شبیه‌ساز محلی ccna_nat_lab.py."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_nat-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_nat.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_nat_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲B: ساخت ccna_nat_lab.py بدون import پرچم‌دار با اعتبارسنجی دقیق پورت ۱..۶۵۵۳۵، بازه RFC 1918، ترتیب پردازش رفت‌وبرگشت و bool."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_nat-section-1",
+      "title": "مسئله واقعی: کمبود آدرس‌های عمومی IPv4 و چگونگی اتصال هزاران کاربر با یک IP عمومی",
+      "html": "<p>آدرس‌های خصوصی <strong>RFC 1918</strong> (<code>10.0.0.0/8</code>، <code>172.16.0.0/12</code>، <code>192.168.0.0/16</code>) در اینترنت عمومی مسیریابی نمی‌شوند. برای اتصال صدها کارمند به اینترنت با یک یا چند IP عمومی، یا انتشار یک وب‌سرور DMZ به بیرون، روتر مرزی از <strong>NAT (Network Address Translation — RFC 3022)</strong> و به‌ویژه <strong>PAT (NAT Overload)</strong> استفاده می‌کند.</p>"
+    },
+    {
+      "id": "ccna_nat-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> ساب‌نت‌بندی IPv4، پورت‌های TCP/UDP و مسیر پیش‌فرض (<code>0.0.0.0/0</code>).</p><ul><li>تفکیک بی‌اشتباه چهار مفهوم سیسکو: <strong>Inside Local</strong>، <strong>Inside Global</strong>، <strong>Outside Local</strong> و <strong>Outside Global</strong>.</li><li>پیاده‌سازی و مقایسه <strong>Static NAT</strong>، <strong>Dynamic NAT</strong> و <strong>PAT (NAT Overload)</strong>.</li><li>تسلط بر <strong>ترتیب پردازش بسته (Order of Operations)</strong> در Cisco IOS برای مسیر رفت و برگشت.</li><li>عیب‌یابی خطاهای کلاسیک مانند خالی ماندن <code>show ip nat translations</code>، فراموشی <code>overload</code> یا نبود <code>ip nat inside/outside</code>.</li></ul>"
+    },
+    {
+      "id": "ccna_nat-section-3",
+      "title": "چهار اصطلاح کلیدی جدول NAT سیسکو",
+      "html": "<p><strong>Inside/Outside</strong> جایگاه دستگاه را نشان می‌دهد و <strong>Local/Global</strong> دید شبکه را: <strong>Inside Local</strong> آدرس خصوصی واقعی میزبان داخلی پیش از ترجمه (<code>192.168.10.11</code>)، <strong>Inside Global</strong> چهره عمومی آن در اینترنت پس از ترجمه (<code>203.0.113.10</code>)، <strong>Outside Global</strong> آدرس عمومی واقعی سرور بیرونی (<code>198.51.100.80</code>) و <strong>Outside Local</strong> چهره سرور بیرونی در شبکه داخلی است (که در نبود Destination NAT دقیقاً برابر Outside Global است).</p>"
+    },
+    {
+      "id": "ccna_nat-section-4",
+      "title": "پیش‌نیاز اجباری: علامت‌گذاری اینترفیس‌های Inside و Outside",
+      "html": "<p>پیش از هر قانون NAT، باید روی اینترفیس سمت LAN دستور <code>ip nat inside</code> و روی اینترفیس سمت WAN دستور <code>ip nat outside</code> اجرا شود. در صورت فراموش کردن حتی یکی از این دو دستور، بسته بدون ترجمه عبور کرده یا در اینترنت Drop می‌شود و جدول NAT خالی می‌ماند.</p>"
+    },
+    {
+      "id": "ccna_nat-section-5",
+      "title": "مقایسه سه مدل Static NAT، Dynamic NAT و PAT (NAT Overload)",
+      "html": "<table><thead><tr><th>مدل NAT</th><th>نسبت نگاشت</th><th>کاربرد اصلی</th><th>محدودیت کلیدی</th></tr></thead><tbody><tr><td><strong>Static NAT</strong></td><td>۱ به ۱ دائمی</td><td>سرور DMZ قابل دسترس از بیرون</td><td>هر سرور یک IP عمومی مصرف می‌کند</td></tr><tr><td><strong>Dynamic NAT</strong></td><td>چند به چند (۱ به ۱ در لحظه)</td><td>استخر چند IP عمومی بدون Overload</td><td>با پر شدن Pool، کاربر بعدی <strong>قطع</strong> می‌شود</td></tr><tr><td><strong>PAT (Overload)</strong></td><td>چند به ۱ (با پورت TCP/UDP)</td><td>اتصال انبوه کاربران داخلی با ۱ IP عمومی</td><td>ترافیک ورودی بدون Port Forwarding مسدود است</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccna_nat-section-6",
+      "title": "نمودار معماری: اصطلاحات NAT و ترتیب پردازش رفت‌وبرگشت در Cisco IOS",
+      "html": "<p>در نمودار زیر تفاوت ترتیب Routing و NAT در دو جهت Inside->Outside و Outside->Inside نمایش داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"NAT Terminology and Cisco IOS Order of Operations\"><rect x=\"16\" y=\"24\" width=\"188\" height=\"172\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"110\" y=\"48\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">Inside (RFC 1918)</text><text x=\"110\" y=\"76\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Host A: 192.168.10.11:51200</text><text x=\"110\" y=\"96\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Host B: 192.168.10.12:51200</text><text x=\"110\" y=\"124\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1d4ed8\">Inside Local</text><text x=\"110\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Interface: ip nat inside</text><rect x=\"234\" y=\"18\" width=\"292\" height=\"184\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"42\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">Edge Router — Order of Operations</text><rect x=\"248\" y=\"54\" width=\"264\" height=\"54\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"380\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">Inside -&gt; Outside: 1) Routing  2) NAT</text><text x=\"380\" y=\"94\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#78350f\">No default route =&gt; Drop BEFORE NAT!</text><rect x=\"248\" y=\"118\" width=\"264\" height=\"54\" rx=\"6\" fill=\"#ffffff\" stroke=\"#2563eb\"/><text x=\"380\" y=\"138\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1d4ed8\">Outside -&gt; Inside: 1) NAT  2) Routing</text><text x=\"380\" y=\"158\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#334155\">Untranslate 203.0.113.10:51201 first!</text><text x=\"380\" y=\"190\" text-anchor=\"middle\" font-size=\"9\" fill=\"#92400e\">PAT shares 1 IP via distinct L4 ports</text><rect x=\"556\" y=\"24\" width=\"188\" height=\"172\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"650\" y=\"48\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Outside (Public)</text><text x=\"650\" y=\"76\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">Inside Global (PAT):</text><text x=\"650\" y=\"94\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">203.0.113.10:51200/51201</text><text x=\"650\" y=\"124\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">Outside Global:</text><text x=\"650\" y=\"142\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">198.51.100.80:443</text><text x=\"650\" y=\"166\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Interface: ip nat outside</text></svg>"
+    },
+    {
+      "id": "ccna_nat-section-7",
+      "title": "ترتیب حیاتی پردازش بسته (Order of Operations) در Cisco IOS",
+      "html": "<p>مطابق مستند رسمی سیسکو (Document ID 6209): (۱) در مسیر <strong>رفت (Inside -> Outside)</strong> روتر <strong>ابتدا جدول مسیریابی (Routing)</strong> را بررسی می‌کند و تنها اگر مسیر خروجی به اینترفیس <code>outside</code> وجود داشت ترجمه NAT را انجام می‌دهد؛ بنابراین در نبود Default Route، جدول NAT خالی می‌ماند! (۲) در مسیر <strong>برگشت (Outside -> Inside)</strong> روتر <strong>ابتدا ترجمه معکوس NAT</strong> را انجام می‌دهد تا آدرس <code>Inside Local</code> به دست آید و <strong>سپس</strong> بر اساس آن در جدول Routing مسیریابی می‌کند.</p>"
+    },
+    {
+      "id": "ccna_nat-section-8",
+      "title": "پیکربندی PAT با اینترفیس خروجی در برابر Pool دارای overload",
+      "html": "<p>در شبکه‌های سازمانی رایج‌ترین دستور PAT استفاده از خود IP اینترفیس WAN است: <code>ip nat inside source list 1 interface GigabitEthernet0/0 overload</code>. اگر یک بازه چندتایی IP عمومی دارید می‌توانید از <code>ip nat pool ...</code> همراه با کلمه کلیدی <code>overload</code> در انتهای دستور <code>ip nat inside source list 1 pool ... overload</code> استفاده کنید. حذف کلمه <code>overload</code> کل سازوکار را به Dynamic NAT محدود و مستعد اتمام استخر می‌کند.</p>"
+    },
+    {
+      "id": "ccna_nat-section-9",
+      "title": "آدرس‌های RFC 1918 در برابر CGNAT (RFC 6598) و RFC 5737",
+      "html": "<p>آدرس‌های خصوصی سازمانی RFC 1918 شامل <code>10.0.0.0/8</code>، <code>172.16.0.0/12</code> و <code>192.168.0.0/16</code> هستند. اپراتورهای اینترنتی برای NAT دولایه از بازه <strong>CGNAT</strong> (<code>100.64.0.0/10</code> — RFC 6598) بهره می‌برند و بازه‌های <code>192.0.2.0/24</code>، <code>198.51.100.0/24</code> و <code>203.0.113.0/24</code> (RFC 5737) صرفاً برای مثال و مستندسازی هستند.</p>"
+    },
+    {
+      "id": "ccna_nat-section-10",
+      "title": "راستی‌آزمایی و پاک‌سازی جدول NAT",
+      "html": "<p>دستور <code>show ip nat translations</code> جدول فعال نگاشت‌ها (چهار ستون Inside/Outside Local/Global) و دستور <code>show ip nat statistics</code> تعداد Hit/Miss، اینترفیس‌های Inside/Outside و میزان مصرف Pool را نشان می‌دهد. پس از تغییر قوانین NAT، پاک‌سازی ورودی‌های پویا با <code>clear ip nat translation *</code> (با احتیاط در محیط تولیدی!) لازم است.</p>"
+    },
+    {
+      "id": "ccna_nat-section-11",
+      "title": "کژفهمی‌های رایج در NAT و PAT",
+      "html": "<ul><li><strong>کژفهمی ۱: «NAT یک فایروال کامل امنیتی است.»</strong> واقعیت: اگرچه PAT ارتباط ورودی بدون جدول را نمی‌پذیرد، اما جایگزین بازرسی عمیق فایروال (Stateful/NGFW) نیست و در IPv6 امنیت با فایروال انجام می‌شود نه NAT.</li><li><strong>کژفهمی ۲: «Dynamic NAT می‌تواند صد کاربر را از یک IP عمومی عبور دهد.»</strong> واقعیت: بدون کلمه <code>overload</code> (یعنی PAT)، Dynamic NAT یک‌به‌یک است و با اولین کاربر استخر تک‌آدرسه پر می‌شود.</li><li><strong>کژفهمی ۳: «ترتیب NAT و Routing در رفت و برگشت یکسان است.»</strong> واقعیت: در رفت ابتدا Routing است و در برگشت ابتدا NAT.</li></ul>"
+    },
+    {
+      "id": "ccna_nat-section-12",
+      "title": "عیب‌یابی خالی ماندن جدول show ip nat translations",
+      "html": "<p>چک‌لیست پنج‌مرحله‌ای: (۱) آیا Default Route به سمت بیرون وجود دارد؟ (۲) آیا <code>ip nat inside</code> و <code>ip nat outside</code> روی اینترفیس‌های درست زده شده‌اند؟ (۳) آیا ACL مربوط به NAT زیرشبکه کلاینت را <code>permit</code> کرده است؟ (۴) آیا کلمه <code>overload</code> برای PAT فراموش نشده؟ (۵) آیا آمار <code>misses</code> در <code>show ip nat statistics</code> بالا می‌رود؟</p>"
+    },
+    {
+      "id": "ccna_nat-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> دو میزبان <code>192.168.10.11:51200</code> و <code>192.168.10.12:51200</code> هم‌زمان از طریق PAT روی <code>203.0.113.10</code> به اینترنت وصل می‌شوند. روتر چگونه پاسخ‌ها را تفکیک می‌کند؟ <strong>پاسخ:</strong> با تخصیص پورت مبدأ یکتا در Inside Global (مثلاً <code>:51200</code> و <code>:51201</code>) و ثبت آن در جدول ترجمه.</p><p><strong>تمرین ۲:</strong> چرا با نبود مسیر <code>0.0.0.0/0</code> هیچ سطری در <code>show ip nat translations</code> ظاهر نمی‌شود؟ <strong>پاسخ:</strong> چون در مسیر Inside->Outside ابتدا Routing اجرا می‌شود و بسته پیش از رسیدن به موتور NAT دور ریخته می‌گردد.</p>"
+    },
+    {
+      "id": "ccna_nat-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc1918\" target=\"_blank\" rel=\"noopener\">RFC 1918 (آدرس‌دهی خصوصی IPv4)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3022\" target=\"_blank\" rel=\"noopener\">RFC 3022 (NAT سنتی)</a> و <a href=\"https://www.cisco.com/c/en/us/support/docs/ip/network-address-translation-nat/6209-5.html\" target=\"_blank\" rel=\"noopener\">مستند ترتیب عملیات NAT سیسکو (Doc ID 6209)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی سیسکو در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "NAT (RFC 3022)",
+      "fa": "ترجمه آدرس شبکه",
+      "simple": "بازنویسی آدرس IP (و در PAT شماره پورت) میان شبکه خصوصی داخلی و شبکه بیرونی."
+    },
+    {
+      "term": "Inside Local",
+      "fa": "آدرس محلی داخلی",
+      "simple": "آدرس خصوصی واقعی میزبان داخلی پیش از ترجمه NAT (مثلاً 192.168.10.11)."
+    },
+    {
+      "term": "Inside Global",
+      "fa": "آدرس سراسری داخلی",
+      "simple": "چهره عمومی میزبان داخلی در اینترنت پس از ترجمه NAT (مثلاً 203.0.113.10)."
+    },
+    {
+      "term": "Outside Local",
+      "fa": "آدرس محلی بیرونی",
+      "simple": "چهره سرور بیرونی از دید شبکه داخلی (معمولاً برابر Outside Global)."
+    },
+    {
+      "term": "Outside Global",
+      "fa": "آدرس سراسری بیرونی",
+      "simple": "آدرس عمومی واقعی سرور مقصد در اینترنت (مثلاً 198.51.100.80)."
+    },
+    {
+      "term": "Static NAT",
+      "fa": "ترجمه ایستای یک‌به‌یک",
+      "simple": "نگاشت دائمی یک IP خصوصی به یک IP عمومی برای سرورهای قابل دسترس از بیرون."
+    },
+    {
+      "term": "Dynamic NAT",
+      "fa": "ترجمه پویا با استخر",
+      "simple": "نگاشت موقت یک‌به‌یک از یک Pool آدرس عمومی که با پر شدن Pool کاربر جدید را رد می‌کند."
+    },
+    {
+      "term": "PAT (NAT Overload)",
+      "fa": "ترجمه آدرس و پورت",
+      "simple": "اشتراک‌گذاری یک IP عمومی میان هزاران کاربر با تفکیک شماره پورت TCP/UDP."
+    },
+    {
+      "term": "Order of Operations",
+      "fa": "ترتیب پردازش NAT و Routing",
+      "simple": "در رفت (Inside->Outside) ابتدا Routing سپس NAT؛ در برگشت ابتدا NAT سپس Routing."
+    },
+    {
+      "term": "ip nat inside / outside",
+      "fa": "نقش اینترفیس در NAT",
+      "simple": "علامت‌گذاری اجباری اینترفیس‌های داخلی و بیرونی برای فعال شدن ترجمه."
+    },
+    {
+      "term": "RFC 1918",
+      "fa": "بازه‌های خصوصی IPv4",
+      "simple": "10.0.0.0/8، 172.16.0.0/12 و 192.168.0.0/16 — غیرقابل مسیریابی در اینترنت عمومی."
+    },
+    {
+      "term": "CGNAT (RFC 6598)",
+      "fa": "بازه NAT اپراتوری",
+      "simple": "بازه 100.64.0.0/10 برای NAT دولایه در شبکه ISPها."
+    },
+    {
+      "term": "Port Forwarding",
+      "fa": "هدایت پورت ایستا",
+      "simple": "Static PAT برای نگاشت یک پورت مشخص از IP عمومی به پورت سرور داخلی."
+    },
+    {
+      "term": "show ip nat translations",
+      "fa": "نمایش جدول ترجمه NAT",
+      "simple": "دستور اصلی بررسی نگاشت‌های فعال Static/Dynamic/PAT در Cisco IOS."
+    },
+    {
+      "term": "clear ip nat translation *",
+      "fa": "پاک‌سازی جدول پویا",
+      "simple": "حذف نگاشت‌های پویا پس از تغییر تنظیمات NAT (با احتیاط در تولید)."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی با ماژول <code>ipaddress</code>، ترتیب پردازش Inside->Outside (Routing پیش از NAT)، اتمام استخر در Dynamic NAT، تفکیک پورت در PAT Overload و ترتیب معکوس Outside->Inside (NAT پیش از Routing) را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_nat_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_nat_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for ccna_nat (Static NAT, Dynamic NAT, PAT &amp; Order of Operations).\n\nBoundary: Pure in-memory simulation using Python stdlib only (ipaddress).\nNo real Cisco router, NAT table, or live traffic is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _require_port(val: object, name: str) -&gt; int:\n    if type(val) is not int or not (1 &lt;= val &lt;= 65535):\n        raise ValueError(f&quot;{name} must be an integer port in 1..65535&quot;)\n    return val\n\n\ndef is_rfc1918_private(ip_str: str) -&gt; bool:\n    &quot;&quot;&quot;Explicitly check RFC 1918 private IPv4 ranges (10/8, 172.16/12, 192.168/16).&quot;&quot;&quot;\n    addr = ipaddress.IPv4Address(ip_str)\n    rfc1918 = (\n        ipaddress.IPv4Network(&quot;10.0.0.0/8&quot;),\n        ipaddress.IPv4Network(&quot;172.16.0.0/12&quot;),\n        ipaddress.IPv4Network(&quot;192.168.0.0/16&quot;),\n    )\n    return any(addr in net for net in rfc1918)\n\n\ndef simulate_outbound_nat(\n    src_ip: str,\n    src_port: int,\n    dst_ip: str,\n    dst_port: int,\n    nat_mode: str,\n    inside_if_marked: bool,\n    outside_if_marked: bool,\n    has_route_to_dst: bool,\n    pool_ips: list[str],\n    existing_bindings: dict[str, str],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate Cisco IOS Inside-&gt;Outside order of operations: Routing FIRST, then NAT.&quot;&quot;&quot;\n    ipaddress.IPv4Address(src_ip)\n    ipaddress.IPv4Address(dst_ip)\n    _require_port(src_port, &quot;src_port&quot;)\n    _require_port(dst_port, &quot;dst_port&quot;)\n    _require_bool(inside_if_marked, &quot;inside_if_marked&quot;)\n    _require_bool(outside_if_marked, &quot;outside_if_marked&quot;)\n    _require_bool(has_route_to_dst, &quot;has_route_to_dst&quot;)\n\n    if nat_mode not in (&quot;static&quot;, &quot;dynamic&quot;, &quot;pat&quot;):\n        raise ValueError(&quot;nat_mode must be one of &#x27;static&#x27;, &#x27;dynamic&#x27;, &#x27;pat&#x27;&quot;)\n    if not pool_ips:\n        raise ValueError(&quot;pool_ips must contain at least one IPv4 address&quot;)\n    for p in pool_ips:\n        ipaddress.IPv4Address(p)\n\n    # Cisco IOS Inside -&gt; Outside: Routing lookup happens BEFORE NAT!\n    if not has_route_to_dst:\n        return {\n            &quot;translated&quot;: False,\n            &quot;order_of_ops&quot;: &quot;ROUTING_BEFORE_NAT&quot;,\n            &quot;reason&quot;: &quot;DROPPED_NO_ROUTE_TO_DESTINATION_EMPTY_NAT_TABLE&quot;,\n        }\n    if not (inside_if_marked and outside_if_marked):\n        return {\n            &quot;translated&quot;: False,\n            &quot;order_of_ops&quot;: &quot;ROUTING_BEFORE_NAT&quot;,\n            &quot;reason&quot;: &quot;FORWARDED_UNTRANSLATED_MISSING_NAT_INSIDE_OR_OUTSIDE&quot;,\n        }\n\n    if nat_mode == &quot;static&quot;:\n        inside_global = pool_ips[0]\n        return {\n            &quot;translated&quot;: True,\n            &quot;mode&quot;: &quot;static&quot;,\n            &quot;inside_local&quot;: f&quot;{src_ip}:{src_port}&quot;,\n            &quot;inside_global&quot;: f&quot;{inside_global}:{src_port}&quot;,\n            &quot;outside_local&quot;: f&quot;{dst_ip}:{dst_port}&quot;,\n            &quot;outside_global&quot;: f&quot;{dst_ip}:{dst_port}&quot;,\n        }\n\n    if nat_mode == &quot;dynamic&quot;:\n        if src_ip in existing_bindings:\n            inside_global = existing_bindings[src_ip]\n        else:\n            used_globals = set(existing_bindings.values())\n            free = [ip for ip in pool_ips if ip not in used_globals]\n            if not free:\n                return {\n                    &quot;translated&quot;: False,\n                    &quot;mode&quot;: &quot;dynamic&quot;,\n                    &quot;reason&quot;: &quot;DYNAMIC_NAT_POOL_EXHAUSTED_NO_OVERLOAD&quot;,\n                }\n            inside_global = free[0]\n        return {\n            &quot;translated&quot;: True,\n            &quot;mode&quot;: &quot;dynamic&quot;,\n            &quot;inside_local&quot;: f&quot;{src_ip}:{src_port}&quot;,\n            &quot;inside_global&quot;: f&quot;{inside_global}:{src_port}&quot;,\n            &quot;outside_local&quot;: f&quot;{dst_ip}:{dst_port}&quot;,\n            &quot;outside_global&quot;: f&quot;{dst_ip}:{dst_port}&quot;,\n        }\n\n    # PAT (NAT Overload): multiplex multiple Inside Local hosts onto a single Inside Global IP via unique L4 port\n    pat_ip = pool_ips[0]\n    used_ports = {int(v.split(&quot;:&quot;)[1]) for v in existing_bindings.values() if &quot;:&quot; in v}\n    mapped_port = src_port\n    while mapped_port in used_ports:\n        mapped_port = 1024 if mapped_port &gt;= 65535 else mapped_port + 1\n    return {\n        &quot;translated&quot;: True,\n        &quot;mode&quot;: &quot;pat_overload&quot;,\n        &quot;inside_local&quot;: f&quot;{src_ip}:{src_port}&quot;,\n        &quot;inside_global&quot;: f&quot;{pat_ip}:{mapped_port}&quot;,\n        &quot;outside_local&quot;: f&quot;{dst_ip}:{dst_port}&quot;,\n        &quot;outside_global&quot;: f&quot;{dst_ip}:{dst_port}&quot;,\n    }\n\n\ndef simulate_inbound_return_nat(\n    packet_dst_global: str,\n    nat_table: dict[str, str],\n    has_internal_route: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate Cisco IOS Outside-&gt;Inside order of operations: NAT FIRST, then Routing.&quot;&quot;&quot;\n    _require_bool(has_internal_route, &quot;has_internal_route&quot;)\n    if packet_dst_global not in nat_table:\n        return {\n            &quot;delivered&quot;: False,\n            &quot;order_of_ops&quot;: &quot;NAT_BEFORE_ROUTING&quot;,\n            &quot;reason&quot;: &quot;NO_MATCHING_NAT_TRANSLATION_ENTRY&quot;,\n        }\n    inside_local = nat_table[packet_dst_global]\n    if not has_internal_route:\n        return {\n            &quot;delivered&quot;: False,\n            &quot;order_of_ops&quot;: &quot;NAT_BEFORE_ROUTING&quot;,\n            &quot;translated_to&quot;: inside_local,\n            &quot;reason&quot;: &quot;NO_INTERNAL_ROUTE_AFTER_UNTRANSLATION&quot;,\n        }\n    return {\n        &quot;delivered&quot;: True,\n        &quot;order_of_ops&quot;: &quot;NAT_BEFORE_ROUTING&quot;,\n        &quot;inside_global_hit&quot;: packet_dst_global,\n        &quot;translated_to_inside_local&quot;: inside_local,\n    }\n\n\ndef main() -&gt; None:\n    assert is_rfc1918_private(&quot;192.168.10.25&quot;) is True\n    assert is_rfc1918_private(&quot;203.0.113.10&quot;) is False\n\n    # Missing default route -&gt; Routing runs BEFORE NAT -&gt; dropped with empty NAT table\n    no_route = simulate_outbound_nat(\n        &quot;192.168.10.11&quot;, 51200, &quot;198.51.100.80&quot;, 443, &quot;pat&quot;, True, True, False, [&quot;203.0.113.10&quot;], {}\n    )\n    assert no_route[&quot;translated&quot;] is False and &quot;NO_ROUTE&quot; in str(no_route[&quot;reason&quot;])\n\n    # Dynamic NAT pool exhaustion (1 public IP, 2nd host fails)\n    dyn_exhausted = simulate_outbound_nat(\n        &quot;192.168.10.12&quot;, 51200, &quot;198.51.100.80&quot;, 443, &quot;dynamic&quot;, True, True, True,\n        [&quot;203.0.113.10&quot;], {&quot;192.168.10.11&quot;: &quot;203.0.113.10&quot;},\n    )\n    assert dyn_exhausted[&quot;translated&quot;] is False and &quot;EXHAUSTED&quot; in str(dyn_exhausted[&quot;reason&quot;])\n\n    # PAT Overload shares single public IP with distinct translated source port\n    pat_ok = simulate_outbound_nat(\n        &quot;192.168.10.12&quot;, 51200, &quot;198.51.100.80&quot;, 443, &quot;pat&quot;, True, True, True,\n        [&quot;203.0.113.10&quot;], {&quot;192.168.10.11:51200&quot;: &quot;203.0.113.10:51200&quot;},\n    )\n    assert pat_ok[&quot;translated&quot;] is True and pat_ok[&quot;inside_global&quot;] == &quot;203.0.113.10:51201&quot;\n\n    # Inbound return: NAT lookup BEFORE internal routing\n    ret_ok = simulate_inbound_return_nat(\n        &quot;203.0.113.10:51201&quot;, {&quot;203.0.113.10:51201&quot;: &quot;192.168.10.12:51200&quot;}, True\n    )\n    assert ret_ok[&quot;delivered&quot;] is True\n\n    print(&quot;Outbound No Route (Routing before NAT):&quot;, no_route)\n    print(&quot;Dynamic NAT Exhausted:&quot;, dyn_exhausted)\n    print(&quot;PAT Overload Multiplexed:&quot;, pat_ok)\n    print(&quot;Inbound Return (NAT before Routing):&quot;, ret_ok)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> در نبود Default Route ترجمه انجام نمی‌شود؛ Dynamic NAT روی استخر ۱آدرسه برای میزبان دوم با <code>EXHAUSTED</code> رد می‌شود؛ PAT میزبان دوم را به <code>203.0.113.10:51201</code> نگاشت می‌کند؛ و بسته بازگشتی ابتدا Untranslate و سپس روت می‌گردد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع Static NAT و PAT Overload در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE PAT &amp; Static NAT config (NOT executed on real router)\nconfigure terminal\n access-list 1 permit 192.168.10.0 0.0.0.255\n interface GigabitEthernet0/1\n  ip nat inside\n interface GigabitEthernet0/0\n  ip nat outside\n ip nat inside source list 1 interface GigabitEthernet0/0 overload\n ip nat inside source static 192.168.50.10 203.0.113.20\n ip route 0.0.0.0 0.0.0.0 203.0.113.1\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "کدام مدل NAT به صدها کاربر داخلی اجازه می‌دهد هم‌زمان از یک آدرس IP عمومی مشترک به اینترنت متصل شوند؟",
+      "options": [
+        "Static NAT یک‌به‌یک",
+        "Dynamic NAT بدون overload",
+        "PAT (NAT Overload)",
+        "Proxy ARP"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>PAT با مالتی‌پلکس شماره پورت‌های لایه ۴ (TCP/UDP) صدها جریان را روی یک IP عمومی تفکیک می‌کند.</p>"
+    },
+    {
+      "title": "آدرس خصوصی واقعی رایانه کارمند در LAN پیش از ترجمه NAT در جدول سیسکو چه نام دارد؟",
+      "options": [
+        "Inside Global",
+        "Outside Local",
+        "Outside Global",
+        "Inside Local"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Inside Local آدرس واقعی میزبان داخلی درون شبکه خودمان است و Inside Global چهره عمومی آن پس از ترجمه می‌باشد.</p>"
+    },
+    {
+      "title": "اگر همه دستورات PAT درست باشند اما روتر مسیر پیش‌فرض (<code>0.0.0.0/0</code>) به بیرون نداشته باشد، خروجی <code>show ip nat translations</code> چگونه است؟",
+      "options": [
+        "جدول خالی می‌ماند زیرا در مسیر Inside->Outside ابتدا Routing اجرا شده و بسته قبل از رسیدن به NAT Drop می‌شود",
+        "روتر خودکار مسیر می‌سازد",
+        "فقط بسته‌های UDP ترجمه می‌شوند",
+        "جدول پر از آدرس APIPA می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مطابق Order of Operations سیسکو، در مسیر رفت ابتدا جدول مسیریابی بررسی می‌شود و در نبود مسیر، NAT اصلاً اجرا نمی‌شود.</p>"
+    },
+    {
+      "title": "در مسیر برگشت از اینترنت به داخل (<strong>Outside -> Inside</strong>)، ترتیب صحیح پردازش در Cisco IOS چیست؟",
+      "options": [
+        "ابتدا Routing و سپس NAT",
+        "ابتدا ترجمه معکوس NAT (یافتن Inside Local) و سپس جست‌وجو در جدول Routing داخلی",
+        "فقط ARP",
+        "هیچ ترجمه‌ای لازم نیست"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در مسیر برگشت، مقصد بسته هنوز Inside Global است؛ پس ابتدا باید به Inside Local بازگردانده شود و سپس مسیریابی داخلی انجام گردد.</p>"
+    },
+    {
+      "title": "اگر در دستور <code>ip nat inside source list 1 pool PUB</code> کلمه <code>overload</code> را فراموش کنیم و Pool فقط ۲ آدرس عمومی داشته باشد، برای کاربر سوم هم‌زمان چه رخ می‌دهد؟",
+      "options": [
+        "به صورت خودکار PAT انجام می‌شود",
+        "ارتباط کاربر سوم به دلیل اتمام Pool در Dynamic NAT برقرار نمی‌شود تا یکی از دو نشست آزاد گردد",
+        "روتر ری‌استارت می‌شود",
+        "آدرس خصوصی مستقیم به اینترنت می‌رود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون <code>overload</code>، Dynamic NAT یک‌به‌یک عمل می‌کند و با پر شدن استخر، میزبان بعدی ترجمه نمی‌شود.</p>"
+    },
+    {
+      "title": "کدام یک از بازه‌های زیر متعلق به آدرس‌های خصوصی <strong>RFC 1918</strong> نیست؟",
+      "options": [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "203.0.113.0/24"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p><code>203.0.113.0/24</code> متعلق به RFC 5737 (TEST-NET-3 برای مستندسازی) است و جزو RFC 1918 نیست.</p>"
+    },
+    {
+      "title": "برای انتشار یک وب‌سرور داخلی DMZ (<code>192.168.50.10</code>) روی یک IP عمومی ثابت (<code>203.0.113.20</code>) که از اینترنت قابل دسترسی باشد، کدام مدل مناسب است؟",
+      "options": [
+        "Static NAT (یا Static PAT / Port Forwarding)",
+        "Dynamic NAT بدون رزرو",
+        "APIPA",
+        "DHCP Relay"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>سرورهایی که باید اتصال ورودی از اینترنت بپذیرند به نگاشت ثابت Static NAT (یا Static PAT روی پورت 443) نیاز دارند.</p>"
+    },
+    {
+      "title": "اگر روی اینترفیس WAN فراموش کنیم دستور <code>ip nat outside</code> را بزنیم چه اتفاقی می‌افتد؟",
+      "options": [
+        "NAT خودکار آن را تشخیص می‌دهد",
+        "ترجمه NAT انجام نمی‌شود و بسته‌های خصوصی بدون ترجمه خارج می‌شوند (و توسط ISP دور ریخته می‌شوند)",
+        "پورت وارد err-disabled می‌شود",
+        "تبدیل به IPv6 می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>علامت‌گذاری هر دو اینترفیس <code>ip nat inside</code> و <code>ip nat outside</code> شرط الزامی اجرای NAT است.</p>"
+    },
+    {
+      "title": "آدرس عمومی واقعی یک وب‌سرور در اینترنت (مانند <code>198.51.100.80</code>) در جدول NAT سیسکو چه نامیده می‌شود؟",
+      "options": [
+        "Inside Local",
+        "Inside Global",
+        "Outside Global",
+        "Private Pool"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>دستگاه بیرونی (Outside) با آدرس عمومی واقعی خود در اینترنت (Global) یعنی Outside Global.</p>"
+    },
+    {
+      "title": "کدام دستور آمار تعداد ترجمه‌های موفق (Hits)، ناموفق (Misses) و درصد مصرف استخر NAT را نمایش می‌دهد؟",
+      "options": [
+        "show vlan brief",
+        "show ip nat statistics",
+        "show spanning-tree",
+        "show cdp neighbors"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>show ip nat statistics</code> دید کاملی از شمارنده‌های Hit/Miss و وضعیت Pool ارائه می‌دهد.</p>"
+    },
+    {
+      "title": "بازه <code>100.64.0.0/10</code> (RFC 6598) برای چه هدفی رزرو شده است؟",
+      "options": [
+        "آدرس‌های Multicast OSPF",
+        "Shared Address Space برای Carrier-Grade NAT (CGNAT) در شبکه اپراتورها",
+        "آدرس‌های APIPA",
+        "آدرس‌های Loopback"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اپراتورها برای جلوگیری از هم‌پوشانی با RFC 1918 مشتریان، در NAT دولایه از بازه CGNAT بهره می‌برند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده PAT روی روتر متصل به اینترنت واقعی",
+        "پکت‌کپچر ترافیک تولیدی",
+        "شبیه‌ساز محلی Python 3 (کتابخانه ipaddress) برای آزمون ترتیب Routing/NAT، اتمام Dynamic NAT و مالتی‌پلکس PAT بدون روتر واقعی",
+        "بدون کد قابل اجرا"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ روتر واقعی متصل نیست.</p>"
+    }
+  ]
+}

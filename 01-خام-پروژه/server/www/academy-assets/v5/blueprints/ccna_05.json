@@ -1,0 +1,343 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_05",
+  "objectiveId": "ccna_05",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "Security Fundamentals",
+  "title": "CCNA (امنیت شبکه): فهرست‌های دسترسی ACL، Port Security، DHCP Snooping، DAI و STP Guards",
+  "titleEn": "CCNA Security Fundamentals: ACLs, Port Security, DHCP Snooping, DAI & STP Guards",
+  "estimatedMinutes": 50,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_05 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_05",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/16-12/configuration_guide/sec/b_1612_sec_9300_cg/configuring_port_security.html",
+      "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/16-12/configuration_guide/sec/b_1612_sec_9300_cg/configuring_dhcp_snooping.html",
+      "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/16-12/configuration_guide/sec/b_1612_sec_9300_cg/configuring_dynamic_arp_inspection.html"
+    ],
+    "limitations": [
+      "هیچ سوئیچ یا روتر واقعی Cisco Catalyst در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 (کتابخانه ipaddress) برای آزمون ترتیب First-Match/Implicit Deny در ACL، سه حالت واکنش Port Security و وابستگی DAI به جدول Snooping/ARP ACL است."
+    ],
+    "legacyAuditFixes": [
+      "افزودن نکته عملیاتی حیاتی no ip dhcp snooping information option روی سوئیچ‌های لایه ۲ برای جلوگیری از رد Option 82 با giaddr=0.0.0.0 توسط روتر بالادستی.",
+      "افزودن تفکیک کامل سه حالت Port Security (shutdown/restrict/protect) و الزام ذخیره Sticky MACها، و نیاز به ARP ACL برای میزبان‌های دارای IP ثابت در DAI.",
+      "توسعه از ۳ بخش/۳ سؤال قدیمی به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با آزمایشگاه محلی ccna_05_lab.py."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_05-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_05.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_05_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲B: ساخت ccna_05_lab.py بدون import پرچم‌دار با اعتبارسنجی دقیق Wildcard Mask، رد پورت‌های dynamic DTP در Port Security و بررسی DAI."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_05-section-1",
+      "title": "مسئله واقعی: چرا دفاع لایه ۳ بدون امنیت لایه ۲ سوئیچ شکننده است؟",
+      "html": "<p>حتی اگر بهترین فایروال و ACL را روی روتر مرزی داشته باشید، مهاجمی که به یک پورت آزاد سوئیچ دسترسی فیزیکی می‌یابد می‌تواند با <strong>MAC Flooding</strong> جدول CAM را پر کند، با <strong>Rogue DHCP Server</strong> خودش را Gateway معرفی کند، با <strong>ARP Spoofing</strong> ترافیک VLAN را شنود (MITM) کند یا با ارسال BPDU جعلی Root Bridge شبکه شود. دفاع مؤثر نیازمند ترکیب ACL در لایه ۳/۴ با زنجیره دفاعی لایه ۲ (Port Security، DHCP Snooping، DAI و STP Guards) است.</p>"
+    },
+    {
+      "id": "ccna_05-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> ساب‌نت‌بندی، ARP، DHCP و ساختار VLAN/STP.</p><ul><li>طراحی و جایگذاری صحیح <strong>Standard ACL</strong> (نزدیک مقصد) و <strong>Extended ACL</strong> (نزدیک مبدأ) با درک <strong>First-Match</strong> و <strong>Implicit Deny Any</strong>.</li><li>پیکربندی <strong>Port Security</strong> با درک تفاوت دقیق سه حالت <code>shutdown</code>، <code>restrict</code> و <code>protect</code>.</li><li>پیاده‌سازی زنجیره <strong>DHCP Snooping -> Binding DB -> DAI</strong> و رفع تله‌های Option 82 و میزبان‌های Static IP.</li><li>حفاظت توپولوژی لایه ۲ با <strong>BPDU Guard</strong> و <strong>Root Guard</strong>.</li></ul>"
+    },
+    {
+      "id": "ccna_05-section-3",
+      "title": "قواعد بنیادین ACL: First-Match، Implicit Deny و Wildcard Mask",
+      "html": "<p>روتر هر بسته را از خط اول ACL به پایین بررسی می‌کند و به محض اولین تطابق (<strong>First-Match</strong>) تصمیم می‌گیرد. در پایان هر ACL یک خط نامرئی <code>deny any</code> (<strong>Implicit Deny</strong>) وجود دارد؛ پس ACL دارای تنها یک خط <code>deny</code> بدون خط <code>permit</code> تمام ترافیک را مسدود می‌کند! <strong>Wildcard Mask</strong> بیت‌های «باید منطبق باشد» (<code>0</code>) و «مهم نیست» (<code>1</code>) را مشخص می‌کند (<code>host</code>=<code>0.0.0.0</code> و <code>any</code>=<code>0.0.0.0 255.255.255.255</code>).</p>"
+    },
+    {
+      "id": "ccna_05-section-4",
+      "title": "جایگذاری Standard ACL در برابر Extended ACL",
+      "html": "<p><strong>Standard ACL</strong> (شماره <code>1–99</code>، <code>1300–1999</code> یا Named) فقط <strong>IP مبدأ</strong> را می‌بیند؛ بنابراین برای جلوگیری از قطع ناخواسته سایر مقاصد، باید <strong>نزدیک‌ترین مکان به مقصد</strong> قرار گیرد. <strong>Extended ACL</strong> (شماره <code>100–199</code>، <code>2000–2699</code> یا Named) مبدأ، مقصد، پروتکل و پورت لایه ۴ را می‌بیند و باید <strong>نزدیک‌ترین مکان به مبدأ</strong> اعمال شود تا بسته‌های غیرمجاز پهنای باند مسیر را هدر ندهند.</p>"
+    },
+    {
+      "id": "ccna_05-section-5",
+      "title": "امنیت پورت لایه ۲: Port Security و سه حالت واکنش",
+      "html": "<p><strong>Port Security</strong> صرفاً روی پورت‌های ایستا (<code>switchport mode access</code> یا <code>trunk</code>؛ هرگز روی <code>dynamic auto/desirable</code>) فعال می‌شود. آدرس‌های MAC مجاز می‌توانند دستی (Static)، پویا یا <strong><code>sticky</code></strong> (ثبت خودکار در <code>running-config</code> که برای ماندگاری پس از ریبوت نیازمند ذخیره در <code>startup-config</code> است) باشند:</p><table><thead><tr><th>حالت واکنش</th><th>وضعیت پورت</th><th>Drop فریم غیرمجاز</th><th>لاگ Syslog و شمارنده</th></tr></thead><tbody><tr><td><code>shutdown</code> (پیش‌فرض)</td><td><strong>err-disabled</strong></td><td>بله (کل پورت قطع)</td><td>بله</td></tr><tr><td><code>restrict</code></td><td>روشن (Up)</td><td>بله (فقط MAC غیرمجاز)</td><td>بله</td></tr><tr><td><code>protect</code></td><td>روشن (Up)</td><td>بله (فقط MAC غیرمجاز)</td><td><strong>خیر (بی‌صدا)</strong></td></tr></tbody></table>"
+    },
+    {
+      "id": "ccna_05-section-6",
+      "title": "نمودار معماری: زنجیره چهارگانه ACL، Port Security، DHCP Snooping و DAI",
+      "html": "<p>در نمودار زیر ارتباط چهار لایه دفاعی کلیدی سیسکو از لایه ۴ تا لایه ۲ نشان داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco L2/L3 Security Chain: ACL, Port Security, DHCP Snooping and DAI\"><rect x=\"16\" y=\"22\" width=\"170\" height=\"176\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"101\" y=\"46\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">1. ACL (L3/L4)</text><text x=\"101\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Standard: Near Dst</text><text x=\"101\" y=\"90\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Extended: Near Src</text><text x=\"101\" y=\"114\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1d4ed8\">Top-Down First Match</text><text x=\"101\" y=\"140\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">Implicit Deny Any</text><text x=\"101\" y=\"160\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">at bottom of every ACL!</text><rect x=\"202\" y=\"22\" width=\"172\" height=\"176\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"288\" y=\"46\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">2. Port Security</text><text x=\"288\" y=\"70\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">Static access/trunk ONLY</text><text x=\"288\" y=\"94\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">shutdown: err-dis + log</text><text x=\"288\" y=\"116\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#d97706\">restrict: drop + log (up)</text><text x=\"288\" y=\"138\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#475569\">protect: silent drop</text><text x=\"288\" y=\"164\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#78350f\">Save sticky MACs to startup!</text><rect x=\"390\" y=\"22\" width=\"172\" height=\"176\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"476\" y=\"46\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">3. DHCP Snooping</text><text x=\"476\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">All ports Untrusted</text><text x=\"476\" y=\"90\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#15803d\">trust ONLY server uplink</text><text x=\"476\" y=\"114\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Builds Binding DB:</text><text x=\"476\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1d4ed8\">MAC | IP | VLAN | Port</text><text x=\"476\" y=\"160\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">Watch Option 82 on L2!</text><rect x=\"578\" y=\"22\" width=\"168\" height=\"176\" rx=\"10\" fill=\"#faf5ff\" stroke=\"#7c3aed\" stroke-width=\"2\"/><text x=\"662\" y=\"46\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#5b21b6\">4. DAI + STP Guard</text><text x=\"662\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#4c1d95\">Validates ARP vs</text><text x=\"662\" y=\"90\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#4c1d95\">Snooping Binding DB</text><text x=\"662\" y=\"114\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#dc2626\">Static hosts need</text><text x=\"662\" y=\"130\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#dc2626\">ARP ACL!</text><text x=\"662\" y=\"158\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">+ BPDU / Root Guard</text></svg>"
+    },
+    {
+      "id": "ccna_05-section-7",
+      "title": "DHCP Snooping و نکته حیاتی Option 82 روی سوئیچ لایه ۲",
+      "html": "<p>پس از فعال‌سازی <code>ip dhcp snooping</code> و <code>ip dhcp snooping vlan 10</code>، تمام پورت‌ها به‌طور پیش‌فرض <strong>Untrusted</strong> می‌شوند و پیام‌های سرور (Offer/ACK) روی آن‌ها Drop می‌گردد. تنها پورت Uplink به سمت سرور DHCP واقعی را <code>ip dhcp snooping trust</code> می‌کنیم و روی پورت‌های کاربر با <code>ip dhcp snooping limit rate</code> جلوی حمله DHCP Starvation را می‌گیریم. <strong>تله کلاسیک تولیدی:</strong> سوئیچ لایه ۲ به‌طور پیش‌فرض <strong>Option 82</strong> را با <code>giaddr=0.0.0.0</code> درج می‌کند که ممکن است توسط روتر Relay بالادستی رد شود؛ در این صورت باید <code>no ip dhcp snooping information option</code> (یا trust کردن Option 82 در Relay) تنظیم گردد.</p>"
+    },
+    {
+      "id": "ccna_05-section-8",
+      "title": "Dynamic ARP Inspection (DAI) و نیاز میزبان‌های Static IP به ARP ACL",
+      "html": "<p><strong>DAI</strong> (<code>ip arp inspection vlan 10</code>) تمام بسته‌های ARP ورودی روی پورت‌های Untrusted را با <strong>DHCP Snooping Binding Table</strong> (نگاشت MAC-IP-VLAN-Port) می‌سنجد و بسته‌های جعلی را Drop می‌کند. پورت‌های Uplink/Trunk باید <code>ip arp inspection trust</code> شوند. <strong>نکته حیاتی:</strong> اگر سروری یا پرینتری IP ثابت (بدون DHCP) دارد، در جدول Snooping حضور ندارد و DAI بسته‌های ARP آن را مسدود می‌کند؛ برای این دستگاه‌ها باید <strong>ARP ACL</strong> (<code>arp access-list</code> و <code>ip arp inspection filter ... vlan ...</code>) تعریف کرد.</p>"
+    },
+    {
+      "id": "ccna_05-section-9",
+      "title": "محافظت STP با BPDU Guard و Root Guard",
+      "html": "<p>روی پورت‌های Access کاربران که <strong>PortFast</strong> دارند، فعال‌سازی <strong>BPDU Guard</strong> باعث می‌شود به محض دریافت هر BPDU (نشانگر اتصال سوئیچ غیرمجاز یا حلقه)، پورت به وضعیت <code>err-disabled</code> برود. همچنین روی پورت‌های منتهی به سوئیچ‌های لایه پایین‌تر، <strong>Root Guard</strong> مانع می‌شود سوئیچی با Bridge Priority کمتر کنترل Root Bridge را تصاحب کند (پورت وارد حالت <code>root-inconsistent</code> می‌شود).</p>"
+    },
+    {
+      "id": "ccna_05-section-10",
+      "title": "ایمن‌سازی پورت‌های بلااستفاده (Hardening پایه سوئیچ)",
+      "html": "<p>هر پورت آزاد روی سوئیچ باید در وضعیت <code>shutdown</code>، مد ایستا <code>switchport mode access</code> (و در صورت پشتیبانی <code>nonegotiate</code>) و در یک VLAN ایزوله و بلااستفاده (Parking VLAN) قرار گیرد تا اتصال فیزیکی غیرمجاز بی‌اثر باشد.</p>"
+    },
+    {
+      "id": "ccna_05-section-11",
+      "title": "کژفهمی‌های رایج در امنیت لایه ۲ و ۳ سیسکو",
+      "html": "<ul><li><strong>کژفهمی ۱: «برای منع یک IP کافی است یک ACL با یک خط <code>deny</code> بنویسیم.»</strong> واقعیت: به‌دلیل Implicit Deny، کل شبکه قطع می‌شود مگر آنکه خط <code>permit any</code> اضافه گردد.</li><li><strong>کژفهمی ۲: «Port Security روی پورت‌های پیش‌فرض <code>dynamic auto</code> هم کار می‌کند.»</strong> واقعیت: IOS آن را رد می‌کند؛ پورت باید ایستا (access/trunk) باشد.</li><li><strong>کژفهمی ۳: «فعال‌سازی DAI بدون DHCP Snooping مشکلی ندارد.»</strong> واقعیت: بدون Binding DB (یا ARP ACL)، تمام ARPهای پورت‌های Untrusted Drop شده و ارتباط قطع می‌شود.</li></ul>"
+    },
+    {
+      "id": "ccna_05-section-12",
+      "title": "عیب‌یابی خطاهای کلاسیک ACL، Port Security و DAI",
+      "html": "<p>اگر ACL ترافیک مجاز را مسدود کرده، با <code>show access-lists</code> شمارنده تطابق خطوط (matches) و ترتیب خطوط را چک کنید. اگر پورت کاربری خاموش شده، با <code>show interfaces status err-disabled</code> و <code>show port-security interface</code> علت را بیابید. اگر پس از فعال‌سازی DAI ارتباط سرورهای Static IP قطع شد، تعریف ARP ACL و وضعیت <code>ip dhcp snooping binding</code> را بررسی کنید.</p>"
+    },
+    {
+      "id": "ccna_05-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> می‌خواهیم فقط SSH (TCP 22) از زیرشبکه <code>10.10.20.0/24</code> به سرور <code>10.10.50.10</code> مسدود و بقیه ترافیک مجاز باشد. چه نوع ACL و کجا؟ <strong>پاسخ:</strong> Extended ACL نزدیک به مبدأ (ورودی اینترفیس زیرشبکه <code>10.10.20.0/24</code>) با خط اول <code>deny tcp ... eq 22</code> و خط دوم <code>permit ip any any</code>.</p><p><strong>تمرین ۲:</strong> تفاوت <code>restrict</code> و <code>protect</code> در Port Security چیست؟ <strong>پاسخ:</strong> هر دو پورت را روشن نگه می‌دارند و فریم غیرمجاز را Drop می‌کنند، اما <code>restrict</code> لاگ Syslog و شمارنده ثبت می‌کند در حالی که <code>protect</code> کاملاً بی‌صداست.</p>"
+    },
+    {
+      "id": "ccna_05-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/16-12/configuration_guide/sec/b_1612_sec_9300_cg/configuring_port_security.html\" target=\"_blank\" rel=\"noopener\">راهنمای Port Security سیسکو Catalyst 9300</a>، <a href=\"https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/16-12/configuration_guide/sec/b_1612_sec_9300_cg/configuring_dhcp_snooping.html\" target=\"_blank\" rel=\"noopener\">راهنمای DHCP Snooping</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/16-12/configuration_guide/sec/b_1612_sec_9300_cg/configuring_dynamic_arp_inspection.html\" target=\"_blank\" rel=\"noopener\">راهنمای Dynamic ARP Inspection</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ سوئیچ یا روتر واقعی در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Standard ACL",
+      "fa": "فهرست دسترسی استاندارد",
+      "simple": "فیلتر فقط بر اساس IP مبدأ (1-99 / 1300-1999 / Named)؛ جایگذاری نزدیک مقصد."
+    },
+    {
+      "term": "Extended ACL",
+      "fa": "فهرست دسترسی گسترده",
+      "simple": "فیلتر بر اساس مبدأ، مقصد، پروتکل و پورت لایه ۴ (100-199 / 2000-2699 / Named)؛ نزدیک مبدأ."
+    },
+    {
+      "term": "First-Match",
+      "fa": "تطابق نخستین در ACL",
+      "simple": "توقف پردازش ACL به محض تطابق بسته با اولین قانون منطبق از بالا به پایین."
+    },
+    {
+      "term": "Implicit Deny Any",
+      "fa": "منع ضمنی انتهای ACL",
+      "simple": "قانون نامرئی deny any در پایین تمام ACLها در صورت تطابق نیافتن با خطوط قبلی."
+    },
+    {
+      "term": "Wildcard Mask",
+      "fa": "ماسک معکوس ACL",
+      "simple": "الگوی بیتی که در آن 0 به‌معنای الزام تطابق و 1 به‌معنای بی‌تفاوتی است."
+    },
+    {
+      "term": "Port Security",
+      "fa": "امنیت MAC پورت سوئیچ",
+      "simple": "محدودسازی تعداد و هویت آدرس‌های MAC مجاز روی پورت‌های ایستا."
+    },
+    {
+      "term": "Sticky MAC",
+      "fa": "یادگیری ماندگار MAC",
+      "simple": "ثبت خودکار MACهای یادگرفته‌شده در running-config (نیازمند ذخیره در startup-config)."
+    },
+    {
+      "term": "Shutdown / Restrict / Protect",
+      "fa": "سه حالت نقض Port Security",
+      "simple": "shutdown پورت را err-disabled می‌کند؛ restrict لاگ می‌دهد؛ protect بی‌صدا Drop می‌کند."
+    },
+    {
+      "term": "DHCP Snooping",
+      "fa": "بازرسی امنیتی DHCP لایه ۲",
+      "simple": "مسدودسازی سرور DHCP جعلی روی پورت‌های Untrusted و ساخت جدول Binding."
+    },
+    {
+      "term": "Option 82",
+      "fa": "گزینه اطلاعات عامل بازپخش",
+      "simple": "فیلدی که سوئیچ لایه ۲ در DHCP Snooping درج می‌کند و ممکن است نیازمند غیرفعال‌سازی روی L2 باشد."
+    },
+    {
+      "term": "DAI",
+      "fa": "بازرسی پویای ARP",
+      "simple": "اعتبارسنجی بسته‌های ARP پورت‌های Untrusted در برابر جدول DHCP Snooping یا ARP ACL."
+    },
+    {
+      "term": "ARP ACL",
+      "fa": "فهرست مجاز ARP ایستا",
+      "simple": "قواعد دستی MAC-to-IP برای میزبان‌های Static IP در شبکه‌های دارای DAI."
+    },
+    {
+      "term": "BPDU Guard",
+      "fa": "محافظ BPDU روی PortFast",
+      "simple": "ورود فوری پورت Access به err-disabled در صورت دریافت هر فریم BPDU."
+    },
+    {
+      "term": "Root Guard",
+      "fa": "محافظت از Root Bridge",
+      "simple": "جلوگیری از تصاحب نقش Root توسط سوئیچ‌های پایین‌دستی با حالت root-inconsistent."
+    },
+    {
+      "term": "err-disabled",
+      "fa": "حالت خاموش خطای پورت",
+      "simple": "خاموشی ایمن پورت پس از نقض Port Security یا BPDU Guard نیازمند بازیابی."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی با ماژول <code>ipaddress</code>، ترتیب First-Match و Implicit Deny در Extended ACL، تفاوت <code>restrict</code> و <code>protect</code> و رد پورت‌های <code>dynamic</code> در Port Security، و اعتبارسنجی DAI با Snooping Binding DB و ARP ACL را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_05_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_05_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for ccna_05 (ACL First-Match, Port Security, DHCP Snooping &amp; DAI).\n\nBoundary: Pure in-memory simulation using Python stdlib only (ipaddress).\nNo real Cisco switch/router, live traffic, or packet capture is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _wildcard_matches(ip_str: str, rule_ip: str, wildcard: str) -&gt; bool:\n    ip_int = int(ipaddress.IPv4Address(ip_str))\n    rule_int = int(ipaddress.IPv4Address(rule_ip))\n    wc_int = int(ipaddress.IPv4Address(wildcard))\n    return (ip_int &amp; ~wc_int) == (rule_int &amp; ~wc_int)\n\n\ndef evaluate_extended_acl(\n    rules: list[dict[str, object]],\n    packet: dict[str, object],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate Cisco Extended ACL top-down (First-Match + Implicit Deny Any).&quot;&quot;&quot;\n    src_ip = str(packet[&quot;src_ip&quot;])\n    dst_ip = str(packet[&quot;dst_ip&quot;])\n    proto = str(packet[&quot;proto&quot;]).lower()\n    dst_port = packet.get(&quot;dst_port&quot;)\n    ipaddress.IPv4Address(src_ip)\n    ipaddress.IPv4Address(dst_ip)\n    if dst_port is not None and (type(dst_port) is not int or not (1 &lt;= dst_port &lt;= 65535)):\n        raise ValueError(&quot;packet dst_port must be an integer in 1..65535 or None&quot;)\n\n    for idx, rule in enumerate(rules, start=1):\n        action = str(rule[&quot;action&quot;]).lower()\n        if action not in (&quot;permit&quot;, &quot;deny&quot;):\n            raise ValueError(f&quot;Rule {idx} action must be &#x27;permit&#x27; or &#x27;deny&#x27;&quot;)\n        r_proto = str(rule[&quot;proto&quot;]).lower()\n        if r_proto not in (&quot;ip&quot;, &quot;tcp&quot;, &quot;udp&quot;, &quot;icmp&quot;):\n            raise ValueError(f&quot;Rule {idx} unsupported protocol: {r_proto}&quot;)\n        if r_proto != &quot;ip&quot; and r_proto != proto:\n            continue\n        if not _wildcard_matches(src_ip, str(rule[&quot;src_ip&quot;]), str(rule[&quot;src_wc&quot;])):\n            continue\n        if not _wildcard_matches(dst_ip, str(rule[&quot;dst_ip&quot;]), str(rule[&quot;dst_wc&quot;])):\n            continue\n        if rule.get(&quot;dst_port&quot;) is not None and rule.get(&quot;dst_port&quot;) != dst_port:\n            continue\n        return {&quot;decision&quot;: action, &quot;matched_rule_index&quot;: idx, &quot;implicit_deny&quot;: False}\n\n    return {&quot;decision&quot;: &quot;deny&quot;, &quot;matched_rule_index&quot;: None, &quot;implicit_deny&quot;: True}\n\n\ndef evaluate_port_security(\n    port_mode: str,\n    max_macs: int,\n    learned_macs: set[str],\n    incoming_mac: str,\n    violation_mode: str = &quot;shutdown&quot;,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate Cisco Switch Port Security violation modes (shutdown/restrict/protect).&quot;&quot;&quot;\n    if port_mode not in (&quot;static_access&quot;, &quot;trunk&quot;, &quot;dynamic_auto&quot;, &quot;dynamic_desirable&quot;):\n        raise ValueError(f&quot;Invalid port_mode: {port_mode}&quot;)\n    if port_mode.startswith(&quot;dynamic_&quot;):\n        raise ValueError(&quot;Port Security cannot be enabled on dynamic DTP ports; set static access or trunk&quot;)\n    if type(max_macs) is not int or max_macs &lt; 1:\n        raise ValueError(&quot;max_macs must be an integer &gt;= 1&quot;)\n    if violation_mode not in (&quot;shutdown&quot;, &quot;restrict&quot;, &quot;protect&quot;):\n        raise ValueError(&quot;violation_mode must be &#x27;shutdown&#x27;, &#x27;restrict&#x27;, or &#x27;protect&#x27;&quot;)\n\n    if incoming_mac in learned_macs or len(learned_macs) &lt; max_macs:\n        return {\n            &quot;allowed&quot;: True,\n            &quot;port_state&quot;: &quot;up&quot;,\n            &quot;syslog_sent&quot;: False,\n            &quot;counter_incremented&quot;: False,\n        }\n\n    if violation_mode == &quot;shutdown&quot;:\n        return {\n            &quot;allowed&quot;: False,\n            &quot;port_state&quot;: &quot;err-disabled&quot;,\n            &quot;syslog_sent&quot;: True,\n            &quot;counter_incremented&quot;: True,\n        }\n    if violation_mode == &quot;restrict&quot;:\n        return {\n            &quot;allowed&quot;: False,\n            &quot;port_state&quot;: &quot;up&quot;,\n            &quot;syslog_sent&quot;: True,\n            &quot;counter_incremented&quot;: True,\n        }\n    # protect: silent drop only\n    return {\n        &quot;allowed&quot;: False,\n        &quot;port_state&quot;: &quot;up&quot;,\n        &quot;syslog_sent&quot;: False,\n        &quot;counter_incremented&quot;: False,\n    }\n\n\ndef evaluate_dai_packet(\n    port_trusted: bool,\n    sender_ip: str,\n    sender_mac: str,\n    snooping_binding_db: dict[str, str],\n    static_arp_acl: dict[str, str],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate Dynamic ARP Inspection (DAI) relying on DHCP Snooping Binding DB or ARP ACL.&quot;&quot;&quot;\n    _require_bool(port_trusted, &quot;port_trusted&quot;)\n    ipaddress.IPv4Address(sender_ip)\n    if not isinstance(sender_mac, str) or not sender_mac.strip():\n        raise ValueError(&quot;sender_mac must be a non-empty string&quot;)\n\n    if port_trusted:\n        return {&quot;action&quot;: &quot;forward&quot;, &quot;reason&quot;: &quot;TRUSTED_UPLINK_PORT_BYPASSES_DAI_CHECK&quot;}\n    if static_arp_acl.get(sender_ip) == sender_mac:\n        return {&quot;action&quot;: &quot;forward&quot;, &quot;reason&quot;: &quot;MATCHED_STATIC_ARP_ACL&quot;}\n    if snooping_binding_db.get(sender_ip) == sender_mac:\n        return {&quot;action&quot;: &quot;forward&quot;, &quot;reason&quot;: &quot;MATCHED_DHCP_SNOOPING_BINDING_DB&quot;}\n    return {&quot;action&quot;: &quot;drop&quot;, &quot;reason&quot;: &quot;ARP_SPOOF_OR_MISSING_BINDING_ON_UNTRUSTED_PORT&quot;}\n\n\ndef main() -&gt; None:\n    acl = [\n        {&quot;action&quot;: &quot;deny&quot;, &quot;proto&quot;: &quot;tcp&quot;, &quot;src_ip&quot;: &quot;10.10.20.0&quot;, &quot;src_wc&quot;: &quot;0.0.0.255&quot;,\n         &quot;dst_ip&quot;: &quot;10.10.50.10&quot;, &quot;dst_wc&quot;: &quot;0.0.0.0&quot;, &quot;dst_port&quot;: 22},\n        {&quot;action&quot;: &quot;permit&quot;, &quot;proto&quot;: &quot;ip&quot;, &quot;src_ip&quot;: &quot;0.0.0.0&quot;, &quot;src_wc&quot;: &quot;255.255.255.255&quot;,\n         &quot;dst_ip&quot;: &quot;0.0.0.0&quot;, &quot;dst_wc&quot;: &quot;255.255.255.255&quot;, &quot;dst_port&quot;: None},\n    ]\n    r_deny = evaluate_extended_acl(acl, {&quot;src_ip&quot;: &quot;10.10.20.5&quot;, &quot;dst_ip&quot;: &quot;10.10.50.10&quot;, &quot;proto&quot;: &quot;tcp&quot;, &quot;dst_port&quot;: 22})\n    r_allow = evaluate_extended_acl(acl, {&quot;src_ip&quot;: &quot;10.10.20.5&quot;, &quot;dst_ip&quot;: &quot;10.10.50.10&quot;, &quot;proto&quot;: &quot;tcp&quot;, &quot;dst_port&quot;: 443})\n    r_implicit = evaluate_extended_acl(acl[:1], {&quot;src_ip&quot;: &quot;10.10.20.5&quot;, &quot;dst_ip&quot;: &quot;10.10.50.10&quot;, &quot;proto&quot;: &quot;tcp&quot;, &quot;dst_port&quot;: 443})\n    assert r_deny[&quot;decision&quot;] == &quot;deny&quot; and r_deny[&quot;implicit_deny&quot;] is False\n    assert r_allow[&quot;decision&quot;] == &quot;permit&quot;\n    assert r_implicit[&quot;decision&quot;] == &quot;deny&quot; and r_implicit[&quot;implicit_deny&quot;] is True\n\n    ps_restrict = evaluate_port_security(&quot;static_access&quot;, 1, {&quot;aa:aa:aa:00:00:01&quot;}, &quot;bb:bb:bb:00:00:02&quot;, &quot;restrict&quot;)\n    ps_protect = evaluate_port_security(&quot;static_access&quot;, 1, {&quot;aa:aa:aa:00:00:01&quot;}, &quot;bb:bb:bb:00:00:02&quot;, &quot;protect&quot;)\n    assert ps_restrict[&quot;port_state&quot;] == &quot;up&quot; and ps_restrict[&quot;syslog_sent&quot;] is True\n    assert ps_protect[&quot;port_state&quot;] == &quot;up&quot; and ps_protect[&quot;syslog_sent&quot;] is False\n\n    dai_ok = evaluate_dai_packet(False, &quot;10.10.10.25&quot;, &quot;aa:aa:aa:00:00:01&quot;, {&quot;10.10.10.25&quot;: &quot;aa:aa:aa:00:00:01&quot;}, {})\n    dai_drop = evaluate_dai_packet(False, &quot;10.10.10.25&quot;, &quot;de:ad:be:ef:00:01&quot;, {&quot;10.10.10.25&quot;: &quot;aa:aa:aa:00:00:01&quot;}, {})\n    dai_static = evaluate_dai_packet(False, &quot;10.10.10.5&quot;, &quot;11:22:33:44:55:66&quot;, {}, {&quot;10.10.10.5&quot;: &quot;11:22:33:44:55:66&quot;})\n    assert dai_ok[&quot;action&quot;] == &quot;forward&quot; and dai_drop[&quot;action&quot;] == &quot;drop&quot; and dai_static[&quot;action&quot;] == &quot;forward&quot;\n\n    print(&quot;Extended ACL:&quot;, r_deny, r_allow, r_implicit)\n    print(&quot;Port Security (restrict vs protect):&quot;, ps_restrict, ps_protect)\n    print(&quot;DAI checks (valid / spoof / static ARP ACL):&quot;, dai_ok, dai_drop, dai_static)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> ترافیک TCP 22 مسدود و TCP 443 با خط permit عبور می‌کند؛ حذف خط permit باعث Implicit Deny می‌شود؛ <code>restrict</code> لاگ می‌دهد ولی <code>protect</code> بی‌صداست؛ و DAI بسته ARP جعلی را Drop و بسته سرور Static با ARP ACL را عبور می‌دهد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع ACL، Port Security، DHCP Snooping و DAI در Cisco Catalyst IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco Catalyst L2/L3 Security config (NOT executed on real switch)\nconfigure terminal\n ip access-list extended BLOCK_SSH_TO_DB\n  deny tcp 10.10.20.0 0.0.0.255 host 10.10.50.10 eq 22\n  permit ip any any\n ip dhcp snooping\n ip dhcp snooping vlan 10\n no ip dhcp snooping information option\n ip arp inspection vlan 10\n interface GigabitEthernet0/1\n  ip dhcp snooping trust\n  ip arp inspection trust\n interface GigabitEthernet0/3\n  switchport mode access\n  switchport port-security\n  switchport port-security maximum 2\n  switchport port-security violation restrict\n  spanning-tree portfast\n  spanning-tree bpduguard enable\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "قاعده استاندارد جایگذاری <strong>Extended ACL</strong> در شبکه کجاست؟",
+      "options": [
+        "نزدیک‌ترین مکان به مبدأ ترافیک تا بسته‌های غیرمجاز پهنای باند مسیر را اشغال نکنند",
+        "نزدیک‌ترین مکان به مقصد",
+        "فقط روی سرور DNS",
+        "فقط روی Loopback0"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Extended ACL مبدأ، مقصد و پورت را دقیق تشخیص می‌دهد؛ پس باید نزدیک به مبدأ اعمال شود.</p>"
+    },
+    {
+      "title": "کدام حالت واکنش Port Security فریم‌های MAC غیرمجاز را Drop می‌کند و پیام لاگ Syslog و شمارنده ثبت می‌کند ولی پورت را روشن نگه می‌دارد؟",
+      "options": [
+        "shutdown",
+        "protect",
+        "restrict",
+        "sticky"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>حالت <code>restrict</code> پورت را Up نگه می‌دارد و Syslog/شمارنده ثبت می‌کند؛ <code>protect</code> بی‌صداست و <code>shutdown</code> پورت را err-disabled می‌کند.</p>"
+    },
+    {
+      "title": "چرا فعال‌سازی DAI بدون داشتن جدول DHCP Snooping Binding (یا ARP ACL) باعث قطع ارتباط کلاینت‌ها می‌شود؟",
+      "options": [
+        "چون DAI سرعت پورت را کم می‌کند",
+        "چون DAI بسته‌های ARP پورت‌های Untrusted را در برابر جدول Binding می‌سنجد و در نبود ورودی آن‌ها را جعلی تلقی و Drop می‌کند",
+        "چون DAI در لایه ۷ کار می‌کند",
+        "چون DAI فقط برای IPv6 است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>جدول Binding ساخته‌شده توسط DHCP Snooping (و ARP ACL برای IPهای ثابت) مرجع اعتبارسنجی DAI است.</p>"
+    },
+    {
+      "title": "اگر یک ACL فقط یک خط <code>deny host 10.10.10.5</code> داشته باشد و هیچ خط <code>permit</code> نداشته باشد چه رخ می‌دهد؟",
+      "options": [
+        "فقط 10.10.10.5 مسدود و بقیه عبور می‌کنند",
+        "به‌دلیل Implicit Deny Any در انتهای ACL، تمام ترافیک مسدود می‌شود",
+        "ACL اصلاً اعمال نمی‌شود",
+        "فقط SSH مسدود می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در انتهای هر ACL یک <code>deny any</code> نامرئی وجود دارد؛ پس حداقل یک خط <code>permit</code> لازم است.</p>"
+    },
+    {
+      "title": "چرا دستور <code>switchport port-security</code> روی یک پورت در حالت پیش‌فرض <code>dynamic auto</code> رد می‌شود؟",
+      "options": [
+        "چون Port Security فقط روی پورت‌های ایستا (static access یا trunk) قابل فعال‌سازی است",
+        "چون فقط روی فیبر کار می‌کند",
+        "چون نیاز به OSPF دارد",
+        "چون باید ابتدا Telnet فعال شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>پورت باید ابتدا به‌صورت دستی روی <code>switchport mode access</code> (یا <code>trunk</code>) قرار گیرد.</p>"
+    },
+    {
+      "title": "تفاوت کلیدی <code>protect</code> و <code>restrict</code> در Port Security چیست؟",
+      "options": [
+        "protect پورت را خاموش می‌کند",
+        "protect بی‌صدا فریم غیرمجاز را Drop می‌کند و هیچ لاگ Syslog یا افزایش شمارنده تولید نمی‌کند، اما restrict لاگ و شمارنده دارد",
+        "restrict فقط یک MAC می‌پذیرد",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>نبود لاگ و شمارنده در <code>protect</code> دید عملیاتی تیم امنیت را کاهش می‌دهد.</p>"
+    },
+    {
+      "title": "چرا روی یک سوئیچ دسترسی لایه ۲ پس از فعال‌سازی DHCP Snooping، گاهی لازم است دستور <code>no ip dhcp snooping information option</code> اجرا شود؟",
+      "options": [
+        "تا سرعت پورت ۱۰ گیگابیت شود",
+        "زیرا سوئیچ لایه ۲ به‌طور پیش‌فرض Option 82 را با giaddr=0.0.0.0 اضافه می‌کند که ممکن است توسط روتر Relay بالادستی رد شود",
+        "برای حذف جدول Binding",
+        "برای تبدیل همه پورت‌ها به Trusted"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تضاد Option 82 با <code>giaddr=0.0.0.0</code> یکی از رایج‌ترین تله‌های عملیاتی DHCP Snooping در سوئیچ‌های L2 است.</p>"
+    },
+    {
+      "title": "برای اینکه یک پرینتر با <strong>IP ثابت (Static IP)</strong> در VLAN دارای DAI قطع نشود، چه اقدامی لازم است؟",
+      "options": [
+        "خاموش کردن کل امنیت سوئیچ",
+        "تعریف یک ARP ACL با نگاشت MAC-to-IP پرینتر و اتصال آن به DAI با ip arp inspection filter",
+        "تغییر پورت به dynamic desirable",
+        "حذف VLAN"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>میزبان‌های Static IP وارد جدول DHCP Snooping نمی‌شوند و نیازمند ARP ACL هستند.</p>"
+    },
+    {
+      "title": "قاعده جایگذاری <strong>Standard ACL</strong> کجاست و چرا؟",
+      "options": [
+        "نزدیک به مقصد، چون فقط IP مبدأ را بررسی می‌کند و اعمال آن نزدیک مبدأ ممکن است دسترسی به سایر مقاصد مجاز را هم قطع کند",
+        "نزدیک به مبدأ",
+        "فقط روی پورت Trunk",
+        "روی سرور NTP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>چون Standard ACL مقصد و پورت را تشخیص نمی‌دهد، باید تا حد ممکن نزدیک مقصد قرار گیرد.</p>"
+    },
+    {
+      "title": "اگر روی پورت کاربر دارای PortFast و <strong>BPDU Guard</strong> یک سوئیچ کوچک رومیزی متصل شود که BPDU ارسال کند، چه رخ می‌دهد؟",
+      "options": [
+        "آن سوئیچ Root Bridge می‌شود",
+        "پورت بلافاصله وارد حالت err-disabled می‌شود تا از حلقه لایه ۲ جلوگیری گردد",
+        "هیچ اتفاقی نمی‌افتد",
+        "تبدیل به Trunk می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>BPDU Guard پورت را با ورود به <code>err-disabled</code> ایزوله می‌کند.</p>"
+    },
+    {
+      "title": "پس از یادگیری MACها با <code>switchport port-security mac-address sticky</code>، چه کاری برای حفظ آن‌ها پس از ریبوت سوئیچ لازم است؟",
+      "options": [
+        "ذخیره پیکربندی در startup-config (copy running-config startup-config)",
+        "هیچ کاری لازم نیست",
+        "خاموش کردن Port Security",
+        "اجرای clear arp"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Sticky MACها در <code>running-config</code> نوشته می‌شوند و بدون ذخیره، پس از ریبوت پاک می‌گردند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده روی Catalyst 9300 واقعی",
+        "حمله ARP واقعی روی شبکه تولیدی",
+        "شبیه‌ساز محلی Python 3 (کتابخانه ipaddress) برای آزمون ACL First-Match/Implicit Deny، Port Security و DAI بدون تجهیز واقعی",
+        "بدون کد قابل اجرا"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 است و بخش ۲ سناریوی مرجع CLI اجرا نشده است.</p>"
+    }
+  ]
+}

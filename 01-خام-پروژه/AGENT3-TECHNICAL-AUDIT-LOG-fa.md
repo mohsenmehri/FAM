@@ -306,4 +306,26 @@
   - `ccna_04_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI (بدون تجهیز واقعی)
 - **وضعیت بازبینی:** خودبازبینی نویسنده (`author-agent-self-review-not-independent`) — بازبینی مستقل انسانی یا intake توسط Agent 2 هنوز انجام نشده است.
 
+## ۱۲B. ممیزی مستقل و تحویل دسته دوم درس‌های انتقالی CCNA (۷ درس سرویس‌ها، امنیت، بی‌سیم و SDN؛ `reviewed.1`)
+
+- **یافته بحرانی ممیزی در منبع خام Agent 1 (`641d02ee`):** در فایل `agent1_rewrites/ccna_wl.json` (که Agent 1 ادعای «۰ خطای فنی» درباره آن داشت)، کلید پاسخ سؤال ۲ (`Q2` درباره حالت پورت سوئیچ AP و WLC در مد پیش‌فرض Local Mode) روی **`ans=2` («پورت رو به AP در حالت Trunk و پورت رو به WLC در حالت Access»)** ثبت شده بود که **کاملاً معکوس** است! در Local Mode تمام ترافیک SSIDها داخل تونل لایه ۳ CAPWAP به WLC می‌رود، پس **پورت AP از نوع Access و پورت WLC از نوع Trunk** است (در حالی که در FlexConnect Local Switching پورت AP نیز Trunk است). این خطای بحرانی در `ccna_wl.json` اصلاح و با تست واحد رگرسیون قفل شد.
+- **سایر اصلاحات و ارتقاهای ممیزی مستقل در ۷ درس دسته ۱۲B (تبدیل همه از ۳–۴ بخش/۳ سؤال به ۱۴ بخش/۱۵ واژه/۱۲ پرسش v5):**
+  - `ccna_dhcp`: تفکیک UDP 67/68، تصریح بازپخش پیش‌فرض ۸ سرویس UDP در `ip helper-address` (`no ip forward-protocol`)، فیلد `giaddr`، APIPA RFC 3927 و کامل‌سازی DNS (رکوردها و UDP/TCP 53 + DoT/DoH).
+  - `ccna_nat`: ترتیب رسمی پردازش سیسکو (Doc ID 6209) در رفت (Routing پیش از NAT) و برگشت (NAT پیش از Routing)، تفکیک RFC 1918 از CGNAT RFC 6598 و RFC 5737 و اتمام Pool در Dynamic NAT.
+  - `ccna_05`: تله عملیاتی Option 82 در DHCP Snooping لایه ۲ (`no ip dhcp snooping information option`)، الزام ARP ACL برای میزبان‌های Static IP در DAI، تفکیک `shutdown`/`restrict`/`protect` و ذخیره Sticky MAC.
+  - `ccna_acl`: تصریح قاعده دقیق AAA `local` fallback (صرفاً هنگام عدم دسترسی سرور AAA، نه هنگام REJECT رمز اشتباه)، TACACS+ (RFC 8907) در برابر RADIUS/RadSec، ممیزی Type 0/7/5/8/9 و جزئیات IKEv2/ESP/AH.
+  - `ccna_qos_ssh`: تصریح ماهیت مهندسی اهداف VoIP SLA (ITU-T G.114/SRND)، Policer داخلی LLQ، مرز اعتماد (Trust Boundary)، تفاوت L2 CoS و L3 DSCP، Policing در برابر Shaping، ۵ پیش‌نیاز SSHv2 و SCP/SFTP در برابر FTP/TFTP.
+  - `ccna_wl`: رفع باگ معکوس `Q2` (Local Mode: AP=Access, WLC=Trunk)، تفکیک رمزنگاری پیش‌فرض CAPWAP Control (UDP 5246 DTLS) در برابر Data (UDP 5247)، FlexConnect و WPA3 SAE + PMF + 6GHz.
+  - `ccna_06`: نگاشت کامل REST CRUD و کدهای وضعیت RFC 9110، تفکیک NBI/SBI، لایه‌های Underlay/Overlay در SD-Access Catalyst Center و مقایسه کامل Ansible/Puppet/Chef + Idempotency + خطای Tab در YAML.
+- **طبقه‌بندی صادقانه اجرای ۷ آزمایشگاه جدید دسته ۱۲B (صفر تجهیز زنده، صفر import پرچم‌دار):**
+  - `ccna_dhcp_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `ipaddress` + سناریوی مرجع CLI
+  - `ccna_nat_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `ipaddress` + سناریوی مرجع CLI
+  - `ccna_05_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `ipaddress` + سناریوی مرجع CLI
+  - `ccna_acl_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI
+  - `ccna_qos_ssh_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `math` + سناریوی مرجع CLI
+  - `ccna_wl_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI
+  - `ccna_06_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `json` + سناریوی مرجع YAML/JSON
+- **وضعیت بازبینی:** خودبازبینی نویسنده (`author-agent-self-review-not-independent`) — بازبینی مستقل انسانی یا intake توسط Agent 2 هنوز انجام نشده است.
+
+
 

@@ -1,0 +1,344 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_dhcp",
+  "objectiveId": "ccna_dhcp",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "IP Services",
+  "title": "CCNA (سرویس‌های IP): سرور DHCP، عامل بازپخش DHCP Relay (giaddr)، APIPA و DNS",
+  "titleEn": "CCNA IP Services: DHCP Server, DHCP Relay (ip helper-address / giaddr), APIPA & DNS",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_dhcp (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_dhcp",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc2131",
+      "https://www.rfc-editor.org/rfc/rfc3927",
+      "https://www.rfc-editor.org/rfc/rfc1035",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipaddr_dhcp/configuration/xe-16/dhcp-xe-16-book/config-dhcp-server.html"
+    ],
+    "limitations": [
+      "هیچ سرور واقعی DHCP/DNS یا روتر سیسکو در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 (کتابخانه استاندارد ipaddress) برای آزمون واگذاری استخر با excluded-address، بازپخش Relay با فیلد giaddr و انتخاب پروتکل UDP/TCP 53 در DNS است."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق پورت‌های UDP 67 (سرور) و UDP 68 (کلاینت) در چرخه DORA و تصریح اینکه ip helper-address به‌طور پیش‌فرض ۸ سرویس UDP Broadcast را بازپخش می‌کند مگر با no ip forward-protocol محدود شود.",
+      "افزودن پوشش کامل رکوردهای DNS (A/AAAA/CNAME/PTR/MX/NS) و مرز استفاده از UDP 53 در برابر TCP 53 (انتقال Zone یا پاسخ‌های بزرگ) و DoT/DoH.",
+      "توسعه از ۳ بخش/۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش همراه با آزمایشگاه محلی ccna_dhcp_lab.py."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_dhcp-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_dhcp.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_dhcp_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲B: ساخت ccna_dhcp_lab.py بدون import پرچم‌دار با اعتبارسنجی سخت‌گیرانه CIDR (strict=True)، بازه‌های excluded-address و فیلد giaddr."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_dhcp-section-1",
+      "title": "مسئله واقعی: چرا سرور DHCP مرکزی بدون Relay به کلاینت‌های سایر VLANها پاسخ نمی‌دهد؟",
+      "html": "<p>کلاینتی که تازه به شبکه متصل شده هنوز آدرس IP ندارد و اولین پیام خود (<strong>DHCP Discover</strong>) را با آدرس IP مقصد <code>255.255.255.255</code> (Limited Broadcast) و MAC مقصد <code>FF:FF:FF:FF:FF:FF</code> می‌فرستد. چون روترها و SVIها به‌طور بنیادین مرز Broadcast هستند، بدون پیکربندی <strong>DHCP Relay Agent</strong> پیام Discover به سرور DHCP مرکزی در VLAN 99 نمی‌رسد و کلاینت پس از اتمام مهلت، به آدرس خودتخصیص <strong>APIPA (<code>169.254.0.0/16</code>)</strong> سقوط می‌کند.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> VLAN/SVI، ساب‌نت‌بندی IPv4 و رفتار روتر در برابر Broadcast.</p><ul><li>کالبدشکافی چرخه ۴مرحله‌ای <strong>DORA</strong> و نقش پورت‌های <strong>UDP 68</strong> (کلاینت) و <strong>UDP 67</strong> (سرور).</li><li>پیکربندی ایمن DHCP Server در Cisco IOS با تقدم <code>ip dhcp excluded-address</code> بر تعریف Pool.</li><li>پیکربندی <strong>DHCP Relay</strong> با <code>ip helper-address</code> روی اینترفیس سمت کلاینت و درک نقش فیلد <strong><code>giaddr</code></strong>.</li><li>درک رکوردهای کلیدی <strong>DNS</strong> (<code>A</code>, <code>AAAA</code>, <code>CNAME</code>, <code>PTR</code>, <code>MX</code>, <code>NS</code>) و انتخاب UDP/TCP 53.</li></ul>"
+    },
+    {
+      "id": "ccna_dhcp-section-3",
+      "title": "چرخه ۴مرحله‌ای DORA در استاندارد RFC 2131",
+      "html": "<p>مبادله DHCP در IPv4 شامل چهار پیام است: (۱) <strong>Discover</strong> (کلاینت از UDP 68 به UDP 67 با <code>0.0.0.0 -> 255.255.255.255</code>)، (۲) <strong>Offer</strong> (پیشنهاد IP، ماسک، دروازه، DNS و زمان Lease توسط سرور)، (۳) <strong>Request</strong> (پذیرش رسمی پیشنهاد توسط کلاینت؛ به‌صورت Broadcast تا سایر سرورهای DHCP مطلع شوند)، و (۴) <strong>Acknowledge (ACK)</strong> (تأیید نهایی اجاره). هنگام تمدید (T1 در ۵۰٪ زمان Lease) کلاینت پیام Request را به‌صورت <strong>Unicast</strong> مستقیماً به سرور می‌فرستد.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-4",
+      "title": "پیکربندی DHCP Server در Cisco IOS و تقدم حیاتی excluded-address",
+      "html": "<p>در شبکه‌های کوچک/شعبه‌ای، خود روتر سیسکو می‌تواند سرور DHCP باشد. <strong>قاعده طلایی:</strong> همیشه پیش از ساخت <code>ip dhcp pool</code>، آدرس‌های ثابت (Gateway، سوئیچ‌ها، پرینترها و سرورها) را در مد Global با <code>ip dhcp excluded-address &lt;start&gt; &lt;end&gt;</code> مستثنا کنید تا بلافاصله به کلاینت‌ها واگذار نشوند. سپس داخل Pool دستورات <code>network</code>، <code>default-router</code>، <code>dns-server</code> و <code>lease</code> تنظیم می‌شوند.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-5",
+      "title": "معماری DHCP Relay Agent، فیلد giaddr و ۸ سرویس پیش‌فرض ip helper-address",
+      "html": "<p>روی <strong>اینترفیس ورودی سمت کلاینت</strong> (مانند <code>interface Vlan10</code> با IP <code>10.10.10.1</code>)، دستور <code>ip helper-address 10.99.0.10</code> باعث می‌شود روتر پیام Broadcast کلاینت را به <strong>Unicast</strong> به مقصد سرور DHCP تبدیل کرده و آدرس IP همان اینترفیس سمت کلاینت را در فیلد <strong><code>giaddr</code> (Gateway IP Address)</strong> درون بدنه بسته DHCP قرار دهد. سرور DHCP با خواندن <code>giaddr</code> می‌فهمد دقیقاً از کدام Scope آدرس بدهد. <strong>نکته امنیتی مهم:</strong> در Cisco IOS، دستور <code>ip helper-address</code> به‌طور پیش‌فرض ۸ پروتکل UDP Broadcast (از جمله BOOTP/DHCP 67/68، TFTP 69، DNS 53، Time 37، TACACS 49 و NetBIOS 137/138) را بازپخش می‌کند؛ برای کاهش سطح حمله می‌توان پروتکل‌های غیرلازم را با <code>no ip forward-protocol udp ...</code> بست.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-6",
+      "title": "نمودار معماری: مسیر DORA، بازپخش Unicast و انتخاب Scope با giaddr",
+      "html": "<p>در نمودار زیر چگونگی تبدیل Broadcast به Unicast توسط Relay Agent و نقش <code>giaddr</code> دیده می‌شود.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"DHCP DORA and Relay Agent giaddr Workflow\"><rect x=\"16\" y=\"36\" width=\"145\" height=\"148\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"88\" y=\"64\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">Client (VLAN 10)</text><text x=\"88\" y=\"88\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Src: 0.0.0.0:68</text><text x=\"88\" y=\"106\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Dst: 255.255.255.255:67</text><text x=\"88\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" fill=\"#dc2626\">No response =&gt;</text><text x=\"88\" y=\"148\" text-anchor=\"middle\" font-size=\"9\" fill=\"#dc2626\">APIPA 169.254.0.0/16</text><line x1=\"161\" y1=\"110\" x2=\"236\" y2=\"110\" stroke=\"#1d4ed8\" stroke-width=\"2.5\"/><text x=\"198\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#1d4ed8\">Broadcast</text><text x=\"198\" y=\"128\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Discover</text><rect x=\"236\" y=\"24\" width=\"218\" height=\"172\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"345\" y=\"48\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">Router / SVI (Relay Agent)</text><text x=\"345\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">interface Vlan10 (10.10.10.1)</text><text x=\"345\" y=\"92\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">ip helper-address 10.99.0.10</text><text x=\"345\" y=\"118\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Rewrites Dst =&gt; 10.99.0.10</text><text x=\"345\" y=\"136\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#1d4ed8\">Sets giaddr = 10.10.10.1</text><text x=\"345\" y=\"160\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#64748b\">(Forwards 8 default UDP services)</text><line x1=\"454\" y1=\"110\" x2=\"534\" y2=\"110\" stroke=\"#15803d\" stroke-width=\"2.5\"/><text x=\"494\" y=\"96\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">Unicast</text><text x=\"494\" y=\"128\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">UDP 67</text><rect x=\"534\" y=\"36\" width=\"210\" height=\"148\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"639\" y=\"64\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Central DHCP Server</text><text x=\"639\" y=\"88\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">10.99.0.10 (VLAN 99)</text><text x=\"639\" y=\"112\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">Reads giaddr = 10.10.10.1</text><text x=\"639\" y=\"132\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">Matches 10.10.10.0/24 Scope</text><text x=\"639\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Respects excluded-address!</text></svg>"
+    },
+    {
+      "id": "ccna_dhcp-section-7",
+      "title": "آدرس‌دهی خودکار APIPA (RFC 3927) در برابر Link-Local IPv6",
+      "html": "<p>اگر کلاینت IPv4 پس از ارسال Discover پاسخی نگیرد، سیستم‌عامل یک آدرس از بازه <strong><code>169.254.0.0/16</code></strong> (APIPA — RFC 3927) برمی‌گزیند که فقط در همان سگمنت محلی کار می‌کند و قابل مسیریابی نیست. دیدن IP در بازه <code>169.254.x.x</code> نشانه کلاسیک شکست DHCP (نبود Relay، اتمام Pool، نبود Scope یا مسدودسازی لایه ۲) است.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-8",
+      "title": "معماری DNS، رکوردهای کلیدی و تفکیک UDP 53 در برابر TCP 53",
+      "html": "<table><thead><tr><th>رکورد DNS</th><th>کاربرد</th></tr></thead><tbody><tr><td><code>A</code> / <code>AAAA</code></td><td>نگاشت نام دامنه به IPv4 (<code>A</code>) یا IPv6 (<code>AAAA</code>)</td></tr><tr><td><code>CNAME</code></td><td>نام مستعار (Alias) به نام اصلی دیگر</td></tr><tr><td><code>PTR</code></td><td>نگاشت معکوس IP به نام دامنه</td></tr><tr><td><code>MX</code> / <code>NS</code></td><td>سرور ایمیل دامنه (<code>MX</code>) و سرور نام معتبر دامنه (<code>NS</code>)</td></tr></tbody></table><p>پرس‌وجوهای معمولی DNS روی <strong>UDP 53</strong> انجام می‌شوند؛ اما برای <strong>انتقال Zone (AXFR/IXFR)</strong> یا پاسخ‌های بزرگ (بیش از ۵۱۲ بایت بدون EDNS0 / DNSSEC) از <strong>TCP 53</strong> استفاده می‌شود. همچنین برای محرمانگی پرس‌وجو، <strong>DoT (TCP 853)</strong> و <strong>DoH (HTTPS 443)</strong> کاربرد دارند.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-9",
+      "title": "کلاینت DHCP روی اینترفیس روتر و دستورات راستی‌آزمایی IOS",
+      "html": "<p>روتر سیسکو خودش هم می‌تواند روی لینک WAN با <code>ip address dhcp</code> کلاینت DHCP باشد. برای راستی‌آزمایی سرور و Relay در IOS از <code>show ip dhcp binding</code>، <code>show ip dhcp pool</code>، <code>show ip dhcp conflict</code> و <code>show ip interface</code> (بخش Helper address) استفاده می‌شود.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-10",
+      "title": "امنیت زیرساخت DHCP و DNS",
+      "html": "<p>در لایه ۲ برای جلوگیری از Rogue DHCP Server و DHCP Starvation از <strong>DHCP Snooping</strong> (با <code>trust</code> صرفاً روی Uplink) استفاده می‌شود. در سطح DNS نیز محدودسازی Zone Transfer به سرورهای Secondary مجاز و فعال‌سازی DNSSEC/پایش تونلینگ DNS حیاتی است.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-11",
+      "title": "کژفهمی‌های رایج در DHCP، Relay و DNS",
+      "html": "<ul><li><strong>کژفهمی ۱: «دستور <code>ip helper-address</code> باید روی اینترفیس سمت سرور DHCP نوشته شود.»</strong> واقعیت: باید روی اینترفیس <strong>سمت کلاینت</strong> (جایی که Broadcast دریافت می‌شود) نوشته شود.</li><li><strong>کژفهمی ۲: «DNS همیشه فقط روی UDP 53 کار می‌کند.»</strong> واقعیت: انتقال Zone و پاسخ‌های بزرگ/برش‌خورده روی TCP 53 انجام می‌شوند.</li><li><strong>کژفهمی ۳: «<code>ip dhcp excluded-address</code> زیر مد Pool نوشته می‌شود.»</strong> واقعیت: در مد Global Config نوشته می‌شود.</li></ul>"
+    },
+    {
+      "id": "ccna_dhcp-section-12",
+      "title": "عیب‌یابی سیستماتیک خطای APIPA (169.254.x.x)",
+      "html": "<p>اگر کاربران VLAN 30 آدرس <code>169.254.x.x</code> می‌گیرند در حالی که VLAN 10 سالم است: (۱) وجود <code>ip helper-address</code> روی اینترفیس <code>Vlan30</code>، (۲) وجود و فعال بودن Scope منطبق با <code>giaddr</code> روی سرور DHCP، (۳) پر نبودن Pool، (۴) مسیریابی رفت‌وبرگشت بین <code>Vlan30</code> و سرور DHCP، و (۵) نبودن مسدودسازی اشتباه در DHCP Snooping یا ACL روی UDP 67/68 را بررسی کنید.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> کلاینت در <code>10.10.10.0/24</code> (دروازه <code>10.10.10.1</code>) است و سرور در <code>10.99.0.10</code>. سرور از کجا می‌فهمد باید از استخر <code>10.10.10.0/24</code> آدرس بدهد؟ <strong>پاسخ:</strong> از فیلد <code>giaddr = 10.10.10.1</code> که روتر Relay در بسته DHCP پر کرده است.</p><p><strong>تمرین ۲:</strong> چرا باید <code>ip dhcp excluded-address 10.10.10.1 10.10.10.20</code> را پیش از تعریف Pool نوشت؟ <strong>پاسخ:</strong> تا از واگذاری آدرس‌های ثابت (Gateway/سرورها) و ایجاد تداخل IP جلوگیری شود.</p>"
+    },
+    {
+      "id": "ccna_dhcp-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc2131\" target=\"_blank\" rel=\"noopener\">RFC 2131 (DHCP)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3927\" target=\"_blank\" rel=\"noopener\">RFC 3927 (APIPA / Link-Local IPv4)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc1035\" target=\"_blank\" rel=\"noopener\">RFC 1035 (DNS)</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipaddr_dhcp/configuration/xe-16/dhcp-xe-16-book/config-dhcp-server.html\" target=\"_blank\" rel=\"noopener\">راهنمای DHCP در Cisco IOS-XE</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ سرور واقعی DHCP/DNS یا روتر سیسکو در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "DORA",
+      "fa": "چرخه چهارمرحله‌ای DHCP",
+      "simple": "ترتیب Discover -> Offer -> Request -> Acknowledge برای اجاره آدرس IPv4."
+    },
+    {
+      "term": "UDP 67 / UDP 68",
+      "fa": "پورت‌های سرور و کلاینت DHCP",
+      "simple": "سرور DHCP روی UDP 67 گوش می‌دهد و کلاینت روی UDP 68 پاسخ می‌گیرد."
+    },
+    {
+      "term": "DHCP Relay Agent",
+      "fa": "عامل بازپخش DHCP",
+      "simple": "روتر یا SVI که Broadcast کلاینت را به Unicast برای سرور مرکزی تبدیل می‌کند."
+    },
+    {
+      "term": "ip helper-address",
+      "fa": "دستور Relay سیسکو",
+      "simple": "پیکربندی روی اینترفیس سمت کلاینت برای ارسال Unicast به سرور DHCP (و ۷ سرویس UDP پیش‌فرض دیگر)."
+    },
+    {
+      "term": "giaddr",
+      "fa": "آدرس IP دروازه Relay",
+      "simple": "فیلد درون پیام DHCP که IP اینترفیس سمت کلاینت را حمل می‌کند تا سرور Scope صحیح را برگزیند."
+    },
+    {
+      "term": "ip dhcp excluded-address",
+      "fa": "بازه استثنای استخر DHCP",
+      "simple": "دستور Global برای رزرو آدرس‌های ثابت (Gateway/سرورها) پیش از فعال‌سازی Pool."
+    },
+    {
+      "term": "DHCP Lease & T1/T2",
+      "fa": "مدت اجاره و زمان تمدید",
+      "simple": "مدت اعتبار IP؛ کلاینت در ۵۰٪ زمان (T1) به‌صورت Unicast درخواست تمدید می‌دهد."
+    },
+    {
+      "term": "APIPA (169.254.0.0/16)",
+      "fa": "آدرس‌دهی خودکار محلی IPv4",
+      "simple": "آدرس اضطراری RFC 3927 هنگام دریافت نکردن پاسخ از سرور DHCP."
+    },
+    {
+      "term": "DHCP Scope / Pool",
+      "fa": "استخر آدرس‌دهی زیرشبکه",
+      "simple": "مجموعه آدرس‌ها، ماسک، دروازه و DNS تعریف‌شده برای یک زیرشبکه روی سرور."
+    },
+    {
+      "term": "DNS A / AAAA",
+      "fa": "رکورد آدرس IPv4 و IPv6",
+      "simple": "نگاشت نام دامنه به آدرس IPv4 (A) یا IPv6 (AAAA)."
+    },
+    {
+      "term": "DNS CNAME / PTR",
+      "fa": "رکورد مستعار و معکوس",
+      "simple": "CNAME نام مستعار به نام دیگر است و PTR نگاشت معکوس IP به نام."
+    },
+    {
+      "term": "DNS MX / NS",
+      "fa": "رکورد ایمیل و سرور نام",
+      "simple": "MX سرور دریافت ایمیل و NS سرور نام معتبر یک دامنه را تعیین می‌کند."
+    },
+    {
+      "term": "UDP 53 vs TCP 53",
+      "fa": "انتقال DNS",
+      "simple": "UDP 53 برای پرس‌وجوهای عادی و TCP 53 برای Zone Transfer و پاسخ‌های بزرگ."
+    },
+    {
+      "term": "DoT / DoH",
+      "fa": "DNS رمزنگاری‌شده",
+      "simple": "انتقال امن پرس‌وجوی DNS روی TLS (TCP 853) یا HTTPS (TCP 443)."
+    },
+    {
+      "term": "ip forward-protocol",
+      "fa": "کنترل بازپخش سرویس‌های Helper",
+      "simple": "دستور IOS برای حذف سرویس‌های UDP غیرضروری از بازپخش ip helper-address."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی با ماژول <code>ipaddress</code>، واگذاری IP از استخر با رعایت <code>excluded-address</code>، بازپخش DHCP Relay با فیلد <code>giaddr</code>، سقوط به APIPA در نبود Helper یا Scope، و تفکیک UDP/TCP 53 در DNS را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_dhcp_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_dhcp_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for ccna_dhcp (DHCP Server, Relay giaddr, APIPA &amp; DNS).\n\nBoundary: Pure in-memory simulation using Python stdlib only (ipaddress).\nNo real Cisco router, DHCP server, DNS server, or network sockets are used.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _require_non_empty_str(val: object, name: str) -&gt; str:\n    if not isinstance(val, str) or not val.strip():\n        raise ValueError(f&quot;{name} must be a non-empty string&quot;)\n    return val.strip()\n\n\ndef allocate_dhcp_lease(\n    subnet_cidr: str,\n    excluded_ranges: list[tuple[str, str]],\n    active_leases: set[str],\n    client_mac: str,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate Cisco IOS DHCP pool allocation respecting excluded-address ranges.&quot;&quot;&quot;\n    _require_non_empty_str(subnet_cidr, &quot;subnet_cidr&quot;)\n    _require_non_empty_str(client_mac, &quot;client_mac&quot;)\n    net = ipaddress.IPv4Network(subnet_cidr, strict=True)\n    if net.prefixlen &gt;= 31:\n        raise ValueError(&quot;DHCP pool requires a subnet with usable host addresses (prefix &lt;= /30)&quot;)\n\n    excluded: set[ipaddress.IPv4Address] = set()\n    for start_s, end_s in excluded_ranges:\n        s_ip = ipaddress.IPv4Address(start_s)\n        e_ip = ipaddress.IPv4Address(end_s)\n        if int(s_ip) &gt; int(e_ip):\n            raise ValueError(f&quot;Excluded range start {start_s} &gt; end {end_s}&quot;)\n        if s_ip not in net or e_ip not in net:\n            raise ValueError(f&quot;Excluded range {start_s}-{end_s} outside subnet {subnet_cidr}&quot;)\n        for raw in range(int(s_ip), int(e_ip) + 1):\n            excluded.add(ipaddress.IPv4Address(raw))\n\n    used = {ipaddress.IPv4Address(ip) for ip in active_leases}\n    for host in net.hosts():\n        if host not in excluded and host not in used:\n            return {\n                &quot;allocated&quot;: True,\n                &quot;client_mac&quot;: client_mac,\n                &quot;assigned_ip&quot;: str(host),\n                &quot;subnet_mask&quot;: str(net.netmask),\n                &quot;excluded_count&quot;: len(excluded),\n            }\n    return {\n        &quot;allocated&quot;: False,\n        &quot;client_mac&quot;: client_mac,\n        &quot;assigned_ip&quot;: None,\n        &quot;reason&quot;: &quot;POOL_EXHAUSTED_CLIENT_FALLS_BACK_TO_APIPA_169_254_0_0_16&quot;,\n    }\n\n\ndef simulate_dhcp_relay(\n    client_vlan: int,\n    gateway_ip: str,\n    helper_address: str | None,\n    server_scopes: dict[str, str],\n    server_reachable: bool = True,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate DHCP Discover crossing a router with/without ip helper-address (giaddr).&quot;&quot;&quot;\n    if type(client_vlan) is not int or not (1 &lt;= client_vlan &lt;= 4094):\n        raise ValueError(&quot;client_vlan must be an integer in 1..4094&quot;)\n    gw = ipaddress.IPv4Address(gateway_ip)\n    _require_bool(server_reachable, &quot;server_reachable&quot;)\n\n    if helper_address is None:\n        return {\n            &quot;dora_success&quot;: False,\n            &quot;client_vlan&quot;: client_vlan,\n            &quot;giaddr&quot;: None,\n            &quot;result&quot;: &quot;DROPPED_AT_ROUTER_NO_HELPER_ADDRESS&quot;,\n            &quot;client_fallback&quot;: &quot;APIPA 169.254.0.0/16 (RFC 3927)&quot;,\n        }\n\n    srv = ipaddress.IPv4Address(helper_address)\n    if not server_reachable:\n        return {\n            &quot;dora_success&quot;: False,\n            &quot;client_vlan&quot;: client_vlan,\n            &quot;giaddr&quot;: str(gw),\n            &quot;helper_target&quot;: str(srv),\n            &quot;result&quot;: &quot;DHCP_SERVER_UNREACHABLE&quot;,\n            &quot;client_fallback&quot;: &quot;APIPA 169.254.0.0/16 (RFC 3927)&quot;,\n        }\n\n    matched_scope = None\n    for scope_name, scope_cidr in server_scopes.items():\n        net = ipaddress.IPv4Network(scope_cidr, strict=True)\n        if gw in net:\n            matched_scope = scope_name\n            break\n\n    if matched_scope is None:\n        return {\n            &quot;dora_success&quot;: False,\n            &quot;client_vlan&quot;: client_vlan,\n            &quot;giaddr&quot;: str(gw),\n            &quot;helper_target&quot;: str(srv),\n            &quot;result&quot;: &quot;NO_MATCHING_SCOPE_FOR_GIADDR&quot;,\n            &quot;client_fallback&quot;: &quot;APIPA 169.254.0.0/16 (RFC 3927)&quot;,\n        }\n\n    return {\n        &quot;dora_success&quot;: True,\n        &quot;client_vlan&quot;: client_vlan,\n        &quot;giaddr&quot;: str(gw),\n        &quot;helper_target&quot;: str(srv),\n        &quot;udp_ports&quot;: {&quot;client&quot;: 68, &quot;server&quot;: 67},\n        &quot;selected_scope&quot;: matched_scope,\n        &quot;result&quot;: &quot;RELAYED_UNICAST_AND_SCOPE_MATCHED&quot;,\n    }\n\n\ndef classify_dns_record(record_type: str, transport_size_bytes: int, is_zone_transfer: bool = False) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Validate common DNS record types and UDP/TCP 53 transport selection.&quot;&quot;&quot;\n    rtype = _require_non_empty_str(record_type, &quot;record_type&quot;).upper()\n    if type(transport_size_bytes) is not int or transport_size_bytes &lt;= 0:\n        raise ValueError(&quot;transport_size_bytes must be a positive integer&quot;)\n    _require_bool(is_zone_transfer, &quot;is_zone_transfer&quot;)\n\n    meanings = {\n        &quot;A&quot;: &quot;IPv4 host address mapping&quot;,\n        &quot;AAAA&quot;: &quot;IPv6 host address mapping&quot;,\n        &quot;CNAME&quot;: &quot;Canonical name alias&quot;,\n        &quot;PTR&quot;: &quot;Reverse IP-to-hostname pointer&quot;,\n        &quot;MX&quot;: &quot;Mail exchanger record&quot;,\n        &quot;NS&quot;: &quot;Authoritative name server record&quot;,\n    }\n    if rtype not in meanings:\n        raise ValueError(f&quot;Unsupported record_type: {rtype}&quot;)\n\n    protocol = &quot;TCP/53&quot; if (is_zone_transfer or transport_size_bytes &gt; 512) else &quot;UDP/53&quot;\n    return {\n        &quot;record_type&quot;: rtype,\n        &quot;purpose&quot;: meanings[rtype],\n        &quot;recommended_transport&quot;: protocol,\n    }\n\n\ndef main() -&gt; None:\n    lease = allocate_dhcp_lease(\n        &quot;10.10.10.0/24&quot;,\n        [(&quot;10.10.10.1&quot;, &quot;10.10.10.20&quot;)],\n        {&quot;10.10.10.21&quot;},\n        &quot;aa:bb:cc:00:00:01&quot;,\n    )\n    assert lease[&quot;allocated&quot;] is True and lease[&quot;assigned_ip&quot;] == &quot;10.10.10.22&quot;\n\n    scopes = {&quot;VLAN10_USERS&quot;: &quot;10.10.10.0/24&quot;, &quot;VLAN20_SALES&quot;: &quot;10.10.20.0/24&quot;}\n    ok_relay = simulate_dhcp_relay(10, &quot;10.10.10.1&quot;, &quot;10.99.0.10&quot;, scopes)\n    no_helper = simulate_dhcp_relay(30, &quot;10.10.30.1&quot;, None, scopes)\n    no_scope = simulate_dhcp_relay(30, &quot;10.10.30.1&quot;, &quot;10.99.0.10&quot;, scopes)\n    assert ok_relay[&quot;dora_success&quot;] is True and ok_relay[&quot;selected_scope&quot;] == &quot;VLAN10_USERS&quot;\n    assert no_helper[&quot;dora_success&quot;] is False and &quot;NO_HELPER&quot; in str(no_helper[&quot;result&quot;])\n    assert no_scope[&quot;dora_success&quot;] is False and no_scope[&quot;result&quot;] == &quot;NO_MATCHING_SCOPE_FOR_GIADDR&quot;\n\n    dns_udp = classify_dns_record(&quot;AAAA&quot;, 128)\n    dns_tcp = classify_dns_record(&quot;NS&quot;, 200, is_zone_transfer=True)\n    assert dns_udp[&quot;recommended_transport&quot;] == &quot;UDP/53&quot;\n    assert dns_tcp[&quot;recommended_transport&quot;] == &quot;TCP/53&quot;\n\n    print(&quot;DHCP Lease (respecting excluded 1..20):&quot;, lease)\n    print(&quot;DHCP Relay OK (giaddr=10.10.10.1):&quot;, ok_relay)\n    print(&quot;DHCP Relay Missing Helper (APIPA fallback):&quot;, no_helper)\n    print(&quot;DHCP Relay Missing Scope:&quot;, no_scope)\n    print(&quot;DNS Transport Checks:&quot;, dns_udp, dns_tcp)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کلاینت با استثنای <code>.1–.20</code> و اجاره <code>.21</code> دقیقاً <code>10.10.10.22</code> می‌گیرد؛ Relay با <code>giaddr=10.10.10.1</code> به Scope <code>VLAN10_USERS</code> نگاشت می‌شود؛ نبود Helper یا Scope به APIPA منتهی می‌شود؛ و انتقال Zone پروتکل <code>TCP/53</code> انتخاب می‌کند.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع DHCP Server و DHCP Relay در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE DHCP Server &amp; Relay config (NOT executed on real router)\nconfigure terminal\n ip dhcp excluded-address 10.10.10.1 10.10.10.20\n ip dhcp pool VLAN10_USERS\n  network 10.10.10.0 255.255.255.0\n  default-router 10.10.10.1\n  dns-server 10.99.0.53\n ! On Relay Agent SVI facing clients:\n interface Vlan10\n  ip address 10.10.10.1 255.255.255.0\n  ip helper-address 10.99.0.10\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در پیکربندی DHCP Relay با <code>ip helper-address 10.99.0.10</code>، سرور DHCP مرکزی از روی کدام فیلد می‌فهمد کلاینت متعلق به کدام زیرشبکه و Scope است؟",
+      "options": [
+        "فیلد giaddr درون بسته DHCP که روتر Relay آن را با IP اینترفیس سمت کلاینت پر می‌کند",
+        "فیلد TTL در هدر IP",
+        "آدرس MAC روتر در جدول OSPF",
+        "پورت تصادفی TCP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>روتر Relay آدرس اینترفیس ورودی سمت کلاینت را در <code>giaddr</code> می‌نویسد و سرور با تطبیق آن، Scope دقیق را انتخاب می‌کند.</p>"
+    },
+    {
+      "title": "کلاینتی در VLAN 30 آدرس <code>169.254.18.90</code> گرفته در حالی که سایر VLANها سالم‌اند. محتمل‌ترین علت اولیه چیست؟",
+      "options": [
+        "خراب بودن کل اینترنت",
+        "نبود ip helper-address روی اینترفیس دروازه VLAN 30 یا نبود/اتمام Scope منطبق با VLAN 30 روی سرور DHCP",
+        "نیاز به کابل فیبر",
+        "خاموش بودن Static NAT"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>آدرس <code>169.254.x.x</code> همان APIPA است و نشانه شکست دریافت پاسخ DHCP برای آن VLAN است.</p>"
+    },
+    {
+      "title": "دستور <code>ip helper-address</code> باید روی کدام اینترفیس روتر نوشته شود؟",
+      "options": [
+        "اینترفیس سمت سرور DHCP",
+        "اینترفیس Loopback0",
+        "اینترفیس ورودی سمت کلاینت (جایی که پیام Broadcast دریافت می‌شود)",
+        "اینترفیس خروجی اینترنت"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Relay باید روی اینترفیسی باشد که Broadcast کلاینت وارد آن می‌شود تا پیش از Drop تبدیل به Unicast شود.</p>"
+    },
+    {
+      "title": "پورت‌های UDP مورد استفاده سرور و کلاینت در DHCPv4 به‌ترتیب کدام‌اند؟",
+      "options": [
+        "UDP 67 برای سرور و UDP 68 برای کلاینت",
+        "TCP 67 و TCP 68",
+        "UDP 53 و UDP 54",
+        "UDP 161 و UDP 162"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>کلاینت از UDP 68 به مقصد UDP 67 سرور پیام می‌فرستد و پاسخ را روی UDP 68 دریافت می‌کند.</p>"
+    },
+    {
+      "title": "چرا باید دستور <code>ip dhcp excluded-address</code> در مد Global و پیش از تعریف Pool اجرا شود؟",
+      "options": [
+        "برای افزایش سرعت پورت",
+        "تا آدرس‌های ثابت (Gateway، سرورها، پرینترها) به کلاینت‌ها واگذار نشوند و تداخل IP رخ ندهد",
+        "چون بدون آن Relay کار نمی‌کند",
+        "برای تغییر STP Root"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>استثنا کردن آدرس‌های ثابت پیش از فعال‌سازی Pool مانع بروز IP Conflict می‌شود.</p>"
+    },
+    {
+      "title": "کدام نکته امنیتی درباره دستور <code>ip helper-address</code> در Cisco IOS صحیح است؟",
+      "options": [
+        "فقط و فقط پورت UDP 67 را بازپخش می‌کند",
+        "به‌طور پیش‌فرض ۸ سرویس UDP Broadcast (شامل TFTP، DNS، NetBIOS و غیره) را بازپخش می‌کند مگر با no ip forward-protocol محدود شود",
+        "تمام ترافیک را با IPsec رمزنگاری می‌کند",
+        "فقط برای IPv6 است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بستن سرویس‌های غیرضروری مانند NetBIOS/TFTP با <code>no ip forward-protocol udp ...</code> جزو Hardening استاندارد است.</p>"
+    },
+    {
+      "title": "در چرخه DORA، پیام سوم (<strong>DHCP Request</strong>) توسط کلاینت معمولاً چگونه ارسال می‌شود و چرا؟",
+      "options": [
+        "به صورت Broadcast، تا هم سرور برگزیده مطلع شود و هم سایر سرورهای DHCP که Offer داده‌اند آدرس پیشنهادی خود را آزاد کنند",
+        "به صورت ICMP Echo",
+        "روی TCP 443",
+        "فقط در لایه ۱"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ارسال Broadcast در مرحله Request به همه سرورهای DHCP شبکه اعلام می‌کند کدام پیشنهاد پذیرفته شده است.</p>"
+    },
+    {
+      "title": "کدام رکورد DNS برای نگاشت نام دامنه به آدرس <strong>IPv6</strong> به کار می‌رود؟",
+      "options": [
+        "A",
+        "AAAA",
+        "PTR",
+        "MX"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>رکورد <code>A</code> برای IPv4 و رکورد <code>AAAA</code> برای آدرس ۱۲۸بیتی IPv6 است.</p>"
+    },
+    {
+      "title": "در چه شرایطی پروتکل DNS از <strong>TCP 53</strong> به‌جای UDP 53 استفاده می‌کند؟",
+      "options": [
+        "هرگز از TCP استفاده نمی‌کند",
+        "در انتقال Zone (AXFR/IXFR) یا زمانی که پاسخ بزرگ‌تر از سقف UDP باشد (مثلاً با DNSSEC)",
+        "فقط برای IPv4",
+        "فقط برای کلاینت‌های APIPA"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پرس‌وجوهای کوچک روی UDP 53 و انتقال Zone یا پاسخ‌های برش‌خورده روی TCP 53 انجام می‌شوند.</p>"
+    },
+    {
+      "title": "رکورد <code>PTR</code> در DNS چه وظیفه‌ای دارد؟",
+      "options": [
+        "نگاشت نام به IPv4",
+        "نگاشت معکوس آدرس IP به نام میزبان (Reverse Lookup)",
+        "تعیین سرور ایمیل",
+        "توزیع آدرس DHCP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>رکورد <code>PTR</code> برای جست‌وجوی معکوس (IP -> Hostname) کاربرد دارد.</p>"
+    },
+    {
+      "title": "بازه آدرس‌های <strong>APIPA (RFC 3927)</strong> کدام است؟",
+      "options": [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "169.254.0.0/16",
+        "192.168.0.0/16"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بازه <code>169.254.0.0/16</code> برای آدرس‌دهی خودکار Link-Local در IPv4 رزرو شده است.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده DHCP روی روتر سیسکو و سرور ویندوز",
+        "تست واقعی DNS روی اینترنت",
+        "شبیه‌ساز محلی Python 3 (کتابخانه ipaddress) برای آزمون excluded-address، Relay/giaddr و UDP/TCP 53 در DNS بدون سرور یا روتر واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بخش ۱ شبیه‌ساز محلی Python 3 است و بخش ۲ سناریوی مرجع CLI اجرا نشده است.</p>"
+    }
+  ]
+}

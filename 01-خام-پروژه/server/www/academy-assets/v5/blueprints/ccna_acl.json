@@ -1,0 +1,344 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_acl",
+  "objectiveId": "ccna_acl",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "Security Fundamentals",
+  "title": "CCNA (امنیت شبکه): چشم‌انداز تهدیدات، AAA (TACACS+ و RADIUS)، VPN مقدماتی و Hardening تجهیزات",
+  "titleEn": "CCNA Security Concepts: Threats, AAA (TACACS+/RADIUS), VPN Fundamentals & Device Hardening",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_acl (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_acl",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc8907",
+      "https://www.rfc-editor.org/rfc/rfc2865",
+      "https://www.rfc-editor.org/rfc/rfc7296",
+      "https://www.cisco.com/c/en/us/support/docs/security-vpn/terminal-access-controller-access-control-system-tacacs-/10384-security.html"
+    ],
+    "limitations": [
+      "هیچ سرور Cisco ISE/TACACS+/RADIUS یا تونل IPsec واقعی در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای آزمون رفتار دقیق AAA Fallback، انتخاب TACACS+/RADIUS و ممیزی انواع رمزنگاری/هش Type 0/7/5/8/9 در سیسکو است."
+    ],
+    "legacyAuditFixes": [
+      "تصریح رفتار دقیق AAA local fallback (فقط هنگام عدم دسترسی به سرور AAA فعال می‌شود، نه هنگام رد رمز اشتباه).",
+      "تکمیل جزئیات TACACS+ (RFC 8907، TCP 49، رمزنگاری کل بدنه به‌جز هدر ۱۲بایتی) در برابر RADIUS (UDP 1812/1813 + RadSec TLS 2083) و مقایسه Type 7/5/8/9.",
+      "افزودن جزئیات پروتکل‌های IPsec (IKEv2 UDP 500/4500، ESP IP 50 در برابر AH IP 51) و گسترش به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با ccna_acl_lab.py."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_acl-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_acl.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_acl_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲B: ساخت ccna_acl_lab.py بدون import پرچم‌دار با اعتبارسنجی سخت‌گیرانه bool و ممیزی کامل سطوح AAA و هش‌ها."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_acl-section-1",
+      "title": "مسئله واقعی: مدیریت صدها روتر بدون AAA متمرکز و خطر قفل شدن یا سرقت دسترسی",
+      "html": "<p>اگر رمز مدیر شبکه روی ۵۰ روتر به‌صورت دستی تعریف شود، با ترک شغل یک مهندس باید رمز همه تجهیزات یکی‌یکی عوض شود و هیچ‌کس نمی‌داند دقیقاً چه کسی دستور <code>no router ospf 1</code> را زده است. معماری <strong>AAA</strong> همراه با <strong>Hardening</strong>، رمزنگاری قوی رمزها (Type 8/9) و تونل‌های امن <strong>VPN</strong> پایه کنترل دسترسی مدرن شبکه هستند.</p>"
+    },
+    {
+      "id": "ccna_acl-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> مفاهیم TCP/UDP، رمزنگاری پایه و مدیریت CLI سیسکو.</p><ul><li>تفکیک دقیق <strong>Vulnerability</strong>، <strong>Threat</strong> و <strong>Exploit</strong> و شناخت بردارهای حمله رایج.</li><li>مقایسه عمیق <strong>TACACS+</strong> و <strong>RADIUS</strong> و درک سازوکار واقعی <strong><code>local</code> fallback</strong> در AAA.</li><li>ممیزی امنیت انواع رمز/هش سیسکو (Type 0، 7، 5، 8 و 9) و اصول Hardening تجهیزات.</li><li>درک تفاوت <strong>Site-to-Site IPsec VPN</strong> و <strong>Remote Access TLS/DTLS VPN</strong>.</li></ul>"
+    },
+    {
+      "id": "ccna_acl-section-3",
+      "title": "تفکیک آسیب‌پذیری، تهدید، اکسپلویت و مثلث CIA",
+      "html": "<p><strong>آسیب‌پذیری (Vulnerability)</strong> ضعف در نرم‌افزار یا پیکربندی است (مانند فعال بودن Telnet یا Type 7)؛ <strong>تهدید (Threat)</strong> عامل یا رویداد بالقوه سوءاستفاده؛ و <strong>اکسپلویت (Exploit)</strong> ابزار یا تکنیک بهره‌برداری از آن ضعف است. امنیت اطلاعات بر سه ستون <strong>Confidentiality (محرمانگی)</strong>، <strong>Integrity (یکپارچگی)</strong> و <strong>Availability (دسترس‌پذیری)</strong> استوار است. بردارهای کلیدی شامل Phishing/مهندسی اجتماعی، Ransomware، MITM، Spoofing، DoS/DDoS و Brute Force هستند.</p>"
+    },
+    {
+      "id": "ccna_acl-section-4",
+      "title": "سه‌گانه AAA: Authentication، Authorization و Accounting",
+      "html": "<p><strong>Authentication</strong> هویت را تأیید می‌کند («تو کی هستی؟»)، <strong>Authorization</strong> سطح دسترسی و دستورات مجاز را تعیین می‌کند («چه کاری می‌توانی بکنی؟»)، و <strong>Accounting</strong> رخدادها و دستورات اجراشده را ثبت می‌کند («دقیقاً چه کردی و چه زمانی؟»).</p>"
+    },
+    {
+      "id": "ccna_acl-section-5",
+      "title": "مقایسه عمیق TACACS+ (RFC 8907) در برابر RADIUS (RFC 2865)",
+      "html": "<table><thead><tr><th>ویژگی</th><th>TACACS+ (RFC 8907)</th><th>RADIUS (RFC 2865/2866)</th></tr></thead><tbody><tr><td>پروتکل و پورت</td><td><strong>TCP 49</strong></td><td><strong>UDP 1812/1813</strong> (قدیمی 1645/1646؛ RadSec: TLS 2083)</td></tr><tr><td>دامنه رمزنگاری</td><td><strong>کل بدنه بسته</strong> (به‌جز هدر ۱۲بایتی)</td><td>در UDP کلاسیک فقط فیلد رمز عبور</td></tr><tr><td>ساختار AAA</td><td>تفکیک کامل AuthN، AuthZ (دستوربه‌دستور CLI) و Acct</td><td>ترکیب AuthN+AuthZ و جداسازی Acct</td></tr><tr><td>کاربرد اصلی</td><td>مدیریت تجهیزات شبکه (Device Admin)</td><td>دسترسی شبکه کاربران (802.1X، Wi-Fi، VPN)</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccna_acl-section-6",
+      "title": "نمودار معماری: TACACS+ در برابر RADIUS، رفتار AAA Fallback و هش‌های امن",
+      "html": "<p>در نمودار زیر مقایسه دو پروتکل AAA، قاعده Fallback و سلسله‌مراتب امنیتی رمزهای سیسکو نمایش داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"AAA TACACS+ vs RADIUS, Password Hash Hardening and IPsec VPN\"><rect x=\"16\" y=\"20\" width=\"236\" height=\"180\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"134\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">TACACS+ vs RADIUS (AAA)</text><rect x=\"28\" y=\"56\" width=\"212\" height=\"58\" rx=\"6\" fill=\"#ffffff\" stroke=\"#2563eb\"/><text x=\"134\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1e40af\">TACACS+ (TCP 49) — Admin CLI</text><text x=\"134\" y=\"90\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#334155\">Encrypts ENTIRE body | Per-cmd AuthZ</text><text x=\"134\" y=\"104\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#15803d\">Separates AuthN / AuthZ / Acct</text><rect x=\"28\" y=\"122\" width=\"212\" height=\"64\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#3b82f6\"/><text x=\"134\" y=\"140\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1e3a8a\">RADIUS (UDP 1812/1813) — Access</text><text x=\"134\" y=\"156\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#334155\">Encrypts password only (or RadSec TLS)</text><text x=\"134\" y=\"172\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">802.1X / VPN | Combines AuthN+AuthZ</text><rect x=\"270\" y=\"20\" width=\"228\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"384\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">AAA Fallback &amp; Hashes</text><text x=\"384\" y=\"70\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">local fallback triggers ONLY when</text><text x=\"384\" y=\"86\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#dc2626\">AAA server is UNREACHABLE!</text><text x=\"384\" y=\"114\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">Type 0 / Type 7: Reversible!</text><text x=\"384\" y=\"134\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#d97706\">Type 5 (MD5): Legacy / Weak</text><text x=\"384\" y=\"154\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">Type 8 (PBKDF2) / Type 9 (scrypt)</text><text x=\"384\" y=\"176\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">Recommended for IOS-XE secrets</text><rect x=\"516\" y=\"20\" width=\"228\" height=\"180\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"630\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">VPN &amp; Hardening</text><text x=\"630\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">Site-to-Site IPsec (IKEv2):</text><text x=\"630\" y=\"90\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">UDP 500/4500 + ESP (IP 50)</text><text x=\"630\" y=\"114\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">Remote Access: TLS/DTLS</text><text x=\"630\" y=\"144\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">Hardening: no ip http server,</text><text x=\"630\" y=\"160\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">SSHv2 + VTY ACL + shut unused</text><text x=\"630\" y=\"176\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">+ legal login banner</text></svg>"
+    },
+    {
+      "id": "ccna_acl-section-7",
+      "title": "تله کلاسیک AAA: روش local fallback چه زمانی اجرا می‌شود؟",
+      "html": "<p>در دستور <code>aaa authentication login default group tacacs+ local</code>، روش پشتیبان <strong><code>local</code> تنها زمانی اجرا می‌شود که سرور مرکزی TACACS+ از دسترس خارج (Unreachable) باشد</strong>. اگر سرور در دسترس باشد و به دلیل رمز اشتباه پاسخ <code>REJECT</code> بدهد، روتر هرگز به حساب <code>local</code> رجوع نمی‌کند (تا از دور زدن سیاست مرکزی جلوگیری شود).</p>"
+    },
+    {
+      "id": "ccna_acl-section-8",
+      "title": "ممیزی امنیتی رمزها در Cisco IOS: چرا Type 7 خطرناک و Type 8/9 استاندارد است؟",
+      "html": "<p><code>Type 0</code> متن ساده است. <code>Type 7</code> (تولیدشده با <code>service password-encryption</code>) صرفاً یک درهم‌ریزی <strong>برگشت‌پذیر</strong> (الگوریتم Vigenere) است و در کسری از ثانیه رمزگشایی می‌شود! <code>Type 5</code> از MD5 استفاده می‌کند که امروزه در برابر شکستن با GPU ضعیف است. استاندارد امن در IOS-XE استفاده از <code>enable algorithm-type scrypt secret</code> (<strong>Type 9 — scrypt</strong>) یا <strong>Type 8 (PBKDF2-SHA256)</strong> است.</p>"
+    },
+    {
+      "id": "ccna_acl-section-9",
+      "title": "مبانی VPN: Site-to-Site IPsec در برابر Remote Access VPN",
+      "html": "<p><strong>Site-to-Site IPsec VPN</strong> دو شعبه را با تونل رمزنگاری‌شده به هم وصل می‌کند: فاز مذاکره کلید با <strong>IKEv2 (RFC 7296، UDP 500 و UDP 4500 برای NAT-T)</strong> انجام شده و محموله با <strong>ESP (IP Protocol 50 — محرمانگی و یکپارچگی)</strong> حمل می‌شود (برخلاف AH با IP Protocol 51 که رمزنگاری ندارد). <strong>Remote Access VPN</strong> کاربران دورکار را معمولاً با <strong>TLS/DTLS</strong> (مانند Cisco Secure Client) یا IKEv2 به شبکه سازمان متصل می‌کند.</p>"
+    },
+    {
+      "id": "ccna_acl-section-10",
+      "title": "چک‌لیست Hardening تجهیزات شبکه سیسکو",
+      "html": "<ul><li>غیرفعال کردن سرویس‌های ناامن متن‌ساده: <code>no ip http server</code>، حذف Telnet و اجبار SSHv2 با VTY <code>access-class</code>.</li><li>خاموش کردن پورت‌های بلااستفاده (<code>shutdown</code>) و انتقال به Parking VLAN، غیرفعال کردن CDP/LLDP روی پورت‌های بیرونی/نامطمئن.</li><li>تنظیم <code>banner login</code> یا <code>banner motd</code> با اخطار حقوقی (بدون کلمه Welcome!) و محدودسازی دسترسی Console/VTY با <code>exec-timeout</code>.</li></ul>"
+    },
+    {
+      "id": "ccna_acl-section-11",
+      "title": "کژفهمی‌های رایج در AAA، رمزنگاری و Hardening",
+      "html": "<ul><li><strong>کژفهمی ۱: «فعال کردن <code>service password-encryption</code> رمزها را امن می‌کند.»</strong> واقعیت: Type 7 کاملاً برگشت‌پذیر است و فقط مانع خواندن اتفاقی روی صفحه می‌شود.</li><li><strong>کژفهمی ۲: «اگر رمز سرور TACACS+ را اشتباه بزنیم، روتر خودکار با حساب <code>local</code> امتحان می‌کند.»</strong> واقعیت: Fallback تنها در صورت عدم دسترسی/پاسخ‌گو نبودن سرور فعال می‌شود.</li><li><strong>کژفهمی ۳: «پروتکل AH در IPsec ترافیک را رمزنگاری می‌کند.»</strong> واقعیت: AH فقط احراز هویت/یکپارچگی دارد؛ رمزنگاری با ESP است.</li></ul>"
+    },
+    {
+      "id": "ccna_acl-section-12",
+      "title": "عیب‌یابی خطاهای ورود AAA و جلوگیری از قفل شدن (Lockout)",
+      "html": "<p>پیش از اعمال <code>aaa new-model</code> و تغییرات VTY روی روتر از راه دور، یک نشست فعال باز نگه دارید، وجود حساب اضطراری <code>username ... secret</code> و کلمه <code>local</code> در انتهای Method List را تأیید کنید، و از <code>test aaa group tacacs+ ...</code> برای آزمون بدون ریسک بهره بگیرید.</p>"
+    },
+    {
+      "id": "ccna_acl-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> برای کنترل دقیق اینکه مهندسان Junior فقط اجازه اجرای <code>show</code> داشته باشند و هر دستور آن‌ها ثبت شود، TACACS+ بهتر است یا RADIUS؟ <strong>پاسخ:</strong> <strong>TACACS+ (TCP 49)</strong>، زیرا Authorization دستوربه‌دستور CLI و رمزنگاری کامل بدنه بسته را ارائه می‌دهد.</p><p><strong>تمرین ۲:</strong> در ممیزی پیکربندی، <code>enable secret 9 $9$...</code> در برابر <code>enable password 7 ...</code> چه برتری دارد؟ <strong>پاسخ:</strong> Type 9 هش یک‌طرفه و مقاوم <code>scrypt</code> است در حالی که Type 7 فوراً رمزگشایی می‌شود.</p>"
+    },
+    {
+      "id": "ccna_acl-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8907\" target=\"_blank\" rel=\"noopener\">RFC 8907 (TACACS+)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc2865\" target=\"_blank\" rel=\"noopener\">RFC 2865 (RADIUS)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc7296\" target=\"_blank\" rel=\"noopener\">RFC 7296 (IKEv2)</a> و <a href=\"https://www.cisco.com/c/en/us/support/docs/security-vpn/terminal-access-controller-access-control-system-tacacs-/10384-security.html\" target=\"_blank\" rel=\"noopener\">مقایسه TACACS+ و RADIUS سیسکو</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ سرور ISE/TACACS+/RADIUS یا تونل IPsec واقعی در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Vulnerability / Threat / Exploit",
+      "fa": "آسیب‌پذیری، تهدید و اکسپلویت",
+      "simple": "به ترتیب: ضعف موجود، عامل بالقوه سوءاستفاده، و کد/ابزار نفوذ."
+    },
+    {
+      "term": "CIA Triad",
+      "fa": "مثلث محرمانگی، یکپارچگی، دسترس‌پذیری",
+      "simple": "سه اصل بنیادین طراحی و ارزیابی امنیت اطلاعات و شبکه."
+    },
+    {
+      "term": "AAA",
+      "fa": "احراز هویت، مجوزدهی و ثبت وقایع",
+      "simple": "چارچوب متمرکز کنترل دسترسی (Authentication, Authorization, Accounting)."
+    },
+    {
+      "term": "TACACS+ (TCP 49)",
+      "fa": "پروتکل AAA مدیریت تجهیزات",
+      "simple": "رمزنگاری کل بدنه بسته و مجوزدهی دستوربه‌دستور CLI (RFC 8907)."
+    },
+    {
+      "term": "RADIUS (UDP 1812/1813)",
+      "fa": "پروتکل AAA دسترسی شبکه",
+      "simple": "استاندارد باز برای 802.1X/Wi-Fi/VPN با ترکیب AuthN+AuthZ."
+    },
+    {
+      "term": "RadSec (TCP 2083)",
+      "fa": "RADIUS روی TLS",
+      "simple": "نسخه مدرن و رمزنگاری‌شده RADIUS برای حفاظت کامل بدنه بسته."
+    },
+    {
+      "term": "AAA Local Fallback",
+      "fa": "پشتیبان محلی AAA",
+      "simple": "استفاده از حساب محلی روتر صرفاً هنگام در دسترس نبودن سرور AAA."
+    },
+    {
+      "term": "Cisco Type 7",
+      "fa": "درهم‌ریزی برگشت‌پذیر Vigenere",
+      "simple": "ناامن؛ توسط service password-encryption تولید می‌شود و فوراً قابل بازیابی است."
+    },
+    {
+      "term": "Cisco Type 8 / Type 9",
+      "fa": "هش‌های امن PBKDF2 / scrypt",
+      "simple": "استانداردهای پیشنهادی یک‌طرفه و مقاوم برای enable secret و username secret."
+    },
+    {
+      "term": "IPsec IKEv2 (RFC 7296)",
+      "fa": "مذاکره کلید IPsec",
+      "simple": "پروتکل مدرن برقراری SA و تبادل کلید روی UDP 500 و UDP 4500 (NAT-T)."
+    },
+    {
+      "term": "ESP (IP Protocol 50)",
+      "fa": "محموله امنیتی رمزنگاری‌شده",
+      "simple": "ارائه محرمانگی (رمزنگاری) و یکپارچگی در تونل‌های IPsec."
+    },
+    {
+      "term": "AH (IP Protocol 51)",
+      "fa": "سرآیند احراز هویت IPsec",
+      "simple": "ارائه یکپارچگی بدون رمزنگاری (ناسازگار با NAT)."
+    },
+    {
+      "term": "Remote Access TLS VPN",
+      "fa": "VPN دسترسی از راه دور",
+      "simple": "اتصال امن کاربران دورکار با TLS/DTLS بدون نیاز به IP ثابت کلاینت."
+    },
+    {
+      "term": "Device Hardening",
+      "fa": "سخت‌سازی تجهیزات شبکه",
+      "simple": "کاهش سطح حمله با حذف سرویس‌های متن‌ساده، بستن پورت‌های آزاد و اعمال ACL."
+    },
+    {
+      "term": "Legal Login Banner",
+      "fa": "پیام اخطار حقوقی ورود",
+      "simple": "پیام پیش از ورود برای منع دسترسی غیرمجاز بدون استفاده از واژه Welcome."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، رفتار دقیق <code>local</code> fallback در AAA (عدم رجوع به local هنگام رد رمز اشتباه، و فعال شدن صرفاً در قطع سرور)، انتخاب بین TACACS+ و RADIUS و ممیزی امنیتی انواع هش Type 0/7/5/8/9 را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_acl_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_acl_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for ccna_acl (AAA TACACS+/RADIUS, Password Hardening &amp; IPsec).\n\nBoundary: Pure in-memory simulation using Python stdlib only.\nNo real Cisco router, ISE/TACACS+/RADIUS server, or IPsec tunnel is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef evaluate_aaa_login(\n    method_list: list[str],\n    aaa_server_reachable: bool,\n    aaa_server_accepts: bool,\n    local_user_accepts: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate Cisco AAA login fallback semantics (fallback triggers ONLY on server unreachable).&quot;&quot;&quot;\n    if not isinstance(method_list, list) or not method_list:\n        raise ValueError(&quot;method_list must be a non-empty list&quot;)\n    _require_bool(aaa_server_reachable, &quot;aaa_server_reachable&quot;)\n    _require_bool(aaa_server_accepts, &quot;aaa_server_accepts&quot;)\n    _require_bool(local_user_accepts, &quot;local_user_accepts&quot;)\n\n    for method in method_list:\n        if method in (&quot;group_tacacs+&quot;, &quot;group_radius&quot;):\n            if not aaa_server_reachable:\n                continue  # Try next method in fallback list\n            return {\n                &quot;authenticated&quot;: aaa_server_accepts,\n                &quot;used_method&quot;: method,\n                &quot;fallback_triggered&quot;: False,\n                &quot;note&quot;: &quot;Server responded; fallback to local is NOT consulted on explicit reject&quot;,\n            }\n        elif method == &quot;local&quot;:\n            return {\n                &quot;authenticated&quot;: local_user_accepts,\n                &quot;used_method&quot;: &quot;local&quot;,\n                &quot;fallback_triggered&quot;: True,\n                &quot;note&quot;: &quot;Emergency local fallback used because central AAA server was unreachable&quot;,\n            }\n        else:\n            raise ValueError(f&quot;Unsupported AAA method: {method}&quot;)\n\n    return {\n        &quot;authenticated&quot;: False,\n        &quot;used_method&quot;: None,\n        &quot;fallback_triggered&quot;: False,\n        &quot;note&quot;: &quot;LOCKED_OUT_NO_LOCAL_FALLBACK_CONFIGURED&quot;,\n    }\n\n\ndef compare_aaa_protocols(use_case: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Recommend TACACS+ vs RADIUS based on Cisco CCNA security architecture.&quot;&quot;&quot;\n    if use_case == &quot;device_admin_cli&quot;:\n        return {\n            &quot;recommended&quot;: &quot;TACACS+&quot;,\n            &quot;transport&quot;: &quot;TCP/49&quot;,\n            &quot;encryption_scope&quot;: &quot;Entire packet body (except 12-byte header)&quot;,\n            &quot;aaa_separation&quot;: &quot;Separate Authentication, Authorization (per-command CLI), Accounting&quot;,\n        }\n    if use_case == &quot;network_access_8021x_vpn&quot;:\n        return {\n            &quot;recommended&quot;: &quot;RADIUS&quot;,\n            &quot;transport&quot;: &quot;UDP/1812 (Auth) &amp; UDP/1813 (Acct) [or RadSec TLS TCP/2083]&quot;,\n            &quot;encryption_scope&quot;: &quot;Password attribute only (in classic UDP RADIUS)&quot;,\n            &quot;aaa_separation&quot;: &quot;Combines Authentication &amp; Authorization; separate Accounting&quot;,\n        }\n    raise ValueError(&quot;use_case must be &#x27;device_admin_cli&#x27; or &#x27;network_access_8021x_vpn&#x27;&quot;)\n\n\ndef audit_password_type(cisco_type: int) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Audit Cisco IOS password/secret hash types (Type 0, 7, 5, 8, 9).&quot;&quot;&quot;\n    if type(cisco_type) is not int or cisco_type not in (0, 5, 7, 8, 9):\n        raise ValueError(&quot;cisco_type must be one of 0, 5, 7, 8, 9&quot;)\n    profiles = {\n        0: {&quot;algorithm&quot;: &quot;Cleartext&quot;, &quot;reversible&quot;: True, &quot;secure_for_prod&quot;: False},\n        7: {&quot;algorithm&quot;: &quot;Vigenere obfuscation (service password-encryption)&quot;, &quot;reversible&quot;: True, &quot;secure_for_prod&quot;: False},\n        5: {&quot;algorithm&quot;: &quot;MD5 salted hash&quot;, &quot;reversible&quot;: False, &quot;secure_for_prod&quot;: False},\n        8: {&quot;algorithm&quot;: &quot;PBKDF2-HMAC-SHA256&quot;, &quot;reversible&quot;: False, &quot;secure_for_prod&quot;: True},\n        9: {&quot;algorithm&quot;: &quot;scrypt (memory-hard KDF)&quot;, &quot;reversible&quot;: False, &quot;secure_for_prod&quot;: True},\n    }\n    return {&quot;cisco_type&quot;: cisco_type, **profiles[cisco_type]}\n\n\ndef main() -&gt; None:\n    # Wrong password on reachable server must NOT fall back to local!\n    reject_no_fb = evaluate_aaa_login([&quot;group_tacacs+&quot;, &quot;local&quot;], True, False, True)\n    assert reject_no_fb[&quot;authenticated&quot;] is False and reject_no_fb[&quot;fallback_triggered&quot;] is False\n\n    # Unreachable server with local fallback succeeds\n    ok_fb = evaluate_aaa_login([&quot;group_tacacs+&quot;, &quot;local&quot;], False, False, True)\n    assert ok_fb[&quot;authenticated&quot;] is True and ok_fb[&quot;fallback_triggered&quot;] is True\n\n    # Unreachable server without local fallback -&gt; lockout\n    lockout = evaluate_aaa_login([&quot;group_tacacs+&quot;], False, False, True)\n    assert lockout[&quot;authenticated&quot;] is False and &quot;LOCKED_OUT&quot; in str(lockout[&quot;note&quot;])\n\n    t_rec = compare_aaa_protocols(&quot;device_admin_cli&quot;)\n    assert t_rec[&quot;recommended&quot;] == &quot;TACACS+&quot;\n    assert audit_password_type(7)[&quot;reversible&quot;] is True\n    assert audit_password_type(9)[&quot;secure_for_prod&quot;] is True\n\n    print(&quot;AAA Explicit Reject (no fallback):&quot;, reject_no_fb)\n    print(&quot;AAA Server Unreachable -&gt; Local Fallback:&quot;, ok_fb)\n    print(&quot;AAA Lockout Risk:&quot;, lockout)\n    print(&quot;Protocol Selection:&quot;, t_rec)\n    print(&quot;Hash Audit (Type 7 vs 9):&quot;, audit_password_type(7), audit_password_type(9))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> رد صریح توسط سرور TACACS+ در دسترس بدون رجوع به local شکست می‌خورد؛ در قطعی سرور، fallback به local موفق می‌شود و نبود local به <code>LOCKED_OUT</code> می‌انجامد؛ Type 7 برگشت‌پذیر و Type 9 امن تشخیص داده می‌شوند.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع AAA با TACACS+، Local Fallback و Hardening در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE AAA &amp; Hardening config (NOT executed on real router)\nconfigure terminal\n username breakglass privilege 15 algorithm-type scrypt secret &lt;STRONG_SECRET&gt;\n enable algorithm-type scrypt secret &lt;ENABLE_SECRET&gt;\n aaa new-model\n tacacs server ISE_PRIMARY\n  address ipv4 10.99.0.50\n  key &lt;TACACS_SHARED_KEY&gt;\n aaa authentication login default group tacacs+ local\n no ip http server\n no ip http secure-server\n banner login ^Authorized personnel only. All activity is logged.^\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "چرا در <code>aaa authentication login default group tacacs+ local</code> روش <code>local</code> در انتها قرار می‌گیرد؟",
+      "options": [
+        "تا سرعت پورت دو برابر شود",
+        "تا اگر سرور مرکزی TACACS+ از دسترس خارج (Unreachable) شد، همچنان امکان ورود اضطراری با حساب محلی وجود داشته باشد",
+        "تا هر رمز اشتباهی را قبول کند",
+        "برای خاموش کردن SSH"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>حساب محلی پشتیبان تنها هنگام در دسترس نبودن سرور مرکزی از قفل شدن مدیران جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "اگر سرور TACACS+ در دسترس باشد اما کاربر رمز اشتباه وارد کند، آیا روتر به روش <code>local</code> موجود در انتهای Method List رجوع می‌کند؟",
+      "options": [
+        "بله، همیشه",
+        "خیر؛ وقتی سرور AAA پاسخ صریح REJECT می‌دهد، Fallback به local فعال نمی‌شود",
+        "فقط در روزهای تعطیل",
+        "فقط اگر Telnet باز باشد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Fallback صرفاً برای خطای ارتباطی/عدم دسترسی به سرور AAA است، نه برای دور زدن رد احراز هویت.</p>"
+    },
+    {
+      "title": "کدام پروتکل برای کنترل دستوربه‌دستور CLI مدیران شبکه مناسب‌تر است و کل بدنه بسته را روی TCP 49 رمزنگاری می‌کند؟",
+      "options": [
+        "RADIUS",
+        "TFTP",
+        "TACACS+",
+        "SNMPv2c"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>TACACS+ روی TCP 49 کل بدنه بسته را رمزنگاری کرده و Authorization را از Authentication جدا می‌سازد.</p>"
+    },
+    {
+      "title": "برتری بنیادین <code>enable secret 9 $9$...</code> نسبت به <code>enable password 7 ...</code> چیست؟",
+      "options": [
+        "Type 9 هش یک‌طرفه و مقاوم (scrypt) است در حالی که Type 7 درهم‌ریزی برگشت‌پذیر بوده و فوراً رمزگشایی می‌شود",
+        "Type 7 فقط در IPv6 کار می‌کند",
+        "Type 9 باعث فعال شدن Telnet می‌شود",
+        "هر دو امنیت یکسانی دارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Type 7 به هیچ عنوان رمزنگاری امن نیست و در ممیزی‌های امنیتی رد می‌شود.</p>"
+    },
+    {
+      "title": "تفاوت اصلی <strong>RADIUS</strong> کلاسیک با <strong>TACACS+</strong> در دامنه رمزنگاری و لایه انتقال چیست؟",
+      "options": [
+        "RADIUS از UDP (1812/1813) استفاده می‌کند و در حالت کلاسیک فقط فیلد رمز عبور را رمزنگاری می‌نماید، اما TACACS+ از TCP 49 استفاده و کل بدنه بسته را رمزنگاری می‌کند",
+        "RADIUS از TCP 22 استفاده می‌کند",
+        "TACACS+ رمزنگاری ندارد",
+        "هر دو روی UDP 69 هستند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>این تفاوت کلاسیک (به همراه تفکیک AuthN/AuthZ در TACACS+) معیار اصلی انتخاب میان دو پروتکل است.</p>"
+    },
+    {
+      "title": "کدام پروتکل درون مجموعه IPsec مسئول <strong>رمزنگاری (محرمانگی)</strong> داده‌ها در کنار یکپارچگی است؟",
+      "options": [
+        "AH (IP Protocol 51)",
+        "ESP (IP Protocol 50)",
+        "ICMP",
+        "CDP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ESP رمزنگاری و یکپارچگی را فراهم می‌کند؛ AH فاقد رمزنگاری است.</p>"
+    },
+    {
+      "title": "تفاوت دقیق <strong>Vulnerability</strong> و <strong>Exploit</strong> چیست؟",
+      "options": [
+        "Vulnerability ضعف موجود در سیستم/پیکربندی است و Exploit کد یا روشی است که از آن ضعف برای نفوذ سوءاستفاده می‌کند",
+        "هر دو دقیقاً یک معنی دارند",
+        "Exploit همان آنتی‌ویروس است",
+        "Vulnerability همان فایروال است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تفکیک این دو مفهوم پایه ارزیابی ریسک و مدیریت آسیب‌پذیری است.</p>"
+    },
+    {
+      "title": "کدام پروتکل AAA برای کنترل دسترسی کاربران شبکه (مانند احراز هویت 802.1X وای‌فای و Remote Access VPN) انتخاب استاندارد و رایج‌تر است؟",
+      "options": [
+        "RADIUS (UDP 1812/1813 یا RadSec)",
+        "TFTP",
+        "RIP",
+        "DTP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>RADIUS استاندارد باز گسترده برای Network Access (802.1X/EAP/VPN) است.</p>"
+    },
+    {
+      "title": "در Hardening یک روتر سیسکو، کدام اقدام نادرست است؟",
+      "options": [
+        "اجرای no ip http server و بستن Telnet",
+        "خاموش کردن پورت‌های بلااستفاده و انتقال به Parking VLAN",
+        "نوشتن واژه «خوش آمدید / Welcome» در banner motd و فعال نگه‌داشتن Type 7 به‌جای secret 9",
+        "اعمال access-class روی line vty"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>پیام ورود باید اخطار حقوقی منع دسترسی غیرمجاز باشد (نه خوش‌آمدگویی) و Type 7 باید حذف شود.</p>"
+    },
+    {
+      "title": "پورت‌های استاندارد IKEv2 برای مذاکره کلید IPsec و NAT Traversal (NAT-T) به‌ترتیب کدام‌اند؟",
+      "options": [
+        "UDP 500 و UDP 4500",
+        "TCP 80 و TCP 443",
+        "UDP 67 و UDP 68",
+        "TCP 49 و UDP 1812"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مذاکره اولیه IKEv2 روی UDP 500 انجام می‌شود و در حضور NAT به UDP 4500 (NAT-T) منتقل می‌گردد.</p>"
+    },
+    {
+      "title": "کدام گزینه در مثلث CIA با یکپارچگی داده (جلوگیری از دستکاری غیرمجاز در مسیر) مرتبط است؟",
+      "options": [
+        "Confidentiality",
+        "Integrity",
+        "Availability",
+        "Latency"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Integrity تضمین می‌کند داده در مسیر یا ذخیره‌سازی بدون مجوز تغییر نکرده است.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اتصال واقعی به Cisco ISE و تونل IPsec زنده",
+        "تست نفوذ واقعی روی شبکه",
+        "شبیه‌ساز محلی Python 3 برای آزمون AAA Fallback، انتخاب TACACS+/RADIUS و ممیزی Type 0/7/5/8/9 بدون تجهیز واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا شده و هیچ سرور AAA یا روتر واقعی متصل نیست.</p>"
+    }
+  ]
+}

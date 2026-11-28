@@ -31,6 +31,8 @@ AGENT3_ALLOWED_IDS = {
     *[f"ccde_{i:02d}" for i in range(1, 21)],
     # Phase 12A — Transferred CCNA Core Batch (5 of 17 former Agent 1 lessons)
     "ccna_02_vlan", "ccna_v1", "ccna_v6", "ccna_03", "ccna_04",
+    # Phase 12B — Transferred CCNA Services/Security/Wireless/SDN Batch (7 of 17 former Agent 1 lessons)
+    "ccna_dhcp", "ccna_nat", "ccna_05", "ccna_acl", "ccna_qos_ssh", "ccna_wl", "ccna_06",
 }
 
 FORBIDDEN_LEGACY_TYPOS = (
@@ -75,7 +77,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
     def test_discovered_lessons_are_strictly_within_agent3_scope(self):
         discovered = discover_agent3_blueprints()
         discovered_ids = {lesson_id for lesson_id, _ in discovered}
-        self.assertEqual(len(AGENT3_ALLOWED_IDS), 69)
+        self.assertEqual(len(AGENT3_ALLOWED_IDS), 76)
         self.assertEqual(
             discovered_ids,
             AGENT3_ALLOWED_IDS,
@@ -1885,9 +1887,96 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             m_04.filter_syslog_events([(8, "bad")], 4)
 
+    def test_phase12b_transferred_ccna_services_security_batch(self):
+        """Phase 12B: independent technical audit & strict lab validation for 7 transferred CCNA lessons."""
+        batch_ids = ("ccna_dhcp", "ccna_nat", "ccna_05", "ccna_acl", "ccna_qos_ssh", "ccna_wl", "ccna_06")
+        flagged_imports = {"socket", "http", "urllib", "requests", "subprocess", "os"}
+
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        for lid in batch_ids:
+            lab_path = AGENT3_LAB_DIR / f"{lid}_lab.py"
+            tree = ast.parse(lab_path.read_text(encoding="utf-8"))
+            mods = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    mods.update(n.name.split(".")[0] for n in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    mods.add(node.module.split(".")[0])
+            self.assertEqual(mods & flagged_imports, set(), f"{lid}_lab.py uses flagged import: {mods & flagged_imports}")
+
+        # 1. ccna_dhcp: giaddr, excluded-address, APIPA, DNS UDP/TCP 53
+        m_dhcp = load_module(AGENT3_LAB_DIR / "ccna_dhcp_lab.py", "ccna_dhcp_p12b")
+        self.assertEqual(
+            m_dhcp.allocate_dhcp_lease("10.10.10.0/24", [("10.10.10.1", "10.10.10.10")], set(), "aa:bb:cc:00:00:01")["assigned_ip"],
+            "10.10.10.11",
+        )
+        self.assertFalse(m_dhcp.simulate_dhcp_relay(30, "10.10.30.1", None, {"V10": "10.10.10.0/24"})["dora_success"])
+        with self.assertRaises(ValueError):
+            m_dhcp.simulate_dhcp_relay(10, "10.10.10.1", "10.99.0.10", {}, server_reachable="True")
+
+        # 2. ccna_nat: Inside->Outside Routing before NAT, Outside->Inside NAT before Routing, RFC 1918
+        m_nat = load_module(AGENT3_LAB_DIR / "ccna_nat_lab.py", "ccna_nat_p12b")
+        self.assertFalse(m_nat.is_rfc1918_private("203.0.113.10"))
+        self.assertFalse(
+            m_nat.simulate_outbound_nat("192.168.10.11", 50000, "198.51.100.1", 443, "pat", True, True, False, ["203.0.113.10"], {})["translated"]
+        )
+        with self.assertRaises(ValueError):
+            m_nat.simulate_inbound_return_nat("203.0.113.10:50000", {}, has_internal_route="True")
+
+        # 3. ccna_05: ACL implicit deny, Port Security rejects dynamic ports, DAI needs Snooping/ARP ACL
+        m_05 = load_module(AGENT3_LAB_DIR / "ccna_05_lab.py", "ccna_05_p12b")
+        with self.assertRaises(ValueError):
+            m_05.evaluate_port_security("dynamic_auto", 1, set(), "aa:bb:cc:00:00:01")
+        self.assertEqual(m_05.evaluate_dai_packet(False, "10.10.10.5", "aa:aa:aa:00:00:01", {}, {})["action"], "drop")
+        with self.assertRaises(ValueError):
+            m_05.evaluate_dai_packet("False", "10.10.10.5", "aa:aa:aa:00:00:01", {}, {})
+
+        # 4. ccna_acl: AAA fallback NOT triggered on explicit reject; Type 7 reversible vs Type 9 secure
+        m_acl = load_module(AGENT3_LAB_DIR / "ccna_acl_lab.py", "ccna_acl_p12b")
+        self.assertFalse(m_acl.evaluate_aaa_login(["group_tacacs+", "local"], True, False, True)["authenticated"])
+        self.assertTrue(m_acl.evaluate_aaa_login(["group_tacacs+", "local"], False, False, True)["authenticated"])
+        self.assertTrue(m_acl.audit_password_type(7)["reversible"])
+        self.assertTrue(m_acl.audit_password_type(9)["secure_for_prod"])
+        with self.assertRaises(ValueError):
+            m_acl.evaluate_aaa_login(["group_tacacs+"], "True", True, True)
+
+        # 5. ccna_qos_ssh: VoIP SLA overflow guard, EF/46, SSHv2 prerequisites, SCP vs FTP
+        m_qos = load_module(AGENT3_LAB_DIR / "ccna_qos_ssh_lab.py", "ccna_qos_ssh_p12b")
+        self.assertEqual(m_qos.classify_dscp_marking("voice")["dscp_decimal"], 46)
+        self.assertFalse(m_qos.audit_ssh_prerequisites("Router", "", 0, 2, ["telnet"], False)["ssh_ready_and_hardened"])
+        self.assertTrue(m_qos.audit_file_transfer_protocol("SCP")["encrypted"])
+        with self.assertRaises(ValueError):
+            m_qos.evaluate_voip_qos_sla(10**500, 10.0, 0.1)
+
+        # 6. ccna_wl: CRITICAL regression — verify Local Mode quiz Q2 fixed (AP=Access, WLC=Trunk) + lab checks
+        bp_wl = json.loads((BLUEPRINT_DIR / "ccna_wl.json").read_text(encoding="utf-8"))
+        q2 = bp_wl["interactiveQuiz"][1]
+        self.assertEqual(q2["correctIndex"], 1)
+        self.assertIn("AP در حالت Access", q2["options"][1])
+        self.assertIn("WLC در حالت Trunk", q2["options"][1])
+        m_wl = load_module(AGENT3_LAB_DIR / "ccna_wl_lab.py", "ccna_wl_p12b")
+        self.assertTrue(m_wl.audit_ap_wlc_switchports("local", "access", "trunk")["architecture_valid"])
+        self.assertFalse(m_wl.audit_ap_wlc_switchports("local", "trunk", "access")["architecture_valid"])
+        with self.assertRaises(ValueError):
+            m_wl.audit_wlan_security("WPA3-Personal", pmf_enabled="True")
+
+        # 7. ccna_06: NBI/SBI, REST CRUD status codes, Agentless Ansible, YAML Tab detection
+        m_06 = load_module(AGENT3_LAB_DIR / "ccna_06_lab.py", "ccna_06_p12b")
+        self.assertEqual(m_06.compare_config_mgmt_tool("ansible")["architecture"], "Agentless")
+        self.assertFalse(m_06.validate_json_and_yaml_indent('{"a": 1}', ["a:", "\tb: 1"])["yaml_valid"])
+        with self.assertRaises(ValueError):
+            m_06.validate_json_and_yaml_indent('{"a": 1}', ["a: 1"], allow_tabs="False")
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
-        self.assertEqual(len(scripts), 69)
+        self.assertEqual(len(scripts), 76)
         for script in scripts:
             with self.subTest(script=script.name):
                 proc = subprocess.run(

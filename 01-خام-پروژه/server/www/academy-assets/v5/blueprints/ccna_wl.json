@@ -1,0 +1,343 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_wl",
+  "objectiveId": "ccna_wl",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "Network Access & Security",
+  "title": "CCNA (شبکه‌های بی‌سیم): مبانی Wi-Fi، کانال‌های RF، معماری AP/WLC (CAPWAP) و امنیت WPA2/WPA3",
+  "titleEn": "CCNA Wireless: 802.11 RF/CSMA-CA, Split-MAC AP/WLC (CAPWAP), Switchports & WPA2/WPA3",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_wl (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_wl",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc5415",
+      "https://www.wi-fi.org/discover-wi-fi/security",
+      "https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/17-9/config-guide/b_wl_17_9_cg.html"
+    ],
+    "limitations": [
+      "هیچ کنترلر واقعی Cisco WLC/9800، اکسس‌پوینت یا آنالایزر طیف RF در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای آزمون هم‌پوشانی کانال‌های 2.4GHz، تطبیق پورت‌های سوئیچ AP/WLC در Local Mode در برابر FlexConnect، و ممیزی امنیت WPA2/WPA3 است."
+    ],
+    "legacyAuditFixes": [
+      "اصلاح خطای بحرانی در آزمون نسخه خام ایجنت ۱ (ccna_wl.json Q2): کلید پاسخ اشتباه ans=2 (پورت AP ترانک و پورت WLC اکسس!) کاملاً برعکس بود! در Local Mode پورت سوئیچ متصل به AP باید Access و پورت متصل به WLC باید Trunk باشد (در حالی که در FlexConnect local-switching پورت AP نیز Trunk است).",
+      "تصریح تفاوت امنیتی دو تونل CAPWAP: کنترل (UDP 5246 با رمزنگاری DTLS پیش‌فرض) در برابر داده (UDP 5247 بدون رمزنگاری پیش‌فرض مگر فعال‌سازی CAPWAP Data DTLS).",
+      "توسعه از ۴ بخش/۳ سؤال قدیمی به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با آزمایشگاه محلی ccna_wl_lab.py."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_wl-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_wl.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_wl_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲B: ساخت ccna_wl_lab.py بدون import پرچم‌دار شامل آزمون صریح تشخیص خطای معکوس پورت AP/WLC در Local Mode و اعتبارسنجی کانال‌ها و PMF در WPA3."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_wl-section-1",
+      "title": "مسئله واقعی: چرا محیط بی‌سیم Half-Duplex است و چرا یک پیکربندی اشتباه پورت WLC کل وای‌فای را قطع می‌کند؟",
+      "html": "<p>برخلاف کابل اترنت تمام‌دوطرفه، تمام کلاینت‌های یک Access Point روی یک کانال فرکانسی در <strong>محیط هوایی مشترک Half-Duplex</strong> رقابت می‌کنند. در مقیاس سازمانی با ده‌ها AP، مدیریت مرکزی از طریق <strong>WLC و تونل CAPWAP</strong> انجام می‌شود؛ اما اشتباه رایجی مانند معکوس تنظیم کردن حالت Access/Trunk پورت‌های AP و WLC یا انتخاب کانال‌های هم‌پوشان 2.4GHz به‌سرعت کیفیت و دسترسی کل شبکه بی‌سیم را مختل می‌کند.</p>"
+    },
+    {
+      "id": "ccna_wl-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> VLAN، Trunk 802.1Q و مفاهیم پایه UDP و رمزنگاری.</p><ul><li>درک <strong>CSMA/CA</strong>، مسئله <strong>Hidden Node</strong> و تفاوت باندهای <strong>2.4GHz</strong>، <strong>5GHz</strong> و <strong>6GHz</strong>.</li><li>تمایز دقیق <strong>Autonomous AP</strong>، <strong>Lightweight AP + WLC (Local Mode)</strong> و <strong>FlexConnect</strong>.</li><li>پیکربندی صحیح پورت سوئیچ برای AP (<strong>Access</strong> در Local Mode؛ <strong>Trunk</strong> در FlexConnect محلی) و WLC (<strong>Trunk</strong>) و شناخت پورت‌های <strong>CAPWAP (UDP 5246/5247)</strong>.</li><li>مقایسه دقیق امنیتی <strong>WPA2-Personal</strong>، <strong>WPA3-Personal (SAE + PMF)</strong> و <strong>WPA2/WPA3-Enterprise (802.1X/RADIUS)</strong>.</li></ul>"
+    },
+    {
+      "id": "ccna_wl-section-3",
+      "title": "چرا Wi-Fi از CSMA/CA به‌جای CSMA/CD استفاده می‌کند؟",
+      "html": "<p>رادیوی بی‌سیم نمی‌تواند هم‌زمان با ارسال سیگنال قوی خود، سیگنال ضعیف برخورد را تشخیص دهد و ممکن است دو کلاینت در دو سوی AP یکدیگر را نبینند (<strong>Hidden Node Problem</strong>). بنابراین استاندارد <strong>IEEE 802.11</strong> از <strong>CSMA/CA (اجتناب از برخورد)</strong> بهره می‌برد: گوش دادن به کانال، تایمر بازگشت تصادفی (Backoff)، تأییدیه ACK برای هر فریم Unicast و در صورت نیاز تبادل اختیاری RTS/CTS با تایمر NAV.</p>"
+    },
+    {
+      "id": "ccna_wl-section-4",
+      "title": "باندهای فرکانسی 2.4GHz، 5GHz و 6GHz و طراحی کانال غیرهم‌پوشان",
+      "html": "<p>در باند شلوغ <strong>2.4GHz</strong> فقط <strong>۳ کانال ۲۰مگاهرتزی غیرهم‌پوشان</strong> وجود دارد: <strong><code>1</code>، <code>6</code> و <code>11</code></strong> (انتخاب کانال 3 باعث تداخل هم‌زمان با هر دو کانال 1 و 6 یعنی Adjacent-Channel Interference می‌شود!). باند <strong>5GHz</strong> بیش از ۲۰ کانال غیرهم‌پوشان دارد (با یادآوری کانال‌های <strong>DFS</strong> که در حضور رادار باید تخلیه شوند). باند <strong>6GHz</strong> (Wi-Fi 6E / Wi-Fi 7) طیف بسیار عریض و بدون تداخل تجهیزات قدیمی ارائه می‌دهد و <strong>WPA3</strong> را اجباری می‌کند.</p>"
+    },
+    {
+      "id": "ccna_wl-section-5",
+      "title": "معماری Split-MAC، تونل‌های CAPWAP و رمزنگاری پیش‌فرض آن‌ها",
+      "html": "<p>در معماری <strong>Split-MAC</strong>، وظایف زمان‌حساس رادیویی (مانند Beacon و ACK) روی <strong>Lightweight AP</strong> می‌ماند و مدیریت متمرکز SSID، امنیت، کانال و Roaming روی <strong>WLC</strong> انجام می‌شود. ارتباط لایه ۳ میان AP و WLC با پروتکل استاندارد <strong>CAPWAP (RFC 5415)</strong> برقرار می‌گردد: (۱) تونل <strong>Control روی UDP 5246</strong> که به‌طور پیش‌فرض با <strong>DTLS رمزنگاری</strong> است، و (۲) تونل <strong>Data روی UDP 5247</strong> که ترافیک کاربران را حمل می‌کند و به‌طور پیش‌فرض بدون رمزنگاری است مگر آنکه قابلیت DTLS Data Encryption فعال شود.</p>"
+    },
+    {
+      "id": "ccna_wl-section-6",
+      "title": "نمودار معماری: Local Mode در برابر FlexConnect، تونل CAPWAP و امنیت WPA3",
+      "html": "<p>در نمودار زیر آرایش صحیح پورت‌های سوئیچ AP و WLC در Local Mode، کانال‌های 2.4GHz و مقایسه WPA2/WPA3 نشان داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Lightweight AP Local Mode vs WLC CAPWAP Architecture and 2.4GHz Channels\"><rect x=\"16\" y=\"20\" width=\"206\" height=\"180\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"119\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">2.4GHz Channels</text><text x=\"119\" y=\"70\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">Non-Overlapping: 1, 6, 11</text><text x=\"119\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#dc2626\">Ch 3 overlaps BOTH 1 &amp; 6!</text><text x=\"119\" y=\"122\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">5GHz: 20+ channels (DFS)</text><text x=\"119\" y=\"142\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">6GHz: Wi-Fi 6E/7 (WPA3)</text><text x=\"119\" y=\"168\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Half-Duplex =&gt; CSMA/CA</text><rect x=\"240\" y=\"20\" width=\"286\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"383\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">WLC Local Mode (CAPWAP)</text><rect x=\"254\" y=\"60\" width=\"114\" height=\"54\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"311\" y=\"80\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">AP Switchport</text><text x=\"311\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#78350f\">ACCESS (Mgmt VLAN)</text><rect x=\"398\" y=\"60\" width=\"114\" height=\"54\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"455\" y=\"80\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1d4ed8\">WLC Switchport</text><text x=\"455\" y=\"98\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1e3a8a\">TRUNK (All WLANs)</text><line x1=\"368\" y1=\"87\" x2=\"398\" y2=\"87\" stroke=\"#0f172a\" stroke-width=\"2\"/><text x=\"383\" y=\"136\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Control: UDP 5246 (DTLS default)</text><text x=\"383\" y=\"154\" text-anchor=\"middle\" font-size=\"9\" fill=\"#0f172a\">Data: UDP 5247 (Plain unless DTLS)</text><text x=\"383\" y=\"176\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#78350f\">(FlexConnect local switching =&gt; AP TRUNK)</text><rect x=\"544\" y=\"20\" width=\"200\" height=\"180\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"644\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">WLAN Security</text><text x=\"644\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">WEP / TKIP: Broken</text><text x=\"644\" y=\"96\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#d97706\">WPA2-PSK: Offline dict risk</text><text x=\"644\" y=\"122\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">WPA3-Personal: SAE + PMF</text><text x=\"644\" y=\"140\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#14532d\">(Per-session PMK + 4-Way HS)</text><text x=\"644\" y=\"166\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1d4ed8\">Enterprise: 802.1X + RADIUS</text></svg>"
+    },
+    {
+      "id": "ccna_wl-section-7",
+      "title": "آرایش صحیح پورت سوئیچ برای AP و WLC: Local Mode در برابر FlexConnect",
+      "html": "<table><thead><tr><th>معماری AP</th><th>پورت سوئیچ متصل به AP</th><th>پورت سوئیچ متصل به WLC</th><th>مسیر ترافیک کلاینت</th></tr></thead><tbody><tr><td><strong>Local Mode (پیش‌فرض)</strong></td><td><strong>Access</strong> (یک VLAN مدیریت AP)</td><td><strong>Trunk</strong> (همه VLANهای SSIDها)</td><td>تمام ترافیک از طریق تونل CAPWAP به WLC می‌رود</td></tr><tr><td><strong>FlexConnect (Local Switching)</strong></td><td><strong>Trunk</strong> (VLAN مدیریت + VLANهای محلی SSID)</td><td><strong>Trunk</strong> (در مرکز)</td><td>ترافیک مستقیم در شعبه سوییچ می‌شود (تاب‌آور در قطع WAN)</td></tr><tr><td><strong>Autonomous AP</strong></td><td><strong>Trunk</strong> (چند SSID روی یک AP مستقل)</td><td>بدون WLC</td><td>مدیریت مستقل روی تک‌تک APها</td></tr></tbody></table><p><strong>تذکر ممیزی:</strong> در آزمون نسخه خام قبلی، پاسخ Local Mode به‌اشتباه معکوس ثبت شده بود؛ همیشه به یاد بسپارید در <strong>Local Mode پورت AP از نوع Access و پورت WLC از نوع Trunk</strong> است!</p>"
+    },
+    {
+      "id": "ccna_wl-section-8",
+      "title": "مقایسه عمیق امنیت وای‌فای: WEP، WPA2 و WPA3 (Personal در برابر Enterprise)",
+      "html": "<p>پروتکل‌های WEP و WPA-TKIP کاملاً شکسته و منسوخ‌اند. در <strong>WPA2-Personal (PSK + AES-CCMP)</strong>، کلید PMK مستقیماً از رمز ثابت مشترک ساخته می‌شود؛ پس ضبط یک 4-Way Handshake به مهاجم امکان حمله <strong>Offline Dictionary</strong> می‌دهد. در <strong>WPA3-Personal</strong>، پیش از اجرای 4-Way Handshake استاندارد 802.11، پروتکل تبادل کلید <strong>SAE (Simultaneous Authentication of Equals)</strong> یک کلید جلسه یکتا (PMK) برای هر نشست تولید می‌کند (مقاوم در برابر حمله آفلاین و دارای Forward Secrecy) و <strong>PMF (802.11w)</strong> را برای محافظت فریم‌های مدیریتی اجباری می‌نماید. در محیط‌های سازمانی، <strong>WPA2/WPA3-Enterprise (802.1X/EAP + سرور RADIUS مانند Cisco ISE)</strong> اعتبارنامه یا گواهی یکتا به هر کاربر اختصاص می‌دهد.</p>"
+    },
+    {
+      "id": "ccna_wl-section-9",
+      "title": "انواع پورت‌های روی کنترلر WLC و فرآیند کشف AP",
+      "html": "<p>روی WLC سنتی/مدرن، <strong>Distribution System / Trunk Port</strong> (یا LAG) ترافیک مدیریت و کل VLANهای WLAN را حمل می‌کند و <strong>Service Port</strong> صرفاً برای مدیریت Out-of-Band است. Lightweight AP برای یافتن WLC از کشف Broadcast محلی، <strong>DHCP Option 43</strong>، رکورد DNS <code>CISCO-CAPWAP-CONTROLLER</code> یا آدرس حافظه قبلی استفاده می‌کند.</p>"
+    },
+    {
+      "id": "ccna_wl-section-10",
+      "title": "بهینه‌سازی RF و اجتناب از تله‌های طراحی بی‌سیم",
+      "html": "<p>از قرار دادن توان فرستنده AP روی حداکثر (موجب عدم تقارن با گوشی کم‌توان کاربر) و استفاده از کانال‌های 80MHz در محیط پرتراکم اداری بپرهیزید؛ در 5GHz معمولاً کانال‌های 20MHz یا 40MHz با طراحی سلولی دقیق پایدارترند.</p>"
+    },
+    {
+      "id": "ccna_wl-section-11",
+      "title": "کژفهمی‌های رایج در شبکه‌های بی‌سیم CCNA",
+      "html": "<ul><li><strong>کژفهمی ۱: «در Local Mode پورت سوئیچ متصل به AP باید Trunk و پورت WLC باید Access باشد.»</strong> واقعیت: <strong>دقیقاً برعکس است!</strong> پورت AP در Local Mode یک پورت <strong>Access</strong> است (چون همه SSIDها داخل تونل CAPWAP لایه ۳ می‌روند) و پورت WLC باید <strong>Trunk</strong> باشد.</li><li><strong>کژفهمی ۲: «WPA3-Personal فرایند 4-Way Handshake را به‌کل حذف کرده است.»</strong> واقعیت: 4-Way Handshake همچنان پس از SAE برای ساخت کلیدهای داده (PTK/GTK) اجرا می‌شود.</li><li><strong>کژفهمی ۳: «انتخاب کانال 3 در 2.4GHz تداخل را کم می‌کند.»</strong> واقعیت: کانال 3 هم‌زمان با کانال 1 و 6 هم‌پوشانی مخرب (ACI) دارد؛ فقط 1، 6 و 11 غیرهم‌پوشانند.</li></ul>"
+    },
+    {
+      "id": "ccna_wl-section-12",
+      "title": "عیب‌یابی اتصال نشدن Lightweight AP به WLC",
+      "html": "<p>اگر AP به WLC وصل (Join) نمی‌شود: (۱) اتصال PoE و دریافت IP از VLAN مدیریت AP روی پورت Access را بررسی کنید، (۲) مسیر لایه ۳ و باز بودن UDP 5246/5247 در فایروال را چک نمایید، (۳) روش کشف (DHCP Option 43 / DNS) را تأیید کنید، و (۴) صحت ساعت سیستم (NTP) برای اعتبار گواهی DTLS کنترلر و AP را بررسی نمایید.</p>"
+    },
+    {
+      "id": "ccna_wl-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> در یک پردیس دانشگاهی با ۵۰ Lightweight AP در مد <strong>Local Mode</strong>، پورت‌های سوئیچ متصل به APها و پورت متصل به WLC چگونه باید تنظیم شوند؟ <strong>پاسخ:</strong> پورت‌های AP به صورت <strong>Access</strong> (روی VLAN مدیریت AP) و پورت WLC به صورت <strong>Trunk</strong> (مجاز برای VLAN مدیریت و تمام VLANهای SSIDها).</p><p><strong>تمرین ۲:</strong> یک شعبه کوچک با لینک WAN ناپایدار می‌خواهد هنگام قطعی WAN دسترسی کلاینت‌های بی‌سیم به پرینتر محلی قطع نشود. چه مدی مناسب است؟ <strong>پاسخ:</strong> <strong>FlexConnect (Local Switching)</strong> با پورت Trunk برای AP.</p>"
+    },
+    {
+      "id": "ccna_wl-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc5415\" target=\"_blank\" rel=\"noopener\">RFC 5415 (پروتکل CAPWAP)</a>، <a href=\"https://www.wi-fi.org/discover-wi-fi/security\" target=\"_blank\" rel=\"noopener\">مرجع امنیت WPA3 در Wi-Fi Alliance</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/17-9/config-guide/b_wl_17_9_cg.html\" target=\"_blank\" rel=\"noopener\">راهنمای پیکربندی Cisco Catalyst 9800 WLC</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ کنترلر WLC یا AP واقعی در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "CSMA/CA",
+      "fa": "اجتناب از برخورد بی‌سیم",
+      "simple": "مکانیزم دسترسی به محیط هوایی Half-Duplex در IEEE 802.11 با Backoff و ACK."
+    },
+    {
+      "term": "Hidden Node Problem",
+      "fa": "مسئله گره پنهان",
+      "simple": "وضعیتی که دو کلاینت در دو طرف AP یکدیگر را نمی‌شنوند و به RTS/CTS نیاز دارند."
+    },
+    {
+      "term": "Channels 1, 6, 11",
+      "fa": "کانال‌های غیرهم‌پوشان 2.4GHz",
+      "simple": "تنها سه کانال ۲۰مگاهرتزی بدون تداخل هم‌جوار (ACI) در باند 2.4GHz."
+    },
+    {
+      "term": "DFS (5GHz)",
+      "fa": "انتخاب پویای فرکانس",
+      "simple": "الزام تخلیه برخی کانال‌های 5GHz در صورت تشخیص سیگنال رادار."
+    },
+    {
+      "term": "Split-MAC",
+      "fa": "معماری تقسیم وظایف MAC",
+      "simple": "تقسیم کار بلادرنگ رادیو روی Lightweight AP و کنترل مرکزی روی WLC."
+    },
+    {
+      "term": "CAPWAP (RFC 5415)",
+      "fa": "تونل کنترل و داده AP-WLC",
+      "simple": "پروتکل لایه ۳ با UDP 5246 (کنترل با DTLS پیش‌فرض) و UDP 5247 (داده)."
+    },
+    {
+      "term": "Local Mode",
+      "fa": "مد پیش‌فرض Lightweight AP",
+      "simple": "ارسال کل ترافیک کلاینت از طریق CAPWAP به WLC؛ پورت AP=Access و پورت WLC=Trunk."
+    },
+    {
+      "term": "FlexConnect",
+      "fa": "مد شعبه‌ای AP",
+      "simple": "سوییچینگ محلی ترافیک کلاینت در شعبه با تاب‌آوری در قطع WAN (پورت AP=Trunk)."
+    },
+    {
+      "term": "Autonomous AP",
+      "fa": "اکسس‌پوینت مستقل",
+      "simple": "AP بدون نیاز به WLC که مستقیماً روی خودش پیکربندی می‌شود."
+    },
+    {
+      "term": "DHCP Option 43",
+      "fa": "کشف کنترلر با DHCP",
+      "simple": "ارسال آدرس IP کنترلر WLC به APها هنگام دریافت IP از سرور DHCP."
+    },
+    {
+      "term": "WPA2-Personal (PSK)",
+      "fa": "امنیت WPA2 با کلید مشترک",
+      "simple": "رمزنگاری AES-CCMP اما آسیب‌پذیر در برابر حمله Offline Dictionary روی Handshake."
+    },
+    {
+      "term": "WPA3-Personal (SAE)",
+      "fa": "امنیت WPA3 با تبادل SAE",
+      "simple": "تولید کلید PMK یکتا برای هر نشست (مقاوم در برابر حمله آفلاین) + 4-Way Handshake."
+    },
+    {
+      "term": "PMF (802.11w)",
+      "fa": "حفاظت فریم‌های مدیریتی",
+      "simple": "جلوگیری از حملات Deauthentication جعلی؛ در WPA3 اجباری است."
+    },
+    {
+      "term": "WPA2/WPA3-Enterprise",
+      "fa": "امنیت بی‌سیم سازمانی 802.1X",
+      "simple": "احراز هویت یکتا به ازای هر کاربر با EAP و سرور RADIUS (مانند Cisco ISE)."
+    },
+    {
+      "term": "SSID / BSS / ESS",
+      "fa": "شناسه و سلول‌های بی‌سیم",
+      "simple": "SSID نام شبکه، BSS محدوده یک رادیو AP، و ESS مجموعه چند AP با یک SSID برای Roaming."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، تشخیص هم‌پوشانی مخرب کانال‌های 2.4GHz (مانند 1 و 3 در برابر 1 و 6)، آزمون تطبیق پورت سوئیچ AP و WLC در <code>Local Mode</code> در برابر <code>FlexConnect</code> (شامل کشف خطای معکوس نسخه قدیمی)، و ممیزی WPA2 در برابر WPA3+PMF را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_wl_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_wl_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for ccna_wl (2.4GHz Channels, Local vs FlexConnect, CAPWAP &amp; WPA3).\n\nBoundary: Pure in-memory simulation using Python stdlib only.\nNo real Access Point, Cisco WLC, RF spectrum, or CAPWAP tunnel is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef check_24ghz_channel_overlap(ch_a: int, ch_b: int) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Check whether two 2.4GHz 20MHz Wi-Fi channels (1..11) overlap.&quot;&quot;&quot;\n    for name, ch in ((&quot;ch_a&quot;, ch_a), (&quot;ch_b&quot;, ch_b)):\n        if type(ch) is not int or not (1 &lt;= ch &lt;= 11):\n            raise ValueError(f&quot;{name} must be an integer channel in 1..11&quot;)\n    separation = abs(ch_a - ch_b)\n    if ch_a == ch_b:\n        relation = &quot;CO_CHANNEL_CONTENTION&quot;\n        overlapping = True\n    elif separation &lt; 5:\n        relation = &quot;ADJACENT_CHANNEL_INTERFERENCE&quot;\n        overlapping = True\n    else:\n        relation = &quot;NON_OVERLAPPING&quot;\n        overlapping = False\n    return {\n        &quot;channels&quot;: (ch_a, ch_b),\n        &quot;separation&quot;: separation,\n        &quot;overlapping&quot;: overlapping,\n        &quot;relation&quot;: relation,\n    }\n\n\ndef audit_ap_wlc_switchports(\n    ap_mode: str,\n    ap_switchport_mode: str,\n    wlc_switchport_mode: str,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Audit switchport Access/Trunk alignment for Local Mode vs FlexConnect AP architectures.\n\n    Note: Corrects the inverted legacy quiz answer (in Local Mode, AP port = access, WLC port = trunk!).\n    &quot;&quot;&quot;\n    if ap_mode not in (&quot;local&quot;, &quot;flexconnect_local_switching&quot;):\n        raise ValueError(&quot;ap_mode must be &#x27;local&#x27; or &#x27;flexconnect_local_switching&#x27;&quot;)\n    for name, mode in ((&quot;ap_switchport_mode&quot;, ap_switchport_mode), (&quot;wlc_switchport_mode&quot;, wlc_switchport_mode)):\n        if mode not in (&quot;access&quot;, &quot;trunk&quot;):\n            raise ValueError(f&quot;{name} must be &#x27;access&#x27; or &#x27;trunk&#x27;&quot;)\n\n    expected_ap = &quot;access&quot; if ap_mode == &quot;local&quot; else &quot;trunk&quot;\n    expected_wlc = &quot;trunk&quot;\n    issues = []\n    if ap_switchport_mode != expected_ap:\n        issues.append(f&quot;AP_PORT_MISMATCH: {ap_mode} expects &#x27;{expected_ap}&#x27;, got &#x27;{ap_switchport_mode}&#x27;&quot;)\n    if wlc_switchport_mode != expected_wlc:\n        issues.append(f&quot;WLC_PORT_MISMATCH: WLC carrying multiple WLAN VLANs expects &#x27;trunk&#x27;, got &#x27;{wlc_switchport_mode}&#x27;&quot;)\n\n    return {\n        &quot;ap_mode&quot;: ap_mode,\n        &quot;capwap_ports&quot;: {&quot;control&quot;: &quot;UDP/5246 (DTLS encrypted by default)&quot;, &quot;data&quot;: &quot;UDP/5247 (unencrypted by default unless DTLS Data enabled)&quot;},\n        &quot;architecture_valid&quot;: len(issues) == 0,\n        &quot;issues&quot;: issues,\n    }\n\n\ndef audit_wlan_security(standard: str, pmf_enabled: bool = True) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate Wi-Fi security protocol resistance to offline dictionary attacks.&quot;&quot;&quot;\n    _require_bool(pmf_enabled, &quot;pmf_enabled&quot;)\n    profiles = {\n        &quot;WEP&quot;: {&quot;deprecated&quot;: True, &quot;offline_dict_resistant&quot;: False, &quot;recommended&quot;: False},\n        &quot;WPA-TKIP&quot;: {&quot;deprecated&quot;: True, &quot;offline_dict_resistant&quot;: False, &quot;recommended&quot;: False},\n        &quot;WPA2-Personal&quot;: {&quot;deprecated&quot;: False, &quot;offline_dict_resistant&quot;: False, &quot;recommended&quot;: False},\n        &quot;WPA3-Personal&quot;: {&quot;deprecated&quot;: False, &quot;offline_dict_resistant&quot;: True, &quot;recommended&quot;: pmf_enabled},\n        &quot;WPA3-Enterprise&quot;: {&quot;deprecated&quot;: False, &quot;offline_dict_resistant&quot;: True, &quot;recommended&quot;: pmf_enabled},\n    }\n    if standard not in profiles:\n        raise ValueError(f&quot;Unsupported WLAN security standard: {standard}&quot;)\n    res = dict(profiles[standard])\n    if standard.startswith(&quot;WPA3&quot;) and not pmf_enabled:\n        res[&quot;warning&quot;] = &quot;WPA3 mandates Protected Management Frames (PMF / 802.11w)&quot;\n    return {&quot;standard&quot;: standard, &quot;pmf_enabled&quot;: pmf_enabled, **res}\n\n\ndef main() -&gt; None:\n    ov_bad = check_24ghz_channel_overlap(1, 3)\n    ov_ok = check_24ghz_channel_overlap(1, 6)\n    assert ov_bad[&quot;relation&quot;] == &quot;ADJACENT_CHANNEL_INTERFERENCE&quot;\n    assert ov_ok[&quot;overlapping&quot;] is False\n\n    # Local Mode: AP = Access, WLC = Trunk (correcting inverted legacy quiz option!)\n    local_ok = audit_ap_wlc_switchports(&quot;local&quot;, &quot;access&quot;, &quot;trunk&quot;)\n    local_inverted = audit_ap_wlc_switchports(&quot;local&quot;, &quot;trunk&quot;, &quot;access&quot;)\n    flex_ok = audit_ap_wlc_switchports(&quot;flexconnect_local_switching&quot;, &quot;trunk&quot;, &quot;trunk&quot;)\n    assert local_ok[&quot;architecture_valid&quot;] is True\n    assert local_inverted[&quot;architecture_valid&quot;] is False and len(local_inverted[&quot;issues&quot;]) == 2\n    assert flex_ok[&quot;architecture_valid&quot;] is True\n\n    wpa2 = audit_wlan_security(&quot;WPA2-Personal&quot;, True)\n    wpa3 = audit_wlan_security(&quot;WPA3-Personal&quot;, True)\n    assert wpa2[&quot;offline_dict_resistant&quot;] is False and wpa3[&quot;offline_dict_resistant&quot;] is True\n\n    print(&quot;2.4GHz Overlap (1 vs 3, 1 vs 6):&quot;, ov_bad, ov_ok)\n    print(&quot;WLC Local Mode OK:&quot;, local_ok)\n    print(&quot;WLC Local Mode Inverted (Legacy Bug Catch):&quot;, local_inverted)\n    print(&quot;FlexConnect Local Switching:&quot;, flex_ok)\n    print(&quot;WLAN Security (WPA2 vs WPA3):&quot;, wpa2, wpa3)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> کانال 1 و 3 وضعیت <code>ADJACENT_CHANNEL_INTERFERENCE</code> و کانال 1 و 6 وضعیت <code>NON_OVERLAPPING</code> می‌دهند؛ Local Mode با AP=Access و WLC=Trunk معتبر و حالت معکوس (باگ قدیمی) نامعتبر تشخیص داده می‌شود؛ و WPA3+PMF مقاوم در برابر حمله دیکشنری آفلاین گزارش می‌گردد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع آماده‌سازی پورت‌های سوئیچ Catalyst برای AP (Local Mode) و WLC (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco Catalyst L2 prep for WLC Local Mode (NOT executed on real hardware)\nconfigure terminal\n vlan 10\n  name CORP_WIFI\n vlan 20\n  name GUEST_WIFI\n vlan 30\n  name AP_MGMT\n ! Port facing Lightweight AP (Local Mode =&gt; ACCESS):\n interface GigabitEthernet0/6\n  switchport mode access\n  switchport access vlan 30\n  spanning-tree portfast\n ! Port facing WLC Distribution System (=&gt; TRUNK):\n interface GigabitEthernet0/1\n  switchport mode trunk\n  switchport trunk allowed vlan 10,20,30\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پروتکل کنترل و تونل داده CAPWAP بین Lightweight AP و WLC به‌ترتیب روی کدام پورت‌ها کار می‌کنند؟",
+      "options": [
+        "UDP 5246 (Control) و UDP 5247 (Data)",
+        "TCP 80 و TCP 443",
+        "UDP 67 و UDP 68",
+        "TCP 22 و TCP 23"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مطابق RFC 5415، کنترل CAPWAP روی UDP 5246 (با DTLS پیش‌فرض) و داده روی UDP 5247 کار می‌کند.</p>"
+    },
+    {
+      "title": "در مد پیش‌فرض <strong>Local Mode</strong> یک سیستم WLC، پورت سوئیچ متصل به اکسس‌پوینت (AP) و پورت سوئیچ متصل به خود WLC به‌ترتیب باید در چه حالتی باشند؟",
+      "options": [
+        "هر دو Access",
+        "پورت رو به AP در حالت Access (روی VLAN مدیریت AP) و پورت رو به WLC در حالت Trunk (حامل VLANهای WLANها)",
+        "پورت رو به AP در حالت Trunk و پورت رو به WLC در حالت Access",
+        "هر دو روی VLAN 1 بدون تگ"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در Local Mode ترافیک تمام SSIDها داخل تونل CAPWAP لایه ۳ از AP به WLC می‌رود؛ پس پورت AP از نوع Access و پورت WLC از نوع Trunk است (این کلید در نسخه خام قدیمی معکوس ثبت شده بود و اصلاح گردید).</p>"
+    },
+    {
+      "title": "تغییر امنیتی کلیدی <strong>WPA3-Personal</strong> نسبت به WPA2-PSK چیست؟",
+      "options": [
+        "استفاده از WEP 64-bit",
+        "حذف کامل 4-Way Handshake و رمزنگاری",
+        "استفاده از پروتکل SAE پیش از 4-Way Handshake برای تولید کلید یکتای هر نشست (مقاوم در برابر حمله Offline Dictionary) همراه با اجبار PMF",
+        "محدود کردن سرعت به ۵۴ مگابیت"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>در WPA3-Personal پروتکل SAE کلید PMK یکتا می‌سازد و سپس 4-Way Handshake استاندارد برای کلیدهای داده اجرا می‌شود.</p>"
+    },
+    {
+      "title": "در باند 2.4GHz کدام سه کانال ۲۰مگاهرتزی کاملاً غیرهم‌پوشان (Non-Overlapping) هستند؟",
+      "options": [
+        "1، 2 و 3",
+        "1، 6 و 11",
+        "2، 5 و 8",
+        "3، 7 و 10"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>فاصله ۵ کاناله بین 1، 6 و 11 مانع بروز تداخل هم‌جوار (Adjacent-Channel Interference) می‌شود.</p>"
+    },
+    {
+      "title": "اگر در مد <strong>FlexConnect</strong> با سوییچینگ محلی (Local Switching) در یک شعبه چند SSID با VLANهای مختلف روی یک AP پخش شود، پورت سوئیچ متصل به آن AP باید چگونه باشد؟",
+      "options": [
+        "Trunk (دارای VLAN مدیریت AP به عنوان Native/Access و VLANهای محلی SSIDها به عنوان Allowed)",
+        "فقط Access روی VLAN 1",
+        "Shutdown",
+        "بدون IP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در Local Switching ترافیک کلاینت‌ها مستقیماً از AP وارد VLANهای محلی سوئیچ شعبه می‌شود؛ پس لینک AP به سوئیچ باید Trunk باشد.</p>"
+    },
+    {
+      "title": "کدام گزاره درباره رمزنگاری پیش‌فرض دو تونل CAPWAP دقیق‌تر است؟",
+      "options": [
+        "هر دو تونل بدون رمزنگاری هستند",
+        "تونل Control (UDP 5246) به‌طور پیش‌فرض با DTLS رمزنگاری است اما تونل Data (UDP 5247) به‌طور پیش‌فرض رمزنگاری نیست مگر آنکه DTLS Data فعال شود",
+        "فقط تونل Data رمزنگاری است",
+        "CAPWAP از IPsec AH استفاده می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در WLCهای سیسکو، ترافیک کنترل CAPWAP همیشه با DTLS محافظت می‌شود ولی رمزنگاری تونل داده یک گزینه فعال‌شدنی است.</p>"
+    },
+    {
+      "title": "چرا در شبکه‌های IEEE 802.11 به‌جای CSMA/CD از <strong>CSMA/CA</strong> استفاده می‌شود؟",
+      "options": [
+        "زیرا محیط بی‌سیم Half-Duplex است، رادیو حین ارسال قادر به شنیدن برخورد نیست و مشکل Hidden Node وجود دارد",
+        "زیرا Wi-Fi لایه ۲ ندارد",
+        "زیرا CSMA/CA نیاز به ACK ندارد",
+        "زیرا سرعت را به 10Mbps قفل می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>CSMA/CA با گوش دادن به کانال، تایمر تصادفی Backoff و تأییدیه ACK از برخورد جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "در یک سازمان با ۵۰۰ کارمند که می‌خواهد هر کاربر با نام کاربری/رمز یا گواهی یکتای خودش به Wi-Fi وصل شود (و با ترک شغل فوراً دسترسی‌اش لغو گردد)، کدام روش صحیح است؟",
+      "options": [
+        "WPA2-Personal با یک رمز مشترک",
+        "WEP",
+        "WPA2/WPA3-Enterprise مبتنی بر 802.1X/EAP و سرور RADIUS (مانند Cisco ISE)",
+        "شبکه باز (Open) بدون رمز"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Enterprise 802.1X/EAP اعتبارنامه یکتا به ازای هر کاربر ارائه می‌دهد و نیاز به تغییر رمز کل شرکت را حذف می‌کند.</p>"
+    },
+    {
+      "title": "کدام گزینه یکی از روش‌های استاندارد کشف آدرس IP کنترلر WLC توسط Lightweight AP در زیرشبکه‌ای متفاوت است؟",
+      "options": [
+        "DHCP Option 43 یا رکورد DNS مانند CISCO-CAPWAP-CONTROLLER",
+        "ARP Broadcast در همان VLAN",
+        "پروتکل RIP",
+        "تنظیم Port Security روی shutdown"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در نبود Broadcast محلی (لایه ۳)، DHCP Option 43 و DNS اصلی‌ترین مکانیزم‌های کشف WLC هستند.</p>"
+    },
+    {
+      "title": "الزام ویژه امنیتی در باند جدید <strong>6GHz (Wi-Fi 6E / Wi-Fi 7)</strong> چیست؟",
+      "options": [
+        "استفاده اجباری از WEP",
+        "پشتیبانی اجباری از WPA3 (و PMF)؛ WPA2 و شبکه‌های قدیمی مجاز نیستند",
+        "حذف کامل رمزنگاری",
+        "فقط کانال 1، 6 و 11"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>باند 6GHz برای حذف میراث ناامن قدیمی، WPA3 (یا OWE برای شبکه‌های عمومی) را اجباری کرده است.</p>"
+    },
+    {
+      "title": "قابلیت <strong>PMF (Protected Management Frames — 802.11w)</strong> جلوی کدام حمله رایج بی‌سیم را می‌گیرد؟",
+      "options": [
+        "حملات جعل فریم‌های مدیریتی مانند Deauthentication / Disassociation Flood",
+        "حمله DHCP Starvation روی کابل",
+        "حمله SQL Injection",
+        "قطع کابل فیبر"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>PMF فریم‌های مدیریتی حیاتی 802.11 را احراز هویت/محافظت کرده و حملات Deauth جعلی را خنثی می‌سازد.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اتصال واقعی به Cisco Catalyst 9800 WLC و AP زنده",
+        "اندازه‌گیری واقعی طیف RF در ساختمان",
+        "شبیه‌ساز محلی Python 3 برای آزمون هم‌پوشانی کانال 2.4GHz، تطبیق پورت AP/WLC در Local/FlexConnect و ممیزی WPA2/WPA3 بدون تجهیز واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 است و بخش ۲ سناریوی مرجع CLI اجرا نشده است.</p>"
+    }
+  ]
+}

@@ -1,0 +1,344 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_06",
+  "objectiveId": "ccna_06",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "Automation and Programmability",
+  "title": "CCNA (اتوماسیون و برنامه‌پذیری): معماری SDN، Cisco Catalyst Center، REST API و ابزارهای Ansible/Puppet/Chef",
+  "titleEn": "CCNA Automation & Programmability: SDN Planes, Catalyst Center, REST API, JSON/YAML & Ansible/Puppet/Chef",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_06 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_06",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc8259",
+      "https://www.rfc-editor.org/rfc/rfc9110",
+      "https://www.rfc-editor.org/rfc/rfc8040",
+      "https://www.cisco.com/c/en/us/products/cloud-systems-management/dna-center/index.html"
+    ],
+    "limitations": [
+      "هیچ کنترلر واقعی Cisco Catalyst Center، سرور RESTCONF یا نود Ansible در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 (کتابخانه json) برای آزمون تفکیک NBI/SBI، چرخه CRUD در REST API، مقایسه Ansible/Puppet/Chef و تشخیص خطای Tab در YAML است."
+    ],
+    "legacyAuditFixes": [
+      "تکمیل نگاشت کامل متدهای HTTP/CRUD (POST/GET/PUT/PATCH/DELETE) و کدهای وضعیت استاندارد RFC 9110 (200/201/204/400/401/403/404/409/429/500).",
+      "تکمیل مقایسه دقیق Ansible (Agentless/Push/YAML/Python)، Puppet (Agent-Pull TCP 8140/Ruby DSL) و Chef (Agent-Pull/Ruby Recipes) همراه با مفهوم Idempotency.",
+      "تفکیک لایه‌های SD-Access در Catalyst Center (Underlay IS-IS + Overlay VXLAN/LISP + Policy SGT) و گسترش به ۱۴ بخش/۱۵ واژه/۱۲ پرسش همراه با ccna_06_lab.py."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_06-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_06.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_06_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲B: ساخت ccna_06_lab.py بدون import پرچم‌دار با اعتبارسنجی دقیق JSON، تشخیص Tab غیرمجاز در YAML و چرخه CRUD کامل."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_06-section-1",
+      "title": "مسئله واقعی: چرا مدیریت دستی CLI در شبکه‌های صدها تجهیزی به خطای انسانی و ناهماهنگی می‌انجامد؟",
+      "html": "<p>ورود دستی با SSH به ۲۰۰ سوئیچ برای تغییر یک VLAN یا ACL، کند، تکرارناپذیر و مستعد خطای تایپی (Configuration Drift) است. <strong>SDN</strong>، کنترلرهای مبتنی بر نیت مانند <strong>Cisco Catalyst Center</strong>، <strong>REST API</strong> و ابزارهای اتوماسیون مانند <strong>Ansible</strong> مدیریت شبکه را به فرایندی ساختاریافته، خودکار و قابل راستی‌آزمایی تبدیل می‌کنند.</p>"
+    },
+    {
+      "id": "ccna_06-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با SSH، مدل لایه‌ای شبکه و پیکربندی پایه روتر/سوئیچ.</p><ul><li>تفکیک سه صفحه <strong>Data Plane</strong>، <strong>Control Plane</strong> و <strong>Management Plane</strong> و نقش کنترلر SDN.</li><li>تمایز <strong>Northbound API (NBI)</strong> و <strong>Southbound API (SBI)</strong> و شناخت معماری <strong>Cisco Catalyst Center / SD-Access</strong>.</li><li>تسلط بر متدهای <strong>REST API CRUD</strong> (<code>POST/GET/PUT/PATCH/DELETE</code>) و کدهای وضعیت HTTP (RFC 9110).</li><li>خواندن ساختار <strong>JSON</strong>، <strong>YAML</strong> و <strong>XML</strong> و مقایسه دقیق <strong>Ansible</strong>، <strong>Puppet</strong> و <strong>Chef</strong>.</li></ul>"
+    },
+    {
+      "id": "ccna_06-section-3",
+      "title": "سه صفحه معماری تجهیزات شبکه و تحول SDN",
+      "html": "<p>در تجهیزات شبکه سنتی: (۱) <strong>Data Plane</strong> (سخت‌افزار ASIC/CEF) بسته‌ها را با سرعت خط فوروارد می‌کند، (۲) <strong>Control Plane</strong> (OSPF/BGP/STP) جدول‌ها را محاسبه می‌کند، و (۳) <strong>Management Plane</strong> (SSH/SNMP/API) ارتباط مدیریتی است. در <strong>SDN</strong>، بخش قابل‌توجهی از سیاست‌گذاری و هماهنگی Control/Management Plane در یک کنترلر مرکزی متمرکز می‌شود در حالی که Data Plane همچنان سریع روی سخت‌افزار تجهیزات اجرا می‌گردد.</p>"
+    },
+    {
+      "id": "ccna_06-section-4",
+      "title": "رابط‌های Northbound API (NBI) در برابر Southbound API (SBI)",
+      "html": "<p>در معماری مبتنی بر کنترلر: رابط بالای کنترلر به سمت برنامه‌ها، اسکریپت‌های پایتون و سیستم‌های ITSM را <strong>Northbound API (NBI)</strong> می‌نامند که معمولاً <strong>REST API روی HTTPS با فرمت JSON</strong> است. رابط پایین کنترلر به سمت تجهیزات شبکه را <strong>Southbound API (SBI)</strong> می‌نامند که از پروتکل‌هایی مانند <strong>NETCONF</strong>، <strong>RESTCONF</strong>، <strong>OpenFlow</strong>، <strong>OpFlex</strong> یا SSH/SNMP استفاده می‌کند.</p>"
+    },
+    {
+      "id": "ccna_06-section-5",
+      "title": "Cisco Catalyst Center (DNA Center سابق) و معماری SD-Access",
+      "html": "<p><strong>Cisco Catalyst Center</strong> الگوی <strong>Intent-Based Networking (IBN)</strong> را پیاده می‌کند: مدیر سیاست تجاری را تعریف کرده و کنترلر پیکربندی تجهیزات و پایش پیوسته (<strong>Assurance</strong>) را مدیریت می‌کند. در <strong>SD-Access</strong> دو لایه داریم: <strong>Underlay</strong> (شبکه IP فیزیکی زیرین مانند IS-IS) و <strong>Overlay</strong> (تونل <strong>VXLAN</strong> برای Data Plane، <strong>LISP</strong> برای Control Plane و <strong>SGT</strong> برای سیاست امنیتی).</p>"
+    },
+    {
+      "id": "ccna_06-section-6",
+      "title": "نمودار معماری: Northbound REST، کنترلر Catalyst Center، Southbound و ابزارهای اتوماسیون",
+      "html": "<p>در نمودار زیر ارتباط میان NBI، کنترلر SDN، SBI و مقایسه ابزارهای اتوماسیون نمایش داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"SDN Architecture: Northbound REST API, Catalyst Center, Southbound APIs and Automation\"><rect x=\"16\" y=\"18\" width=\"218\" height=\"184\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"125\" y=\"42\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">Apps &amp; Northbound API</text><text x=\"125\" y=\"68\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Python / ITSM / CI-CD</text><text x=\"125\" y=\"92\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#1d4ed8\">REST API over HTTPS</text><text x=\"125\" y=\"112\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">JSON payloads (UTF-8)</text><text x=\"125\" y=\"138\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">POST 201 | GET 200</text><text x=\"125\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#15803d\">PUT/PATCH 200 | DEL 204</text><text x=\"125\" y=\"178\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#dc2626\">401/403 Auth | 404 | 429</text><line x1=\"234\" y1=\"110\" x2=\"266\" y2=\"110\" stroke=\"#1d4ed8\" stroke-width=\"2.5\"/><rect x=\"266\" y=\"18\" width=\"228\" height=\"184\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"380\" y=\"42\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">SDN Controller (Catalyst Ctr)</text><text x=\"380\" y=\"68\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">Intent-Based Networking</text><text x=\"380\" y=\"88\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">Centralized Policy &amp; Assurance</text><rect x=\"282\" y=\"104\" width=\"196\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"380\" y=\"121\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#92400e\">SD-Access Fabric:</text><text x=\"380\" y=\"136\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#334155\">Underlay (IS-IS) + Overlay (VXLAN/LISP)</text><text x=\"380\" y=\"168\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">Southbound APIs (SBI):</text><text x=\"380\" y=\"184\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">NETCONF / RESTCONF / OpenFlow / SSH</text><line x1=\"494\" y1=\"110\" x2=\"526\" y2=\"110\" stroke=\"#15803d\" stroke-width=\"2.5\"/><rect x=\"526\" y=\"18\" width=\"218\" height=\"184\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"635\" y=\"42\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Automation &amp; Formats</text><text x=\"635\" y=\"68\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">Ansible: Agentless (Push)</text><text x=\"635\" y=\"86\" text-anchor=\"middle\" font-size=\"9\" fill=\"#14532d\">YAML Playbooks (Spaces!)</text><text x=\"635\" y=\"110\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Puppet: Agent/Pull (TCP 8140)</text><text x=\"635\" y=\"130\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Chef: Agent/Pull (Ruby)</text><text x=\"635\" y=\"158\" text-anchor=\"middle\" font-size=\"9\" fill=\"#1d4ed8\">Data: JSON | YAML | XML</text><text x=\"635\" y=\"178\" text-anchor=\"middle\" font-size=\"8.5\" fill=\"#475569\">Goal: Idempotent &amp; Repeatable</text></svg>"
+    },
+    {
+      "id": "ccna_06-section-7",
+      "title": "پروتکل REST API، نگاشت CRUD و کدهای وضعیت HTTP (RFC 9110)",
+      "html": "<table><thead><tr><th>عملیات CRUD</th><th>متد HTTP</th><th>کدهای پاسخ موفق رایج</th><th>رفتار</th></tr></thead><tbody><tr><td>Create</td><td><code>POST</code></td><td><code>201 Created</code> (یا 200/202)</td><td>ایجاد منبع جدید</td></tr><tr><td>Read</td><td><code>GET</code></td><td><code>200 OK</code></td><td>خواندن وضعیت منبع (فقط‌خواندنی)</td></tr><tr><td>Update (کامل)</td><td><code>PUT</code></td><td><code>200 OK</code> / <code>204</code></td><td>جایگزینی کامل منبع</td></tr><tr><td>Update (جزئی)</td><td><code>PATCH</code></td><td><code>200 OK</code> / <code>204</code></td><td>به‌روزرسانی فقط فیلدهای ارسالی</td></tr><tr><td>Delete</td><td><code>DELETE</code></td><td><code>204 No Content</code> / <code>200</code></td><td>حذف منبع</td></tr></tbody></table><p>کدهای خطای پرتکرار: <code>400</code> درخواست نامعتبر، <code>401</code> نبود/بطلان احراز هویت، <code>403</code> نداشتن مجوز، <code>404</code> منبع یافت نشد، <code>429</code> محدودیت نرخ درخواست و <code>500</code> خطای سرور.</p>"
+    },
+    {
+      "id": "ccna_06-section-8",
+      "title": "ساختار داده‌های JSON، YAML و XML",
+      "html": "<p><strong>JSON (RFC 8259)</strong> قالب اصلی REST API با آکولاد <code>{}</code>، آرایه <code>[]</code> و <strong>نقل‌قول دوتایی اجباری</strong> است (توضیح/Comment و ویرگول پایانی غیرمجازند). <strong>YAML</strong> بسیار خوانا و قالب اصلی Ansible Playbookها است و به <strong>تورفتگی دقیق با Space (و نه Tab!)</strong> وابسته است. <strong>XML</strong> قالب تگ‌دار کلاسیک مورد استفاده در NETCONF (RFC 6241) می‌باشد.</p>"
+    },
+    {
+      "id": "ccna_06-section-9",
+      "title": "مقایسه Ansible، Puppet و Chef و مفهوم Idempotency",
+      "html": "<table><thead><tr><th>ابزار</th><th>معماری Agent</th><th>مدل انتقال</th><th>زبان / قالب</th></tr></thead><tbody><tr><td><strong>Ansible</strong></td><td><strong>Agentless</strong></td><td>Push (SSH / NETCONF / REST)</td><td>YAML Playbooks (مبتنی بر Python)</td></tr><tr><td><strong>Puppet</strong></td><td>معمولاً Agent-based</td><td>Pull (پورت TCP 8140)</td><td>Ruby DSL (Manifests)</td></tr><tr><td><strong>Chef</strong></td><td>Agent-based</td><td>Pull</td><td>Ruby (Recipes / Cookbooks)</td></tr></tbody></table><p><strong>Idempotency (هم‌توانی)</strong> یعنی اجرای مجدد یک Playbook وقتی تجهیز از پیش در وضعیت مطلوب است، تغییر اضافی یا خطای تکراری ایجاد نمی‌کند.</p>"
+    },
+    {
+      "id": "ccna_06-section-10",
+      "title": "چرا Cisco تجهیزات شبکه را با مدل داده YANG (NETCONF/RESTCONF) ترکیب می‌کند؟",
+      "html": "<p>به‌جای پارس کردن خروجی متنی شکننده CLI، پروتکل‌های <strong>NETCONF</strong> (روی SSH TCP 830 با XML) و <strong>RESTCONF</strong> (روی HTTPS TCP 443 با JSON/XML — RFC 8040) از مدل‌های استاندارد <strong>YANG</strong> استفاده می‌کنند تا ساختار پیکربندی و وضعیت عملیاتی دقیقاً تعریف شده باشد.</p>"
+    },
+    {
+      "id": "ccna_06-section-11",
+      "title": "کژفهمی‌های رایج در SDN و اتوماسیون CCNA",
+      "html": "<ul><li><strong>کژفهمی ۱: «در SDN دیگر سخت‌افزار سوئیچ و روتر وجود ندارد.»</strong> واقعیت: Data Plane همچنان روی ASIC سخت‌افزار تجهیزات اجرا می‌شود؛ کنترل و سیاست‌گذاری متمرکز می‌شود.</li><li><strong>کژفهمی ۲: «Ansible برای کار با روتر سیسکو نیاز به نصب Agent روی IOS دارد.»</strong> واقعیت: Ansible کاملاً Agentless است و از SSH/NETCONF/REST استفاده می‌کند.</li><li><strong>کژفهمی ۳: «در YAML استفاده از کلید Tab برای تورفتگی مجاز است.»</strong> واقعیت: استاندارد YAML استفاده از Tab برای تورفتگی را رد می‌کند و خطای پارس می‌دهد.</li></ul>"
+    },
+    {
+      "id": "ccna_06-section-12",
+      "title": "عیب‌یابی خطاهای رایج در فراخوانی REST API و YAML",
+      "html": "<p>اگر API کد <code>401</code> برمی‌گرداند، اعتبار توکن/گواهی را چک کنید؛ اگر <code>403</code> برمی‌گرداند، سطح دسترسی (RBAC) کاربر را بررسی کنید؛ اگر <code>400</code> می‌دهد، معتبر بودن JSON (نقل‌قول دوتایی، نبود ویرگول اضافه) را کنترل کنید. در خطای اجرای Ansible Playbook، نبود کاراکتر <code>Tab</code> و تراز بودن Spaceها را در فایل YAML بررسی نمایید.</p>"
+    },
+    {
+      "id": "ccna_06-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> یک اسکریپت پایتون با Catalyst Center ارتباط می‌گیرد تا فهرست VLANها را بخواند. این رابط Northbound است یا Southbound و از کدام متد HTTP استفاده می‌کند؟ <strong>پاسخ:</strong> <strong>Northbound API (NBI)</strong> با متد <code>GET</code> (و پاسخ موفق <code>200 OK</code> به فرمت JSON).</p><p><strong>تمرین ۲:</strong> چرا Ansible در شبکه‌های سیسکو از Puppet و Chef رایج‌تر است؟ <strong>پاسخ:</strong> به‌دلیل <strong>Agentless</strong> بودن (نیاز نداشتن به نصب Agent روی IOS/NX-OS)، مدل Push ساده و خوانایی YAML Playbooks.</p>"
+    },
+    {
+      "id": "ccna_06-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8259\" target=\"_blank\" rel=\"noopener\">RFC 8259 (JSON)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc9110\" target=\"_blank\" rel=\"noopener\">RFC 9110 (معناشناسی HTTP)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc8040\" target=\"_blank\" rel=\"noopener\">RFC 8040 (RESTCONF)</a> و <a href=\"https://www.cisco.com/c/en/us/products/cloud-systems-management/dna-center/index.html\" target=\"_blank\" rel=\"noopener\">مستندات Cisco Catalyst Center</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ کنترلر واقعی Catalyst Center، سرور RESTCONF یا نود Ansible در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع YAML/JSON است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Data / Control / Management Plane",
+      "fa": "سه صفحه معماری شبکه",
+      "simple": "به‌ترتیب: فوروارد سخت‌افزاری، محاسبه جدول‌ها، و مدیریت/پایش تجهیز."
+    },
+    {
+      "term": "SDN",
+      "fa": "شبکه تعریف‌شده با نرم‌افزار",
+      "simple": "جداسازی و متمرکزسازی بخش کنترل و سیاست‌گذاری شبکه روی کنترلر نرم‌افزاری."
+    },
+    {
+      "term": "Northbound API (NBI)",
+      "fa": "رابط شمال‌سو",
+      "simple": "رابط برنامه‌ها و اسکریپت‌ها با کنترلر SDN (معمولاً REST روی HTTPS با JSON)."
+    },
+    {
+      "term": "Southbound API (SBI)",
+      "fa": "رابط جنوب‌سو",
+      "simple": "رابط کنترلر SDN با تجهیزات شبکه (NETCONF، RESTCONF، OpenFlow، OpFlex)."
+    },
+    {
+      "term": "Cisco Catalyst Center",
+      "fa": "کنترلر پردیسی سیسکو",
+      "simple": "پلتفرم Intent-Based Networking و Assurance برای شبکه‌های سازمانی (DNA Center سابق)."
+    },
+    {
+      "term": "Underlay / Overlay",
+      "fa": "زیرلایه و رولایه SD-Access",
+      "simple": "Underlay شبکه IP فیزیکی (IS-IS) و Overlay شبکه منطقی VXLAN/LISP/SGT."
+    },
+    {
+      "term": "REST API",
+      "fa": "رابط برنامه‌نویسی REST",
+      "simple": "سبک معماری بدون‌حالت روی HTTP/HTTPS با عملیات CRUD (POST/GET/PUT/PATCH/DELETE)."
+    },
+    {
+      "term": "JSON (RFC 8259)",
+      "fa": "قالب داده کلید-مقدار",
+      "simple": "قالب اصلی پاسخ‌های REST API با نقل‌قول دوتایی اجباری و بدون Comment."
+    },
+    {
+      "term": "YAML",
+      "fa": "قالب داده خوانای Ansible",
+      "simple": "وابسته به تورفتگی دقیق با Space (استفاده از Tab خطای پارس می‌دهد)."
+    },
+    {
+      "term": "XML",
+      "fa": "زبان نشانه‌گذاری تگ‌دار",
+      "simple": "قالب استاندارد داده‌ها در پروتکل NETCONF (RFC 6241)."
+    },
+    {
+      "term": "Ansible",
+      "fa": "ابزار اتوماسیون بدون Agent",
+      "simple": "مدل Push با YAML Playbooks روی SSH/NETCONF/REST بدون نیاز به نصب Agent روی روتر."
+    },
+    {
+      "term": "Puppet",
+      "fa": "ابزار مدیریت پیکربندی Pull",
+      "simple": "عمدتاً Agent-based روی TCP 8140 با زبان Ruby DSL (Manifests)."
+    },
+    {
+      "term": "Chef",
+      "fa": "ابزار اتوماسیون مبتنی بر Ruby",
+      "simple": "معماری Agent-based و Pull با فایل‌های Recipes و Cookbooks."
+    },
+    {
+      "term": "Idempotency",
+      "fa": "خاصیت هم‌توانی",
+      "simple": "اجرای چندباره یک Playbook بدون ایجاد تغییرات تکراری یا خطا در صورت برقراری وضعیت مطلوب."
+    },
+    {
+      "term": "RESTCONF (RFC 8040)",
+      "fa": "پروتکل REST مبتنی بر YANG",
+      "simple": "مدیریت مدل‌محور تجهیزات شبکه روی HTTPS با داده‌های JSON یا XML."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی با ماژول استاندارد <code>json</code>، تفکیک NBI/SBI، چرخه کامل REST CRUD (<code>POST 201 -> PATCH 200 -> DELETE 204 -> GET 404</code>)، مقایسه Ansible/Puppet/Chef و تشخیص خطای Tab در YAML را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_06_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_06_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python 3 stdlib mock lab for ccna_06 (SDN Planes, Catalyst Center, REST CRUD &amp; JSON/YAML/Ansible).\n\nBoundary: Pure in-memory simulation using Python stdlib only (json).\nNo real Cisco Catalyst Center, RESTCONF endpoint, HTTP server, or Ansible controller is executed.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport json\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if type(val) is not bool:\n        raise ValueError(f&quot;{name} must be a strict bool, got {type(val).__name__}&quot;)\n    return val\n\n\ndef _require_non_empty_str(val: object, name: str) -&gt; str:\n    if not isinstance(val, str) or not val.strip():\n        raise ValueError(f&quot;{name} must be a non-empty string&quot;)\n    return val.strip()\n\n\ndef classify_sdn_interface(direction: str, protocol: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Classify Northbound API (app &lt;-&gt; controller) vs Southbound API (controller &lt;-&gt; device).&quot;&quot;&quot;\n    d = _require_non_empty_str(direction, &quot;direction&quot;).lower()\n    p = _require_non_empty_str(protocol, &quot;protocol&quot;)\n    if d == &quot;northbound&quot;:\n        return {\n            &quot;direction&quot;: &quot;Northbound API (NBI)&quot;,\n            &quot;peers&quot;: &quot;Applications / Scripts / ITSM &lt;-&gt; SDN Controller&quot;,\n            &quot;protocol&quot;: p,\n            &quot;typical_format&quot;: &quot;REST over HTTPS (JSON)&quot;,\n        }\n    if d == &quot;southbound&quot;:\n        return {\n            &quot;direction&quot;: &quot;Southbound API (SBI)&quot;,\n            &quot;peers&quot;: &quot;SDN Controller &lt;-&gt; Network Devices&quot;,\n            &quot;protocol&quot;: p,\n            &quot;typical_examples&quot;: [&quot;NETCONF&quot;, &quot;RESTCONF&quot;, &quot;OpenFlow&quot;, &quot;OpFlex&quot;, &quot;SSH/SNMP&quot;],\n        }\n    raise ValueError(&quot;direction must be &#x27;northbound&#x27; or &#x27;southbound&#x27;&quot;)\n\n\ndef simulate_rest_crud(\n    store: dict[str, dict[str, object]],\n    method: str,\n    resource_id: str,\n    payload: dict[str, object] | None = None,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate REST API CRUD semantics (POST/GET/PUT/PATCH/DELETE) with standard HTTP status codes.&quot;&quot;&quot;\n    m = _require_non_empty_str(method, &quot;method&quot;).upper()\n    rid = _require_non_empty_str(resource_id, &quot;resource_id&quot;)\n\n    if m == &quot;POST&quot;:\n        if payload is None:\n            return {&quot;status&quot;: 400, &quot;error&quot;: &quot;Missing JSON payload&quot;}\n        if rid in store:\n            return {&quot;status&quot;: 409, &quot;error&quot;: f&quot;Resource {rid} already exists&quot;}\n        store[rid] = dict(payload)\n        return {&quot;status&quot;: 201, &quot;resource_id&quot;: rid, &quot;body&quot;: store[rid]}\n    if m == &quot;GET&quot;:\n        if rid not in store:\n            return {&quot;status&quot;: 404, &quot;error&quot;: f&quot;Resource {rid} not found&quot;}\n        return {&quot;status&quot;: 200, &quot;resource_id&quot;: rid, &quot;body&quot;: store[rid]}\n    if m == &quot;PUT&quot;:\n        if payload is None:\n            return {&quot;status&quot;: 400, &quot;error&quot;: &quot;Missing JSON payload&quot;}\n        existed = rid in store\n        store[rid] = dict(payload)\n        return {&quot;status&quot;: 200 if existed else 201, &quot;resource_id&quot;: rid, &quot;body&quot;: store[rid]}\n    if m == &quot;PATCH&quot;:\n        if rid not in store:\n            return {&quot;status&quot;: 404, &quot;error&quot;: f&quot;Resource {rid} not found&quot;}\n        if payload is None:\n            return {&quot;status&quot;: 400, &quot;error&quot;: &quot;Missing JSON payload&quot;}\n        store[rid].update(payload)\n        return {&quot;status&quot;: 200, &quot;resource_id&quot;: rid, &quot;body&quot;: store[rid]}\n    if m == &quot;DELETE&quot;:\n        if rid not in store:\n            return {&quot;status&quot;: 404, &quot;error&quot;: f&quot;Resource {rid} not found&quot;}\n        del store[rid]\n        return {&quot;status&quot;: 204, &quot;resource_id&quot;: rid}\n    raise ValueError(f&quot;Unsupported HTTP method: {method}&quot;)\n\n\ndef compare_config_mgmt_tool(tool: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compare Ansible, Puppet, and Chef architecture for CCNA automation.&quot;&quot;&quot;\n    t = _require_non_empty_str(tool, &quot;tool&quot;).lower()\n    tools = {\n        &quot;ansible&quot;: {&quot;architecture&quot;: &quot;Agentless&quot;, &quot;model&quot;: &quot;Push (SSH/NETCONF/REST)&quot;, &quot;language&quot;: &quot;YAML Playbooks (Python)&quot;},\n        &quot;puppet&quot;: {&quot;architecture&quot;: &quot;Agent-based (typically)&quot;, &quot;model&quot;: &quot;Pull (TCP 8140)&quot;, &quot;language&quot;: &quot;Ruby-based DSL Manifests&quot;},\n        &quot;chef&quot;: {&quot;architecture&quot;: &quot;Agent-based&quot;, &quot;model&quot;: &quot;Pull&quot;, &quot;language&quot;: &quot;Ruby Recipes/Cookbooks&quot;},\n    }\n    if t not in tools:\n        raise ValueError(f&quot;Unsupported tool: {tool}&quot;)\n    return {&quot;tool&quot;: t, **tools[t]}\n\n\ndef validate_json_and_yaml_indent(json_text: str, yaml_lines: list[str], allow_tabs: bool = False) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Verify strict JSON parsing and detect illegal Tab indentation in YAML.&quot;&quot;&quot;\n    _require_bool(allow_tabs, &quot;allow_tabs&quot;)\n    parsed = json.loads(json_text)\n    tab_lines = [i + 1 for i, line in enumerate(yaml_lines) if &quot;\\t&quot; in line]\n    yaml_valid = len(tab_lines) == 0 or allow_tabs\n    return {&quot;json_keys&quot;: sorted(parsed.keys()) if isinstance(parsed, dict) else [], &quot;yaml_valid&quot;: yaml_valid, &quot;tab_lines&quot;: tab_lines}\n\n\ndef main() -&gt; None:\n    nbi = classify_sdn_interface(&quot;northbound&quot;, &quot;REST/HTTPS (JSON)&quot;)\n    sbi = classify_sdn_interface(&quot;southbound&quot;, &quot;NETCONF/RESTCONF&quot;)\n    assert &quot;Northbound&quot; in str(nbi[&quot;direction&quot;]) and &quot;Southbound&quot; in str(sbi[&quot;direction&quot;])\n\n    store: dict[str, dict[str, object]] = {}\n    c_res = simulate_rest_crud(store, &quot;POST&quot;, &quot;vlan-10&quot;, {&quot;vlan_id&quot;: 10, &quot;name&quot;: &quot;FINANCE&quot;})\n    p_res = simulate_rest_crud(store, &quot;PATCH&quot;, &quot;vlan-10&quot;, {&quot;name&quot;: &quot;FINANCE_CORE&quot;})\n    d_res = simulate_rest_crud(store, &quot;DELETE&quot;, &quot;vlan-10&quot;)\n    g_404 = simulate_rest_crud(store, &quot;GET&quot;, &quot;vlan-10&quot;)\n    assert c_res[&quot;status&quot;] == 201 and p_res[&quot;body&quot;][&quot;name&quot;] == &quot;FINANCE_CORE&quot;\n    assert d_res[&quot;status&quot;] == 204 and g_404[&quot;status&quot;] == 404\n\n    ans = compare_config_mgmt_tool(&quot;ansible&quot;)\n    assert ans[&quot;architecture&quot;] == &quot;Agentless&quot;\n\n    fmt = validate_json_and_yaml_indent(&#x27;{&quot;hostname&quot;: &quot;SW1&quot;, &quot;vlans&quot;: [10, 20]}&#x27;, [&quot;vlans:&quot;, &quot;\\t- 10&quot;])\n    assert fmt[&quot;yaml_valid&quot;] is False and fmt[&quot;tab_lines&quot;] == [2]\n\n    print(&quot;SDN APIs:&quot;, nbi, sbi)\n    print(&quot;REST CRUD:&quot;, c_res, p_res, d_res, g_404)\n    print(&quot;Ansible Profile:&quot;, ans)\n    print(&quot;JSON/YAML Format Check:&quot;, fmt)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> تراکنش CRUD کدهای <code>201</code>، <code>200</code>، <code>204</code> و سپس <code>404</code> بازمی‌گرداند؛ Ansible با معماری <code>Agentless</code> گزارش می‌شود؛ و خطای کاراکتر <code>\\t</code> در خط ۲ فایل YAML نمونه شناسایی و رد می‌گردد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع Ansible Playbook (YAML) و محموله JSON (اجرا نشده روی کنترلر یا تجهیز واقعی):</strong></p><pre dir=\"ltr\"><code># Reference Ansible Playbook for Cisco IOS-XE (NOT executed on real devices)\n- name: Ensure Finance VLAN 10 exists (Idempotent)\n  hosts: campus_switches\n  gather_facts: false\n  tasks:\n    - name: Configure VLAN 10\n      cisco.ios.ios_vlans:\n        config:\n          - vlan_id: 10\n            name: FINANCE\n        state: merged</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در معماری کنترلرهای SDN مانند Cisco Catalyst Center، رابط بین اسکریپت‌های کاربر/برنامه‌ها و کنترلر چه نام دارد و معمولاً از چه نوع API استفاده می‌کند؟",
+      "options": [
+        "Southbound API — OpenFlow",
+        "Data Plane — کابل فیبر",
+        "Northbound API — معمولاً REST API روی HTTPS با فرمت JSON",
+        "Hardware ASIC"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>برنامه‌ها و اسکریپت‌های بالادستی از طریق Northbound API (معمولاً REST/HTTPS/JSON) با کنترلر ارتباط می‌گیرند.</p>"
+    },
+    {
+      "title": "کدام متد HTTP در REST API برای <strong>ساختن یک منبع جدید (Create)</strong> استفاده می‌شود و کد پاسخ موفق استاندارد آن چیست؟",
+      "options": [
+        "GET — کد 404",
+        "POST — کد 201 Created (یا 200/202)",
+        "DELETE — کد 500",
+        "PATCH — کد 401"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>POST</code> برای ایجاد منبع جدید و کد <code>201 Created</code> پاسخ استاندارد موفقیت آن است.</p>"
+    },
+    {
+      "title": "چرا <strong>Ansible</strong> نسبت به Puppet و Chef برای شروع اتوماسیون تجهیزات شبکه سیسکو رایج‌تر است؟",
+      "options": [
+        "چون Ansible بدون نیاز به نصب Agent روی روتر و سوئیچ (Agentless، مدل Push روی SSH/API) و با فایل‌های خوانای YAML کار می‌کند",
+        "چون فقط ویندوز را پشتیبانی می‌کند",
+        "چون از Telnet اجباری استفاده می‌کند",
+        "چون نیاز به SSH ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Agentless بودن Ansible مزیت کلیدی آن در تجهیزات شبکه‌ای مانند IOS/IOS-XE است.</p>"
+    },
+    {
+      "title": "در معماری کنترلر SDN، پروتکل‌هایی مانند <strong>NETCONF</strong>، <strong>RESTCONF</strong> و <strong>OpenFlow</strong> در کدام سمت قرار می‌گیرند؟",
+      "options": [
+        "Southbound API (بین کنترلر و تجهیزات شبکه)",
+        "Northbound API",
+        "فقط لایه فیزیکی",
+        "فقط در DNS"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>رابط بین کنترلر و تجهیزات شبکه (سوئیچ‌ها و روترها) Southbound API نامیده می‌شود.</p>"
+    },
+    {
+      "title": "تفاوت متد <code>PUT</code> و <code>PATCH</code> در REST API چیست؟",
+      "options": [
+        "PUT کل منبع را جایگزین می‌کند اما PATCH فقط فیلدهای مشخص‌شده را به صورت جزئی به‌روزرسانی می‌نماید",
+        "PATCH منبع را حذف می‌کند",
+        "PUT فقط خواندنی است",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>برای تغییر جزئی یک فیلد (مثل تغییر نام یک VLAN) از <code>PATCH</code> و برای جایگزینی کامل از <code>PUT</code> استفاده می‌شود.</p>"
+    },
+    {
+      "title": "کدام خطای سینتکسی باعث شکست پارس شدن فایل <strong>YAML</strong> در Ansible Playbook می‌شود؟",
+      "options": [
+        "استفاده از Space برای تورفتگی",
+        "استفاده از کلید Tab برای تورفتگی به جای Space",
+        "نوشتن توضیح با علامت #",
+        "استفاده از خط تیره - برای لیست"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در YAML استفاده از کاراکتر Tab برای تورفتگی غیرمجاز است و باید صرفاً از Space استفاده شود.</p>"
+    },
+    {
+      "title": "در معماری <strong>Cisco SD-Access</strong> (تحت مدیریت Catalyst Center)، دو لایه <strong>Underlay</strong> و <strong>Overlay</strong> چه نقشی دارند؟",
+      "options": [
+        "Underlay شبکه IP فیزیکی زیرین (مثل IS-IS) برای دسترسی پایه است و Overlay تونل منطقی VXLAN/LISP/SGT برای حمل ترافیک و سیاست کاربران است",
+        "هر دو یکی هستند",
+        "Overlay همان کابل فیبر است",
+        "Underlay فقط Wi-Fi است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>جداسازی Underlay و Overlay اجازه می‌دهد سیاست‌های امنیتی و تحرک کاربران مستقل از توپولوژی فیزیکی اعمال شوند.</p>"
+    },
+    {
+      "title": "در فرمت استاندارد <strong>JSON (RFC 8259)</strong> کدام مورد معتبر است؟",
+      "options": [
+        "استفاده از نقل‌قول تکی برای کلیدها",
+        "استفاده از نقل‌قول دوتایی برای نام کلیدها و رشته‌ها بدون ویرگول پایانی اضافه",
+        "نوشتن Comment با //",
+        "استفاده از تگ‌های <key>"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>JSON سخت‌گیرانه نیازمند نقل‌قول دوتایی <code>\" \"</code> بوده و فاقد Comment و Trailing Comma است.</p>"
+    },
+    {
+      "title": "تفاوت کد پاسخ HTTP <code>401 Unauthorized</code> و <code>403 Forbidden</code> چیست؟",
+      "options": [
+        "401 به معنای نبود یا نامعتبر بودن احراز هویت (Authentication) است، اما 403 یعنی هویت شناخته شده ولی مجوز (Authorization) دسترسی به آن منبع را ندارد",
+        "403 یعنی سرور خاموش است",
+        "401 یعنی منبع با موفقیت ساخته شد",
+        "هر دو یکسان‌اند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تفکیک 401 (AuthN) و 403 (AuthZ) در عیب‌یابی REST API بسیار کلیدی است.</p>"
+    },
+    {
+      "title": "مفهوم <strong>Idempotency (هم‌توانی)</strong> در ابزارهای اتوماسیون مانند Ansible چیست؟",
+      "options": [
+        "اجرای چندباره یک Playbook روی تجهیز، اگر وضعیت مطلوب از پیش برقرار باشد تغییر اضافی یا خطا ایجاد نمی‌کند",
+        "هر بار اجرا پیکربندی را پاک می‌کند",
+        "نیاز به ریبوت پس از هر دستور",
+        "اجرا فقط روی یک روتر"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>هم‌توانی اجرای ایمن و تکرارپذیر اسکریپت‌های اتوماسیون را در شبکه تولیدی ممکن می‌سازد.</p>"
+    },
+    {
+      "title": "کدام صفحه از تجهیزات شبکه مسئول فوروارد سریع بسته‌ها با سخت‌افزار ASIC بر اساس جدول CEF/MAC است؟",
+      "options": [
+        "Management Plane",
+        "Control Plane",
+        "Data Plane (Forwarding Plane)",
+        "Northbound API"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Data Plane وظیفه ارسال سریع بسته‌ها از اینترفیس ورودی به خروجی را بر عهده دارد.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اتصال زنده به Catalyst Center و اجرای واقعی Ansible روی روترها",
+        "درخواست واقعی HTTPS روی اینترنت",
+        "شبیه‌ساز محلی Python 3 (کتابخانه json) برای آزمون NBI/SBI، چرخه CRUD در REST، مقایسه ابزارها و اعتبارسنجی JSON/YAML بدون کنترلر واقعی",
+        "بدون کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ کنترلر یا تجهیز واقعی متصل نیست.</p>"
+    }
+  ]
+}

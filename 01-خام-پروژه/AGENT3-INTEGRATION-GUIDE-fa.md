@@ -1,10 +1,10 @@
-# راهنمای ادغام محتوای ایجنت ۳ (Agent 3 Integration Guide — ۶۹ درس: ۶۴ اصلی + ۵ انتقالی CCNA دسته ۱۲A)
+# راهنمای ادغام محتوای ایجنت ۳ (Agent 3 Integration Guide — ۷۶ درس: ۶۴ اصلی + ۱۲ انتقالی CCNA دسته‌های ۱۲A و ۱۲B)
 
 تاریخ تولید و اعتبارسنجی: **۲۰۲۶-۱۱-۲۷** | شاخه کاری: `arena/941b9e62-fam` | مبنای مقایسه قدیمی: `5a7474902c8d729950288198953686702cfd85dc` (و منبع خام ایجنت ۱ @ `641d02ee`)
 
 ## ۱. خلاصه دامنه و سیاست بدون تعارض (Zero-Conflict Scope)
 
-- **تعداد دقیق درس‌های تحویلی ایجنت ۳ تا پایان دسته ۱۲A:** **۶۹ درس** شامل ۶۴ درس اصلی (۶ Specialist پایه، ۱۲ Specialist عمیق، ۱۹ Automation به‌جز `auto_12`، ۷ CCIE و ۲۰ CCDE) + **۵ درس نخست از ۱۷ درس انتقالی سابق ایجنت ۱ (دسته ۱۲A — هسته CCNA):** `ccna_02_vlan`, `ccna_v1`, `ccna_v6`, `ccna_03`, `ccna_04`.
+- **تعداد دقیق درس‌های تحویلی ایجنت ۳ تا پایان دسته ۱۲B:** **۷۶ درس** شامل ۶۴ درس اصلی (۶ Specialist پایه، ۱۲ Specialist عمیق، ۱۹ Automation به‌جز `auto_12`، ۷ CCIE و ۲۰ CCDE) + **۱۲ درس کامل CCNA انتقالی سابق ایجنت ۱** (دسته ۱۲A: ۵ درس هسته + دسته ۱۲B: ۷ درس سرویس‌ها، امنیت، بی‌سیم و اتوماسیون). ۵ درس باقی‌مانده (`adv_*`) در دسته ۱۲C تحویل می‌شوند.
 - **بدون دست‌کاری فایل‌های مشترک هسته:** فایل‌های مشترک `curriculum-catalog.json`، `lesson-engine.js`، `server/app.py` و `tests/test_academy_content.py` دست‌نخورده باقی مانده‌اند (`SHARED_FILES_TOUCHED=0`) و نسخه‌های محلی ادغام‌شده توسط Agent 2 روی `arena/ab96c97c-fam` بازنویسی نمی‌شوند.
 - **استاندارد فنی هر ۶۴ درس:** قالب رسمی `fam-app-blueprint-v1`، حداقل **۱۴ بخش آموزشی فارسی** (با حداقل ۱ نمودار SVG معتبر XML دارای `viewBox`)، حداقل **۱۵ واژه تخصصی**، دقیقاً **۱۲ پرسش چهارگزینه‌ای با گزینه‌های یکتا و پاسخ تشریحی**، **اسکریپت آزمایشگاه مستقل Python 3 (stdlib-only)** به‌صورت Verbatim HTML-Escaped در `stages.lab.html` و فایل ثبت بازبینی معنایی اختصاصی.
 
@@ -118,7 +118,19 @@
 | `ccna_03` | CCNA (مسیریابی): Static، Default، Floating Static و OSPF Single-Area (Area 0) | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_03.json` | `academy-labs/agent3/ccna_03_lab.py` | `academy-labs/reviews/ccna_03-review-fa.md` |
 | `ccna_04` | CCNA (سرویس‌های IP): افزونگی دروازه HSRP، همگام‌سازی NTP، ثبت وقایع Syslog و پایش SNMPv3 | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_04.json` | `academy-labs/agent3/ccna_04_lab.py` | `academy-labs/reviews/ccna_04-review-fa.md` |
 
-**جمع کل درس‌های احصاشده و تاییدشده:** `69` درس (`64` اصلی + `5` انتقالی دسته ۱۲A).
+### مسیر CCNA v1.1 انتقالی (دسته ۱۲B — ۷ درس سرویس‌ها، امنیت، بی‌سیم و SDN)
+
+| شناسه | عنوان فارسی | مسیر / دوره پیشنهادی | Blueprint | Lab Script | گزارش بازبینی |
+|---|---|---|---|---|---|
+| `ccna_dhcp` | CCNA (سرویس‌های IP): سرور DHCP، عامل بازپخش DHCP Relay (giaddr)، APIPA و DNS | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_dhcp.json` | `academy-labs/agent3/ccna_dhcp_lab.py` | `academy-labs/reviews/ccna_dhcp-review-fa.md` |
+| `ccna_nat` | CCNA (سرویس‌های IP): Static NAT، Dynamic NAT، PAT (NAT Overload) و ترتیب پردازش بسته | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_nat.json` | `academy-labs/agent3/ccna_nat_lab.py` | `academy-labs/reviews/ccna_nat-review-fa.md` |
+| `ccna_05` | CCNA (امنیت شبکه): فهرست‌های دسترسی ACL، Port Security، DHCP Snooping، DAI و STP Guards | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_05.json` | `academy-labs/agent3/ccna_05_lab.py` | `academy-labs/reviews/ccna_05-review-fa.md` |
+| `ccna_acl` | CCNA (امنیت شبکه): چشم‌انداز تهدیدات، AAA (TACACS+ و RADIUS)، VPN مقدماتی و Hardening تجهیزات | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_acl.json` | `academy-labs/agent3/ccna_acl_lab.py` | `academy-labs/reviews/ccna_acl-review-fa.md` |
+| `ccna_qos_ssh` | CCNA (سرویس‌های IP و مدیریت): مبانی QoS (DiffServ/DSCP/LLQ)، مدیریت امن SSHv2 و انتقال فایل (TFTP/FTP/SCP) | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_qos_ssh.json` | `academy-labs/agent3/ccna_qos_ssh_lab.py` | `academy-labs/reviews/ccna_qos_ssh-review-fa.md` |
+| `ccna_wl` | CCNA (شبکه‌های بی‌سیم): مبانی Wi-Fi، کانال‌های RF، معماری AP/WLC (CAPWAP) و امنیت WPA2/WPA3 | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_wl.json` | `academy-labs/agent3/ccna_wl_lab.py` | `academy-labs/reviews/ccna_wl-review-fa.md` |
+| `ccna_06` | CCNA (اتوماسیون و برنامه‌پذیری): معماری SDN، Cisco Catalyst Center، REST API و ابزارهای Ansible/Puppet/Chef | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_06.json` | `academy-labs/agent3/ccna_06_lab.py` | `academy-labs/reviews/ccna_06-review-fa.md` |
+
+**جمع کل درس‌های احصاشده و تاییدشده:** `76` درس (`64` اصلی + `12` انتقالی CCNA دسته‌های ۱۲A و ۱۲B).
 
 ## ۴. خلاصه مهم‌ترین اصلاحات ممیزی نسخه قدیمی (Legacy Audit Fixes)
 
