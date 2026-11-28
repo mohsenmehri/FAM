@@ -687,7 +687,7 @@ def create_app(config=None):
         # without a header remain compatible; writes always require one.
         supplied=request.headers.get('X-FAM-CSRF')
         if request.method not in ('GET','HEAD') or supplied is not None:
-            if not hmac.compare_digest(supplied or '',g.session['csrf']):
+            if not supplied or not supplied.isascii() or not hmac.compare_digest(supplied,g.session['csrf']):
                 if supplied:return jsonify(error='نشست این صفحه تغییر کرده است؛ دوباره وارد شوید.',code='session_changed'),403
                 fail(403,'توکن درخواست معتبر نیست.')
     @app.after_request

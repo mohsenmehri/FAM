@@ -20,9 +20,9 @@ class AcademyHandoffTests(unittest.TestCase):
         self.assertEqual(len({r[0] for r in rows}), 114)
         third = [row for row in rows if row[1].strip() == 'ایجنت سوم']
         mine = [row for row in rows if row[1].strip() == 'یکپارچه‌ساز']
-        self.assertEqual((len(mine), len(third)), (50, 64))
+        self.assertEqual((len(mine), len(third)), (33, 81))
         for lesson, owner, sha, status, action in rows:
-            expected_third = lesson.startswith(('spec_', 'ccie_', 'ccde_')) or (lesson.startswith('auto_') and lesson != 'auto_12')
+            expected_third = (lesson.startswith(('spec_', 'ccie_', 'ccde_')) or (lesson.startswith('auto_') and lesson != 'auto_12') or (lesson.startswith('ccna_') and lesson not in {'ccna_01', 'ccna_02'}) or lesson in {'adv_01', 'adv_02', 'adv_03', 'adv_04', 'adv_bfd'})
             self.assertEqual(owner.strip() == 'ایجنت سوم', expected_third, lesson)
             self.assertTrue(status.strip(), lesson)
             self.assertTrue(action.strip(), lesson)

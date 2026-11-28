@@ -559,6 +559,21 @@ class FamAppApiTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as db:
             self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,9))
 
+    def test_non_ascii_csrf_rejected_for_migration_recovery_and_reads(self):
+        self._login_admin()
+        h={'Origin':self.ORIGIN,'X-FAM-CSRF':'invalid-é'}
+        for url in ('/api/academy/progress/export', '/api/academy/progress/legacy-preview',
+                    '/api/academy/progress/backups'):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url,headers=h,environ_base=self.https_env).status_code,403)
+        for url, body in (('/api/academy/progress/migrate', {'expectedRevision':0,'selectedLessons':['s02']}),
+                          ('/api/academy/progress/restore', {'expectedRevision':0,'backupRevision':1})):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url,json=body,headers=h,environ_base=self.https_env).status_code,403)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups').fetchone()[0],0)
+
     def test_selected_legacy_migration_is_atomic_explicit_and_reversible(self):
         url='/api/academy/progress/migrate'; preview='/api/academy/progress/legacy-preview'
         self.assertEqual(self.client.post(url,json={},headers={'Origin':self.ORIGIN},environ_base=self.https_env).status_code,401)
