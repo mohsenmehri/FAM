@@ -682,6 +682,35 @@ class FamAppApiTests(unittest.TestCase):
         self.assertEqual(restored.status_code,200)
         with sqlite3.connect(self.db_path) as db:
             self.assertEqual(db.execute('SELECT payload FROM academy_progress WHERE user_id=?',(uid,)).fetchone()[0],raw)
+
+    def test_reset_fresh_clears_progress_and_preserves_reversible_backup(self):
+        url='/api/academy/progress/reset-fresh'
+        self.assertEqual(self.client.post(url,json={'expectedRevision':0,'confirmReset':True},headers={'Origin':self.ORIGIN},environ_base=self.https_env).status_code,401)
+        csrf=self._login_admin().json['csrf']; h={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
+        # Fresh account with no row succeeds with expectedRevision=0
+        empty_res=self.client.post(url,json={'expectedRevision':0,'confirmReset':True},headers=h,environ_base=self.https_env)
+        self.assertEqual(empty_res.status_code,200); self.assertEqual(empty_res.json['revision'],0)
+        with sqlite3.connect(self.db_path) as db:
+            uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
+            prior=json.dumps({'fam4.learn.v1':json.dumps({'completed':['s02','adv_bgp'],'labs':{'lessonNotes':{'s02':'note'}},'profile':{'goal':'fam-automation'}}),'unrelated':'keep'})
+            db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,prior,1,4))
+        # Must explicitly pass confirmReset=True and matching expectedRevision
+        self.assertEqual(self.client.post(url,json={'expectedRevision':4,'confirmReset':False},headers=h,environ_base=self.https_env).status_code,400)
+        self.assertEqual(self.client.post(url,json={'expectedRevision':3,'confirmReset':True},headers=h,environ_base=self.https_env).status_code,409)
+        res=self.client.post(url,json={'expectedRevision':4,'confirmReset':True},headers=h,environ_base=self.https_env)
+        self.assertEqual(res.status_code,200); self.assertEqual(res.json['revision'],5)
+        with sqlite3.connect(self.db_path) as db:
+            payload,rev=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
+            backup=db.execute('SELECT payload FROM academy_progress_backups WHERE user_id=? AND revision=4',(uid,)).fetchone()[0]
+        self.assertEqual(rev,5); self.assertEqual(backup,prior)
+        outer=json.loads(payload)
+        self.assertEqual(outer['unrelated'],'keep')
+        self.assertEqual(json.loads(outer['fam4.learn.v1']),{'completed':[],'labs':{}})
+        # Reversible via restore
+        restored=self.client.post('/api/academy/progress/restore',json={'backupRevision':4,'expectedRevision':5},headers=h,environ_base=self.https_env)
+        self.assertEqual(restored.status_code,200)
+        with sqlite3.connect(self.db_path) as db:
+            self.assertEqual(db.execute('SELECT payload FROM academy_progress WHERE user_id=?',(uid,)).fetchone()[0],prior)
         self.assertEqual(self.client.post('/api/academy/progress',json={'expectedRevision':8,'changes':{'fam4.learn.v1':'{}'}},headers=h,environ_base=self.https_env).status_code,409)
 
     def test_migration_rejects_archive_collision_and_cross_account_request(self):

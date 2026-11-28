@@ -112,9 +112,38 @@ async function testEmptyLegacyArchiveUnlockFlow() {
   dom.window.close();
 }
 
+async function testResetFreshFlow() {
+  const dom=new JSDOM('<!doctype html><div id="academy-save-status"></div><button id="academy-reset-fresh" hidden></button>',{url:'https://fam.test/',runScripts:'outside-only'});
+  const w=dom.window, requests=[];
+  w.confirm=()=>true;
+  w.localStorage.setItem('fam.academy.theme','light');
+  w.localStorage.setItem('fam.academy.missions.v1.admin','{"day":"2026-11-28","done":{"study-one":true}}');
+  w.localStorage.setItem('fam.academy.timer.v1.admin','{"day":"2026-11-28","minutes":25}');
+  w.fetch=async(url,opts)=>{
+    requests.push({url,opts});
+    if(url.endsWith('/reset-fresh')) return {ok:true,json:async()=>({ok:true,revision:5,reset:true})};
+    throw Error('unexpected '+url);
+  };
+  w.eval(script.replace('__FAM_ACADEMY_BOOTSTRAP__',JSON.stringify({csrf:'tok',userName:'admin',progressRevision:4,progress:{'fam4.learn.v1':JSON.stringify({completed:['s02'],labs:{}})}})));
+  await tick();
+  const btn=w.document.getElementById('academy-reset-fresh');
+  assert.equal(btn.hidden,false,'reset-fresh button must be visible');
+  const ok = await w.FamAcademyBridge.resetFresh({noReload:true});
+  assert.equal(ok,true);
+  assert.equal(requests.length,1);
+  assert.equal(requests[0].url,'/api/academy/progress/reset-fresh');
+  assert.deepEqual(JSON.parse(requests[0].opts.body),{expectedRevision:4,confirmReset:true});
+  assert.deepEqual(JSON.parse(JSON.stringify(w.FamAcademyBridge.progress)),{completed:[],labs:{}});
+  assert.equal(w.localStorage.getItem('fam.academy.missions.v1.admin'),null,'missions must be cleared');
+  assert.equal(w.localStorage.getItem('fam.academy.timer.v1.admin'),null,'timer must be cleared');
+  assert.equal(w.localStorage.getItem('fam.academy.theme'),'light','theme preference must be preserved');
+  dom.window.close();
+}
+
 (async()=>{
   await testMigrationFlow();
   await testReadOnlyLegacyArchiveViewer();
   await testEmptyLegacyArchiveUnlockFlow();
-  console.log('jsdom migration + archive-unlock + read-only legacy archive viewer passed');
+  await testResetFreshFlow();
+  console.log('jsdom migration + archive-unlock + reset-fresh + read-only legacy archive viewer passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

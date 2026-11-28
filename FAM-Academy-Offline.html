@@ -447,8 +447,109 @@
               : (bridge.lastError || 'ذخیره نشد؛ اتصال را بررسی کنید. برای تلاش دوباره تغییری ثبت کنید.'));
           }
           return ok;
+        },
+        async resetFresh(options) {
+          const skipConfirm = Boolean(options && options.skipConfirm);
+          const isOffline = boot.offline === true;
+          const confirmMsg = isOffline
+            ? 'تمام پیشرفت درس‌ها، نمره‌های آزمون، یادداشت‌ها، پروفایل، مأموریت‌های امروز و تایمر مطالعه از حافظه مرورگر پاک شده و آکادمی دقیقاً مثل اولین ورود خام می‌شود. ادامه می‌دهید؟'
+            : 'تمام پیشرفت درس‌ها، نمره‌های آزمون، یادداشت‌ها، پروفایل، مأموریت‌های امروز و تایمر مطالعه پاک شده و آکادمی دقیقاً مثل اولین ورود خام می‌شود.\n\nنکته: پیش از پاک‌سازی، یک نسخه پشتیبان خودکار در حساب شما ذخیره می‌شود تا در صورت نیاز قابل بازیابی باشد.\n\nادامه می‌دهید؟';
+          if (!skipConfirm && typeof window.confirm === 'function' && !window.confirm(confirmMsg)) {
+            return false;
+          }
+          const bridge = this;
+          bridge.lastError = '';
+          bridge.lastStatus = 0;
+          bridge.lastCode = '';
+
+          const clearLocalAcademyState = () => {
+            try {
+              const userSuffix = bridge.user?.username || 'guest';
+              const exactKeys = [
+                'fam_academy_progress_v1',
+                'fam_academy_quiz_v1',
+                'fam.academy.notes.v1',
+                'fam.academy.offline.v1',
+                'fam.academy.offline.v2',
+                'fam.academy.s4.v1',
+                'fam.academy.s4.v1.' + userSuffix,
+                'fam.academy.s4.v1.guest',
+                'fam.academy.missions.v1',
+                'fam.academy.missions.v1.' + userSuffix,
+                'fam.academy.missions.v1.guest',
+                'fam.academy.timer.v1',
+                'fam.academy.timer.v1.' + userSuffix,
+                'fam.academy.timer.v1.guest'
+              ];
+              for (const k of exactKeys) localStorage.removeItem(k);
+              // Also clear any other scoped academy keys except theme preferences.
+              const keep = new Set(['fam.academy.theme', 'fam.ui.theme']);
+              for (let i = localStorage.length - 1; i >= 0; i--) {
+                const k = localStorage.key(i);
+                if (!k || keep.has(k)) continue;
+                if (k.startsWith('fam.academy.') || k.startsWith('fam_academy_')) {
+                  localStorage.removeItem(k);
+                }
+              }
+            } catch (_) {}
+          };
+
+          if (!isOffline && csrf) {
+            try {
+              const response = await fetch('/api/academy/progress/reset-fresh', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-FAM-CSRF': csrf },
+                body: JSON.stringify({ expectedRevision: Number.isSafeInteger(progressRevision) ? progressRevision : 0, confirmReset: true })
+              });
+              let data = null;
+              try { data = response && typeof response.json === 'function' ? await response.json() : null; } catch (_) {}
+              if (!response || !response.ok) {
+                const status = response ? response.status : 0;
+                bridge.lastStatus = status;
+                if (status === 401) {
+                  bridge.lastCode = 'auth_expired';
+                  bridge.lastError = 'نشست کاربری منقضی شده است؛ لطفاً دوباره وارد شوید.';
+                } else if (status === 409) {
+                  bridge.lastCode = 'revision_conflict';
+                  bridge.lastError = (data && data.error) || 'نسخه پیشرفت تغییر کرده است؛ صفحه را بازخوانی و دوباره تلاش کنید.';
+                } else {
+                  bridge.lastCode = 'reset_failed';
+                  bridge.lastError = (data && data.error) || 'بازنشانی انجام نشد؛ اتصال را بررسی و دوباره تلاش کنید.';
+                }
+                saveStatus(bridge.lastError);
+                return false;
+              }
+              if (data && Number.isSafeInteger(data.revision)) progressRevision = data.revision;
+            } catch (_) {
+              bridge.lastStatus = 0;
+              bridge.lastCode = 'network_error';
+              bridge.lastError = 'ارتباط با سرور برای بازنشانی برقرار نشد؛ اتصال شبکه را بررسی کنید.';
+              saveStatus(bridge.lastError);
+              return false;
+            }
+          }
+
+          clearLocalAcademyState();
+          bridge.progress = { completed: [], labs: {} };
+          saveStatus('آکادمی به حالت خام (ورود اول) بازنشانی شد. در حال بارگذاری مجدد…');
+          if (!(options && options.noReload)) {
+            try { location.hash = '#/dashboard'; } catch (_) {}
+            try { window.location.reload(); } catch (_) {}
+          }
+          return true;
         }
       };
+      document.addEventListener('DOMContentLoaded', () => {
+        const resetBtn = document.getElementById('academy-reset-fresh');
+        if (!resetBtn) return;
+        resetBtn.hidden = false;
+        resetBtn.addEventListener('click', async () => {
+          resetBtn.disabled = true;
+          const ok = await window.FamAcademyBridge.resetFresh();
+          if (!ok) resetBtn.disabled = false;
+        });
+      });
     })();
   </script>
 
@@ -2272,6 +2373,22 @@ figure figcaption {
   color: #06101f;
   border: 0;
 }
+.journey-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.btn-reset-fresh {
+  border: 1px solid color-mix(in srgb, var(--rose) 55%, var(--line)) !important;
+  background: color-mix(in srgb, var(--rose) 12%, var(--panel2)) !important;
+  color: var(--rose) !important;
+  font-weight: 800;
+}
+.btn-reset-fresh:hover {
+  border-color: var(--rose) !important;
+  background: color-mix(in srgb, var(--rose) 22%, var(--panel2)) !important;
+}
 
 @media (max-width: 480px) {
   .topbar { padding: 0 8px; gap: 6px; }
@@ -2308,7 +2425,7 @@ figure figcaption {
   <section id="academy-account-tools" class="account-tools-bar" aria-label="مدیریت داده، پشتیبان و آرشیو حساب">
     <div class="account-tools-card">
       <div id="academy-save-status" role="status" aria-live="polite"></div>
-      <div class="account-tools-row"><button id="academy-export-progress" type="button" hidden>دریافت نسخه خام پیشرفت حساب</button><small>نسخه ممکن است یادداشت و اطلاعات حساس داشته باشد؛ در محل امن نگهداری کنید. این دریافت، مهاجرت یا بازیابی نیست.</small></div>
+      <div class="account-tools-row"><button id="academy-export-progress" type="button" hidden>دریافت نسخه خام پیشرفت حساب</button><button id="academy-reset-fresh" class="btn-reset-fresh" type="button" hidden>شروع از صفر (حالت خام ورود اول)</button><small>نسخه ممکن است یادداشت و اطلاعات حساس داشته باشد؛ در محل امن نگهداری کنید. «شروع از صفر» پیش از پاک‌سازی، پشتیبان خودکار قابل بازگشت ذخیره می‌کند.</small></div>
       <div class="account-tools-row"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-legacy-migrate" type="button" hidden>انتقال تکمیل درس‌های تأییدشده</button><button id="academy-legacy-archive-unlock" type="button" hidden>بایگانی امن نسخه قدیمی و فعال‌سازی ذخیره جدید</button><button id="academy-legacy-reload" type="button" hidden>بازخوانی صفحه</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button><button id="academy-legacy-archive-toggle" type="button" aria-expanded="false" hidden>مشاهده خواندنی آرشیو نسخه قدیمی (نمره‌ها و یادداشت‌ها)</button></div>
       <section id="academy-legacy-archive-panel" aria-label="آرشیو خواندنی نسخه قدیمی" hidden style="margin:10px 0 0;padding:14px 16px;border:1px solid #475569;border-radius:10px;"></section>
     </div>
@@ -4924,7 +5041,7 @@ figure figcaption {
         const sc = Number((ratio * 10).toFixed(1));
         return `<span class="journey-score-badge ${ratio >= 0.7 ? 'is-pass' : 'is-low'}">آزمون: ${sc}/۱۰</span>`;
       };
-      root.innerHTML=`<div class="journey-progress-page"><div class="journey-progress-head"><div><span class="journey-kicker">YOUR LEARNING PROFILE</span><h1>پیشرفت و سنجش تسلط من</h1><p>ترکیبی از درس‌های تکمیل‌شده، نمرات آزمون ۱۲سؤالی و پیشرفت هر دوره.</p></div><button class="journey-primary small" id="journey-edit-profile">ویرایش هدف و برنامه ←</button></div>
+      root.innerHTML=`<div class="journey-progress-page"><div class="journey-progress-head"><div><span class="journey-kicker">YOUR LEARNING PROFILE</span><h1>پیشرفت و سنجش تسلط من</h1><p>ترکیبی از درس‌های تکمیل‌شده، نمرات آزمون ۱۲سؤالی و پیشرفت هر دوره.</p></div><div class="journey-head-actions"><button class="journey-primary small" id="journey-edit-profile" type="button">ویرایش هدف و برنامه ←</button><button class="btn btn-reset-fresh" id="journey-reset-fresh" type="button">شروع از صفر (حالت خام)</button></div></div>
         <div class="journey-progress-grid"><article class="journey-panel"><span class="journey-kicker">LESSONS COMPLETED</span><h2>درس‌های تکمیل‌شده</h2><div class="journey-stat">${done.length}<small>از ${count} درس</small></div><div class="fa-progress journey-meter"><span style="width:${pct}%"></span></div><p>بر اساس تکمیل ثبت‌شده درس‌ها</p></article>
         <article class="journey-panel"><span class="journey-kicker">ASSESSMENT MASTERY</span><h2>میانگین آزمون‌ها</h2><div class="journey-stat">${quizCount ? avgScore : '—'}<small>${quizCount ? 'از ۱۰' : 'هنوز آزمونی ثبت نشده'}</small></div><p>${quizCount ? `${quizCount.toLocaleString('fa-IR')} آزمون ثبت‌شده · ${passedCount.toLocaleString('fa-IR')} قبولی (نمره ۷+)` : 'با ثبت اولین آزمون ۱۲سؤالی، میانگین تسلط اینجا محاسبه می‌شود.'}</p></article>
         <article class="journey-panel"><span class="journey-kicker">YOUR PLAN</span><h2>هدف و برنامه</h2><div class="journey-stat" style="font-size:22px">${esc(goalTitle)}</div>${focusTitle ? `<p style="color:var(--cyan);font-weight:700">تمرکز مرحله: ${esc(focusTitle)}</p>` : ''}<p>${Number(p.minutesPerDay)||45} دقیقه در روز · ${Number(p.daysPerWeek)||5} روز در هفته</p><p>${p.targetDate ? `تاریخ هدف: <bdi dir="ltr">${esc(p.targetDate)}</bdi>` : 'تاریخ هدف تنظیم نشده است.'}</p></article>
@@ -4934,6 +5051,16 @@ figure figcaption {
         </section>
         <section class="journey-history"><div class="journey-heading"><div><span class="journey-kicker">YOUR MILESTONES</span><h2>درس‌های ثبت‌شده</h2><p>برای هر درس تکمیل‌شده می‌توانی دوباره مطالعه را باز کنی.</p></div></div>${done.length?`<div class="journey-history-list">${done.map(l=>`<button class="journey-history-item" data-open-lesson="${esc(l.id)}"><span>✓</span><strong>${esc(l.title)}</strong>${scoreBadge(l.id)}<small>تکمیل‌شده ←</small></button>`).join('')}</div>`:'<div class="journey-empty">هنوز درسی را تکمیل‌شده علامت نزده‌ای. با اولین قدم شروع کن.</div>'}</section></div>`;
       root.querySelector('#journey-edit-profile').onclick=()=>openProfile();
+      const resetFreshBtn = root.querySelector('#journey-reset-fresh');
+      if (resetFreshBtn) {
+        resetFreshBtn.onclick = async () => {
+          if (window.FamAcademyBridge && typeof window.FamAcademyBridge.resetFresh === 'function') {
+            resetFreshBtn.disabled = true;
+            const ok = await window.FamAcademyBridge.resetFresh();
+            if (!ok) resetFreshBtn.disabled = false;
+          }
+        };
+      }
       root.querySelectorAll('[data-open-lesson]').forEach(button=>{button.onclick=()=>{location.hash='#'+button.dataset.openLesson;};});
     } catch(err) { if(root.dataset.loadSequence===requestId) root.textContent='نمایش پیشرفت ناموفق بود: '+err.message; }
   }

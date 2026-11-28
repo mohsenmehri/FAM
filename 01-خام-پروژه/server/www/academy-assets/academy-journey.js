@@ -167,7 +167,7 @@
         const sc = Number((ratio * 10).toFixed(1));
         return `<span class="journey-score-badge ${ratio >= 0.7 ? 'is-pass' : 'is-low'}">آزمون: ${sc}/۱۰</span>`;
       };
-      root.innerHTML=`<div class="journey-progress-page"><div class="journey-progress-head"><div><span class="journey-kicker">YOUR LEARNING PROFILE</span><h1>پیشرفت و سنجش تسلط من</h1><p>ترکیبی از درس‌های تکمیل‌شده، نمرات آزمون ۱۲سؤالی و پیشرفت هر دوره.</p></div><button class="journey-primary small" id="journey-edit-profile">ویرایش هدف و برنامه ←</button></div>
+      root.innerHTML=`<div class="journey-progress-page"><div class="journey-progress-head"><div><span class="journey-kicker">YOUR LEARNING PROFILE</span><h1>پیشرفت و سنجش تسلط من</h1><p>ترکیبی از درس‌های تکمیل‌شده، نمرات آزمون ۱۲سؤالی و پیشرفت هر دوره.</p></div><div class="journey-head-actions"><button class="journey-primary small" id="journey-edit-profile" type="button">ویرایش هدف و برنامه ←</button><button class="btn btn-reset-fresh" id="journey-reset-fresh" type="button">شروع از صفر (حالت خام)</button></div></div>
         <div class="journey-progress-grid"><article class="journey-panel"><span class="journey-kicker">LESSONS COMPLETED</span><h2>درس‌های تکمیل‌شده</h2><div class="journey-stat">${done.length}<small>از ${count} درس</small></div><div class="fa-progress journey-meter"><span style="width:${pct}%"></span></div><p>بر اساس تکمیل ثبت‌شده درس‌ها</p></article>
         <article class="journey-panel"><span class="journey-kicker">ASSESSMENT MASTERY</span><h2>میانگین آزمون‌ها</h2><div class="journey-stat">${quizCount ? avgScore : '—'}<small>${quizCount ? 'از ۱۰' : 'هنوز آزمونی ثبت نشده'}</small></div><p>${quizCount ? `${quizCount.toLocaleString('fa-IR')} آزمون ثبت‌شده · ${passedCount.toLocaleString('fa-IR')} قبولی (نمره ۷+)` : 'با ثبت اولین آزمون ۱۲سؤالی، میانگین تسلط اینجا محاسبه می‌شود.'}</p></article>
         <article class="journey-panel"><span class="journey-kicker">YOUR PLAN</span><h2>هدف و برنامه</h2><div class="journey-stat" style="font-size:22px">${esc(goalTitle)}</div>${focusTitle ? `<p style="color:var(--cyan);font-weight:700">تمرکز مرحله: ${esc(focusTitle)}</p>` : ''}<p>${Number(p.minutesPerDay)||45} دقیقه در روز · ${Number(p.daysPerWeek)||5} روز در هفته</p><p>${p.targetDate ? `تاریخ هدف: <bdi dir="ltr">${esc(p.targetDate)}</bdi>` : 'تاریخ هدف تنظیم نشده است.'}</p></article>
@@ -177,6 +177,16 @@
         </section>
         <section class="journey-history"><div class="journey-heading"><div><span class="journey-kicker">YOUR MILESTONES</span><h2>درس‌های ثبت‌شده</h2><p>برای هر درس تکمیل‌شده می‌توانی دوباره مطالعه را باز کنی.</p></div></div>${done.length?`<div class="journey-history-list">${done.map(l=>`<button class="journey-history-item" data-open-lesson="${esc(l.id)}"><span>✓</span><strong>${esc(l.title)}</strong>${scoreBadge(l.id)}<small>تکمیل‌شده ←</small></button>`).join('')}</div>`:'<div class="journey-empty">هنوز درسی را تکمیل‌شده علامت نزده‌ای. با اولین قدم شروع کن.</div>'}</section></div>`;
       root.querySelector('#journey-edit-profile').onclick=()=>openProfile();
+      const resetFreshBtn = root.querySelector('#journey-reset-fresh');
+      if (resetFreshBtn) {
+        resetFreshBtn.onclick = async () => {
+          if (window.FamAcademyBridge && typeof window.FamAcademyBridge.resetFresh === 'function') {
+            resetFreshBtn.disabled = true;
+            const ok = await window.FamAcademyBridge.resetFresh();
+            if (!ok) resetFreshBtn.disabled = false;
+          }
+        };
+      }
       root.querySelectorAll('[data-open-lesson]').forEach(button=>{button.onclick=()=>{location.hash='#'+button.dataset.openLesson;};});
     } catch(err) { if(root.dataset.loadSequence===requestId) root.textContent='نمایش پیشرفت ناموفق بود: '+err.message; }
   }

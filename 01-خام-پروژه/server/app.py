@@ -1028,6 +1028,43 @@ def create_app(config=None):
                        (payload, revision, now, user['id']))
         return jsonify(ok=True, revision=revision, archived=True)
 
+    @app.post('/api/academy/progress/reset-fresh')
+    def reset_academy_progress_fresh():
+        body = data()
+        if (not isinstance(body, dict) or set(body) != {'expectedRevision', 'confirmReset'} or
+            body['confirmReset'] is not True or
+            type(body['expectedRevision']) is not int or not 0 <= body['expectedRevision'] < 2**63 - 1):
+            fail(400, 'تأیید صریح بازنشانی و نسخه فعلی معتبر لازم است.')
+        with transaction() as db:
+            user, _ = user_and_session(db)
+            row = db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?', (user['id'],)).fetchone()
+            if not row:
+                if body['expectedRevision'] != 0:
+                    fail(409, 'پیشرفت تغییر کرده است؛ صفحه را بازخوانی کنید.')
+                return jsonify(ok=True, revision=0, reset=True)
+            if row['revision'] != body['expectedRevision']:
+                fail(409, 'پیشرفت تغییر کرده است؛ صفحه را بازخوانی کنید.')
+            try:
+                outer = strict_progress_json(row['payload'])
+                if not isinstance(outer, dict):
+                    outer = {}
+            except (ValueError, TypeError, RecursionError):
+                outer = {}
+            # Keep unrelated keys and any existing read-only legacy archive;
+            # wipe active academy progress to a clean first-login state.
+            outer.pop('fam3.progress.v1', None)
+            outer['fam4.learn.v1'] = packed({'completed': [], 'labs': {}})
+            payload = packed(outer)
+            if len(payload.encode('utf-8')) > 8 * 1024 * 1024:
+                fail(413, 'فضای مجاز ذخیره کافی نیست؛ هیچ داده‌ای تغییر نکرد.')
+            now = int(time.time() * 1000)
+            db.execute('INSERT INTO academy_progress_backups(user_id,revision,payload,saved_at) VALUES(?,?,?,?)',
+                       (user['id'], row['revision'], row['payload'], now))
+            revision = row['revision'] + 1
+            db.execute('UPDATE academy_progress SET payload=?,revision=?,updated_at=? WHERE user_id=?',
+                       (payload, revision, now, user['id']))
+        return jsonify(ok=True, revision=revision, reset=True)
+
     @app.get('/api/academy/progress/backups')
     def list_academy_progress_backups():
         with connect() as db:
