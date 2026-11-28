@@ -1,0 +1,346 @@
+{
+ "schema": "fam-app-blueprint-v1",
+ "lessonId": "auto_06",
+ "objectiveId": "auto_06",
+ "kind": "lesson",
+ "track": "Automation",
+ "course": "automation-foundations",
+ "title": "۷.۷ Automation (درس ۶ از ۲۰): مبانی REST API و Postman",
+ "titleEn": "Automation 06: REST API Fundamentals, HTTP Methods, Status Codes & Postman",
+ "domain": "Network Automation",
+ "source": "Legacy auto_06 rewritten and audited",
+ "evidence": "HTTP واقعی محلی موقت روی loopback اجرا شده؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+ "reviewStatus": "بازبینی فنی توسط یکپارچه‌ساز انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+ "estimatedMinutes": 50,
+ "prerequisites": [],
+ "sections": [
+  {
+   "id": "auto_06-section-1",
+   "title": "مسئله واقعی: چرا کنترلرهای مدرن شبکه به جای اسکرپینگ CLI از REST API استفاده می‌کنند؟",
+   "html": "<p>بسیاری از کنترلرها در کنار CLI واسط HTTP/JSON یا RESTCONF ارائه می‌کنند. برای تغییر ایمن باید قرارداد همان API، روش احراز هویت، نسخه و فرمت داده را بررسی کرد؛ استفاده نادرست از جایگزینی کامل یا retry می‌تواند پیکربندی را تغییر دهد یا بار را افزایش دهد.</p>"
+  },
+  {
+   "id": "auto_06-section-2",
+   "title": "هدف یادگیری و پیش‌نیازها",
+   "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با JSON (درس <code>auto_05</code>) و مفاهیم پایه TCP/HTTP.</p><ul><li>تبیین ۶ قید معماری <strong>REST</strong> (به‌ویژه <strong>Stateless</strong> و <strong>Uniform Interface</strong>).</li><li>تفکیک دقیق متدهای <code>GET</code>، <code>POST</code>، <code>PUT</code>، <code>PATCH</code> و <code>DELETE</code> از نظر <strong>Safety</strong> و <strong>Idempotency</strong> (مطابق RFC 9110 و RFC 5789).</li><li>رمزگشایی سریع کدهای وضعیت HTTP (<code>200/201/204</code>، <code>400/401/403/404/409/429</code>، <code>500/502/503</code>) در عیب‌یابی API شبکه.</li><li>طراحی جریان تست ایمن در <strong>Postman</strong> (Environments و Secrets) و انتقال به کد مقاوم Python (<code>timeout</code>، <code>raise_for_status</code> و Retry محدود و ایمن روی <code>429</code>).</li></ul>"
+  },
+  {
+   "id": "auto_06-section-3",
+   "title": "شش قید معماری REST (روی فیلدینگ) و چرایی Stateless بودن",
+   "html": "<p>REST سبک معماری شامل client-server، stateless، cacheable، uniform interface و layered system، و code-on-demand اختیاری است. Stateless یعنی زمینه لازم برای پردازش هر درخواست در آن وجود دارد، نه آنکه سرور هیچ داده یا منبعی ذخیره نکند. همه APIهای HTTP صرفاً به دلیل داشتن URI لزوماً REST کامل نیستند.</p>"
+  },
+  {
+   "id": "auto_06-section-4",
+   "title": "کالبدشکافی متدهای HTTP: Safety و Idempotency (RFC 9110 و RFC 5789)",
+   "html": "<table><thead><tr><th>متد</th><th>عملیات معمول</th><th>Safe (بدون تغییر وضعیت سرور)؟</th><th>Idempotent (تکرار نتیجه یکسان دارد)؟</th></tr></thead><tbody><tr><td><code>GET</code></td><td>خواندن منبع</td><td><strong>بله</strong></td><td><strong>بله</strong></td></tr><tr><td><code>POST</code></td><td>ایجاد منبع جدید / اجرای عملیات</td><td>خیر</td><td><strong>خیر</strong> (تکرار ممکن است ۲ منبع تکراری بسازد)</td></tr><tr><td><code>PUT</code></td><td><strong>جایگزینی کامل</strong> منبع هدف (یا ایجاد با URI مشخص)</td><td>خیر</td><td><strong>بله</strong></td></tr><tr><td><code>PATCH</code></td><td><strong>تغییر جزئی</strong> بخشی از منبع (RFC 5789)</td><td>خیر</td><td><strong>لزوماً خیر</strong> (بسته به نوع Patch؛ مثلاً افزایش شمارنده Idempotent نیست)</td></tr><tr><td><code>DELETE</code></td><td>حذف منبع</td><td>خیر</td><td><strong>بله</strong> (وضعیت نهایی سرور پس از ۱ یا ۵ بار حذف، نبودن منبع است؛ هرچند کد پاسخ دوم ممکن است 404 باشد)</td></tr></tbody></table><p><strong>تله واقعی PUT در برابر PATCH:</strong> اگر برای تغییر صرفاً <code>description</code> یک اینترفیس از <code>PUT</code> استفاده کنید و فیلد <code>ip</code> را در بدنه JSON نگذارید، سرور <code>PUT</code> را جایگزینی کامل تلقی کرده و ممکن است IP اینترفیس را پاک کند! در صورت پشتیبانی API و فرمت مناسب می‌توان از <code>PATCH</code> استفاده کرد؛ نسخه و شرط تغییر را بررسی کنید.</p><p>Safe یعنی کلاینت تغییر وضعیت را درخواست نمی‌کند؛ رخدادهای جانبی مانند ثبت لاگ همچنان ممکن‌اند. Idempotent درباره اثر موردنظر تکرار درخواست یکسان است، نه لزوماً پاسخ یکسان، نبود لاگ یا ایمنی در برابر تغییر هم‌زمان دیگران. POST به طور عمومی تضمین idempotence ندارد؛ برخی APIها کلید تکرارنشدنی ارائه می‌کنند. PATCH فرمت و عملیات مشخص دارد و با If-Match می‌توان از overwrite هم‌زمان جلوگیری کرد؛ از پشتیبانی PATCH در API هدف مطمئن شوید.</p>"
+  },
+  {
+   "id": "auto_06-section-5",
+   "title": "نمودار چرخه درخواست و پاسخ REST API در اتوماسیون شبکه",
+   "html": "<p>نمودار زیر ارتباط هدرها، متدهای CRUD، کدهای وضعیت و مقاومت کلاینت را نشان می‌دهد.</p><svg viewBox=\"0 0 760 215\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"REST API Client-Server CRUD Lifecycle and HTTP Status Codes\"><rect x=\"14\" y=\"24\" width=\"185\" height=\"168\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"106\" y=\"48\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Client (Python / Postman)</text><text x=\"106\" y=\"78\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Headers: Authorization,</text><text x=\"106\" y=\"94\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">Accept, Content-Type</text><text x=\"106\" y=\"122\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">Set bounded timeouts</text><text x=\"106\" y=\"146\" text-anchor=\"middle\" font-size=\"10\" fill=\"#1e40af\">Handle 429 Retry-After</text><rect x=\"234\" y=\"18\" width=\"290\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"379\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">HTTP Methods (RFC 9110 / 5789)</text><text x=\"379\" y=\"70\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">GET: Read (Safe + Idempotent) -&gt; 200</text><text x=\"379\" y=\"94\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">POST: Create (no general idempotency)</text><text x=\"379\" y=\"118\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">PUT: Full Replace (Idempotent) -&gt; 200</text><text x=\"379\" y=\"142\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">PATCH: Partial Update (RFC 5789) -&gt; 200</text><text x=\"379\" y=\"166\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">DELETE: Remove (Idempotent) -&gt; 204</text><rect x=\"558\" y=\"24\" width=\"188\" height=\"168\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"652\" y=\"48\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Controller / REST API</text><text x=\"652\" y=\"78\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">Stateless Request Handling</text><text x=\"652\" y=\"102\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">2xx Success | 401 AuthN</text><text x=\"652\" y=\"126\" text-anchor=\"middle\" font-size=\"10\" fill=\"#14532d\">403 AuthZ | 404 Missing</text><text x=\"652\" y=\"150\" text-anchor=\"middle\" font-size=\"10\" fill=\"#b91c1c\">429 Rate Limit | 5xx Server</text><line x1=\"199\" y1=\"108\" x2=\"234\" y2=\"108\" stroke=\"#0f172a\" stroke-width=\"2\"/><line x1=\"524\" y1=\"108\" x2=\"558\" y2=\"108\" stroke=\"#0f172a\" stroke-width=\"2\"/></svg>"
+  },
+  {
+   "id": "auto_06-section-6",
+   "title": "رمزگشایی کدهای وضعیت HTTP در عیب‌یابی کنترلرهای شبکه",
+   "html": "<ul><li><strong><code>200 OK</code>:</strong> موفقیت همراه بدنه پاسخ (GET/PUT/PATCH).</li><li><strong><code>201 Created</code>:</strong> ایجاد موفق منبع جدید (معمولاً POST) همراه هدر <code>Location</code>.</li><li><strong><code>204 No Content</code>:</strong> موفقیت بدون بدنه پاسخ (رایج در <code>DELETE</code> و برخی <code>PUT/PATCH</code>ها؛ نباید روی پاسخ 204 متد <code>resp.json()</code> صدا زد چون بدنه خالی است و خطا می‌دهد!).</li><li><strong><code>400 Bad Request</code>:</strong> خطای سینتکس JSON یا مقدار نامعتبر ارسالی توسط کلاینت.</li><li><strong><code>401 Unauthorized</code> در برابر <code>403 Forbidden</code>:</strong> کد <code>401</code> یعنی <strong>احراز هویت (AuthN)</strong> ناموفق یا توکن منقضی است؛ کد <code>403</code> یعنی سرور درخواست را رد می‌کند؛ ممکن است <strong>مجوز دسترسی (AuthZ / RBAC)</strong> به این عملیات را ندارید.</li><li><strong><code>404 Not Found</code>:</strong> مسیر URI یا شناسه منبع وجود ندارد.</li><li><strong><code>429 Too Many Requests</code>:</strong> عبور از Rate Limit API (بسیار رایج در Meraki!)؛ باید در صورت وجود، <code>Retry-After</code> را با سقف تلاش و زمان رعایت و فقط در صورت ایمنی تکرار backoff اعمال کنید.</li><li><strong><code>500 / 502 / 503</code>:</strong> خطای سمت سرور یا دروازه/سرویس موقتاً از دسترس خارج.</li></ul><p>401 معمولاً چالش احراز هویت دارد؛ 403 همیشه اثبات احراز هویت موفق نیست و 404 می‌تواند وجود منبع را نیز پنهان کند. کدها و بدنه مطابق قرارداد API بررسی شوند؛ 202 به معنای پذیرش است نه پایان عملیات.</p>"
+  },
+  {
+   "id": "auto_06-section-7",
+   "title": "ساختار URI، Query Parameters و هدرهای کلیدی (Content-Type در برابر Accept)",
+   "html": "<p>در یک درخواست REST، مسیر (Path) منبع را مشخص می‌کند (مثلاً <code>/api/v1/vlans/20</code>) و <strong>Query Parameters</strong> برای فیلتر، مرتب‌سازی و صفحه‌بندی (Pagination) به کار می‌روند (مثلاً <code>?site=tehran&amp;limit=50&amp;offset=100</code>).</p><p>تفاوت دو هدر حیاتی: <strong><code>Content-Type: application/json</code></strong> به سرور می‌گوید بدنه ارسالی <em>شما</em> چه فرمتی دارد؛ <strong><code>Accept: application/json</code></strong> به سرور می‌گوید انتظار دارید پاسخ سرور با چه فرمتی برگردد. در RESTCONF برای JSON معمولاً <code>application/yang-data+json</code> استفاده می‌شود؛ XML و جزئیات سرور نیز ممکن‌اند.</p>"
+  },
+  {
+   "id": "auto_06-section-8",
+   "title": "Pagination و Rate Limiting در کنترلرهای واقعی (Meraki / Catalyst Center)",
+   "html": "<p>کنترلرهایی با هزاران تجهیز، کل لیست را در یک پاسخ برنمی‌گردانند؛ بلکه از <strong>Pagination</strong> (با <code>limit/offset</code> یا هدر <code>Link</code> / Cursor) استفاده می‌کنند. اسکریپتی که فقط صفحه اول را بخواند، بی‌صدا بقیه تجهیزات سازمان را جا می‌اندازد! همچنین هنگام دریافت <code>429 Too Many Requests</code>، تکرار فوری در حلقه بدون تأخیر باعث بن شدن موقت یا افزایش فشار روی کنترلر می‌شود؛ باید مقدار هدر <code>Retry-After</code> خوانده شده و با تأخیر نمایی (Exponential Backoff + Jitter) تلاش مجدد شود.</p><p><code>Retry-After</code> می‌تواند ثانیه یا تاریخ HTTP باشد و ممکن است وجود نداشته باشد؛ تعداد تلاش، jitter و سقف کل را مشخص کنید. بعد از timeout نتیجه عملیات نوشتن ممکن است نامعلوم باشد؛ POST/PATCH را بدون قرارداد idempotency یا تأیید وضعیت کورکورانه retry نکنید. مقصد لینک صفحه بعد را به میزبان مورد اعتماد محدود کنید تا توکن به مبدأ دیگری نرود.</p>"
+  },
+  {
+   "id": "auto_06-section-9",
+   "title": "کار حرفه‌ای با Postman: Collections، Environments و محافظت از Secrets",
+   "html": "<p>ابزار <strong>Postman</strong> (یا جایگزین‌های سبک مثل Bruno / Hoppscotch / <code>curl</code>) برای کاوش اولیه APIها پیش از کدنویسی بسیار مفید است. قواعد ایمنی در کار تیمی با Postman:</p><ul><li>از متغیرهای محیطی (<code>{{base_url}}</code>، <code>{{api_token}}</code>) استفاده کنید تا بتوانید Collection را بدون تغییر کد بین Lab و Production جابه‌جا کنید.</li><li>در نسخه و شیوه اشتراک مورد استفاده، کنترل‌های اسرار را بررسی کنید؛ مثلاً توکن را در <strong>Current Value</strong> (با نوع <code>secret</code>) قرار دهید، اما این به تنهایی تضمین محرمانگی نیست؛ پیش از اشتراک/Export، تمام environment، لاگ، اسکریپت، URL و فایل خروجی را بررسی کنید و کلیدهای API را در <code>Initial Value</code> یا فایل JSON خروجی قرار ندهید.</li></ul>"
+  },
+  {
+   "id": "auto_06-section-10",
+   "title": "تبدیل به کد مقاوم Python (timeout، Session و عدم خاموش کردن verify در تولید)",
+   "html": "<p>در کتابخانه <code>requests</code> (یا <code>httpx</code>) سه قاعده طلایی برای کد تولیدی وجود دارد:</p><ol><li><strong>همیشه <code>timeout=(5, 15)</code> بگذارید:</strong> در <code>requests</code> پیش‌فرض بدون Timeout است؛ یعنی اگر سرور پاسخ ندهد اسکریپت می‌تواند تا ابد قفل (Hang) شود!</li><li><strong>از <code>requests.Session()</code> استفاده کنید:</strong> اتصال TCP/TLS را بازاستفاده (Connection Pooling) کرده و هدرهای مشترک را یک‌جا نگه می‌دارد.</li><li><strong>در تولید <code>verify=False</code> نگذارید:</strong> به جای خاموش کردن اعتبارسنجی TLS، مسیر گواهینامه CA داخلی سازمان را بدهید (<code>verify=\"/etc/ssl/certs/corp-ca.pem\"</code>).</li></ol><p>timeout اتصال و فاصله انتظار خواندن لزوماً سقف زمان کل درخواست نیستند؛ timeout کلی، retry محدود و مدیریت خطا باید جدا طراحی شود. Session می‌تواند cookie و هدر حساس را نگهداری کند؛ به مقصد و redirect دقت کنید.</p>"
+  },
+  {
+   "id": "auto_06-section-11",
+   "title": "کژفهمی‌های رایج درباره REST API",
+   "html": "<ul><li><strong>کژفهمی ۱: «برای بررسی خطا در Python requests کافی است try/except بگذاریم چون کد ۴۰۴ یا ۵۰۰ خودش استثنا پرتاب می‌کند.»</strong> واقعیت: <code>requests</code> برای پاسخ‌های 4xx/5xx به‌طور خودکار Exception پرتاب نمی‌کند! باید صریحاً <code>resp.raise_for_status()</code> یا <code>resp.status_code</code> را بررسی کنید (در <code>urllib.request</code> اما کدهای 4xx/5xx باعث <code>HTTPError</code> می‌شوند).</li><li><strong>کژفهمی ۲: «POST و PUT هر دو یکسان‌اند.»</strong> واقعیت: POST تضمین عمومی idempotence ندارد؛ PUT از نظر اثر موردنظر idempotent است، اما محدودیت و رفتار خاص API باید بررسی شود.</li><li><strong>کژفهمی ۳: «پاسخ 204 No Content را می‌توانیم با resp.json() بخوانیم.»</strong> واقعیت: پاسخ 204 هیچ بدنه‌ای ندارد و فراخوانی <code>resp.json()</code> باعث <code>JSONDecodeError</code> می‌شود.</li></ul>"
+  },
+  {
+   "id": "auto_06-section-12",
+   "title": "عیب‌یابی سیستماتیک خطاهای REST API",
+   "html": "<p><strong>سناریو ۱ — دریافت <code>415 Unsupported Media Type</code>:</strong> هدر <code>Content-Type</code> ارسالی با آنچه سرور انتظار دارد هم‌خوان نیست (مثلاً ارسال <code>text/plain</code> به جای <code>application/json</code> یا <code>application/yang-data+json</code>).</p><p><strong>سناریو ۲ — دریافت <code>401</code> در برابر <code>403</code>:</strong> در <code>401</code> انقضای توکن، پیشوند <code>Bearer</code> یا نام هدر احراز هویت (مثلاً <code>X-Auth-Token</code> در Catalyst Center) را چک کنید؛ در <code>403</code> سطح دسترسی نقش (RBAC) حساب کاربری را در کنترلر بررسی نمایید.</p>"
+  },
+  {
+   "id": "auto_06-section-13",
+   "title": "تمرین تحلیلی با پاسخ تشریحی",
+   "html": "<p><strong>تمرین ۱:</strong> اسکریپت شما با <code>PUT /api/vlans/20</code> دو بار متوالی همان بدنه <code>{\"name\": \"VOICE_FINAL\", \"state\": \"active\"}</code> را می‌فرستد. آیا دو VLAN 20 ساخته می‌شود؟ <strong>پاسخ:</strong> خیر؛ چون <code>PUT</code> Idempotent است، هر دو بار منبع <code>/api/vlans/20</code> به همان وضعیت نهایی یکسان می‌رسد.</p><p><strong>تمرین ۲:</strong> پس از <code>DELETE /api/vlans/20</code> سرور کد <code>204 No Content</code> برمی‌گرداند و سپس در درخواست <code>GET /api/vlans/20</code> چه کدی انتظار می‌رود؟ <strong>پاسخ:</strong> <code>404 Not Found</code>، که حذف موفق منبع را تأیید می‌کند.</p><p>این نتایج در سرور فرضی این آزمایش‌اند؛ در API واقعی عملیات ناموفق، تغییر هم‌زمان، پاسخ asynchronous و سیاست مخفی‌سازی منبع می‌توانند نتیجه دیگری بدهند.</p>"
+  },
+  {
+   "id": "auto_06-section-14",
+   "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+   "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc9110\" target=\"_blank\" rel=\"noopener\">RFC 9110 (HTTP Semantics)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc5789\" target=\"_blank\" rel=\"noopener\">RFC 5789 (PATCH Method for HTTP)</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> آزمایشگاه این درس یک سرور واقعی HTTP محلی موقت روی <code>127.0.0.1</code> در Python اجرا و تمام عملیات <code>POST (201)</code>، <code>PATCH (200)</code>، <code>PUT (200 idempotent)</code>، <code>DELETE (204)</code> و <code>GET (404)</code> را روی آن آزمایش کرده است؛ هیچ کنترلر تولیدی Cisco Catalyst Center، Meraki یا تجهیز شبکه واقعی درگیر نشده است.</p><p>این سرور موقت بدون TLS و احراز هویت و فقط برای آزمایش محلی است؛ برای production یا قرار دادن روی شبکه طراحی نشده است. timeout و بستن سرور و انتظار پایان thread در آزمایش انجام می‌شود.</p>"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "REST",
+   "fa": "معماری REST",
+   "simple": "Representational State Transfer؛ سبک معماری API مبتنی بر ۶ قید و منابع URI."
+  },
+  {
+   "term": "Stateless",
+   "fa": "بدون حالت",
+   "simple": "قید REST که در آن هر درخواست تمام زمینه و احراز هویت لازم را مستقل حمل می‌کند."
+  },
+  {
+   "term": "Safe Method",
+   "fa": "متد ایمن",
+   "simple": "کلاینت تغییر را درخواست نمی‌کند؛ عوارض جانبی مانند ثبت لاگ ممکن است."
+  },
+  {
+   "term": "Idempotent",
+   "fa": "تکرارپذیر بی‌اثر اضافه",
+   "simple": "اثر موردنظر تکرار درخواست یکسان است؛ کد پاسخ و لاگ می‌توانند متفاوت باشند."
+  },
+  {
+   "term": "PUT vs PATCH",
+   "fa": "تفاوت PUT و PATCH",
+   "simple": "PUT جایگزینی کامل منبع است؛ PATCH به‌روزرسانی جزئی بخشی از منبع (RFC 5789)."
+  },
+  {
+   "term": "201 Created",
+   "fa": "کد ۲01 (ساخته شد)",
+   "simple": "کد وضعیت HTTP نشان‌دهنده ایجاد موفق منبع جدید (معمولاً در POST)."
+  },
+  {
+   "term": "204 No Content",
+   "fa": "کد ۲04 (موفق بدون بدنه)",
+   "simple": "کد موفقیت بدون بدنه پاسخ (رایج در DELETE)؛ نباید روی آن .json() صدا زد."
+  },
+  {
+   "term": "401 vs 403",
+   "fa": "تفاوت ۴01 و ۴03",
+   "simple": "401 معمولاً مشکل احراز هویت و 403 رد درخواست است؛ 403 لزوماً اثبات هویت موفق نیست."
+  },
+  {
+   "term": "429 Too Many Requests",
+   "fa": "محدودیت نرخ (۴29)",
+   "simple": "خطای عبور از Rate Limit API؛ نیازمند احترام به هدر Retry-After و Backoff."
+  },
+  {
+   "term": "Content-Type",
+   "fa": "هدر نوع محتوا",
+   "simple": "اعلام فرمت بدنه ارسالی (مثلاً application/json)."
+  },
+  {
+   "term": "Accept",
+   "fa": "هدر فرمت درخواستی",
+   "simple": "اعلام فرمت مورد انتظار برای بدنه پاسخ سرور."
+  },
+  {
+   "term": "Pagination",
+   "fa": "صفحه‌بندی پاسخ",
+   "simple": "تقسیم فهرست‌های بزرگ API به چند صفحه با limit/offset یا Cursor/Link."
+  },
+  {
+   "term": "Exponential Backoff",
+   "fa": "تأخیر نمایی تلاش مجدد",
+   "simple": "افزایش پلکانی زمان انتظار بین تلاش‌های مجدد هنگام خطای 429 یا 503."
+  },
+  {
+   "term": "raise_for_status",
+   "fa": "بررسی کد خطای HTTP",
+   "simple": "متد requests برای پرتاب استثنا هنگام دریافت کدهای 4xx/5xx."
+  },
+  {
+   "term": "Postman Environment",
+   "fa": "محیط متغیرهای Postman",
+   "simple": "جداسازی آدرس‌ها و اسرار بین محیط آزمایشگاهی و تولیدی در Postman."
+  }
+ ],
+ "stages": {
+  "lab": {
+   "title": "آزمایشگاه واقعی HTTP Loopback محلی (127.0.0.1 CRUD) — کنترلر شبکه تولیدی اجرا نشده",
+   "executionStatus": "HTTP واقعی محلی موقت روی loopback اجرا شده؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+   "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>اجرای واقعی سرور HTTP محلی روی 127.0.0.1</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ کنترلر Catalyst Center، Meraki، vManage یا روتر واقعی در این آزمایشگاه متصل نشده است.</p><p>این آزمایشگاه یک سرور واقعی HTTP روی پورت تصادفی <code>127.0.0.1</code> بالا می‌آورد و با <code>urllib.request</code> تمام عملیات <code>POST</code>، <code>PATCH</code>، دو بار <code>PUT</code> (برای اثبات Idempotency)، <code>DELETE</code> و <code>GET</code> پس از حذف را واقعاً اجرا کرده و سپس سرور را می‌بندد.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/auto_06_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/auto_06_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Loopback HTTP REST API Lab for auto_06 (runs a real ephemeral HTTP server on 127.0.0.1).\n\nUses Python stdlib http.server on localhost only; no external Catalyst Center/Meraki/router is used.\nValidates JSON payloads, returning 400 Bad Request on malformed/missing fields and 409 Conflict on duplicate POST.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\nimport json\nimport threading\nimport re\nimport urllib.error\nimport urllib.request\n\n\ndef run_local_rest_lab() -&gt; dict[str, object]:\n    &quot;&quot;&quot;Start an ephemeral localhost REST server, test CRUD + error status codes, and shut down cleanly.&quot;&quot;&quot;\n    store: dict[str, dict[str, object]] = {\n        &quot;10&quot;: {&quot;id&quot;: &quot;10&quot;, &quot;name&quot;: &quot;CORP_DATA&quot;, &quot;state&quot;: &quot;active&quot;},\n    }\n\n    class VlanHandler(BaseHTTPRequestHandler):\n        def setup(self):\n            super().setup()\n            self.connection.settimeout(3)\n\n        def log_message(self, format, *args):  # noqa: A002\n            return\n\n        def _send_json(self, code: int, payload: object | None = None) -&gt; None:\n            self.send_response(code)\n            self.send_header(&quot;Content-Type&quot;, &quot;application/json&quot;)\n            self.end_headers()\n            if payload is not None:\n                self.wfile.write(json.dumps(payload).encode(&quot;utf-8&quot;))\n\n        def _read_json(self) -&gt; dict[str, object] | None:\n            # Constrained educational parser, not a production HTTP server.\n            def unique(pairs):\n                out = {}\n                for key, value in pairs:\n                    if key in out:\n                        raise ValueError(&quot;duplicate JSON key&quot;)\n                    out[key] = value\n                return out\n            def invalid_constant(_):\n                raise ValueError(&quot;non-finite number&quot;)\n            try:\n                length = int(self.headers.get(&quot;Content-Length&quot;, &quot;0&quot;))\n                if length &lt;= 0 or length &gt; 4096:\n                    return None\n                raw = self.rfile.read(length).decode(&quot;utf-8&quot;)\n                obj = json.loads(raw, object_pairs_hook=unique, parse_constant=invalid_constant)\n                return obj if isinstance(obj, dict) else None\n            except (ValueError, UnicodeDecodeError, TimeoutError):\n                return None\n\n        def _resource_id(self):\n            match = re.fullmatch(r&quot;/api/vlans/([1-9][0-9]{0,3})&quot;, self.path)\n            if not match or int(match.group(1)) &gt; 4094:\n                return None\n            return match.group(1)\n\n        def do_GET(self):\n            parts = self.path.strip(&quot;/&quot;).split(&quot;/&quot;)\n            if parts == [&quot;api&quot;, &quot;vlans&quot;]:\n                self._send_json(200, list(store.values()))\n            elif len(parts) == 3 and parts[:2] == [&quot;api&quot;, &quot;vlans&quot;]:\n                item = store.get(parts[2])\n                self._send_json(200, item) if item else self._send_json(404, {&quot;error&quot;: &quot;not_found&quot;})\n            else:\n                self._send_json(404, {&quot;error&quot;: &quot;unknown_path&quot;})\n\n        def do_POST(self):\n            if self.path != &quot;/api/vlans&quot;:\n                self._send_json(404, {&quot;error&quot;: &quot;unknown_path&quot;})\n                return\n            body = self._read_json()\n            if body is None or &quot;id&quot; not in body or &quot;name&quot; not in body or set(body) - {&quot;id&quot;, &quot;name&quot;, &quot;state&quot;}:\n                self._send_json(400, {&quot;error&quot;: &quot;invalid_or_incomplete_payload&quot;})\n                return\n            if (type(body[&quot;id&quot;]) not in (str, int) or not isinstance(body[&quot;name&quot;], str)\n                    or not body[&quot;name&quot;].strip() or not isinstance(body.get(&quot;state&quot;, &quot;active&quot;), str)):\n                self._send_json(400, {&quot;error&quot;: &quot;invalid_field_types&quot;})\n                return\n            vid = str(body[&quot;id&quot;]).strip()\n            if not re.fullmatch(r&quot;[1-9][0-9]{0,3}&quot;, vid) or not (1 &lt;= int(vid) &lt;= 4094):\n                self._send_json(400, {&quot;error&quot;: &quot;invalid_vlan_id_range&quot;})\n                return\n            if vid in store:\n                self._send_json(409, {&quot;error&quot;: &quot;already_exists&quot;})\n                return\n            store[vid] = {&quot;id&quot;: vid, &quot;name&quot;: body[&quot;name&quot;], &quot;state&quot;: str(body.get(&quot;state&quot;, &quot;active&quot;))}\n            self._send_json(201, store[vid])\n\n        def do_PUT(self):\n            vid = self._resource_id()\n            if vid is None:\n                self._send_json(404, {&quot;error&quot;: &quot;unknown_path&quot;})\n                return\n            body = self._read_json()\n            if (body is None or set(body) - {&quot;name&quot;, &quot;state&quot;} or &quot;name&quot; not in body\n                    or not isinstance(body[&quot;name&quot;], str) or not body[&quot;name&quot;].strip()\n                    or not isinstance(body.get(&quot;state&quot;, &quot;active&quot;), str)):\n                self._send_json(400, {&quot;error&quot;: &quot;invalid_or_incomplete_payload&quot;})\n                return\n            if not re.fullmatch(r&quot;[1-9][0-9]{0,3}&quot;, vid) or not (1 &lt;= int(vid) &lt;= 4094):\n                self._send_json(400, {&quot;error&quot;: &quot;invalid_vlan_id_range&quot;})\n                return\n            store[vid] = {&quot;id&quot;: vid, &quot;name&quot;: body[&quot;name&quot;], &quot;state&quot;: str(body.get(&quot;state&quot;, &quot;active&quot;))}\n            self._send_json(200, store[vid])\n\n        def do_PATCH(self):\n            vid = self._resource_id()\n            if vid is None or vid not in store:\n                self._send_json(404, {&quot;error&quot;: &quot;not_found&quot;})\n                return\n            body = self._read_json()\n            if (body is None or not body or any(k not in (&quot;name&quot;, &quot;state&quot;) for k in body)\n                    or any(not isinstance(v, str) or not v.strip() for v in body.values())):\n                self._send_json(400, {&quot;error&quot;: &quot;invalid_or_unsupported_patch_fields&quot;})\n                return\n            store[vid].update({k: str(v) for k, v in body.items()})\n            self._send_json(200, store[vid])\n\n        def do_DELETE(self):\n            vid = self._resource_id()\n            if vid is not None and vid in store:\n                del store[vid]\n                self.send_response(204)\n                self.end_headers()\n            else:\n                self._send_json(404, {&quot;error&quot;: &quot;not_found&quot;})\n\n    server = HTTPServer((&quot;127.0.0.1&quot;, 0), VlanHandler)\n    port = server.server_address[1]\n    thread = threading.Thread(target=server.serve_forever, daemon=True)\n    thread.start()\n\n    def call(method: str, path: str, body: dict[str, object] | None = None) -&gt; tuple[int, str]:\n        data = json.dumps(body).encode(&quot;utf-8&quot;) if body is not None else None\n        headers = {&quot;Content-Type&quot;: &quot;application/json&quot;, &quot;Accept&quot;: &quot;application/json&quot;}\n        req = urllib.request.Request(f&quot;http://127.0.0.1:{port}{path}&quot;, data=data, headers=headers, method=method)\n        try:\n            with urllib.request.urlopen(req, timeout=5) as resp:\n                return resp.status, resp.read().decode(&quot;utf-8&quot;)\n        except urllib.error.HTTPError as err:\n            return err.code, err.read().decode(&quot;utf-8&quot;)\n\n    try:\n        r_bad = call(&quot;POST&quot;, &quot;/api/vlans&quot;, {&quot;name&quot;: &quot;NO_ID&quot;})\n        r_wrong_path = call(&quot;POST&quot;, &quot;/wrong&quot;, {&quot;id&quot;: &quot;20&quot;, &quot;name&quot;: &quot;VOICE&quot;})\n        r_bad_type = call(&quot;POST&quot;, &quot;/api/vlans&quot;, {&quot;id&quot;: True, &quot;name&quot;: &quot;VOICE&quot;})\n        r_post = call(&quot;POST&quot;, &quot;/api/vlans&quot;, {&quot;id&quot;: &quot;20&quot;, &quot;name&quot;: &quot;VOICE&quot;})\n        r_dup = call(&quot;POST&quot;, &quot;/api/vlans&quot;, {&quot;id&quot;: &quot;20&quot;, &quot;name&quot;: &quot;VOICE_DUP&quot;})\n        r_patch = call(&quot;PATCH&quot;, &quot;/api/vlans/20&quot;, {&quot;name&quot;: &quot;VOICE_CORP&quot;})\n        r_invalid_patch = call(&quot;PATCH&quot;, &quot;/api/vlans/20&quot;, {&quot;state&quot;: None})\n        r_wrong_delete = call(&quot;DELETE&quot;, &quot;/wrong/20&quot;)\n        r_put_1 = call(&quot;PUT&quot;, &quot;/api/vlans/20&quot;, {&quot;name&quot;: &quot;VOICE_FINAL&quot;, &quot;state&quot;: &quot;active&quot;})\n        r_put_2 = call(&quot;PUT&quot;, &quot;/api/vlans/20&quot;, {&quot;name&quot;: &quot;VOICE_FINAL&quot;, &quot;state&quot;: &quot;active&quot;})\n        r_del = call(&quot;DELETE&quot;, &quot;/api/vlans/20&quot;)\n        r_missing = call(&quot;GET&quot;, &quot;/api/vlans/20&quot;)\n        return {\n            &quot;bad_post_status&quot;: r_bad[0],\n            &quot;post_status&quot;: r_post[0],\n            &quot;wrong_path_status&quot;: r_wrong_path[0],\n            &quot;bad_type_status&quot;: r_bad_type[0],\n            &quot;invalid_patch_status&quot;: r_invalid_patch[0],\n            &quot;wrong_delete_status&quot;: r_wrong_delete[0],\n            &quot;duplicate_post_status&quot;: r_dup[0],\n            &quot;patch_status&quot;: r_patch[0],\n            &quot;put_idempotent_same_result&quot;: r_put_1 == r_put_2 and r_put_1[0] == 200,\n            &quot;delete_status&quot;: r_del[0],\n            &quot;get_after_delete_status&quot;: r_missing[0],\n        }\n    finally:\n        server.shutdown()\n        server.server_close()\n        thread.join(timeout=5)\n        if thread.is_alive():\n            raise RuntimeError(&quot;HTTP lab server thread failed to stop&quot;)\n\n\ndef main() -&gt; None:\n    print(&quot;Local loopback 127.0.0.1 REST lab only — no external SDN controller or router is contacted.&quot;)\n    res = run_local_rest_lab()\n    assert res[&quot;bad_post_status&quot;] == 400\n    assert res[&quot;post_status&quot;] == 201\n    assert res[&quot;duplicate_post_status&quot;] == 409\n    assert res[&quot;patch_status&quot;] == 200\n    assert res[&quot;put_idempotent_same_result&quot;] is True\n    assert res[&quot;delete_status&quot;] == 204\n    assert res[&quot;get_after_delete_status&quot;] == 404\n    print(res)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> <code>post_status: 201</code>، <code>patch_status: 200</code>، <code>put_idempotent_same_result: True</code>، <code>delete_status: 204</code> و <code>get_after_delete_status: 404</code>.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع اتصال به کنترلر واقعی با Python requests (اجرا نشده روی کنترلر زنده):</strong></p><pre dir=\"ltr\"><code># Reference pattern (NOT executed against a live Catalyst Center/Meraki)\nimport os, requests\ns = requests.Session()\ns.headers.update({\"Accept\": \"application/json\", \"Authorization\": f\"Bearer {os.environ['API_TOKEN']}\"})\nresp = s.get(\"https://controller.example/api/v1/devices\", timeout=(5, 15), verify=\"/etc/ssl/certs/corp-ca.pem\")\nresp.raise_for_status()</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط بخش مدل‌شده/محلی را می‌آزماید و جایگزین آزمایش روی سخت‌افزار شبکه یا سامانه تولیدی نیست.</p><p>سرور فقط برای نمونه محلی و بدون TLS یا احراز هویت است؛ روی رابط شبکه یا production اجرا نکنید. خطاهای مسیر و ورودی و پایان thread نیز به‌طور محلی بررسی شده‌اند.</p>"
+  },
+  "quiz": {
+   "title": "آزمون درس مبانی REST API و Postman",
+   "instructions": "پاسخ هر ۱۲ پرسش را انتخاب کرده و توضیح فنی گزینه‌ها را بررسی کنید."
+  }
+ },
+ "interactiveQuiz": [
+  {
+   "title": "تفاوت دقیق متدهای PUT و PATCH در REST API (RFC 9110 / RFC 5789) چیست؟",
+   "options": [
+    "PUT نمایش موردنظر منبع را جایگزین می‌کند؛ PATCH طبق فرمت پشتیبانی‌شده تغییر جزئی درخواست می‌کند",
+    "هیچ تفاوتی ندارند",
+    "PUT فقط برای خواندن داده است",
+    "PATCH فقط برای حذف منبع است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>قرارداد API و رسانه Patch را بررسی کنید؛ برای جلوگیری از تداخل از شرط مناسب استفاده کنید.</p>"
+  },
+  {
+   "title": "کد وضعیت 204 No Content در پاسخ به DELETE به چه معناست و چه احتیاطی در کد پایتون لازم دارد؟",
+   "options": [
+    "حذف با خطا مواجه شده است",
+    "عملیات حذف موفق بوده و بدنه پاسخ خالی است؛ بنابراین نباید روی آن resp.json() فراخوانی کرد",
+    "منبع منتقل شده است",
+    "سرور نیاز به رمز عبور دارد"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>در پاسخ 204 بدنه‌ای ارسال نمی‌شود؛ پارس کردن بدنه خالی به‌عنوان JSON خطای <code>JSONDecodeError</code> می‌دهد.</p>"
+  },
+  {
+   "title": "تفاوت دقیق کدهای خطای 401 Unauthorized و 403 Forbidden چیست؟",
+   "options": [
+    "هر دو دقیقاً یک معنی دارند",
+    "401 خطای سرور و 403 خطای DNS است",
+    "401 معمولاً به اعتبار احراز هویت مربوط است؛ 403 رد درخواست است و الزاماً اثبات احراز هویت موفق نیست",
+    "403 یعنی منبع حذف شده است"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>پیام و challenge و قرارداد API را بررسی کنید؛ 403 می‌تواند دلایل دیگری هم داشته باشد.</p>"
+  },
+  {
+   "title": "هنگام دریافت کد 429 Too Many Requests از API یک کنترلر شبکه، واکنش صحیح اسکریپت چیست؟",
+   "options": [
+    "افزایش تعداد تردها برای ارسال سریع‌تر",
+    "تغییر متد به DELETE",
+    "خاموش کردن TLS",
+    "در صورت وجود Retry-After، با سقف زمان و تعداد و تنها در صورت ایمنی تکرار، backoff و jitter به کار ببرید"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>کد 429 نشانه Rate Limiting است؛ تلاش مجدد فوری بدون وقفه فشار را بدتر می‌کند.</p>"
+  },
+  {
+   "title": "کدام متد HTTP هم Safe و هم Idempotent است؟",
+   "options": [
+    "GET",
+    "POST",
+    "PATCH",
+    "DELETE"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>GET از نظر معنای درخواستی safe و idempotent است؛ عوارضی مانند ثبت لاگ ممکن‌اند.</p>"
+  },
+  {
+   "title": "چرا نبود پارامتر timeout در فراخوانی requests.get(...) در اسکریپت‌های اتوماسیون خطرناک است؟",
+   "options": [
+    "چون باعث خطای 404 می‌شود",
+    "چون پیش‌فرض requests بدون Timeout است و در صورت پاسخ ندادن سرور، اسکریپت می‌تواند نامحدود قفل (Hang) شود",
+    "چون JSON را به XML تبدیل می‌کند",
+    "چون هدر Accept را حذف می‌کند"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>timeout اتصال و read جلوی برخی انتظارهای طولانی را می‌گیرند، اما deadline کل wall-clock نیستند.</p>"
+  },
+  {
+   "title": "تفاوت دو هدر Content-Type و Accept در درخواست‌های REST چیست؟",
+   "options": [
+    "هر دو نام سرور را مشخص می‌کنند",
+    "Accept برای رمز عبور است",
+    "Content-Type فرمت بدنه ارسالی کلاینت را اعلام می‌کند و Accept فرمت مورد انتظار کلاینت برای پاسخ سرور را",
+    "Content-Type فقط در GET ارسال می‌شود"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>در POST/PUT/PATCH هدر <code>Content-Type</code> فرمت ورودی و هدر <code>Accept</code> فرمت خروجی درخواستی را تعیین می‌کنند.</p>"
+  },
+  {
+   "title": "در کتابخانه Python requests، اگر سرور کد 404 یا 500 برگرداند چه اتفاقی می‌افتد؟",
+   "options": [
+    "به‌طور خودکار Exception پرتاب می‌شود",
+    "اسکریپت خودش دوباره تلاش می‌کند",
+    "کد وضعیت به 200 تغییر می‌کند",
+    "به‌طور خودکار Exception پرتاب نمی‌شود و باید resp.raise_for_status() یا resp.status_code را بررسی کرد"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>فراموش کردن <code>raise_for_status()</code> باعث می‌شود اسکریپت با بدنه خطای 404/500 ادامه دهد و خطاهای گمراه‌کننده بسازد.</p>"
+  },
+  {
+   "title": "چرا پیاده‌سازی Pagination هنگام دریافت لیست تجهیزات از کنترلرهای بزرگ ضروری است؟",
+   "options": [
+    "زیرا API ممکن است فقط بخشی از رکوردها (مثلاً ۵۰ یا ۱۰۰ مورد اول) را در صفحه اول برگرداند و بدون پیمایش صفحات بعدی، بقیه تجهیزات جا می‌مانند",
+    "زیرا Pagination رمزنگاری TLS را فعال می‌کند",
+    "زیرا بدون Pagination متد GET غیر-Idempotent می‌شود",
+    "زیرا Pagination فقط برای فایل‌های تصویر است"
+   ],
+   "correctIndex": 0,
+   "explanationHtml": "<p>نادیده‌گرفتن صفحه‌بندی یکی از باگ‌های خاموش رایج در ممیزی دارایی‌های شبکه از طریق API است.</p>"
+  },
+  {
+   "title": "قید Stateless در معماری REST به چه معناست؟",
+   "options": [
+    "سرور هرگز داده‌ای در دیتابیس ذخیره نمی‌کند",
+    "هر درخواست کلاینت مستقل است و همه اطلاعات لازم (مثل توکن احراز هویت) را با خود دارد تا سرور نیازی به نگهداری حالت نشست کلاینت در حافظه نداشته باشد",
+    "کلاینت نمی‌تواند هدر بفرستد",
+    "فقط یک کلاینت در آن واحد می‌تواند وصل شود"
+   ],
+   "correctIndex": 1,
+   "explanationHtml": "<p>Stateless قابلیت توزیع درخواست را تسهیل می‌کند اما به‌تنهایی سازگاری state، داده و زیرساخت توزیع‌شده را تضمین نمی‌کند.</p>"
+  },
+  {
+   "title": "هنگام خروجی گرفتن (Export) از یک Postman Collection برای اشتراک با تیم، کدام اقدام امنیتی الزامی است؟",
+   "options": [
+    "نوشتن API Key تولیدی به صورت متن ساده در URL",
+    "گذاشتن رمز عبور در Initial Value و انتشار عمومی",
+    "استفاده از Environment Variables با نوع secret در Current Value و اطمینان از نبود توکن واقعی در فایل خروجی",
+    "غیرفعال کردن HTTPS"
+   ],
+   "correctIndex": 2,
+   "explanationHtml": "<p>تمام محیط، فایل‌ها، متغیرها، URL و لاگ را پیش از اشتراک بررسی کنید؛ نوع secret به‌تنهایی تضمین محرمانگی نیست.</p>"
+  },
+  {
+   "title": "آزمایشگاه این درس چگونه اجرا شده است؟",
+   "options": [
+    "ارسال درخواست واقعی به Meraki Dashboard تولیدی",
+    "تغییر VLAN روی روتر فیزیکی سیسکو",
+    "فقط متن نظری بدون اجرای کد",
+    "اجرای واقعی یک سرور HTTP محلی موقت روی 127.0.0.1 در Python و آزمایش نمونه متدهای POST/PATCH/PUT/DELETE/GET بدون اتصال به کنترلر بیرونی"
+   ],
+   "correctIndex": 3,
+   "explanationHtml": "<p>آزمایشگاه سرور HTTP واقعی را تنها روی loopback محلی (<code>127.0.0.1</code>) اجرا و آزمون می‌کند.</p>"
+  }
+ ],
+ "meta": {
+  "version": "integration-review.1",
+  "legacyId": "auto_06",
+  "sources": [
+   "https://www.rfc-editor.org/rfc/rfc9110",
+   "https://www.rfc-editor.org/rfc/rfc5789"
+  ],
+  "limitations": [
+   "سرور HTTP آزمایشگاه صرفاً روی 127.0.0.1 محلی اجرا شده و هیچ کنترلر تولیدی Cisco Catalyst Center، Meraki یا روتر واقعی متصل نشده است."
+  ],
+  "legacyAuditFixes": [
+   "رفع غلط تایپی آزمون نسخه قدیمی («چهخروجیی») و گسترش به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش با توضیح فنی.",
+   "افزودن آزمایشگاه واقعی HTTP Loopback روی 127.0.0.1 برای تست زنده 201/200/204/404 و Idempotency متد PUT."
+  ],
+  "semanticReview": {
+   "date": "2026-11-27",
+   "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، SVG و اسکریپت HTTP محلی؛ بازبینی نویسنده نه مستقل",
+   "reviewer": "author-agent-self-review-not-independent",
+   "evidence": "academy-labs/reviews/auto_06-review-fa.md"
+  },
+  "integration": {
+   "recommendedPath": "fam-automation",
+   "recommendedCourse": "automation-foundations",
+   "blueprint": "/academy-assets/v5/blueprints/auto_06.json",
+   "labScript": "01-خام-پروژه/academy-labs/agent3/auto_06_lab.py"
+  },
+  "technicalAuditFixes": [
+   "اصلاح بازبینی فاز ۸C-1: افزودن اعتبارسنجی JSON با پاسخ 400 Bad Request و رد POST تکراری با 409 Conflict در سرور محلی loopback فایل auto_06_lab.py + assertها."
+  ],
+  "integrationReview": {
+   "date": "2026-11-27",
+   "reviewer": "integrator-agent-not-human",
+   "sourceCommit": "f3b5fdc1c57d772928cd3e022d034b722e59bd43",
+   "evidence": "academy-labs/reviews/auto_06-integration-review-fa.md"
+  }
+ }
+}
