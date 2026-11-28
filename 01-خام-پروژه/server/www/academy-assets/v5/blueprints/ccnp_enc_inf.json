@@ -1,0 +1,350 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_enc_inf",
+  "objectiveId": "ccnp_enc_inf",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENCOR Infrastructure Services (NTP, NAT/PAT, IP SLA, NetFlow, SPAN/ERSPAN)",
+  "title": "سرویس‌های زیرساخت در CCNP ENCOR: سلسله‌مراتب NTP، NAT/PAT، IP SLA، NetFlow و SPAN/ERSPAN",
+  "titleEn": "CCNP ENCOR Infrastructure: NTP, NAT/PAT, IP SLA, NetFlow & SPAN/ERSPAN",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccna_04",
+    "adv_ec"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_enc_inf (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_enc_inf",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc5905",
+      "https://www.rfc-editor.org/rfc/rfc7011",
+      "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/configuration_guide/nmgmt/b_179_nmgmt_9300_cg/configuring_span_and_rspan.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_enc_inf_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق Stratum 0 تا 16 در NTP (RFC 5905) و اهمیت احراز هویت و منبع‌یابی پایدار زمان برای TLS/Kerberos/Syslog.",
+      "تفکیک SPAN، RSPAN (VLAN اختصاصی) و ERSPAN (کپسوله‌سازی GRE روی شبکه لایه ۳) همراه با سقف ترافیک و اثر بازتاب.",
+      "ساخت آزمایشگاه محلی ccnp_enc_inf_lab.py برای شبیه‌سازی انتخاب Stratum در NTP، جدول PAT (65535 overflow check) و تحلیل جریان NetFlow/IPFIX."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_enc_inf-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_enc_inf.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_enc_inf_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تفکیک دقیق Stratum 0 تا 16 در NTP (RFC 5905) و اهمیت احراز هویت و منبع‌یابی پایدار زمان برای TLS/Kerberos/Syslog.",
+      "تفکیک SPAN، RSPAN (VLAN اختصاصی) و ERSPAN (کپسوله‌سازی GRE روی شبکه لایه ۳) همراه با سقف ترافیک و اثر بازتاب.",
+      "ساخت آزمایشگاه محلی ccnp_enc_inf_lab.py برای شبیه‌سازی انتخاب Stratum در NTP، جدول PAT (65535 overflow check) و تحلیل جریان NetFlow/IPFIX."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_enc_inf-section-1",
+      "title": "مسئله واقعی: چرا اختلاف ۶ دقیقه‌ای ساعت سرورها باعث شکست Kerberos و بی‌اعتباری لاگ‌های امنیتی می‌شود؟",
+      "html": "<p>احراز هویت <strong>Kerberos</strong> (پیش‌فرض ۵ دقیقه تلورانس)، اعتبار گواهی‌های TLS و تحلیل رویدادهای SIEM به هم‌زمانی دقیق <strong>NTP (RFC 5905)</strong> وابسته‌اند؛ هم‌زمان تله‌متری <strong>NetFlow/IPFIX</strong> و <strong>ERSPAN</strong> دید عملیاتی را در مقیاس سازمانی فراهم می‌کنند.</p>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> NAT/NTP/SNMP پایه (<code>ccna_04</code>) و FHRP Tracking (<code>adv_ec</code>).</p><ul><li>طراحی سلسله‌مراتب امن <strong>NTP (Stratum 0..16)</strong> و <strong>PTP</strong>.</li><li>تحلیل عمیق <strong>Static/Dynamic NAT و PAT</strong> و پایش فعال مسیر با <strong>IP SLA</strong>.</li><li>تفاوت <strong>SPAN، RSPAN و ERSPAN</strong> و تحلیل جریان <strong>Flexible NetFlow / IPFIX (RFC 7011)</strong>.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-3",
+      "title": "سلسله‌مراتب NTP (RFC 5905): Stratum 0 تا 15 و وضعیت 16 (Unsynchronized)",
+      "html": "<p>ساعت اتمی/GPS در <strong>Stratum 0</strong> و سرور متصل مستقیم در <strong>Stratum 1</strong> است؛ هر لایه بعدی یک واحد به Stratum می‌افزاید و <strong>Stratum 16</strong> به معنای عدم هم‌زمانی و غیرقابل اعتماد است.</p>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-4",
+      "title": "NAT استاتیک، پویا و PAT (Overload) و ریسک Exhaustion پورت",
+      "html": "<p>در PAT چندین میزبان داخلی یک IP عمومی را با نگاشت پورت‌های لایه ۴ به اشتراک می‌گذارند؛ در شبکه‌های پرکاربر اگر تعداد اتصالات هم‌زمان از ظرفیت پورت یک IP عمومی فراتر رود (Port Exhaustion)، باید از NAT Pool چند-IP با <code>overload</code> استفاده کرد.</p>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-5",
+      "title": "پایش فعال مسیر با IP SLA و اتصال به Object Tracking",
+      "html": "<p><strong>IP SLA</strong> بسته‌های سنجش فعال (ICMP Echo، HTTP، UDP Jitter) ارسال می‌کند و با اتصال به <code>track</code> می‌تواند مسیر Static پیش‌فرض یا اولویت HSRP را هنگام افت واقعی اینترنت (حتی با Up بودن فیزیکی لینک) تغییر دهد.</p>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-6",
+      "title": "نمودار معماری: هم‌زمانی NTP، پایش IP SLA و دیدپذیری SPAN/NetFlow",
+      "html": "<p>نمودار زیر سرویس‌های هم‌زمانی، پایش فعال و تله‌متری زیرساخت ENCOR را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"ENCOR Infrastructure Services\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">ENCOR Infrastructure: NTP Stratum, IP SLA Track &amp; NetFlow/ERSPAN</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Time Sync (RFC 5905)</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Stratum 1 -&gt; 2 -&gt; 3 (16=Unsync)</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Auth keys + Loopback source</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">NAT/PAT &amp; IP SLA</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">PAT maps (IP,Port) -&gt; Pub:Port</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">IP SLA -&gt; Track -&gt; Failover</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Visibility (SPAN/IPFIX)</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">SPAN (local) / RSPAN (VLAN)</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">ERSPAN (GRE L3) + NetFlow/IPFIX</text></svg>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-7",
+      "title": "Flexible NetFlow و IPFIX (RFC 7011): فراداده جریان به‌جای کپی کامل بسته",
+      "html": "<p>برخلاف SPAN که کل Payload بسته را کپی می‌کند، <strong>NetFlow/IPFIX</strong> فراداده جریان (۵-تاپل، بایت، بسته، پرچم TCP، DSCP) را جمع‌آوری و به Collector ارسال می‌کند که برای کشف ناهنجاری، DDoS و برنامه‌ریزی ظرفیت بسیار کارآمدتر است.</p>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-8",
+      "title": "مقایسه دقیق SPAN، RSPAN و ERSPAN",
+      "html": "<table><thead><tr><th>روش</th><th>دامنه عمل</th><th>سازوکار انتقال</th></tr></thead><tbody><tr><td><strong>Local SPAN</strong></td><td>درون یک سوئیچ</td><td>کپی مستقیم فریم به پورت مقصد محلی</td></tr><tr><td><strong>RSPAN</strong></td><td>بین چند سوئیچ در یک دامنه L2</td><td>انتقال فریم داخل یک <code>remote-span</code> VLAN</td></tr><tr><td><strong>ERSPAN</strong></td><td>در کل شبکه لایه ۳ (L3 Routed)</td><td>کپسوله‌سازی فریم داخل تونل <strong>GRE</strong> تا آنالیزور دوردست</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-9",
+      "title": "معماری Syslog، SNMPv3 و انتقال به Streaming Telemetry",
+      "html": "<p>در شبکه‌های مدرن، برای مدیریت امن از <strong>SNMPv3 AuthPriv</strong> (نه v2c با Community متن‌باز) و <strong>Syslog</strong> با timestamp دقیق NTP و در مقیاس بالا از <strong>Model-Driven Telemetry (gNMI/gRPC)</strong> استفاده می‌شود.</p>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-10",
+      "title": "تله‌های عملیاتی سرویس‌های زیرساخت",
+      "html": "<ul><li>تنظیم پورت مقصد SPAN و فراموش کردن اینکه ترافیک عادی ورودی آن پورت به‌طور پیش‌فرض غیرفعال است.</li><li>ساخت <code>ntp master</code> با Stratum بسیار پایین (مثلاً ۱) که ساعت واقعی شبکه را تخریب کند.</li><li>خاموش بودن <code>ip nat inside</code> / <code>outside</code> روی یکی از اینترفیس‌ها.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-11",
+      "title": "نکات امنیتی سرویس‌های زیرساخت",
+      "html": "<p>محدودسازی دسترسی NTP با <code>ntp access-group</code>، فعال‌سازی احراز هویت NTP، و ارسال ERSPAN صرفاً در VLAN/VRF مدیریتی امن از نشت داده‌های حساس جلوگیری می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-12",
+      "title": "چک‌لیست عیب‌یابی سرویس‌های زیرساخت",
+      "html": "<ul><li><code>show ntp associations</code> (علامت <code>*</code> یعنی همگام با مرجع).</li><li><code>show ip nat translations</code> و <code>show ip sla statistics</code>.</li><li><code>show flow exporter statistics</code> و <code>show monitor session all</code>.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-13",
+      "title": "تمرین تحلیلی سناریو (رد Stratum 16 در NTP و تشخیص Port Exhaustion در PAT)",
+      "html": "<p>در <code>ccnp_enc_inf_lab.py</code> همتای NTP با Stratum 16 رد و کمترین Stratum معتبر انتخاب می‌شود؛ نگاشت PAT و سرریز استخر پورت شبیه‌سازی و Top-Talkerها از رکوردهای NetFlow استخراج می‌گردند.</p>"
+    },
+    {
+      "id": "ccnp_enc_inf-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc5905\" target=\"_blank\" rel=\"noopener\">RFC 5905 (NTPv4)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc7011\" target=\"_blank\" rel=\"noopener\">RFC 7011 (IPFIX)</a> و راهنمای SPAN/RSPAN/ERSPAN سیسکو.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_enc_inf_lab.py</code> مدل محلی Python 3 بدون سرور NTP یا Collector زنده است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "NTP (RFC 5905)",
+      "fa": "پروتکل زمان شبکه",
+      "simple": "هم‌زمانی سلسله‌مراتبی ساعت تجهیزات شبکه روی UDP 123."
+    },
+    {
+      "term": "Stratum (0..16)",
+      "fa": "لایه مرجع زمان NTP",
+      "simple": "فاصله از ساعت اتمی؛ ۱ تا ۱۵ معتبر و ۱۶ به معنای ناهمگام."
+    },
+    {
+      "term": "PAT (NAT Overload)",
+      "fa": "ترجمه آدرس و پورت",
+      "simple": "اشتراک یک IP عمومی بین چند میزبان داخلی با پورت‌های مجزا."
+    },
+    {
+      "term": "Port Exhaustion",
+      "fa": "اتمام ظرفیت پورت PAT",
+      "simple": "پر شدن جدول پورت‌های یک IP عمومی زیر بار زیاد اتصالات."
+    },
+    {
+      "term": "IP SLA",
+      "fa": "پایش فعال سطح سرویس",
+      "simple": "ارسال بسته‌های سنجش فعال برای ارزیابی واقعی دسترس‌پذیری مسیر."
+    },
+    {
+      "term": "Flexible NetFlow",
+      "fa": "نت‌فلو انعطاف‌پذیر",
+      "simple": "جمع‌آوری فراداده جریان‌ها با Record/Exporter/Monitor سفارشی."
+    },
+    {
+      "term": "IPFIX (RFC 7011)",
+      "fa": "استاندارد باز تله‌متری جریان",
+      "simple": "استاندارد IETF مبتنی بر NetFlow v9 برای صادرات آمار جریان."
+    },
+    {
+      "term": "Local SPAN",
+      "fa": "آینه‌سازی پورت محلی",
+      "simple": "کپی ترافیک پورت/VLAN به پورت آنالیزور در همان سوئیچ."
+    },
+    {
+      "term": "RSPAN",
+      "fa": "آینه‌سازی راه دور لایه ۲",
+      "simple": "ارسال ترافیک آینه‌شده بین سوئیچ‌ها از طریق RSPAN VLAN."
+    },
+    {
+      "term": "ERSPAN",
+      "fa": "آینه‌سازی راه دور لایه ۳",
+      "simple": "کپسوله‌سازی ترافیک SPAN درون GRE برای ارسال روی شبکه L3."
+    },
+    {
+      "term": "SNMPv3 AuthPriv",
+      "fa": "مدیریت امن SNMPv3",
+      "simple": "نسخه امن SNMP با احراز هویت و رمزنگاری کامل."
+    },
+    {
+      "term": "Syslog Severity (0..7)",
+      "fa": "سطوح شدت لاگ",
+      "simple": "طبقه‌بندی پیام‌ها از Emergency (0) تا Debugging (7)."
+    },
+    {
+      "term": "Flow Record",
+      "fa": "قالب رکورد جریان",
+      "simple": "تعریف فیلدهای کلیدی و شمارنده‌ها در Flexible NetFlow."
+    },
+    {
+      "term": "Flow Exporter",
+      "fa": "صادرکننده NetFlow",
+      "simple": "تنظیم مقصد Collector، پورت UDP و مبدأ ارسال جریان."
+    },
+    {
+      "term": "Top Talkers",
+      "fa": "پرمصرف‌ترین جریان‌ها",
+      "simple": "شناخت پرمصرف‌ترین IPها/پورت‌ها از آمار NetFlow."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENCOR Infrastructure: NTP, NAT/PAT, IP SLA, NetFlow & SPAN/ERSPAN",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_enc_inf_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_enc_inf_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_enc_inf (OSPF Network-Type Adjacency Audit &amp; Wireless L2/L3 Roaming Model).\n\nEducational local model only — no live Cisco IOS-XE OSPF router, Catalyst 9800 WLC,\nor CAPWAP AP is contacted.\nModels:\n1. OSPF network-type mismatch detector (e.g., point-to-point vs broadcast: Hello/Dead timers\n   match on 10s/40s, adjacency reaches FULL, yet LSA Type-1 vs Type-2 mismatch breaks SPF/RIB!).\n2. Wireless L2 (Intra-Controller / Same-VLAN) vs L3 (Anchor / Foreign Tunnel) Roaming state model.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nOSPF_NET_TYPES = {\n    &quot;point-to-point&quot;: {&quot;hello&quot;: 10, &quot;dead&quot;: 40, &quot;elects_dr&quot;: False},\n    &quot;broadcast&quot;: {&quot;hello&quot;: 10, &quot;dead&quot;: 40, &quot;elects_dr&quot;: True},\n    &quot;non-broadcast&quot;: {&quot;hello&quot;: 30, &quot;dead&quot;: 120, &quot;elects_dr&quot;: True},\n    &quot;point-to-multipoint&quot;: {&quot;hello&quot;: 30, &quot;dead&quot;: 120, &quot;elects_dr&quot;: False},\n}\n\n\ndef audit_ospf_network_type_pair(r1_type: str, r2_type: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Audit two ends of an OSPF link for timer compatibility AND DR/LSA SPF consistency.&quot;&quot;&quot;\n    if r1_type not in OSPF_NET_TYPES or r2_type not in OSPF_NET_TYPES:\n        raise ValueError(f&quot;network types must be in {sorted(OSPF_NET_TYPES)}&quot;)\n    t1, t2 = OSPF_NET_TYPES[r1_type], OSPF_NET_TYPES[r2_type]\n    timers_match = (t1[&quot;hello&quot;] == t2[&quot;hello&quot;]) and (t1[&quot;dead&quot;] == t2[&quot;dead&quot;])\n    dr_match = t1[&quot;elects_dr&quot;] == t2[&quot;elects_dr&quot;]\n    if not timers_match:\n        return {\n            &quot;neighbor_forms_full&quot;: False,\n            &quot;spf_routes_healthy&quot;: False,\n            &quot;reason&quot;: &quot;HELLO_DEAD_TIMER_MISMATCH_NO_ADJACENCY&quot;,\n        }\n    if not dr_match:\n        return {\n            &quot;neighbor_forms_full&quot;: True,\n            &quot;spf_routes_healthy&quot;: False,\n            &quot;reason&quot;: &quot;SILENT_TRAP_FULL_ADJACENCY_BUT_DR_NON_DR_LSA_MISMATCH_NO_SPF_ROUTES&quot;,\n        }\n    return {\n        &quot;neighbor_forms_full&quot;: True,\n        &quot;spf_routes_healthy&quot;: True,\n        &quot;dr_election_overhead_avoided&quot;: (r1_type == &quot;point-to-point&quot;),\n        &quot;reason&quot;: &quot;OSPF_NETWORK_TYPES_COMPATIBLE&quot;,\n    }\n\n\ndef classify_wireless_roam(\n    old_vlan: int,\n    new_vlan: int,\n    same_wlc: bool,\n    same_mobility_group: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Classify client roaming as L2 vs L3 (Foreign/Anchor tunnel) in a WLC architecture.&quot;&quot;&quot;\n    if isinstance(old_vlan, bool) or isinstance(new_vlan, bool) or not isinstance(old_vlan, int) or not isinstance(new_vlan, int):\n        raise ValueError(&quot;VLAN IDs must be ints&quot;)\n    if not (1 &lt;= old_vlan &lt;= 4094) or not (1 &lt;= new_vlan &lt;= 4094):\n        raise ValueError(&quot;VLAN IDs must be in 1..4094&quot;)\n    if not isinstance(same_wlc, bool) or not isinstance(same_mobility_group, bool):\n        raise ValueError(&quot;same_wlc and same_mobility_group must be strict bools&quot;)\n    if not same_wlc and not same_mobility_group:\n        return {&quot;roam_type&quot;: &quot;FULL_REAUTH_NEW_SESSION&quot;, &quot;client_ip_preserved&quot;: False, &quot;anchor_tunnel_used&quot;: False}\n    if old_vlan == new_vlan:\n        return {\n            &quot;roam_type&quot;: &quot;L2_INTRA_CONTROLLER&quot; if same_wlc else &quot;L2_INTER_CONTROLLER&quot;,\n            &quot;client_ip_preserved&quot;: True,\n            &quot;anchor_tunnel_used&quot;: False,\n        }\n    return {\n        &quot;roam_type&quot;: &quot;L3_ROAM_ANCHOR_FOREIGN_TUNNEL&quot;,\n        &quot;client_ip_preserved&quot;: True,\n        &quot;anchor_tunnel_used&quot;: True,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live IOS-XE OSPF router or Catalyst 9800 WLC is contacted.&quot;)\n    trap = audit_ospf_network_type_pair(&quot;point-to-point&quot;, &quot;broadcast&quot;)\n    clean = audit_ospf_network_type_pair(&quot;point-to-point&quot;, &quot;point-to-point&quot;)\n    assert trap[&quot;neighbor_forms_full&quot;] is True and trap[&quot;spf_routes_healthy&quot;] is False\n    assert clean[&quot;spf_routes_healthy&quot;] is True and clean[&quot;dr_election_overhead_avoided&quot;] is True\n\n    l2 = classify_wireless_roam(10, 10, same_wlc=True, same_mobility_group=True)\n    l3 = classify_wireless_roam(10, 20, same_wlc=False, same_mobility_group=True)\n    assert l2[&quot;anchor_tunnel_used&quot;] is False and l3[&quot;anchor_tunnel_used&quot;] is True\n    print(&quot;OSPF P2P-vs-Broadcast silent trap:&quot;, trap)\n    print(&quot;Wireless L3 roam:&quot;, l3)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE NTP, IP SLA &amp; Flexible NetFlow (NOT executed on live hardware)\nntp server 10.255.0.10 prefer\nip sla 10\n icmp-echo 198.51.100.1 source-interface GigabitEthernet0/0\n frequency 10\nip sla schedule 10 life forever start-time now\ntrack 10 ip sla 10 reachability</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در NTP (RFC 5905)، مقدار <strong>Stratum 16</strong> چه معنایی دارد؟",
+      "options": [
+        "دقیق‌ترین ساعت اتمی",
+        "ساعت ناهمگام (Unsynchronized) و غیرقابل استفاده به عنوان مرجع",
+        "سرور GPS",
+        "فعال بودن احراز هویت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Stratum معتبر ۱ تا ۱۵ است و ۱۶ به معنای عدم هم‌زمانی است.</p>"
+    },
+    {
+      "title": "تفاوت اصلی <strong>ERSPAN</strong> با Local SPAN و RSPAN چیست؟",
+      "options": [
+        "ERSPAN ترافیک آینه‌شده را درون GRE روی شبکه لایه ۳ تا آنالیزور دوردست می‌فرستد",
+        "ERSPAN فقط درون یک سوئیچ است",
+        "ERSPAN به VLAN 1 نیاز دارد",
+        "ERSPAN فقط UDP را کپی می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>کپسوله‌سازی GRE امکان انتقال ترافیک آینه‌شده را در کل شبکه Routed می‌دهد.</p>"
+    },
+    {
+      "title": "تفاوت بنیادین <strong>NetFlow/IPFIX</strong> با <strong>SPAN</strong> چیست؟",
+      "options": [
+        "NetFlow فقط فراداده و آمار جریان را می‌فرستد ولی SPAN کل فریم/Payload را کپی می‌کند",
+        "SPAN روی لایه ۳ است",
+        "NetFlow Payload کامل می‌فرستد",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>NetFlow برای دیدپذیری مقیاس‌پذیر و SPAN برای تحلیل بسته عمیق (PCAP) به کار می‌رود.</p>"
+    },
+    {
+      "title": "چرا اتصال <strong>IP SLA</strong> به <strong>Object Tracking</strong> از پایش صرف وضعیت فیزیکی لینک بهتر است؟",
+      "options": [
+        "زیرا قطعی واقعی در شبکه بالادست ISP را حتی زمانی که پورت فیزیکی Up است تشخیص می‌دهد",
+        "زیرا مصرف پهنای باند را صفر می‌کند",
+        "زیرا جایگزین BGP است",
+        "زیرا نیاز به IP ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>IP SLA دسترس‌پذیری سرتاسری مسیر را می‌سنجد.</p>"
+    },
+    {
+      "title": "برای پیشگیری از <strong>Port Exhaustion</strong> در PAT با هزاران کاربر هم‌زمان چه راهکاری پیشنهاد می‌شود؟",
+      "options": [
+        "تغییر به Static NAT",
+        "استفاده از یک NAT Pool شامل چند IP عمومی همراه با overload",
+        "کاهش MTU",
+        "خاموش کردن DNS"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>چند IP عمومی ظرفیت پورت‌های هم‌زمان را چندبرابر می‌کند.</p>"
+    },
+    {
+      "title": "سه مؤلفه اصلی <strong>Flexible NetFlow</strong> در IOS-XE کدام‌اند؟",
+      "options": [
+        "class-map، policy-map، acl",
+        "Flow Record، Flow Exporter و Flow Monitor",
+        "NTP، SNMP، Syslog",
+        "SPAN، RSPAN، ERSPAN"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Monitor ترکیب Record و Exporter را روی اینترفیس اعمال می‌کند.</p>"
+    },
+    {
+      "title": "کدام نسخه SNMP هم احراز هویت و هم رمزنگاری ترافیک مدیریتی را فراهم می‌کند؟",
+      "options": [
+        "SNMPv1",
+        "SNMPv2c",
+        "SNMPv3 AuthPriv",
+        "هیچ‌کدام"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>AuthPriv امن‌ترین سطح SNMPv3 است.</p>"
+    },
+    {
+      "title": "در Syslog سطح شدت <strong>0 (Emergency)</strong> نسبت به <strong>7 (Debugging)</strong> چه رابطه‌ای دارد؟",
+      "options": [
+        "عدد کوچکتر یعنی بحرانی‌تر (0 بحرانی‌ترین است)",
+        "7 بحرانی‌ترین است",
+        "یکسان‌اند",
+        "فقط در Linux است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>شدت پیام در Syslog از ۰ (بحرانی‌ترین) تا ۷ (اشکال‌زدایی) است.</p>"
+    },
+    {
+      "title": "اگر سروری به مرجع Stratum 2 متصل شود، خود این سرور چه Stratumی خواهد داشت؟",
+      "options": [
+        "1",
+        "2",
+        "3",
+        "16"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>هر گام در سلسله‌مراتب NTP یک واحد به Stratum اضافه می‌کند.</p>"
+    },
+    {
+      "title": "کدام علامت در خروجی <code>show ntp associations</code> نشانه همگام‌سازی موفق با مرجع فعلی است؟",
+      "options": [
+        "<code>~</code>",
+        "<code>*</code>",
+        "<code>#</code>",
+        "<code>x</code>"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>علامت ستاره (<code>*</code>) مرجع همگام‌شده فعلی را نشان می‌دهد.</p>"
+    },
+    {
+      "title": "در <code>ccnp_enc_inf_lab.py</code> هنگام پر شدن کامل استخر پورت PAT چه نتیجه‌ای تولید می‌شود؟",
+      "options": [
+        "بازنویسی خودکار",
+        "<code>ok=False</code> با خطای <code>PAT_PORT_EXHAUSTION</code>",
+        "حذف NTP",
+        "ایجاد ERSPAN"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مدل صریحاً اتمام ظرفیت پورت را گزارش می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_enc_inf_lab.py</code> چیست؟",
+      "options": [
+        "همگام‌سازی واقعی با GPS",
+        "پویش شبکه زنده",
+        "شبیه‌ساز محلی Python 3 برای NTP، PAT و NetFlow بدون تجهیز زنده",
+        "تولید PCAP"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه شبیه‌ساز محلی Python بدون سخت‌افزار زنده است.</p>"
+    }
+  ]
+}

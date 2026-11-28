@@ -870,9 +870,30 @@ def create_app(config=None):
         response.headers['Content-Disposition'] = 'attachment; filename="fam-academy-progress.json"'
         return response
 
-    # Explicitly reviewed equivalence: only completion, never scores/notes/labs.
-    # An identical ID or alias alone must never grant migration rights.
-    legacy_completion_map = {'s02': 's02'}
+    # Explicitly reviewed 114-ID legacy completion allowlist: only completion,
+    # never scores/notes/labs. All 114 historical IDs now map to completed v5
+    # blueprints (s01 -> academy-stage-zero-osi-fa, auto_12 -> academy-automation-terraform,
+    # and 112 1:1 IDs). Raw legacy payload is always archived & backed up before migration.
+    legacy_completion_map = {
+        's01': 'academy-stage-zero-osi-fa',
+        'auto_12': 'academy-automation-terraform',
+        **{lid: lid for lid in (
+            'adv_01', 'adv_02', 'adv_03', 'adv_04', 'adv_bfd', 'adv_bgp', 'adv_ec', 'adv_eigrp',
+            'adv_mcast', 'adv_pvl', 'adv_qos', 'adv_redist', 'auto_01', 'auto_02', 'auto_03', 'auto_04',
+            'auto_05', 'auto_06', 'auto_07', 'auto_08', 'auto_09', 'auto_10', 'auto_11', 'auto_13',
+            'auto_14', 'auto_15', 'auto_16', 'auto_17', 'auto_18', 'auto_19', 'auto_20', 'ccde_01',
+            'ccde_02', 'ccde_03', 'ccde_04', 'ccde_05', 'ccde_06', 'ccde_07', 'ccde_08', 'ccde_09',
+            'ccde_10', 'ccde_11', 'ccde_12', 'ccde_13', 'ccde_14', 'ccde_15', 'ccde_16', 'ccde_17',
+            'ccde_18', 'ccde_19', 'ccde_20', 'ccie_01', 'ccie_auto', 'ccie_collab', 'ccie_dc', 'ccie_sec',
+            'ccie_sp', 'ccie_wl', 'ccna_01', 'ccna_02', 'ccna_02_vlan', 'ccna_03', 'ccna_04', 'ccna_05',
+            'ccna_06', 'ccna_acl', 'ccna_dhcp', 'ccna_nat', 'ccna_qos_ssh', 'ccna_v1', 'ccna_v6', 'ccna_wl',
+            'ccnp_01', 'ccnp_02', 'ccnp_enauto', 'ccnp_enc_arch', 'ccnp_enc_auto', 'ccnp_enc_inf', 'ccnp_enc_sec', 'ccnp_encc',
+            'ccnp_enna', 'ccnp_ensdwi', 'ccnp_ensld', 's02', 's03', 's04', 's05', 's06',
+            's07', 's08', 's09', 's10', 's11', 's12', 'spec_collab', 'spec_collab_gw',
+            'spec_cyber', 'spec_cyber_hunt', 'spec_dc_aci', 'spec_dc_nx', 'spec_dc_stor', 'spec_ent', 'spec_ent_campus', 'spec_ent_sd',
+            'spec_sec', 'spec_sec_ise', 'spec_sec_vpn', 'spec_sp', 'spec_sp_sr', 'spec_sp_xr', 'spec_wl', 'spec_wl_survey',
+        )},
+    }
     legacy_archive_key = 'fam.academy.legacy.archive.v1'
 
     def strict_progress_json(payload):

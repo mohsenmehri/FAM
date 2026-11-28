@@ -1,0 +1,349 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_enc_arch",
+  "objectiveId": "ccnp_enc_arch",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENCOR Enterprise Architecture (Campus, SD-Access, SD-WAN, CEF/SSO)",
+  "title": "معماری سازمانی در CCNP ENCOR: طراحی Three-Tier/Collapsed Core، SD-Access، SD-WAN و CEF/NSF-SSO",
+  "titleEn": "CCNP ENCOR Architecture: Campus Design, SD-Access, SD-WAN & CEF/SSO",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "adv_ec",
+    "ccnp_01"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_enc_arch (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_enc_arch",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.cisco.com/c/en/us/td/docs/solutions/CVD/Campus/cisco-campus-lan-wlan-design-guide.html",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipswitch_cef/configuration/xe-17/isw-cef-xe-17-book.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_enc_arch_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق معیار انتخاب Two-Tier (Collapsed Core) از Three-Tier و مزایای Routed Access.",
+      "تصریح دقیق سه صفحه Control/Data/Policy در SD-Access (LISP، VXLAN، SGT/TrustSec) و چهار مؤلفه کلیدی SD-WAN (vBond، vSmart، vManage، WAN Edge).",
+      "ساخت آزمایشگاه محلی ccnp_enc_arch_lab.py برای شبیه‌سازی CEF (FIB + Adjacency Table)، NSF/SSO و پیشنهاد معماری Campus."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_enc_arch-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_enc_arch.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_enc_arch_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تفکیک دقیق معیار انتخاب Two-Tier (Collapsed Core) از Three-Tier و مزایای Routed Access.",
+      "تصریح دقیق سه صفحه Control/Data/Policy در SD-Access (LISP، VXLAN، SGT/TrustSec) و چهار مؤلفه کلیدی SD-WAN (vBond، vSmart، vManage، WAN Edge).",
+      "ساخت آزمایشگاه محلی ccnp_enc_arch_lab.py برای شبیه‌سازی CEF (FIB + Adjacency Table)، NSF/SSO و پیشنهاد معماری Campus."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_enc_arch-section-1",
+      "title": "مسئله واقعی: چرا شبکه‌های Flat لایه ۲ در مقیاس سازمانی ناپایدار و مستعد Broadcast Storm هستند؟",
+      "html": "<p>گسترش یک VLAN در کل ساختمان، دامنه خرابی STP و Broadcast را به کل سازمان تعمیم می‌دهد. معماری سلسله‌مراتبی (<strong>Two-Tier / Three-Tier</strong>) و <strong>Routed Access</strong> دامنه لایه ۲ را کوچک، همگرایی را سریع و توسعه را ماژولار می‌کنند.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> EtherChannel/FHRP (<code>adv_ec</code>) و VXLAN/LISP (<code>ccnp_01</code>).</p><ul><li>انتخاب مهندسی بین <strong>Two-Tier (Collapsed Core)</strong>، <strong>Three-Tier</strong> و <strong>Routed Access</strong>.</li><li>درک دقیق <strong>Cisco SD-Access</strong> و <strong>Cisco SD-WAN</strong> و صفحه‌های کنترلی آن‌ها.</li><li>مکانیسم سخت‌افزاری <strong>CEF (FIB + Adjacency Table)</strong>، <strong>SSO</strong> و <strong>NSF (Graceful Restart)</strong>.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-3",
+      "title": "معماری Campus: مقایسه Two-Tier (Collapsed Core) و Three-Tier",
+      "html": "<p>در <strong>Collapsed Core</strong> لایه‌های Distribution و Core ادغام می‌شوند که برای پردیس‌های کوچک/متوسط (تا حدود ۳ بلوک دسترسی) اقتصادی و ساده است؛ در پردیس‌های بزرگ با چند ساختمان و بلوک دیتاسنتر، لایه <strong>Core</strong> مجزا از پیچیدگی Full-Mesh بین Distributionها جلوگیری می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-4",
+      "title": "طراحی Routed Access (لایه ۳ تا لبه دسترسی)",
+      "html": "<p>بردن لایه ۳ (OSPF/EIGRP) تا سوئیچ Access، نیاز به STP و FHRP روی لینک‌های بالادست را حذف کرده و بهره‌برداری هم‌زمان از تمام آپلینک‌ها با <strong>ECMP</strong> را ممکن می‌سازد.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-5",
+      "title": "معماری Cisco SD-Access: جداسازی Underlay، Overlay و سیاست SGT",
+      "html": "<p>در SD-Access: شبکه <strong>Underlay</strong> معمولاً IS-IS است؛ <strong>Control Plane</strong> مبتنی بر LISP؛ <strong>Data Plane</strong> مبتنی بر VXLAN؛ و <strong>Policy Plane</strong> بر پایه <strong>SGT (Scalable Group Tag)</strong> و Cisco ISE بدون وابستگی به IP است.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-6",
+      "title": "نمودار معماری: Campus + SD-Access/SD-WAN و مسیر سخت‌افزاری CEF",
+      "html": "<p>نمودار زیر لایه‌های معماری سازمانی و دو جدول کلیدی CEF را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"ENCOR Architecture and CEF Forwarding\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">ENCOR Architecture: Campus/Fabric Planes &amp; CEF (FIB + Adjacency)</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Campus Hierarchy</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">2-Tier (&lt;=3 blocks) vs 3-Tier</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Routed Access -&gt; ECMP, no STP</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Fabric Architectures</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">SD-Access: LISP + VXLAN + SGT</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">SD-WAN: vManage/vSmart/vBond</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Data Plane (CEF + SSO)</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">FIB (LPM) + Adjacency (L2 hdr)</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">SSO + NSF keeps forwarding live</text></svg>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-7",
+      "title": "معماری Cisco SD-WAN: تفکیک چهار صفحه عملیاتی",
+      "html": "<p>در Cisco SD-WAN چهار صفحه کاملاً تفکیک می‌شوند: <strong>Management</strong> (vManage)، <strong>Orchestration</strong> (vBond)، <strong>Control</strong> (vSmart با OMP) و <strong>Data</strong> (روترهای WAN Edge با تانل‌های IPsec).</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-8",
+      "title": "معماری بی‌سیم سازمانی: FlexConnect در برابر Centralized WLC",
+      "html": "<p>در حالت <strong>Centralized</strong> تمام ترافیک از تونل CAPWAP به WLC مرکزی می‌رود؛ در <strong>FlexConnect</strong> ترافیک شعب کوچک به‌صورت محلی (Local Switching) ارسال شده و هنگام قطع WAN نیز سرویس داخلی ادامه می‌یابد.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-9",
+      "title": "تفاوت Process Switching، Fast Switching و CEF",
+      "html": "<p><strong>Process Switching</strong> هر بسته را به CPU می‌فرستد؛ <strong>Fast Switching</strong> فقط بسته اول را به CPU برده و کش می‌سازد؛ اما <strong>CEF</strong> پیش‌دستانه <strong>FIB</strong> (آینه بهینه RIB) و <strong>Adjacency Table</strong> (هدر لایه ۲ آماده از ARP) را می‌سازد و فورواردینگ را بدون درگیری CPU در سخت‌افزار انجام می‌دهد.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-10",
+      "title": "افزونگی سطح شاسی: SSO و NSF (Graceful Restart)",
+      "html": "<p>در شاسی‌های دو-Supervisor، قابلیت <strong>SSO</strong> وضعیت کنترل را همگام نگه می‌دارد و <strong>NSF</strong> به همسایگان OSPF/BGP اعلام می‌کند حین Switchover مسیرها را حذف نکنند تا CEF فورواردینگ را بی‌وقفه ادامه دهد.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-11",
+      "title": "چگونه ترافیک استثنایی (Punt) به CPU می‌رسد؟",
+      "html": "<p>بسته‌هایی مانند TTL=1، گزینه‌های IP، ARP ناتمام (Glean Adjacency) یا بسته‌های خطاب به خود روتر (Receive Adjacency) همچنان به CPU ارسال (Punt) می‌شوند.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-12",
+      "title": "چک‌لیست طراحی معماری سازمانی",
+      "html": "<ul><li>محدود کردن دامنه لایه ۲ به یک کمد دسترسی یا بلوک مشخص.</li><li>تضمین تقارن ظرفیت در لایه Distribution/Core و بررسی <code>show ip cef</code> و <code>show adjacency</code>.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-13",
+      "title": "تمرین تحلیلی سناریو (موتور CEF و انتخاب Two-Tier در برابر Three-Tier)",
+      "html": "<p>در <code>ccnp_enc_arch_lab.py</code> بسته با تطابق LPM روی FIB و Adjacency آماده در سخت‌افزار فوروارد و بسته فاقد ARP به عنوان <code>GLEAN_PUNT_TO_CPU</code> گزارش می‌شود؛ همچنین با بیش از ۳ بلوک، معماری Three-Tier پیشنهاد می‌گردد.</p>"
+    },
+    {
+      "id": "ccnp_enc_arch-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> راهنمای طراحی <a href=\"https://www.cisco.com/c/en/us/td/docs/solutions/CVD/Campus/cisco-campus-lan-wlan-design-guide.html\" target=\"_blank\" rel=\"noopener\">Cisco Campus LAN/WLAN CVD</a> و مستندات CEF IOS-XE 17.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_enc_arch_lab.py</code> مدل محلی Python 3 است و شاسی دو-Supervisor یا Catalyst Center زنده متصل نیست.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Three-Tier Architecture",
+      "fa": "معماری سه‌لایه پردیس",
+      "simple": "تفکیک Access، Distribution و Core برای پردیس‌های بزرگ."
+    },
+    {
+      "term": "Collapsed Core (Two-Tier)",
+      "fa": "معماری دولایه ادغام‌شده",
+      "simple": "ادغام Core و Distribution برای سازمان‌های کوچک و متوسط."
+    },
+    {
+      "term": "Routed Access",
+      "fa": "لایه دسترسی مسیریابی‌شده",
+      "simple": "اجرای لایه ۳ و ECMP تا سوئیچ Access بدون نیاز به STP روی آپلینک."
+    },
+    {
+      "term": "SD-Access",
+      "fa": "فابریک دسترسی نرم‌افزارمحور",
+      "simple": "ترکیب LISP (Control)، VXLAN (Data) و SGT (Policy)."
+    },
+    {
+      "term": "SGT (Scalable Group Tag)",
+      "fa": "برچسب گروه امنیتی",
+      "simple": "اعمال سیاست دسترسی مبتنی بر نقش به‌جای آدرس IP در TrustSec."
+    },
+    {
+      "term": "Cisco SD-WAN",
+      "fa": "WAN نرم‌افزارمحور",
+      "simple": "جداسازی کنترل (vSmart)، هماهنگی (vBond)، مدیریت (vManage) و داده."
+    },
+    {
+      "term": "CAPWAP",
+      "fa": "تونل کنترل و داده بی‌سیم",
+      "simple": "تونل میان AP و کنترلر بی‌سیم WLC (UDP 5246/5247)."
+    },
+    {
+      "term": "FlexConnect",
+      "fa": "حالت شعبه بی‌سیم",
+      "simple": "سوییچینگ محلی ترافیک بی‌سیم در شعب بدون وابستگی دائم به WAN."
+    },
+    {
+      "term": "CEF",
+      "fa": "فورواردینگ سریع سیسکو",
+      "simple": "فورواردینگ پیش‌دستانه با دو جدول FIB و Adjacency Table."
+    },
+    {
+      "term": "FIB",
+      "fa": "پایگاه اطلاعات فوروارد",
+      "simple": "آینه بهینه جدول RIB برای جست‌وجوی سریع LPM در Data Plane."
+    },
+    {
+      "term": "Adjacency Table",
+      "fa": "جدول همسایگی لایه ۲",
+      "simple": "نگهداری هدرهای آماده لایه ۲ (از ARP) برای فوروارد بدون CPU."
+    },
+    {
+      "term": "Glean Adjacency",
+      "fa": "وضعیت نیاز به ARP در CEF",
+      "simple": "ارسال بسته به CPU برای کشف MAC میزبان متصل مستقیم."
+    },
+    {
+      "term": "Punt to CPU",
+      "fa": "ارجاع بسته به پردازنده",
+      "simple": "ارسال بسته‌های کنترلی/استثنایی (TTL=1، ARP) از سخت‌افزار به CPU."
+    },
+    {
+      "term": "SSO",
+      "fa": "انتقال وضعیت‌مند ناظرها",
+      "simple": "همگام‌سازی وضعیت میان Supervisor فعال و آماده در یک شاسی."
+    },
+    {
+      "term": "NSF / Graceful Restart",
+      "fa": "فوروارد بدون وقفه",
+      "simple": "حفظ مسیرها در همسایگان هنگام Switchover ناظر برای ادامه فوروارد CEF."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENCOR Architecture: Campus Design, SD-Access, SD-WAN & CEF/SSO",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_enc_arch_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_enc_arch_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_enc_arch (CEF FIB/Adjacency Lookup, TCAM Utilization &amp; SD-Access Roles).\n\nEducational local model only — no live Cisco Catalyst 9000 ASIC, CEF engine, TCAM bank,\nor Cisco SD-Access fabric is contacted.\nModels:\n1. Illustrative CEF Data-Plane table separation (FIB prefix -&gt; Adjacency L2 rewrite header).\n2. Illustrative TCAM entry utilization budget warning (ACL/QoS/L3 routes).\n3. SD-Access fabric node role mapping (Control Plane Node, Edge Node, Border Node).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_non_neg_int(val: object, name: str, max_val: int = 10_000_000) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (0 &lt;= val &lt;= max_val):\n        raise ValueError(f&quot;{name} must be an int in 0..{max_val}, got {val!r}&quot;)\n    return val\n\n\ndef cef_fib_adjacency_lookup(\n    destination_ip: str,\n    fib_table: list[dict[str, str]],\n    adjacency_table: dict[str, dict[str, str]],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model two-table CEF lookup: Longest Prefix Match in FIB -&gt; L2 rewrite in Adjacency Table.&quot;&quot;&quot;\n    dst = ipaddress.IPv4Address(destination_ip.strip())\n    best_len = -1\n    best_entry: dict[str, str] | None = None\n    for row in fib_table:\n        net = ipaddress.IPv4Network(str(row[&quot;prefix&quot;]), strict=True)\n        if dst in net and net.prefixlen &gt; best_len:\n            best_len = net.prefixlen\n            best_entry = row\n    if best_entry is None:\n        return {&quot;cef_hit&quot;: False, &quot;reason&quot;: &quot;NO_FIB_MATCH_PUNT_OR_DROP&quot;}\n    nh = str(best_entry[&quot;next_hop&quot;])\n    adj = adjacency_table.get(nh)\n    if not adj:\n        return {&quot;cef_hit&quot;: False, &quot;fib_prefix&quot;: best_entry[&quot;prefix&quot;], &quot;reason&quot;: &quot;GLEAN_ADJACENCY_ARP_REQUIRED&quot;}\n    return {\n        &quot;cef_hit&quot;: True,\n        &quot;fib_prefix&quot;: best_entry[&quot;prefix&quot;],\n        &quot;next_hop&quot;: nh,\n        &quot;l2_rewrite_dst_mac&quot;: adj[&quot;dst_mac&quot;],\n        &quot;egress_interface&quot;: adj[&quot;egress_interface&quot;],\n        &quot;model_scope_note&quot;: &quot;Illustrative CEF FIB/Adjacency data-structure model only; no hardware ASIC tested.&quot;,\n    }\n\n\ndef evaluate_tcam_utilization(used_entries: int, max_entries: int) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate illustrative TCAM occupancy percentage and exhaustion risk.&quot;&quot;&quot;\n    used = _require_non_neg_int(used_entries, &quot;used_entries&quot;)\n    cap = _require_non_neg_int(max_entries, &quot;max_entries&quot;)\n    if cap == 0:\n        raise ValueError(&quot;max_entries must be &gt; 0&quot;)\n    pct = round((used / cap) * 100.0, 2)\n    status = &quot;EXHAUSTED_CPU_PUNT_OR_DROP_RISK&quot; if used &gt;= cap else (&quot;WARNING_HIGH_OCCUPANCY&quot; if pct &gt;= 80.0 else &quot;NORMAL&quot;)\n    return {&quot;used_entries&quot;: used, &quot;max_entries&quot;: cap, &quot;utilization_pct&quot;: pct, &quot;status&quot;: status}\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Catalyst ASIC, TCAM, or SD-Access fabric is contacted.&quot;)\n    fib = [\n        {&quot;prefix&quot;: &quot;0.0.0.0/0&quot;, &quot;next_hop&quot;: &quot;10.0.0.1&quot;},\n        {&quot;prefix&quot;: &quot;10.40.0.0/16&quot;, &quot;next_hop&quot;: &quot;10.0.0.2&quot;},\n    ]\n    adj = {&quot;10.0.0.2&quot;: {&quot;dst_mac&quot;: &quot;00:50:56:aa:bb:02&quot;, &quot;egress_interface&quot;: &quot;TenGigabitEthernet1/0/1&quot;}}\n    hit = cef_fib_adjacency_lookup(&quot;10.40.12.5&quot;, fib, adj)\n    glean = cef_fib_adjacency_lookup(&quot;198.51.100.10&quot;, fib, adj)\n    assert hit[&quot;cef_hit&quot;] is True and glean[&quot;reason&quot;] == &quot;GLEAN_ADJACENCY_ARP_REQUIRED&quot;\n    tcam = evaluate_tcam_utilization(3600, 4096)\n    assert tcam[&quot;status&quot;] == &quot;WARNING_HIGH_OCCUPANCY&quot;\n    print(&quot;CEF hit:&quot;, hit)\n    print(&quot;TCAM occupancy:&quot;, tcam)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE CEF &amp; SSO Verification (NOT executed on live hardware)\nip cef\nshow ip cef 10.20.1.5 detail\nshow adjacency detail\nshow redundancy states</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "دو جدول اصلی تشکیل‌دهنده <strong>CEF</strong> کدام‌اند؟",
+      "options": [
+        "ARP و STP",
+        "FIB و Adjacency Table",
+        "LSDB و BGP Table",
+        "NAT و ACL"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>CEF مسیر L3 را از FIB و هدر آماده L2 را از Adjacency Table می‌خواند.</p>"
+    },
+    {
+      "title": "مهم‌ترین مزیت طراحی <strong>Routed Access</strong> چیست؟",
+      "options": [
+        "افزایش دامنه VLAN",
+        "حذف STP روی آپلینک‌ها و استفاده هم‌زمان از همه لینک‌ها با ECMP",
+        "حذف IP",
+        "الزام به VTP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مسیریابی تا لبه دسترسی از مسدودسازی لینک توسط STP جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "سه صفحه اصلی <strong>Cisco SD-Access</strong> به‌ترتیب بر چه فناوری‌هایی استوارند؟",
+      "options": [
+        "RIP، GRE، ACL",
+        "LISP (Control)، VXLAN (Data) و SGT/TrustSec (Policy)",
+        "OSPF، MPLS، NAT",
+        "STP، LACP، HSRP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>SD-Access این سه فناوری را در یک فابریک خودکار ترکیب می‌کند.</p>"
+    },
+    {
+      "title": "نقش <strong>vBond</strong> در معماری Cisco SD-WAN چیست؟",
+      "options": [
+        "صفحه داده",
+        "Orchestration و احراز هویت اولیه/کشف NAT برای پیوستن روترها به فابریک",
+        "مدیریت گرافیکی",
+        "محاسبه SPF"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>vBond هماهنگ‌کننده اولیه اتصال vEdge به vManage و vSmart است.</p>"
+    },
+    {
+      "title": "در CEF وضعیت <strong>Glean Adjacency</strong> به چه معناست؟",
+      "options": [
+        "مسیر حذف شده",
+        "مقصد در سگمنت مستقیم است اما هنوز MAC آن در ARP کشف نشده و بسته برای ARP به CPU ارجاع می‌شود",
+        "فریم رمزنگاری شده",
+        "SSO قطع است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پس از دریافت پاسخ ARP، مدخل Adjacency کامل ساخته می‌شود.</p>"
+    },
+    {
+      "title": "هدف ترکیب <strong>NSF (Graceful Restart)</strong> با <strong>SSO</strong> در شاسی دو-Supervisor چیست؟",
+      "options": [
+        "خاموش کردن CEF",
+        "ادامه فورواردینگ بدون افت بسته در Data Plane حین جابه‌جایی Supervisor",
+        "افزایش MTU",
+        "تبدیل به FlexConnect"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>همسایگان مسیرها را موقتاً حفظ می‌کنند تا Control Plane جدید بازسازی شود.</p>"
+    },
+    {
+      "title": "معماری <strong>Two-Tier (Collapsed Core)</strong> معمولاً برای چه ابعادی مناسب‌تر است؟",
+      "options": [
+        "پردیس‌های بسیار بزرگ با ۱۰ ساختمان",
+        "پردیس‌های کوچک و متوسط (مثلاً ۲ تا ۳ بلوک دسترسی)",
+        "فقط شبکه ISP",
+        "فقط Wi-Fi"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در ابعاد کوچک، ادغام Core و Distribution هزینه و پیچیدگی را کاهش می‌دهد.</p>"
+    },
+    {
+      "title": "کاربرد اصلی <strong>FlexConnect</strong> در شبکه بی‌سیم سازمانی چیست؟",
+      "options": [
+        "شعب دوردست با WAN محدود تا ترافیک محلی بدون عبور از WLC مرکزی سوییچ شود",
+        "حذف رمزنگاری WPA3",
+        "اجرای BGP روی AP",
+        "جایگزینی CEF"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>FlexConnect بقای سرویس محلی شعبه را هنگام قطع WAN نیز حفظ می‌کند.</p>"
+    },
+    {
+      "title": "کدام بسته حتی با فعال بودن CEF به CPU ارجاع (Punt) می‌شود؟",
+      "options": [
+        "ترافیک عادی TCP با Adjacency آماده",
+        "بسته دارای TTL=1 یا نیازمند ARP",
+        "ترافیک UDP با FIB کامل",
+        "ترافیک VLAN 10"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>استثناهای پروتکلی مانند انقضای TTL یا کشف ARP به CPU می‌روند.</p>"
+    },
+    {
+      "title": "چرا <strong>SGT</strong> در SD-Access نگهداری سیاست‌های امنیتی را ساده می‌کند؟",
+      "options": [
+        "زیرا سیاست بر مبنای نقش/برچسب اعمال می‌شود نه آدرس‌های IP متغیر",
+        "زیرا ACL را حذف می‌کند بدون جایگزین",
+        "زیرا فقط لایه ۱ است",
+        "زیرا رمزنگاری ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>با جابه‌جایی کاربر، برچسب SGT حفظ و سیاست یکپارچه اعمال می‌شود.</p>"
+    },
+    {
+      "title": "در <code>ccnp_enc_arch_lab.py</code> ارسال بسته به مقصد بدون مدخل Adjacency چه خروجی دارد؟",
+      "options": [
+        "<code>FORWARDED_IN_HARDWARE</code>",
+        "<code>GLEAN_PUNT_TO_CPU</code>",
+        "<code>DROP_NO_ROUTE</code>",
+        "<code>THREE_TIER</code>"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مدل نیاز به ARP و ارجاع به CPU را تشخیص می‌دهد.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_enc_arch_lab.py</code> چیست؟",
+      "options": [
+        "اجرای زنده Catalyst 9600",
+        "تست واقعی SSO",
+        "شبیه‌ساز محلی Python 3 برای CEF و طراحی Campus بدون سخت‌افزار زنده",
+        "اتصال vManage"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کد محلی صرفاً منطق مدل‌شده را بررسی می‌کند.</p>"
+    }
+  ]
+}

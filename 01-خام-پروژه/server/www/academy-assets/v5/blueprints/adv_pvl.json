@@ -1,0 +1,349 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_pvl",
+  "objectiveId": "adv_pvl",
+  "kind": "lesson",
+  "track": "مهندسی پیشرفته (Advanced Engineering)",
+  "course": "c5-advanced-eng",
+  "domain": "Layer 2 Isolation & Trunk Optimization",
+  "title": "مهندسی پیشرفته لایه ۲: Private VLAN (RFC 5517)، Voice VLAN و بهینه‌سازی VLAN Pruning",
+  "titleEn": "Private VLANs (RFC 5517), Voice VLAN & Trunk Pruning",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccna_02_vlan",
+    "ccna_qos_ssh"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy adv_pvl (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "adv_pvl",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc5517",
+      "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/configuration_guide/vlan/b_179_vlan_9300_cg/configuring_private_vlans.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/adv_pvl_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "اصلاح ادعای مطلق درباره شرط اجباری VTP transparent/off برای همه Catalystها: تصریح وابستگی به مدل سخت‌افزار و نسخه IOS/IOS-XE و تفاوت VTPv1/v2 با VTPv3.",
+      "تصریح مرز امنیتی PVLAN مطابق RFC 5517: ایزولاسیون PVLAN صرفاً در لایه ۲ عمل می‌کند و بدون ACL/فایروال و کنترل Proxy ARP روی دروازه لایه ۳ (SVI/روتر)، ترافیک ممکن است در لایه ۳ دور زده شود.",
+      "ارتقای پیش‌نویس ۳ بخشی به ساختار ۱۶ بخشی Curriculum 5.0 همراه با آزمایشگاه محلی adv_pvl_lab.py برای ماتریس PVLAN و ممیزی هرس ترانک."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_pvl-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-advanced-eng",
+      "blueprint": "/academy-assets/v5/blueprints/adv_pvl.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_pvl_lab.py"
+    },
+    "technicalAuditFixes": [
+      "اصلاح ادعای مطلق درباره شرط اجباری VTP transparent/off برای همه Catalystها: تصریح وابستگی به مدل سخت‌افزار و نسخه IOS/IOS-XE و تفاوت VTPv1/v2 با VTPv3.",
+      "تصریح مرز امنیتی PVLAN مطابق RFC 5517: ایزولاسیون PVLAN صرفاً در لایه ۲ عمل می‌کند و بدون ACL/فایروال و کنترل Proxy ARP روی دروازه لایه ۳ (SVI/روتر)، ترافیک ممکن است در لایه ۳ دور زده شود.",
+      "ارتقای پیش‌نویس ۳ بخشی به ساختار ۱۶ بخشی Curriculum 5.0 همراه با آزمایشگاه محلی adv_pvl_lab.py برای ماتریس PVLAN و ممیزی هرس ترانک."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_pvl-section-1",
+      "title": "مسئله واقعی: چرا ساخت یک VLAN و سابنت مجزا برای هر مستأجر باعث هدررفت IPv4 می‌شود؟",
+      "html": "<p>در دیتاسنترهای اشتراکی و شبکه‌های میزبانی، اختصاص یک VLAN و سابنت <code>/29</code> یا <code>/30</code> مستقل برای هر مشتری بخش بزرگی از فضای IPv4 را صرف آدرس شبکه، Broadcast و Gateway می‌کند و مدیریت ده‌ها SVI را پیچیده می‌سازد. <strong>Private VLAN (RFC 5517)</strong> اجازه می‌دهد مشتریان در یک سابنت IP مشترک قرار بگیرند اما در <strong>لایه ۲</strong> از یکدیگر ایزوله بمانند و صرفاً با دروازه مشترک (روتر یا فایروال) ارتباط داشته باشند.</p>"
+    },
+    {
+      "id": "adv_pvl-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر VLAN، 802.1Q Trunk، Native VLAN و Voice VLAN پایه (<code>ccna_02_vlan</code>).</p><ul><li>تفکیک دقیق <strong>Primary VLAN</strong>، <strong>Isolated VLAN</strong> و <strong>Community VLAN</strong> و ماتریس فوروارد لایه ۲ آن‌ها.</li><li>شناخت نقش پورت‌های <strong>Promiscuous</strong> و <strong>Host</strong> و مرز امنیتی لایه ۳ (Proxy ARP و ACL/فایروال).</li><li>تفاوت <strong>Private VLAN</strong> با <strong>Protected Port</strong> و وابستگی VTP به پلتفرم و نسخه (VTPv1/v2 در برابر VTPv3).</li><li>بهینه‌سازی ترافیک بین‌سوئیچی با <strong>Manual Trunk Pruning</strong> و ملاحظات Voice VLAN.</li></ul>"
+    },
+    {
+      "id": "adv_pvl-section-3",
+      "title": "معماری RFC 5517: Primary VLAN، Isolated VLAN و Community VLAN",
+      "html": "<p>در Private VLAN یک <strong>Primary VLAN</strong> (مثلاً 100) به یک یا چند <strong>Secondary VLAN</strong> نگاشت می‌شود: <strong>Isolated VLAN</strong> (مثلاً 101) که اعضایش در لایه ۲ <em>فقط</em> با پورت Promiscuous صحبت می‌کنند و نه با یکدیگر؛ و <strong>Community VLAN</strong> (مثلاً 102 و 103) که اعضای همان گروه در لایه ۲ با هم و با Promiscuous ارتباط دارند اما از سایر Communityها و Isolatedها جدا هستند.</p>"
+    },
+    {
+      "id": "adv_pvl-section-4",
+      "title": "ماتریس فوروارد لایه ۲ و نقش پورت‌های Promiscuous و Host",
+      "html": "<table><thead><tr><th>مبدأ \\ مقصد (L2)</th><th>Promiscuous</th><th>Isolated</th><th>Community A</th><th>Community B</th></tr></thead><tbody><tr><td><strong>Promiscuous</strong></td><td>مجاز</td><td>مجاز</td><td>مجاز</td><td>مجاز</td></tr><tr><td><strong>Isolated</strong></td><td>مجاز</td><td>مسدود</td><td>مسدود</td><td>مسدود</td></tr><tr><td><strong>Community A</strong></td><td>مجاز</td><td>مسدود</td><td>مجاز</td><td>مسدود</td></tr><tr><td><strong>Community B</strong></td><td>مجاز</td><td>مسدود</td><td>مسدود</td><td>مجاز</td></tr></tbody></table><p>پورت <strong>Promiscuous</strong> به دروازه لایه ۳ یا فایروال متصل شده و ترافیک Secondaryها را به Primary نگاشت می‌کند.</p>"
+    },
+    {
+      "id": "adv_pvl-section-5",
+      "title": "مرز امنیتی حیاتی: چرا PVLAN جایگزین ACL و فایروال لایه ۳ نیست؟",
+      "html": "<p>ایزولاسیون PVLAN صرفاً رفتار لایه ۲ است. اگر روی دروازه متصل به پورت Promiscuous قابلیت <strong>Local Proxy ARP</strong> فعال باشد یا سیاست فیلترینگ لایه ۳ (ACL/فایروال) تنظیم نشده باشد، میزبان A می‌تواند بسته را به مک دروازه بفرستد و دروازه آن را در لایه ۳ به میزبان B بازگرداند! بنابراین PVLAN باید همراه با سیاست لایه ۳ صریح و بررسی <code>no ip proxy-arp</code> پیاده‌سازی شود.</p>"
+    },
+    {
+      "id": "adv_pvl-section-6",
+      "title": "نمودار معماری: جداسازی لایه ۲ در Private VLAN و نقطه کنترل دروازه",
+      "html": "<p>نمودار زیر ماتریس لایه ۲ درون Primary VLAN 100 و نقش کنترلی دروازه Promiscuous را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Private VLAN L2 isolation architecture\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">Private VLAN (Primary 100): L2 Matrix vs L3 Gateway Policy</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Isolated VLAN 101</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Host A x--x Host B (Blocked L2)</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Only talks to Promiscuous</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Community VLAN 102</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">App1 &lt;---&gt; App2 (Allowed L2)</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Blocked from 101 &amp; other Comms</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Promiscuous / Gateway</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Maps Primary 100 &lt;-&gt; Sec 101/102</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Enforce L3 ACL &amp; Proxy-ARP policy</text></svg>"
+    },
+    {
+      "id": "adv_pvl-section-7",
+      "title": "وابستگی VTP به پلتفرم و مقایسه با Protected Port",
+      "html": "<p>در پیاده‌سازی‌های کلاسیک Cisco Catalyst با <strong>VTPv1/v2</strong> تنظیم PVLAN معمولاً نیازمند <code>vtp mode transparent</code> یا <code>off</code> بود؛ اما در <strong>VTPv3</strong> روی پلتفرم‌ها و نسخه‌های IOS-XE پشتیبان، انتشار PVLAN در دامنه VTP ممکن است. بنابراین باید مستند دقیق مدل سخت‌افزار و نسخه نرم‌افزار بررسی شود. همچنین <strong>Protected Port</strong> (<code>switchport protected</code>) ساده‌تر است اما فقط در سطح یک سوئیچ فیزیکی عمل کرده و روی ترانک چندسوئیچی گسترش نمی‌یابد.</p>"
+    },
+    {
+      "id": "adv_pvl-section-8",
+      "title": "عبور Private VLAN روی لینک‌های ترانک بین‌سوئیچی",
+      "html": "<p>در سوئیچ‌های پشتیبان، ترانک 802.1Q هم Primary و هم Secondary VLANها را حمل می‌کند تا سوئیچ مقابل بداند فریم از یک پورت Isolated یا Community آمده و قانون ایزولاسیون لایه ۲ در کل شبکه حفظ شود. برای اتصال به تجهیزات فاقد پشتیبانی PVLAN در برخی پلتفرم‌ها حالت‌های Isolated/Promiscuous Trunk تعریف شده است.</p>"
+    },
+    {
+      "id": "adv_pvl-section-9",
+      "title": "Voice VLAN در جزئیات: CDP/LLDP-MED و مرز اعتماد QoS",
+      "html": "<p>روی پورت Access مشترک رایانه و تلفن IP، سوئیچ از طریق <strong>CDP</strong> یا <strong>LLDP-MED</strong> شناسه Voice VLAN را به تلفن اعلام می‌کند تا صدای تلفن تگ‌دار و داده رایانه بدون تگ بماند. سیاست پذیرش <strong>CoS/DSCP</strong> از پورت تلفن باید وابسته به پلتفرم و مرز اعتماد امنیتی طراحی شود و به علامت‌گذاری رایانه کاربر نباید بی‌قیدوشرط اعتماد کرد.</p>"
+    },
+    {
+      "id": "adv_pvl-section-10",
+      "title": "بهینه‌سازی ترانک: Manual Trunk Pruning در برابر VTP Pruning",
+      "html": "<p>بدون محدود کردن VLANهای مجاز روی ترانک، ترافیک BUM مربوط به VLANهای بی‌کاربر در سوئیچ مقابل نیز از ترانک عبور می‌کند. <strong>Manual Pruning</strong> با دستور دقیق <code>switchport trunk allowed vlan</code> (و استفاده از <code>add</code>/<code>remove</code>) پیش‌بینی‌پذیرتر از VTP Pruning است و خطای ناشی از تغییرات ناخواسته دامنه VTP را حذف می‌کند.</p>"
+    },
+    {
+      "id": "adv_pvl-section-11",
+      "title": "خطاها و تله‌های رایج عملیاتی",
+      "html": "<ul><li>فراموش کردن افزودن Primary/Secondary یا Voice VLAN به فهرست <code>allowed vlan</code> ترانک بین‌سوئیچی.</li><li>اعتماد صرف به PVLAN بدون مسدودسازی لایه ۳/Proxy ARP روی دروازه.</li><li>فراموش کردن نگاشت <code>private-vlan mapping</code> روی SVI یا پورت Promiscuous.</li><li>اجرای <code>allowed vlan 50</code> بدون کلیدواژه <code>add</code> و پاک شدن سایر VLANهای فعال.</li></ul>"
+    },
+    {
+      "id": "adv_pvl-section-12",
+      "title": "چک‌لیست طراحی و راستی‌آزمایی پیش از استقرار",
+      "html": "<ul><li>بررسی پشتیبانی مدل و نسخه IOS/IOS-XE از PVLAN و حالت VTP مجاز.</li><li>انطباق کامل فهرست VLANها در پایگاه داده هر دو سوئیچ و ترانک میانی.</li><li>آزمون سیاست ACL/فایروال و Proxy ARP روی SVI یا فایروال متصل به پورت Promiscuous.</li></ul>"
+    },
+    {
+      "id": "adv_pvl-section-13",
+      "title": "تمرین تحلیلی سناریو (دور زدن لایه ۳ و هرس اشتباه Voice VLAN)",
+      "html": "<p><strong>سناریو:</strong> دو میزبان Isolated در VLAN 101 در لایه ۲ ایزوله‌اند اما از طریق دروازه با Proxy ARP یکدیگر را پینگ می‌کنند؛ هم‌زمان Voice VLAN 50 در فهرست ترانک <code>10,20,999</code> جا افتاده است.</p><p><strong>تحلیل:</strong> دروازه باید با ACL و سیاست Proxy ARP کنترل شود و VLAN 50 به فهرست مجاز ترانک افزوده گردد — هر دو در <code>adv_pvl_lab.py</code> بررسی شده‌اند.</p>"
+    },
+    {
+      "id": "adv_pvl-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc5517\" target=\"_blank\" rel=\"noopener\">RFC 5517</a> و راهنمای Private VLAN در Cisco Catalyst 9300 IOS-XE 17.9.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>adv_pvl_lab.py</code> یک مدل محلی Python 3 است و هیچ سوئیچ واقعی Catalyst یا VTP اجرا نشده است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Private VLAN (PVLAN)",
+      "fa": "VLAN خصوصی",
+      "simple": "تقسیم یک Primary VLAN به Secondary VLANهای ایزوله لایه ۲ درون یک سابنت (RFC 5517)."
+    },
+    {
+      "term": "Primary VLAN",
+      "fa": "VLAN اصلی",
+      "simple": "دامنه والد در PVLAN که پورت‌های Promiscuous را به Secondary VLANها متصل می‌کند."
+    },
+    {
+      "term": "Isolated VLAN",
+      "fa": "VLAN ایزوله",
+      "simple": "VLAN ثانویه‌ای که اعضایش در لایه ۲ فقط با Promiscuous ارتباط دارند."
+    },
+    {
+      "term": "Community VLAN",
+      "fa": "VLAN اشتراکی",
+      "simple": "VLAN ثانویه‌ای که اعضای همان گروه با هم و با Promiscuous ارتباط لایه ۲ دارند."
+    },
+    {
+      "term": "Promiscuous Port",
+      "fa": "پورت مشترک دروازه",
+      "simple": "پورت متصل به روتر/فایروال با دسترسی لایه ۲ به همه Secondaryها."
+    },
+    {
+      "term": "Host Port",
+      "fa": "پورت میزبان PVLAN",
+      "simple": "پورت کاربر/سرور در حالت Isolated یا Community."
+    },
+    {
+      "term": "Protected Port",
+      "fa": "پورت محافظت‌شده محلی",
+      "simple": "ایزولاسیون ساده لایه ۲ تنها درون یک سوئیچ واحد."
+    },
+    {
+      "term": "Local Proxy ARP",
+      "fa": "پراکسی ARP محلی",
+      "simple": "پاسخ دروازه به ARP هم‌سابنت که بدون ACL می‌تواند ایزولاسیون لایه ۲ را دور بزند."
+    },
+    {
+      "term": "VACL",
+      "fa": "فیلتر دسترسی VLAN",
+      "simple": "اعمال فیلتر لایه ۲/۳ درون یک VLAN روی پلتفرم‌های پشتیبان."
+    },
+    {
+      "term": "VTPv3",
+      "fa": "پروتکل VTP نسخه ۳",
+      "simple": "نسخه پیشرفته VTP با پشتیبانی پلتفرم‌محور از Extended VLAN و PVLAN."
+    },
+    {
+      "term": "Voice VLAN",
+      "fa": "VLAN صوتی",
+      "simple": "VLAN مجزای تگ‌دار برای تلفن IP روی پورت Access."
+    },
+    {
+      "term": "LLDP-MED",
+      "fa": "کشف لایه ۲ ویژه VoIP",
+      "simple": "استاندارد باز برای اعلام Voice VLAN و سیاست QoS به تلفن IP."
+    },
+    {
+      "term": "BUM Traffic",
+      "fa": "ترافیک پخش و چندپخشی",
+      "simple": "ترافیک Broadcast، Unknown Unicast و Multicast."
+    },
+    {
+      "term": "Manual Trunk Pruning",
+      "fa": "هرس دستی ترانک",
+      "simple": "محدودسازی دقیق VLANهای مجاز روی ترانک با allowed vlan."
+    },
+    {
+      "term": "SVI PVLAN Mapping",
+      "fa": "نگاشت SVI در PVLAN",
+      "simple": "اتصال Secondary VLANها به SVI لایه ۳ متعلق به Primary VLAN."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: Private VLANs (RFC 5517), Voice VLAN & Trunk Pruning",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_pvl_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_pvl_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for adv_pvl (Private VLAN L2 Forwarding Matrix &amp; VLAN Pruning Audit).\n\nEducational local model only — no live Cisco Catalyst switch, hardware ASIC,\nVTP daemon, or L3 SVI ACL is contacted or tested.\nModels:\n1. Private VLAN (PVLAN) Layer 2 forwarding matrix (RFC 5517 concepts):\n   - Promiscuous &lt;-&gt; Primary / Isolated / Community (allowed at L2)\n   - Community &lt;-&gt; Same Community &amp; Promiscuous (blocked from other Community / Isolated at L2)\n   - Isolated &lt;-&gt; Promiscuous ONLY (blocked from other Isolated &amp; Community at L2)\n   - Explicitly notes that L2 PVLAN isolation does NOT replace L3 gateway ACLs/firewalls\n     or proxy-ARP policy!\n2. Manual trunk pruning audit checking that required VLANs (and Voice/Primary/Secondary VLANs)\n   are present in both VLAN databases and trunk allowed lists.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nVALID_PVLAN_PORT_TYPES = frozenset({&quot;promiscuous&quot;, &quot;isolated&quot;, &quot;community&quot;})\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r}&quot;)\n    return val\n\n\ndef _require_vlan(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (1 &lt;= val &lt;= 4094):\n        raise ValueError(f&quot;{name} must be an int VLAN ID in 1..4094, got {val!r}&quot;)\n    return val\n\n\ndef _require_vlan_set(vals: object, name: str) -&gt; set[int]:\n    if not isinstance(vals, (list, set, tuple)):\n        raise ValueError(f&quot;{name} must be a sequence or set of VLAN IDs&quot;)\n    return {_require_vlan(v, f&quot;{name}[]&quot;) for v in vals}\n\n\ndef evaluate_pvlan_l2_forwarding(\n    src_port_type: str,\n    src_secondary_vlan: int | None,\n    dst_port_type: str,\n    dst_secondary_vlan: int | None,\n    primary_vlan: int,\n    l3_proxy_arp_enabled: bool = False,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate Layer 2 PVLAN frame forwarding rules within a single Primary VLAN.&quot;&quot;&quot;\n    p_vlan = _require_vlan(primary_vlan, &quot;primary_vlan&quot;)\n    proxy_arp = _require_bool(l3_proxy_arp_enabled, &quot;l3_proxy_arp_enabled&quot;)\n    if not isinstance(src_port_type, str) or src_port_type not in VALID_PVLAN_PORT_TYPES:\n        raise ValueError(f&quot;src_port_type must be in {sorted(VALID_PVLAN_PORT_TYPES)}&quot;)\n    if not isinstance(dst_port_type, str) or dst_port_type not in VALID_PVLAN_PORT_TYPES:\n        raise ValueError(f&quot;dst_port_type must be in {sorted(VALID_PVLAN_PORT_TYPES)}&quot;)\n\n    s_sec = None if src_port_type == &quot;promiscuous&quot; else _require_vlan(src_secondary_vlan, &quot;src_secondary_vlan&quot;)\n    d_sec = None if dst_port_type == &quot;promiscuous&quot; else _require_vlan(dst_secondary_vlan, &quot;dst_secondary_vlan&quot;)\n    if s_sec == p_vlan or d_sec == p_vlan:\n        raise ValueError(&quot;Secondary VLAN ID must differ from Primary VLAN ID&quot;)\n\n    if src_port_type == &quot;promiscuous&quot; or dst_port_type == &quot;promiscuous&quot;:\n        l2_allowed = True\n        reason = &quot;PROMISCUOUS_ENDPOINT_PERMITTED_L2&quot;\n    elif src_port_type == &quot;isolated&quot; or dst_port_type == &quot;isolated&quot;:\n        l2_allowed = False\n        reason = &quot;ISOLATED_PORT_L2_BLOCKED_TO_NON_PROMISCUOUS&quot;\n    elif src_port_type == &quot;community&quot; and dst_port_type == &quot;community&quot;:\n        if s_sec == d_sec:\n            l2_allowed = True\n            reason = &quot;SAME_COMMUNITY_VLAN_PERMITTED_L2&quot;\n        else:\n            l2_allowed = False\n            reason = &quot;DIFFERENT_COMMUNITY_VLANS_BLOCKED_L2&quot;\n    else:\n        l2_allowed = False\n        reason = &quot;BLOCKED_BY_DEFAULT&quot;\n\n    warnings: list[str] = []\n    if not l2_allowed and proxy_arp:\n        warnings.append(\n            &quot;L3_GATEWAY_BYPASS_RISK: Proxy ARP or unguarded L3 SVI routing on the gateway &quot;\n            &quot;can still route traffic between isolated/different-community hosts unless blocked by ACL/firewall.&quot;\n        )\n\n    return {\n        &quot;primary_vlan&quot;: p_vlan,\n        &quot;l2_model_allowed&quot;: l2_allowed,\n        &quot;reason&quot;: reason,\n        &quot;warnings&quot;: warnings,\n        &quot;model_scope_note&quot;: &quot;RFC 5517 L2 PVLAN logic model only; platform VTP/ASIC/ACL support must be verified separately.&quot;,\n    }\n\n\ndef audit_trunk_pruning(\n    trunk_allowed_vlans: list[int],\n    active_edge_vlans: list[int],\n    voice_vlan: int | None = None,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Audit manual trunk pruning: find missing required VLANs and unnecessary unpruned VLANs.&quot;&quot;&quot;\n    allowed = _require_vlan_set(trunk_allowed_vlans, &quot;trunk_allowed_vlans&quot;)\n    needed = _require_vlan_set(active_edge_vlans, &quot;active_edge_vlans&quot;)\n    if voice_vlan is not None:\n        needed.add(_require_vlan(voice_vlan, &quot;voice_vlan&quot;))\n    missing = sorted(needed - allowed)\n    excess = sorted(allowed - needed)\n    return {\n        &quot;model_checks_ok&quot;: len(missing) == 0,\n        &quot;missing_required_vlans&quot;: missing,\n        &quot;excess_prunable_vlans&quot;: excess,\n        &quot;recommended_allowed_vlans&quot;: sorted(needed),\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco Catalyst switch or VTP daemon is contacted.&quot;)\n    iso_to_iso = evaluate_pvlan_l2_forwarding(&quot;isolated&quot;, 101, &quot;isolated&quot;, 101, primary_vlan=100, l3_proxy_arp_enabled=True)\n    iso_to_prom = evaluate_pvlan_l2_forwarding(&quot;isolated&quot;, 101, &quot;promiscuous&quot;, None, primary_vlan=100)\n    comm_same = evaluate_pvlan_l2_forwarding(&quot;community&quot;, 102, &quot;community&quot;, 102, primary_vlan=100)\n    comm_diff = evaluate_pvlan_l2_forwarding(&quot;community&quot;, 102, &quot;community&quot;, 103, primary_vlan=100)\n    assert iso_to_iso[&quot;l2_model_allowed&quot;] is False and len(iso_to_iso[&quot;warnings&quot;]) == 1\n    assert iso_to_prom[&quot;l2_model_allowed&quot;] is True\n    assert comm_same[&quot;l2_model_allowed&quot;] is True\n    assert comm_diff[&quot;l2_model_allowed&quot;] is False\n    prune = audit_trunk_pruning([10, 20, 30, 40, 999], [10, 20, 999], voice_vlan=50)\n    assert prune[&quot;model_checks_ok&quot;] is False and prune[&quot;missing_required_vlans&quot;] == [50]\n    print(&quot;PVLAN Isolated&lt;-&gt;Isolated (with proxy-ARP warning):&quot;, iso_to_iso)\n    print(&quot;PVLAN Community&lt;-&gt;Same Community:&quot;, comm_same)\n    print(&quot;Manual trunk pruning audit:&quot;, prune)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco Catalyst IOS-XE Private VLAN &amp; Pruning (NOT executed on live hardware)\nvlan 101\n private-vlan isolated\nvlan 102\n private-vlan community\nvlan 100\n private-vlan primary\n private-vlan association 101,102\ninterface GigabitEthernet1/0/1\n switchport mode private-vlan host\n switchport private-vlan host-association 100 101\ninterface GigabitEthernet1/0/24\n switchport mode private-vlan promiscuous\n switchport private-vlan mapping 100 101,102</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در Private VLAN مطابق RFC 5517، دو میزبان درون یک <strong>Isolated VLAN</strong> مشترک چه ارتباط لایه ۲ با هم دارند؟",
+      "options": [
+        "مستقیماً در لایه ۲ متصل‌اند",
+        "در لایه ۲ مسدودند و فقط با پورت Promiscuous صحبت می‌کنند",
+        "تنها با STP متصل می‌شوند",
+        "به Broadcast تبدیل می‌شوند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پورت‌های Isolated در لایه ۲ فقط با Promiscuous ارتباط دارند و از هم ایزوله‌اند.</p>"
+    },
+    {
+      "title": "تفاوت اصلی <strong>Community VLAN</strong> با <strong>Isolated VLAN</strong> چیست؟",
+      "options": [
+        "اعضای یک Community مشترک می‌توانند در لایه ۲ با هم و با Promiscuous صحبت کنند",
+        "Community با Promiscuous ارتباط ندارد",
+        "Isolated فقط برای IPv6 است",
+        "Community نیاز به Primary VLAN ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>اعضای یک Community واحد در لایه ۲ با یکدیگر ارتباط دارند ولی از سایر Communityها و Isolatedها جدا هستند.</p>"
+    },
+    {
+      "title": "چرا فعال بودن PVLAN به‌تنهایی مانع قطعی ارتباط دو مستأجر Isolated نیست؟",
+      "options": [
+        "زیرا PVLAN فقط لایه ۲ را کنترل می‌کند و دروازه لایه ۳ با Proxy ARP یا نبود ACL/فایروال می‌تواند ترافیک را برگرداند",
+        "زیرا MAC را حذف می‌کند",
+        "زیرا فقط روی UDP کار می‌کند",
+        "زیرا روی ترانک کار نمی‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>برای جداسازی کامل باید سیاست لایه ۳ (ACL/فایروال و کنترل Proxy ARP) روی دروازه اعمال شود.</p>"
+    },
+    {
+      "title": "محدودیت <strong>Protected Port</strong> نسبت به Private VLAN کامل چیست؟",
+      "options": [
+        "فقط روی فیبر کار می‌کند",
+        "محدود به یک سوئیچ فیزیکی است و از طریق ترانک بین سوئیچ‌ها گسترش نمی‌یابد",
+        "دروازه را هم قطع می‌کند",
+        "نیاز به BGP دارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Protected Port صرفاً محلی همان سوئیچ است و روی لینک ترانک به سوئیچ دیگر منتقل نمی‌شود.</p>"
+    },
+    {
+      "title": "کدام بیان درباره پیش‌نیاز <strong>VTP</strong> برای PVLAN دقیق‌تر است؟",
+      "options": [
+        "همیشه VTPv1 کافی است",
+        "وابسته به مدل سخت‌افزار و نسخه IOS/IOS-XE است (در VTPv1/v2 معمولاً Transparent/Off لازم بود، اما VTPv3 در پلتفرم‌های پشتیبان آن را پشتیبانی می‌کند)",
+        "اصلاً ربطی به VTP ندارد",
+        "باید VTP Client باشد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>نباید شرط VTP را بدون توجه به مدل و نسخه نرم‌افزار و تفاوت VTPv3 مطلق بیان کرد.</p>"
+    },
+    {
+      "title": "مزیت کلیدی <strong>Manual Trunk Pruning</strong> چیست؟",
+      "options": [
+        "افزایش MTU",
+        "حذف ترافیک BUM غیرضروری VLANهای فاقد کاربر در سمت مقابل و پیش‌بینی‌پذیری بالا",
+        "خاموش کردن 802.1Q",
+        "تبدیل Trunk به Access"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تعیین دقیق VLANهای مجاز مانع عبور ترافیک پخش غیرضروری روی ترانک می‌شود.</p>"
+    },
+    {
+      "title": "کدام پروتکل استاندارد باز برای اعلام Voice VLAN به تلفن IP روی پورت Access به کار می‌رود؟",
+      "options": [
+        "RIPv2",
+        "LLDP-MED (در کنار CDP در سیسکو)",
+        "BGP",
+        "OSPF"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>LLDP-MED استاندارد باز و CDP گزینه سیسکو برای اعلام Voice VLAN به تلفن IP هستند.</p>"
+    },
+    {
+      "title": "در آزمایشگاه <code>adv_pvl_lab.py</code> ارتباط لایه ۲ بین Community 102 و Community 103 چه نتیجه‌ای دارد؟",
+      "options": [
+        "مجاز",
+        "مسدود در لایه ۲ (`DIFFERENT_COMMUNITY_VLANS_BLOCKED_L2`)",
+        "فقط با Proxy ARP",
+        "تبدیل به Promiscuous"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دو Community مختلف در لایه ۲ از یکدیگر ایزوله هستند.</p>"
+    },
+    {
+      "title": "اجرای <code>switchport trunk allowed vlan 50</code> بدون کلمه <code>add</code> روی ترانک فعال چه اثری دارد؟",
+      "options": [
+        "تغییری نمی‌دهد",
+        "فهرست مجاز قبلی را بازنویسی کرده و سایر VLANها را قطع می‌کند",
+        "VLAN 50 را حذف می‌کند",
+        "Native VLAN را تغییر می‌دهد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>نبود <code>add</code> باعث جایگزینی کامل فهرست مجاز می‌شود.</p>"
+    },
+    {
+      "title": "سیاست اعتماد به برچسب CoS/DSCP روی پورت مشترک تلفن IP و رایانه کاربر چگونه باید باشد؟",
+      "options": [
+        "اعتماد کامل به رایانه کاربر",
+        "وابسته به پلتفرم و مرز اعتماد امنیتی، بدون اعتماد کورکورانه به برچسب‌های رایانه کاربر",
+        "تلفن IP هرگز تگ ندارد",
+        "اعتماد به QoS رمزنگاری ایجاد می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مرز اعتماد QoS مانع سوءاستفاده رایانه کاربر از صف اولویت صوتی می‌شود.</p>"
+    },
+    {
+      "title": "در <code>audit_trunk_pruning</code> اگر Voice VLAN 50 در فهرست ترانک نباشد چه گزارش می‌شود؟",
+      "options": [
+        "<code>model_checks_ok=True</code>",
+        "<code>model_checks_ok=False</code> و درج 50 در <code>missing_required_vlans</code>",
+        "حذف VLAN 10",
+        "تغییر Native"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تابع دقیقاً VLANهای ضروری غایب را گزارش می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>adv_pvl_lab.py</code> کدام است؟",
+      "options": [
+        "اتصال زنده به Catalyst 9300",
+        "تست VTPv3 واقعی",
+        "شبیه‌ساز محلی Python 3 برای ماتریس لایه ۲ و هرس ترانک بدون سخت‌افزار زنده",
+        "اجرا نشده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کد محلی صرفاً منطق مدل را می‌آزماید و به سوئیچ واقعی متصل نیست.</p>"
+    }
+  ]
+}

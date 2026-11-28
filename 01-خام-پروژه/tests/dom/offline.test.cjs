@@ -23,7 +23,9 @@ async function waitFor(fn) {
 (async()=>{
   let dom=boot(); let w=dom.window;
   await waitFor(()=>w.document.querySelector('[data-lesson-quiz]'));
-  assert.match(w.document.querySelector('[role=note]').textContent,/دوره ۱۱۴ درسی کامل نیست/);
+  assert.match(w.document.querySelector('[role=note]').textContent,/پوشش کامل ۱۱۴ شناسه تاریخی/);
+  assert.match(w.document.querySelector('[role=note]').textContent,/با حساب آنلاین همگام نیست/);
+  assert.ok(w.document.querySelector('[data-fam-cli-simulator]'));
   assert.match(w.document.querySelector('.lesson-review-status').textContent,/در انتظار بازبینی/);
   const response=await w.fetch('https://example.invalid/not-bundled');
   assert.equal(response.status,404);

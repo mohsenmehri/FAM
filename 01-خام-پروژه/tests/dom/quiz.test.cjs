@@ -75,10 +75,13 @@ for (const item of catalog.paths.flatMap(track => track.courses.flatMap(course =
     assert.match(notice.textContent, /بازبینی مستقل انسانی انجام نشده/);
     assert.match(notice.textContent, item.id === "auto_07" ? /اجرای Python محلی/ : item.id === "auto_16" ? /شبیه‌سازی Python محلی/ : item.id === "ccna_v1" ? /شبیه‌سازی Python محلی/ : item.id === "auto_08" ? /شبیه‌سازی Python محلی/ : item.id === "ccna_02_vlan" ? /شبیه‌سازی Python محلی/ : item.id === "auto_06" ? /HTTP واقعی محلی/ : item.id === "auto_20" ? /شبیه‌سازی Python محلی/ : item.id === "auto_05" ? /پارس JSON و XML محلی/ : item.id === "auto_04" ? /Git محلی/ : /Python محلی/);
     assert.match(notice.textContent, item.id === "auto_01" ? /tcpdump مرجع است و روی تجهیز اجرا نشده/ : /سناریوی تجهیز مرجع/);
-  } else {
+  } else if (item.id.startsWith("ccna-v11-") || item.id.startsWith("academy-")) {
     assert.match(notice.textContent, /در انتظار بازبینی/);
+  } else {
+    assert.match(notice.textContent, /بازبینی.*نویسنده|خودبازبینی/);
+    assert.match(notice.textContent, /بازبینی مستقل.*انجام نشده/);
   }
-  if (!["auto_01", "auto_02", "auto_03", "auto_04", "auto_05", "auto_06", "auto_07", "auto_08", "auto_10", "auto_16", "auto_20", "ccna_02_vlan", "ccna_v1"].includes(item.id)) assert.match(notice.textContent, /اجرای واقعی آن تأیید نشده/);
+  assert.match(notice.textContent, /اجرای واقعی آن تأیید نشده|روی تجهیز اجرا نشده|سناریوی تجهیز مرجع/);
 }
 const unknown = {...bp, reviewStatus: '', evidence: ''};
 w.FamLessonEngine.renderLesson(w.document.querySelector('#root'), unknown);

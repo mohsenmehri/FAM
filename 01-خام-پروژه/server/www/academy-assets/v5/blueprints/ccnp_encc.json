@@ -1,0 +1,350 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_encc",
+  "objectiveId": "ccnp_encc",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENCC (Cloud Connectivity: IPsec/BGP to Cloud, Transit Gateway, Direct Connect & Multi-Cloud)",
+  "title": "تخصص CCNP ENCC (اتصال ابری): اتصال امن On-Prem به ابر (IPsec/BGP، Direct Connect)، Transit Gateway و امنیت چندابری",
+  "titleEn": "CCNP ENCC: Enterprise Cloud Connectivity (IPsec/BGP, Direct Connect, Transit & Multi-Cloud)",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "adv_bgp",
+    "ccnp_01",
+    "ccnp_ensdwi"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_encc (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_encc",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc4271",
+      "https://www.rfc-editor.org/rfc/rfc7296"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_encc_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "مقایسه مهندسی اتصال IPsec VPN روی اینترنت در برابر لینک اختصاصی (Direct Connect / ExpressRoute / Interconnect) همراه با سقف MTU و افزونگی دوگانه.",
+      "تحلیل کامل مشکل عدم عبور غیرمستقیم (Non-Transitive Peering) در VPC/VNet و راهکار Transit Hub/Gateway + تفکیک CIDR بدون هم‌پوشانی.",
+      "ساخت آزمایشگاه محلی ccnp_encc_lab.py برای ممیزی CIDR چندابری، انتخاب مسیر Primary/Backup با BGP و بررسی عدم Transitivity در VPC Peering."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_encc-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_encc.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_encc_lab.py"
+    },
+    "technicalAuditFixes": [
+      "مقایسه مهندسی اتصال IPsec VPN روی اینترنت در برابر لینک اختصاصی (Direct Connect / ExpressRoute / Interconnect) همراه با سقف MTU و افزونگی دوگانه.",
+      "تحلیل کامل مشکل عدم عبور غیرمستقیم (Non-Transitive Peering) در VPC/VNet و راهکار Transit Hub/Gateway + تفکیک CIDR بدون هم‌پوشانی.",
+      "ساخت آزمایشگاه محلی ccnp_encc_lab.py برای ممیزی CIDR چندابری، انتخاب مسیر Primary/Backup با BGP و بررسی عدم Transitivity در VPC Peering."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_encc-section-1",
+      "title": "مسئله واقعی: چرا اتصال مستقیم تک‌تونل IPsec به ابر برای بارهای کاری حساس ناکافی است و VPC Peering عبوری نیست؟",
+      "html": "<p>در مهاجرت به ابرهای عمومی (AWS، Azure، GCP)، اتصال شبکه On-Premises به VPC/VNetها با سه چالش بزرگ روبه‌روست: انتخاب مدل اتصال (IPsec در برابر لینک اختصاصی)، <strong>غیرعبوری بودن VPC Peering</strong> در مقیاس ده‌ها VPC، و هم‌پوشانی رنج‌های IP (CIDR Overlap).</p>"
+    },
+    {
+      "id": "ccnp_encc-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> BGP (<code>adv_bgp</code>)، GRE/IPsec MTU (<code>ccnp_01</code>) و SD-WAN (<code>ccnp_ensdwi</code>).</p><ul><li>انتخاب بین <strong>Site-to-Site IPsec (IKEv2 RFC 7296)</strong>، <strong>Dedicated Interconnect</strong> و <strong>Cloud OnRamp (SD-WAN)</strong>.</li><li>حل محدودیت <strong>Non-Transitive VPC Peering</strong> با <strong>Transit Gateway / Virtual WAN</strong>.</li><li>مهندسی مسیرهای افزونه <strong>BGP (Primary Dedicated + Backup IPsec)</strong> و پیشگیری از مسیریابی نامتقارن روی فایروال ابری.</li></ul>"
+    },
+    {
+      "id": "ccnp_encc-section-3",
+      "title": "مقایسه مدل‌های اتصال On-Prem به ابر",
+      "html": "<table><thead><tr><th>مدل اتصال</th><th>ویژگی کلیدی</th><th>محدودیت / نکته امنیتی</th></tr></thead><tbody><tr><td><strong>IPsec VPN (IKEv2)</strong></td><td>راه‌اندازی سریع روی اینترنت، رمزنگاری ذاتی</td><td>پهنای باند و تأخیر وابسته به اینترنت، سربار MTU</td></tr><tr><td><strong>Dedicated Link</strong></td><td>پهنای باند بالا و تأخیر پیش‌بینی‌پذیر (Direct Connect/ExpressRoute)</td><td>به‌طور پیش‌فرض رمزنگاری لایه ۳ ندارد (نیاز به MACsec یا IPsec روی آن برای داده‌های حساس)</td></tr><tr><td><strong>SD-WAN Cloud OnRamp</strong></td><td>اتوماسیون یکپارچه سیاست و AAR تا لبه ابر</td><td>نیازمند طراحی دقیق لایسنس و ظرفیت vEdge/cEdge ابری</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccnp_encc-section-4",
+      "title": "قانون حیاتی VPC/VNet Peering: غیرعبوری بودن (Non-Transitive)",
+      "html": "<p>اگر VPC-A با VPC-B و VPC-B با VPC-C همتا (Peered) باشند، <strong>VPC-A نمی‌تواند از طریق VPC-B به VPC-C برسد</strong>. در مقیاس ده‌ها VPC، ساخت Full-Mesh غیرقابل مدیریت است و باید از معماری هاب مرکزی (<strong>Transit Gateway / Azure Virtual WAN</strong>) استفاده کرد.</p>"
+    },
+    {
+      "id": "ccnp_encc-section-5",
+      "title": "مهندسی BGP در اتصال دوگانه: Primary Dedicated + Backup IPsec",
+      "html": "<p>در ترکیب لینک اختصاصی اصلی با تونل IPsec پشتیبان، پیشوندهای دقیق‌تر (Longest Prefix Match)، سپس <code>LOCAL_PREF</code> و <code>AS-Path Prepend</code> مسیر رفت و برگشت را متقارن روی لینک اصلی نگه می‌دارند و هنگام افت لینک اصلی، BGP ترافیک را به‌صورت خودکار روی IPsec منتقل می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_encc-section-6",
+      "title": "نمودار معماری: اتصال دوگانه On-Prem به Transit Hub و VPCهای چندابری",
+      "html": "<p>نمودار زیر اتصال Primary/Backup با BGP و نقش Transit Gateway در اتصال امن VPCها را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCNP ENCC Cloud Connectivity\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">CCNP ENCC: Dual-Path BGP (Dedicated + IPsec) -&gt; Cloud Transit Hub</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">On-Premises Edge</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Primary: Dedicated (LP 200)</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Backup: IKEv2 IPsec (Prepend)</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Cloud Transit Hub</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Solves Non-Transitive Peering</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Central Inspection VPC (FW)</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Spoke VPCs / Multi-Cloud</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Non-overlapping CIDRs audited</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Workload / Shared Services VPC</text></svg>"
+    },
+    {
+      "id": "ccnp_encc-section-7",
+      "title": "الگوی بازرسی متمرکز (Centralized Inspection VPC) و تله نامتقارنی",
+      "html": "<p>برای عبور ترافیک East-West و North-South از فایروال وضعیت‌مند (Stateful NGFW) در ابر، مسیر رفت و برگشت هر نشست باید به همان فایروال برسد (استفاده از Appliance Mode در Transit Gateway یا SNAT هدفمند)؛ در غیر این صورت فایروال بسته‌های برگشتی را Drop می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_encc-section-8",
+      "title": "مدیریت CIDR در محیط‌های چندابری و راه‌حل هم‌پوشانی",
+      "html": "<p>بهترین عمل، تخصیص بلوک‌های کاملاً مجزا با IPAM مرکزی پیش از ایجاد VPCهاست. در صورت هم‌پوشانی ناگزیر (مثلاً ادغام دو شرکت)، باید در لبه از NAT متقارن یا PrivateLink/Private Endpoint (دسترسی سرویس‌محور به‌جای مسیریابی کامل) استفاده کرد.</p>"
+    },
+    {
+      "id": "ccnp_encc-section-9",
+      "title": "ملاحظات MTU، Jumbo Frames و TCP MSS در اتصال ابری",
+      "html": "<p>تونل‌های IPsec ابری معمولاً MTU حدود <strong>۱۴۰۰ تا ۱۴۳۶</strong> و MSS حدود <strong>۱۳۶۰</strong> می‌طلبند؛ همچنین برخی لینک‌های اختصاصی از Jumbo Frame (مثل ۸۵۰۰ یا ۹۰۰۱ بایت) پشتیبانی می‌کنند که باید سرتاسری هماهنگ باشد.</p>"
+    },
+    {
+      "id": "ccnp_encc-section-10",
+      "title": "امنیت و رمزنگاری در لینک اختصاصی: MACsec و IPsec over Dedicated",
+      "html": "<p>برخلاف تصور رایج، لینک اختصاصی به ابر به معنای رمزنگاری خودکار نیست؛ برای داده‌های حساس بانکی/پزشکی باید از <strong>MACsec</strong> روی پیوند فیزیکی یا <strong>IPsec over Dedicated Private/Public VIF</strong> و TLS سرتاسری استفاده شود.</p>"
+    },
+    {
+      "id": "ccnp_encc-section-11",
+      "title": "تله‌های رایج اتصال ابری در ENCC",
+      "html": "<ul><li>اتصال تک‌تونل به یک Availability Zone واحد (ایجاد SPOF ابری!).</li><li>فراموش کردن محدودیت تعداد پیشوند BGP در دروازه‌های ابری (مثلاً سقف ۱۰۰ پیشوند در برخی Gatewayها و نیاز به Summarization).</li><li>مسیریابی نامتقارن در فایروال ابری به‌علت فعال نبودن Appliance Mode.</li></ul>"
+    },
+    {
+      "id": "ccnp_encc-section-12",
+      "title": "چک‌لیست راستی‌آزمایی پیش از مهاجرت ترافیک ابری",
+      "html": "<ul><li>ممیزی عدم هم‌پوشانی تمام CIDRهای On-Prem و ابرها.</li><li>تست واقعی Failover از لینک اختصاصی به تونل IPsec پشتیبان و بررسی تقارن مسیر.</li><li>تأیید محدودیت‌های BGP Prefix و MSS Clamping روی تونل‌ها.</li></ul>"
+    },
+    {
+      "id": "ccnp_encc-section-13",
+      "title": "تمرین تحلیلی سناریو (کشف هم‌پوشانی CIDR، غیرعبوری بودن Peering و BGP Failover)",
+      "html": "<p>در <code>ccnp_encc_lab.py</code> عدم اتصال مستقیم VPC-A به VPC-C از طریق Peering (و حل آن با Transit Gateway)، کشف تداخل CIDR، و اولویت‌بندی مسیر Dedicated بر IPsec (با Failover خودکار هنگام افت لینک اصلی) آزموده شده‌اند.</p>"
+    },
+    {
+      "id": "ccnp_encc-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc4271\" target=\"_blank\" rel=\"noopener\">RFC 4271 (BGP-4)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc7296\" target=\"_blank\" rel=\"noopener\">RFC 7296 (IKEv2)</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_encc_lab.py</code> مدل محلی Python 3 است و به حساب واقعی AWS/Azure/GCP متصل نیست.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Site-to-Site IPsec (IKEv2)",
+      "fa": "تونل IPsec سایت‌به‌سایت",
+      "simple": "اتصال رمزنگاری‌شده به ابر روی اینترنت با RFC 7296."
+    },
+    {
+      "term": "Dedicated Interconnect",
+      "fa": "لینک اختصاصی ابری",
+      "simple": "اتصال فیزیکی خصوصی (Direct Connect / ExpressRoute) با تأخیر پایدار."
+    },
+    {
+      "term": "VPC / VNet Peering",
+      "fa": "همتاسازی مستقیم شبکه‌های ابری",
+      "simple": "اتصال مستقیم اما غیرعبوری (Non-Transitive) میان دو شبکه ابری."
+    },
+    {
+      "term": "Non-Transitive Routing",
+      "fa": "مسیریابی غیرعبوری",
+      "simple": "اتصال A-B و B-C به معنای ارتباط A با C از طریق B نیست."
+    },
+    {
+      "term": "Transit Gateway / Hub",
+      "fa": "دروازه ترانزیت ابری",
+      "simple": "هاب مرکزی مقیاس‌پذیر برای اتصال ده‌ها VPC و شبکه On-Prem."
+    },
+    {
+      "term": "Cloud OnRamp",
+      "fa": "ادغام SD-WAN با ابر",
+      "simple": "گسترش خودکار فابریک SD-WAN و AAR تا زیرساخت ابر عمومی."
+    },
+    {
+      "term": "Inspection VPC",
+      "fa": "VPC بازرسی امنیتی متمرکز",
+      "simple": "هدایت متمرکز ترافیک بین‌شبکه‌ای به خوشه NGFW در ابر."
+    },
+    {
+      "term": "Appliance Mode",
+      "fa": "حالت حفظ تقارن فایروال",
+      "simple": "تضمین عبور رفت و برگشت یک جریان از همان AZ فایروال در Transit Hub."
+    },
+    {
+      "term": "CIDR Overlap",
+      "fa": "هم‌پوشانی رنج IP",
+      "simple": "تداخل سابنت‌های On-Prem و ابر که مانع مسیریابی مستقیم می‌شود."
+    },
+    {
+      "term": "PrivateLink / Private Endpoint",
+      "fa": "اتصال خصوصی سرویس‌محور",
+      "simple": "دسترسی امن به یک سرویس خاص بدون نیاز به مسیریابی کل VPC."
+    },
+    {
+      "term": "IPsec over Dedicated",
+      "fa": "رمزنگاری IPsec روی لینک اختصاصی",
+      "simple": "افزودن محرمانگی لایه ۳ روی لینک خصوصی ابری فاقد رمزنگاری ذاتی."
+    },
+    {
+      "term": "BGP Prefix Limit",
+      "fa": "سقف پیشوند BGP ابری",
+      "simple": "محدودیت تعداد مسیرهای ارسالی به دروازه ابری (الزام به Summarization)."
+    },
+    {
+      "term": "Availability Zone (AZ)",
+      "fa": "ناحیه دسترس‌پذیری ابری",
+      "simple": "دیتاسنتر فیزیکی مستقل درون یک منطقه ابری برای حذف SPOF."
+    },
+    {
+      "term": "East-West / North-South",
+      "fa": "ترافیک بین‌VPC / ورودی-خروجی",
+      "simple": "تفکیک ترافیک داخلی میان بارهای ابری از ترافیک اینترنت/On-Prem."
+    },
+    {
+      "term": "Egress / Data Transfer Cost",
+      "fa": "هزینه خروج داده ابری",
+      "simple": "عامل مهم معماری در انتخاب مسیرهای عبوری و موقعیت فایروال‌ها."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENCC: Enterprise Cloud Connectivity (IPsec/BGP, Direct Connect, Transit & Multi-Cloud)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_encc_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_encc_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_encc (Cloud Connectivity: Overlapping CIDR Audit &amp; BGP Prefix Limit Guard).\n\nEducational local model only — no live AWS Transit Gateway, AWS Direct Connect,\nAzure Virtual WAN, ExpressRoute, or IPsec tunnel is contacted.\nModels:\n1. Multi-VPC / On-Premises CIDR overlap detector (detecting overlapping subnets that require\n   summarization, re-IPing, or NAT at the cloud edge!).\n2. Cloud BGP prefix-limit guard (illustrative check against provider BGP route limits such as\n   100 routes on AWS Direct Connect / VGW BGP sessions, reminding engineers to summarize).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef audit_cloud_cidr_overlaps(allocations: list[dict[str, str]]) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Detect IPv4 CIDR overlaps across on-prem sites and cloud VPC/VNets.&quot;&quot;&quot;\n    if not isinstance(allocations, list) or len(allocations) &lt; 2:\n        raise ValueError(&quot;allocations must be a list of at least 2 {&#x27;name&#x27;, &#x27;cidr&#x27;} dicts&quot;)\n    parsed: list[tuple[str, ipaddress.IPv4Network]] = []\n    for item in allocations:\n        if not isinstance(item, dict):\n            raise ValueError(&quot;each allocation must be a dict&quot;)\n        name = str(item.get(&quot;name&quot;, &quot;&quot;)).strip()\n        if not name:\n            raise ValueError(&quot;allocation name must be non-empty&quot;)\n        net = ipaddress.IPv4Network(str(item[&quot;cidr&quot;]), strict=True)\n        parsed.append((name, net))\n\n    overlaps: list[dict[str, str]] = []\n    for i in range(len(parsed)):\n        for j in range(i + 1, len(parsed)):\n            n1, net1 = parsed[i]\n            n2, net2 = parsed[j]\n            if net1.overlaps(net2):\n                overlaps.append({&quot;a&quot;: f&quot;{n1} ({net1})&quot;, &quot;b&quot;: f&quot;{n2} ({net2})&quot;})\n\n    return {\n        &quot;model_checks_ok&quot;: len(overlaps) == 0,\n        &quot;overlap_count&quot;: len(overlaps),\n        &quot;overlaps&quot;: overlaps,\n        &quot;remediation_hint&quot;: &quot;Use non-overlapping IPAM blocks or explicit NAT/translation gateway for overlapping VPCs.&quot; if overlaps else &quot;No CIDR overlaps detected in supplied list.&quot;,\n    }\n\n\ndef check_cloud_bgp_prefix_limit(advertised_prefixes: int, provider_limit: int = 100) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Check whether advertised BGP prefix count stays safely below a cloud gateway limit.&quot;&quot;&quot;\n    if isinstance(advertised_prefixes, bool) or not isinstance(advertised_prefixes, int) or advertised_prefixes &lt; 0:\n        raise ValueError(&quot;advertised_prefixes must be a non-negative int&quot;)\n    if isinstance(provider_limit, bool) or not isinstance(provider_limit, int) or provider_limit &lt;= 0:\n        raise ValueError(&quot;provider_limit must be a positive int&quot;)\n    exceeds = advertised_prefixes &gt; provider_limit\n    return {\n        &quot;advertised_prefixes&quot;: advertised_prefixes,\n        &quot;provider_limit&quot;: provider_limit,\n        &quot;bgp_session_reset_risk&quot;: exceeds,\n        &quot;action&quot;: &quot;SUMMARIZE_PREFIXES_BEFORE_ADVERTISING&quot; if exceeds else &quot;WITHIN_MODEL_LIMIT&quot;,\n        &quot;model_scope_note&quot;: &quot;Illustrative prefix-limit check only; verify current AWS/Azure quota docs for exact service tier limits.&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live AWS/Azure cloud gateway or BGP session is contacted.&quot;)\n    audit = audit_cloud_cidr_overlaps([\n        {&quot;name&quot;: &quot;OnPrem-HQ&quot;, &quot;cidr&quot;: &quot;10.10.0.0/16&quot;},\n        {&quot;name&quot;: &quot;AWS-Prod-VPC&quot;, &quot;cidr&quot;: &quot;10.20.0.0/16&quot;},\n        {&quot;name&quot;: &quot;Acquired-Azure-VNet&quot;, &quot;cidr&quot;: &quot;10.10.50.0/24&quot;},\n    ])\n    assert audit[&quot;model_checks_ok&quot;] is False and audit[&quot;overlap_count&quot;] == 1\n    lim = check_cloud_bgp_prefix_limit(135, provider_limit=100)\n    assert lim[&quot;bgp_session_reset_risk&quot;] is True\n    print(&quot;Cloud CIDR overlap audit:&quot;, audit)\n    print(&quot;Cloud BGP prefix limit check:&quot;, lim)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cloud Edge BGP Primary/Backup Policy (Conceptual, NOT executed on live cloud/hardware)\nroute-map TO_CLOUD_BACKUP permit 10\n set as-path prepend 65100 65100\nroute-map FROM_CLOUD_PRIMARY permit 10\n set local-preference 200</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "اگر VPC-A با VPC-B و VPC-B با VPC-C از طریق Peering استاندارد متصل باشند، ارتباط VPC-A با VPC-C چگونه است؟",
+      "options": [
+        "به‌صورت خودکار برقرار است",
+        "برقرار نیست زیرا VPC/VNet Peering غیرعبوری (Non-Transitive) است",
+        "فقط روی IPv6 برقرار است",
+        "نیاز به RIP دارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>برای مقیاس‌پذیری اتصال چند VPC از Transit Gateway/Hub استفاده می‌شود.</p>"
+    },
+    {
+      "title": "کدام نکته امنیتی درباره لینک اختصاصی ابری (Direct Connect / ExpressRoute) اغلب نادیده گرفته می‌شود؟",
+      "options": [
+        "همیشه روی Wi-Fi است",
+        "به‌طور پیش‌فرض ترافیک آن رمزنگاری لایه ۳ نشده و برای داده‌های حساس نیاز به MACsec یا IPsec/TLS است",
+        "از BGP پشتیبانی نمی‌کند",
+        "پهنای باند ندارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>خصوصی بودن مدار فیزیکی به معنای رمزنگاری خودکار نیست.</p>"
+    },
+    {
+      "title": "چرا فعال‌سازی <strong>Appliance Mode</strong> (یا حفظ تقارن) در Inspection VPC حیاتی است؟",
+      "options": [
+        "برای افزایش MTU",
+        "برای اطمینان از عبور رفت و برگشت هر نشست از همان فایروال وضعیت‌مند (جلوگیری از Drop نامتقارن)",
+        "برای حذف BGP",
+        "برای کاهش AZ"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>فایروال Stateful بسته برگشتی نشستی را که رفتش را ندیده Drop می‌کند.</p>"
+    },
+    {
+      "title": "چگونه می‌توان در اتصال دوگانه (Dedicated + IPsec) ترافیک را به‌طور متقارن روی لینک اصلی نگه داشت؟",
+      "options": [
+        "تنظیم <code>LOCAL_PREF</code> بالاتر روی لینک اصلی و <code>AS-Path Prepend</code> روی تونل پشتیبان",
+        "خاموش کردن BGP روی پشتیبان",
+        "تکرار CIDR",
+        "حذف IKEv2"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ترکیب LP برای خروج و Prepend برای ورود تقارن مسیر را برقرار می‌کند.</p>"
+    },
+    {
+      "title": "اگر دو VPC یا شبکه On-Prem دارای <strong>CIDR هم‌پوشان</strong> باشند کدام راهکار تمیزتر برای دسترسی به یک سرویس مشخص است؟",
+      "options": [
+        "اتصال مستقیم بدون NAT",
+        "استفاده از PrivateLink / Private Endpoint (یا NAT متقارن در لبه)",
+        "افزایش TTL",
+        "تغییر ASN"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>PrivateLink بدون نیاز به مسیریابی کل فضای IP هم‌پوشان سرویس را در دسترس قرار می‌دهد.</p>"
+    },
+    {
+      "title": "چرا در اتصال BGP به دروازه‌های ابری اغلب نیاز به <strong>Summarization</strong> است؟",
+      "options": [
+        "زیرا دروازه‌های ابری معمولاً سقف تعداد پیشوند BGP (مانند ۱۰۰ مسیر) دارند و عبور از آن نشست را ریست می‌کند",
+        "چون ابر IPv4 ندارد",
+        "برای حذف IPsec",
+        "بی‌تأثیر است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>خلاصه‌سازی مسیرها از رسیدن به سقف BGP Gateway جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "برای حذف SPOF در لایه ابری هنگام اتصال On-Prem، تونل‌ها یا لینک‌ها باید چگونه توزیع شوند؟",
+      "options": [
+        "هر دو روی یک روتر و یک AZ",
+        "روی حداقل دو روتر On-Prem و دو Availability Zone/Location مستقل در ابر",
+        "فقط یک تونل IPsec",
+        "بدون BGP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>افزونگی واقعی باید در هر دو سمت On-Prem و Cloud AZ برقرار باشد.</p>"
+    },
+    {
+      "title": "تنظیم معمول <strong>TCP MSS Clamping</strong> روی تونل IPsec به ابر چقدر است؟",
+      "options": [
+        "1500",
+        "حدود 1360 بایت (متناسب با MTU حدود 1400)",
+        "9000",
+        "512"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>از تکه‌تکه‌شدن بسته‌های TCP داخل تونل IPsec جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "مهم‌ترین مزیت <strong>Transit Gateway / Virtual WAN</strong> در سازمان‌های چند-VPC چیست؟",
+      "options": [
+        "جایگزینی پیچیدگی Full-Mesh Peering با یک هاب مرکزی، مسیریابی عبوری و بازرسی امنیتی متمرکز",
+        "حذف IP",
+        "عملکرد بدون مسیر",
+        "رایگان بودن کامل ترافیک"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مدیریت ده‌ها VPC و اتصال به On-Prem را یکپارچه و مقیاس‌پذیر می‌کند.</p>"
+    },
+    {
+      "title": "کدام استاندارد IETF پایه مذاکره کلید مدرن در IPsec VPN ابری است؟",
+      "options": [
+        "RFC 7296 (IKEv2)",
+        "RFC 1112",
+        "RFC 5517",
+        "RFC 5798"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>IKEv2 (RFC 7296) استاندارد امن و سریع مذاکره IPsec است.</p>"
+    },
+    {
+      "title": "در <code>ccnp_encc_lab.py</code> پس از افت مسیر Dedicated، کدام مسیر برای مقصد ابری انتخاب می‌شود؟",
+      "options": [
+        "مسیر قطع می‌شود",
+        "تونل <code>IPSEC_BACKUP</code> به‌صورت خودکار انتخاب می‌شود",
+        "Peering عبوری فعال می‌شود",
+        "CIDR تغییر می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>موتور BGP پس از افت لینک اصلی روی تونل پشتیبان Failover می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_encc_lab.py</code> چیست؟",
+      "options": [
+        "اتصال به AWS Direct Connect زنده",
+        "تست واقعی Azure Virtual WAN",
+        "شبیه‌ساز محلی Python 3 برای CIDR، Peering/Transit و BGP Failover بدون حساب ابری زنده",
+        "تست MACsec زنده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کد محلی صرفاً منطق مدل‌شده را بررسی می‌کند.</p>"
+    }
+  ]
+}

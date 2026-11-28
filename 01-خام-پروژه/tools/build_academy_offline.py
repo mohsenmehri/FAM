@@ -87,13 +87,13 @@ def build():
             raise ValueError('unsafe inline JavaScript')
         return '<script>\n' + source + '\n</script>'
     page, count = pattern.subn(inline_js, page)
-    if count != 4:
-        raise ValueError(f'expected four JS assets, got {count}')
+    if count != 5:
+        raise ValueError(f'expected five JS assets, got {count}')
     page = page.replace('href="/app"', 'href="#/dashboard"')
     banner = (f'<div role="note" style="padding:12px;background:#fff7ed;color:#7c2d12;text-align:center">'
-              f'پیش‌نمایش آفلاین: فقط {len(records)} درس موجودِ نسخه فعلی؛ دوره ۱۱۴ درسی کامل نیست. '
-              'پیشرفت فقط در همین مرورگر ذخیره می‌شود و با حساب آنلاین همگام نیست. '
-              'محتوا در انتظار بازبینی است؛ اتصال به تجهیزات واقعی وجود ندارد.</div>')
+              f'نسخه آفلاین کامل FAM Academy: شامل هر {len(records)} درس فعال (پوشش کامل ۱۱۴ شناسه تاریخی + ۱۳ درس پایه Curriculum 5.0) همراه با شبیه‌ساز آموزشی CLI. '
+              'محدودیت‌های نسخه آفلاین: پیشرفت فقط در همین مرورگر ذخیره می‌شود و با حساب آنلاین همگام نیست؛ '
+              'بازبینی انجام‌شده خودبازبینی فنی نویسنده/یکپارچه‌ساز است (نه بازبینی مستقل انسانی) و اتصال به تجهیزات واقعی وجود ندارد.</div>')
     if page.count('<body>') != 1:
         raise ValueError('body marker changed')
     page = page.replace('<body>', '<body>\n' + banner, 1)

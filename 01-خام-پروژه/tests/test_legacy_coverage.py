@@ -24,24 +24,26 @@ class LegacyCoverageTests(unittest.TestCase):
             if owner == 'agent-1': self.assertTrue(i.startswith(('ccna_', 'adv_', 'ccnp_')))
             if owner == 'agent-3': self.assertTrue(i.startswith(('spec_', 'ccie_', 'ccde_', 'auto_')) and i != 'auto_12')
 
-    def test_current_integrator_lessons_are_unique_and_aliases_do_not_claim_migration(self):
+    def test_all_114_historical_lessons_are_mapped_and_unique_in_catalog(self):
         data = json.loads((ROOT / 'academy-labs/legacy-coverage.json').read_text())
         catalog = json.loads((ASSETS / 'curriculum-catalog.json').read_text())
         lessons = [x for p in catalog['paths'] for c in p['courses'] for x in c['lessons']]
         catalog_ids = [x['id'] for x in lessons]
         self.assertEqual(len(catalog_ids), len(set(catalog_ids)))
+        self.assertEqual(len(catalog_ids), 127)
         records = {x['id']: x for x in lessons}
         for row in data['lessons']:
-            if row['owner'] != 'integrator': continue
             legacy = row['legacyId']
             catalog_id = data['catalogAliases'].get(legacy, legacy)
-            self.assertIn(catalog_id, records)
+            self.assertEqual(row.get('status'), 'completed', legacy)
+            self.assertIn(catalog_id, records, legacy)
             self.assertFalse(legacy in records and legacy != catalog_id)
             path = records[catalog_id]['blueprint'].removeprefix('/academy-assets/')
             blueprint = json.loads((ASSETS / path).read_text())
             self.assertEqual(blueprint['lessonId'], catalog_id)
-            self.assertEqual(blueprint['objectiveId'], legacy)
-        # Aliases only link content identity; no progress migration is asserted.
+            self.assertGreaterEqual(len(blueprint.get('sections', [])), 14, legacy)
+            if row['owner'] == 'integrator':
+                self.assertEqual(blueprint['objectiveId'], legacy)
         self.assertEqual(data['catalogAliases'], {'s01':'academy-stage-zero-osi-fa', 'auto_12':'academy-automation-terraform'})
 
 class HistoricalVerificationTests(unittest.TestCase):

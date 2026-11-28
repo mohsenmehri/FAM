@@ -1,0 +1,349 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_enc_sec",
+  "objectiveId": "ccnp_enc_sec",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENCOR Security (AAA, CoPP, 802.1X/MAB, RBAC, Wireless Security)",
+  "title": "امنیت زیرساخت در CCNP ENCOR: AAA (TACACS+/RADIUS)، CoPP، 802.1X/MAB و امنیت بی‌سیم",
+  "titleEn": "CCNP ENCOR Security: AAA (TACACS+/RADIUS), CoPP, 802.1X/MAB & Wireless Security",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccna_05",
+    "ccna_qos_ssh"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_enc_sec (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_enc_sec",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc8907",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/qos_plcshp/configuration/xe-17/qos-plcshp-xe-17-book/qos-plcshp-ctrl-pln-plc.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_enc_sec_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق TACACS+ (RFC 8907، TCP 49، تفکیک AAA و مجوز تک‌فرمان) از RADIUS (UDP 1812/1813، ترکیب Authentication و Authorization).",
+      "تبیین دقیق طراحی امن CoPP (حفظ صف مجزا برای پروتکل‌های کنترل، جلوگیری از Drop خودی در class-default) و زنجیره 802.1X -> MAB.",
+      "ساخت آزمایشگاه محلی ccnp_enc_sec_lab.py برای شبیه‌سازی موتور سیاست AAA/RBAC، نرخ‌گذاری CoPP و ترتیب 802.1X/MAB."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_enc_sec-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_enc_sec.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_enc_sec_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تفکیک دقیق TACACS+ (RFC 8907، TCP 49، تفکیک AAA و مجوز تک‌فرمان) از RADIUS (UDP 1812/1813، ترکیب Authentication و Authorization).",
+      "تبیین دقیق طراحی امن CoPP (حفظ صف مجزا برای پروتکل‌های کنترل، جلوگیری از Drop خودی در class-default) و زنجیره 802.1X -> MAB.",
+      "ساخت آزمایشگاه محلی ccnp_enc_sec_lab.py برای شبیه‌سازی موتور سیاست AAA/RBAC، نرخ‌گذاری CoPP و ترتیب 802.1X/MAB."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_enc_sec-section-1",
+      "title": "مسئله واقعی: چگونه یک سیلاب بسته ICMP یا پویش پورت می‌تواند CPU روتر هسته را از کار بیندازد؟",
+      "html": "<p>بسته‌هایی که مستقیماً خطاب به روتر یا مستلزم پردازش نرم‌افزاری هستند به CPU (Control Plane) ارسال می‌شوند. بدون <strong>CoPP (Control Plane Policing)</strong>، سیلاب ترافیک کنترلی می‌تواند BGP/OSPF را از کار بیندازد.</p>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> امنیت لایه ۲/ACL (<code>ccna_05</code>) و SSH/QoS پایه (<code>ccna_qos_ssh</code>).</p><ul><li>تفاوت مهندسی <strong>TACACS+ (RFC 8907)</strong> و <strong>RADIUS</strong> و تنظیم امن Fallback محلی.</li><li>طراحی <strong>CoPP</strong> بدون قطع همسایگی‌های حیاتی.</li><li>معماری <strong>802.1X (EAP)، MAB</strong> و امنیت بی‌سیم <strong>WPA3-Enterprise / 802.11w</strong>.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-3",
+      "title": "مقایسه عمیق TACACS+ (RFC 8907) و RADIUS",
+      "html": "<table><thead><tr><th>ویژگی</th><th>TACACS+ (RFC 8907)</th><th>RADIUS</th></tr></thead><tbody><tr><td><strong>پروتکل انتقال</strong></td><td>TCP 49</td><td>UDP 1812 (Auth) / 1813 (Acct)</td></tr><tr><td><strong>رمزنگاری بسته</strong></td><td>کل بدنه بسته (Payload)</td><td>تنها رمز عبور (مگر RadSec)</td></tr><tr><td><strong>کاربرد اصلی</strong></td><td>مدیریت تجهیزات و مجوز تک‌فرمان CLI</td><td>احراز هویت دسترسی شبکه (802.1X/Wi-Fi/VPN)</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-4",
+      "title": "کنترل دسترسی مبتنی بر نقش (RBAC) و تله قفل شدن AAA",
+      "html": "<p>همیشه در فهرست روش‌های AAA (مانند <code>aaa authentication login</code>) یک روش <code>local</code> به‌عنوان <strong>Fallback</strong> تنها برای زمان قطع دسترسی به سرور AAA تعریف کنید؛ در غیر این صورت قطعی سرور TACACS+ دسترسی تمام مدیران را قفل می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-5",
+      "title": "طراحی CoPP (Control Plane Policing) و محافظت از CPU",
+      "html": "<p>CoPP با ساختار MQC روی <code>control-plane</code> اعمال می‌شود: ترافیک حیاتی (BGP/OSPF/SSH مدیریتی) در کلاس مجزا با نرخ مناسب محافظت و ترافیک نامطلوب/ناشناخته در کلاس‌های جداگانه محدود (Police) می‌شوند تا از افت همسایگی جلوگیری شود.</p>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-6",
+      "title": "نمودار معماری: حفاظت چندلایه از Control Plane تا لبه دسترسی 802.1X",
+      "html": "<p>نمودار زیر سه حلقه دفاعی ENCOR (مدیریت AAA، حفاظت CoPP و لبه دسترسی 802.1X/MAB) را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"ENCOR Security Architecture\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">ENCOR Security: AAA (TACACS+/RADIUS), CoPP &amp; 802.1X/MAB</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Device Admin (AAA)</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">TACACS+ TCP 49 (per-cmd authz)</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Local fallback ONLY if unreachable</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Control Plane (CoPP)</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Protect BGP/OSPF/SSH classes</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Police ICMP/undesirable floods</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Access Edge (802.1X)</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Supplicant -&gt; Auth -&gt; ISE (RADIUS)</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Fallback to MAB for IoT/Printers</text></svg>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-7",
+      "title": "کنترل دسترسی پورت با IEEE 802.1X و MAB",
+      "html": "<p>در <strong>802.1X</strong> سه نقش وجود دارد: <strong>Supplicant</strong> (کلاینت)، <strong>Authenticator</strong> (سوئیچ/WLC) و <strong>Authentication Server</strong> (مانند Cisco ISE با RADIUS). برای تجهیزاتی که Supplicant ندارند (مانند چاپگرها)، سوئیچ پس از timeout به <strong>MAB (MAC Authentication Bypass)</strong> می‌رود که باید با پروفایلینگ و VLAN محدود ترکیب شود چون MAC قابل جعل است.</p>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-8",
+      "title": "حالت‌های استقرار 802.1X: Monitor، Low-Impact و Closed Mode",
+      "html": "<p>استقرار ایمن معمولاً با <strong>Monitor Mode</strong> (پایش بدون قطع کاربر) آغاز شده، به <strong>Low-Impact</strong> (دسترسی محدود پیش از احراز هویت مثل DHCP/DNS) می‌رسد و در نهایت به <strong>Closed Mode</strong> ارتقا می‌یابد.</p>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-9",
+      "title": "امنیت بی‌سیم سازمانی: WPA3-Enterprise، EAP-TLS و 802.11w (PMF)",
+      "html": "<p><strong>EAP-TLS</strong> مبتنی بر گواهی دیجیتال در دو سمت (کلاینت و سرور) امن‌ترین روش احراز هویت بی‌سیم است. استاندارد <strong>802.11w (Protected Management Frames)</strong> از حملات Deauthentication Spoofing جلوگیری می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-10",
+      "title": "تله‌های رایج امنیتی در پیاده‌سازی ENCOR",
+      "html": "<ul><li>حذف فراموش‌شده دسترسی کنسول یا Fallback محلی در AAA.</li><li>اعمال CoPP با <code>drop</code> روی <code>class-default</code> بدون آزمون قبلی و قطع شدن پروتکل‌های کنترلی فراموش‌شده.</li><li>اتکا به MAB بدون محدودسازی VLAN/ACL (آسیب‌پذیر در برابر MAC Spoofing).</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-11",
+      "title": "حفاظت از صفحه داده و زیرساخت: uRPF و ACL زیرساختی",
+      "html": "<p><strong>uRPF</strong> در لبه WAN از جعل آدرس مبدأ جلوگیری می‌کند و <strong>Infrastructure ACL (iACL)</strong> دسترسی مستقیم به آدرس‌های لینک‌های ترانزیت و Loopback روترها را تنها به شبکه‌های مدیریتی مجاز محدود می‌سازد.</p>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-12",
+      "title": "چک‌لیست راستی‌آزمایی امنیتی",
+      "html": "<ul><li>تست احراز هویت در یک نشست دوم پیش از بستن نشست SSH فعلی!</li><li>بررسی <code>show policy-map control-plane</code> برای اطمینان از صفر بودن Drop در کلاس BGP/OSPF.</li><li>بررسی <code>show authentication sessions</code> روی پورت‌های 802.1X.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-13",
+      "title": "تمرین تحلیلی سناریو (مجوز فرمان TACACS+، نرخ‌گذاری CoPP و 802.1X/MAB)",
+      "html": "<p>در <code>ccnp_enc_sec_lab.py</code> رد شدن فرمان <code>reload</code> برای نقش <code>NOC_OPERATOR</code>، محدودسازی سیلاب ICMP در CoPP بدون Drop شدن BGP، و گذار کنترل‌شده به MAB برای چاپگر فاقد Supplicant آزموده شده‌اند.</p>"
+    },
+    {
+      "id": "ccnp_enc_sec-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8907\" target=\"_blank\" rel=\"noopener\">RFC 8907 (TACACS+)</a> و مستندات CoPP و 802.1X در Cisco IOS-XE 17.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_enc_sec_lab.py</code> مدل محلی Python 3 بدون سرور ISE/RADIUS زنده است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "AAA",
+      "fa": "احراز هویت، مجوز و حسابرسی",
+      "simple": "سه رکن Authentication، Authorization و Accounting در امنیت شبکه."
+    },
+    {
+      "term": "TACACS+ (RFC 8907)",
+      "fa": "پروتکل مدیریت امن تجهیزات",
+      "simple": "پروتکل روی TCP 49 با رمزنگاری کل بدنه و مجوزدهی تک‌فرمان CLI."
+    },
+    {
+      "term": "RADIUS",
+      "fa": "پروتکل دسترسی شبکه",
+      "simple": "پروتکل UDP 1812/1813 استاندارد برای 802.1X، Wi-Fi و VPN."
+    },
+    {
+      "term": "AAA Local Fallback",
+      "fa": "بازگشت محلی AAA",
+      "simple": "احراز هویت با دیتابیس محلی صرفاً هنگام از دسترس خارج شدن سرور AAA."
+    },
+    {
+      "term": "RBAC",
+      "fa": "کنترل دسترسی مبتنی بر نقش",
+      "simple": "تفکیک سطح دسترسی مدیران (مثل اپراتور خواندنی در برابر ادمین)."
+    },
+    {
+      "term": "CoPP",
+      "fa": "پلیسینگ صفحه کنترل",
+      "simple": "اعمال MQC روی ورودی CPU روتر برای مهار سیلاب بسته‌های کنترلی."
+    },
+    {
+      "term": "IEEE 802.1X",
+      "fa": "کنترل دسترسی مبتنی بر پورت",
+      "simple": "استاندارد احراز هویت کاربر/دستگاه پیش از باز شدن کامل پورت."
+    },
+    {
+      "term": "Supplicant / Authenticator",
+      "fa": "کلاینت / احرازکننده پورت",
+      "simple": "دستگاه متقاضی و سوئیچ/WLC کنترل‌کننده در 802.1X."
+    },
+    {
+      "term": "MAB",
+      "fa": "احراز هویت بر مبنای MAC",
+      "simple": "مسیر جایگزین 802.1X برای تجهیزات فاقد Supplicant (همراه با محدودیت)."
+    },
+    {
+      "term": "EAP-TLS",
+      "fa": "احراز هویت با گواهی دوطرفه",
+      "simple": "امن‌ترین روش EAP در شبکه‌های سیمی و بی‌سیم سازمانی."
+    },
+    {
+      "term": "802.11w (PMF)",
+      "fa": "حفاظت فریم‌های مدیریتی Wi-Fi",
+      "simple": "پیشگیری از حملات جعل Deauthentication در Wi-Fi (الزامی در WPA3)."
+    },
+    {
+      "term": "WPA3-Enterprise",
+      "fa": "امنیت بی‌سیم سازمانی WPA3",
+      "simple": "استفاده از 802.1X/EAP همراه با رمزنگاری قوی و PMF."
+    },
+    {
+      "term": "uRPF",
+      "fa": "بررسی مسیر بازگشت Unicast",
+      "simple": "جلوگیری از جعل آدرس IP مبدأ در لبه شبکه."
+    },
+    {
+      "term": "Infrastructure ACL (iACL)",
+      "fa": "ACL حفاظت زیرساخت",
+      "simple": "محدودسازی دسترسی مستقیم به آدرس‌های مدیریتی و لینک‌های روترها."
+    },
+    {
+      "term": "Monitor / Closed Mode",
+      "fa": "حالت پایش / بسته 802.1X",
+      "simple": "مراحل تدریجی استقرار 802.1X از پایش بی‌وقفه تا مسدودسازی سخت‌گیرانه."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENCOR Security: AAA (TACACS+/RADIUS), CoPP, 802.1X/MAB & Wireless Security",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_enc_sec_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_enc_sec_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_enc_sec (CoPP MQC Policy Evaluator &amp; AAA/VTY Access Audit).\n\nEducational local model only — no live Cisco IOS-XE router, TACACS+/RADIUS server,\nor real control-plane CPU queue is contacted.\nModels:\n1. Control Plane Policing (CoPP) ordered MQC class matching + rate check (ensuring BGP/OSPF/SSH\n   are protected in high-priority classes while floods hit lower/class-default policers, and\n   flagging dangerous `drop` on `class-default` that could break unknown legit control traffic).\n2. AAA method-list fallback audit ensuring a local emergency fallback exists when TACACS+ is\n   unreachable (without allowing silent bypass when TACACS+ explicitly rejects credentials!).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nVALID_TRAFFIC_TYPES = frozenset({&quot;bgp&quot;, &quot;ospf&quot;, &quot;ssh&quot;, &quot;icmp_flood&quot;, &quot;unknown_control&quot;})\n\n\ndef _require_pos_int(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or val &lt;= 0:\n        raise ValueError(f&quot;{name} must be a positive int, got {val!r}&quot;)\n    return val\n\n\ndef evaluate_copp_policy(\n    traffic_type: str,\n    offered_pps: int,\n    policy_classes: list[dict[str, object]],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate ordered CoPP MQC classes for a control-plane traffic flow.&quot;&quot;&quot;\n    if traffic_type not in VALID_TRAFFIC_TYPES:\n        raise ValueError(f&quot;traffic_type must be in {sorted(VALID_TRAFFIC_TYPES)}&quot;)\n    pps = _require_pos_int(offered_pps, &quot;offered_pps&quot;)\n    if not isinstance(policy_classes, list) or not policy_classes:\n        raise ValueError(&quot;policy_classes must be a non-empty list&quot;)\n\n    for cls in policy_classes:\n        match_types = cls.get(&quot;matches&quot;, [])\n        if traffic_type in match_types or cls.get(&quot;name&quot;) == &quot;class-default&quot;:\n            cir = _require_pos_int(cls[&quot;cir_pps&quot;], &quot;cir_pps&quot;)\n            exceed_action = str(cls.get(&quot;exceed_action&quot;, &quot;drop&quot;))\n            conforms = pps &lt;= cir\n            return {\n                &quot;traffic_type&quot;: traffic_type,\n                &quot;matched_class&quot;: cls[&quot;name&quot;],\n                &quot;offered_pps&quot;: pps,\n                &quot;cir_pps&quot;: cir,\n                &quot;action&quot;: &quot;transmit&quot; if conforms else exceed_action,\n                &quot;policed_excess_pps&quot;: 0 if conforms else (pps - cir),\n            }\n    return {&quot;traffic_type&quot;: traffic_type, &quot;matched_class&quot;: &quot;unmatched&quot;, &quot;action&quot;: &quot;transmit&quot;, &quot;policed_excess_pps&quot;: 0}\n\n\ndef evaluate_aaa_fallback(\n    tacacs_state: str,\n    has_local_fallback: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model TACACS+ -&gt; local fallback semantics (fallback ONLY on server unreachable, NEVER on explicit reject).&quot;&quot;&quot;\n    if tacacs_state not in {&quot;accept&quot;, &quot;reject&quot;, &quot;unreachable&quot;}:\n        raise ValueError(&quot;tacacs_state must be &#x27;accept&#x27;, &#x27;reject&#x27;, or &#x27;unreachable&#x27;&quot;)\n    if not isinstance(has_local_fallback, bool):\n        raise ValueError(&quot;has_local_fallback must be a strict bool&quot;)\n\n    if tacacs_state == &quot;accept&quot;:\n        return {&quot;outcome&quot;: &quot;PERMITTED_BY_TACACS&quot;, &quot;fallback_used&quot;: False}\n    if tacacs_state == &quot;reject&quot;:\n        return {&quot;outcome&quot;: &quot;DENIED_BY_TACACS_NO_FALLBACK&quot;, &quot;fallback_used&quot;: False}\n    if has_local_fallback:\n        return {&quot;outcome&quot;: &quot;FALLBACK_TO_LOCAL_DATABASE&quot;, &quot;fallback_used&quot;: True}\n    return {&quot;outcome&quot;: &quot;LOCKOUT_RISK_NO_LOCAL_FALLBACK&quot;, &quot;fallback_used&quot;: False}\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco IOS-XE CoPP or TACACS+ server is contacted.&quot;)\n    classes = [\n        {&quot;name&quot;: &quot;CRITICAL-ROUTING&quot;, &quot;matches&quot;: [&quot;bgp&quot;, &quot;ospf&quot;], &quot;cir_pps&quot;: 5000, &quot;exceed_action&quot;: &quot;transmit&quot;},\n        {&quot;name&quot;: &quot;MGMT-ACCESS&quot;, &quot;matches&quot;: [&quot;ssh&quot;], &quot;cir_pps&quot;: 1000, &quot;exceed_action&quot;: &quot;drop&quot;},\n        {&quot;name&quot;: &quot;UNDESIRABLE-FLOOD&quot;, &quot;matches&quot;: [&quot;icmp_flood&quot;], &quot;cir_pps&quot;: 200, &quot;exceed_action&quot;: &quot;drop&quot;},\n        {&quot;name&quot;: &quot;class-default&quot;, &quot;matches&quot;: [], &quot;cir_pps&quot;: 500, &quot;exceed_action&quot;: &quot;drop&quot;},\n    ]\n    bgp = evaluate_copp_policy(&quot;bgp&quot;, 1200, classes)\n    flood = evaluate_copp_policy(&quot;icmp_flood&quot;, 2500, classes)\n    assert bgp[&quot;action&quot;] == &quot;transmit&quot; and flood[&quot;action&quot;] == &quot;drop&quot; and flood[&quot;policed_excess_pps&quot;] == 2300\n\n    rej = evaluate_aaa_fallback(&quot;reject&quot;, has_local_fallback=True)\n    unr = evaluate_aaa_fallback(&quot;unreachable&quot;, has_local_fallback=True)\n    assert rej[&quot;fallback_used&quot;] is False and unr[&quot;fallback_used&quot;] is True\n    print(&quot;CoPP flood policing:&quot;, flood)\n    print(&quot;AAA reject vs unreachable:&quot;, {&quot;reject&quot;: rej[&quot;outcome&quot;], &quot;unreachable&quot;: unr[&quot;outcome&quot;]})\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE AAA TACACS+ &amp; CoPP Skeleton (NOT executed on live hardware)\naaa new-model\naaa authentication login default group tacacs+ local\naaa authorization commands 15 default group tacacs+ if-authenticated\ncontrol-plane\n service-policy input COPP_POLICY</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "مهم‌ترین مزیت <strong>TACACS+ (RFC 8907)</strong> برای مدیریت CLI تجهیزات نسبت به RADIUS چیست؟",
+      "options": [
+        "استفاده از UDP",
+        "تفکیک کامل A/A/A، رمزنگاری کل بدنه بسته روی TCP 49 و مجوزدهی تک‌فرمان",
+        "رایگان بودن سخت‌افزار",
+        "حذف SSH"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>TACACS+ کنترل دقیق بر تک‌تک فرمان‌های CLI و ثبت حسابرسی آن‌ها را فراهم می‌کند.</p>"
+    },
+    {
+      "title": "چرا افزودن <code>local</code> در انتهای فهرست <code>aaa authentication</code> حیاتی است؟",
+      "options": [
+        "برای دور زدن همیشه TACACS+",
+        "به‌عنوان Fallback صرفاً هنگام در دسترس نبودن سرور AAA تا دسترسی مدیریت قفل نشود",
+        "برای رمزنگاری RADIUS",
+        "برای فعال شدن CoPP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در IOS-XE روش <code>local</code> تنها زمانی اجرا می‌شود که سرور AAA پاسخ ندهد (نه هنگام رمز اشتباه).</p>"
+    },
+    {
+      "title": "هدف اصلی <strong>CoPP (Control Plane Policing)</strong> چیست؟",
+      "options": [
+        "رمزنگاری ترافیک کاربران",
+        "محافظت از CPU روتر برابر سیلاب بسته‌های کنترلی و حفظ پایداری BGP/OSPF",
+        "تخصیص VLAN",
+        "جایگزینی 802.1X"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>CoPP از اشباع CPU توسط حملات یا ترافیک غیرعادی جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "سه نقش استاندارد در معماری <strong>IEEE 802.1X</strong> کدام‌اند؟",
+      "options": [
+        "Active، Standby، AVG",
+        "Supplicant، Authenticator و Authentication Server",
+        "Hub، Spoke، RP",
+        "Client، RR، ASBR"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>سوئیچ/WLC نقش Authenticator و سرور RADIUS نقش Authentication Server را دارد.</p>"
+    },
+    {
+      "title": "چرا نباید <strong>MAB</strong> را به‌تنهایی هم‌تراز امنیت 802.1X (EAP-TLS) دانست؟",
+      "options": [
+        "زیرا آدرس MAC به‌سادگی قابل جعل (Spoofing) است و باید با پروفایلینگ و دسترسی محدود همراه شود",
+        "زیرا MAB روی اترنت کار نمی‌کند",
+        "زیرا MAB گواهی TLS می‌خواهد",
+        "زیرا MAB به BGP نیاز دارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>MAB راهکار جایگزین برای دستگاه‌های فاقد Supplicant است و سطح اطمینان کمتری از EAP-TLS دارد.</p>"
+    },
+    {
+      "title": "استاندارد <strong>802.11w (PMF)</strong> در شبکه‌های بی‌سیم جلوی چه حمله‌ای را می‌گیرد؟",
+      "options": [
+        "BGP Hijacking",
+        "جعل فریم‌های مدیریتی مانند Deauthentication Spoofing",
+        "OSPF MTU Mismatch",
+        "VLAN Pruning"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>PMF فریم‌های مدیریتی Wi-Fi را محافظت می‌کند و در WPA3 الزامی است.</p>"
+    },
+    {
+      "title": "کدام ریسک در تنظیم نادرست <strong>CoPP</strong> بسیار خطرناک است؟",
+      "options": [
+        "افزایش سرعت",
+        "اعمال Drop سخت‌گیرانه روی class-default و قطع شدن پروتکل‌های کنترلی فراموش‌شده مانند BGP/BFD",
+        "فعال شدن SNMPv3",
+        "تغییر MTU"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پیش از اعمال Drop در CoPP باید تمام پروتکل‌های کنترلی مجاز در کلاس‌های صریح قرار گیرند.</p>"
+    },
+    {
+      "title": "کدام پروتکل استاندارد برای ارتباط Authenticator (سوئیچ) با سرور ISE در 802.1X به کار می‌رود؟",
+      "options": [
+        "RADIUS (UDP 1812/1813)",
+        "RIP",
+        "Telnet",
+        "TFTP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>802.1X میان سوئیچ و سرور احراز هویت از RADIUS استفاده می‌کند.</p>"
+    },
+    {
+      "title": "برای شروع استقرار 802.1X در شبکه عملیاتی بدون قطع ناگهانی کاربران کدام حالت توصیه می‌شود؟",
+      "options": [
+        "Closed Mode فوری",
+        "Monitor Mode",
+        "Shutdown",
+        "غیرفعال کردن AAA"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Monitor Mode وضعیت احراز هویت را بدون مسدودسازی ترافیک گزارش می‌دهد.</p>"
+    },
+    {
+      "title": "در <strong>RBAC</strong> هدف از مجوزدهی تک‌فرمان (Command Authorization) چیست؟",
+      "options": [
+        "دادن دسترسی کامل به همه",
+        "محدود کردن هر نقش فقط به فرمان‌های مجاز (مثلاً فقط show برای اپراتور NOC)",
+        "حذف Accounting",
+        "بستن SSH"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اصل کمترین دسترسی (Least Privilege) را در CLI اجرا می‌کند.</p>"
+    },
+    {
+      "title": "در <code>ccnp_enc_sec_lab.py</code> ارسال فرمان <code>reload</code> توسط نقش <code>NOC_OPERATOR</code> چه نتیجه‌ای دارد؟",
+      "options": [
+        "مجاز",
+        "رد می‌شود (<code>permitted=False</code>)",
+        "تغییر به MAB",
+        "حذف BGP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>موتور سیاست RBAC تنها فرمان‌های مجاز همان نقش را می‌پذیرد.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_enc_sec_lab.py</code> چیست؟",
+      "options": [
+        "اتصال به Cisco ISE زنده",
+        "تست WPA3 واقعی",
+        "شبیه‌ساز محلی Python 3 برای AAA/RBAC، CoPP و 802.1X/MAB بدون تجهیز زنده",
+        "تست TACACS+ زنده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه شبیه‌ساز محلی Python بدون سرور یا سوئیچ زنده است.</p>"
+    }
+  ]
+}

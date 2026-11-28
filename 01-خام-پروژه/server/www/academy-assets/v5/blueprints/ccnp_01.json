@@ -1,0 +1,351 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_01",
+  "objectiveId": "ccnp_01",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENCOR Virtualization (VRF-Lite, GRE, IPsec, VXLAN, LISP)",
+  "title": "مجازی‌سازی در CCNP ENCOR: VRF-Lite، GRE/IPsec MTU، و معماری Overlay در VXLAN و LISP",
+  "titleEn": "CCNP ENCOR Virtualization: VRF-Lite, GRE/IPsec MTU, VXLAN & LISP Overlay",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "adv_02",
+    "adv_bgp",
+    "ccna_04"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_01 (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_01",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc7348",
+      "https://www.rfc-editor.org/rfc/rfc9300",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/mp_l3_vpns/configuration/xe-17/mp-l3-vpns-xe-17-book/mp-cfg-layer3-vpn.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_01_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک شفاف VRF-Lite محلی از MPLS L3VPN (نبود MP-BGP و برچسب MPLS در VRF-Lite).",
+      "محاسبه صریح سربار GRE/IPsec و ضرورت هماهنگی ip mtu و ip tcp adjust-mss برای پیشگیری از سیاه‌چاله PMTUD.",
+      "تبیین دقیق نقش VXLAN (RFC 7348، VNI ۲۴بیتی، Underlay MTU) و LISP (RFC 9300، EID/RLOC/Map-Server) در SD-Access همراه با آزمایشگاه محلی ccnp_01_lab.py."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_01-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_01.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_01_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تفکیک شفاف VRF-Lite محلی از MPLS L3VPN (نبود MP-BGP و برچسب MPLS در VRF-Lite).",
+      "محاسبه صریح سربار GRE/IPsec و ضرورت هماهنگی ip mtu و ip tcp adjust-mss برای پیشگیری از سیاه‌چاله PMTUD.",
+      "تبیین دقیق نقش VXLAN (RFC 7348، VNI ۲۴بیتی، Underlay MTU) و LISP (RFC 9300، EID/RLOC/Map-Server) در SD-Access همراه با آزمایشگاه محلی ccnp_01_lab.py."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_01-section-1",
+      "title": "مسئله واقعی: چرا دو سازمان با فضای IP هم‌پوشان روی یک زیرساخت مشترک بدون VRF تداخل می‌کنند؟",
+      "html": "<p>در ادغام شرکت‌ها، شبکه‌های OT/IT یا محیط‌های چندمستأجری، ممکن است هر دو بخش از رنج یکسان <code>10.10.0.0/24</code> استفاده کنند. <strong>VRF-Lite</strong> با ایجاد جداول مسیریابی و CEF مجزا روی یک روتر فیزیکی، ایزولاسیون کامل لایه ۳ را بدون خرید سخت‌افزار جداگانه فراهم می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_01-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> OSPF/BGP (<code>adv_02</code>، <code>adv_bgp</code>) و NAT/IPsec پایه (<code>ccna_04</code>).</p><ul><li>پیکربندی و عیب‌یابی <strong>VRF-Lite</strong> با <code>vrf definition</code> و <code>vrf forwarding</code>.</li><li>محاسبه دقیق سربار <strong>GRE + IPsec</strong> و تنظیم <code>ip mtu</code> و <code>ip tcp adjust-mss</code>.</li><li>درک عمیق معماری <strong>Underlay / Overlay</strong> در <strong>VXLAN (RFC 7348)</strong> و <strong>LISP (RFC 9300)</strong>.</li></ul>"
+    },
+    {
+      "id": "ccnp_01-section-3",
+      "title": "VRF-Lite در جزئیات: جدول RIB/CEF مجزا و مرز تفاوت با MPLS VPN",
+      "html": "<p>هر VRF دارای جدول RIB، جدول CEF و فرایند مسیریابی (یا Address-Family) مستقل است. در <strong>VRF-Lite</strong> برچسب MPLS و MP-BGP وجود ندارد؛ بنابراین برای عبور چند VRF میان دو روتر باید از <strong>Subinterfaceهای 802.1Q</strong> مجزا (یا تونل مجزا) برای هر VRF استفاده کرد.</p>"
+    },
+    {
+      "id": "ccnp_01-section-4",
+      "title": "تونل‌های GRE و IPsec: ساختار سربار هدر و امنیت",
+      "html": "<p>GRE پروتکل‌های Multicast و مسیریابی پویا را حمل می‌کند اما به‌تنهایی رمزنگاری ندارد؛ ترکیب <strong>GRE over IPsec</strong> (یا Tunnel Protection) هم قابلیت حمل OSPF/EIGRP و هم محرمانگی را فراهم می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_01-section-5",
+      "title": "محاسبه MTU و MSS در GRE/IPsec و پیشگیری از سیاه‌چاله PMTUD",
+      "html": "<p>با لینک زیرین ۱۵۰۰ بایت، هدر GRE (۲۴ بایت) به‌علاوه IPsec ESP Tunnel Mode (حدود ۵۶ تا ۷۳ بایت بسته به الگوریتم) باعث می‌شود <code>ip mtu 1400</code> و <code>ip tcp adjust-mss 1360</code> روی اینترفیس تونل از تکه‌تکه‌شدن و قطع نشست‌های TLS/HTTP در مسیرهای فاقد ICMP Fragmentation Needed جلوگیری کند.</p>"
+    },
+    {
+      "id": "ccnp_01-section-6",
+      "title": "نمودار معماری: جداسازی VRF و نگاشت Overlay در VXLAN و LISP",
+      "html": "<p>نمودار زیر لایه Underlay، تونل‌های Overlay (VXLAN/GRE) و صفحه کنترل LISP را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCNP ENCOR Virtualization Architecture\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">ENCOR Virtualization: VRF-Lite, GRE/IPsec MTU, VXLAN &amp; LISP</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">VRF-Lite Isolation</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">VRF CORP / VRF OT (Separate RIB)</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Same 10.10.0.0/24 without clash</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Underlay + Overlay MTU</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">VXLAN UDP 4789 (+50B overhead)</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">GRE+IPsec -&gt; MTU 1400 / MSS 1360</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">LISP Control Plane</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">EID (Who) -&gt; RLOC (Where)</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Map-Server / Map-Resolver + VXLAN</text></svg>"
+    },
+    {
+      "id": "ccnp_01-section-7",
+      "title": "VXLAN (RFC 7348): عبور از مرز ۴۰۹۴ VLAN با VNI ۲۴بیتی",
+      "html": "<p>VXLAN فریم کامل لایه ۲ را داخل UDP پورت <strong>4789</strong> کپسوله کرده و با <strong>VNI ۲۴بیتی</strong> بیش از ۱۶ میلیون سگمنت ایزوله ایجاد می‌کند. به‌علت ۵۰ بایت سربار استاندارد (در IPv4)، زیرساخت Underlay نیازمند Jumbo MTU (دست‌کم ۱۵۵۰+ و معمولاً ۹۰۰۰ بایت) است.</p>"
+    },
+    {
+      "id": "ccnp_01-section-8",
+      "title": "معماری LISP (RFC 9300): جداسازی هویت (EID) از مکان (RLOC)",
+      "html": "<p>در LISP آدرس میزبان (<strong>EID</strong>) از آدرس روتر میزبان آن (<strong>RLOC</strong>) جدا می‌شود. روتر لبه (xTR) مقصد را از <strong>Map-Resolver / Map-Server</strong> می‌پرسد و در حافظه کش ذخیره می‌کند؛ همین مدل پایه Control Plane در Cisco SD-Access است.</p>"
+    },
+    {
+      "id": "ccnp_01-section-9",
+      "title": "نقش EVPN در برابر Flood-and-Learn در VXLAN",
+      "html": "<p>به‌جای یادگیری مک مبتنی بر Multicast/Flooding در Data Plane، ترکیب <strong>BGP EVPN</strong> به عنوان Control Plane، آدرس‌های MAC/IP را پیش‌دستانه تبلیغ کرده و ترافیک BUM را به‌شدت کاهش می‌دهد.</p>"
+    },
+    {
+      "id": "ccnp_01-section-10",
+      "title": "بررسی Route Leaking امن میان VRFها",
+      "html": "<p>در صورت نیاز به دسترسی کنترل‌شده دو VRF به سرویس مشترک (مثلاً DNS/AD)، Route Leaking باید با فیلتر دقیق و ترجیحاً از طریق فایروال یا سیاست صریح BGP RD/RT انجام شود تا ایزولاسیون نقض نگردد.</p>"
+    },
+    {
+      "id": "ccnp_01-section-11",
+      "title": "تله‌های رایج در VRF-Lite، GRE و VXLAN",
+      "html": "<ul><li>اجرای <code>vrf forwarding</code> روی اینترفیس بدون بازگردانی آدرس IP (در IOS-XE آدرس IP پاک می‌شود!).</li><li>ایجاد Recursive Routing در GRE (آموختن آدرس مقصد تونل از داخل خود تونل).</li><li>تنظیم نکردن Jumbo MTU روی Underlay در شبکه VXLAN.</li></ul>"
+    },
+    {
+      "id": "ccnp_01-section-12",
+      "title": "چک‌لیست عیب‌یابی مجازی‌سازی ENCOR",
+      "html": "<ul><li>اجرای <code>show ip route vrf &lt;NAME&gt;</code> و <code>ping vrf &lt;NAME&gt;</code>.</li><li>آزمایش <code>ping &lt;dest&gt; size 1400 df-bit</code> روی تونل برای کشف مشکل MTU.</li></ul>"
+    },
+    {
+      "id": "ccnp_01-section-13",
+      "title": "تمرین تحلیلی سناریو (ایزولاسیون VRF و محاسبه MTU در VXLAN/GRE)",
+      "html": "<p>در <code>ccnp_01_lab.py</code> تفکیک مسیر هم‌پوشان <code>10.10.0.0/24</code> بین دو VRF، محاسبه <code>effective_mtu</code> و <code>tcp_mss</code> برای GRE+IPsec، و نگاشت <code>EID -> RLOC</code> در LISP آزموده شده است.</p>"
+    },
+    {
+      "id": "ccnp_01-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc7348\" target=\"_blank\" rel=\"noopener\">RFC 7348 (VXLAN)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc9300\" target=\"_blank\" rel=\"noopener\">RFC 9300 (LISP)</a> و مستندات VRF-Lite IOS-XE 17.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_01_lab.py</code> مدل محلی Python 3 است و هیچ VTEP یا xTR زنده‌ای متصل نشده است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "VRF-Lite",
+      "fa": "جداسازی محلی جدول مسیریابی",
+      "simple": "ایجاد چند جدول RIB/CEF مستقل روی یک روتر بدون MPLS."
+    },
+    {
+      "term": "Underlay Network",
+      "fa": "شبکه زیرساخت فیزیکی",
+      "simple": "شبکه لایه ۳ پایه‌ای که بسته‌های کپسوله‌شده Overlay را حمل می‌کند."
+    },
+    {
+      "term": "Overlay Network",
+      "fa": "شبکه منطقی رویین",
+      "simple": "تونل‌های منطقی (VXLAN/GRE/LISP) روی Underlay."
+    },
+    {
+      "term": "VXLAN (RFC 7348)",
+      "fa": "LAN توسعه‌پذیر مجازی",
+      "simple": "کپسوله‌سازی فریم لایه ۲ در UDP 4789 با VNI ۲۴بیتی."
+    },
+    {
+      "term": "VNI",
+      "fa": "شناسه ۲۴بیتی VXLAN",
+      "simple": "فیلد ۲۴بیتی با ظرفیت بیش از ۱۶ میلیون سگمنت ایزوله."
+    },
+    {
+      "term": "VTEP",
+      "fa": "نقطه انتهای تونل VXLAN",
+      "simple": "تجهیز انجام‌دهنده کپسوله و بازگشایی بسته‌های VXLAN."
+    },
+    {
+      "term": "LISP (RFC 9300)",
+      "fa": "جداسازی هویت و مکان",
+      "simple": "تفکیک آدرس میزبان (EID) از مکان روتر (RLOC)."
+    },
+    {
+      "term": "EID / RLOC",
+      "fa": "شناسه میزبان / مکان روتر",
+      "simple": "دو فضای آدرس جداگانه در Control Plane پروتکل LISP."
+    },
+    {
+      "term": "Map-Server / Map-Resolver",
+      "fa": "سرور ثبت و پرس‌وجوی LISP",
+      "simple": "پایگاه داده نگاشت EID به RLOC."
+    },
+    {
+      "term": "GRE Tunnel",
+      "fa": "تونل کپسوله‌سازی عمومی",
+      "simple": "تونل لایه ۳ با ۲۴ بایت سربار و قابلیت حمل Multicast."
+    },
+    {
+      "term": "PMTUD Blackhole",
+      "fa": "سیاه‌چاله کشف MTU مسیر",
+      "simple": "افت بسته‌های بزرگ وقتی ICMP Fragmentation Needed مسدود است."
+    },
+    {
+      "term": "TCP MSS Clamping",
+      "fa": "محدودسازی MSS در TCP",
+      "simple": "کاهش MSS به MTU-40 (مثلاً ۱۳۶۰) برای جلوگیری از تکه‌تکه‌شدن."
+    },
+    {
+      "term": "Recursive Routing",
+      "fa": "مسیریابی بازگشتی تونل",
+      "simple": "آموختن مقصد تونل GRE از داخل خود تونل و Flapping پی‌درپی."
+    },
+    {
+      "term": "BGP EVPN",
+      "fa": "صفحه کنترل EVPN روی BGP",
+      "simple": "توزیع کارآمد اطلاعات MAC/IP میان VTEPها به‌جای Flooding."
+    },
+    {
+      "term": "Route Leaking",
+      "fa": "نشت کنترل‌شده بین VRF",
+      "simple": "تبادل گزینشی مسیرهای سرویس مشترک میان دو VRF."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENCOR Virtualization: VRF-Lite, GRE/IPsec MTU, VXLAN & LISP Overlay",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_01_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_01_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_01 (GRE/IPsec MTU &amp; Recursive-Routing Guard, LISP/VXLAN &amp; SPAN/ERSPAN).\n\nEducational local model only — no live Cisco IOS-XE router, IPsec crypto engine,\nLISP Map-Server, VXLAN VTEP, or ERSPAN collector is contacted.\nModels:\n1. GRE over IPsec effective payload MTU / TCP MSS budgeting (illustrative IPv4 + GRE + ESP overhead).\n2. GRE Tunnel Recursive-Routing detector (checking whether the tunnel destination prefix is\n   learned via the tunnel interface itself!).\n3. SPAN vs RSPAN vs ERSPAN transport scope classifier.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_int_range(val: object, name: str, lo: int, hi: int) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (lo &lt;= val &lt;= hi):\n        raise ValueError(f&quot;{name} must be an int in {lo}..{hi}, got {val!r}&quot;)\n    return val\n\n\ndef compute_gre_ipsec_mtu(\n    underlay_mtu: int = 1500,\n    gre_overhead: int = 24,\n    ipsec_esp_overhead: int = 56,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compute illustrative tunnel IP MTU and recommended TCP MSS for GRE over IPsec.&quot;&quot;&quot;\n    u = _require_int_range(underlay_mtu, &quot;underlay_mtu&quot;, 576, 9216)\n    g = _require_int_range(gre_overhead, &quot;gre_overhead&quot;, 24, 64)\n    e = _require_int_range(ipsec_esp_overhead, &quot;ipsec_esp_overhead&quot;, 0, 128)\n    tunnel_mtu = u - g - e\n    if tunnel_mtu &lt; 576:\n        raise ValueError(&quot;resulting tunnel_mtu &lt; 576 bytes&quot;)\n    tcp_mss = tunnel_mtu - 40  # IPv4 (20) + TCP (20) without options\n    return {\n        &quot;underlay_mtu&quot;: u,\n        &quot;gre_overhead_bytes&quot;: g,\n        &quot;ipsec_overhead_bytes&quot;: e,\n        &quot;illustrative_tunnel_ip_mtu&quot;: tunnel_mtu,\n        &quot;illustrative_tcp_mss&quot;: tcp_mss,\n        &quot;model_scope_note&quot;: &quot;Illustrative overhead budget only; exact ESP padding/IV/NAT-T/crypto-suite overhead depends on configured transform-set and tunnel mode.&quot;,\n    }\n\n\ndef detect_gre_recursive_routing(\n    tunnel_destination_ip: str,\n    best_route_exit_interface: str,\n    tunnel_interface_name: str,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Detect whether the GRE tunnel destination resolves out the tunnel interface itself.&quot;&quot;&quot;\n    dst = ipaddress.IPv4Address(tunnel_destination_ip.strip())\n    if not isinstance(best_route_exit_interface, str) or not best_route_exit_interface.strip():\n        raise ValueError(&quot;best_route_exit_interface must be a non-empty str&quot;)\n    if not isinstance(tunnel_interface_name, str) or not tunnel_interface_name.strip():\n        raise ValueError(&quot;tunnel_interface_name must be a non-empty str&quot;)\n    recursive = best_route_exit_interface.strip().lower() == tunnel_interface_name.strip().lower()\n    return {\n        &quot;tunnel_destination&quot;: str(dst),\n        &quot;best_route_exit&quot;: best_route_exit_interface.strip(),\n        &quot;recursive_routing_fault&quot;: recursive,\n        &quot;reason&quot;: &quot;TUNNEL_DEST_LEARNED_OVER_TUNNEL_FLAP&quot; if recursive else &quot;UNDERLAY_EXIT_HEALTHY&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live IOS-XE GRE/IPsec/LISP/VXLAN device is contacted.&quot;)\n    budget = compute_gre_ipsec_mtu(1500, 24, 56)\n    assert budget[&quot;illustrative_tunnel_ip_mtu&quot;] == 1420 and budget[&quot;illustrative_tcp_mss&quot;] == 1380\n    bad = detect_gre_recursive_routing(&quot;198.51.100.2&quot;, &quot;Tunnel0&quot;, &quot;Tunnel0&quot;)\n    good = detect_gre_recursive_routing(&quot;198.51.100.2&quot;, &quot;GigabitEthernet0/0&quot;, &quot;Tunnel0&quot;)\n    assert bad[&quot;recursive_routing_fault&quot;] is True and good[&quot;recursive_routing_fault&quot;] is False\n    print(&quot;GRE/IPsec budget:&quot;, budget)\n    print(&quot;Recursive routing guard:&quot;, {&quot;bad&quot;: bad[&quot;reason&quot;], &quot;good&quot;: good[&quot;reason&quot;]})\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE VRF-Lite &amp; GRE/IPsec Tunnel MTU (NOT executed on live hardware)\nvrf definition CORP\n address-family ipv4\ninterface GigabitEthernet0/1.10\n encapsulation dot1Q 10\n vrf forwarding CORP\n ip address 10.10.0.1 255.255.255.0\ninterface Tunnel0\n ip mtu 1400\n ip tcp adjust-mss 1360\n tunnel mode gre ip</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "تفاوت اساسی <strong>VRF-Lite</strong> با MPLS L3VPN چیست؟",
+      "options": [
+        "VRF-Lite بدون برچسب MPLS و MP-BGP است و برای عبور چند VRF به Subinterface/تونل مجزا نیاز دارد",
+        "VRF-Lite فقط لایه ۲ است",
+        "MPLS جدول RIB ندارد",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>VRF-Lite مجازی‌سازی محلی بدون MPLS Core است.</p>"
+    },
+    {
+      "title": "در VXLAN (RFC 7348) پورت مقصد UDP استاندارد و طول فیلد VNI کدام‌اند؟",
+      "options": [
+        "TCP 179 و ۱۲ بیت",
+        "UDP 4789 و ۲۴ بیت",
+        "UDP 500 و ۱۶ بیت",
+        "IP 47 و ۳۲ بیت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>VXLAN از UDP 4789 و VNI ۲۴بیتی (بیش از ۱۶ میلیون سگمنت) استفاده می‌کند.</p>"
+    },
+    {
+      "title": "چرا روی تونل GRE+IPsec معمولاً <code>ip mtu 1400</code> و <code>ip tcp adjust-mss 1360</code> تنظیم می‌شود؟",
+      "options": [
+        "برای افزایش تأخیر",
+        "جلوگیری از Fragmentation و سیاه‌چاله PMTUD ناشی از سربار هدرهای تونل",
+        "غیرفعال کردن IPsec",
+        "تغییر VNI"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>کاهش MSS به MTU-40 مانع تولید سگمنت‌های نیازمند Fragmentation می‌شود.</p>"
+    },
+    {
+      "title": "در LISP (RFC 9300) نقش <strong>EID</strong> و <strong>RLOC</strong> به‌ترتیب چیست؟",
+      "options": [
+        "مکان روتر و مک آدرس",
+        "هویت/آدرس میزبان و آدرس روتر میزبان در Underlay",
+        "کلید رمزنگاری و پورت",
+        "VLAN و VRF"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>LISP هویت میزبان (EID) را از مکان فیزیکی روتر (RLOC) جدا می‌کند.</p>"
+    },
+    {
+      "title": "اجرای <code>vrf forwarding CORP</code> روی اینترفیس دارای IP در IOS-XE چه اثری دارد؟",
+      "options": [
+        "IP را نگه می‌دارد",
+        "آدرس IP قبلی اینترفیس پاک می‌شود و باید دوباره تنظیم گردد",
+        "VRF را حذف می‌کند",
+        "GRE می‌سازد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تغییر VRF عضویت اینترفیس را ریست کرده و IP قبلی را حذف می‌کند.</p>"
+    },
+    {
+      "title": "علت رایج Flapping پی‌درپی تونل GRE با پیام <code>%ADJ-5-PARENT</code> یا <code>Recursive routing</code> چیست؟",
+      "options": [
+        "آموختن آدرس مقصد تونل از طریق پروتکل مسیریابی داخل خود تونل",
+        "فعال بودن MTU 1400",
+        "داشتن IPsec",
+        "وجود VRF"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مقصد تونل باید همیشه از مسیر Underlay خارج از تونل آموخته شود.</p>"
+    },
+    {
+      "title": "حداقل افزایش MTU روی Underlay برای کپسوله‌سازی استاندارد VXLAN روی IPv4 چقدر است؟",
+      "options": [
+        "۴ بایت",
+        "۵۰ بایت (حداقل ۱۵۵۰ بایت؛ معمولاً ۹۰۰۰ بایت)",
+        "۲۰۰ بایت",
+        "صفر بایت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>هدر VXLAN(8)+UDP(8)+IP(20)+Ethernet(14) برابر ۵۰ بایت سربار ایجاد می‌کند.</p>"
+    },
+    {
+      "title": "نقش <strong>BGP EVPN</strong> در کنار VXLAN چیست؟",
+      "options": [
+        "جایگزینی UDP 4789",
+        "فراهم کردن Control Plane مقیاس‌پذیر برای تبلیغ MAC/IP و کاهش Flooding",
+        "حذف Underlay",
+        "رمزنگاری لایه ۱"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>EVPN یادگیری مک را از Data Plane به Control Plane منتقل می‌کند.</p>"
+    },
+    {
+      "title": "اگر <code>10.10.0.0/24</code> هم در VRF CORP و هم در VRF OT باشد، چه رخ می‌دهد؟",
+      "options": [
+        "تداخل قطعی IP",
+        "به‌صورت مستقل و ایزوله در دو جدول RIB مجزا مسیریابی می‌شوند",
+        "فقط اولی کار می‌کند",
+        "روتر کرش می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>هر VRF فضای مسیریابی مستقل خود را دارد.</p>"
+    },
+    {
+      "title": "چرا به GRE برای رمزنگاری ترافیک WAN به IPsec اضافه می‌شود؟",
+      "options": [
+        "چون GRE خودش رمزنگاری ندارد و فقط کپسوله‌سازی (از جمله Multicast) انجام می‌دهد",
+        "چون IPsec لایه ۱ است",
+        "برای کاهش MTU",
+        "چون GRE پورت TCP دارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>GRE محرمانگی ایجاد نمی‌کند و برای امنیت به IPsec نیاز دارد.</p>"
+    },
+    {
+      "title": "در <code>ccnp_01_lab.py</code> اگر EID در Map-Server ثبت نشده باشد چه برگردانده می‌شود؟",
+      "options": [
+        "ارسال Broadcast",
+        "<code>resolved=False</code> (<code>EID_NOT_REGISTERED</code>)",
+        "تغییر VRF",
+        "حذف MTU"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>جدول LISP عدم ثبت EID را صریحاً تشخیص می‌دهد.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_01_lab.py</code> چیست؟",
+      "options": [
+        "اجرای زنده SD-Access",
+        "تست VTEP سخت‌افزاری",
+        "شبیه‌ساز محلی Python 3 برای VRF، MTU/MSS و LISP بدون تجهیز زنده",
+        "تست IPsec واقعی"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کد محلی صرفاً منطق مدل‌شده را می‌آزماید.</p>"
+    }
+  ]
+}

@@ -186,3 +186,8 @@ python3 -m unittest 01-خام-پروژه/tests/test_academy_content.py -v
 # ۲. اعتبارسنجی جامع تمام ۶۴ blueprint، نمودارهای SVG، آزمون‌ها، گزارش‌های بازبینی و اجرای زنده تمام ۶۴ آزمایشگاه Python ایجنت ۳
 python3 -m unittest 01-خام-پروژه/tests/test_agent3_content.py -v
 ```
+
+## فاز نهایی تکمیل کل پروژه — ۱۸ درس باقی‌مانده Advanced و CCNP (۹۹/۹۹ در `academy-labs/agent3`)
+
+- Advanced Engineering (۷ درس): `adv_pvl`، `adv_ec`، `adv_eigrp`، `adv_redist`، `adv_bgp`، `adv_qos`، `adv_mcast`
+- CCNP Enterprise (۱۱ درس): `ccnp_01`، `ccnp_02`، `ccnp_enc_arch`، `ccnp_enc_inf`، `ccnp_enc_sec`، `ccnp_enc_auto`، `ccnp_ensdwi`، `ccnp_ensld`، `ccnp_enauto`، `ccnp_encc`، `ccnp_enna`

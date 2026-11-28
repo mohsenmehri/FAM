@@ -1,0 +1,350 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_enna",
+  "objectiveId": "ccnp_enna",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENNA (Network Assurance: Synthetic Tests, Path Analysis, Baselines & SLO/Error Budget)",
+  "title": "تخصص CCNP ENNA (تضمین کیفیت و پایش شبکه): آزمون مصنوعی، تحلیل مسیر BGP/Hop-by-Hop، Baseline و SLO/Error Budget",
+  "titleEn": "CCNP ENNA: Network Assurance, Synthetic Probes, Path Visualization, Baselines & SLO/Error Budget",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccnp_enc_inf",
+    "ccnp_enauto",
+    "adv_qos"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_enna (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_enna",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc2679",
+      "https://www.rfc-editor.org/rfc/rfc3393"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_enna_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق پایش سنتی (Up/Down اینترفیس) از Network Assurance مدرن (تجربه واقعی کاربر، آزمون مصنوعی HTTP/DNS/TLS و تحلیل مسیر hop-by-hop).",
+      "تبیین ریاضی شاخص‌های SLI، SLO و Error Budget و تشخیص ناهنجاری مبتنی بر Baseline (میانگین/انحراف معیار یا صدک P95/P99).",
+      "ساخت آزمایشگاه محلی ccnp_enna_lab.py برای تحلیل مسیر hop-by-hop (تفکیک ICMP rate-limit میانی از افت واقعی)، محاسبه P95/P99 و مصرف Error Budget."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_enna-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_enna.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_enna_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تفکیک دقیق پایش سنتی (Up/Down اینترفیس) از Network Assurance مدرن (تجربه واقعی کاربر، آزمون مصنوعی HTTP/DNS/TLS و تحلیل مسیر hop-by-hop).",
+      "تبیین ریاضی شاخص‌های SLI، SLO و Error Budget و تشخیص ناهنجاری مبتنی بر Baseline (میانگین/انحراف معیار یا صدک P95/P99).",
+      "ساخت آزمایشگاه محلی ccnp_enna_lab.py برای تحلیل مسیر hop-by-hop (تفکیک ICMP rate-limit میانی از افت واقعی)، محاسبه P95/P99 و مصرف Error Budget."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_enna-section-1",
+      "title": "مسئله واقعی: چرا وقتی همه اینترفیس‌های روتر سبز و Up هستند، کاربران از کندی شدید SaaS شکایت می‌کنند؟",
+      "html": "<p>پایش سنتی (SNMP Up/Down) تنها سلامت تجهیزات داخلی شما را می‌بیند، اما مشکل ممکن است در مسیر ISP، تغییر ناگهانی مسیر BGP، تأخیر DNS/TLS یا افت بسته در یک گام میانی اینترنت باشد. <strong>Network Assurance (CCNP ENNA)</strong> با ترکیب آزمون‌های مصنوعی (Synthetic Probes)، تحلیل مسیر و تله‌متری، تجربه واقعی کاربر تا برنامه را می‌سنجد.</p>"
+    },
+    {
+      "id": "ccnp_enna-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> NetFlow/IP SLA (<code>ccnp_enc_inf</code>)، تله‌متری (<code>ccnp_enauto</code>) و QoS (<code>adv_qos</code>).</p><ul><li>طراحی آزمون‌های مصنوعی چندلایه (Network، DNS، TLS، HTTP Transaction) با مدل Agentهای Enterprise و Cloud.</li><li>تفسیر مهندسی <strong>Path Visualization</strong> (تشخیص تفاوت ICMP Rate-Limiting میانی با افت واقعی بسته!).</li><li>تعریف <strong>SLI، SLO، Error Budget</strong> و کشف ناهنجاری با <strong>P95/P99 Baseline</strong>.</li></ul>"
+    },
+    {
+      "id": "ccnp_enna-section-3",
+      "title": "تفکیک Monitoring سنتی از Network Assurance مدرن",
+      "html": "<p>پایش سنتی می‌پرسد «آیا روتر روشن است؟»؛ اما <strong>Network Assurance</strong> (مانند اکوسیستم ThousandEyes و Catalyst Assurance) می‌پرسد «آیا کاربر شعبه تهران می‌تواند در کمتر از ۳۰۰ms به سرویس ابری متصل شود و اگر نه، دقیقاً در کدام لایه یا کدام AS گلوگاه رخ داده است؟»</p>"
+    },
+    {
+      "id": "ccnp_enna-section-4",
+      "title": "انواع Agentها و لایه‌های آزمون مصنوعی (Synthetic Tests)",
+      "html": "<p><strong>Enterprise Agents</strong> درون شبکه سازمان، <strong>Cloud Agents</strong> در POPهای جهانی و <strong>Endpoint Agents</strong> روی لپ‌تاپ کاربران قرار می‌گیرند و به‌صورت پیوسته تأخیر <strong>DNS، TCP Handshake، TLS Handshake و HTTP TTFB</strong> را تفکیک می‌کنند.</p>"
+    },
+    {
+      "id": "ccnp_enna-section-5",
+      "title": "تله کلاسیک تحلیل مسیر (Traceroute / Path Visualization): ICMP Rate-Limiting در برابر افت واقعی",
+      "html": "<p>اگر گام ۴ در Traceroute دارای ۶۰٪ Packet Loss باشد اما گام‌های ۵، ۶ و مقصد نهایی ۰٪ Loss داشته باشند، این یک <strong>افت واقعی مسیر نیست</strong> بلکه صرفاً <strong>CoPP / ICMP Rate-Limiting</strong> روی CPU روتر گام ۴ است! افت واقعی زمانی است که Loss از یک گام آغاز شده و تا مقصد ادامه یابد.</p>"
+    },
+    {
+      "id": "ccnp_enna-section-6",
+      "title": "نمودار معماری: از سنجش چندلایه کاربر تا تشخیص گلوگاه و مدیریت Error Budget",
+      "html": "<p>نمودار زیر زنجیره Network Assurance از آزمون مصنوعی و Path Analysis تا تصمیم‌گیری SLO/Error Budget را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCNP ENNA Network Assurance\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">CCNP ENNA: Synthetic Probes -&gt; Hop Path Analysis -&gt; P95/SLO Budget</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Synthetic Probes</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">DNS + TCP + TLS + HTTP TTFB</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Enterprise / Cloud / Endpoint</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Path &amp; BGP Analysis</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Distinguish CoPP ICMP limit</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">vs True Persistent Packet Loss</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Baseline &amp; SLO Budget</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Track P95/P99 Latency (not avg)</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Error Budget Burn Rate -&gt; Alert</text></svg>"
+    },
+    {
+      "id": "ccnp_enna-section-7",
+      "title": "چرا میانگین (Average) گمراه‌کننده است و باید از P95/P99 استفاده کرد؟",
+      "html": "<p>اگر ۹۵٪ درخواست‌ها ۴۰ms و ۵٪ آن‌ها ۲.۵ ثانیه طول بکشند، میانگین حدود ۱۶۰ms به نظر «قابل قبول» می‌آید در حالی که ۱ از هر ۲۰ کاربر تجربه وحشتناکی دارد! شاخص‌های صدکی <strong>P95 و P99</strong> (در کنار <strong>RFC 2679 One-Way Delay</strong> و <strong>RFC 3393 IPDV/Jitter</strong>) دم توزیع را آشکار می‌کنند.</p>"
+    },
+    {
+      "id": "ccnp_enna-section-8",
+      "title": "تعریف دقیق SLI، SLO، SLA و Error Budget",
+      "html": "<p><strong>SLI</strong> شاخص اندازه‌گیری‌شده (مثلاً نسبت درخواست‌های زیر ۳۰۰ms)، <strong>SLO</strong> هدف داخلی (مثلاً ۹۹.۹٪ در ۳۰ روز)، <strong>SLA</strong> تعهد قراردادی بیرونی، و <strong>Error Budget</strong> سهمیه مجاز خطا (<code>1 - SLO = 0.1%</code>) است که اگر سریع مصرف شود، تغییرات پرریسک تا تثبیت سیستم متوقف می‌شوند.</p>"
+    },
+    {
+      "id": "ccnp_enna-section-9",
+      "title": "پایش لایه BGP و همبستگی آن با اختلالات برنامه",
+      "html": "<p>کشف تغییر ناگهانی <strong>AS_PATH</strong>، افزایش Route Flap یا Route Leak از طریق ناظرهای جهانی BGP اجازه می‌دهد در چند دقیقه بفهمیم افت سرعت برنامه ناشی از تغییر مسیر ISP بوده نه خطای فایروال داخلی.</p>"
+    },
+    {
+      "id": "ccnp_enna-section-10",
+      "title": "پایش تجربه دیجیتال (DEM) و تشخیص ریشه خطا (Wi-Fi در برابر WAN در برابر SaaS)",
+      "html": "<p><strong>Endpoint Agent</strong> با سنجش هم‌زمان کیفیت سیگنال Wi-Fi، تأخیر تا دروازه محلی، مسیر ISP و زمان پاسخ سرور برنامه، مجادله همیشگی «تقصیر شبکه است یا اپلیکیشن؟» را با شواهد عددی خاتمه می‌دهد.</p>"
+    },
+    {
+      "id": "ccnp_enna-section-11",
+      "title": "تله‌های رایج در استقرار Network Assurance",
+      "html": "<ul><li>تفسیر غلط ICMP Rate-Limit یک روتر میانی به‌عنوان خرابی ISP و ارسال تیکت نادرست!</li><li>هشداردهی بر پایه آستانه ثابت بدون Baseline و ایجاد خستگی هشدار (Alert Fatigue).</li><li>سنجش فقط با ICMP Ping در حالی که اختلال در لایه DNS یا TLS است.</li></ul>"
+    },
+    {
+      "id": "ccnp_enna-section-12",
+      "title": "چک‌لیست طراحی برنامه Assurance سازمانی",
+      "html": "<ul><li>پوشش سه لایه: Endpoint (کاربر)، Enterprise (شعب/دیتاسنتر) و Cloud (مسیر بیرونی).</li><li>تعریف SLOهای قابل اندازه‌گیری با Error Budget و همبستگی خودکار با ابزارهای Ticketing.</li></ul>"
+    },
+    {
+      "id": "ccnp_enna-section-13",
+      "title": "تمرین تحلیلی سناریو (تشخیص ICMP Rate-Limit، محاسبه P95 و Burn Rate بودجه خطا)",
+      "html": "<p>در <code>ccnp_enna_lab.py</code> الگوریتم Path Analysis افت ۶۰٪ صرفاً در گام ۳ (با ۰٪ افت در گام‌های بعدی) را <code>CONTROL_PLANE_ICMP_RATE_LIMIT</code> و افت پایدار از گام ۴ تا مقصد را <code>REAL_DATA_PLANE_LOSS</code> تشخیص می‌دهد؛ همچنین P95/P99 و درصد مصرف Error Budget محاسبه می‌شوند.</p>"
+    },
+    {
+      "id": "ccnp_enna-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc2679\" target=\"_blank\" rel=\"noopener\">RFC 2679 (One-Way Delay)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc3393\" target=\"_blank\" rel=\"noopener\">RFC 3393 (IP Packet Delay Variation)</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_enna_lab.py</code> موتور تحلیلی محلی Python 3 است و به سرویس زنده ThousandEyes یا Agentهای واقعی متصل نیست.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Network Assurance",
+      "fa": "تضمین کیفیت سرتاسری شبکه",
+      "simple": "ارزیابی مداوم تجربه واقعی کاربر و همبستگی مسیر، BGP و برنامه."
+    },
+    {
+      "term": "Synthetic Monitoring",
+      "fa": "پایش با آزمون مصنوعی",
+      "simple": "ارسال تراکنش‌های برنامه‌ریزی‌شده (DNS/TCP/TLS/HTTP) برای سنجش فعال."
+    },
+    {
+      "term": "Path Visualization",
+      "fa": "مصورسازی گام‌به‌گام مسیر",
+      "simple": "ترسیم مسیر واقعی بسته‌ها روی شبکه داخلی، ISP و ابر همراه با افت و تأخیر."
+    },
+    {
+      "term": "ICMP Rate-Limiting",
+      "fa": "محدودسازی پاسخ ICMP میانی",
+      "simple": "افت ظاهری در یک گام میانی Traceroute بدون اثر بر گام‌های بعدی (غیرواقعی)."
+    },
+    {
+      "term": "SLI",
+      "fa": "شاخص سطح سرویس",
+      "simple": "متریک کمی اندازه‌گیری‌شده (مانند نسبت پاسخ‌های سالم یا P95 تأخیر)."
+    },
+    {
+      "term": "SLO",
+      "fa": "هدف سطح سرویس",
+      "simple": "آستانه هدف داخلی تیم مهندسی برای SLI (مثلاً 99.9%)."
+    },
+    {
+      "term": "SLA",
+      "fa": "توافق‌نامه سطح سرویس",
+      "simple": "تعهد قراردادی بیرونی با مشتری همراه با پیامدهای نقض."
+    },
+    {
+      "term": "Error Budget",
+      "fa": "بودجه خطا",
+      "simple": "سهمیه مجاز خطا یا قطعی (1 - SLO) برای متوازن‌سازی سرعت تغییر و پایداری."
+    },
+    {
+      "term": "Burn Rate",
+      "fa": "نرخ مصرف بودجه خطا",
+      "simple": "سرعت تخلیه Error Budget نسبت به بازه زمانی هدف."
+    },
+    {
+      "term": "P95 / P99 Latency",
+      "fa": "تأخیر صدک ۹۵ و ۹۹",
+      "simple": "شاخص دم توزیع که کندی‌های آزاردهنده پنهان‌شده در میانگین را آشکار می‌کند."
+    },
+    {
+      "term": "TTFB",
+      "fa": "زمان تا اولین بایت",
+      "simple": "زمان پردازش سرور تا ارسال اولین بایت پاسخ HTTP."
+    },
+    {
+      "term": "Baseline",
+      "fa": "خط مبنای رفتاری",
+      "simple": "الگوی عادی عملکرد شبکه برای تشخیص هوشمند ناهنجاری."
+    },
+    {
+      "term": "DEM",
+      "fa": "پایش تجربه دیجیتال",
+      "simple": "دید سرتاسری از دستگاه کاربر (Wi-Fi/CPU) تا سرور برنامه."
+    },
+    {
+      "term": "Alert Fatigue",
+      "fa": "خستگی از هشدار",
+      "simple": "تولید هشدارهای کاذب و بی‌ارزش که باعث نادیده گرفتن هشدارهای واقعی می‌شود."
+    },
+    {
+      "term": "IPDV / Jitter (RFC 3393)",
+      "fa": "تغییرات تأخیر بسته",
+      "simple": "نوسان فاصله زمانی رسیدن بسته‌های متوالی در جریان‌های حساس."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENNA: Network Assurance, Synthetic Probes, Path Visualization, Baselines & SLO/Error Budget",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_enna_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_enna_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_enna (Network Assurance: Synthetic Path Hop Fault Isolation &amp; Health Score).\n\nEducational local model only — no live Cisco ThousandEyes agent, BGP collector,\nor Catalyst Center Assurance cluster is contacted.\nModels:\n1. Synthetic end-to-end transaction breakdown (DNS -&gt; TCP -&gt; TLS -&gt; HTTP TTFB) isolating which\n   layer dominates user-perceived delay even when interface status is `up/up`.\n2. Path hop-by-hop loss localization (distinguishing ICMP-rate-limited intermediate transit hops\n   from genuine sustained loss propagating to the destination!).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport math\n\n\ndef _require_non_neg_float(val: object, name: str) -&gt; float:\n    if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(float(val)) or float(val) &lt; 0:\n        raise ValueError(f&quot;{name} must be a non-negative finite number, got {val!r}&quot;)\n    return float(val)\n\n\ndef analyze_synthetic_http_waterfall(\n    dns_ms: float,\n    tcp_connect_ms: float,\n    tls_handshake_ms: float,\n    http_ttfb_ms: float,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Identify the dominant latency layer in a synthetic HTTP/TLS transaction.&quot;&quot;&quot;\n    stages = {\n        &quot;dns&quot;: _require_non_neg_float(dns_ms, &quot;dns_ms&quot;),\n        &quot;tcp&quot;: _require_non_neg_float(tcp_connect_ms, &quot;tcp_connect_ms&quot;),\n        &quot;tls&quot;: _require_non_neg_float(tls_handshake_ms, &quot;tls_handshake_ms&quot;),\n        &quot;http_ttfb&quot;: _require_non_neg_float(http_ttfb_ms, &quot;http_ttfb_ms&quot;),\n    }\n    total = sum(stages.values())\n    if total == 0:\n        raise ValueError(&quot;total waterfall time must be &gt; 0&quot;)\n    dominant = max(stages, key=lambda k: stages[k])\n    share = round((stages[dominant] / total) * 100.0, 2)\n    return {\n        &quot;total_ms&quot;: round(total, 2),\n        &quot;dominant_stage&quot;: dominant,\n        &quot;dominant_share_pct&quot;: share,\n        &quot;stages_ms&quot;: stages,\n    }\n\n\ndef localize_path_loss(hops: list[dict[str, object]]) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Distinguish control-plane ICMP rate-limiting on one transit hop from real sustained path loss.&quot;&quot;&quot;\n    if not isinstance(hops, list) or len(hops) &lt; 2:\n        raise ValueError(&quot;hops must be a list of at least 2 hop dicts&quot;)\n    losses = []\n    for h in hops:\n        hop_num = h.get(&quot;hop&quot;)\n        if isinstance(hop_num, bool) or not isinstance(hop_num, int) or hop_num &lt; 1:\n            raise ValueError(&quot;hop must be a positive int&quot;)\n        loss = _require_non_neg_float(h[&quot;loss_pct&quot;], &quot;loss_pct&quot;)\n        if loss &gt; 100.0:\n            raise ValueError(&quot;loss_pct must be &lt;= 100&quot;)\n        losses.append((hop_num, str(h.get(&quot;node&quot;, &quot;&quot;)), loss))\n\n    end_loss = losses[-1][2]\n    if end_loss == 0.0:\n        transit_spikes = [x for x in losses[:-1] if x[2] &gt; 0.0]\n        return {\n            &quot;real_forwarding_loss&quot;: False,\n            &quot;destination_loss_pct&quot;: 0.0,\n            &quot;diagnosis&quot;: &quot;ICMP_CONTROL_PLANE_RATE_LIMIT_ARTIFACT&quot; if transit_spikes else &quot;PATH_CLEAN_ZERO_LOSS&quot;,\n            &quot;suspect_hop&quot;: None,\n        }\n    first_sustained = next((x for x in losses if x[2] &gt;= end_loss * 0.5), losses[-1])\n    return {\n        &quot;real_forwarding_loss&quot;: True,\n        &quot;destination_loss_pct&quot;: end_loss,\n        &quot;diagnosis&quot;: &quot;SUSTAINED_DATA_PLANE_LOSS_PROPAGATING_TO_DESTINATION&quot;,\n        &quot;suspect_hop&quot;: {&quot;hop&quot;: first_sustained[0], &quot;node&quot;: first_sustained[1], &quot;loss_pct&quot;: first_sustained[2]},\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live ThousandEyes agent or Catalyst Center cluster is contacted.&quot;)\n    wf = analyze_synthetic_http_waterfall(dns_ms=15.0, tcp_connect_ms=25.0, tls_handshake_ms=40.0, http_ttfb_ms=620.0)\n    assert wf[&quot;dominant_stage&quot;] == &quot;http_ttfb&quot;\n    artifact = localize_path_loss([\n        {&quot;hop&quot;: 1, &quot;node&quot;: &quot;gw-edge&quot;, &quot;loss_pct&quot;: 0.0},\n        {&quot;hop&quot;: 2, &quot;node&quot;: &quot;isp-core-copp&quot;, &quot;loss_pct&quot;: 35.0},\n        {&quot;hop&quot;: 3, &quot;node&quot;: &quot;saas-vip&quot;, &quot;loss_pct&quot;: 0.0},\n    ])\n    real_fault = localize_path_loss([\n        {&quot;hop&quot;: 1, &quot;node&quot;: &quot;gw-edge&quot;, &quot;loss_pct&quot;: 0.0},\n        {&quot;hop&quot;: 2, &quot;node&quot;: &quot;isp-peering-congestion&quot;, &quot;loss_pct&quot;: 12.0},\n        {&quot;hop&quot;: 3, &quot;node&quot;: &quot;saas-vip&quot;, &quot;loss_pct&quot;: 12.0},\n    ])\n    assert artifact[&quot;real_forwarding_loss&quot;] is False and real_fault[&quot;real_forwarding_loss&quot;] is True\n    print(&quot;Synthetic HTTP waterfall:&quot;, wf)\n    print(&quot;Path loss diagnosis:&quot;, {&quot;artifact&quot;: artifact[&quot;diagnosis&quot;], &quot;real&quot;: real_fault[&quot;suspect_hop&quot;]})\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Assurance Diagnostics (Conceptual, NOT executed on live agents)\n# Synthetic probe breakdown: DNS(12ms) + TCP(25ms) + TLS(40ms) + HTTP TTFB(85ms)\n# Path check: hop3 60% loss, hop4 0% loss, dest 0% loss -&gt; Control-plane ICMP rate limit</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در خروجی Path Visualization اگر گام ۳ دارای ۵۰٪ Packet Loss اما گام ۴ و مقصد نهایی ۰٪ Loss باشند، تحلیل مهندسی صحیح چیست؟",
+      "options": [
+        "قطعی قطعی فیبر در گام ۳",
+        "محدودسازی ICMP/CoPP روی CPU روتر گام ۳ (افت واقعی Data Plane نیست)",
+        "خرابی DNS",
+        "افت BGP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>افت واقعی Data Plane در تمام گام‌های بعدی تا مقصد ادامه می‌یابد.</p>"
+    },
+    {
+      "title": "چرا پایش تأخیر با <strong>P95 / P99</strong> برتر از اتکا به میانگین (Average) است؟",
+      "options": [
+        "محاسبه میانگین ناممکن است",
+        "میانگین جهش‌های شدید تأخیر برای ۵٪ کاربران را پنهان می‌کند اما P95/P99 آن‌ها را آشکار می‌سازد",
+        "P99 همیشه کمتر از میانگین است",
+        "فقط برای ICMP است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>صدک‌های بالا کیفیت واقعی تجربه کاربران در دم توزیع را نشان می‌دهند.</p>"
+    },
+    {
+      "title": "رابطه میان <strong>SLI، SLO و Error Budget</strong> کدام است؟",
+      "options": [
+        "SLI شاخص اندازه‌گیری، SLO هدف داخلی و Error Budget برابر 1 - SLO است",
+        "هر سه یکی هستند",
+        "Error Budget همیشه صفر است",
+        "SLA داخلی و SLO بیرونی است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Error Budget سهمیه خطای مجاز پیش از نقض SLO را مشخص می‌کند.</p>"
+    },
+    {
+      "title": "اگر فقط با <strong>ICMP Ping</strong> یک وب‌اپلیکیشن را پایش کنیم چه اختلالاتی از دید ما پنهان می‌ماند؟",
+      "options": [
+        "هیچ اختلالی",
+        "کندی DNS، انقضای گواهی TLS و خطای HTTP 500 سرور برنامه",
+        "قطعی لایه ۱",
+        "تغییر MAC"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>آزمون مصنوعی چندلایه باید DNS، TCP، TLS و HTTP را جداگانه بسنجد.</p>"
+    },
+    {
+      "title": "تفاوت <strong>Enterprise Agent</strong> با <strong>Endpoint Agent</strong> چیست؟",
+      "options": [
+        "Enterprise در شعبه/دیتاسنتر برای پایش شبکه و Endpoint روی دستگاه کاربر برای دید Wi-Fi/تجربه محلی است",
+        "یکسان‌اند",
+        "Endpoint فقط برای BGP است",
+        "Enterprise روی گوشی نصب می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ترکیب آن‌ها دید سرتاسری از لپ‌تاپ کاربر تا سرویس ابری ایجاد می‌کند.</p>"
+    },
+    {
+      "title": "<strong>TTFB (Time To First Byte)</strong> در آزمون HTTP بیشتر بیانگر چیست؟",
+      "options": [
+        "تأخیر لایه ۲ سوئیچ",
+        "زمان پردازش سمت سرور و پایگاه داده تا ارسال اولین بایت پاسخ",
+        "تأخیر DNS",
+        "اندازه MTU"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تفکیک TTFB از TCP/TLS کمک می‌کند مشکل اپلیکیشن را از شبکه جدا کنیم.</p>"
+    },
+    {
+      "title": "وقتی <strong>Error Budget</strong> در نیمه ماه به طور کامل مصرف شود، بهترین واکنش مهندسی چیست؟",
+      "options": [
+        "افزایش سرعت انتشار ویژگی‌های پرریسک",
+        "توقف تغییرات غیراضطراری و تمرکز بر پایداری و رفع ریشه‌ای خطاها",
+        "حذف مانیتورینگ",
+        "تغییر عدد SLI"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Error Budget مکانیسم تصمیم‌گیری مبتنی بر داده میان نوآوری و پایداری است.</p>"
+    },
+    {
+      "title": "<strong>Alert Fatigue (خستگی از هشدار)</strong> چگونه کاهش می‌یابد؟",
+      "options": [
+        "هشدار روی هر تغییر ۱ms",
+        "استفاده از Baseline پویا، همبستگی رویدادها و هشداردهی مبتنی بر Burn Rate بودجه خطا",
+        "خاموش کردن کل Syslog",
+        "افزایش فرکانس SNMP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>هشدار باید دقیق، قابل اقدام و مرتبط با اثر واقعی بر کاربر باشد.</p>"
+    },
+    {
+      "title": "کدام استاندارد IETF شاخص تغییر تأخیر بسته (<strong>IPDV / Jitter</strong>) را تعریف می‌کند؟",
+      "options": [
+        "RFC 3393",
+        "RFC 5517",
+        "RFC 1112",
+        "RFC 7348"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>RFC 3393 چارچوب استاندارد اندازه‌گیری IPDV است.</p>"
+    },
+    {
+      "title": "افت بسته که از گام ۴ شروع شده و در گام ۵ و مقصد نهایی نیز ۵٪ باقی بماند نشانه چیست؟",
+      "options": [
+        "ICMP Rate-Limit",
+        "افت واقعی Data Plane که از حوالی گام ۴ آغاز شده است",
+        "سلامت کامل مسیر",
+        "خطای مرورگر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تداوم افت بسته تا مقصد نشانه اختلال واقعی در صفحه داده است.</p>"
+    },
+    {
+      "title": "در <code>ccnp_enna_lab.py</code> افت ۶۰٪ در گام ۳ همراه با ۰٪ در گام ۴ و مقصد چه برچسبی می‌گیرد؟",
+      "options": [
+        "<code>REAL_DATA_PLANE_LOSS</code>",
+        "<code>CONTROL_PLANE_ICMP_RATE_LIMIT</code>",
+        "<code>SLO_BREACH</code>",
+        "<code>BGP_FLAP</code>"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تحلیلگر مسیر افت ظاهری CoPP میانی را از افت واقعی تفکیک می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_enna_lab.py</code> چیست؟",
+      "options": [
+        "اتصال به ThousandEyes زنده",
+        "سنجش واقعی ISP",
+        "موتور تحلیلی محلی Python 3 برای Path Analysis، P95/P99 و Error Budget بدون Agent زنده",
+        "پایش SNMP زنده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه شبیه‌ساز محلی Python بدون سرویس پایش زنده است.</p>"
+    }
+  ]
+}

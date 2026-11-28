@@ -599,6 +599,10 @@
         if (resEl) resEl.textContent = `امتیاز نهایی: ${score} از ${bp.knowledgeCheck.length}`;
       };
     }
+
+    if (window.FamAcademySimulator && typeof window.FamAcademySimulator.mount === 'function') {
+      window.FamAcademySimulator.mount(container, bp);
+    }
   }
 
 

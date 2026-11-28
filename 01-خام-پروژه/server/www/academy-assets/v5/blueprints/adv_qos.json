@@ -1,0 +1,350 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_qos",
+  "objectiveId": "adv_qos",
+  "kind": "lesson",
+  "track": "مهندسی پیشرفته (Advanced Engineering)",
+  "course": "c5-advanced-eng",
+  "domain": "Quality of Service (MQC, DSCP, Policing/Shaping & WRED)",
+  "title": "کیفیت سرویس (QoS): معماری MQC، رمزگشایی DSCP/PHB، ریاضیات Token Bucket و WRED",
+  "titleEn": "Enterprise QoS: MQC, DSCP/PHB, Token Bucket (Policing/Shaping) & WRED",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccna_qos_ssh",
+    "s03"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy adv_qos (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "adv_qos",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc2474",
+      "https://www.rfc-editor.org/rfc/rfc2597",
+      "https://www.rfc-editor.org/rfc/rfc3246"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/adv_qos_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تبیین دقیق ۶بیتی DSCP و کلاس‌های EF=46 (ToS=184)، AFxy=8x+2y و CS مطابق RFC 2474/2597/3246.",
+      "تفکیک مهندسی Policing (Drop/Re-mark، ورودی/خروجی) از Shaping (بافر، خروجی) با رابطه Bc = CIR × Tc و نقش HQoS در لینک‌های Sub-rate.",
+      "ساخت آزمایشگاه محلی adv_qos_lab.py برای رمزگشایی DSCP، محاسبه Token Bucket و احتمال حذف WRED."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_qos-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-advanced-eng",
+      "blueprint": "/academy-assets/v5/blueprints/adv_qos.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_qos_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تبیین دقیق ۶بیتی DSCP و کلاس‌های EF=46 (ToS=184)، AFxy=8x+2y و CS مطابق RFC 2474/2597/3246.",
+      "تفکیک مهندسی Policing (Drop/Re-mark، ورودی/خروجی) از Shaping (بافر، خروجی) با رابطه Bc = CIR × Tc و نقش HQoS در لینک‌های Sub-rate.",
+      "ساخت آزمایشگاه محلی adv_qos_lab.py برای رمزگشایی DSCP، محاسبه Token Bucket و احتمال حذف WRED."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_qos-section-1",
+      "title": "مسئله واقعی: چرا افزایش پهنای باند به‌تنهایی Jitter تماس VoIP را هنگام پشتیبان‌گیری حل نمی‌کند؟",
+      "html": "<p>در لحظه ارسال Burst حجیم داده، پر شدن بافر (Bufferbloat) باعث صف‌بندی بسته‌های کوچک صدا پشت بسته‌های بزرگ و افزایش Jitter می‌شود. <strong>QoS</strong> هنگام ازدحام، ترافیک را هوشمندانه طبقه‌بندی، اولویت‌بندی و شکل‌دهی می‌کند.</p>"
+    },
+    {
+      "id": "adv_qos-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> مبانی LLQ/CBWFQ (<code>ccna_qos_ssh</code>) و کنترل ازدحام TCP (<code>s03</code>).</p><ul><li>ساختار سه‌گانه <strong>MQC</strong> و رمزگشایی <strong>DSCP/PHB</strong>.</li><li>محاسبه <strong>Token Bucket</strong> و تفکیک <strong>Policing</strong>، <strong>Shaping</strong> و <strong>HQoS</strong>.</li><li>پیشگیری از <strong>TCP Global Synchronization</strong> با <strong>WRED</strong>.</li></ul>"
+    },
+    {
+      "id": "adv_qos-section-3",
+      "title": "معماری سه‌مرحله‌ای Modular QoS CLI (MQC)",
+      "html": "<p><code>class-map</code> ترافیک را شناسایی، <code>policy-map</code> عمل صف‌بندی/حذف/شکل‌دهی را تعیین و <code>service-policy</code> سیاست را به جهت ورودی یا خروجی اینترفیس متصل می‌کند.</p>"
+    },
+    {
+      "id": "adv_qos-section-4",
+      "title": "رمزگشایی DSCP (۶ بیت) و کلاس‌های PHB",
+      "html": "<p>در فیلد ۶بیتی DSCP (با <code>ToS = DSCP × 4</code> وقتی ECN=0): <strong>EF = 46</strong> (ToS=184، RFC 3246) برای صدا؛ <strong>AFxy = 8x + 2y</strong> (RFC 2597، مثلاً AF31=26) با سه سطح احتمال حذف؛ و <strong>CSn = 8n</strong> (مثل CS6=48 برای مسیریابی).</p>"
+    },
+    {
+      "id": "adv_qos-section-5",
+      "title": "CBWFQ و صف اولویت اکید LLQ با Policer ضمنی",
+      "html": "<p>LLQ (<code>priority</code>) ارسال فوری بسته‌های صوتی را فراهم می‌کند و هم‌زمان با Policer داخلی در زمان ازدحام مانع گرسنگی سایر کلاس‌ها (مانند کنترل مسیریابی) می‌شود.</p>"
+    },
+    {
+      "id": "adv_qos-section-6",
+      "title": "نمودار معماری: مسیر بسته از MQC تا Token Bucket و WRED",
+      "html": "<p>نمودار زیر مراحل طبقه‌بندی MQC، مدل سطل ژتون و منحنی حذف تدریجی WRED را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"QoS MQC Token Bucket and WRED\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">QoS Pipeline: MQC -&gt; Token Bucket (Bc = CIR * Tc) -&gt; WRED</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">MQC Classification</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">class-map: EF(46), AF31(26)</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">policy-map -&gt; service-policy</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Token Bucket (CIR/Tc)</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Bc = CIR * Tc (Tc&lt;=10ms VoIP)</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Police=Drop/Mark | Shape=Buffer</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">WRED Congestion Avoid</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">q &lt; min: 0% | min..max: linear</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Prevents TCP Global Sync</text></svg>"
+    },
+    {
+      "id": "adv_qos-section-7",
+      "title": "ریاضیات Token Bucket: `Bc = CIR × Tc` و انتخاب `Tc <= 10ms`",
+      "html": "<p>در نرخ <code>CIR = 10 Mbps</code> و <code>Tc = 10 ms</code>، اندازه جهش مجاز <code>Bc = 100,000 bits</code> (۱۲۵۰۰ بایت) است؛ کوچک نگه داشتن <code>Tc</code> در لینک‌های صوتی، تأخیر و Jitter ناشی از Shaping را محدود نگه می‌دارد.</p>"
+    },
+    {
+      "id": "adv_qos-section-8",
+      "title": "مقایسه دقیق Policing در برابر Shaping",
+      "html": "<table><thead><tr><th>ویژگی</th><th>Policing</th><th>Shaping</th></tr></thead><tbody><tr><td><strong>عمل مازاد</strong></td><td>Drop یا Re-mark</td><td>بافر و ارسال هموار</td></tr><tr><td><strong>جهت</strong></td><td>ورودی و خروجی</td><td>فقط خروجی</td></tr><tr><td><strong>کاربرد رایج</strong></td><td>اعمال سقف قرارداد در لبه ISP</td><td>تطبیق نرخ CE با لینک Sub-rate</td></tr></tbody></table>"
+    },
+    {
+      "id": "adv_qos-section-9",
+      "title": "تله Tail Drop و هم‌زمانی سراسری TCP",
+      "html": "<p>در Tail Drop، پر شدن ۱۰۰٪ صف همه نشست‌های TCP را هم‌زمان دچار Drop کرده و الگوی افت و خیز دندان‌اره‌ای (TCP Global Synchronization) ایجاد می‌کند.</p>"
+    },
+    {
+      "id": "adv_qos-section-10",
+      "title": "پیشگیری از ازدحام با WRED",
+      "html": "<p>WRED بین <code>min-threshold</code> و <code>max-threshold</code> با احتمال خطی و بر پایه Drop Precedence (حذف زودتر <code>AFx3</code> نسبت به <code>AFx1</code>) بسته‌های TCP را پیش‌دستانه حذف یا ECN-mark می‌کند و برای VoIP (UDP) به کار نمی‌رود.</p>"
+    },
+    {
+      "id": "adv_qos-section-11",
+      "title": "سیاست سلسله‌مراتبی (HQoS) در لینک‌های Sub-rate",
+      "html": "<p>روی پورت ۱ گیگابیتی با قرارداد ۲۰۰ مگابیت، یک <code>policy-map</code> والد ترافیک را به ۲۰۰M Shape کرده و <code>policy-map</code> فرزند درون آن LLQ/CBWFQ را اعمال می‌کند تا صف‌بندی واقعاً فعال شود.</p>"
+    },
+    {
+      "id": "adv_qos-section-12",
+      "title": "چک‌لیست طراحی و عیب‌یابی QoS",
+      "html": "<ul><li>تعیین Trust Boundary نزدیک به لبه دسترسی.</li><li>پایش <code>show policy-map interface</code> برای شمارنده‌های Matches و Drops.</li></ul>"
+    },
+    {
+      "id": "adv_qos-section-13",
+      "title": "تمرین تحلیلی سناریو (DSCP 46/26، Bc و WRED)",
+      "html": "<p>در <code>adv_qos_lab.py</code> مقدار <code>EF=46 (ToS=184)</code>، <code>Bc=100,000 bits</code> برای 10Mbps/10ms و احتمال حذف <code>0.05</code> در نقطه میانی WRED با <code>MPD=10</code> به‌دقت محاسبه می‌شود.</p>"
+    },
+    {
+      "id": "adv_qos-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc2474\" target=\"_blank\" rel=\"noopener\">RFC 2474</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc2597\" target=\"_blank\" rel=\"noopener\">RFC 2597</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc3246\" target=\"_blank\" rel=\"noopener\">RFC 3246</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>adv_qos_lab.py</code> مدل ریاضی محلی Python 3 است و هیچ صف سخت‌افزاری زنده ندارد.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "MQC",
+      "fa": "رابط ماژولار QoS",
+      "simple": "ساختار class-map، policy-map و service-policy."
+    },
+    {
+      "term": "DSCP (RFC 2474)",
+      "fa": "نقطه کد سرویس متمایز",
+      "simple": "فیلد ۶بیتی هدر IP (۰..۶۳) برای برچسب اولویت."
+    },
+    {
+      "term": "PHB",
+      "fa": "رفتار در هر گام",
+      "simple": "سیاست صف‌بندی و حذف هر روتر برای یک DSCP مشخص."
+    },
+    {
+      "term": "EF (DSCP 46)",
+      "fa": "فوروارد شتاب‌دار",
+      "simple": "کلاس کم‌تأخیر و کم‌جیتر ویژه VoIP (RFC 3246)."
+    },
+    {
+      "term": "AFxy (RFC 2597)",
+      "fa": "فوروارد تضمین‌شده",
+      "simple": "۴ کلاس با ۳ سطح Drop Precedence (فرمول 8x+2y)."
+    },
+    {
+      "term": "LLQ",
+      "fa": "صف اولویت کم‌تأخیر",
+      "simple": "صف اولویت اکید با Policer ضمنی برای صدا."
+    },
+    {
+      "term": "CBWFQ",
+      "fa": "صف‌بندی منصفانه کلاسی",
+      "simple": "تضمین حداقل پهنای باند هر کلاس هنگام ازدحام."
+    },
+    {
+      "term": "Token Bucket",
+      "fa": "مدل سطل ژتون",
+      "simple": "الگوریتم سنجش نرخ با CIR، Tc و Bc."
+    },
+    {
+      "term": "CIR / Bc / Tc",
+      "fa": "نرخ، جهش و بازه زمانی",
+      "simple": "پارامترهای اصلی سطل ژتون با رابطه Bc = CIR × Tc."
+    },
+    {
+      "term": "Policing",
+      "fa": "کنترل سخت نرخ",
+      "simple": "حذف یا Re-mark ترافیک مازاد در ورودی یا خروجی."
+    },
+    {
+      "term": "Shaping",
+      "fa": "هموارسازی ترافیک",
+      "simple": "نگهداری مازاد در بافر خروجی با تأخیر کنترل‌شده."
+    },
+    {
+      "term": "Tail Drop",
+      "fa": "حذف انتهای صف",
+      "simple": "حذف هم‌زمان بسته‌ها در ۱۰۰٪ صف و عامل TCP Global Sync."
+    },
+    {
+      "term": "WRED",
+      "fa": "حذف تصادفی زودهنگام",
+      "simple": "حذف خطی تدریجی بسته‌های TCP بر پایه DSCP پیش از پر شدن صف."
+    },
+    {
+      "term": "HQoS",
+      "fa": "QoS سلسله‌مراتبی",
+      "simple": "ترکیب Shaping والد با LLQ/CBWFQ فرزند در لینک Sub-rate."
+    },
+    {
+      "term": "Trust Boundary",
+      "fa": "مرز اعتماد QoS",
+      "simple": "نقطه‌ای که از آن به بعد برچسب‌های DSCP/CoS معتبر پذیرفته می‌شوند."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: Enterprise QoS: MQC, DSCP/PHB, Token Bucket (Policing/Shaping) & WRED",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_qos_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_qos_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for adv_qos (DSCP/PHB Decoder, Token Bucket Policing/Shaping &amp; WRED).\n\nEducational local model only — no live Cisco IOS-XE QoS hardware scheduler or ASIC queue\nis contacted.\nModels:\n1. RFC 2474/2597/3246 DSCP binary/decimal/PHB mapping (CS, AFxy, EF).\n2. Single-rate Token Bucket calculation (`Bc = CIR * Tc`) for Policing (drop/re-mark)\n   vs Shaping (buffer/delay).\n3. WRED linear drop probability between min-threshold and max-threshold.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport math\n\nNAMED_PHB = {\n    &quot;BE&quot;: 0,\n    &quot;CS1&quot;: 8, &quot;AF11&quot;: 10, &quot;AF12&quot;: 12, &quot;AF13&quot;: 14,\n    &quot;CS2&quot;: 16, &quot;AF21&quot;: 18, &quot;AF22&quot;: 20, &quot;AF23&quot;: 22,\n    &quot;CS3&quot;: 24, &quot;AF31&quot;: 26, &quot;AF32&quot;: 28, &quot;AF33&quot;: 30,\n    &quot;CS4&quot;: 32, &quot;AF41&quot;: 34, &quot;AF42&quot;: 36, &quot;AF43&quot;: 38,\n    &quot;CS5&quot;: 40, &quot;EF&quot;: 46, &quot;CS6&quot;: 48, &quot;CS7&quot;: 56,\n}\n\n\ndef _require_int_range(val: object, name: str, lo: int, hi: int) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (lo &lt;= val &lt;= hi):\n        raise ValueError(f&quot;{name} must be an int in {lo}..{hi}, got {val!r}&quot;)\n    return val\n\n\ndef _require_pos_float(val: object, name: str) -&gt; float:\n    if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(float(val)) or float(val) &lt;= 0:\n        raise ValueError(f&quot;{name} must be a positive finite number, got {val!r}&quot;)\n    return float(val)\n\n\ndef decode_dscp(dscp_value: int) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Decode a 6-bit DSCP value (0..63) to binary, ToS byte (shifted &lt;&lt;2), and standard PHB name.&quot;&quot;&quot;\n    v = _require_int_range(dscp_value, &quot;dscp_value&quot;, 0, 63)\n    reverse_map = {val: name for name, val in NAMED_PHB.items()}\n    phb = reverse_map.get(v, &quot;NON_STANDARD_OR_LOCAL_USE&quot;)\n    return {\n        &quot;dscp_decimal&quot;: v,\n        &quot;dscp_6bit_binary&quot;: f&quot;{v:06b}&quot;,\n        &quot;tos_byte_zero_ecn&quot;: v &lt;&lt; 2,\n        &quot;phb_name&quot;: phb,\n    }\n\n\ndef compute_token_bucket(cir_bps: int, tc_ms: float) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compute committed burst Bc (bits &amp; bytes) from CIR (bps) and Tc (milliseconds).&quot;&quot;&quot;\n    cir = _require_int_range(cir_bps, &quot;cir_bps&quot;, 8_000, 100_000_000_000)\n    tc = _require_pos_float(tc_ms, &quot;tc_ms&quot;)\n    if tc &gt; 1000.0:\n        raise ValueError(&quot;tc_ms must be &lt;= 1000 ms&quot;)\n    bc_bits = cir * (tc / 1000.0)\n    return {\n        &quot;cir_bps&quot;: cir,\n        &quot;tc_ms&quot;: tc,\n        &quot;bc_bits&quot;: round(bc_bits, 2),\n        &quot;bc_bytes&quot;: round(bc_bits / 8.0, 2),\n        &quot;voice_friendly_tc&quot;: tc &lt;= 10.0,\n    }\n\n\ndef compute_wred_drop_probability(\n    avg_queue_depth: int,\n    min_threshold: int,\n    max_threshold: int,\n    mark_prob_denominator: int,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compute illustrative WRED drop probability (between 0.0 and 1.0).&quot;&quot;&quot;\n    q = _require_int_range(avg_queue_depth, &quot;avg_queue_depth&quot;, 0, 1_000_000)\n    mn = _require_int_range(min_threshold, &quot;min_threshold&quot;, 1, 1_000_000)\n    mx = _require_int_range(max_threshold, &quot;max_threshold&quot;, mn + 1, 2_000_000)\n    mpd = _require_int_range(mark_prob_denominator, &quot;mark_prob_denominator&quot;, 1, 65535)\n\n    if q &lt; mn:\n        prob = 0.0\n        zone = &quot;BELOW_MIN_THRESHOLD_NO_WRED_DROP&quot;\n    elif q &gt;= mx:\n        prob = 1.0\n        zone = &quot;AT_OR_ABOVE_MAX_THRESHOLD_FULL_DROP&quot;\n    else:\n        max_p = 1.0 / mpd\n        prob = max_p * ((q - mn) / (mx - mn))\n        zone = &quot;LINEAR_RANDOM_EARLY_DROP_ZONE&quot;\n    return {&quot;avg_queue_depth&quot;: q, &quot;drop_probability&quot;: round(prob, 6), &quot;zone&quot;: zone}\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco IOS-XE QoS queue or hardware scheduler is contacted.&quot;)\n    ef = decode_dscp(46)\n    af31 = decode_dscp(26)\n    assert ef[&quot;phb_name&quot;] == &quot;EF&quot; and ef[&quot;tos_byte_zero_ecn&quot;] == 184\n    assert af31[&quot;phb_name&quot;] == &quot;AF31&quot;\n    tb = compute_token_bucket(cir_bps=10_000_000, tc_ms=10.0)\n    assert tb[&quot;bc_bits&quot;] == 100_000.0 and tb[&quot;voice_friendly_tc&quot;] is True\n    wred_mid = compute_wred_drop_probability(avg_queue_depth=30, min_threshold=20, max_threshold=40, mark_prob_denominator=10)\n    assert wred_mid[&quot;drop_probability&quot;] == 0.05\n    print(&quot;DSCP EF:&quot;, ef, &quot;| Token Bucket:&quot;, tb, &quot;| WRED mid:&quot;, wred_mid)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE HQoS with LLQ &amp; WRED (NOT executed on live hardware)\nclass-map match-any VOICE\n match dscp ef\npolicy-map CHILD_QOS\n class VOICE\n  priority percent 20\n class class-default\n  random-detect dscp-based\npolicy-map PARENT_SHAPE\n class class-default\n  shape average 200000000\n  service-policy CHILD_QOS</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "مقدار ده‌دهی DSCP برای <strong>EF</strong> و بایت ToS متناظر (ECN=0) کدام است؟",
+      "options": [
+        "26 و 104",
+        "46 و 184",
+        "48 و 192",
+        "10 و 40"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>EF برابر ۴۶ است و <code>46 × 4 = 184</code>.</p>"
+    },
+    {
+      "title": "در کلاس AF3x کدام برچسب بیشترین احتمال حذف (Drop Precedence) را دارد؟",
+      "options": [
+        "AF31",
+        "AF32",
+        "AF33",
+        "همه یکسان‌اند"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>عدد دوم بزرگ‌تر (۳) نشانه احتمال حذف بالاتر است.</p>"
+    },
+    {
+      "title": "تفاوت اساسی <strong>Shaping</strong> با <strong>Policing</strong> چیست؟",
+      "options": [
+        "Shaping در بافر خروجی هموارسازی می‌کند ولی Policing در ورودی/خروجی Drop یا Re-mark انجام می‌دهد",
+        "Shaping فقط ورودی است",
+        "Policing بافر بزرگ دارد",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Shaping صرفاً Outbound و مبتنی بر بافر است.</p>"
+    },
+    {
+      "title": "با <code>CIR=10Mbps</code> و <code>Tc=10ms</code>، مقدار <code>Bc</code> چند بیت است؟",
+      "options": [
+        "10,000",
+        "100,000 بیت",
+        "1,000,000",
+        "800"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>Bc = 10,000,000 × 0.01 = 100,000 bits</code>.</p>"
+    },
+    {
+      "title": "چرا روی لینک ۱Gbps با قرارداد ۲۰۰Mbps به <strong>HQoS</strong> نیاز است؟",
+      "options": [
+        "تا Shaping والد نقطه ازدحام را به ۲۰۰M بیاورد و LLQ/CBWFQ فرزند فعال شود",
+        "برای حذف DSCP",
+        "برای حذف WRED",
+        "MQC تک‌کلاسه است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بدون Shaping والد روتر ۱G را بی‌ازدحام می‌بیند.</p>"
+    },
+    {
+      "title": "هدف اصلی <strong>WRED</strong> چیست؟",
+      "options": [
+        "حذف VoIP",
+        "پیشگیری از Tail Drop و TCP Global Synchronization",
+        "افزایش MTU",
+        "رمزنگاری"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>حذف تصادفی تدریجی مانع کاهش هم‌زمان پنجره تمام نشست‌های TCP می‌شود.</p>"
+    },
+    {
+      "title": "در WRED با <code>min=20</code>، <code>max=40</code> و <code>MPD=10</code>، در عمق میانگین ۳۰ احتمال حذف چقدر است؟",
+      "options": [
+        "0%",
+        "5% (0.05)",
+        "50%",
+        "100%"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>(1/10) × (10/20) = 0.05</code>.</p>"
+    },
+    {
+      "title": "چرا <strong>LLQ</strong> دارای Policer داخلی در زمان ازدحام است؟",
+      "options": [
+        "برای جلوگیری از گرسنگی سایر صف‌ها توسط ترافیک اولویت‌دار",
+        "افزایش Jitter",
+        "تبدیل UDP به TCP",
+        "حذف CBWFQ"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مانع تصاحب ۱۰۰٪ لینک توسط صف اولویت می‌شود.</p>"
+    },
+    {
+      "title": "مقدار ده‌دهی <strong>AF31</strong> طبق <code>8x+2y</code> چیست؟",
+      "options": [
+        "18",
+        "26",
+        "34",
+        "46"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>8(3) + 2(1) = 26</code>.</p>"
+    },
+    {
+      "title": "مزیت انتخاب <code>Tc &lt;= 10ms</code> در Shaping لینک حامل صدا چیست؟",
+      "options": [
+        "کاهش تأخیر Serialization و Jitter صدا",
+        "دو برابر کردن سرعت",
+        "حذف TCP",
+        "فعال کردن WRED روی صدا"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بازه کوچک‌تر نوسان تأخیر بسته‌های صوتی را کم می‌کند.</p>"
+    },
+    {
+      "title": "کدام بلوک MQC سیاست را به اینترفیس متصل می‌کند؟",
+      "options": [
+        "class-map",
+        "policy-map",
+        "service-policy",
+        "acl"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>دستور <code>service-policy input|output</code> سیاست را اعمال می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>adv_qos_lab.py</code> چیست؟",
+      "options": [
+        "تست زنده Jitter روی ISR",
+        "تست ASIC",
+        "مدل ریاضی محلی Python 3 برای DSCP، Token Bucket و WRED بدون سخت‌افزار زنده",
+        "تولید VoIP"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه شبیه‌ساز محلی Python بدون تجهیز زنده است.</p>"
+    }
+  ]
+}

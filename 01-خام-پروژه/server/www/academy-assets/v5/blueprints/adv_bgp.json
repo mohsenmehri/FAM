@@ -1,0 +1,348 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_bgp",
+  "objectiveId": "adv_bgp",
+  "kind": "lesson",
+  "track": "مهندسی پیشرفته (Advanced Engineering)",
+  "course": "c5-advanced-eng",
+  "domain": "BGP Architecture & Path Selection",
+  "title": "مبانی و مهندسی BGP (RFC 4271 / 4456): eBGP در برابر iBGP، Route Reflector و Path Selection",
+  "titleEn": "BGP Fundamentals (RFC 4271 / 4456): eBGP/iBGP, Route Reflectors & Path Selection",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "adv_redist"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy adv_bgp (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "adv_bgp",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc4271",
+      "https://www.rfc-editor.org/rfc/rfc4456"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/adv_bgp_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق مکانیسم ضدلوپ eBGP (AS_PATH) از iBGP (Split Horizon و Route Reflector RFC 4456).",
+      "تبیین ترتیب واقعی BGP Best-Path Selection شامل پیش‌نیاز Reachable Next-Hop، Weight (محلی سیسکو)، LOCAL_PREF، AS_PATH، Origin و شرط هم‌AS بودن برای MED.",
+      "ساخت آزمایشگاه محلی adv_bgp_lab.py برای Path Selection و ماتریس انعکاس RFC 4456."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_bgp-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-advanced-eng",
+      "blueprint": "/academy-assets/v5/blueprints/adv_bgp.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_bgp_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تفکیک دقیق مکانیسم ضدلوپ eBGP (AS_PATH) از iBGP (Split Horizon و Route Reflector RFC 4456).",
+      "تبیین ترتیب واقعی BGP Best-Path Selection شامل پیش‌نیاز Reachable Next-Hop، Weight (محلی سیسکو)، LOCAL_PREF، AS_PATH، Origin و شرط هم‌AS بودن برای MED.",
+      "ساخت آزمایشگاه محلی adv_bgp_lab.py برای Path Selection و ماتریس انعکاس RFC 4456."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_bgp-section-1",
+      "title": "مسئله واقعی: چرا BGP بر پایه سیاست (Policy) و TCP 179 کار می‌کند؟",
+      "html": "<p>اینترنت از ده‌ها هزار سیستم مستقل (AS) با قراردادهای تجاری متفاوت تشکیل شده است؛ <strong>BGP-4 (RFC 4271)</strong> روی <strong>TCP پورت ۱۷۹</strong> با ویژگی‌های سیاستی (Path Attributes) مسیر خروج و ورود ترافیک بین سازمان‌ها را کنترل می‌کند.</p>"
+    },
+    {
+      "id": "adv_bgp-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> Prefix-List، Route-Map و IGP (<code>adv_redist</code>).</p><ul><li>تفکیک <strong>eBGP</strong> از <strong>iBGP</strong> و ضرورت <code>next-hop-self</code>.</li><li>حل <strong>iBGP Split Horizon</strong> با <strong>Route Reflector (RFC 4456)</strong>.</li><li>تسلط بر ترتیب واقعی <strong>BGP Path Selection</strong> و پیشگیری از Transit AS.</li></ul>"
+    },
+    {
+      "id": "adv_bgp-section-3",
+      "title": "eBGP در برابر iBGP: تفاوت‌های بنیادی",
+      "html": "<table><thead><tr><th>ویژگی</th><th>eBGP</th><th>iBGP</th></tr></thead><tbody><tr><td><strong>AS همسایه</strong></td><td>متفاوت</td><td>یکسان</td></tr><tr><td><strong>تغییر Next-Hop</strong></td><td>به خود تغییر می‌دهد</td><td>Next-Hop خارجی را حفظ می‌کند</td></tr><tr><td><strong>TTL پیش‌فرض</strong></td><td>۱ (مگر <code>ebgp-multihop</code>)</td><td>۲۵۵ (معمولاً با Loopback)</td></tr><tr><td><strong>AD پیش‌فرض سیسکو</strong></td><td>۲۰</td><td>۲۰۰</td></tr></tbody></table>"
+    },
+    {
+      "id": "adv_bgp-section-4",
+      "title": "ضرورت `next-hop-self` در iBGP",
+      "html": "<p>چون روتر مرزی هنگام ارسال مسیر eBGP به همسایگان iBGP آدرس Next-Hop بیرونی ISP را حفظ می‌کند، روترهای داخلی بدون مسیر IGP به لینک بیرونی، مسیر را به علت <strong>Inaccessible Next-Hop</strong> رد می‌کنند؛ دستور <code>next-hop-self</code> این مشکل را حل می‌کند.</p>"
+    },
+    {
+      "id": "adv_bgp-section-5",
+      "title": "iBGP Split Horizon و قواعد انعکاس Route Reflector (RFC 4456)",
+      "html": "<p>در iBGP مسیر آموخته‌شده از یک همسایه iBGP به همسایه iBGP دیگر ارسال نمی‌شود. <strong>Route Reflector</strong> مسیرهای eBGP و Client را به همه منعکس می‌کند، اما مسیر دریافتی از یک <strong>Non-Client</strong> را <strong>هرگز به Non-Client دیگر منعکس نمی‌کند</strong>.</p>"
+    },
+    {
+      "id": "adv_bgp-section-6",
+      "title": "نمودار معماری: دروازه Next-Hop و ترتیب انتخاب بهترین مسیر BGP",
+      "html": "<p>نمودار زیر مراحل Best-Path Selection و دروازه اول Next-Hop را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"BGP Route Reflector and Path Selection\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">BGP Architecture: RFC 4456 Route Reflector &amp; Best-Path Pipeline</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Pre-Check (Gate 0)</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Next-Hop MUST be reachable</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Unreachable NH -&gt; Ignored</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Outbound Policy</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">1) Weight (Cisco-local, High)</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">2) LOCAL_PREF (AS-wide, High)</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">AS/Inbound Policy</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">3) Shortest AS_PATH -&gt; Origin</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">4) MED (Same AS) -&gt; eBGP -&gt; RID</text></svg>"
+    },
+    {
+      "id": "adv_bgp-section-7",
+      "title": "دسته‌بندی Path Attributes در RFC 4271",
+      "html": "<p>ویژگی‌ها در چهار دسته <strong>Well-known Mandatory</strong> (<code>ORIGIN</code>/<code>AS_PATH</code>/<code>NEXT_HOP</code>)، <strong>Well-known Discretionary</strong> (<code>LOCAL_PREF</code>)، <strong>Optional Transitive</strong> (<code>COMMUNITY</code>) و <strong>Optional Non-transitive</strong> (<code>MED</code>/<code>ORIGINATOR_ID</code>/<code>CLUSTER_LIST</code>) قرار می‌گیرند.</p>"
+    },
+    {
+      "id": "adv_bgp-section-8",
+      "title": "ترتیب انتخاب بهترین مسیر BGP (Cisco Best-Path Selection)",
+      "html": "<ol><li>دسترس‌پذیری <strong>Next-Hop</strong> (پیش‌نیاز).</li><li>بالاترین <strong>Weight</strong> (محلی سیسکو).</li><li>بالاترین <strong>LOCAL_PREF</strong> (درون AS، پیش‌فرض ۱۰۰).</li><li>مسیر محلی تولیدشده بر دریافتی.</li><li>کوتاه‌ترین <strong>AS_PATH</strong>.</li><li>کمترین <strong>Origin</strong> (<code>IGP &lt; EGP &lt; Incomplete</code>).</li><li>کمترین <strong>MED</strong> (به‌طور پیش‌فرض فقط میان مسیرهای یک Neighbor AS یکسان!).</li><li><strong>eBGP</strong> بر iBGP، کمترین IGP Cost تا Next-Hop و کمترین Router-ID.</li></ol>"
+    },
+    {
+      "id": "adv_bgp-section-9",
+      "title": "مهندسی ترافیک خروجی (`LOCAL_PREF`) و ورودی (`AS-Path Prepend` / `MED`)",
+      "html": "<p><code>LOCAL_PREF</code> مسیر خروج کل AS را تعیین می‌کند؛ <code>AS-Path Prepend</code> و <code>MED</code> روی مسیر ورود ترافیک از ISP اثر می‌گذارند (مشروط به سیاست پذیرش ISP مقابل).</p>"
+    },
+    {
+      "id": "adv_bgp-section-10",
+      "title": "ضدلوپ در خوشه‌های Route Reflector: `ORIGINATOR_ID` و `CLUSTER_LIST`",
+      "html": "<p>مطابق RFC 4456، اگر RR شناسه خوشه خود را در <code>CLUSTER_LIST</code> ببیند یا روتر شناسه خود را در <code>ORIGINATOR_ID</code> مشاهده کند، مسیر را برای پیشگیری از حلقه دور می‌ریزد.</p>"
+    },
+    {
+      "id": "adv_bgp-section-11",
+      "title": "تله‌های رایج همسایگی و جلوگیری از Transit AS",
+      "html": "<ul><li>فراموش کردن <code>update-source Loopback0</code> یا <code>ebgp-multihop</code> در همسایگی با Loopback.</li><li>نبود فیلتر خروجی (Prefix-List یا <code>as-path ^$</code>) روی سازمان دو-ISP و تبدیل شدن به Transit AS.</li></ul>"
+    },
+    {
+      "id": "adv_bgp-section-12",
+      "title": "چک‌لیست عیب‌یابی BGP",
+      "html": "<ul><li>در <code>show bgp ipv4 unicast summary</code> وجود عدد در <code>State/PfxRcd</code> یعنی Established؛ وضعیت <code>Active</code> یعنی اتصال TCP 179 هنوز برقرار نشده.</li><li>در <code>show bgp</code> علامت <code>*&gt;</code> یعنی Valid و Best.</li></ul>"
+    },
+    {
+      "id": "adv_bgp-section-13",
+      "title": "تمرین تحلیلی سناریو (مقایسه سه مسیر کاندیدا)",
+      "html": "<p>در <code>adv_bgp_lab.py</code> مسیر با <code>LP=200</code> اما Next-Hop غیرقابل دسترس حذف شده و مسیر <code>LP=150</code> (با وجود AS_PATH بلندتر) بر <code>LP=100</code> پیروز می‌شود.</p>"
+    },
+    {
+      "id": "adv_bgp-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc4271\" target=\"_blank\" rel=\"noopener\">RFC 4271</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc4456\" target=\"_blank\" rel=\"noopener\">RFC 4456</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>adv_bgp_lab.py</code> شبیه‌ساز محلی Python 3 بدون نشست زنده TCP 179 است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "BGP-4 (RFC 4271)",
+      "fa": "پروتکل دروازه مرزی",
+      "simple": "پروتکل Path-Vector بین‌سازمانی روی TCP 179 مبتنی بر سیاست."
+    },
+    {
+      "term": "Autonomous System (AS)",
+      "fa": "سیستم مستقل",
+      "simple": "دامنه مدیریتی با شماره ASN و سیاست مسیریابی واحد."
+    },
+    {
+      "term": "eBGP / iBGP",
+      "fa": "BGP خارجی / داخلی",
+      "simple": "همسایگی بین دو AS متفاوت در برابر همسایگی درون یک AS."
+    },
+    {
+      "term": "iBGP Split Horizon",
+      "fa": "افق تقسیم iBGP",
+      "simple": "منع ارسال مجدد مسیر iBGP به همسایه iBGP دیگر."
+    },
+    {
+      "term": "Route Reflector (RR)",
+      "fa": "بازتاب‌دهنده مسیر",
+      "simple": "کاهش نیاز به Full Mesh در iBGP با انعکاس کنترل‌شده (RFC 4456)."
+    },
+    {
+      "term": "next-hop-self",
+      "fa": "تغییر گام بعدی به خود",
+      "simple": "جایگزینی Next-Hop خارجی با آدرس روتر مرزی در iBGP."
+    },
+    {
+      "term": "Weight",
+      "fa": "وزن محلی سیسکو",
+      "simple": "بالاترین معیار محلی روی روتر سیسکو که تبلیغ نمی‌شود."
+    },
+    {
+      "term": "LOCAL_PREF",
+      "fa": "ترجیح محلی AS",
+      "simple": "معیار خروج کل AS (بالاتر = بهتر، پیش‌فرض ۱۰۰)."
+    },
+    {
+      "term": "AS_PATH",
+      "fa": "فهرست ASهای عبوری",
+      "simple": "ابزار ضدلوپ eBGP و معیار کوتاه‌ترین مسیر."
+    },
+    {
+      "term": "MED",
+      "fa": "تفکیک‌کننده چندورودی",
+      "simple": "متریک پیشنهادی ورود (کمتر = بهتر، پیش‌فرض فقط هم‌AS)."
+    },
+    {
+      "term": "AS-Path Prepending",
+      "fa": "تکرار شماره AS",
+      "simple": "بلندتر کردن عمدی AS_PATH در خروجی لینک پشتیبان."
+    },
+    {
+      "term": "ORIGINATOR_ID",
+      "fa": "شناسه مبدأ بازتاب",
+      "simple": "ویژگی ضدلوپ RFC 4456 درون خوشه RR."
+    },
+    {
+      "term": "CLUSTER_LIST",
+      "fa": "فهرست خوشه‌های RR",
+      "simple": "فهرست شناسه‌های RR برای پیشگیری از حلقه انعکاس."
+    },
+    {
+      "term": "Transit AS",
+      "fa": "AS عبوری ناخواسته",
+      "simple": "عبور ترافیک بین دو ISP از داخل شبکه سازمان بدون فیلتر خروجی."
+    },
+    {
+      "term": "update-source",
+      "fa": "آدرس مبدأ نشست",
+      "simple": "تعیین Loopback به عنوان IP مبدأ بسته TCP 179."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: BGP Fundamentals (RFC 4271 / 4456): eBGP/iBGP, Route Reflectors & Path Selection",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_bgp_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_bgp_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for adv_bgp (BGP Path Selection, iBGP Split Horizon &amp; Route Reflector Rules).\n\nEducational local model only — no live BGP TCP/179 router or production Internet DFZ\nis contacted.\nModels:\n1. Cisco-style BGP Best-Path Selection subset:\n   Next-hop reachable -&gt; Highest Weight (Cisco-local) -&gt; Highest LOCAL_PREF -&gt;\n   Shortest AS_PATH -&gt; Lowest Origin (IGP &lt; EGP &lt; Incomplete) -&gt; Lowest MED (same neighbor AS) -&gt;\n   eBGP over iBGP -&gt; Lowest Router-ID.\n2. RFC 4456 Route Reflector reflection matrix (Client vs Non-Client vs eBGP).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\nORIGIN_RANK = {&quot;igp&quot;: 0, &quot;egp&quot;: 1, &quot;incomplete&quot;: 2}\nPEER_TYPES = frozenset({&quot;ebgp&quot;, &quot;rr_client&quot;, &quot;rr_non_client&quot;})\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r}&quot;)\n    return val\n\n\ndef _require_non_neg_int(val: object, name: str, max_val: int = 2**32 - 1) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (0 &lt;= val &lt;= max_val):\n        raise ValueError(f&quot;{name} must be an int in 0..{max_val}, got {val!r}&quot;)\n    return val\n\n\ndef select_best_bgp_path(candidates: list[dict[str, object]]) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Select best BGP path using Cisco-style tie-breakers (ignoring unreachable next-hops).&quot;&quot;&quot;\n    if not isinstance(candidates, list) or not candidates:\n        raise ValueError(&quot;candidates must be a non-empty list&quot;)\n\n    eligible: list[dict[str, object]] = []\n    skipped: list[str] = []\n    for c in candidates:\n        if not isinstance(c, dict):\n            raise ValueError(&quot;each candidate must be a dict&quot;)\n        reachable = _require_bool(c.get(&quot;next_hop_reachable&quot;, True), &quot;next_hop_reachable&quot;)\n        rid = str(ipaddress.IPv4Address(str(c[&quot;router_id&quot;])))\n        if not reachable:\n            skipped.append(rid)\n            continue\n        weight = _require_non_neg_int(c.get(&quot;weight&quot;, 0), &quot;weight&quot;, 65535)\n        lp = _require_non_neg_int(c.get(&quot;local_pref&quot;, 100), &quot;local_pref&quot;)\n        as_path = c.get(&quot;as_path&quot;, [])\n        if not isinstance(as_path, list) or not all(not isinstance(a, bool) and isinstance(a, int) and 1 &lt;= a &lt;= 2**32 - 1 for a in as_path):\n            raise ValueError(&quot;as_path must be a list of valid ASN ints&quot;)\n        origin = str(c.get(&quot;origin&quot;, &quot;igp&quot;)).lower()\n        if origin not in ORIGIN_RANK:\n            raise ValueError(f&quot;origin must be in {sorted(ORIGIN_RANK)}&quot;)\n        med = _require_non_neg_int(c.get(&quot;med&quot;, 0), &quot;med&quot;)\n        is_ebgp = _require_bool(c.get(&quot;is_ebgp&quot;, True), &quot;is_ebgp&quot;)\n        eligible.append({\n            &quot;router_id&quot;: rid,\n            &quot;weight&quot;: weight,\n            &quot;local_pref&quot;: lp,\n            &quot;as_path&quot;: as_path,\n            &quot;origin&quot;: origin,\n            &quot;med&quot;: med,\n            &quot;is_ebgp&quot;: is_ebgp,\n        })\n\n    if not eligible:\n        return {&quot;best_path&quot;: None, &quot;skipped_unreachable_rids&quot;: skipped, &quot;reason&quot;: &quot;NO_REACHABLE_NEXT_HOP&quot;}\n\n    # Note: MED is only comparable across paths from the same neighbor AS unless always-compare-med is enabled.\n    first_ases = {p[&quot;as_path&quot;][0] if p[&quot;as_path&quot;] else 0 for p in eligible}\n    compare_med = len(first_ases) == 1\n\n    def sort_key(p: dict[str, object]) -&gt; tuple:\n        return (\n            -int(p[&quot;weight&quot;]),\n            -int(p[&quot;local_pref&quot;]),\n            len(p[&quot;as_path&quot;]),\n            ORIGIN_RANK[str(p[&quot;origin&quot;])],\n            int(p[&quot;med&quot;]) if compare_med else 0,\n            0 if p[&quot;is_ebgp&quot;] else 1,\n            int(ipaddress.IPv4Address(str(p[&quot;router_id&quot;]))),\n        )\n\n    ranked = sorted(eligible, key=sort_key)\n    return {\n        &quot;best_path&quot;: ranked[0],\n        &quot;med_compared_same_neighbor_as&quot;: compare_med,\n        &quot;skipped_unreachable_rids&quot;: skipped,\n        &quot;model_scope_note&quot;: &quot;Educational BGP path-selection subset only (ignores IGP-cost-to-NH/multipath/cluster-list); no live BGP speaker contacted.&quot;,\n    }\n\n\ndef evaluate_rr_reflection(learned_from: str, target_peer: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate RFC 4456 Route Reflector advertisement rules.&quot;&quot;&quot;\n    if learned_from not in PEER_TYPES or target_peer not in PEER_TYPES:\n        raise ValueError(f&quot;peer types must be in {sorted(PEER_TYPES)}&quot;)\n    # RFC 4456: non-client -&gt; non-client is NOT reflected!\n    allowed = not (learned_from == &quot;rr_non_client&quot; and target_peer == &quot;rr_non_client&quot;)\n    return {\n        &quot;learned_from&quot;: learned_from,\n        &quot;target_peer&quot;: target_peer,\n        &quot;reflect_route&quot;: allowed,\n        &quot;reason&quot;: &quot;BLOCKED_NON_CLIENT_TO_NON_CLIENT_SPLIT_HORIZON&quot; if not allowed else &quot;PERMITTED_BY_RFC4456&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live BGP TCP/179 session is contacted.&quot;)\n    res = select_best_bgp_path([\n        {&quot;router_id&quot;: &quot;1.1.1.1&quot;, &quot;weight&quot;: 0, &quot;local_pref&quot;: 200, &quot;as_path&quot;: [65001, 65002], &quot;origin&quot;: &quot;igp&quot;, &quot;med&quot;: 50, &quot;is_ebgp&quot;: True, &quot;next_hop_reachable&quot;: False},\n        {&quot;router_id&quot;: &quot;2.2.2.2&quot;, &quot;weight&quot;: 0, &quot;local_pref&quot;: 150, &quot;as_path&quot;: [65001, 65002, 65003], &quot;origin&quot;: &quot;igp&quot;, &quot;med&quot;: 100, &quot;is_ebgp&quot;: False, &quot;next_hop_reachable&quot;: True},\n        {&quot;router_id&quot;: &quot;3.3.3.3&quot;, &quot;weight&quot;: 0, &quot;local_pref&quot;: 100, &quot;as_path&quot;: [65009], &quot;origin&quot;: &quot;igp&quot;, &quot;med&quot;: 10, &quot;is_ebgp&quot;: True, &quot;next_hop_reachable&quot;: True},\n    ])\n    assert res[&quot;best_path&quot;][&quot;router_id&quot;] == &quot;2.2.2.2&quot;  # 1.1.1.1 unreachable, 2.2.2.2 wins on LOCAL_PREF 150 &gt; 100\n    assert evaluate_rr_reflection(&quot;rr_non_client&quot;, &quot;rr_non_client&quot;)[&quot;reflect_route&quot;] is False\n    assert evaluate_rr_reflection(&quot;rr_client&quot;, &quot;rr_non_client&quot;)[&quot;reflect_route&quot;] is True\n    print(&quot;BGP best path:&quot;, res)\n    print(&quot;RR non-client-&gt;non-client:&quot;, evaluate_rr_reflection(&quot;rr_non_client&quot;, &quot;rr_non_client&quot;))\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE BGP Edge + Route Reflector (NOT executed on live hardware)\nrouter bgp 65100\n bgp router-id 10.255.0.1\n neighbor 10.255.0.2 remote-as 65100\n neighbor 10.255.0.2 update-source Loopback0\n neighbor 10.255.0.2 route-reflector-client\n neighbor 10.255.0.2 next-hop-self</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "پیش از مقایسه Weight و LOCAL_PREF در BGP کدام پیش‌نیاز بررسی می‌شود؟",
+      "options": [
+        "Router-ID",
+        "دسترس‌پذیر بودن Next-Hop در RIB",
+        "مقدار MED",
+        "BFD"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مسیر با Next-Hop غیرقابل دسترس اصلاً وارد انتخاب Best-Path نمی‌شود.</p>"
+    },
+    {
+      "title": "مطابق RFC 4456، یک Route Reflector مسیر دریافتی از یک <strong>Non-Client</strong> را به کدام همسایه منعکس <em>نمی‌کند</em>؟",
+      "options": [
+        "Clientها",
+        "eBGP",
+        "Non-Clientهای دیگر",
+        "هیچ‌کس"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>مسیر Non-Client به Non-Client دیگر منعکس نمی‌شود.</p>"
+    },
+    {
+      "title": "چرا دستور <code>next-hop-self</code> برای همسایگان iBGP روی روتر مرزی رایج است؟",
+      "options": [
+        "چون iBGP پیش‌فرض Next-Hop خارجی eBGP را تغییر نمی‌دهد و ممکن است در شبکه داخلی دسترس‌پذیر نباشد",
+        "برای افزایش TTL",
+        "برای تغییر ASN",
+        "برای حذف LP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تغییر Next-Hop به آدرس قابل دسترس روتر مرزی مسیر را Valid می‌کند.</p>"
+    },
+    {
+      "title": "تفاوت اصلی <strong>Weight</strong> با <strong>LOCAL_PREF</strong> چیست؟",
+      "options": [
+        "Weight فقط محلی همان روتر سیسکو است ولی LOCAL_PREF در کل AS پخش می‌شود",
+        "LOCAL_PREF به ISP ارسال می‌شود",
+        "Weight کمتر بهتر است",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>LOCAL_PREF سیاست خروج یکپارچه در کل AS می‌سازد.</p>"
+    },
+    {
+      "title": "شرط پیش‌فرض مقایسه <strong>MED</strong> میان دو مسیر در BGP چیست؟",
+      "options": [
+        "مقایسه میان همه ISPها",
+        "مقایسه صرفاً میان مسیرهای دریافتی از یک Neighbor AS یکسان",
+        "فقط در iBGP",
+        "MED بیشتر بهتر است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مگر با <code>bgp always-compare-med</code>، MED فقط درون یک Neighbor AS مقایسه می‌شود.</p>"
+    },
+    {
+      "title": "کدام ترتیب برای <strong>ORIGIN</strong> صحیح است؟",
+      "options": [
+        "Incomplete > EGP > IGP",
+        "IGP (i) بهتر از EGP (e) و آن بهتر از Incomplete (?)",
+        "EGP اول است",
+        "بی‌تأثیر است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>کمترین کد Origin (<code>i &lt; e &lt; ?</code>) برنده است.</p>"
+    },
+    {
+      "title": "برای جلوگیری از تبدیل سازمان دو-ISP به <strong>Transit AS</strong> چه کاری لازم است؟",
+      "options": [
+        "حذف iBGP",
+        "فیلتر خروجی به هر دو ISP تا فقط پیشوندهای خود سازمان تبلیغ شوند",
+        "کاهش Weight",
+        "افزایش MED"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>فیلتر Prefix-List یا AS-Path <code>^$</code> مانع تبلیغ مسیرهای یک ISP به دیگری می‌شود.</p>"
+    },
+    {
+      "title": "وضعیت <strong><code>Active</code></strong> در <code>show bgp summary</code> به چه معناست؟",
+      "options": [
+        "نشست برقرار و سالم است",
+        "اتصال TCP 179 هنوز برقرار نشده و روتر در تلاش برای اتصال است",
+        "مسیر نصب شده",
+        "پورت Shutdown است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>نشست برقرار با عدد (تعداد پیشوند دریافتی) نشان داده می‌شود.</p>"
+    },
+    {
+      "title": "دو ویژگی ضدلوپ RFC 4456 برای Route Reflector کدام‌اند؟",
+      "options": [
+        "Weight و MED",
+        "ORIGINATOR_ID و CLUSTER_LIST",
+        "LP و NH",
+        "TTL و MTU"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>این دو ویژگی مانع حلقه انعکاس بین خوشه‌های RR می‌شوند.</p>"
+    },
+    {
+      "title": "در همسایگی eBGP با Loopback بین دو روتر مستقیم کدام تنظیمات لازم است؟",
+      "options": [
+        "فقط RR Client",
+        "<code>update-source Loopback0</code> و <code>ebgp-multihop</code> (یا <code>disable-connected-check</code>)",
+        "فقط next-hop-self",
+        "تبدیل به UDP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>eBGP پیش‌فرض TTL=1 و کنترل اتصال مستقیم دارد.</p>"
+    },
+    {
+      "title": "در <code>adv_bgp_lab.py</code> بین LP=200 (Next-Hop غیرقابل دسترس) و LP=150 (Next-Hop سالم) کدام انتخاب می‌شود؟",
+      "options": [
+        "LP=200",
+        "LP=150 چون مسیر اول Next-Hop غیرقابل دسترس دارد",
+        "هیچ‌کدام",
+        "هر دو"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دروازه صفر Next-Hop مسیر اول را رد می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>adv_bgp_lab.py</code> چیست؟",
+      "options": [
+        "نشست زنده با اینترنت",
+        "جدول کامل DFZ",
+        "شبیه‌ساز محلی Python 3 برای زیرمجموعه Best-Path و RFC 4456 بدون TCP 179 زنده",
+        "تست IOS-XR"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه مدل محلی Python بدون نشست زنده است.</p>"
+    }
+  ]
+}

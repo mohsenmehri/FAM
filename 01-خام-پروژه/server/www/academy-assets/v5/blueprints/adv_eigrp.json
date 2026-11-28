@@ -1,0 +1,349 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_eigrp",
+  "objectiveId": "adv_eigrp",
+  "kind": "lesson",
+  "track": "مهندسی پیشرفته (Advanced Engineering)",
+  "course": "c5-advanced-eng",
+  "domain": "Advanced Distance-Vector Routing (EIGRP)",
+  "title": "پروتکل EIGRP (RFC 7868): متریک Classic و Wide، الگوریتم DUAL، Variance و Stub",
+  "titleEn": "EIGRP (RFC 7868): Classic vs Wide Metrics, DUAL, Variance & Stub",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccna_03",
+    "adv_02"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy adv_eigrp (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "adv_eigrp",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc7868",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_eigrp/configuration/xe-17/ire-xe-17-book/ire-wid-met.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/adv_eigrp_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "ارائه دقیق فرمول Classic Metric در برابر RFC 7868 Wide Metrics (مقیاس ۶۴بیتی و RIB Scale) برای لینک‌های ۱۰/۴۰/۱۰۰ گیگابیتی.",
+      "تبیین دقیق شرط ضدلوپ اکید DUAL (RD < FD) و تفکیک شفاف آن از شرط Variance.",
+      "ساخت آزمایشگاه محلی adv_eigrp_lab.py برای Classic/Wide Metrics، DUAL و Variance."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_eigrp-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-advanced-eng",
+      "blueprint": "/academy-assets/v5/blueprints/adv_eigrp.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_eigrp_lab.py"
+    },
+    "technicalAuditFixes": [
+      "ارائه دقیق فرمول Classic Metric در برابر RFC 7868 Wide Metrics (مقیاس ۶۴بیتی و RIB Scale) برای لینک‌های ۱۰/۴۰/۱۰۰ گیگابیتی.",
+      "تبیین دقیق شرط ضدلوپ اکید DUAL (RD < FD) و تفکیک شفاف آن از شرط Variance.",
+      "ساخت آزمایشگاه محلی adv_eigrp_lab.py برای Classic/Wide Metrics، DUAL و Variance."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_eigrp-section-1",
+      "title": "مسئله واقعی: چرا یک مسیر پشتیبانِ کوتاه‌تر گاهی به‌عنوان Feasible Successor پذیرفته نمی‌شود؟",
+      "html": "<p>در EIGRP، پذیرش مسیر پشتیبان بدون ارسال Query تنها زمانی مجاز است که شرط ریاضی ضدلوپ <strong><code>RD &lt; FD</code></strong> (اکیداً کمتر) برقرار باشد؛ حتی تساوی <code>RD == FD</code> نیز می‌تواند حلقه بسازد و در DUAL رد می‌شود.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> تسلط بر مسیریابی IPv4/IPv6 و OSPF (<code>ccna_03</code>، <code>adv_02</code>).</p><ul><li>مقایسه <strong>Classic Metric</strong> با <strong>Wide Metrics (RFC 7868)</strong> در لینک‌های پرسرعت.</li><li>تسلط بر <strong>FD</strong>، <strong>RD</strong>، <strong>Successor</strong>، <strong>Feasible Successor</strong> و شرط <code>RD &lt; FD</code>.</li><li>پیکربندی <strong>Variance</strong> و مهار <strong>SIA</strong> با <strong>EIGRP Stub</strong> و Summarization.</li></ul>"
+    },
+    {
+      "id": "adv_eigrp-section-3",
+      "title": "معماری EIGRP (RFC 7868): پروتکل ۸۸، RTP و سه جدول کلیدی",
+      "html": "<p>EIGRP مستقیماً روی IP Protocol <strong>88</strong> (<code>224.0.0.10</code> / <code>ff02::a</code>) با لایه انتقال مطمئن <strong>RTP</strong> کار کرده و سه جدول Neighbor، Topology و RIB را نگهداری می‌کند.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-4",
+      "title": "فرمول Classic در برابر Wide Metrics (تفکیک 10G و 40G)",
+      "html": "<p>در Classic Metric (<code>K1=1, K3=1</code>)، تقسیم صحیح <code>10^7 // BW_kbps</code> بالای ۱۰ گیگابیت تفکیک‌پذیری را از دست می‌دهد. در <strong>Named Mode / Wide Metrics</strong> با مقیاس ۶۴بیتی (<code>65536</code>) و تأخیر پیکوثانیه‌ای (همراه با <code>rib-scale</code> پیش‌فرض ۱۲۸)، سرعت‌های ۱۰/۴۰/۱۰۰G به‌دقت متمایز می‌شوند.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-5",
+      "title": "قلب EIGRP: الگوریتم DUAL و شرط ضدلوپ `RD < FD`",
+      "html": "<p><strong>RD</strong> متریک اعلامی همسایه، <strong>CD</strong> مجموع RD به‌علاوه هزینه لینک محلی، و <strong>FD</strong> کمترین CD شناخته‌شده (متعلق به Successor) است. یک مسیر پشتیبان فقط وقتی <strong>Feasible Successor</strong> می‌شود که <strong><code>RD &lt; FD</code></strong> باشد تا بازگشت ترافیک از خودمان ناممکن شود.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-6",
+      "title": "نمودار معماری: جدول توپولوژی DUAL، شرط RD < FD و Variance",
+      "html": "<p>نمودار زیر انتخاب Successor، ارزیابی شرط ضدلوپ DUAL و فیلتر Variance را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"EIGRP DUAL Feasibility Condition and Variance\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">EIGRP DUAL: Successor, Feasible Successor (RD &lt; FD) &amp; Variance</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Candidate Paths</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">CD = RD + Local Link Cost</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">FD = min(CD) -&gt; Successor</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Feasibility Check</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Require strict RD &lt; FD</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">If RD &gt;= FD -&gt; Rejected as FS</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Variance (UCLB)</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Eligible FS with CD &lt;= FD * V</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Installs unequal-cost paths in RIB</text></svg>"
+    },
+    {
+      "id": "adv_eigrp-section-7",
+      "title": "توزیع بار نابرابر (UCLB) با دستور `variance`",
+      "html": "<p>با تنظیم <code>variance N</code> (۱..۱۲۸)، EIGRP تنها مسیرهایی را نصب می‌کند که هم <strong>Feasible Successor</strong> باشند (<code>RD &lt; FD</code>) و هم <code>CD &lt;= FD × N</code> داشته باشند.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-8",
+      "title": "حالت Active/Passive، پیام‌های Query و SIA",
+      "html": "<p>در حالت سالم مسیر <strong>Passive</strong> است. نبود FS هنگام قطعی Successor مسیر را <strong>Active</strong> کرده و Query می‌فرستد؛ در نیمی از تایمر Active (معمولاً ۹۰ ثانیه)، <strong>SIA-Query</strong> ارسال می‌شود تا همسایگی‌های سالم حفظ شوند.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-9",
+      "title": "محدودسازی دامنه Query با EIGRP Stub و Summarization",
+      "html": "<p>فعال‌سازی <code>eigrp stub</code> روی روترهای شعبه (Spoke) مانع ارسال Query از Hub به شعب می‌شود؛ همچنین Summarization در مرز توزیع انتشار Queryهای جزئی را متوقف می‌کند.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-10",
+      "title": "Classic Mode در برابر Named Mode در IOS-XE",
+      "html": "<p>حالت <strong>Named Mode</strong> (<code>router eigrp NAME</code>) تنظیمات IPv4/IPv6 و Wide Metrics را در ساختار سلسله‌مراتبی یکپارچه مدیریت می‌کند.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-11",
+      "title": "تله‌های رایج همسایگی و طراحی EIGRP",
+      "html": "<ul><li>ناهم‌خوانی K-Values یا شماره AS مانع همسایگی می‌شود (برخلاف OSPF، Hello/Hold نیازی به یکسان بودن ندارند).</li><li>تنظیم اشتباه <code>eigrp stub</code> روی روتر ترانزیت هسته باعث قطع تبلیغ مسیرهای میانی می‌شود.</li></ul>"
+    },
+    {
+      "id": "adv_eigrp-section-12",
+      "title": "چک‌لیست عیب‌یابی EIGRP",
+      "html": "<ul><li>بررسی <code>show ip eigrp neighbors</code> (به‌ویژه <code>Q Cnt = 0</code>).</li><li>بررسی <code>show ip eigrp topology all-links</code> برای دیدن مسیرهای ردشده در شرط <code>RD &lt; FD</code>.</li></ul>"
+    },
+    {
+      "id": "adv_eigrp-section-13",
+      "title": "تمرین تحلیلی سناریو (سه مسیر کاندیدا با Variance=2)",
+      "html": "<p>در <code>adv_eigrp_lab.py</code> مسیر با <code>FD=1500</code> برنده، مسیر با <code>RD=1400, CD=2600</code> به عنوان FS و واجد شرایط <code>variance 2</code> پذیرفته، و مسیر با <code>RD=1500, CD=1800</code> به‌دلیل نقض <code>RD &lt; FD</code> رد می‌شود.</p>"
+    },
+    {
+      "id": "adv_eigrp-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc7868\" target=\"_blank\" rel=\"noopener\">RFC 7868</a> و مستندات EIGRP Wide Metrics در Cisco IOS-XE 17.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>adv_eigrp_lab.py</code> مدل محلی Python 3 است و هیچ روتر زنده‌ای متصل نشده است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "EIGRP (RFC 7868)",
+      "fa": "پروتکل EIGRP",
+      "simple": "پروتکل Distance-Vector پیشرفته مبتنی بر DUAL روی IP 88."
+    },
+    {
+      "term": "DUAL",
+      "fa": "الگوریتم به‌روزرسانی پخش‌شده",
+      "simple": "الگوریتم انتخاب مسیر بدون حلقه و همگرایی سریع در EIGRP."
+    },
+    {
+      "term": "Reported Distance (RD)",
+      "fa": "فاصله اعلام‌شده همسایه",
+      "simple": "متریک تا مقصد آن‌گونه که همسایه اعلام می‌کند."
+    },
+    {
+      "term": "Feasible Distance (FD)",
+      "fa": "کمترین متریک کل شناخته‌شده",
+      "simple": "بهترین متریک کل برای مقصد و مبنای شرط ضدلوپ."
+    },
+    {
+      "term": "Successor",
+      "fa": "مسیر اصلی برنده",
+      "simple": "همسایه دارای بهترین متریک (FD) نصب‌شده در RIB."
+    },
+    {
+      "term": "Feasible Successor (FS)",
+      "fa": "مسیر پشتیبان بدون حلقه",
+      "simple": "مسیر جایگزین واجد شرط اکید RD < FD آماده جایگزینی بی‌درنگ."
+    },
+    {
+      "term": "Feasibility Condition",
+      "fa": "شرط ضدلوپ DUAL",
+      "simple": "شرط اکید RD < FD برای تضمین نبود حلقه."
+    },
+    {
+      "term": "Variance",
+      "fa": "ضریب توزیع بار نابرابر",
+      "simple": "ضریب نصب هم‌زمان FSهایی با CD <= FD × Variance."
+    },
+    {
+      "term": "Classic Metric",
+      "fa": "متریک ۳۲بیتی کلاسیک",
+      "simple": "فرمول قدیمی با افت تفکیک‌پذیری در سرعت‌های بالای ۱۰ گیگابیت."
+    },
+    {
+      "term": "Wide Metrics",
+      "fa": "متریک ۶۴بیتی گسترده",
+      "simple": "فرمول RFC 7868 با دقت پیکوثانیه ویژه لینک‌های ۱۰/۴۰/۱۰۰G."
+    },
+    {
+      "term": "RTP",
+      "fa": "پروتکل انتقال مطمئن EIGRP",
+      "simple": "تحویل تضمینی Update/Query/Reply روی IP 88."
+    },
+    {
+      "term": "Active / Passive",
+      "fa": "حالت جست‌وجو / پایدار",
+      "simple": "Passive یعنی سالم و Active یعنی ارسال Query برای یافتن مسیر."
+    },
+    {
+      "term": "SIA (Stuck-in-Active)",
+      "fa": "گیرکردن در حالت فعال",
+      "simple": "بی‌پاسخ ماندن Query تا پایان تایمر و ریست همسایگی."
+    },
+    {
+      "term": "EIGRP Stub",
+      "fa": "روتر انتهایی EIGRP",
+      "simple": "محدودسازی دامنه Query روی روترهای غیرترانزیت شعبه."
+    },
+    {
+      "term": "Named Mode",
+      "fa": "حالت نام‌دار IOS-XE",
+      "simple": "پیکربندی یکپارچه IPv4/IPv6 و Wide Metrics در یک بلوک."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: EIGRP (RFC 7868): Classic vs Wide Metrics, DUAL, Variance & Stub",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_eigrp_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_eigrp_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for adv_eigrp (EIGRP Classic/Wide Metrics, DUAL Feasibility &amp; Variance).\n\nEducational local model only — no live Cisco IOS/IOS-XE EIGRP router or real RTP/DUAL\nstate machine is contacted.\nModels:\n1. Classic EIGRP Metric (default K1=1, K3=1, K2=K4=K5=0) vs Wide Metric (64-bit scaling for &gt;10Gbps).\n2. DUAL Feasibility Condition (`RD &lt; FD`), Successor, Feasible Successor selection,\n   and Unequal-Cost Load Balancing (`variance`) candidate filtering.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nCLASSIC_BW_REF_KBPS = 10_000_000\nWIDE_SCALE = 65_536\nWIDE_BW_REF_KBPS = 10_000_000  # 10^7 * 65536 / bw_kbps per RFC 7868 Wide Metric Throughput\n\n\ndef _require_pos_int(val: object, name: str, max_val: int = 10**12) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (1 &lt;= val &lt;= max_val):\n        raise ValueError(f&quot;{name} must be an int in 1..{max_val}, got {val!r}&quot;)\n    return val\n\n\ndef _require_non_neg_int(val: object, name: str, max_val: int = 10**15) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (0 &lt;= val &lt;= max_val):\n        raise ValueError(f&quot;{name} must be an int in 0..{max_val}, got {val!r}&quot;)\n    return val\n\n\ndef compute_classic_metric(min_bandwidth_kbps: int, total_delay_tens_of_us: int) -&gt; int:\n    &quot;&quot;&quot;Compute Classic EIGRP Metric with default K-values (K1=1, K3=1, K2=K4=K5=0).&quot;&quot;&quot;\n    bw = _require_pos_int(min_bandwidth_kbps, &quot;min_bandwidth_kbps&quot;)\n    delay = _require_non_neg_int(total_delay_tens_of_us, &quot;total_delay_tens_of_us&quot;)\n    bw_term = CLASSIC_BW_REF_KBPS // bw\n    return (bw_term + delay) * 256\n\n\ndef compute_wide_metric(min_bandwidth_kbps: int, total_delay_picoseconds: int, rib_scale: int = 128) -&gt; dict[str, int]:\n    &quot;&quot;&quot;Compute RFC 7868 EIGRP Wide Metric (default K1=1, K3=1) and RIB-scaled value.&quot;&quot;&quot;\n    bw = _require_pos_int(min_bandwidth_kbps, &quot;min_bandwidth_kbps&quot;)\n    delay_ps = _require_non_neg_int(total_delay_picoseconds, &quot;total_delay_picoseconds&quot;)\n    scale = _require_pos_int(rib_scale, &quot;rib_scale&quot;, max_val=255)\n    # RFC 7868: Throughput = (10^7 * 65536) // bw_kbps; Latency = (delay_ps * 65536) // 1_000_000\n    throughput = (WIDE_BW_REF_KBPS * WIDE_SCALE) // bw\n    latency = (delay_ps * WIDE_SCALE) // 1_000_000\n    composite_64 = throughput + latency\n    return {\n        &quot;wide_composite_64bit&quot;: composite_64,\n        &quot;rib_scaled_metric&quot;: composite_64 // scale,\n    }\n\n\ndef evaluate_dual_and_variance(\n    paths: list[dict[str, object]],\n    variance: int = 1,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Select Successor, Feasible Successors (strict RD &lt; FD), and Variance-eligible paths.&quot;&quot;&quot;\n    var = _require_pos_int(variance, &quot;variance&quot;, max_val=128)\n    if not isinstance(paths, list) or not paths:\n        raise ValueError(&quot;paths must be a non-empty list&quot;)\n\n    norm: list[dict[str, object]] = []\n    for p in paths:\n        if not isinstance(p, dict):\n            raise ValueError(&quot;each path must be a dict&quot;)\n        nh = p.get(&quot;next_hop&quot;)\n        if not isinstance(nh, str) or not nh.strip():\n            raise ValueError(&quot;next_hop must be a non-empty str&quot;)\n        rd = _require_non_neg_int(p[&quot;rd&quot;], &quot;rd&quot;)\n        local_cost = _require_pos_int(p[&quot;local_cost&quot;], &quot;local_cost&quot;)\n        computed_dist = rd + local_cost\n        norm.append({&quot;next_hop&quot;: nh.strip(), &quot;rd&quot;: rd, &quot;local_cost&quot;: local_cost, &quot;computed_distance&quot;: computed_dist})\n\n    fd = min(p[&quot;computed_distance&quot;] for p in norm)\n    successors = [p for p in norm if p[&quot;computed_distance&quot;] == fd]\n    feasible_successors = [p for p in norm if p[&quot;computed_distance&quot;] &gt; fd and p[&quot;rd&quot;] &lt; fd]\n    non_feasible = [p for p in norm if p[&quot;computed_distance&quot;] &gt; fd and p[&quot;rd&quot;] &gt;= fd]\n    variance_limit = fd * var\n    uclb_paths = successors + [p for p in feasible_successors if p[&quot;computed_distance&quot;] &lt;= variance_limit]\n\n    return {\n        &quot;feasible_distance_fd&quot;: fd,\n        &quot;variance&quot;: var,\n        &quot;variance_ceiling&quot;: variance_limit,\n        &quot;successors&quot;: successors,\n        &quot;feasible_successors&quot;: feasible_successors,\n        &quot;non_feasible_rejected&quot;: non_feasible,\n        &quot;uclb_eligible_paths&quot;: uclb_paths,\n        &quot;model_scope_note&quot;: &quot;RFC 7868 DUAL Feasibility Condition (RD &lt; FD) educational model only; no live EIGRP router contacted.&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco IOS/IOS-XE EIGRP router is contacted.&quot;)\n    # Classic metric cannot distinguish 10G vs 40G (10_000_000 // bw truncates to 1 vs 0!)\n    c_10g = compute_classic_metric(10_000_000, 1)\n    c_40g = compute_classic_metric(40_000_000, 1)\n    w_10g = compute_wide_metric(10_000_000, 10_000_000)\n    w_40g = compute_wide_metric(40_000_000, 10_000_000)\n    assert w_40g[&quot;wide_composite_64bit&quot;] &lt; w_10g[&quot;wide_composite_64bit&quot;]\n    print(&quot;Classic 10G vs 40G:&quot;, {&quot;10G&quot;: c_10g, &quot;40G&quot;: c_40g})\n    print(&quot;Wide 10G vs 40G:&quot;, {&quot;10G&quot;: w_10g, &quot;40G&quot;: w_40g})\n\n    dual = evaluate_dual_and_variance(\n        [\n            {&quot;next_hop&quot;: &quot;10.0.12.2&quot;, &quot;rd&quot;: 1000, &quot;local_cost&quot;: 500},   # CD=1500 (Successor, FD=1500)\n            {&quot;next_hop&quot;: &quot;10.0.13.3&quot;, &quot;rd&quot;: 1400, &quot;local_cost&quot;: 1200},  # CD=2600, RD=1400 &lt; 1500 (FS!)\n            {&quot;next_hop&quot;: &quot;10.0.14.4&quot;, &quot;rd&quot;: 1500, &quot;local_cost&quot;: 300},   # CD=1800, RD=1500 == FD (NOT FS!)\n        ],\n        variance=2,\n    )\n    assert len(dual[&quot;successors&quot;]) == 1\n    assert [p[&quot;next_hop&quot;] for p in dual[&quot;feasible_successors&quot;]] == [&quot;10.0.13.3&quot;]\n    assert [p[&quot;next_hop&quot;] for p in dual[&quot;non_feasible_rejected&quot;]] == [&quot;10.0.14.4&quot;]\n    assert len(dual[&quot;uclb_eligible_paths&quot;]) == 2\n    print(&quot;DUAL &amp; Variance=2 evaluation:&quot;, dual)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE EIGRP Named Mode &amp; Stub (NOT executed on live hardware)\nrouter eigrp CORP_NET\n address-family ipv4 unicast autonomous-system 100\n  topology base\n   variance 2\n  exit-af-topology\n  network 10.0.0.0\n  eigrp stub connected summary</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "شرط دقیق <strong>Feasibility Condition</strong> برای پذیرش Feasible Successor کدام است؟",
+      "options": [
+        "RD <= FD",
+        "RD < FD (اکیداً کمتر)",
+        "CD < FD",
+        "RD > FD"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در DUAL، باید <code>RD</code> اکیداً کمتر از <code>FD</code> باشد.</p>"
+    },
+    {
+      "title": "چرا <strong>Classic Metric</strong> لینک‌های ۱۰G و ۴۰G را به‌خوبی تفکیک نمی‌کند؟",
+      "options": [
+        "زیرا تقسیم صحیح 10^7 بر پهنای باند بالای ۱۰G به ۱ یا ۰ افت می‌کند",
+        "زیرا فقط روی ۱۰M کار می‌کند",
+        "زیرا تأخیر ندارد",
+        "فقط برای IPv6 است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Wide Metrics با مقیاس ۶۴بیتی این محدودیت را رفع کرده است.</p>"
+    },
+    {
+      "title": "با <code>FD=1500</code> و <code>variance=2</code> کدام مسیر پشتیبان نصب می‌شود؟",
+      "options": [
+        "RD=1500, CD=1800",
+        "RD=1400, CD=2600",
+        "RD=1400, CD=3200",
+        "هر مسیری با CD<=3000"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>هم باید <code>RD &lt; FD</code> باشد و هم <code>CD &lt;= 3000</code>.</p>"
+    },
+    {
+      "title": "حالت <strong>Passive</strong> برای یک مسیر در جدول توپولوژی EIGRP نشانه چیست؟",
+      "options": [
+        "خرابی مسیر",
+        "پایداری و سلامت مسیر بدون نیاز به Query",
+        "قطع همسایگی",
+        "وقوع SIA"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Passive حالت عادی و پایدار مسیر در DUAL است.</p>"
+    },
+    {
+      "title": "نقش اصلی <strong><code>eigrp stub</code></strong> روی روترهای شعبه چیست؟",
+      "options": [
+        "رمزنگاری",
+        "منع ارسال Query از Hub به شعب و پیشگیری از SIA",
+        "تبدیل به OSPF",
+        "افزایش پهنای باند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دامنه انتشار Query را به هسته شبکه محدود می‌کند.</p>"
+    },
+    {
+      "title": "کدام دو پارامتر برای همسایگی EIGRP باید کاملاً یکسان باشند؟",
+      "options": [
+        "Hello و Hold",
+        "شماره AS و K-Values",
+        "مدل روتر و MTU",
+        "Router-ID دو روتر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>برخلاف OSPF، یکسان بودن Hello/Hold در EIGRP الزامی نیست ولی AS و K-Values باید یکسان باشند.</p>"
+    },
+    {
+      "title": "شماره پروتکل IP و آدرس مولتی‌کست IPv4 برای EIGRP کدام است؟",
+      "options": [
+        "TCP 179 و 224.0.0.5",
+        "IP Protocol 88 و 224.0.0.10",
+        "UDP 520 و 224.0.0.9",
+        "IP 89 و 224.0.0.6"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>EIGRP روی IP 88 و مولتی‌کست <code>224.0.0.10</code> کار می‌کند.</p>"
+    },
+    {
+      "title": "کدام دستور حتی مسیرهای ردشده در شرط <code>RD &lt; FD</code> را نمایش می‌دهد؟",
+      "options": [
+        "show ip route",
+        "show ip eigrp topology all-links",
+        "show arp",
+        "show interfaces"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>گزینه <code>all-links</code> کل مسیرهای کاندیدا را نشان می‌دهد.</p>"
+    },
+    {
+      "title": "در پیش‌فرض EIGRP کدام K-Valueها برابر ۱ هستند؟",
+      "options": [
+        "همه K1 تا K5",
+        "فقط K1 (Bandwidth) و K3 (Delay)",
+        "فقط K2",
+        "فقط K4"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پیش‌فرض تنها حداقل پهنای باند و مجموع تأخیر را لحاظ می‌کند.</p>"
+    },
+    {
+      "title": "نقش <strong>SIA-Query</strong> چیست؟",
+      "options": [
+        "حذف همسایه",
+        "بررسی زنده بودن همسایه در نیمه تایمر Active تا همسایگی سالم ریست نشود",
+        "تنظیم Variance",
+        "خاموش کردن Stub"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>از ریست شدن همسایگی‌های سالم هنگام تأخیر یک روتر دوردست جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "قرار دادن <code>eigrp stub</code> روی یک روتر ترانزیت در مرکز شبکه چه خطایی ایجاد می‌کند؟",
+      "options": [
+        "بهبود همگرایی",
+        "توقف تبلیغ مسیرهای عبوری از آن روتر و قطع ارتباط بخش‌هایی از شبکه",
+        "غیرفعال شدن Wide Metrics",
+        "بی‌اثر است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Stub فقط برای روترهای انتهایی/شعبه طراحی شده است.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>adv_eigrp_lab.py</code> کدام است؟",
+      "options": [
+        "تست روی دو روتر زنده",
+        "تست RTP روی 40G",
+        "شبیه‌ساز محلی Python 3 برای Classic/Wide Metric، DUAL و Variance بدون روتر زنده",
+        "ارسال 224.0.0.10"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه یک مدل محلی Python 3 بدون تجهیز زنده است.</p>"
+    }
+  ]
+}

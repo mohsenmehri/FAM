@@ -1,0 +1,350 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_enauto",
+  "objectiveId": "ccnp_enauto",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENAUTO (Network Automation: GitOps, CI/CD, API Rate-Limit/Pagination, Drift & Telemetry)",
+  "title": "تخصص CCNP ENAUTO: خط لوله NetDevOps و CI/CD، الگوی APIهای مقیاس‌پذیر، کشف Drift و تله‌متری جریانی",
+  "titleEn": "CCNP ENAUTO: NetDevOps CI/CD Pipelines, Resilient API Clients, Drift Detection & Streaming Telemetry",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccnp_enc_auto",
+    "auto_10",
+    "auto_14"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_enauto (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_enauto",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc8641",
+      "https://www.rfc-editor.org/rfc/rfc9110"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_enauto_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "طراحی کلاینت API مقاوم با Pagination امن، مدیریت HTTP 429 + Retry-After و Backoff نمایی (RFC 9110).",
+      "تفکیک دقیق Source of Truth (NetBox/Git) از وضعیت زنده تجهیزات و الگوریتم کشف/اصلاح Configuration Drift.",
+      "ساخت آزمایشگاه محلی ccnp_enauto_lab.py برای شبیه‌سازی پایپ‌لاین CI/CD (Lint->Validate->Dry-Run->Approve->Deploy)، Pagination/Retry و کشف Drift."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_enauto-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_enauto.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_enauto_lab.py"
+    },
+    "technicalAuditFixes": [
+      "طراحی کلاینت API مقاوم با Pagination امن، مدیریت HTTP 429 + Retry-After و Backoff نمایی (RFC 9110).",
+      "تفکیک دقیق Source of Truth (NetBox/Git) از وضعیت زنده تجهیزات و الگوریتم کشف/اصلاح Configuration Drift.",
+      "ساخت آزمایشگاه محلی ccnp_enauto_lab.py برای شبیه‌سازی پایپ‌لاین CI/CD (Lint->Validate->Dry-Run->Approve->Deploy)، Pagination/Retry و کشف Drift."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_enauto-section-1",
+      "title": "مسئله واقعی: چرا اجرای مستقیم اسکریپت روی ۱۰۰ روتر بدون Source of Truth و Dry-Run خطرناک است؟",
+      "html": "<p>در <strong>CCNP ENAUTO</strong> اتوماسیون از اسکریپت‌های فردی به مهندسی نرم‌افزار شبکه (<strong>NetDevOps</strong>) ارتقا می‌یابد: تغییرات ابتدا در Git ثبت، با CI اعتبارسنجی و شبیه‌سازی (Dry-Run) شده و سپس به‌صورت تکرارپذیر و قابل بازگشت مستقر می‌شوند.</p>"
+    },
+    {
+      "id": "ccnp_enauto-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> ENCOR Automation (<code>ccnp_enc_auto</code>)، CI/CD (<code>auto_10</code>) و Telemetry (<code>auto_14</code>).</p><ul><li>ساخت خط لوله <strong>GitOps / CI-CD شبکه</strong> با دروازه‌های کیفیت و تایید.</li><li>پیاده‌سازی کلاینت‌های <strong>API مقاوم</strong> (Pagination، HTTP 429/Retry-After و Idempotency).</li><li>کشف <strong>Configuration Drift</strong> نسبت به <strong>Source of Truth</strong> و مقایسه <strong>Streaming Telemetry (gNMI)</strong> با SNMP.</li></ul>"
+    },
+    {
+      "id": "ccnp_enauto-section-3",
+      "title": "معماری Source of Truth (SoT) و الگوی GitOps در شبکه",
+      "html": "<p><strong>Source of Truth</strong> (مانند NetBox یا مخزن Git مدل‌دار) وضعیت مطلوب (Intended State) شبکه را تعریف می‌کند؛ تجهیزات شبکه دیگر منبع حقیقت نیستند بلکه صرفاً مصرف‌کننده وضعیت تاییدشده‌اند.</p>"
+    },
+    {
+      "id": "ccnp_enauto-section-4",
+      "title": "مراحل امن خط لوله CI/CD شبکه",
+      "html": "<ol><li><strong>Lint &amp; Schema Validation:</strong> بررسی نحو YAML/JSON/YANG.</li><li><strong>Unit/Intent Tests:</strong> آزمون قوانین سیاستی (مثلاً نبود VLAN تکراری یا پورت ناامن).</li><li><strong>Dry-Run / Diff:</strong> محاسبه دقیق اختلاف پیش از اعمال.</li><li><strong>Approval Gate &amp; Canary Deploy:</strong> استقرار مرحله‌ای با پایش سلامت و Rollback خودکار.</li></ol>"
+    },
+    {
+      "id": "ccnp_enauto-section-5",
+      "title": "مقاوم‌سازی کلاینت‌های REST API: Pagination، HTTP 429 و Exponential Backoff",
+      "html": "<p>کنترلرهای سازمانی (Catalyst Center، vManage، Meraki، ISE) پاسخ‌های بزرگ را صفحه‌بندی (<strong>Pagination</strong>) و نرخ درخواست را با <strong>HTTP 429 Too Many Requests</strong> و هدر <code>Retry-After</code> محدود می‌کنند؛ کلاینت حرفه‌ای نباید روی 429/503 فوراً حمله مجدد کند بلکه باید با Backoff کنترل‌شده و سقف تلاش مجدد عمل نماید.</p>"
+    },
+    {
+      "id": "ccnp_enauto-section-6",
+      "title": "نمودار معماری: چرخه NetDevOps از Source of Truth تا کشف Drift و تله‌متری",
+      "html": "<p>نمودار زیر حلقه بسته NetDevOps از Git/SoT تا استقرار امن و پایش تله‌متری را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCNP ENAUTO NetDevOps Pipeline\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">CCNP ENAUTO: Source of Truth -&gt; CI/CD Gate -&gt; Resilient API &amp; Drift</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Source of Truth (Git)</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Intended Config + YANG Schema</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">PR Review + Lint + Policy Tests</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">CI/CD &amp; API Engine</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Dry-Run Diff + Approval Gate</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Pagination + 429 Retry-After</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Drift &amp; Telemetry</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">gNMI / YANG-Push (RFC 8641)</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Compare Intended vs Actual State</text></svg>"
+    },
+    {
+      "id": "ccnp_enauto-section-7",
+      "title": "کشف و مهار Configuration Drift",
+      "html": "<p>تغییرات دستی مستقیم روی CLI باعث ایجاد <strong>Drift</strong> (شکاف بین Intended State و Running State) می‌شوند؛ موتور Drift به‌صورت دوره‌ای وضعیت زنده را با SoT مقایسه کرده و موارد اضافه، حذف‌شده یا تغییریافته را گزارش یا پس از تایید همگام‌سازی می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_enauto-section-8",
+      "title": "تله‌متری جریانی (YANG-Push RFC 8641 / gNMI) در برابر SNMP Polling",
+      "html": "<p>به‌جای پرس‌وجوی تکراری و سنگین SNMP (Pull)، تله‌متری جریانی با اشتراک <strong>On-Change</strong> (ارسال فوری هنگام تغییر وضعیت لینک/BGP) یا <strong>Periodic</strong> (بازه دقیق ثانیه‌ای) روی gRPC/Protobuf داده ساخت‌یافته را به کلکتورها Push می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_enauto-section-9",
+      "title": "تست پیش از تولید: Batfish، pyATS و شبیه‌سازی دوقلوی دیجیتال",
+      "html": "<p>ابزارهایی مانند <strong>pyATS/Genie</strong> برای آزمون‌های پیش/پس از تغییر (Pre/Post-Checks) و تحلیلگرهای استاتیک مانند <strong>Batfish</strong> برای کشف خطای ACL/مسیریابی پیش از استقرار به کار می‌روند.</p>"
+    },
+    {
+      "id": "ccnp_enauto-section-10",
+      "title": "تله‌های رایج در اتوماسیون مقیاس‌پذیر",
+      "html": "<ul><li>قرار دادن توکن یا رمز عبور در کد/Git به‌جای Vault یا متغیر محیطی امن.</li><li>نادیده گرفتن صفحه دوم Pagination و از قلم افتادن نیمی از تجهیزات در ممیزی!</li><li>تغییر مستقیم هم‌زمان روی ۱۰۰٪ تجهیزات بدون استقرار Canary.</li></ul>"
+    },
+    {
+      "id": "ccnp_enauto-section-11",
+      "title": "طراحی Idempotent و مدیریت خطا در عملیات دسته‌ای",
+      "html": "<p>عملیات اتوماسیون باید <strong>Idempotent</strong> باشد تا اجرای مجدد آن پس از یک خطای میانی، تنظیمات تکراری یا مخرب ایجاد نکند و گزارش شفاف موفق/ناموفق برای هر تجهیز تولید نماید.</p>"
+    },
+    {
+      "id": "ccnp_enauto-section-12",
+      "title": "چک‌لیست کیفیت خط لوله ENAUTO",
+      "html": "<ul><li>وجود تست خودکار Schema و Policy روی هر Pull Request.</li><li>مدیریت کامل HTTP 429/5xx و Timeout روی تمام فراخوانی‌های API.</li><li>اجرای Pre/Post-Check و گزارش خودکار Drift.</li></ul>"
+    },
+    {
+      "id": "ccnp_enauto-section-13",
+      "title": "تمرین تحلیلی سناریو (کشف Drift و مدیریت 429/Pagination در پایپ‌لاین)",
+      "html": "<p>در <code>ccnp_enauto_lab.py</code> پایپ‌لاین بدون تاییدیه یا با شکست Lint متوقف می‌شود، کلاینت API پاسخ <code>429</code> را با رعایت <code>Retry-After</code> مدیریت و تمام صفحات Pagination را جمع‌آوری می‌کند، و موتور Drift تغییرات دستی خارج از SoT را کشف می‌نماید.</p>"
+    },
+    {
+      "id": "ccnp_enauto-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc8641\" target=\"_blank\" rel=\"noopener\">RFC 8641 (YANG-Push)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc9110\" target=\"_blank\" rel=\"noopener\">RFC 9110 (HTTP Semantics)</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_enauto_lab.py</code> شبیه‌ساز محلی Python 3 بدون اتصال به کنترلر زنده یا کلکتور gNMI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "NetDevOps",
+      "fa": "مهندسی نرم‌افزار در عملیات شبکه",
+      "simple": "به‌کارگیری Git، CI/CD، تست خودکار و کد برای مدیریت شبکه."
+    },
+    {
+      "term": "Source of Truth (SoT)",
+      "fa": "منبع یگانه حقیقت",
+      "simple": "مرجع رسمی وضعیت مطلوب شبکه (مانند Git یا NetBox)."
+    },
+    {
+      "term": "Configuration Drift",
+      "fa": "انحراف پیکربندی",
+      "simple": "اختلاف بین وضعیت مطلوب در SoT و پیکربندی زنده روی تجهیز."
+    },
+    {
+      "term": "GitOps",
+      "fa": "عملیات مبتنی بر Git",
+      "simple": "مدیریت تمام تغییرات زیرساخت از طریق Pull Request و خط لوله خودکار."
+    },
+    {
+      "term": "CI/CD Pipeline",
+      "fa": "خط لوله یکپارچه‌سازی و استقرار",
+      "simple": "زنجیره خودکار Lint، تست، Dry-Run، تایید و استقرار مرحله‌ای."
+    },
+    {
+      "term": "Canary Deployment",
+      "fa": "استقرار تدریجی قناری",
+      "simple": "اعمال تغییر روی گروه کوچکی از تجهیزات پیش از تعمیم به کل شبکه."
+    },
+    {
+      "term": "API Pagination",
+      "fa": "صفحه‌بندی پاسخ API",
+      "simple": "دریافت مرحله‌ای فهرست‌های بزرگ با offset/limit یا cursor."
+    },
+    {
+      "term": "HTTP 429 / Retry-After",
+      "fa": "محدودیت نرخ API",
+      "simple": "سیگنال سرور برای کاهش نرخ درخواست و زمان انتظار پیشنهادی."
+    },
+    {
+      "term": "Exponential Backoff",
+      "fa": "عقب‌نشینی نمایی",
+      "simple": "افزایش تدریجی فاصله تلاش مجدد همراه با Jitter هنگام خطای موقت."
+    },
+    {
+      "term": "YANG-Push (RFC 8641)",
+      "fa": "ارسال جریانی مدل YANG",
+      "simple": "اشتراک Push تله‌متری به‌صورت Periodic یا On-Change."
+    },
+    {
+      "term": "gNMI",
+      "fa": "رابط مدیریت شبکه روی gRPC",
+      "simple": "پروتکل مدرن OpenConfig برای پیکربندی و تله‌متری جریانی."
+    },
+    {
+      "term": "On-Change Telemetry",
+      "fa": "تله‌متری رویدادمحور",
+      "simple": "ارسال فوری داده تنها هنگام رخداد تغییر واقعی وضعیت."
+    },
+    {
+      "term": "Pre/Post-Check",
+      "fa": "راستی‌آزمایی پیش و پس از تغییر",
+      "simple": "ثبت و مقایسه وضعیت عملیاتی (همسایگی، مسیرها) قبل و بعد استقرار."
+    },
+    {
+      "term": "Dry-Run / Diff",
+      "fa": "اجرای آزمایشی و نمایش اختلاف",
+      "simple": "محاسبه تغییرات پیش از اعمال واقعی روی شبکه."
+    },
+    {
+      "term": "Secret Management",
+      "fa": "مدیریت امن اسرار",
+      "simple": "نگهداری کلیدها و رمزها در Vault به‌جای ثبت در مخزن Git."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENAUTO: NetDevOps CI/CD Pipelines, Resilient API Clients, Drift Detection & Streaming Telemetry",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_enauto_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_enauto_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_enauto (YANG Model Selection, Pagination &amp; Rate-Limit Backoff Planner).\n\nEducational local model only — no live Catalyst Center, vManage, Meraki Dashboard API,\nor NETCONF/RESTCONF device is contacted.\nModels:\n1. YANG model taxonomy selector (OpenConfig vs IETF vs Vendor-Native trade-offs).\n2. API rate-limit (`429 Too Many Requests` / `Retry-After`) + exponential backoff with bounded cap\n   and RFC 5988 `Link: &lt;...&gt;; rel=&quot;next&quot;` pagination parser (Meraki/REST API style).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport re\n\n_LINK_NEXT_RE = re.compile(r&#x27;&lt;([^&gt;]+)&gt;\\s*;\\s*rel=&quot;next&quot;&#x27;)\n\n\ndef _require_non_neg_int(val: object, name: str, max_val: int = 1000) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (0 &lt;= val &lt;= max_val):\n        raise ValueError(f&quot;{name} must be an int in 0..{max_val}, got {val!r}&quot;)\n    return val\n\n\ndef parse_rfc5988_next_link(link_header: str) -&gt; str | None:\n    &quot;&quot;&quot;Extract the rel=&quot;next&quot; URL from an HTTP Link pagination header (e.g., Meraki API).&quot;&quot;&quot;\n    if not isinstance(link_header, str):\n        raise ValueError(&quot;link_header must be a str&quot;)\n    m = _LINK_NEXT_RE.search(link_header)\n    return m.group(1) if m else None\n\n\ndef compute_retry_delay_seconds(\n    attempt: int,\n    retry_after_header: str | None = None,\n    base_delay_sec: int = 1,\n    max_delay_sec: int = 60,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compute bounded retry delay honoring integer Retry-After when present.&quot;&quot;&quot;\n    att = _require_non_neg_int(attempt, &quot;attempt&quot;, 20)\n    base = _require_non_neg_int(base_delay_sec, &quot;base_delay_sec&quot;, 60)\n    cap = _require_non_neg_int(max_delay_sec, &quot;max_delay_sec&quot;, 600)\n    if base == 0 or cap &lt; base:\n        raise ValueError(&quot;base_delay_sec must be &gt;= 1 and &lt;= max_delay_sec&quot;)\n\n    if retry_after_header is not None:\n        if not isinstance(retry_after_header, str) or not retry_after_header.strip().isdigit():\n            raise ValueError(&quot;retry_after_header must be a non-negative integer string or None&quot;)\n        ra = min(int(retry_after_header.strip()), cap)\n        return {&quot;delay_seconds&quot;: ra, &quot;source&quot;: &quot;retry_after_header_capped&quot;}\n\n    exp = min(base * (2 ** att), cap)\n    return {&quot;delay_seconds&quot;: exp, &quot;source&quot;: &quot;exponential_backoff_capped&quot;}\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Catalyst Center, SD-WAN, or Meraki API is contacted.&quot;)\n    hdr = &#x27;&lt;https://api.meraki.com/api/v1/orgs/1/devices?startingAfter=abc&gt;; rel=&quot;next&quot;, &lt;https://api.meraki.com/api/v1/orgs/1/devices&gt;; rel=&quot;first&quot;&#x27;\n    nxt = parse_rfc5988_next_link(hdr)\n    assert nxt == &quot;https://api.meraki.com/api/v1/orgs/1/devices?startingAfter=abc&quot;\n    d1 = compute_retry_delay_seconds(attempt=0, retry_after_header=&quot;5&quot;, max_delay_sec=30)\n    d2 = compute_retry_delay_seconds(attempt=4, retry_after_header=None, base_delay_sec=1, max_delay_sec=10)\n    assert d1[&quot;delay_seconds&quot;] == 5 and d2[&quot;delay_seconds&quot;] == 10\n    print(&quot;RFC 5988 next link:&quot;, nxt)\n    print(&quot;Rate-limit retry delays:&quot;, {&quot;retry_after&quot;: d1, &quot;exp_capped&quot;: d2})\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference NetDevOps Workflow Stages (Conceptual, NOT executed on live controllers)\n# 1. git checkout -b feat/vlan-policy\n# 2. pytest tests/test_intent.py &amp;&amp; yamllint inventory/\n# 3. deploy --dry-run -&gt; review diff -&gt; approve -&gt; canary rollout</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "مفهوم <strong>Configuration Drift</strong> در NetDevOps چیست؟",
+      "options": [
+        "افزایش پهنای باند",
+        "ایجاد شکاف بین وضعیت مطلوب (Source of Truth) و وضعیت زنده تجهیز (مثلاً بر اثر تغییر دستی CLI)",
+        "حذف JSON",
+        "قطع Git"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>موتور Drift اختلاف Intended و Actual را کشف می‌کند.</p>"
+    },
+    {
+      "title": "هنگام دریافت کد <strong>HTTP 429 Too Many Requests</strong> از API کنترلر، کلاینت حرفه‌ای چه باید بکند؟",
+      "options": [
+        "ارسال ۱۰۰ درخواست هم‌زمان دیگر",
+        "رعایت هدر Retry-After و استفاده از Exponential Backoff با سقف تلاش",
+        "تغییر رمز عبور",
+        "نادیده گرفتن خطا"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>رعایت <code>Retry-After</code> از تشدید فشار و مسدودسازی کلاینت جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "چرا نادیده گرفتن <strong>Pagination</strong> در فراخوانی APIهای Inventory خطرناک است؟",
+      "options": [
+        "سرعت را کم می‌کند",
+        "ممکن است تنها صفحه اول دریافت شود و بقیه تجهیزات از ممیزی یا تغییر جا بمانند",
+        "باعث خطای 404 می‌شود",
+        "گواهی TLS را باطل می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بسیاری از APIها خروجی را در صفحات ۵۰ یا ۱۰۰تایی برمی‌گردانند.</p>"
+    },
+    {
+      "title": "تفاوت کلیدی <strong>Streaming Telemetry (YANG-Push / gNMI)</strong> با SNMP Polling چیست؟",
+      "options": [
+        "تله‌متری جریانی Push-based، مدل‌محور (YANG) و دارای حالت On-Change است ولی SNMP سنتی Pull-based است",
+        "SNMP سریع‌تر از gNMI است",
+        "gNMI بدون مدل داده است",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>مدل Push و On-Change بار CPU را کم و دقت زمانی پایش را بسیار بیشتر می‌کند.</p>"
+    },
+    {
+      "title": "هدف از <strong>Canary Deployment</strong> در خط لوله CI/CD شبکه چیست؟",
+      "options": [
+        "تغییر ناگهانی روی ۱۰۰٪ تجهیزات",
+        "اعمال آزمایشی روی زیرمجموعه کوچک و بررسی سلامت پیش از تعمیم به کل شبکه",
+        "حذف مرحله Lint",
+        "ذخیره رمز در Git"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>شعاع انفجار (Blast Radius) خطاهای پیش‌بینی‌نشده را محدود می‌کند.</p>"
+    },
+    {
+      "title": "وظیفه <strong>Source of Truth (SoT)</strong> چیست؟",
+      "options": [
+        "جمع‌آوری Syslog",
+        "نگهداری نسخه رسمی و تاییدشده وضعیت مطلوب شبکه (Intended State)",
+        "جایگزینی BGP",
+        "تخصیص MAC"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>SoT مرجع یگانه تولید پیکربندی و ممیزی Drift است.</p>"
+    },
+    {
+      "title": "کدام اقدام از نشت اعتبارنامه‌ها در خط لوله ENAUTO جلوگیری می‌کند؟",
+      "options": [
+        "کامیت توکن در README",
+        "استفاده از Secret Vault و متغیرهای محیطی امن به‌جای هاردکد در Git",
+        "استفاده از HTTP ساده",
+        "حذف RBAC"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اسرار هرگز نباید وارد تاریخچه Git شوند.</p>"
+    },
+    {
+      "title": "ارزش اصلی <strong>Pre-Check و Post-Check</strong> (مثلاً با pyATS) چیست؟",
+      "options": [
+        "مقایسه خودکار سلامت عملیاتی شبکه پیش و پس از اعمال تغییر برای تشخیص سریع افت سرویس",
+        "کاهش MTU",
+        "حذف YAML",
+        "غیرفعال کردن SSH"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>تضمین می‌کند تغییر پیکربندی موجب افت ناخواسته همسایگی‌ها یا مسیرها نشده است.</p>"
+    },
+    {
+      "title": "حالت اشتراک <strong>On-Change</strong> در YANG-Push (RFC 8641) برای کدام داده مناسب‌تر است؟",
+      "options": [
+        "شمارنده بایت لحظه‌ای",
+        "تغییرات گسسته و بحرانی مانند تغییر وضعیت اینترفیس یا همسایگی BGP",
+        "فایل تصویر",
+        "تاریخچه Git"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>On-Change تغییرات وضعیت را بلافاصله بدون انتظار برای بازه زمانی بعدی گزارش می‌کند.</p>"
+    },
+    {
+      "title": "ویژگی <strong>Idempotency</strong> در اتوماسیون چه تضمینی می‌دهد؟",
+      "options": [
+        "اجرای چندباره اسکریپت روی وضعیت منطبق، تغییر اضافی یا مخرب ایجاد نمی‌کند",
+        "اجرا فقط یک بار ممکن است",
+        "نیازی به تایید ندارد",
+        "به SNMP نیاز دارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>امکان اجرای ایمن مجدد پس از خطاهای میانی را فراهم می‌سازد.</p>"
+    },
+    {
+      "title": "در <code>ccnp_enauto_lab.py</code> اگر <code>approved=False</code> باشد پایپ‌لاین چه می‌کند؟",
+      "options": [
+        "مستقر می‌کند",
+        "در مرحله Approval متوقف شده و <code>deployed=False</code> برمی‌گرداند",
+        "Lint را رد می‌کند",
+        "Drift را پاک می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دروازه تایید مانع استقرار بدون مجوز می‌شود.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_enauto_lab.py</code> چیست؟",
+      "options": [
+        "اتصال زنده به Catalyst Center",
+        "کلکتور واقعی gNMI",
+        "شبیه‌ساز محلی Python 3 برای CI/CD، Pagination/429 و Drift بدون سرویس زنده",
+        "اجرای pyATS روی روتر زنده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کد محلی صرفاً منطق مدل‌شده را می‌آزماید.</p>"
+    }
+  ]
+}

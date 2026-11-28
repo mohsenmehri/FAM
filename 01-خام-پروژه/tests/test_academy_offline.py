@@ -19,8 +19,11 @@ class OfflineBuildTests(unittest.TestCase):
         text = build.build()
         catalog = json.loads((PACKAGE / 'server/www/academy-assets/curriculum-catalog.json').read_text(encoding='utf-8'))
         lessons = [l for p in catalog['paths'] for c in p['courses'] for l in c['lessons']]
-        self.assertIn(f'فقط {len(lessons)} درس', text)
-        self.assertIn('دوره ۱۱۴ درسی کامل نیست', text)
+        self.assertEqual(len(lessons), 127)
+        self.assertIn(f'هر {len(lessons)} درس فعال', text)
+        self.assertIn('پوشش کامل ۱۱۴ شناسه تاریخی', text)
+        self.assertIn('شبیه‌ساز آموزشی CLI', text)
+        self.assertIn('FamAcademySimulator', text)
         for lesson in lessons:
             with self.subTest(lesson=lesson['id']):
                 self.assertIn(lesson['blueprint'], text)

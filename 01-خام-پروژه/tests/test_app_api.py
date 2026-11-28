@@ -551,7 +551,7 @@ class FamAppApiTests(unittest.TestCase):
         self.assertEqual(self.client.get(preview,environ_base=self.https_env).status_code,403)
         with sqlite3.connect(self.db_path) as db:
             uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
-        legacy=json.dumps({'completedLessons':['s01','s02','s02'],'notes':{'s01':'private'},'quizScores':{'s01':80}})
+        legacy=json.dumps({'completedLessons':['unknown_legacy_99','s02','s02'],'notes':{'unknown_legacy_99':'private'},'quizScores':{'unknown_legacy_99':80}})
         raw=json.dumps({'fam4.learn.v1':legacy,'unknown':'preserve'})
         with sqlite3.connect(self.db_path) as db:
             db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,10,7))
@@ -596,7 +596,7 @@ class FamAppApiTests(unittest.TestCase):
         csrf=self._login_admin().json['csrf'];headers={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
         with sqlite3.connect(self.db_path) as db:
             uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
-            legacy=json.dumps({'completedLessons':['unmapped-secret','unmapped-secret','s01'],'notes':{'s01':'private note'}})
+            legacy=json.dumps({'completedLessons':['unmapped-secret','unmapped-secret','unknown_legacy_99'],'notes':{'unknown_legacy_99':'private note'}})
             payload=json.dumps({'fam4.learn.v1':legacy})
             db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,payload,1,2))
         result=self.client.get('/api/academy/progress/legacy-preview',headers=headers,environ_base=self.https_env)
@@ -612,12 +612,12 @@ class FamAppApiTests(unittest.TestCase):
         csrf=self._login_admin().json['csrf']; h={'Origin':self.ORIGIN,'X-FAM-CSRF':csrf}
         with sqlite3.connect(self.db_path) as db:
             uid=db.execute("SELECT id FROM users WHERE username='admin'").fetchone()[0]
-        old=json.dumps({'completedLessons':['s02','s01','s02'],'notes':{'s01':'secret'},'quizScores':{'s02':90},'unknown':'preserve'})
+        old=json.dumps({'completedLessons':['s02','s01','auto_12','adv_bgp','ccnp_ensdwi','unknown_legacy_99','s02'],'notes':{'s01':'secret'},'quizScores':{'s02':90},'unknown':'preserve'})
         raw=json.dumps({'fam4.learn.v1':old,'some-other-key':'untouched'})
         with sqlite3.connect(self.db_path) as db:db.execute('INSERT INTO academy_progress VALUES(?,?,?,?)',(uid,raw,1,5))
         def post(body):return self.client.post(url,json=body,headers=h,environ_base=self.https_env)
         self.assertEqual(post({'expectedRevision':4,'selectedLessons':['s02']}).status_code,409)
-        for selection in (['s01'],['s02','s02'],[],['s02','s01'],[True]):
+        for selection in (['unknown_legacy_99'],['s02','s02'],[],['s02','unknown_legacy_99'],[True],['ccna_03']):
             with self.subTest(selection=selection):self.assertEqual(post({'expectedRevision':5,'selectedLessons':selection}).status_code,400)
         with sqlite3.connect(self.db_path) as db:
             db.execute("CREATE TRIGGER fail_migration BEFORE UPDATE ON academy_progress BEGIN SELECT RAISE(ABORT, 'migration failure'); END")
@@ -626,15 +626,16 @@ class FamAppApiTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone(),(raw,5))
             self.assertEqual(db.execute('SELECT COUNT(*) FROM academy_progress_backups WHERE user_id=?',(uid,)).fetchone()[0],0)
             db.execute('DROP TRIGGER fail_migration')
-        result=post({'expectedRevision':5,'selectedLessons':['s02']});self.assertEqual(result.status_code,200)
-        self.assertEqual(result.json['revision'],6);self.assertEqual(result.json['migrated'],['s02'])
+        selected=['s01','s02','auto_12','adv_bgp','ccnp_ensdwi']
+        result=post({'expectedRevision':5,'selectedLessons':selected});self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json['revision'],6);self.assertEqual(result.json['migrated'],selected)
         self.assertEqual(post({'expectedRevision':5,'selectedLessons':['s02']}).status_code,409)
         with sqlite3.connect(self.db_path) as db:
             payload,revision=db.execute('SELECT payload,revision FROM academy_progress WHERE user_id=?',(uid,)).fetchone()
             backup=db.execute('SELECT payload FROM academy_progress_backups WHERE user_id=? AND revision=5',(uid,)).fetchone()[0]
         self.assertEqual(backup,raw);self.assertEqual(revision,6);state=json.loads(payload)
         self.assertEqual(state['fam.academy.legacy.archive.v1'],old);self.assertEqual(state['some-other-key'],'untouched')
-        self.assertEqual(json.loads(state['fam4.learn.v1']),{'completed':['s02'],'labs':{}})
+        self.assertEqual(json.loads(state['fam4.learn.v1']),{'completed':['academy-stage-zero-osi-fa','s02','academy-automation-terraform','adv_bgp','ccnp_ensdwi'],'labs':{}})
         # Subsequent saves cannot access the archive; unknown keys are retained.
         normal=self.client.post('/api/academy/progress',json={'expectedRevision':6,'changes':{'fam4.learn.v1':json.dumps({'completed':['s02'],'labs':{'x':1}})}},headers=h,environ_base=self.https_env)
         self.assertEqual(normal.status_code,200)

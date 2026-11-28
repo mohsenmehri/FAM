@@ -1,0 +1,351 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_02",
+  "objectiveId": "ccnp_02",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENARSI Advanced Troubleshooting (OSPF/BGP/DMVPN/DNA)",
+  "title": "عیب‌یابی پیشرفته CCNP ENARSI: همسایگی OSPF/BGP، فیلترینگ مسیر، DMVPN و تله‌های کلیدی",
+  "titleEn": "CCNP ENARSI Advanced Troubleshooting: OSPF/BGP, Route Filtering & DMVPN",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "adv_02",
+    "adv_bgp",
+    "adv_redist"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_02 (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_02",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc2328",
+      "https://www.cisco.com/c/en/us/support/docs/ip/open-shortest-path-first-ospf/13699-29.html",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/sec_conn_dmvpn/configuration/xe-17/sec-conn-dmvpn-xe-17-book.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_02_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تحلیل سیستماتیک علل توقف OSPF در INIT، 2-WAY و EXSTART/EXCHANGE (به‌ویژه MTU Mismatch، Network Type و Stub Flag).",
+      "تفکیک دقیق سه فاز DMVPN (Phase 1/2/3 با NHRP Redirect/Shortcut) و رفتار Summarization در Hub.",
+      "ساخت آزمایشگاه محلی ccnp_02_lab.py برای تشخیص خودکار خطای همسایگی OSPF، تحلیل BGP State و ارزیابی فازهای DMVPN."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_02-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_02.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_02_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تحلیل سیستماتیک علل توقف OSPF در INIT، 2-WAY و EXSTART/EXCHANGE (به‌ویژه MTU Mismatch، Network Type و Stub Flag).",
+      "تفکیک دقیق سه فاز DMVPN (Phase 1/2/3 با NHRP Redirect/Shortcut) و رفتار Summarization در Hub.",
+      "ساخت آزمایشگاه محلی ccnp_02_lab.py برای تشخیص خودکار خطای همسایگی OSPF، تحلیل BGP State و ارزیابی فازهای DMVPN."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_02-section-1",
+      "title": "مسئله واقعی: چرا دو روتر OSPF در وضعیت EXSTART گیر می‌کنند در حالی که یکدیگر را پینگ می‌کنند؟",
+      "html": "<p>پینگ پیش‌فرض ۱۰۰ بایتی از لینک عبور می‌کند، اما بسته‌های DBD در مرحله <strong>EXSTART/EXCHANGE</strong> حامل مقدار MTU هستند؛ اگر یک طرف MTU=1500 و طرف دیگر MTU=1400 داشته باشد، همسایگی در EXSTART قفل می‌شود و هیچ مسیری تبادل نمی‌گردد.</p>"
+    },
+    {
+      "id": "ccnp_02-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> OSPF (<code>adv_02</code>)، BGP (<code>adv_bgp</code>) و Redistribution (<code>adv_redist</code>).</p><ul><li>عیب‌یابی ساخت‌یافته وضعیت‌های گیرکرده OSPF (<code>DOWN/INIT/2-WAY/EXSTART</code>) و تطابق Network Type.</li><li>عیب‌یابی نشست‌های BGP (<code>Idle/Active/OpenSent</code>) و مسیرهای نصب‌نشده در RIB.</li><li>تسلط بر تفاوت‌های معماری و عیب‌یابی <strong>DMVPN Phase 1، 2 و 3</strong>.</li></ul>"
+    },
+    {
+      "id": "ccnp_02-section-3",
+      "title": "کالبدشکافی حالات توقف همسایگی OSPF (RFC 2328)",
+      "html": "<table><thead><tr><th>وضعیت OSPF</th><th>علل کلیدی در دنیای واقعی</th></tr></thead><tbody><tr><td><strong>DOWN / ATTEMPT</strong></td><td>عدم تطابق Area، تایمرهای Hello/Dead، احراز هویت، Stub Flag یا Passive Interface</td></tr><tr><td><strong>INIT</strong></td><td>ارتباط یک‌طرفه (ACL ورودی یا مشکل لایه ۲)</td></tr><tr><td><strong>2-WAY</strong></td><td>عادی بین DROTHERها، یا Priority=0 روی هر دو طرف سگمنت Broadcast</td></tr><tr><td><strong>EXSTART/EXCHANGE</strong></td><td>ناهم‌خوانی MTU، تکرار Router-ID یا افت بسته‌های بزرگ DBD</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccnp_02-section-4",
+      "title": "تله پنهان OSPF: ناهم‌خوانی Network Type (Broadcast در برابر Point-to-Point)",
+      "html": "<p>اگر یک سمت <code>Broadcast</code> (نیازمند DR/BDR) و سمت دیگر <code>Point-to-Point</code> (بدون DR) باشد، ممکن است با تایمر یکسان (۱۰/۴۰) حتی به <strong>FULL</strong> برسند، اما به‌علت ناسازگاری LSA Type 1/2 مسیرها وارد RIB نشوند!</p>"
+    },
+    {
+      "id": "ccnp_02-section-5",
+      "title": "عیب‌یابی ساختاریافته BGP: از Idle و Active تا نبود Next-Hop",
+      "html": "<p>در <strong>Idle</strong> روتر حتی تلاش TCP نمی‌کند (مسیر به همسایه نیست یا Max-Prefix رد شده)؛ در <strong>Active</strong> نشست TCP 179 برقرار نمی‌شود (فایروال، نبود <code>update-source</code> یا <code>ebgp-multihop</code>). همچنین مسیرهای دریافتی با Next-Hop غیرقابل دسترس یا فیلترشده توسط <code>distribute-list</code> وارد RIB نمی‌شوند.</p>"
+    },
+    {
+      "id": "ccnp_02-section-6",
+      "title": "نمودار معماری: درخت عیب‌یابی OSPF/BGP و گذار DMVPN Phase 1 -> 3",
+      "html": "<p>نمودار زیر نقشه تشخیص سریع خطا در OSPF/BGP و مسیر مستقیم Spoke-to-Spoke در DMVPN Phase 3 را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"ENARSI Troubleshooting &amp; DMVPN Phases\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">ENARSI Diagnostics: OSPF States, BGP FSM &amp; DMVPN Phase 1/2/3</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">OSPF Adjacency Audit</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Area/Timer/Stub -&gt; INIT/2-WAY</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">MTU &amp; Net-Type -&gt; EXSTART / RIB</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">BGP Session &amp; RIB Audit</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Idle (no route) / Active (TCP179)</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Next-Hop / RIB-Failure checks</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">DMVPN Phase 3 (NHRP)</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Hub sends NHRP Redirect</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Spoke Shortcut + Hub Summary OK</text></svg>"
+    },
+    {
+      "id": "ccnp_02-section-7",
+      "title": "معماری DMVPN: تفکیک دقیق Phase 1، Phase 2 و Phase 3",
+      "html": "<p>در <strong>Phase 1</strong> تمام ترافیک Spoke-to-Spoke از Hub عبور می‌کند. در <strong>Phase 2</strong> تونل مستقیم Spoke-to-Spoke با mGRE و حفظ Next-Hop ساخته می‌شود اما Summarization در Hub غیرممکن است. در <strong>Phase 3</strong> با <code>ip nhrp redirect</code> روی Hub و <code>ip nhrp shortcut</code> روی Spoke، هم تونل مستقیم برقرار می‌شود و هم Hub می‌تواند پیشوندها را Summarize یا Default Route ارسال کند!</p>"
+    },
+    {
+      "id": "ccnp_02-section-8",
+      "title": "عیب‌یابی فیلترینگ مسیر: Distribute-List در OSPF در برابر Prefix-List",
+      "html": "<p>به یاد داشته باشید در OSPF (به عنوان پروتکل Link-State)، دستور <code>distribute-list in</code> فقط ورود مسیر از LSDB به RIB محلی را مسدود می‌کند و LSA را از LSDB حذف نمی‌کند؛ برای فیلتر بین Areaها باید روی ABR با <code>area filter-list</code> عمل کرد.</p>"
+    },
+    {
+      "id": "ccnp_02-section-9",
+      "title": "مسیریابی مبتنی بر سیاست (PBR) و تله ترتیب اجرا",
+      "html": "<p>PBR پیش از جدول مسیریابی عادی روی بسته ورودی اجرا می‌شود؛ تنظیم اشتباه ACL یا Next-Hop غیرقابل دسترس در <code>route-map</code> می‌تواند ترافیک را بدون هشدار به مسیر نامطلوب یا Drop هدایت کند.</p>"
+    },
+    {
+      "id": "ccnp_02-section-10",
+      "title": "بررسی IPv6 و عیب‌یابی سرویس‌های زیرساختی (DHCP Relay / CoPP)",
+      "html": "<p>در عیب‌یابی ENARSI بسیاری از اختلالات پروتکل‌های مسیریابی در واقع ریشه در CoPP سخت‌گیرانه (Drop بسته‌های TCP 179 یا IP 89)، یا ACL ورودی مسدودکننده <code>224.0.0.5</code> دارند.</p>"
+    },
+    {
+      "id": "ccnp_02-section-11",
+      "title": "روش‌شناسی عیب‌یابی گام‌به‌گام (Divide-and-Conquer)",
+      "html": "<p>پیش از تغییر پیکربندی، ابتدا شواهد لایه ۱ تا ۳، شمارنده‌های Drop، جداول همسایگی، پایگاه داده (LSDB/BGP Table) و سپس جدول RIB و CEF را تفکیک و بررسی کنید.</p>"
+    },
+    {
+      "id": "ccnp_02-section-12",
+      "title": "چک‌لیست دستورات کلیدی تشخیص در ENARSI",
+      "html": "<ul><li><code>show ip ospf neighbor</code> و <code>show ip ospf interface brief</code></li><li><code>show bgp all summary</code> و <code>show ip route &lt;prefix&gt;</code></li><li><code>show dmvpn</code> و <code>show ip nhrp shortcut</code></li></ul>"
+    },
+    {
+      "id": "ccnp_02-section-13",
+      "title": "تمرین تحلیلی سناریو (MTU=1400 در OSPF و انتخاب Phase 3 در DMVPN)",
+      "html": "<p>در <code>ccnp_02_lab.py</code> ناهم‌خوانی MTU به عنوان علت توقف <code>EXSTART_EXCHANGE</code>، ناهم‌خوانی Network Type به عنوان ریسک نبود مسیر در RIB، و DMVPN Phase 3 به عنوان تنها فاز سازگار با هر دو شرط Spoke-to-Spoke و Hub Summarization تشخیص داده می‌شوند.</p>"
+    },
+    {
+      "id": "ccnp_02-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc2328\" target=\"_blank\" rel=\"noopener\">RFC 2328 (OSPFv2)</a> و راهنمای عیب‌یابی OSPF و DMVPN در Cisco IOS-XE 17.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_02_lab.py</code> موتور تشخیص محلی Python 3 است و به روتر واقعی متصل نشده است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "OSPF EXSTART",
+      "fa": "توقف در مرحله EXSTART",
+      "simple": "وضعیت رایج هنگام ناهم‌خوانی MTU یا تداخل Router-ID در OSPF."
+    },
+    {
+      "term": "OSPF Network Type",
+      "fa": "نوع شبکه OSPF",
+      "simple": "رفتار DR/BDR و تایمرها (Broadcast، Point-to-Point، NBMA)."
+    },
+    {
+      "term": "RIB Failure",
+      "fa": "عدم نصب مسیر BGP در RIB",
+      "simple": "وجود مسیر با AD بهتر (مثل Static/OSPF) مانع نصب مسیر BGP در RIB می‌شود."
+    },
+    {
+      "term": "BGP Active State",
+      "fa": "وضعیت تلاش اتصال BGP",
+      "simple": "عدم برقراری نشست TCP 179 میان دو همسایه BGP."
+    },
+    {
+      "term": "BGP Idle State",
+      "fa": "وضعیت بیکار BGP",
+      "simple": "عدم شروع تلاش اتصال (مثلاً نبود مسیر یا Shutdown/Max-Prefix)."
+    },
+    {
+      "term": "DMVPN",
+      "fa": "شبکه خصوصی مجازی چندنقطه‌ای پویا",
+      "simple": "ترکیب mGRE، NHRP و IPsec برای اتصال شعب با تونل پویا."
+    },
+    {
+      "term": "mGRE",
+      "fa": "GRE چندنقطه‌ای",
+      "simple": "اینترفیس تونل واحد با قابلیت برقراری ارتباط با چندین همتا."
+    },
+    {
+      "term": "NHRP",
+      "fa": "پروتکل کشف گام بعدی",
+      "simple": "نگاشت آدرس Overlay تونل به آدرس عمومی Underlay (NBMA)."
+    },
+    {
+      "term": "NHRP Redirect / Shortcut",
+      "fa": "هدایت و میانبر Phase 3",
+      "simple": "سازوکار Phase 3 برای ساخت تونل مستقیم Spoke-to-Spoke همراه با Summarization."
+    },
+    {
+      "term": "Stub Area Flag",
+      "fa": "پرچم ناحیه Stub",
+      "simple": "بیت درون Hello که در صورت ناهم‌خوانی مانع همسایگی OSPF می‌شود."
+    },
+    {
+      "term": "PBR",
+      "fa": "مسیریابی مبتنی بر سیاست",
+      "simple": "هدایت بسته ورودی بر اساس Route-Map پیش از جدول مسیریابی عادی."
+    },
+    {
+      "term": "OSPF Distribute-List",
+      "fa": "فیلتر محلی RIB در OSPF",
+      "simple": "فیلتر نصب مسیر از LSDB به RIB محلی بدون حذف LSA."
+    },
+    {
+      "term": "ABR Filter-List",
+      "fa": "فیلتر LSA Type 3 در ABR",
+      "simple": "فیلترینگ واقعی مسیرها میان ناحیه‌های OSPF با Prefix-List."
+    },
+    {
+      "term": "CoPP",
+      "fa": "حفاظت از صفحه کنترل",
+      "simple": "سیاست نرخ‌گذاری ترافیک ورودی به CPU روتر که با تنظیم غلط همسایگی را قطع می‌کند."
+    },
+    {
+      "term": "Divide-and-Conquer",
+      "fa": "عیب‌یابی تقسیم و فتح",
+      "simple": "شروع بررسی از لایه میانی (لایه ۳) برای محدودسازی سریع دامنه خطا."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENARSI Advanced Troubleshooting: OSPF/BGP, Route Filtering & DMVPN",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_02_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_02_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_02 (PBR Evaluation, DMVPN Phase 1/2/3 &amp; MPLS L3VPN RT Import/Export).\n\nEducational local model only — no live Cisco IOS-XE router, NHRP server, IPsec SA,\nor MP-BGP MPLS L3VPN PE router is contacted.\nModels:\n1. Policy-Based Routing (PBR) evaluation order: `set ip next-hop` vs `set ip default next-hop`\n   relative to the RIB/FIB.\n2. MPLS L3VPN Route Target (RT) export/import matching (separating RD uniqueness from RT policy).\n3. uRPF Strict vs Loose check on symmetric vs asymmetric routing paths.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef evaluate_pbr_action(\n    destination_ip: str,\n    matched_route_map: bool,\n    pbr_mode: str,\n    pbr_next_hop: str,\n    rib_has_specific_route: bool,\n    rib_next_hop: str | None,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model PBR override behavior: `set ip next-hop` (before RIB) vs `set ip default next-hop` (after specific RIB).&quot;&quot;&quot;\n    dst = ipaddress.IPv4Address(destination_ip.strip())\n    nh_pbr = ipaddress.IPv4Address(pbr_next_hop.strip())\n    if not isinstance(matched_route_map, bool) or not isinstance(rib_has_specific_route, bool):\n        raise ValueError(&quot;matched_route_map and rib_has_specific_route must be strict bools&quot;)\n    if pbr_mode not in {&quot;set_next_hop&quot;, &quot;set_default_next_hop&quot;}:\n        raise ValueError(&quot;pbr_mode must be &#x27;set_next_hop&#x27; or &#x27;set_default_next_hop&#x27;&quot;)\n\n    if not matched_route_map:\n        return {&quot;destination&quot;: str(dst), &quot;selected_next_hop&quot;: rib_next_hop, &quot;decision&quot;: &quot;NORMAL_RIB_LOOKUP_NO_PBR_MATCH&quot;}\n    if pbr_mode == &quot;set_next_hop&quot;:\n        return {&quot;destination&quot;: str(dst), &quot;selected_next_hop&quot;: str(nh_pbr), &quot;decision&quot;: &quot;PBR_OVERRIDES_RIB&quot;}\n    # set_default_next_hop only applies if RIB lacks a specific (non-default) route\n    if rib_has_specific_route:\n        return {&quot;destination&quot;: str(dst), &quot;selected_next_hop&quot;: rib_next_hop, &quot;decision&quot;: &quot;SPECIFIC_RIB_ROUTE_PREFERRED_OVER_DEFAULT_PBR&quot;}\n    return {&quot;destination&quot;: str(dst), &quot;selected_next_hop&quot;: str(nh_pbr), &quot;decision&quot;: &quot;DEFAULT_PBR_USED_NO_SPECIFIC_RIB_ROUTE&quot;}\n\n\ndef match_mpls_vrf_rt(\n    route_rd: str,\n    exported_rts: list[str],\n    target_vrf_import_rts: list[str],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Determine whether an MP-BGP VPNv4 prefix is imported into a target VRF based on Route Targets (NOT RD).&quot;&quot;&quot;\n    if not isinstance(route_rd, str) or &quot;:&quot; not in route_rd:\n        raise ValueError(&quot;route_rd must be a string in &#x27;ASN:nn&#x27; or &#x27;IP:nn&#x27; format&quot;)\n    exp = {str(x).strip() for x in exported_rts if str(x).strip()}\n    imp = {str(x).strip() for x in target_vrf_import_rts if str(x).strip()}\n    matched = sorted(exp &amp; imp)\n    return {\n        &quot;rd_for_uniqueness_only&quot;: route_rd.strip(),\n        &quot;matched_route_targets&quot;: matched,\n        &quot;imported_into_vrf&quot;: len(matched) &gt; 0,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live ENARSI PBR/DMVPN/MPLS-PE router is contacted.&quot;)\n    pbr1 = evaluate_pbr_action(&quot;10.10.20.5&quot;, True, &quot;set_next_hop&quot;, &quot;192.0.2.99&quot;, True, &quot;192.0.2.1&quot;)\n    pbr2 = evaluate_pbr_action(&quot;10.10.20.5&quot;, True, &quot;set_default_next_hop&quot;, &quot;192.0.2.99&quot;, True, &quot;192.0.2.1&quot;)\n    assert pbr1[&quot;selected_next_hop&quot;] == &quot;192.0.2.99&quot;\n    assert pbr2[&quot;selected_next_hop&quot;] == &quot;192.0.2.1&quot;\n\n    rt_ok = match_mpls_vrf_rt(&quot;65001:100&quot;, [&quot;65001:10&quot;], [&quot;65001:10&quot;, &quot;65001:99&quot;])\n    rt_no = match_mpls_vrf_rt(&quot;65001:100&quot;, [&quot;65001:20&quot;], [&quot;65001:10&quot;])\n    assert rt_ok[&quot;imported_into_vrf&quot;] is True and rt_no[&quot;imported_into_vrf&quot;] is False\n    print(&quot;PBR override vs default-next-hop:&quot;, {&quot;pbr1&quot;: pbr1[&quot;decision&quot;], &quot;pbr2&quot;: pbr2[&quot;decision&quot;]})\n    print(&quot;MPLS RT import check:&quot;, {&quot;ok&quot;: rt_ok[&quot;imported_into_vrf&quot;], &quot;no&quot;: rt_no[&quot;imported_into_vrf&quot;]})\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE DMVPN Phase 3 Hub &amp; Spoke (NOT executed on live hardware)\n! Hub Tunnel0:\ninterface Tunnel0\n ip nhrp redirect\n! Spoke Tunnel0:\ninterface Tunnel0\n ip nhrp shortcut\n! OSPF MTU &amp; Network Type Check:\nshow ip ospf interface brief</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "گیرکردن همسایگی OSPF در وضعیت <strong>EXSTART/EXCHANGE</strong> معمولاً نشانه چیست؟",
+      "options": [
+        "ناهم‌خوانی Area",
+        "ناهم‌خوانی MTU (یا تکرار Router-ID)",
+        "خاموش بودن BGP",
+        "تفاوت VLAN"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بسته‌های DBD شامل MTU هستند و ناهم‌خوانی آن همسایگی را در EXSTART متوقف می‌کند.</p>"
+    },
+    {
+      "title": "تنظیم یک سمت OSPF به <code>Broadcast</code> و سمت دیگر به <code>Point-to-Point</code> (با تایمر یکسان) چه تله‌ای می‌سازد؟",
+      "options": [
+        "اصلاً Hello ردوبدل نمی‌شود",
+        "همسایگی ممکن است FULL شود اما مسیرها به‌علت ناسازگاری LSA وارد RIB نشوند",
+        "تبدیل به EIGRP",
+        "تغییر MTU"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ناسازگاری نوع شبکه، تطبیق LSA Type 1/2 را در محاسبه SPF مختل می‌کند.</p>"
+    },
+    {
+      "title": "کدام فاز <strong>DMVPN</strong> هم تونل مستقیم Spoke-to-Spoke و هم Summarization روی Hub را هم‌زمان پشتیبانی می‌کند؟",
+      "options": [
+        "Phase 1",
+        "Phase 2",
+        "Phase 3 (با NHRP Redirect و Shortcut)",
+        "هیچ‌کدام"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>Phase 3 محدودیت Phase 2 در Summarization را با Redirect/Shortcut برطرف می‌کند.</p>"
+    },
+    {
+      "title": "اثر دستور <code>distribute-list ... in</code> در OSPF چیست؟",
+      "options": [
+        "حذف LSA از کل شبکه",
+        "فقط جلوگیری از نصب مسیر در RIB محلی همان روتر (LSA در LSDB باقی می‌ماند)",
+        "قطع همسایگی",
+        "تغییر Area"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در OSPF همه روترهای یک Area باید LSDB یکسان داشته باشند.</p>"
+    },
+    {
+      "title": "در BGP وضعیت <strong><code>Active</code></strong> نشانه کدام مشکل است؟",
+      "options": [
+        "نشست سالم است",
+        "عدم موفقیت در برقراری نشست TCP 179 (فایروال، نبود update-source یا ebgp-multihop)",
+        "پر شدن دیسک",
+        "نصب کامل مسیر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Active به معنای تلاش نافرجام برای اتصال TCP 179 است.</p>"
+    },
+    {
+      "title": "تفاوت اصلی <strong>DMVPN Phase 1</strong> با Phase 2 چیست؟",
+      "options": [
+        "در Phase 1 ترافیک Spoke-to-Spoke اجباراً از Hub می‌گذرد، در Phase 2 مستقیم است",
+        "Phase 1 از IPsec پشتیبانی نمی‌کند",
+        "Phase 2 از Hub استفاده نمی‌کند",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در Phase 1 شعب تونل point-to-point به Hub دارند.</p>"
+    },
+    {
+      "title": "چرا یک مسیر معتبر در جدول BGP ممکن است برچسب <code>r</code> (<strong>RIB Failure</strong>) بگیرد؟",
+      "options": [
+        "چون مسیر با AD بهتر (مانند Static یا OSPF) از قبل در RIB وجود دارد",
+        "چون TCP 179 قطع است",
+        "چون MTU اشتباه است",
+        "چون NHRP خاموش است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>RIB Failure یعنی مسیر در BGP وجود دارد اما در RIB پروتکل با AD کمتر برنده شده است.</p>"
+    },
+    {
+      "title": "کدام دو دستور کلیدی روی Hub و Spoke باعث تبدیل DMVPN به Phase 3 می‌شوند؟",
+      "options": [
+        "next-hop-self و passive",
+        "<code>ip nhrp redirect</code> (Hub) و <code>ip nhrp shortcut</code> (Spoke)",
+        "area stub و summary",
+        "standby preempt"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Hub پیام Redirect می‌فرستد و Spoke جدول CEF را با Shortcut به‌روزرسانی می‌کند.</p>"
+    },
+    {
+      "title": "اگر در OSPF یک سمت در <code>Area 0</code> و سمت دیگر در <code>Area 1</code> باشد چه رخ می‌دهد؟",
+      "options": [
+        "EXSTART",
+        "همسایگی در DOWN مانده و تشکیل نمی‌شود",
+        "2-WAY پایدار",
+        "FULL بدون مسیر"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>شناسه Area در Hello باید دوطرفه یکسان باشد.</p>"
+    },
+    {
+      "title": "موضع اجرای <strong>PBR</strong> نسبت به جدول مسیریابی عادی (RIB/CEF) چیست؟",
+      "options": [
+        "پس از RIB",
+        "پیش از جست‌وجوی جدول مسیریابی عادی روی اینترفیس ورودی",
+        "فقط در خروجی",
+        "فقط برای ARP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>PBR روی ترافیک ورودی پیش از lookup عادی تصمیم می‌گیرد.</p>"
+    },
+    {
+      "title": "در <code>ccnp_02_lab.py</code> کدام مشکل باعث نتیجه <code>stuck_state='EXSTART_EXCHANGE'</code> می‌شود؟",
+      "options": [
+        "تفاوت Area",
+        "تفاوت MTU بین دو همسایه OSPF",
+        "تفاوت Stub Flag",
+        "DMVPN Phase 1"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مدل به‌طور مشخص ناهم‌خوانی MTU را به توقف EXSTART/EXCHANGE نگاشت می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_02_lab.py</code> چیست؟",
+      "options": [
+        "اتصال زنده به دو روتر DMVPN",
+        "تست CoPP سخت‌افزاری",
+        "موتور تشخیص محلی Python 3 برای OSPF/BGP/DMVPN بدون سخت‌افزار زنده",
+        "اجرای واقعی NHRP"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه شبیه‌ساز محلی Python بدون تجهیز زنده است.</p>"
+    }
+  ]
+}

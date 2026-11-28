@@ -1,0 +1,351 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_enc_auto",
+  "objectiveId": "ccnp_enc_auto",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENCOR Automation (JSON/YAML, RESTCONF, NETCONF/YANG, EEM, Guest Shell)",
+  "title": "اتوماسیون در CCNP ENCOR: JSON/YAML/XML، مدل YANG، NETCONF در برابر RESTCONF، EEM و Guest Shell",
+  "titleEn": "CCNP ENCOR Automation: YANG, NETCONF vs RESTCONF, EEM & Guest Shell",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "auto_03",
+    "auto_04",
+    "auto_08"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_enc_auto (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_enc_auto",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc6241",
+      "https://www.rfc-editor.org/rfc/rfc7950",
+      "https://www.rfc-editor.org/rfc/rfc8040"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_enc_auto_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق NETCONF (RFC 6241، SSH 830، XML، Candidate Datastore و تایید تراکنشی) از RESTCONF (RFC 8040، HTTPS 443، JSON/XML، بدون Candidate Datastore استاندارد).",
+      "تبیین دقیق نقش YANG (RFC 7950) به‌عنوان زبان مدل‌سازی داده و تفاوت OpenConfig، IETF و Native Models.",
+      "ساخت آزمایشگاه محلی ccnp_enc_auto_lab.py برای شبیه‌سازی چرخه Candidate->Commit/Discard در NETCONF، متدهای RESTCONF و سیاست EEM."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_enc_auto-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_enc_auto.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_enc_auto_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تفکیک دقیق NETCONF (RFC 6241، SSH 830، XML، Candidate Datastore و تایید تراکنشی) از RESTCONF (RFC 8040، HTTPS 443، JSON/XML، بدون Candidate Datastore استاندارد).",
+      "تبیین دقیق نقش YANG (RFC 7950) به‌عنوان زبان مدل‌سازی داده و تفاوت OpenConfig، IETF و Native Models.",
+      "ساخت آزمایشگاه محلی ccnp_enc_auto_lab.py برای شبیه‌سازی چرخه Candidate->Commit/Discard در NETCONF، متدهای RESTCONF و سیاست EEM."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_enc_auto-section-1",
+      "title": "مسئله واقعی: چرا اسکریپت‌نویسی روی خروجی متنی CLI در مقیاس صدها تجهیز شکننده است؟",
+      "html": "<p>تغییر یک فاصله در خروجی متنی CLI میان دو نسخه IOS-XE می‌تواند Regex را بشکند؛ اما مدل‌های داده <strong>YANG (RFC 7950)</strong> همراه با <strong>NETCONF</strong> و <strong>RESTCONF</strong> قرارداد ساخت‌یافته، اعتبارسنجی‌پذیر و ماشین‌خوان فراهم می‌کنند.</p>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> مبانی REST/JSON و NETCONF/RESTCONF (<code>auto_03</code>، <code>auto_04</code>، <code>auto_08</code>).</p><ul><li>تفاوت فرمت‌های داده <strong>JSON</strong>، <strong>YAML</strong> و <strong>XML</strong>.</li><li>مقایسه مهندسی <strong>NETCONF (RFC 6241)</strong> و <strong>RESTCONF (RFC 8040)</strong> روی مدل <strong>YANG (RFC 7950)</strong>.</li><li>اتوماسیون درون‌تجهیز با <strong>EEM (Embedded Event Manager)</strong> و <strong>Guest Shell</strong>.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-3",
+      "title": "مقایسه قالب‌های داده JSON، YAML و XML در اتوماسیون شبکه",
+      "html": "<p><strong>JSON</strong> سبک و بومی APIهای REST است؛ <strong>YAML</strong> خوانا و محبوب در Ansible/CI اما حساس به تورفتگی؛ و <strong>XML</strong> دارای Namespace و Schema و فرمت بومی NETCONF است.</p>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-4",
+      "title": "مدل داده YANG (RFC 7950): IETF، OpenConfig و Vendor-Native",
+      "html": "<p>YANG ساختار درختی داده‌های پیکربندی (<code>config true</code>) و وضعیت عملیاتی (<code>config false</code>) را تعریف می‌کند. مدل‌های <strong>OpenConfig/IETF</strong> چندفروشنده‌اند، در حالی که مدل‌های <strong>Native</strong> (مثل <code>Cisco-IOS-XE-native</code>) جزئیات اختصاصی هر سازنده را پوشش می‌دهند.</p>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-5",
+      "title": "مقایسه عمیق NETCONF (RFC 6241) در برابر RESTCONF (RFC 8040)",
+      "html": "<table><thead><tr><th>ویژگی</th><th>NETCONF (RFC 6241)</th><th>RESTCONF (RFC 8040)</th></tr></thead><tbody><tr><td><strong>انتقال و پورت</strong></td><td>SSH (پورت پیش‌فرض 830)</td><td>HTTPS (پورت 443)</td></tr><tr><td><strong>فرمت داده</strong></td><td>XML</td><td>JSON یا XML</td></tr><tr><td><strong>Datastore تراکنشی</strong></td><td>پشتیبانی از Candidate، Lock، Validate، Commit/Rollback</td><td>بدون Candidate/Lock استاندارد؛ اعمال مستقیم روی Running</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-6",
+      "title": "نمودار معماری: مدل YANG مشترک بین NETCONF و RESTCONF + اتوماسیون EEM",
+      "html": "<p>نمودار زیر اشتراک مدل YANG میان NETCONF/RESTCONF و حلقه واکنش خودکار EEM را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"ENCOR Automation YANG NETCONF RESTCONF EEM\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">ENCOR Automation: YANG Models, NETCONF/RESTCONF &amp; EEM</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">YANG Data Models</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">IETF / OpenConfig / Native</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Config (rw) vs State (ro)</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">NETCONF vs RESTCONF</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">NETCONF: SSH 830, Candidate+Lock</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">RESTCONF: HTTPS 443, JSON/CRUD</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">On-Box Automation</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">EEM: Event -&gt; Action (Syslog/CLI)</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Guest Shell: Linux Python sandbox</text></svg>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-7",
+      "title": "تفاوت HTTP PUT، PATCH و POST در RESTCONF",
+      "html": "<p>در RESTCONF متد <strong>GET</strong> خواندن، <strong>POST</strong> ایجاد یا اجرای RPC، <strong>PUT</strong> ایجاد یا <em>جایگزینی کامل</em> منبع (ریسک حذف فیلدهای ذکرنشده!) و <strong>PATCH</strong> اصلاح جزئی و ایمن‌تر منبع است.</p>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-8",
+      "title": "چرخه ایمن NETCONF: `lock -> edit-config -> validate -> commit -> unlock`",
+      "html": "<p>قفل کردن Datastore، ویرایش در <code>candidate</code>، اعتبارسنجی پیش از اعمال و استفاده از <code>confirmed-commit</code> ریسک قطع دسترسی شبکه را به حداقل می‌رساند.</p>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-9",
+      "title": "اتوماسیون درون‌تجهیز: EEM (Embedded Event Manager) و Guest Shell",
+      "html": "<p><strong>EEM</strong> رویدادهای محلی (الگوی Syslog، تایمر یا تغییر شمارنده) را پایش کرده و واکنش خودکار اجرا می‌کند؛ <strong>Guest Shell</strong> یک کانتینر لینوکس ایزوله درون IOS-XE برای اجرای اسکریپت‌های Python است.</p>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-10",
+      "title": "ابزارهای مدیریت پیکربندی: Agentless (Ansible) در برابر Agent-Based",
+      "html": "<p>در شبکه معمولاً <strong>Ansible</strong> به‌صورت Agentless (روی SSH/NETCONF/RESTCONF) ترجیح داده می‌شود چون نیازی به نصب Agent روی سوئیچ‌ها ندارد، در حالی که Puppet/Chef بیشتر در سرورها با مدل Pull/Agent دیده می‌شوند.</p>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-11",
+      "title": "تله‌های رایج اتوماسیون در ENCOR",
+      "html": "<ul><li>استفاده بی‌احتیاط از HTTP <code>PUT</code> به‌جای <code>PATCH</code> و پاک شدن بخش‌هایی از پیکربندی اینترفیس.</li><li>نوشتن EEM Applet با حلقه بی‌نهایت (تولید همان Syslog که دوباره خودش را تریگر کند!).</li><li>فراموش کردن <code>unlock</code> پس از خطا در NETCONF.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-12",
+      "title": "چک‌لیست امن پیش از اجرای اتوماسیون",
+      "html": "<ul><li>اعتبارسنجی مدل و Diff پیش از Commit.</li><li>بررسی <code>show event manager policy registered</code> و محدودسازی دسترسی RESTCONF/NETCONF به VRF مدیریت.</li></ul>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-13",
+      "title": "تمرین تحلیلی سناریو (تراکنش Candidate در NETCONF و مقایسه PUT/PATCH)",
+      "html": "<p>در <code>ccnp_enc_auto_lab.py</code> ویرایش روی <code>candidate</code> بدون تأثیر بر <code>running</code> تا لحظه <code>commit</code>، بازگشت با <code>discard-changes</code>، تفاوت تخریبی <code>PUT</code> با <code>PATCH</code> و اجرای شرطی EEM آزموده شده‌اند.</p>"
+    },
+    {
+      "id": "ccnp_enc_auto-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc6241\" target=\"_blank\" rel=\"noopener\">RFC 6241 (NETCONF)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc7950\" target=\"_blank\" rel=\"noopener\">RFC 7950 (YANG 1.1)</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc8040\" target=\"_blank\" rel=\"noopener\">RFC 8040 (RESTCONF)</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_enc_auto_lab.py</code> مدل محلی Python 3 بدون اتصال زنده به روتر IOS-XE است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "YANG (RFC 7950)",
+      "fa": "زبان مدل‌سازی داده شبکه",
+      "simple": "تعریف درختی داده‌های پیکربندی و وضعیت عملیاتی تجهیزات."
+    },
+    {
+      "term": "NETCONF (RFC 6241)",
+      "fa": "پروتکل پیکربندی شبکه",
+      "simple": "پروتکل RPC مبتنی بر XML روی SSH 830 با پشتیبانی تراکنش و Candidate."
+    },
+    {
+      "term": "RESTCONF (RFC 8040)",
+      "fa": "رابط REST مبتنی بر YANG",
+      "simple": "پروتکل HTTP/HTTPS با JSON/XML برای تعامل CRUD با داده‌های YANG."
+    },
+    {
+      "term": "Candidate Datastore",
+      "fa": "مخزن پیکربندی کاندیدا",
+      "simple": "محیط پیش‌نویس در NETCONF برای اعتبارسنجی پیش از Commit روی Running."
+    },
+    {
+      "term": "Confirmed Commit",
+      "fa": "اعمال با بازگشت خودکار",
+      "simple": "بازگشت خودکار پیکربندی در NETCONF در صورت تایید نشدن طی مهلت تعیین‌شده."
+    },
+    {
+      "term": "OpenConfig",
+      "fa": "مدل‌های YANG چندفروشنده",
+      "simple": "مجموعه مدل‌های YANG مستقل از سازنده برای یکپارچگی شبکه."
+    },
+    {
+      "term": "HTTP PATCH vs PUT",
+      "fa": "ویرایش جزئی در برابر جایگزینی کامل",
+      "simple": "PATCH فقط فیلدهای مشخص را تغییر می‌دهد ولی PUT کل منبع را بازنویسی می‌کند."
+    },
+    {
+      "term": "EEM",
+      "fa": "مدیر رویداد تعبیه‌شده",
+      "simple": "اجرای خودکار واکنش‌ها روی تجهیز در پاسخ به Syslog/تایمر/شمارنده."
+    },
+    {
+      "term": "Guest Shell",
+      "fa": "پوسته لینوکس ایزوله",
+      "simple": "محیط کانتینری لینوکس روی IOS-XE برای اجرای Python و ابزارهای اتوماسیون."
+    },
+    {
+      "term": "Agentless Automation",
+      "fa": "اتوماسیون بدون عامل",
+      "simple": "مدیریت تجهیزات از راه دور بدون نصب نرم‌افزار Agent روی تجهیز (مثل Ansible)."
+    },
+    {
+      "term": "Idempotency",
+      "fa": "تکرارپذیری بی‌اثر",
+      "simple": "اجرای چندباره یک اسکریپت با نتیجه یکسان بدون تغییر ناخواسته."
+    },
+    {
+      "term": "Model-Driven Telemetry",
+      "fa": "تله‌متری مدل‌محور",
+      "simple": "ارسال جریانی (Push) داده‌های YANG جایگزین Polling سنتی SNMP."
+    },
+    {
+      "term": "Data Encoding",
+      "fa": "رمزگذاری ساخت‌یافته داده",
+      "simple": "قالب‌های JSON، YAML و XML برای انتقال و نگهداری داده."
+    },
+    {
+      "term": "RPC",
+      "fa": "فراخوانی رویه از راه دور",
+      "simple": "اجرای عملیات ساخت‌یافته مانند get-config یا commit روی تجهیز."
+    },
+    {
+      "term": "Sync-Check / Diff",
+      "fa": "مقایسه اختلاف پیش از اعمال",
+      "simple": "بررسی دقیق تغییرات میان Candidate و Running پیش از Commit."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENCOR Automation: YANG, NETCONF vs RESTCONF, EEM & Guest Shell",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_enc_auto_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_enc_auto_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_enc_auto (YANG/NETCONF/RESTCONF Selector &amp; Cisco IOS EEM Applet Simulator).\n\nEducational local model only — no live Cisco IOS-XE EEM engine, NETCONF server,\nor Ansible control node is contacted.\nModels:\n1. Event-driven Cisco IOS EEM (Embedded Event Manager) Applet matcher (syslog/CLI/timer triggers)\n   with explicit loop-guard (`max_runs`) so a triggered CLI action cannot create an infinite syslog loop!\n2. Protocol/tool matrix selector comparing NETCONF, RESTCONF, EEM, and Ansible/Python trade-offs.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport re\n\n\ndef evaluate_eem_applet(\n    events: list[str],\n    pattern: str,\n    actions: list[str],\n    max_triggers: int = 3,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Simulate a syslog-triggered Cisco EEM applet with a loop-prevention cap.&quot;&quot;&quot;\n    if not isinstance(events, list) or not all(isinstance(e, str) for e in events):\n        raise ValueError(&quot;events must be a list of strings&quot;)\n    if not isinstance(pattern, str) or not pattern.strip():\n        raise ValueError(&quot;pattern must be a non-empty regex string&quot;)\n    if not isinstance(actions, list) or not all(isinstance(a, str) and a.strip() for a in actions):\n        raise ValueError(&quot;actions must be a list of non-empty strings&quot;)\n    if isinstance(max_triggers, bool) or not isinstance(max_triggers, int) or not (1 &lt;= max_triggers &lt;= 100):\n        raise ValueError(&quot;max_triggers must be an int in 1..100&quot;)\n\n    compiled = re.compile(pattern)\n    matched_indices: list[int] = []\n    executed_log: list[dict[str, object]] = []\n    suppressed = 0\n\n    for idx, line in enumerate(events):\n        if compiled.search(line):\n            matched_indices.append(idx)\n            if len(executed_log) &lt; max_triggers:\n                executed_log.append({&quot;event_index&quot;: idx, &quot;event&quot;: line, &quot;simulated_actions&quot;: list(actions)})\n            else:\n                suppressed += 1\n\n    return {\n        &quot;matched_count&quot;: len(matched_indices),\n        &quot;executed_count&quot;: len(executed_log),\n        &quot;suppressed_by_loop_guard&quot;: suppressed,\n        &quot;executed_log&quot;: executed_log,\n        &quot;model_scope_note&quot;: &quot;Educational Python EEM matcher only; no live Cisco IOS-XE router or EEM daemon is contacted.&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco IOS-XE EEM daemon or NETCONF/Ansible node is contacted.&quot;)\n    syslogs = [\n        &quot;%LINK-3-UPDOWN: Interface GigabitEthernet0/1, changed state to down&quot;,\n        &quot;%OSPF-5-ADJCHG: Process 1, Nbr 2.2.2.2 on Gi0/1 from FULL to DOWN&quot;,\n        &quot;%LINK-3-UPDOWN: Interface GigabitEthernet0/1, changed state to down&quot;,\n        &quot;%LINK-3-UPDOWN: Interface GigabitEthernet0/1, changed state to down&quot;,\n    ]\n    res = evaluate_eem_applet(\n        syslogs,\n        pattern=r&quot;%LINK-3-UPDOWN: Interface GigabitEthernet0/1.*down&quot;,\n        actions=[&quot;cli command \\&quot;show interface GigabitEthernet0/1\\&quot;&quot;, &quot;syslog msg \\&quot;EEM captured Gi0/1 flap\\&quot;&quot;],\n        max_triggers=2,\n    )\n    assert res[&quot;matched_count&quot;] == 3 and res[&quot;executed_count&quot;] == 2 and res[&quot;suppressed_by_loop_guard&quot;] == 1\n    print(&quot;EEM applet simulation:&quot;, {&quot;matched&quot;: res[&quot;matched_count&quot;], &quot;executed&quot;: res[&quot;executed_count&quot;], &quot;suppressed&quot;: res[&quot;suppressed_by_loop_guard&quot;]})\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE NETCONF/RESTCONF &amp; EEM Applet (NOT executed on live hardware)\nnetconf-yang\nrestconf\nevent manager applet LINK_DOWN_LOG\n event syslog pattern &quot;LINEPROTO-5-UPDOWN.*down&quot;\n action 1.0 syslog msg &quot;EEM detected interface state drop&quot;</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "تفاوت اصلی <strong>NETCONF</strong> نسبت به <strong>RESTCONF</strong> در اعمال تغییرات چیست؟",
+      "options": [
+        "NETCONF روی HTTPS است",
+        "NETCONF از Candidate Datastore، Lock و Confirmed-Commit روی SSH 830 پشتیبانی می‌کند",
+        "RESTCONF فقط XML است",
+        "NETCONF بدون YANG است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مدل تراکنشی Candidate و Lock نقطه قوت اصلی NETCONF است.</p>"
+    },
+    {
+      "title": "تفاوت حیاتی HTTP <strong><code>PUT</code></strong> و <strong><code>PATCH</code></strong> در RESTCONF چیست؟",
+      "options": [
+        "PUT فقط می‌خواند",
+        "PUT کل منبع را جایگزین می‌کند (فیلدهای ذکرنشده حذف می‌شوند) اما PATCH فقط فیلدهای مشخص‌شده را به‌روز می‌کند",
+        "PATCH منبع را پاک می‌کند",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>برای ویرایش جزئی و ایمن باید از <code>PATCH</code> استفاده کرد.</p>"
+    },
+    {
+      "title": "نقش <strong>YANG (RFC 7950)</strong> در اکوسیستم اتوماسیون چیست؟",
+      "options": [
+        "پروتکل انتقال لایه ۴",
+        "زبان مدل‌سازی ساختار داده که هم NETCONF و هم RESTCONF از آن استفاده می‌کنند",
+        "ویرایشگر متن",
+        "پروتکل مسیریابی"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>YANG طرح‌واره داده است و NETCONF/RESTCONF پروتکل‌های انتقال آن هستند.</p>"
+    },
+    {
+      "title": "پورت استاندارد پیش‌فرض <strong>NETCONF over SSH</strong> کدام است؟",
+      "options": [
+        "22",
+        "443",
+        "830",
+        "161"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>طبق RFC 6242 پورت استاندارد NETCONF روی SSH برابر <code>830</code> است.</p>"
+    },
+    {
+      "title": "کاربرد اصلی <strong>EEM (Embedded Event Manager)</strong> چیست؟",
+      "options": [
+        "ساخت VLAN",
+        "واکنش خودکار درون‌تجهیز به رویدادهایی مانند Syslog یا تغییر شمارنده‌ها",
+        "تخصیص IP",
+        "جایگزینی BGP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>EEM سیاست‌های رویدادمحور محلی روی خود روتر/سوئیچ اجرا می‌کند.</p>"
+    },
+    {
+      "title": "تفاوت مدل‌های <strong>OpenConfig</strong> با <strong>Vendor-Native YANG</strong> چیست؟",
+      "options": [
+        "OpenConfig چندفروشنده و استانداردتر است ولی Native جزئیات اختصاصی کامل یک سازنده را پوشش می‌دهد",
+        "OpenConfig فقط XML است",
+        "Native مدل YANG نیست",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>انتخاب میان آن‌ها به نیاز چندفروشنده در برابر دسترسی به ویژگی‌های اختصاصی بستگی دارد.</p>"
+    },
+    {
+      "title": "<strong>Guest Shell</strong> در IOS-XE چیست؟",
+      "options": [
+        "کاربر مهمان Wi-Fi",
+        "محیط کانتینری لینوکس ایزوله روی تجهیز برای اجرای اسکریپت‌های Python",
+        "حالت بدون رمز",
+        "یک پروتکل WAN"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اجازه اجرای کد Python و ابزارهای اتوماسیون را مستقیماً روی تجهیز می‌دهد.</p>"
+    },
+    {
+      "title": "چرا Ansible در شبکه‌های سازمانی محبوب‌تر از ابزارهای Agent-Based سنتی است؟",
+      "options": [
+        "زیرا Agentless است و بدون نصب عامل روی سوئیچ‌ها از طریق SSH/NETCONF/RESTCONF کار می‌کند",
+        "زیرا به پایتون نیاز ندارد",
+        "زیرا فقط روی ویندوز است",
+        "زیرا رمزنگاری ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بسیاری از تجهیزات شبکه امکان نصب Agent دلخواه را ندارند.</p>"
+    },
+    {
+      "title": "کدام خطای طراحی در <strong>EEM Applet</strong> می‌تواند باعث حلقه بی‌نهایت شود؟",
+      "options": [
+        "استفاده از تایمر ۶۰ ثانیه‌ای",
+        "تولید همان الگوی Syslog در Action که دوباره همان Applet را تریگر کند",
+        "ذخیره فایل در flash",
+        "اجرای show clock"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بازتولید الگوی تریگر باعث اجرای پی‌درپی و بار شدید CPU می‌شود.</p>"
+    },
+    {
+      "title": "فرمت بومی پیام‌های <strong>NETCONF</strong> کدام است؟",
+      "options": [
+        "CSV",
+        "XML",
+        "YAML",
+        "INI"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پیام‌های RPC در NETCONF به صورت XML رمزگذاری می‌شوند.</p>"
+    },
+    {
+      "title": "در <code>ccnp_enc_auto_lab.py</code> اجرای <code>discard_changes()</code> پیش از <code>commit()</code> چه نتیجه‌ای دارد؟",
+      "options": [
+        "تغییرات در Running ثبت می‌شود",
+        "مخزن Candidate به وضعیت Running بازگشته و هیچ تغییری اعمال نمی‌شود",
+        "قفل حذف نمی‌شود",
+        "RESTCONF بسته می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>discard-changes</code> پیش‌نویس Candidate را بی‌اثر می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_enc_auto_lab.py</code> چیست؟",
+      "options": [
+        "اتصال زنده SSH 830 به Catalyst",
+        "اجرای Guest Shell واقعی",
+        "شبیه‌ساز محلی Python 3 برای NETCONF Candidate، RESTCONF PUT/PATCH و EEM بدون تجهیز زنده",
+        "تست Ansible واقعی"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کد محلی صرفاً منطق مدل‌شده را می‌آزماید.</p>"
+    }
+  ]
+}

@@ -35,6 +35,10 @@ AGENT3_ALLOWED_IDS = {
     "ccna_dhcp", "ccna_nat", "ccna_05", "ccna_acl", "ccna_qos_ssh", "ccna_wl", "ccna_06",
     # Phase 12C — Transferred Advanced Switching/Routing/Troubleshooting/BFD Batch (5 of 17 former Agent 1 lessons)
     "adv_01", "adv_02", "adv_03", "adv_04", "adv_bfd",
+    # Final Consolidation Batches 1-3 — Remaining 7 Advanced + 11 CCNP lessons (18 lessons -> 99 total in agent3/)
+    "adv_pvl", "adv_ec", "adv_eigrp", "adv_redist", "adv_bgp", "adv_qos", "adv_mcast",
+    "ccnp_01", "ccnp_02", "ccnp_enc_arch", "ccnp_enc_inf", "ccnp_enc_sec", "ccnp_enc_auto",
+    "ccnp_ensdwi", "ccnp_ensld", "ccnp_enauto", "ccnp_encc", "ccnp_enna",
 }
 
 FORBIDDEN_LEGACY_TYPOS = (
@@ -79,7 +83,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
     def test_discovered_lessons_are_strictly_within_agent3_scope(self):
         discovered = discover_agent3_blueprints()
         discovered_ids = {lesson_id for lesson_id, _ in discovered}
-        self.assertEqual(len(AGENT3_ALLOWED_IDS), 81)
+        self.assertEqual(len(AGENT3_ALLOWED_IDS), 99)
         self.assertEqual(
             discovered_ids,
             AGENT3_ALLOWED_IDS,
@@ -2367,7 +2371,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
 
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
-        self.assertEqual(len(scripts), 81)
+        self.assertEqual(len(scripts), 99)
         for script in scripts:
             with self.subTest(script=script.name):
                 proc = subprocess.run(

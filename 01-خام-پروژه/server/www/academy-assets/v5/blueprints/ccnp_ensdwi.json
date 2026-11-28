@@ -1,0 +1,350 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_ensdwi",
+  "objectiveId": "ccnp_ensdwi",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENSDWI (Cisco SD-WAN Architecture, OMP, TLOC, AAR Policies)",
+  "title": "تخصص CCNP ENSDWI (Cisco SD-WAN): چهار صفحه معماری، پروتکل OMP، TLOC و مسیریابی آگاه از برنامه (AAR)",
+  "titleEn": "CCNP ENSDWI: Cisco SD-WAN Planes, OMP, TLOC & Application-Aware Routing",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccnp_enc_arch",
+    "adv_bgp",
+    "adv_qos"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_ensdwi (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_ensdwi",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.cisco.com/c/en/us/td/docs/routers/sdwan/configuration/sdwan-xe-gs-book/cisco-sd-wan-overlay-network-bringup.html",
+      "https://www.cisco.com/c/en/us/td/docs/routers/sdwan/configuration/policies/ios-xe-17/policies-book-xe/application-aware-routing.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_ensdwi_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق چهار صفحه Management (vManage)، Orchestration (vBond)، Control (vSmart/OMP) و Data (WAN Edge/IPsec) و جداسازی VPN 0، VPN 512 و Service VPN.",
+      "تبیین دقیق سه مؤلفه TLOC (System IP، Color، Encapsulation)، سه نوع مسیر OMP (OMP/TLOC/Service) و معیارهای BFD برای AAR (Latency/Loss/Jitter).",
+      "ساخت آزمایشگاه محلی ccnp_ensdwi_lab.py برای شبیه‌سازی انتخاب TLOC، سیاست SLA در AAR و منطق مسیردهی OMP."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_ensdwi-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_ensdwi.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_ensdwi_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تفکیک دقیق چهار صفحه Management (vManage)، Orchestration (vBond)، Control (vSmart/OMP) و Data (WAN Edge/IPsec) و جداسازی VPN 0، VPN 512 و Service VPN.",
+      "تبیین دقیق سه مؤلفه TLOC (System IP، Color، Encapsulation)، سه نوع مسیر OMP (OMP/TLOC/Service) و معیارهای BFD برای AAR (Latency/Loss/Jitter).",
+      "ساخت آزمایشگاه محلی ccnp_ensdwi_lab.py برای شبیه‌سازی انتخاب TLOC، سیاست SLA در AAR و منطق مسیردهی OMP."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_ensdwi-section-1",
+      "title": "مسئله واقعی: چرا لینک‌های MPLS گران‌قیمت بدون دید بر کیفیت لحظه‌ای برنامه (Latency/Loss/Jitter) ناکارآمدند؟",
+      "html": "<p>در WAN سنتی، یک لینک اینترنت یا MPLS ممکن است فیزیکی Up باشد اما ۵٪ Packet Loss یا ۲۰۰ms تأخیر داشته باشد و تماس‌های ویدئویی را مختل کند. <strong>Cisco SD-WAN (ENSDWI)</strong> با کنترل مرکزی (vSmart/OMP) و سنجش مستمر <strong>BFD</strong>، ترافیک هر برنامه را به‌صورت پویا روی مسیر واجد SLA هدایت می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> معماری ENCOR (<code>ccnp_enc_arch</code>)، BGP (<code>adv_bgp</code>) و QoS (<code>adv_qos</code>).</p><ul><li>تفکیک چهار صفحه عملیاتی و ساختار <strong>VPN 0 / VPN 512 / Service VPN</strong>.</li><li>تسلط بر <strong>OMP</strong>، سه‌تایی <strong>TLOC</strong> و ترتیب انتخاب مسیر در OMP.</li><li>طراحی سیاست‌های متمرکز <strong>Application-Aware Routing (AAR)</strong> و توپولوژی Hub-and-Spoke/Full-Mesh.</li></ul>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-3",
+      "title": "چهار صفحه معماری SD-WAN و احراز هویت Zero-Trust",
+      "html": "<p><strong>vManage</strong> (مدیریت و قالب‌ها)، <strong>vBond</strong> (هماهنگی و NAT Traversal)، <strong>vSmart</strong> (توزیع مسیر و سیاست با OMP روی DTLS/TLS) و <strong>WAN Edge</strong> (صفحه داده با IPsec). تمام کنترلرها و روترها با گواهی دیجیتال X.509 یکدیگر را احراز هویت می‌کنند.</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-4",
+      "title": "ساختار VPNها: VPN 0 (Transport)، VPN 512 (Management) و Service VPN",
+      "html": "<p><strong>VPN 0</strong> مخصوص لینک‌های WAN زیرین (MPLS، Biz-Internet، LTE) و اتصال به کنترلرهاست؛ <strong>VPN 512</strong> مخصوص مدیریت Out-of-Band؛ و <strong>VPN 1..511 و 513..65527</strong> برای ایزولاسیون سگمنت‌های کاربری (Service VPN معادل VRF) به کار می‌روند.</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-5",
+      "title": "پروتکل OMP (Overlay Management Protocol) و سه‌تایی TLOC",
+      "html": "<p>هر نقطه اتصال WAN با یک <strong>TLOC</strong> شامل <code>(System IP, Color, Encapsulation)</code> شناخته می‌شود. OMP سه نوع مسیر تبلیغ می‌کند: <strong>OMP Routes</strong> (پیشوندهای LAN)، <strong>TLOC Routes</strong> (مقاصد تانل) و <strong>Service Routes</strong> (زنجیره‌سازی فایروال/IDS).</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-6",
+      "title": "نمودار معماری: چهار صفحه SD-WAN، سه‌تایی TLOC و تصمیم‌گیری SLA در AAR",
+      "html": "<p>نمودار زیر جریان کنترل OMP/vSmart و انتخاب خودکار مسیر AAR بر پایه سنجش BFD را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cisco SD-WAN ENSDWI Architecture\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">Cisco SD-WAN (ENSDWI): vManage/vBond/vSmart, OMP TLOC &amp; AAR SLA</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Control &amp; Orch Planes</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">vBond (Auth/NAT) + vManage (UI)</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">vSmart -&gt; OMP over DTLS/TLS</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Transport &amp; TLOC (VPN 0)</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">TLOC = (System-IP, Color, Encap)</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">BFD probes Latency/Loss/Jitter</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">AAR SLA Steering</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Match SLA -&gt; Preferred Color</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">SLA Breach -&gt; Instant Failover</text></svg>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-7",
+      "title": "سنجش BFD و مسیریابی آگاه از برنامه (AAR)",
+      "html": "<p>بین TLOCهای فعال، پروتکل <strong>BFD</strong> به‌طور مداوم <strong>Latency، Loss و Jitter</strong> را اندازه می‌گیرد. در سیاست <strong>AAR</strong> اگر مسیر ترجیحی (مثلاً MPLS) سقف SLA (مانند Loss &gt; 1% یا Latency &gt; 120ms) را نقض کند، ترافیک برنامه بلافاصله به مسیر جایگزین واجد SLA (مثلاً Biz-Internet) منتقل می‌شود.</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-8",
+      "title": "سیاست‌های متمرکز (Centralized) در برابر محلی (Localized)",
+      "html": "<p>سیاست‌های <strong>Centralized</strong> (Control، Data، AAR) روی vSmart تعریف و در کل فابریک اعمال می‌شوند؛ سیاست‌های <strong>Localized</strong> (QoS، ACL محلی، مسیریابی OSPF/BGP محلی) مستقیماً از vManage روی WAN Edge اعمال می‌گردند.</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-9",
+      "title": "رنگ‌های Private و Public و مفهوم `restrict` در TLOC",
+      "html": "<p>رنگ‌های خصوصی (<code>mpls</code>، <code>metro-ethernet</code>، <code>private1..6</code>) انتظار اتصال با IP خصوصی دارند و رنگ‌های عمومی (<code>biz-internet</code>، <code>public-internet</code>) با IP عمومی/NAT کار می‌کنند؛ گزینه <code>restrict</code> از تلاش بی‌مورد برای ساخت تانل بین رنگ‌های غیرهم‌جنس جلوگیری می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-10",
+      "title": "انتخاب مسیر OMP و پیشگیری از حلقه با Site-ID",
+      "html": "<p>هر سایت یک <strong>Site-ID</strong> دارد؛ روترهای یک سایت (Site-ID یکسان) برای جلوگیری از حلقه تانل IPsec به یکدیگر نمی‌سازند و مسیرهای OMP دریافتی با Site-ID خود را رد می‌کنند.</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-11",
+      "title": "تله‌های رایج در استقرار SD-WAN",
+      "html": "<ul><li>تکرار System-IP یا اشتباه در تخصیص Site-ID یکسان برای دو شعبه مجزا.</li><li>فراموش کردن <code>allow-service</code> روی اینترفیس VPN 0 یا تنظیم نکردن رنگ <code>restrict</code> در لینک MPLS ایزوله.</li><li>نداشتن Fallback در سیاست AAR هنگام نقض SLA در هر دو لینک.</li></ul>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-12",
+      "title": "چک‌لیست راستی‌آزمایی عملیاتی ENSDWI",
+      "html": "<ul><li><code>show sdwan control connections</code> برای بررسی اتصال DTLS/TLS به vSmart/vBond/vManage.</li><li><code>show sdwan bfd sessions</code> و <code>show sdwan omp routes</code>.</li></ul>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-13",
+      "title": "تمرین تحلیلی سناریو (افت کیفیت MPLS و سوئیچ AAR به Biz-Internet)",
+      "html": "<p>در <code>ccnp_ensdwi_lab.py</code> هنگامی که لینک MPLS دچار ۲.۵٪ Loss شود، سیاست AAR برای کلاس VoIP (سقف Loss 1% و Latency 150ms) به‌صورت خودکار مسیر را به <code>biz-internet</code> منتقل می‌کند و در حالت نقض هر دو مسیر، به مسیر Fallback تعیین‌شده بازمی‌گردد.</p>"
+    },
+    {
+      "id": "ccnp_ensdwi-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> مستندات رسمی <a href=\"https://www.cisco.com/c/en/us/td/docs/routers/sdwan/configuration/policies/ios-xe-17/policies-book-xe/application-aware-routing.html\" target=\"_blank\" rel=\"noopener\">Cisco SD-WAN AAR & Overlay Bringup (IOS-XE 17)</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_ensdwi_lab.py</code> مدل محلی Python 3 است و هیچ کنترلر vManage/vSmart/vBond زنده متصل نیست.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "vManage",
+      "fa": "صفحه مدیریت SD-WAN",
+      "simple": "داشبورد مرکزی پیکربندی، قالب‌ها، سیاست‌ها و پایش فابریک."
+    },
+    {
+      "term": "vBond",
+      "fa": "هماهنگ‌کننده SD-WAN",
+      "simple": "احراز هویت اولیه، کشف NAT و معرفی vSmart/vManage به WAN Edge."
+    },
+    {
+      "term": "vSmart",
+      "fa": "کنترلر صفحه کنترل",
+      "simple": "توزیع مرکزی مسیرهای OMP، کلیدهای IPsec و سیاست‌های فابریک."
+    },
+    {
+      "term": "WAN Edge",
+      "fa": "روتر لبه صفحه داده",
+      "simple": "تجهیزات cEdge/vEdge برقرارکننده تانل‌های IPsec میان شعب."
+    },
+    {
+      "term": "OMP",
+      "fa": "پروتکل مدیریت Overlay",
+      "simple": "پروتکل شبیه BGP میان vSmart و WAN Edge روی DTLS/TLS."
+    },
+    {
+      "term": "TLOC",
+      "fa": "مکان‌یاب انتقال",
+      "simple": "سه‌تایی (System-IP، Color، Encapsulation) برای شناسایی هر لینک WAN."
+    },
+    {
+      "term": "VPN 0",
+      "fa": "VPN زیرساخت انتقال",
+      "simple": "VRF مخصوص اینترفیس‌های WAN و اتصال کنترلرها."
+    },
+    {
+      "term": "VPN 512",
+      "fa": "VPN مدیریت OOB",
+      "simple": "فضای ایزوله مخصوص مدیریت Out-of-Band تجهیزات."
+    },
+    {
+      "term": "Service VPN",
+      "fa": "VPN سرویس کاربران",
+      "simple": "VRFهای جداگانه برای ترافیک LAN و سگمنت‌های سازمانی."
+    },
+    {
+      "term": "AAR",
+      "fa": "مسیریابی آگاه از برنامه",
+      "simple": "انتخاب پویا و مبتنی بر SLA مسیر ترافیک بر اساس سنجش BFD."
+    },
+    {
+      "term": "BFD Probing",
+      "fa": "سنجش پیوسته BFD",
+      "simple": "اندازه‌گیری مداوم Latency، Loss و Jitter میان TLOCها."
+    },
+    {
+      "term": "TLOC Color",
+      "fa": "رنگ لینک انتقال",
+      "simple": "برچسب منطقی نوع لینک WAN (مثل mpls، biz-internet، lte)."
+    },
+    {
+      "term": "Site-ID",
+      "fa": "شناسه عددی سایت",
+      "simple": "شناسه هر شعبه برای اعمال سیاست و جلوگیری از ساخت تانل درون‌سایتی."
+    },
+    {
+      "term": "Centralized Policy",
+      "fa": "سیاست متمرکز فابریک",
+      "simple": "سیاست کنترل/داده/AAR تعریف‌شده روی vSmart برای کل شبکه."
+    },
+    {
+      "term": "Localized Policy",
+      "fa": "سیاست محلی روتر",
+      "simple": "سیاست‌های QoS/ACL/مسیریابی محلی اعمال‌شده مستقیم روی WAN Edge."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENSDWI: Cisco SD-WAN Planes, OMP, TLOC & Application-Aware Routing",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_ensdwi_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_ensdwi_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_ensdwi (Cisco Catalyst SD-WAN OMP TLOC &amp; AAR SLA Selector).\n\nEducational local model only — no live vManage/vSmart/vBond/WAN-Edge controller,\nOMP session, or live BFD probe is contacted.\nModels:\n1. Application-Aware Routing (AAR) SLA tunnel selector across MPLS / biz-internet / lte TLOCs\n   checking BFD loss %, latency (ms), and jitter (ms) against an application SLA class.\n2. Fallback behavior when NO transport meets SLA (strict preferred-color vs fallback-to-best-available).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport math\n\n\ndef _require_non_neg_float(val: object, name: str, max_val: float = 100_000.0) -&gt; float:\n    if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(float(val)):\n        raise ValueError(f&quot;{name} must be a finite number, got {val!r}&quot;)\n    f = float(val)\n    if not (0.0 &lt;= f &lt;= max_val):\n        raise ValueError(f&quot;{name} must be in 0..{max_val}, got {f}&quot;)\n    return f\n\n\ndef select_aar_tloc(\n    tlocs: list[dict[str, object]],\n    max_loss_pct: float,\n    max_latency_ms: float,\n    max_jitter_ms: float,\n    preferred_color: str | None = None,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Select an SD-WAN TLOC meeting BFD SLA thresholds, with explicit fallback if none comply.&quot;&quot;&quot;\n    mloss = _require_non_neg_float(max_loss_pct, &quot;max_loss_pct&quot;, 100.0)\n    mlat = _require_non_neg_float(max_latency_ms, &quot;max_latency_ms&quot;, 60_000.0)\n    mjit = _require_non_neg_float(max_jitter_ms, &quot;max_jitter_ms&quot;, 60_000.0)\n    if not isinstance(tlocs, list) or not tlocs:\n        raise ValueError(&quot;tlocs must be a non-empty list&quot;)\n\n    compliant: list[dict[str, object]] = []\n    up_tlocs: list[dict[str, object]] = []\n    for t in tlocs:\n        color = str(t.get(&quot;color&quot;, &quot;&quot;)).strip()\n        if not color:\n            raise ValueError(&quot;tloc color must be non-empty&quot;)\n        bfd_up = t.get(&quot;bfd_up&quot;)\n        if not isinstance(bfd_up, bool):\n            raise ValueError(&quot;bfd_up must be a strict bool&quot;)\n        loss = _require_non_neg_float(t[&quot;loss_pct&quot;], &quot;loss_pct&quot;, 100.0)\n        lat = _require_non_neg_float(t[&quot;latency_ms&quot;], &quot;latency_ms&quot;, 60_000.0)\n        jit = _require_non_neg_float(t[&quot;jitter_ms&quot;], &quot;jitter_ms&quot;, 60_000.0)\n        entry = {&quot;color&quot;: color, &quot;bfd_up&quot;: bfd_up, &quot;loss_pct&quot;: loss, &quot;latency_ms&quot;: lat, &quot;jitter_ms&quot;: jit}\n        if not bfd_up:\n            continue\n        up_tlocs.append(entry)\n        if loss &lt;= mloss and lat &lt;= mlat and jit &lt;= mjit:\n            compliant.append(entry)\n\n    if not up_tlocs:\n        return {&quot;selected_color&quot;: None, &quot;sla_met&quot;: False, &quot;reason&quot;: &quot;NO_BFD_UP_TLOC_AVAILABLE&quot;}\n\n    if compliant:\n        if preferred_color:\n            pref = [c for c in compliant if c[&quot;color&quot;] == preferred_color]\n            if pref:\n                return {&quot;selected_color&quot;: pref[0][&quot;color&quot;], &quot;sla_met&quot;: True, &quot;reason&quot;: &quot;PREFERRED_COLOR_MET_SLA&quot;}\n        best = sorted(compliant, key=lambda x: (x[&quot;loss_pct&quot;], x[&quot;latency_ms&quot;], x[&quot;jitter_ms&quot;]))[0]\n        return {&quot;selected_color&quot;: best[&quot;color&quot;], &quot;sla_met&quot;: True, &quot;reason&quot;: &quot;BEST_SLA_COMPLIANT_TLOC&quot;}\n\n    fallback = sorted(up_tlocs, key=lambda x: (x[&quot;loss_pct&quot;], x[&quot;latency_ms&quot;], x[&quot;jitter_ms&quot;]))[0]\n    return {\n        &quot;selected_color&quot;: fallback[&quot;color&quot;],\n        &quot;sla_met&quot;: False,\n        &quot;reason&quot;: &quot;NO_TLOC_MET_SLA_FALLBACK_TO_LEAST_DEGRADED_UP_TLOC&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live vManage/vSmart/vBond/WAN-Edge or BFD probe is contacted.&quot;)\n    tlocs = [\n        {&quot;color&quot;: &quot;mpls&quot;, &quot;bfd_up&quot;: True, &quot;loss_pct&quot;: 3.5, &quot;latency_ms&quot;: 40.0, &quot;jitter_ms&quot;: 5.0},\n        {&quot;color&quot;: &quot;biz-internet&quot;, &quot;bfd_up&quot;: True, &quot;loss_pct&quot;: 0.2, &quot;latency_ms&quot;: 55.0, &quot;jitter_ms&quot;: 8.0},\n        {&quot;color&quot;: &quot;lte&quot;, &quot;bfd_up&quot;: False, &quot;loss_pct&quot;: 0.0, &quot;latency_ms&quot;: 90.0, &quot;jitter_ms&quot;: 20.0},\n    ]\n    res = select_aar_tloc(tlocs, max_loss_pct=1.0, max_latency_ms=150.0, max_jitter_ms=30.0, preferred_color=&quot;mpls&quot;)\n    assert res[&quot;selected_color&quot;] == &quot;biz-internet&quot; and res[&quot;sla_met&quot;] is True\n    print(&quot;AAR SLA selection (MPLS degraded -&gt; switched to biz-internet):&quot;, res)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco SD-WAN Policy &amp; Verification (NOT executed on live controllers)\nshow sdwan control connections\nshow sdwan omp tlocs\nshow sdwan bfd sessions\nshow sdwan policy from-vsmart</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "سه‌تایی تشکیل‌دهنده یک <strong>TLOC</strong> در Cisco SD-WAN کدام است؟",
+      "options": [
+        "IP، MAC، VLAN",
+        "System IP، Color و Encapsulation",
+        "ASN، Router-ID، Area",
+        "VPN، Port، DSCP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>TLOC با سه شناسه System IP، Color و Encapsulation (IPsec/GRE) تعریف می‌شود.</p>"
+    },
+    {
+      "title": "در معماری Cisco SD-WAN وظیفه <strong>VPN 0</strong> و <strong>VPN 512</strong> به‌ترتیب چیست؟",
+      "options": [
+        "کاربران و صدا",
+        "Transport (لینک‌های WAN) و مدیریت Out-of-Band",
+        "فایروال و Wi-Fi",
+        "دیتاسنتر و شعبه"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>VPN 0 حمل‌ونقل WAN و VPN 512 مدیریت OOB است.</p>"
+    },
+    {
+      "title": "کدام مؤلفه وظیفه توزیع مسیرهای <strong>OMP</strong> و کلیدهای IPsec را در Control Plane برعهده دارد؟",
+      "options": [
+        "vBond",
+        "vSmart",
+        "vManage",
+        "WAN Edge"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>vSmart مغز صفحه کنترل SD-WAN است.</p>"
+    },
+    {
+      "title": "<strong>Application-Aware Routing (AAR)</strong> بر اساس سنجش کدام پروتکل مسیر را تغییر می‌دهد؟",
+      "options": [
+        "STP",
+        "BFD (اندازه‌گیری Latency، Loss و Jitter بین TLOCها)",
+        "CDP",
+        "ARP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>BFD کیفیت لحظه‌ای هر تانل را به موتور AAR گزارش می‌کند.</p>"
+    },
+    {
+      "title": "دو WAN Edge در یک شعبه با <strong>Site-ID یکسان</strong> چه رفتاری با یکدیگر دارند؟",
+      "options": [
+        "به‌صورت خودکار تانل IPsec بین خود می‌سازند",
+        "برای جلوگیری از حلقه بین خود تانل IPsec نمی‌سازند",
+        "هر دو خاموش می‌شوند",
+        "تبدیل به vBond می‌شوند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Site-ID یکسان مانع تشکیل تانل Overlay درون یک سایت می‌شود.</p>"
+    },
+    {
+      "title": "گزینه <strong><code>restrict</code></strong> روی رنگ TLOC (مثلاً <code>mpls</code>) چه اثری دارد؟",
+      "options": [
+        "قطع کل لینک",
+        "محدود کردن تشکیل تانل صرفاً با همتایان دارای همان رنگ (جلوگیری از تلاش به اینترنت)",
+        "حذف رمزنگاری",
+        "افزایش MTU"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>از تلاش بی‌نتیجه روتر MPLS خصوصی برای ساخت تانل به رنگ‌های عمومی جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "سه نوع مسیر تبلیغ‌شده توسط <strong>OMP</strong> کدام‌اند؟",
+      "options": [
+        "OSPF، EIGRP، RIP",
+        "OMP Routes، TLOC Routes و Service Routes",
+        "LSA1، LSA2، LSA3",
+        "Static، Connected، Default"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>این سه نوع مسیر پیشوندها، نقاط انتهای تانل و سرویس‌های امنیتی را پوشش می‌دهند.</p>"
+    },
+    {
+      "title": "تفاوت <strong>Centralized Policy</strong> با <strong>Localized Policy</strong> چیست؟",
+      "options": [
+        "Centralized روی vSmart برای کل فابریک و Localized مستقیماً روی WAN Edge (مثل QoS/ACL محلی) اعمال می‌شود",
+        "یکسان‌اند",
+        "Localized فقط برای VPN 0 است",
+        "Centralized بدون vManage است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>AAR و توپولوژی جزو Centralized و QoS/ACL محلی جزو Localized هستند.</p>"
+    },
+    {
+      "title": "اگر در سیاست AAR همه مسیرهای موجود SLA را نقض کنند چه تصمیمی ایمن‌تر است؟",
+      "options": [
+        "پاک کردن vSmart",
+        "تعریف رفتار Fallback صریح (ارسال روی بهترین مسیر موجود یا Fallback Color)",
+        "تغییر VPN 512",
+        "ریست BGP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون Fallback ممکن است ترافیک حساس به‌طور ناخواسته Drop یا سرگردان شود.</p>"
+    },
+    {
+      "title": "ارتباط صفحه کنترل میان WAN Edge و vSmart روی چه پروتکل امنی برقرار می‌شود؟",
+      "options": [
+        "Telnet",
+        "DTLS یا TLS با گواهی دیجیتال",
+        "HTTP ساده",
+        "TFTP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اتصالات کنترلی SD-WAN با DTLS/TLS احراز هویت و رمزنگاری می‌شوند.</p>"
+    },
+    {
+      "title": "در <code>ccnp_ensdwi_lab.py</code> هنگام افزایش Loss لینک MPLS به ۲.۵٪ (بالاتر از سقف ۱٪ VoIP) چه رنگی انتخاب می‌شود؟",
+      "options": [
+        "mpls",
+        "<code>biz-internet</code> (مسیر سالم واجد SLA)",
+        "drop",
+        "vpn512"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>موتور AAR بلافاصله به مسیر جایگزین واجد شرایط SLA سوئیچ می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_ensdwi_lab.py</code> چیست؟",
+      "options": [
+        "اتصال زنده به vManage/vSmart",
+        "اجرای تانل IPsec زنده",
+        "شبیه‌ساز محلی Python 3 برای TLOC/OMP/AAR بدون کنترلر زنده",
+        "تست cEdge سخت‌افزاری"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کد محلی صرفاً منطق مدل‌شده را می‌آزماید.</p>"
+    }
+  ]
+}

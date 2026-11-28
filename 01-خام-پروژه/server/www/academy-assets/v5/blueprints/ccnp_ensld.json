@@ -1,0 +1,350 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccnp_ensld",
+  "objectiveId": "ccnp_ensld",
+  "kind": "lesson",
+  "track": "مهندسی CCNP Enterprise (ENCOR / ENARSI / Specializations)",
+  "course": "c5-ccnp-enterprise",
+  "domain": "ENSLD (Enterprise Network Design: Addressing, Scalability, WAN & High Availability)",
+  "title": "تخصص CCNP ENSLD (طراحی شبکه سازمانی): طرح آدرس‌دهی سلسله‌مراتبی، مقیاس‌پذیری IGP/BGP و دسترسی‌پذیری بالا",
+  "titleEn": "CCNP ENSLD: Hierarchical IP Addressing, IGP/BGP Scale & High Availability Design",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "adv_02",
+    "adv_bgp",
+    "ccnp_enc_arch"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy ccnp_ensld (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "ccnp_ensld",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc1918",
+      "https://www.cisco.com/c/en/us/td/docs/solutions/Enterprise/Campus/HA_campus_DG/hacampusdg.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/ccnp_ensld_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "محاسبه ریاضی دقیق دسترس‌پذیری ترکیبی (سری و موازی: A_series = A1*A2 و A_parallel = 1 - (1-A1)*(1-A2)) و ترجمه به دقیقه قطعی سالانه.",
+      "طراحی طرح آدرس‌دهی سلسله‌مراتبی Summarizable (جلوگیری از هم‌پوشانی و شکسته شدن Summarization در مرز Area/Site).",
+      "ساخت آزمایشگاه محلی ccnp_ensld_lab.py برای ممیزی عدم هم‌پوشانی سابنت‌ها، محاسبه Availability و انتخاب الگوی طراحی IGP/BGP."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccnp_ensld-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccnp-enterprise",
+      "blueprint": "/academy-assets/v5/blueprints/ccnp_ensld.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccnp_ensld_lab.py"
+    },
+    "technicalAuditFixes": [
+      "محاسبه ریاضی دقیق دسترس‌پذیری ترکیبی (سری و موازی: A_series = A1*A2 و A_parallel = 1 - (1-A1)*(1-A2)) و ترجمه به دقیقه قطعی سالانه.",
+      "طراحی طرح آدرس‌دهی سلسله‌مراتبی Summarizable (جلوگیری از هم‌پوشانی و شکسته شدن Summarization در مرز Area/Site).",
+      "ساخت آزمایشگاه محلی ccnp_ensld_lab.py برای ممیزی عدم هم‌پوشانی سابنت‌ها، محاسبه Availability و انتخاب الگوی طراحی IGP/BGP."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccnp_ensld-section-1",
+      "title": "مسئله واقعی: چرا یک طرح آدرس‌دهی تصادفی تمام مزایای Area Design و Summarization را از بین می‌برد؟",
+      "html": "<p>در <strong>CCNP ENSLD</strong> تمرکز از پیکربندی تک‌تجهیز به <strong>معماری کلان و تصمیم‌های برگشت‌ناپذیر طراحی</strong> منتقل می‌شود: طرح آدرس‌دهی بدون سلسله‌مراتب، جدول مسیریابی را منفجر و همگرایی را کند می‌کند؛ یک نقطه شکست واحد (SPOF) نیز کل SLA سازمان را زیر ۹۹.۹٪ می‌آورد.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> OSPF Multi-Area (<code>adv_02</code>)، BGP (<code>adv_bgp</code>) و معماری ENCOR (<code>ccnp_enc_arch</code>).</p><ul><li>طراحی <strong>Hierarchical IPv4/IPv6 Addressing</strong> قابل خلاصه‌سازی (Summarizable).</li><li>محاسبه دقیق <strong>Availability</strong> (سری/موازی و Downtime سالانه) و حذف SPOF.</li><li>انتخاب معماری <strong>OSPF/IS-IS/BGP</strong> در مقیاس صدها سایت و WAN دوگانه.</li></ul>"
+    },
+    {
+      "id": "ccnp_ensld-section-3",
+      "title": "اصول طراحی آدرس‌دهی سلسله‌مراتبی (Bit-Boundary Summarization)",
+      "html": "<p>اختصاص بلوک‌های پیوسته روی مرز توان ۲ (مثلاً هر منطقه یک <code>/16</code>، هر سایت یک <code>/20</code> و هر VLAN یک <code>/24</code> با فضای رزرو رشد ۵۰٪) امکان Summarization در مرز ABR/WAN را فراهم و از پراکنده شدن ده‌ها مسیر ریز در Core جلوگیری می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-4",
+      "title": "آدرس‌دهی IPv6 سازمانی: مزیت مرز ۴بیتی (Nibble Boundary)",
+      "html": "<p>در IPv6 با دریافت یک بلوک <code>/48</code>، هر سایت می‌تواند یک <code>/56</code> یا <code>/52</code> و هر VLAN یک <code>/64</code> دقیق روی مرز هگزادسیمال (Nibble) بگیرد تا هم خوانایی انسانی و هم Summarization بی‌نقص شود.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-5",
+      "title": "ریاضیات دسترس‌پذیری بالا (Availability & Downtime Budget)",
+      "html": "<p>دو مؤلفه <strong>سری</strong> دسترس‌پذیری <code>A_total = A1 × A2</code> (بدتر از هر دو!) و دو مؤلفه <strong>موازی</strong> مستقل دسترس‌پذیری <code>A_total = 1 - (1 - A1)(1 - A2)</code> دارند. چهار نُه (<strong>99.99%</strong>) معادل حدود <strong>۵۲.۶ دقیقه</strong> قطعی مجاز در کل سال است.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-6",
+      "title": "نمودار معماری: بلوک‌بندی آدرس، حذف SPOF و محاسبه Availability",
+      "html": "<p>نمودار زیر سه رکن طراحی ENSLD (بلوک آدرس قابل خلاصه‌سازی، حذف SPOF و مقیاس‌پذیری کنترل‌پلین) را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"CCNP ENSLD Design Principles\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">CCNP ENSLD: Hierarchical Addressing, Parallel HA &amp; Routing Scale</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Hierarchical IP Plan</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Region /16 -&gt; Site /20 -&gt; LAN /24</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Clean Summarization at ABR/WAN</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">HA Math (Series vs Parallel)</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Series: A1*A2 (SPOF risk!)</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Parallel: 1-(1-A1)(1-A2) -&gt; 99.99%</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">Routing Scale (IGP/BGP)</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Limit OSPF routers/area + Stub</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">BGP RR + Dual-Homed WAN Edge</text></svg>"
+    },
+    {
+      "id": "ccnp_ensld-section-7",
+      "title": "طراحی مقیاس‌پذیر IGP: OSPF در برابر IS-IS و EIGRP",
+      "html": "<p>برای مقیاس‌پذیری OSPF باید تعداد روترها در یک Area کنترل شود، <strong>Stub/Totally Stubby</strong> در لبه‌ها و <strong>Summarization</strong> روی ABRها اعمال گردد. در شبکه‌های بسیار بزرگ یا ارائه‌دهنده سرویس، <strong>IS-IS</strong> (مستقل از IP و مبتنی بر TLV) و <strong>BGP</strong> محبوبیت بالایی دارند.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-8",
+      "title": "طراحی اتصال اینترنت سازمانی: Single/Dual-Homed در برابر Multihomed",
+      "html": "<p>اتصال <strong>Dual-Multihomed</strong> (دو روتر مرزی به دو ISP مستقل با BGP و پیوند iBGP میانی) هم خطای لینک، هم خطای ISP و هم خرابی روتر مرزی را تحمل می‌کند.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-9",
+      "title": "طراحی Failure Domain و تقارن (Symmetry) در پردیس",
+      "html": "<p>کاهش اندازه Failure Domain با مثلث‌های متقارن L3 میان Access، Distribution و Core باعث می‌شود خرابی یک تجهیز تنها کسری کوچک از شبکه را متأثر کند و مسیر برگشت پیش‌بینی‌پذیر بماند.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-10",
+      "title": "موازنه‌سازی هزینه، پیچیدگی و SLA (Trade-off Analysis)",
+      "html": "<p>طراحی خوب به معنای خرید گران‌ترین سخت‌افزار نیست؛ معمار باید بر اساس <strong>RTO/RPO</strong>، بودجه قطعی (Downtime Budget) و پیچیدگی عملیاتی تیم نگهداری تصمیم بگیرد.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-11",
+      "title": "تله‌های رایج طراحی در ENSLD",
+      "html": "<ul><li>قرار دادن دو لینک فیبر «افزونه» در یک داکت فیزیکی مشترک (Shared Risk Link Group / SRLG!).</li><li>ساخت مثلث L2 در Distribution که STP یکی از لینک‌ها را مسدود کند.</li><li>طراحی بدون ذخیره فضای IP برای رشد ۳ تا ۵ ساله.</li></ul>"
+    },
+    {
+      "id": "ccnp_ensld-section-12",
+      "title": "چک‌لیست ممیزی طراحی پیش از تایید نهایی",
+      "html": "<ul><li>ممیزی خودکار عدم هم‌پوشانی بلوک‌های IPv4/IPv6.</li><li>شناسایی و حذف تمام نقاط SPOF (برق، فیبر، روتر، ISP، کنترلر).</li><li>محاسبه Availability مرکب و انطباق با SLA کسب‌وکار.</li></ul>"
+    },
+    {
+      "id": "ccnp_ensld-section-13",
+      "title": "تمرین تحلیلی سناریو (مقایسه لینک سری ۹۹.۹٪ با لینک موازی و ممیزی IP)",
+      "html": "<p>در <code>ccnp_ensld_lab.py</code> نشان داده می‌شود دو مؤلفه سری <code>0.999</code> به <code>0.998001</code> (~۱۰۵۱ دقیقه قطعی/سال) افت می‌کنند، در حالی که دو مسیر موازی مستقل <code>0.999</code> به <code>0.999999</code> (~۰.۵ دقیقه/سال) می‌رسند؛ همچنین هم‌پوشانی سابنت و امکان خلاصه‌سازی به <code>/20</code> بررسی می‌شود.</p>"
+    },
+    {
+      "id": "ccnp_ensld-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc1918\" target=\"_blank\" rel=\"noopener\">RFC 1918</a> و راهنمای طراحی <a href=\"https://www.cisco.com/c/en/us/td/docs/solutions/Enterprise/Campus/HA_campus_DG/hacampusdg.html\" target=\"_blank\" rel=\"noopener\">Cisco High Availability Campus Design</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>ccnp_ensld_lab.py</code> مدل تحلیلی محلی Python 3 است و داده‌های واقعی MTBF تجهیزات تولیدی را اندازه‌گیری نمی‌کند.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Hierarchical Addressing",
+      "fa": "آدرس‌دهی سلسله‌مراتبی",
+      "simple": "تخصیص بلوک‌های پیوسته روی مرز توان ۲ برای Summarization تمیز."
+    },
+    {
+      "term": "Nibble Boundary (IPv6)",
+      "fa": "مرز ۴بیتی هگزادسیمال",
+      "simple": "تقسیم پیشوندهای IPv6 بر مضارب ۴ بیت برای خوانایی و خلاصه‌سازی."
+    },
+    {
+      "term": "Availability",
+      "fa": "دسترس‌پذیری سیستم",
+      "simple": "نسبت زمان کارکرد (MTBF / (MTBF + MTTR)) به کل زمان."
+    },
+    {
+      "term": "Series Availability",
+      "fa": "دسترس‌پذیری سری",
+      "simple": "حاصل‌ضرب A1×A2 که همیشه از ضعیف‌ترین مؤلفه کمتر است."
+    },
+    {
+      "term": "Parallel Availability",
+      "fa": "دسترس‌پذیری موازی",
+      "simple": "1 - (1-A1)(1-A2) برای مسیرهای واقعاً مستقل بدون SRLG."
+    },
+    {
+      "term": "SPOF",
+      "fa": "نقطه شکست واحد",
+      "simple": "هر مؤلفه‌ای که خرابی آن کل سرویس را از کار بیندازد."
+    },
+    {
+      "term": "SRLG",
+      "fa": "گروه ریسک مشترک لینک",
+      "simple": "مسیرهای ظاهراً افزونه با نقطه شکست فیزیکی مشترک (مثل یک داکت فیبر)."
+    },
+    {
+      "term": "Failure Domain",
+      "fa": "دامنه تأثیر خرابی",
+      "simple": "محدوده‌ای از شبکه که از خطای یک لینک یا تجهیز متأثر می‌شود."
+    },
+    {
+      "term": "Dual-Multihomed",
+      "fa": "اتصال دوگانه به دو ISP",
+      "simple": "دو روتر مرزی متصل به دو ISP مجزا برای حذف SPOF در WAN."
+    },
+    {
+      "term": "MTBF / MTTR",
+      "fa": "میانگین فاصله خرابی / زمان بازیابی",
+      "simple": "دو شاخص کلیدی تعیین دسترس‌پذیری عملیاتی شبکه."
+    },
+    {
+      "term": "Downtime Budget",
+      "fa": "سقف مجاز قطعی سالانه",
+      "simple": "دقیقه قطعی مجاز بر اساس SLA (مثلاً ۵۲.۶ دقیقه برای 99.99%)."
+    },
+    {
+      "term": "Modular Design",
+      "fa": "طراحی ماژولار",
+      "simple": "ساخت بلوک‌های تکرارپذیر و مستقل برای سادگی توسعه و نگهداری."
+    },
+    {
+      "term": "Symmetry",
+      "fa": "تقارن طراحی",
+      "simple": "مسیرها و ظرفیت‌های متعادل برای پیش‌بینی‌پذیری ترافیک و Failover."
+    },
+    {
+      "term": "Summarization Boundary",
+      "fa": "مرز خلاصه‌سازی مسیر",
+      "simple": "تجمیع پیشوندها در ABR/لبه برای کوچک نگه داشتن RIB و دامنه SPF."
+    },
+    {
+      "term": "Trade-off Analysis",
+      "fa": "تحلیل موازنه طراحی",
+      "simple": "سنجش هزینه، پیچیدگی و ریسک نسبت به الزامات کسب‌وکار."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: CCNP ENSLD: Hierarchical IP Addressing, IGP/BGP Scale & High Availability Design",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccnp_ensld_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccnp_ensld_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccnp_ensld (Enterprise Design: Oversubscription, Failure Domain &amp; IPv6 Nibble Plan).\n\nEducational local model only — no live enterprise campus/DC switch or IPAM system is contacted.\nModels:\n1. Access-to-Distribution / Leaf-to-Spine Oversubscription ratio calculation.\n2. IPv6 Nibble-boundary hierarchical site subnet planner (`/48` per site -&gt; `/52` functional block -&gt; `/64` VLAN).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_pos_int(val: object, name: str, max_val: int = 10**9) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (1 &lt;= val &lt;= max_val):\n        raise ValueError(f&quot;{name} must be an int in 1..{max_val}, got {val!r}&quot;)\n    return val\n\n\ndef compute_oversubscription_ratio(\n    downlink_ports: int,\n    downlink_gbps: int,\n    uplink_ports: int,\n    uplink_gbps: int,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compute oversubscription ratio (downlink aggregate / uplink aggregate).&quot;&quot;&quot;\n    dp = _require_pos_int(downlink_ports, &quot;downlink_ports&quot;, 10_000)\n    dg = _require_pos_int(downlink_gbps, &quot;downlink_gbps&quot;, 800)\n    up = _require_pos_int(uplink_ports, &quot;uplink_ports&quot;, 10_000)\n    ug = _require_pos_int(uplink_gbps, &quot;uplink_gbps&quot;, 800)\n    down_total = dp * dg\n    up_total = up * ug\n    ratio = round(down_total / up_total, 2)\n    return {\n        &quot;downlink_total_gbps&quot;: down_total,\n        &quot;uplink_total_gbps&quot;: up_total,\n        &quot;oversubscription_ratio&quot;: f&quot;{ratio}:1&quot;,\n        &quot;ratio_numeric&quot;: ratio,\n        &quot;non_blocking&quot;: ratio &lt;= 1.0,\n        &quot;design_note&quot;: &quot;Illustrative capacity math only; acceptable oversubscription (e.g., 20:1 campus access vs 3:1 DC leaf-spine) depends on workload burst profile.&quot;,\n    }\n\n\ndef allocate_ipv6_site_prefix(\n    org_prefix: str,\n    site_index: int,\n    vlan_id: int,\n) -&gt; dict[str, str]:\n    &quot;&quot;&quot;Allocate a nibble-aligned IPv6 /48 site block and /64 VLAN prefix from an org /32 (or /36.. /44).&quot;&quot;&quot;\n    base = ipaddress.IPv6Network(org_prefix, strict=True)\n    if base.prefixlen &gt; 44:\n        raise ValueError(&quot;org_prefix must be /44 or shorter to carve /48 site blocks&quot;)\n    s_idx = _require_pos_int(site_index, &quot;site_index&quot;, 255)\n    vid = _require_pos_int(vlan_id, &quot;vlan_id&quot;, 4094)\n    # Build deterministic /48 site prefix and /64 subnet using hex VLAN ID (nibble-aligned!)\n    site_addr = int(base.network_address) + (s_idx &lt;&lt; 80)\n    site_net = ipaddress.IPv6Network((site_addr, 48))\n    if not site_net.subnet_of(base):\n        raise ValueError(&quot;site_index exceeds org_prefix capacity&quot;)\n    vlan_net = ipaddress.IPv6Network((int(site_net.network_address) + (vid &lt;&lt; 64), 64))\n    return {\n        &quot;org_prefix&quot;: str(base),\n        &quot;site_slash48&quot;: str(site_net),\n        &quot;vlan_slash64&quot;: str(vlan_net),\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live switch or IPAM database is contacted.&quot;)\n    campus = compute_oversubscription_ratio(48, 1, 2, 10)  # 48G / 20G = 2.4:1\n    dc_leaf = compute_oversubscription_ratio(48, 25, 4, 100)  # 1200G / 400G = 3.0:1\n    assert campus[&quot;ratio_numeric&quot;] == 2.4 and dc_leaf[&quot;ratio_numeric&quot;] == 3.0\n    v6 = allocate_ipv6_site_prefix(&quot;2001:db8::/32&quot;, site_index=1, vlan_id=10)\n    assert v6[&quot;site_slash48&quot;] == &quot;2001:db8:1::/48&quot; and v6[&quot;vlan_slash64&quot;] == &quot;2001:db8:1:a::/64&quot;\n    print(&quot;Campus &amp; DC oversubscription:&quot;, {&quot;campus&quot;: campus[&quot;oversubscription_ratio&quot;], &quot;dc&quot;: dc_leaf[&quot;oversubscription_ratio&quot;]})\n    print(&quot;IPv6 nibble plan:&quot;, v6)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Design Summary Block Check (Conceptual, NOT executed on live hardware)\n! Region A: 10.10.0.0/16 -&gt; Site 1: 10.10.0.0/20 -&gt; VLAN10: 10.10.1.0/24\n! ABR Summary: area 10 range 10.10.0.0 255.255.240.0</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "اگر دو مؤلفه با دسترس‌پذیری <code>0.999</code> به‌صورت <strong>سری</strong> قرار گیرند، دسترس‌پذیری کل چقدر است؟",
+      "options": [
+        "0.999999",
+        "0.998001 (بدتر از هر تک‌مؤلفه)",
+        "0.999",
+        "1.0"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در حالت سری <code>0.999 × 0.999 = 0.998001</code>.</p>"
+    },
+    {
+      "title": "اگر همان دو مسیر مستقل <code>0.999</code> به‌صورت <strong>موازی</strong> عمل کنند، دسترس‌پذیری کل چقدر است؟",
+      "options": [
+        "0.998",
+        "0.999999 (شش نُه)",
+        "0.999",
+        "0.99"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>1 - (0.001 × 0.001) = 0.999999</code> (به شرط نبود SRLG).</p>"
+    },
+    {
+      "title": "چرا عبور دو کابل فیبر «افزونه» از یک داکت فیزیکی مشترک یک خطای طراحی است؟",
+      "options": [
+        "زیرا یک <strong>SRLG</strong> (نقطه ریسک مشترک) ساخته و فرض استقلال موازی را نقض می‌کند",
+        "زیرا MTU را کم می‌کند",
+        "زیرا BGP را خاموش می‌کند",
+        "مشکلی ندارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بریدن همان داکت هر دو مسیر را هم‌زمان قطع می‌کند.</p>"
+    },
+    {
+      "title": "دسترس‌پذیری <strong>99.99%</strong> تقریباً معادل چند دقیقه قطعی مجاز در سال است؟",
+      "options": [
+        "۵۲۶ دقیقه",
+        "حدود ۵۲.۶ دقیقه",
+        "۵.۲ دقیقه",
+        "۸.۷ ساعت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p><code>0.0001 × 525,600 ≈ 52.56</code> دقیقه در سال.</p>"
+    },
+    {
+      "title": "هدف اصلی از <strong>آدرس‌دهی سلسله‌مراتبی</strong> در ENSLD چیست؟",
+      "options": [
+        "تصادفی کردن IPها",
+        "امکان Summarization تمیز، کاهش اندازه RIB و کوچک نگه داشتن دامنه همگرایی",
+        "حذف IPv6",
+        "افزایش تعداد LSA"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بلوک‌های پیوسته مرزهای خلاصه‌سازی را ممکن می‌سازند.</p>"
+    },
+    {
+      "title": "کدام الگوی اتصال اینترنت هم خطای لینک، هم خطای روتر مرزی و هم خطای ISP را تحمل می‌کند؟",
+      "options": [
+        "Single-Homed",
+        "Dual-Homed به یک ISP",
+        "Dual-Multihomed (دو روتر به دو ISP مستقل)",
+        "تک‌روتر بدون BGP"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>تنها Dual-Multihomed هر سه SPOF را حذف می‌کند.</p>"
+    },
+    {
+      "title": "منظور از <strong>Nibble Boundary</strong> در طراحی IPv6 چیست؟",
+      "options": [
+        "تقسیم بر ۸ بیت",
+        "تخصیص زیرشبکه‌ها روی مرزهای ۴بیتی (هر رقم هگزادسیمال)",
+        "حذف /64",
+        "استفاده از NAT"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تراز شدن روی مضارب ۴ بیت خوانایی و خلاصه‌سازی IPv6 را ساده می‌کند.</p>"
+    },
+    {
+      "title": "کوچک نگه داشتن <strong>Failure Domain</strong> در پردیس چه نتیجه‌ای دارد؟",
+      "options": [
+        "گسترش خرابی به کل ساختمان",
+        "محدود شدن اثر خطا به یک بلوک کوچک و تسریع همگرایی",
+        "حذف افزونگی",
+        "اجبار به STP سرتاسری"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ایزوله کردن دامنه‌های خرابی پایداری کل شبکه را بالا می‌برد.</p>"
+    },
+    {
+      "title": "کاهش <strong>MTTR</strong> (زمان بازیابی) از طریق اتوماسیون و مانیتورینگ چه اثری بر Availability دارد؟",
+      "options": [
+        "Availability را افزایش می‌دهد",
+        "بی‌تأثیر است",
+        "MTBF را صفر می‌کند",
+        "Downtime را بیشتر می‌کند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>طبق <code>MTBF / (MTBF + MTTR)</code>، کاهش MTTR مستقیماً دسترس‌پذیری را بالا می‌برد.</p>"
+    },
+    {
+      "title": "در طراحی OSPF مقیاس‌بزرگ، کدام اقدام به پایداری کمک می‌کند؟",
+      "options": [
+        "قرار دادن ۳۰۰ روتر در Area 0 بدون خلاصه‌سازی",
+        "محدود کردن اندازه Areaها، استفاده از Stub و Summarization روی ABR",
+        "حذف DR",
+        "اجبار به Broadcast"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مهار اندازه LSDB و دامنه SPF کلید مقیاس‌پذیری OSPF است.</p>"
+    },
+    {
+      "title": "در <code>ccnp_ensld_lab.py</code> اگر دو بلوک IPv4 هم‌پوشان به ممیز داده شوند چه گزارش می‌شود؟",
+      "options": [
+        "تایید می‌شود",
+        "<code>overlap_free=False</code> و شناسایی جفت بلوک متداخل",
+        "خلاصه‌سازی خودکار",
+        "تبدیل به IPv6"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>ممیز پیش از استقرار تداخل آدرس‌ها را کشف می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>ccnp_ensld_lab.py</code> چیست؟",
+      "options": [
+        "اندازه‌گیری زنده MTBF کارخانه",
+        "تست واقعی فیبر",
+        "مدل تحلیلی محلی Python 3 برای ممیزی IP و محاسبه Availability",
+        "اجرای BGP زنده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه یک مدل تحلیلی محلی بدون سخت‌افزار زنده است.</p>"
+    }
+  ]
+}

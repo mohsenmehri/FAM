@@ -1,0 +1,350 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_redist",
+  "objectiveId": "adv_redist",
+  "kind": "lesson",
+  "track": "مهندسی پیشرفته (Advanced Engineering)",
+  "course": "c5-advanced-eng",
+  "domain": "Route Filtering & Multi-Protocol Redistribution",
+  "title": "مهندسی پیشرفته مسیریابی: Route Redistribution، Prefix-List، Route-Map و پیشگیری از Route Feedback",
+  "titleEn": "Route Redistribution, Prefix-Lists, Route-Maps & Route Feedback Prevention",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "adv_02",
+    "adv_eigrp",
+    "ccna_v6"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy adv_redist (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "adv_redist",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.cisco.com/c/en/us/support/docs/ip/enhanced-interior-gateway-routing-protocol-eigrp/8606-redist.html",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/configuration/xe-17/iri-xe-17-book/iri-ip-prefix-list.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/adv_redist_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تصریح دقیق قوانین Seed Metric در OSPF (۲۰ E2 و لزوم کلیدواژه subnets در IOS/IOS-XE) در برابر EIGRP (بی‌نهایت بدون Seed Metric صریح).",
+      "تبیین دقیق قواعد ge/le در Prefix-List و منطق AND/OR و Implicit Deny در Route-Map.",
+      "ساخت آزمایشگاه محلی adv_redist_lab.py برای تطابق Prefix-List و مهار Route Feedback با Route Tagging."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_redist-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-advanced-eng",
+      "blueprint": "/academy-assets/v5/blueprints/adv_redist.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_redist_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تصریح دقیق قوانین Seed Metric در OSPF (۲۰ E2 و لزوم کلیدواژه subnets در IOS/IOS-XE) در برابر EIGRP (بی‌نهایت بدون Seed Metric صریح).",
+      "تبیین دقیق قواعد ge/le در Prefix-List و منطق AND/OR و Implicit Deny در Route-Map.",
+      "ساخت آزمایشگاه محلی adv_redist_lab.py برای تطابق Prefix-List و مهار Route Feedback با Route Tagging."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_redist-section-1",
+      "title": "مسئله واقعی: چرا Redistribution دوطرفه روی دو روتر مرزی می‌تواند حلقه مسیریابی بسازد؟",
+      "html": "<p>هنگام تزریق متقابل میان EIGRP و OSPF روی دو روتر مرزی (ASBR1/ASBR2)، بدون فیلتر و <strong>Route Tagging</strong> ممکن است پیشوندهای خارجی به‌دلیل تفاوت AD (مانند 110 در برابر 170) به دامنه مبدأ بازتزریق شده و موجب <strong>Route Feedback</strong> یا مسیریابی غیربهینه شوند.</p>"
+    },
+    {
+      "id": "adv_redist-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> OSPF Multi-Area (<code>adv_02</code>)، EIGRP (<code>adv_eigrp</code>) و RIB/FIB (<code>ccna_v6</code>).</p><ul><li>قوانین <strong>Seed Metric</strong> و کلیدواژه <code>subnets</code>.</li><li>تسلط بر <strong>Prefix-List</strong> (<code>ge</code>/<code>le</code>) و <strong>Route-Map</strong>.</li><li>مهار <strong>Route Feedback</strong> با <strong>Route Tagging</strong> دوطرفه.</li></ul>"
+    },
+    {
+      "id": "adv_redist-section-3",
+      "title": "قانون Seed Metric و تله کلیدواژه `subnets`",
+      "html": "<p>تزریق به <strong>EIGRP</strong> بدون Seed Metric صریح متریک <strong>بی‌نهایت</strong> داشته و هیچ مسیری تزریق نمی‌شود. در <strong>OSPF</strong> پیش‌فرض متریک ۲۰ از نوع E2 است اما در IOS/IOS-XE بدون <code>subnets</code> فقط شبکه‌های Classful تزریق می‌شوند.</p>"
+    },
+    {
+      "id": "adv_redist-section-4",
+      "title": "تله مسیرهای Connected روی روتر مرزی",
+      "html": "<p>تزریق از جدول RIB روتر انجام می‌شود و مسیرهای Connected عضو فرایند مبدأ را نیز شامل می‌گردد؛ سایر شبکه‌های Connected در صورت نیاز باید با Route-Map هدفمند مدیریت شوند.</p>"
+    },
+    {
+      "id": "adv_redist-section-5",
+      "title": "فیلترینگ دقیق پیشوندها با `ip prefix-list` و `ge`/`le`",
+      "html": "<p><code>10.0.0.0/8</code> بدون <code>ge/le</code> تنها دقیقاً <code>/8</code> را می‌پذیرد؛ اما <code>10.0.0.0/8 ge 24 le 26</code> زیرشبکه‌های <code>/24</code> تا <code>/26</code> را منطبق می‌کند. همیشه باید <code>base_len &lt; ge &lt;= le &lt;= 32</code> رعایت شود.</p>"
+    },
+    {
+      "id": "adv_redist-section-6",
+      "title": "نمودار معماری: دو روتر مرزی و مسدودسازی Route Feedback با Route Tagging",
+      "html": "<p>نمودار زیر برچسب‌گذاری مسیر روی ASBR1 و رد بازگشت آن روی ASBR2 را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Mutual Redistribution Route Tagging Guard\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">Two-Router Mutual Redistribution: Blocking Route Feedback with Tags</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">EIGRP Domain (AD 90/170)</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Origin prefix 10.50.0.0/24</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">External EIGRP AD = 170</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">ASBR1: EIGRP -&gt; OSPF</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">route-map E2O: set tag 90</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Deny tag 110 before inject</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">ASBR2: OSPF -&gt; EIGRP</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">route-map O2E: deny tag 90!</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Breaks feedback loop cleanly</text></svg>"
+    },
+    {
+      "id": "adv_redist-section-7",
+      "title": "ساختار منطقی `route-map`: AND/OR و Implicit Deny",
+      "html": "<p>چند <code>match</code> در سطرهای مجزا منطق <strong>AND</strong> و چند مقدار در یک خط منطق <strong>OR</strong> دارند. پایان هر <code>route-map</code> یک <code>deny any</code> ضمنی دارد.</p>"
+    },
+    {
+      "id": "adv_redist-section-8",
+      "title": "کالبدشکافی تله Route Feedback و اختلاف AD=170 با AD=110",
+      "html": "<p>از آنجا که AD مسیر EIGRP External در سیسکو <code>170</code> و OSPF برابر <code>110</code> است، روتر مرزی دوم نسخه بازتاب‌یافته در OSPF را بر مسیر اصلی EIGRP ترجیح می‌دهد و بدون Tag آن را دوباره به EIGRP بازمی‌گرداند.</p>"
+    },
+    {
+      "id": "adv_redist-section-9",
+      "title": "راهکار استاندارد: Route Tagging متقارن در هر دو جهت",
+      "html": "<p>در جهت EIGRP->OSPF مسیرهای دارای <code>tag 110</code> رد و به بقیه <code>tag 90</code> زده می‌شود؛ در جهت OSPF->EIGRP مسیرهای دارای <code>tag 90</code> رد و به بقیه <code>tag 110</code> زده می‌شود.</p>"
+    },
+    {
+      "id": "adv_redist-section-10",
+      "title": "مقایسه OSPF External Type 1 (E1) با Type 2 (E2)",
+      "html": "<p>نوع E2 هزینه داخلی OSPF تا ASBR را به Seed Metric اضافه نمی‌کند؛ نوع E1 هزینه داخلی را جمع می‌بندد و در حضور چند ASBR دقیق‌تر است.</p>"
+    },
+    {
+      "id": "adv_redist-section-11",
+      "title": "تنظیم هدفمند AD و پرهیز از تغییر سراسری",
+      "html": "<p>در صورت نیاز به تعدیل AD روی روتر مرزی باید از فیلتر پیشوند مشخص استفاده کرد و از تغییر بی‌ضابطه AD کل پروتکل پرهیز نمود.</p>"
+    },
+    {
+      "id": "adv_redist-section-12",
+      "title": "چک‌لیست امن پیش از Redistribution",
+      "html": "<ul><li>فیلتر صریح پیشوندها با Prefix-List.</li><li>تعیین Seed Metric برای EIGRP و افزودن <code>subnets</code> در OSPF.</li><li>بررسی Tagها در <code>show ip route &lt;prefix&gt;</code> روی همه روترهای مرزی.</li></ul>"
+    },
+    {
+      "id": "adv_redist-section-13",
+      "title": "تمرین تحلیلی سناریو (تطابق Prefix-List و Seed Metric)",
+      "html": "<p>در <code>adv_redist_lab.py</code> نشان داده می‌شود <code>10.10.20.0/27</code> در قانون <code>ge 24 le 26</code> رد می‌شود، نبود Seed Metric تزریق به EIGRP را متوقف می‌کند و Tagging جلوی Route Feedback را می‌گیرد.</p>"
+    },
+    {
+      "id": "adv_redist-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> مستندات <a href=\"https://www.cisco.com/c/en/us/support/docs/ip/enhanced-interior-gateway-routing-protocol-eigrp/8606-redist.html\" target=\"_blank\" rel=\"noopener\">Cisco Redistributing Routing Protocols</a> و راهنمای Prefix-List IOS-XE 17.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>adv_redist_lab.py</code> مدل محلی Python 3 است و هیچ روتر زنده‌ای متصل نشده است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Route Redistribution",
+      "fa": "تزریق بین‌پروتکلی مسیر",
+      "simple": "تبادل پیشوندها بین دو پروتکل مسیریابی متفاوت روی روتر مرزی."
+    },
+    {
+      "term": "Seed Metric",
+      "fa": "متریک اولیه تزریق",
+      "simple": "متریک شروع اختصاص‌یافته هنگام ورود مسیر به پروتکل مقصد."
+    },
+    {
+      "term": "Route Feedback",
+      "fa": "بازخورد و حلقه تزریق",
+      "simple": "بازگشت ناخواسته مسیر تزریق‌شده به دامنه مبدأ از روتر مرزی دوم."
+    },
+    {
+      "term": "Route Tagging",
+      "fa": "برچسب‌گذاری مسیر",
+      "simple": "الصاق شناسه عددی به مسیرها برای منع بازتزریق آن‌ها."
+    },
+    {
+      "term": "Prefix-List",
+      "fa": "فهرست تطابق پیشوند",
+      "simple": "فیلتر دقیق شبکه و بازه طول ماسک با ge/le."
+    },
+    {
+      "term": "Route-Map",
+      "fa": "نقشه سیاستی مسیر",
+      "simple": "قواعد match/set برای فیلتر، Tag و تغییر ویژگی‌های مسیر."
+    },
+    {
+      "term": "Implicit Deny",
+      "fa": "رد ضمنی انتهایی",
+      "simple": "قانون رد نهایی در انتهای Prefix-List و Route-Map."
+    },
+    {
+      "term": "ASBR",
+      "fa": "روتر مرزی OSPF",
+      "simple": "روتر واردکننده مسیرهای خارجی به دامنه OSPF."
+    },
+    {
+      "term": "OSPF Type E1",
+      "fa": "مسیر خارجی نوع ۱",
+      "simple": "مسیر خارجی با جمع Seed Metric و Cost داخلی تا ASBR."
+    },
+    {
+      "term": "OSPF Type E2",
+      "fa": "مسیر خارجی نوع ۲",
+      "simple": "پیش‌فرض OSPF بدون جمع Cost داخلی با Seed Metric."
+    },
+    {
+      "term": "EIGRP External AD (170)",
+      "fa": "AD خارجی EIGRP",
+      "simple": "فاصله اداری مسیرهای تزریق‌شده به EIGRP در سیسکو (بدتر از ۱۱۰ OSPF)."
+    },
+    {
+      "term": "Suboptimal Routing",
+      "fa": "مسیریابی غیربهینه",
+      "simple": "عبور ترافیک از مسیر طولانی‌تر پس از تزریق به‌علت تفاوت AD."
+    },
+    {
+      "term": "subnets Keyword",
+      "fa": "کلیدواژه زیرشبکه‌ها",
+      "simple": "لازم در IOS/IOS-XE برای تزریق مسیرهای Classless به OSPF."
+    },
+    {
+      "term": "ge / le Operators",
+      "fa": "عملگرهای بازه ماسک",
+      "simple": "تعیین حداقل و حداکثر طول پیشوند مجاز در Prefix-List."
+    },
+    {
+      "term": "Mutual Redistribution",
+      "fa": "تزریق دوطرفه",
+      "simple": "تزریق مسیر در هر دو جهت میان دو دامنه مسیریابی."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: Route Redistribution, Prefix-Lists, Route-Maps & Route Feedback Prevention",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_redist_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_redist_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for adv_redist (Prefix-List ge/le Matcher &amp; Mutual Redistribution Tag Guard).\n\nEducational local model only — no live Cisco IOS/IOS-XE router is contacted.\nModels:\n1. Exact Prefix-List evaluation with `ge` and `le` prefix-length bounds.\n2. Two-router mutual redistribution (OSPF &lt;-&gt; EIGRP) showing how missing route-tag\n   filtering can cause Route Feedback / suboptimal domain loops, and how tagging\n   (e.g., tag 110 / tag 90) blocks re-injection across border routers.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r}&quot;)\n    return val\n\n\ndef _require_int_range(val: object, name: str, lo: int, hi: int) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (lo &lt;= val &lt;= hi):\n        raise ValueError(f&quot;{name} must be an int in {lo}..{hi}, got {val!r}&quot;)\n    return val\n\n\ndef match_prefix_list_entry(\n    candidate_prefix: str,\n    rule_prefix: str,\n    ge: int | None = None,\n    le: int | None = None,\n) -&gt; bool:\n    &quot;&quot;&quot;Evaluate Cisco-style IPv4 ip prefix-list rule with optional ge/le bounds.&quot;&quot;&quot;\n    cand = ipaddress.IPv4Network(candidate_prefix, strict=True)\n    rule = ipaddress.IPv4Network(rule_prefix, strict=True)\n    base_len = rule.prefixlen\n\n    if ge is not None:\n        ge_val = _require_int_range(ge, &quot;ge&quot;, 0, 32)\n        if ge_val &lt;= base_len:\n            raise ValueError(f&quot;ge ({ge_val}) must be strictly greater than rule prefixlen ({base_len})&quot;)\n    else:\n        ge_val = None\n\n    if le is not None:\n        le_val = _require_int_range(le, &quot;le&quot;, 0, 32)\n        if le_val &lt; (ge_val if ge_val is not None else base_len + 1):\n            raise ValueError(f&quot;le ({le_val}) must be &gt;= ge/base_len+1&quot;)\n    else:\n        le_val = None\n\n    if not cand.subnet_of(rule):\n        return False\n    if ge_val is None and le_val is None:\n        return cand.prefixlen == base_len\n    min_len = ge_val if ge_val is not None else base_len\n    max_len = le_val if le_val is not None else 32\n    return min_len &lt;= cand.prefixlen &lt;= max_len\n\n\ndef simulate_mutual_redistribution_guard(\n    prefix: str,\n    origin_domain: str,\n    seed_metric_configured: bool,\n    use_route_tags: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model OSPF &lt;-&gt; EIGRP mutual redistribution across two border routers (R1, R2).&quot;&quot;&quot;\n    net = ipaddress.IPv4Network(prefix, strict=True)\n    if origin_domain not in {&quot;ospf&quot;, &quot;eigrp&quot;}:\n        raise ValueError(&quot;origin_domain must be &#x27;ospf&#x27; or &#x27;eigrp&#x27;&quot;)\n    has_seed = _require_bool(seed_metric_configured, &quot;seed_metric_configured&quot;)\n    tagged = _require_bool(use_route_tags, &quot;use_route_tags&quot;)\n\n    if not has_seed and origin_domain == &quot;ospf&quot;:\n        return {\n            &quot;prefix&quot;: str(net),\n            &quot;injected_into_peer_domain&quot;: False,\n            &quot;route_feedback_detected&quot;: False,\n            &quot;reason&quot;: &quot;EIGRP_SEED_METRIC_INFINITY_WITHOUT_EXPLICIT_METRIC&quot;,\n        }\n\n    # R1 redistributes origin -&gt; peer (tagging if enabled)\n    applied_tag = (110 if origin_domain == &quot;ospf&quot; else 90) if tagged else 0\n    # R2 checks whether to re-inject back into origin domain\n    if tagged and applied_tag in (110, 90):\n        return {\n            &quot;prefix&quot;: str(net),\n            &quot;injected_into_peer_domain&quot;: True,\n            &quot;applied_tag&quot;: applied_tag,\n            &quot;route_feedback_detected&quot;: False,\n            &quot;reason&quot;: &quot;REINJECTION_BLOCKED_BY_ROUTE_MAP_TAG_DENY&quot;,\n        }\n    return {\n        &quot;prefix&quot;: str(net),\n        &quot;injected_into_peer_domain&quot;: True,\n        &quot;applied_tag&quot;: 0,\n        &quot;route_feedback_detected&quot;: True,\n        &quot;reason&quot;: &quot;UNTAGGED_MUTUAL_REDISTRIBUTION_RISK_ROUTE_FEEDBACK&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco IOS/IOS-XE router is contacted.&quot;)\n    # Prefix-list 10.0.0.0/8 ge 24 le 26\n    assert match_prefix_list_entry(&quot;10.10.20.0/24&quot;, &quot;10.0.0.0/8&quot;, ge=24, le=26) is True\n    assert match_prefix_list_entry(&quot;10.10.20.0/27&quot;, &quot;10.0.0.0/8&quot;, ge=24, le=26) is False\n    assert match_prefix_list_entry(&quot;192.168.1.0/24&quot;, &quot;10.0.0.0/8&quot;, ge=24, le=26) is False\n    assert match_prefix_list_entry(&quot;10.0.0.0/8&quot;, &quot;10.0.0.0/8&quot;) is True\n    assert match_prefix_list_entry(&quot;10.1.0.0/16&quot;, &quot;10.0.0.0/8&quot;) is False\n\n    no_seed = simulate_mutual_redistribution_guard(&quot;10.50.0.0/24&quot;, &quot;ospf&quot;, seed_metric_configured=False, use_route_tags=True)\n    unsafe = simulate_mutual_redistribution_guard(&quot;10.50.0.0/24&quot;, &quot;eigrp&quot;, seed_metric_configured=True, use_route_tags=False)\n    safe = simulate_mutual_redistribution_guard(&quot;10.50.0.0/24&quot;, &quot;eigrp&quot;, seed_metric_configured=True, use_route_tags=True)\n    assert no_seed[&quot;injected_into_peer_domain&quot;] is False\n    assert unsafe[&quot;route_feedback_detected&quot;] is True\n    assert safe[&quot;route_feedback_detected&quot;] is False\n    print(&quot;Prefix-list &amp; mutual redistribution tag guard checks passed:&quot;, {&quot;no_seed&quot;: no_seed, &quot;safe&quot;: safe})\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE Mutual Redistribution with Route Tags (NOT executed on live hardware)\nroute-map EIGRP_TO_OSPF deny 10\n match tag 110\nroute-map EIGRP_TO_OSPF permit 20\n set tag 90\nroute-map OSPF_TO_EIGRP deny 10\n match tag 90\nroute-map OSPF_TO_EIGRP permit 20\n set tag 110</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "تزریق به EIGRP بدون تعیین Seed Metric چه نتیجه‌ای دارد؟",
+      "options": [
+        "تزریق با متریک ۲۰",
+        "متریک بی‌نهایت بوده و هیچ مسیری تزریق نمی‌شود",
+        "تبدیل به BGP",
+        "فقط /24 تزریق می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Seed Metric پیش‌فرض EIGRP بی‌نهایت است.</p>"
+    },
+    {
+      "title": "فراموش کردن کلیدواژه <code>subnets</code> هنگام تزریق به OSPF در IOS-XE چه اثری دارد؟",
+      "options": [
+        "تزریق با E1",
+        "تنها شبکه‌های Classful تزریق و زیرشبکه‌های Classless حذف می‌شوند",
+        "ریبوت روتر",
+        "بی‌اثر است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون <code>subnets</code> فقط مسیرهای Classful به OSPF وارد می‌شوند.</p>"
+    },
+    {
+      "title": "کدام پیشوند با <code>10.0.0.0/8 ge 24 le 26</code> منطبق است؟",
+      "options": [
+        "10.0.0.0/8",
+        "10.10.20.0/24",
+        "10.10.20.0/27",
+        "192.168.10.0/24"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>طول <code>/24</code> در بازه <code>24..26</code> و زیرمجموعه <code>10.0.0.0/8</code> است.</p>"
+    },
+    {
+      "title": "سطر <code>ip prefix-list P permit 10.0.0.0/8</code> بدون <code>ge/le</code> چه چیزی را می‌پذیرد؟",
+      "options": [
+        "همه زیرشبکه‌های 10/8",
+        "فقط دقیقاً 10.0.0.0/8",
+        "فقط /24ها",
+        "هیچ‌چیز"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>نبود <code>ge/le</code> به معنای Exact Match روی طول <code>/8</code> است.</p>"
+    },
+    {
+      "title": "چرا مسیرهای EIGRP External در تزریق دوطرفه با OSPF مستعد Route Feedback هستند؟",
+      "options": [
+        "چون AD=170 EIGRP External از AD=110 OSPF بدتر است",
+        "چون OSPF Tag ندارد",
+        "چون EIGRP روی UDP است",
+        "چون AD OSPF ۲۰۰ است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>روتر مرزی دوم مسیر بازتابی OSPF با AD=110 را بر مسیر EIGRP External با AD=170 ترجیح می‌دهد.</p>"
+    },
+    {
+      "title": "بهترین راهکار جلوگیری از Route Feedback در تزریق دوطرفه چیست؟",
+      "options": [
+        "خاموش کردن روتر دوم",
+        "Route Tagging متقارن در هر دو جهت روی همه روترهای مرزی",
+        "حذف subnets",
+        "استفاده از RIP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>Tagging از بازگشت پیشوند به دامنه مبدأ جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "تفاوت OSPF E1 با E2 چیست؟",
+      "options": [
+        "E1 فقط IPv6 است",
+        "E1 هزینه داخلی تا ASBR را با Seed Metric جمع می‌بندد اما E2 ثابت می‌ماند",
+        "E2 AD کمتری دارد",
+        "یکسان‌اند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>E1 مسیر داخلی بهینه‌تر تا ASBR را در متریک لحاظ می‌کند.</p>"
+    },
+    {
+      "title": "دو دستور <code>match</code> در دو سطر جداگانه داخل یک بند Route-Map چه منطقی دارند؟",
+      "options": [
+        "OR",
+        "AND",
+        "XOR",
+        "حذف شرط اول"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>سطرهای جداگانه منطق AND دارند.</p>"
+    },
+    {
+      "title": "نبود بند <code>permit</code> خالی در انتهای Route-Map چه نتیجه‌ای برای مسیرهای تطابق‌نیافته دارد؟",
+      "options": [
+        "عبور با Tag 0",
+        "رد شدن به‌علت Implicit Deny",
+        "تبدیل به Default Route",
+        "ثبت در ARP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پایان هر Route-Map یک Implicit Deny دارد.</p>"
+    },
+    {
+      "title": "کدام ترکیب برای <code>10.0.0.0/16</code> نامعتبر است؟",
+      "options": [
+        "ge 20 le 24",
+        "ge 16 le 24",
+        "ge 17 le 32",
+        "le 24"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مقدار <code>ge</code> باید اکیداً بزرگ‌تر از طول پایه ۱۶ باشد.</p>"
+    },
+    {
+      "title": "در <code>adv_redist_lab.py</code> تزریق از OSPF به EIGRP بدون Seed Metric چه خروجی می‌دهد؟",
+      "options": [
+        "تزریق موفق",
+        "<code>injected_into_peer_domain=False</code> (Seed Metric Infinity)",
+        "Route Feedback",
+        "تغییر AD"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مدل قانون Seed Metric بی‌نهایت EIGRP را بررسی می‌کند.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>adv_redist_lab.py</code> چیست؟",
+      "options": [
+        "تزریق روی دو روتر زنده",
+        "تولید LSA5",
+        "شبیه‌ساز محلی Python 3 برای Prefix-List و Route Tagging بدون روتر زنده",
+        "اتصال SSH"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه یک مدل محلی Python بدون تجهیز زنده است.</p>"
+    }
+  ]
+}

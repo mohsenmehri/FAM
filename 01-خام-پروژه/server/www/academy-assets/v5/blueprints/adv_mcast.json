@@ -1,0 +1,351 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_mcast",
+  "objectiveId": "adv_mcast",
+  "kind": "lesson",
+  "track": "مهندسی پیشرفته (Advanced Engineering)",
+  "course": "c5-advanced-eng",
+  "domain": "IPv4 Multicast, IGMP Snooping & PIM-SM",
+  "title": "مبانی و مهندسی Multicast: نگاشت ۳۲ به ۱ لایه ۲، IGMP Snooping/Querier و PIM Sparse Mode",
+  "titleEn": "IPv4 Multicast: 32-to-1 MAC Mapping, IGMP Snooping & PIM Sparse Mode",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "s02",
+    "s04",
+    "adv_02"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy adv_mcast (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "adv_mcast",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc1112",
+      "https://www.rfc-editor.org/rfc/rfc4541",
+      "https://www.rfc-editor.org/rfc/rfc7761"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/adv_mcast_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "تبیین ریاضی نگاشت ۲۳ بیت کم‌ارزش کلاس D به 01:00:5E (RFC 1112) و هم‌پوشانی ۳۲ به ۱.",
+      "تصریح نقش IGMP Snooping Querier در VLANهای صرفاً لایه ۲ بدون روتر Multicast.",
+      "ساخت آزمایشگاه محلی adv_mcast_lab.py برای نگاشت MAC و بررسی PIM RPF (RFC 7761)."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_mcast-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-advanced-eng",
+      "blueprint": "/academy-assets/v5/blueprints/adv_mcast.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_mcast_lab.py"
+    },
+    "technicalAuditFixes": [
+      "تبیین ریاضی نگاشت ۲۳ بیت کم‌ارزش کلاس D به 01:00:5E (RFC 1112) و هم‌پوشانی ۳۲ به ۱.",
+      "تصریح نقش IGMP Snooping Querier در VLANهای صرفاً لایه ۲ بدون روتر Multicast.",
+      "ساخت آزمایشگاه محلی adv_mcast_lab.py برای نگاشت MAC و بررسی PIM RPF (RFC 7761)."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_mcast-section-1",
+      "title": "مسئله واقعی: چرا پخش زنده IPTV با Unicast و Broadcast ناکارآمد است؟",
+      "html": "<p>در <strong>IP Multicast</strong> تنها یک نسخه از بسته روی هر لینک ارسال و فقط در نقاط انشعاب برای گیرندگان علاقه‌مند تکثیر می‌شود.</p>"
+    },
+    {
+      "id": "adv_mcast-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> IPv4/MAC (<code>s02</code>، <code>s04</code>) و IGP (<code>adv_02</code>).</p><ul><li>نگاشت ۲۳بیتی به MAC و هم‌پوشانی ۳۲ به ۱.</li><li>کنترل لایه ۲ با IGMP Snooping و Querier.</li><li>مسیریابی لایه ۳ با PIM-SM، RPF، RP و SSM.</li></ul>"
+    },
+    {
+      "id": "adv_mcast-section-3",
+      "title": "بازه آدرس‌های IPv4 Multicast (`224.0.0.0/4`)",
+      "html": "<p><code>224.0.0.0/24</code> (Link-Local غیرقابل مسیریابی)، <code>232.0.0.0/8</code> (SSM با IGMPv3 بدون RP) و <code>239.0.0.0/8</code> (خصوصی سازمانی).</p>"
+    },
+    {
+      "id": "adv_mcast-section-4",
+      "title": "راز ریاضی نگاشت ۲۳بیتی به MAC و هم‌پوشانی ۳۲ به ۱ (RFC 1112)",
+      "html": "<p>از ۲۸ بیت متغیر کلاس D تنها ۲۳ بیت کم‌ارزش به <code>01:00:5E:xx:xx:xx</code> نگاشت می‌شود؛ ۵ بیت نادیده‌گرفته‌شده هم‌پوشانی <code>2^5 = 32</code> ایجاد می‌کنند (مثلاً <code>224.1.1.1</code> و <code>239.129.1.1</code> هر دو به <code>01:00:5e:01:01:01</code> می‌رسند).</p>"
+    },
+    {
+      "id": "adv_mcast-section-5",
+      "title": "کنترل لایه ۲: IGMP Snooping و تله نبود Querier",
+      "html": "<p><strong>IGMP Snooping (RFC 4541)</strong> مانع سیلاب فریم Multicast به پورت‌های غیرمتقاضی می‌شود؛ در VLANهای بدون روتر Multicast باید <strong>IGMP Snooping Querier</strong> فعال شود تا جدول Snooping منقضی نگردد.</p>"
+    },
+    {
+      "id": "adv_mcast-section-6",
+      "title": "نمودار معماری: از نگاشت MAC و IGMP Snooping تا PIM-SM و RPF",
+      "html": "<p>نمودار زیر زنجیره لایه ۲ و لایه ۳ Multicast را نمایش می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Multicast IGMP Snooping and PIM-SM Architecture\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">IPv4 Multicast: 32:1 MAC Map -&gt; IGMP Snooping -&gt; PIM-SM RPF &amp; RP</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">L2 Mapping &amp; IGMP</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">23 low bits -&gt; 01:00:5E (32:1)</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">IGMP Snooping + Querier on VLAN</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">L3 PIM RPF Check</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Unicast FIB LPM toward Source</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Wrong ingress iface -&gt; DROP!</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">PIM-SM Trees (RFC 7761)</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Shared Tree (*,G) via RP</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">SPT Switchover -&gt; Shortest (S,G)</text></svg>"
+    },
+    {
+      "id": "adv_mcast-section-7",
+      "title": "PIM Sparse Mode (RFC 7761): مدل درخواستی (Pull)",
+      "html": "<p>در PIM-SM روتر تنها با ارسال صریح <code>PIM Join</code> جریان را دریافت می‌کند که برای شبکه‌های بزرگ مقیاس‌پذیر است.</p>"
+    },
+    {
+      "id": "adv_mcast-section-8",
+      "title": "بررسی حیاتی RPF (Reverse Path Forwarding)",
+      "html": "<p>روتر آدرس <em>مبدأ</em> بسته Multicast را در FIB Unicast می‌جوید؛ اگر بسته از اینترفیسی غیر از بهترین مسیر Unicast به مبدأ رسیده باشد، برای جلوگیری از حلقه فوراً حذف می‌شود.</p>"
+    },
+    {
+      "id": "adv_mcast-section-9",
+      "title": "درخت اشتراکی `(*,G)`، نقش RP و SPT Switchover",
+      "html": "<p>ابتدا گیرنده با <code>(*,G) Join</code> به RP وصل می‌شود و پس از شناخت فرستنده <code>S</code>، می‌تواند با <code>(S,G) Join</code> به کوتاه‌ترین درخت منبع (SPT) مهاجرت کند.</p>"
+    },
+    {
+      "id": "adv_mcast-section-10",
+      "title": "تله‌های عملیاتی: نامتقارنی مسیر و هم‌پوشانی با `224.0.0.x`",
+      "html": "<p>مسیریابی نامتقارن موجب RPF Failure می‌شود (قابل رفع با هماهنگی IGP یا <code>ip mroute</code>)؛ همچنین انتخاب <code>239.0.0.x</code> به‌علت هم‌MAC بودن با <code>224.0.0.x</code> ترافیک را به CPU تجهیزات می‌کشاند.</p>"
+    },
+    {
+      "id": "adv_mcast-section-11",
+      "title": "مزیت IGMPv3 و SSM (`232.0.0.0/8`)",
+      "html": "<p>IGMPv3 امکان تعیین دقیق فرستنده <code>S</code> را می‌دهد و در بازه SSM نیاز به Rendezvous Point را حذف می‌کند.</p>"
+    },
+    {
+      "id": "adv_mcast-section-12",
+      "title": "چک‌لیست عیب‌یابی Multicast",
+      "html": "<ul><li>بررسی <code>show ip igmp snooping groups</code> و وجود Querier.</li><li>بررسی <code>show ip mroute</code> و <code>show ip rpf &lt;source&gt;</code>.</li></ul>"
+    },
+    {
+      "id": "adv_mcast-section-13",
+      "title": "تمرین تحلیلی سناریو (هم‌پوشانی 224.1.1.1 / 239.129.1.1 و خطای RPF)",
+      "html": "<p>در <code>adv_mcast_lab.py</code> هم‌پوشانی MAC اثبات و رد شدن بسته روی اینترفیس غیر-RPF (<code>Gi0/1</code> در برابر <code>Gi0/0</code>) بررسی می‌شود.</p>"
+    },
+    {
+      "id": "adv_mcast-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc1112\" target=\"_blank\" rel=\"noopener\">RFC 1112</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc4541\" target=\"_blank\" rel=\"noopener\">RFC 4541</a> و <a href=\"https://www.rfc-editor.org/rfc/rfc7761\" target=\"_blank\" rel=\"noopener\">RFC 7761</a>.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>adv_mcast_lab.py</code> مدل محلی Python 3 بدون سوئیچ یا روتر زنده است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "IPv4 Multicast (224.0.0.0/4)",
+      "fa": "چندپخشی کلاس D",
+      "simple": "بازه آدرس‌های گروهی برای ارسال یک نسخه ترافیک به چند گیرنده."
+    },
+    {
+      "term": "32-to-1 MAC Mapping",
+      "fa": "نگاشت ۳۲ به ۱ مک",
+      "simple": "کپی ۲۳ بیت کم‌ارزش کلاس D به 01:00:5E و هم‌پوشانی ۳۲ IP در یک MAC."
+    },
+    {
+      "term": "IGMPv2 / IGMPv3",
+      "fa": "مدیریت گروه اینترنت",
+      "simple": "پروتکل عضویت میزبان در گروه Multicast."
+    },
+    {
+      "term": "IGMP Snooping",
+      "fa": "شنود IGMP سوئیچ",
+      "simple": "ارسال هدفمند فریم Multicast تنها به پورت‌های متقاضی."
+    },
+    {
+      "term": "IGMP Snooping Querier",
+      "fa": "پرسشگر IGMP سوئیچ",
+      "simple": "ارسال Query دوره‌ای در VLANهای لایه ۲ فاقد روتر Multicast."
+    },
+    {
+      "term": "PIM Sparse Mode",
+      "fa": "PIM حالت پراکنده",
+      "simple": "مسیریابی Multicast درخواستی مبتنی بر Join و RP (RFC 7761)."
+    },
+    {
+      "term": "RPF Check",
+      "fa": "بررسی مسیر بازگشت",
+      "simple": "پذیرش بسته تنها از بهترین اینترفیس Unicast به سمت مبدأ."
+    },
+    {
+      "term": "Rendezvous Point (RP)",
+      "fa": "نقطه ملاقات PIM-SM",
+      "simple": "روتر میانی مشترک برای آشنایی فرستنده و گیرنده."
+    },
+    {
+      "term": "Shared Tree (*,G)",
+      "fa": "درخت اشتراکی",
+      "simple": "درخت توزیع ریشه‌دار در RP برای همه فرستنده‌های گروه G."
+    },
+    {
+      "term": "Source Tree (S,G)",
+      "fa": "درخت منبع SPT",
+      "simple": "کوتاه‌ترین مسیر مستقیم از فرستنده S به گیرندگان."
+    },
+    {
+      "term": "SPT Switchover",
+      "fa": "مهاجرت به درخت منبع",
+      "simple": "گذار از درخت اشتراکی RP به مسیر مستقیم (S,G)."
+    },
+    {
+      "term": "SSM (232.0.0.0/8)",
+      "fa": "چندپخشی ویژه منبع",
+      "simple": "اتصال مستقیم (S,G) با IGMPv3 بدون نیاز به RP."
+    },
+    {
+      "term": "239.0.0.0/8",
+      "fa": "بازه خصوصی Multicast",
+      "simple": "بازه داخلی سازمان‌ها (Administratively Scoped)."
+    },
+    {
+      "term": "IIF / OIL",
+      "fa": "ورودی RPF / فهرست خروجی",
+      "simple": "ستون‌های اصلی جدول mroute برای دریافت و تکثیر."
+    },
+    {
+      "term": "Static mroute",
+      "fa": "مسیر RPF استاتیک",
+      "simple": "اصلاح مسیر RPF در سناریوهای نامتقارن بدون تغییر FIB Unicast."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: IPv4 Multicast: 32-to-1 MAC Mapping, IGMP Snooping & PIM Sparse Mode",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_mcast_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_mcast_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for adv_mcast (IPv4 Multicast 32-to-1 MAC Mapping &amp; PIM RPF Check).\n\nEducational local model only — no live multicast router, IGMP snooping ASIC, or PIM-SM\nRendezvous Point is contacted.\nModels:\n1. RFC 1112 IPv4 Multicast (`224.0.0.0/4`) 23-bit mapping to `01:00:5e:xx:xx:xx` and\n   exact 32-to-1 L2 MAC collision detection across different IPv4 multicast groups.\n2. PIM Reverse Path Forwarding (RPF) check against a unicast FIB table (longest prefix match).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef ipv4_multicast_to_mac(group_ip: str) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Map an IPv4 multicast address (224.0.0.0/4) to its RFC 1112 Ethernet MAC address.&quot;&quot;&quot;\n    if not isinstance(group_ip, str) or not group_ip.strip():\n        raise ValueError(&quot;group_ip must be a non-empty IPv4 multicast address string&quot;)\n    ip = ipaddress.IPv4Address(group_ip.strip())\n    if not ip.is_multicast:\n        raise ValueError(f&quot;{ip} is not in IPv4 multicast range 224.0.0.0/4&quot;)\n    octets = ip.packed\n    low23_b1 = octets[1] &amp; 0x7F  # drop top bit of second octet (5 bits lost overall -&gt; 2^5 = 32 overlap)\n    mac = f&quot;01:00:5e:{low23_b1:02x}:{octets[2]:02x}:{octets[3]:02x}&quot;\n    return {\n        &quot;group_ip&quot;: str(ip),\n        &quot;multicast_mac&quot;: mac,\n        &quot;link_local_224_0_0_x&quot;: ip in ipaddress.IPv4Network(&quot;224.0.0.0/24&quot;),\n        &quot;overlap_factor&quot;: 32,\n    }\n\n\ndef evaluate_pim_rpf(\n    source_ip: str,\n    incoming_interface: str,\n    unicast_fib: list[dict[str, str]],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Check whether a multicast packet from source_ip arrived on the unicast RPF interface.&quot;&quot;&quot;\n    src = ipaddress.IPv4Address(source_ip.strip())\n    if not isinstance(incoming_interface, str) or not incoming_interface.strip():\n        raise ValueError(&quot;incoming_interface must be a non-empty str&quot;)\n    if not isinstance(unicast_fib, list):\n        raise ValueError(&quot;unicast_fib must be a list of {&#x27;prefix&#x27;, &#x27;interface&#x27;} dicts&quot;)\n\n    best_len = -1\n    rpf_iface: str | None = None\n    for entry in unicast_fib:\n        net = ipaddress.IPv4Network(str(entry[&quot;prefix&quot;]), strict=True)\n        if src in net and net.prefixlen &gt; best_len:\n            best_len = net.prefixlen\n            rpf_iface = str(entry[&quot;interface&quot;]).strip()\n\n    if rpf_iface is None:\n        return {&quot;rpf_passed&quot;: False, &quot;expected_rpf_interface&quot;: None, &quot;reason&quot;: &quot;NO_UNICAST_ROUTE_TO_SOURCE&quot;}\n    passed = incoming_interface.strip() == rpf_iface\n    return {\n        &quot;source_ip&quot;: str(src),\n        &quot;incoming_interface&quot;: incoming_interface.strip(),\n        &quot;expected_rpf_interface&quot;: rpf_iface,\n        &quot;rpf_passed&quot;: passed,\n        &quot;reason&quot;: &quot;RPF_INTERFACE_MATCHED&quot; if passed else &quot;RPF_FAILURE_PACKET_DROPPED&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live PIM-SM router or IGMP snooping switch is contacted.&quot;)\n    m1 = ipv4_multicast_to_mac(&quot;224.1.1.1&quot;)\n    m2 = ipv4_multicast_to_mac(&quot;239.129.1.1&quot;)\n    assert m1[&quot;multicast_mac&quot;] == m2[&quot;multicast_mac&quot;] == &quot;01:00:5e:01:01:01&quot;\n    print(&quot;32-to-1 MAC overlap proven:&quot;, {&quot;224.1.1.1&quot;: m1[&quot;multicast_mac&quot;], &quot;239.129.1.1&quot;: m2[&quot;multicast_mac&quot;]})\n\n    fib = [\n        {&quot;prefix&quot;: &quot;0.0.0.0/0&quot;, &quot;interface&quot;: &quot;GigabitEthernet0/1&quot;},\n        {&quot;prefix&quot;: &quot;10.50.0.0/16&quot;, &quot;interface&quot;: &quot;GigabitEthernet0/0&quot;},\n    ]\n    ok = evaluate_pim_rpf(&quot;10.50.1.10&quot;, &quot;GigabitEthernet0/0&quot;, fib)\n    fail = evaluate_pim_rpf(&quot;10.50.1.10&quot;, &quot;GigabitEthernet0/1&quot;, fib)\n    assert ok[&quot;rpf_passed&quot;] is True and fail[&quot;rpf_passed&quot;] is False\n    print(&quot;PIM RPF checks:&quot;, {&quot;ok&quot;: ok[&quot;rpf_passed&quot;], &quot;fail&quot;: fail[&quot;reason&quot;]})\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE PIM-SM &amp; IGMP Snooping Querier (NOT executed on live hardware)\nip multicast-routing\nip pim rp-address 10.255.0.10\ninterface GigabitEthernet0/0\n ip pim sparse-mode\nip igmp snooping querier</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "چرا دقیقاً ۳۲ آدرس IPv4 Multicast به یک MAC نگاشت می‌شوند؟",
+      "options": [
+        "زیرا ۵ بیت میانی در نگاشت ۲۸ بیت به ۲۳ بیت نادیده گرفته می‌شوند (2^5=32)",
+        "اترنت ۳۲ MAC دارد",
+        "محدودیت IGMP",
+        "محدودیت PIM"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>طبق RFC 1112 تنها ۲۳ بیت کم‌ارزش به <code>01:00:5E</code> منتقل می‌شوند.</p>"
+    },
+    {
+      "title": "MAC متناظر با <code>224.1.1.1</code> و <code>239.129.1.1</code> کدام است؟",
+      "options": [
+        "01:00:5e:81:01:01",
+        "01:00:5e:01:01:01",
+        "ff:ff:ff:ff:ff:ff",
+        "01:80:c2:00:00:00"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بیت پرارزش اکتت دوم (۱۲۹) صفر شده و به <code>01</code> تبدیل می‌شود.</p>"
+    },
+    {
+      "title": "نقش <strong>IGMP Snooping Querier</strong> در یک VLAN صرفاً لایه ۲ چیست؟",
+      "options": [
+        "تخصیص IP",
+        "ارسال Query دوره‌ای برای زنده نگه داشتن جدول Snooping در نبود روتر لایه ۳",
+        "جایگزینی STP",
+        "رمزنگاری"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بدون Querier، میزبان‌ها Report دوره‌ای نمی‌دهند.</p>"
+    },
+    {
+      "title": "بررسی <strong>PIM RPF</strong> چه چیزی را کنترل می‌کند؟",
+      "options": [
+        "جدول ARP",
+        "تطابق اینترفیس ورودی بسته با بهترین مسیر Unicast به سمت مبدأ S",
+        "مقدار TTL",
+        "پورت TCP 179"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>عدم تطابق موجب حذف فوری بسته برای پیشگیری از حلقه می‌شود.</p>"
+    },
+    {
+      "title": "بازه خصوصی سازمانی IPv4 Multicast کدام است؟",
+      "options": [
+        "224.0.0.0/24",
+        "232.0.0.0/8",
+        "239.0.0.0/8",
+        "192.168.0.0/16"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p><code>239.0.0.0/8</code> ویژه استفاده داخلی سازمان‌هاست.</p>"
+    },
+    {
+      "title": "چرا باید از تخصیص <code>239.0.0.5</code> پرهیز کرد؟",
+      "options": [
+        "چون هم‌MAC با 224.0.0.5 (OSPF) است و بار اضافه به CPU تجهیزات وارد می‌کند",
+        "آدرس نامعتبر است",
+        "فقط IPv6 است",
+        "به Broadcast تبدیل می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>به‌دلیل هم‌پوشانی ۳۲ به ۱ با بازه کنترلی <code>224.0.0.x</code> تداخل لایه ۲ ایجاد می‌کند.</p>"
+    },
+    {
+      "title": "نقش <strong>RP</strong> در PIM-SM چیست؟",
+      "options": [
+        "نقطه تلاقی اولیه درخت اشتراکی (*,G) میان فرستنده‌ها و گیرندگان",
+        "تخصیص MAC",
+        "جایگزین OSPF",
+        "فیلتر UDP"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>RP نقطه آشنایی اولیه پیش از SPT Switchover است.</p>"
+    },
+    {
+      "title": "مزیت <strong>SSM (<code>232.0.0.0/8</code>)</strong> چیست؟",
+      "options": [
+        "اتصال مستقیم به (S,G) با IGMPv3 بدون نیاز به RP",
+        "عملکرد صرفاً لایه ۲",
+        "حذف RPF",
+        "جایگزین Broadcast"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>SSM با دانستن آدرس فرستنده نیاز به RP را حذف می‌کند.</p>"
+    },
+    {
+      "title": "رایج‌ترین علت <strong>RPF Failure</strong> چیست؟",
+      "options": [
+        "مسیریابی نامتقارن",
+        "فعال بودن IGMP Snooping",
+        "VLAN 10",
+        "MTU 1500"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>ورود بسته از لینکی غیر از بهترین مسیر Unicast به مبدأ باعث رد در RPF می‌شود.</p>"
+    },
+    {
+      "title": "ویژگی بازه <code>224.0.0.0/24</code> چیست؟",
+      "options": [
+        "مسیریابی در اینترنت",
+        "بازه Link-Local با TTL=1 که روترها فوروارد نمی‌کنند",
+        "ویژه IPTV",
+        "نیازمند RP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>صرفاً برای پروتکل‌های کنترلی همان سگمنت محلی است.</p>"
+    },
+    {
+      "title": "در <code>adv_mcast_lab.py</code> ورود بسته روی اینترفیس غیر-RPF چه نتیجه‌ای دارد؟",
+      "options": [
+        "<code>rpf_passed=True</code>",
+        "<code>rpf_passed=False</code> (<code>RPF_FAILURE_PACKET_DROPPED</code>)",
+        "تغییر FIB",
+        "ایجاد OSPF"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بسته در بررسی RPF رد می‌شود.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>adv_mcast_lab.py</code> چیست؟",
+      "options": [
+        "پخش زنده IPTV",
+        "همسایگی زنده PIM",
+        "شبیه‌ساز محلی Python 3 برای نگاشت RFC 1112 و RPF بدون تجهیز زنده",
+        "تولید IGMPv3"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه مدل محلی Python بدون سخت‌افزار زنده است.</p>"
+    }
+  ]
+}

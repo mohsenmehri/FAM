@@ -67,18 +67,21 @@
             if (!response.ok) throw new Error('unrecognized');
             const info = await response.json();
             if (!Number.isSafeInteger(info.revision) || !Array.isArray(info.eligible) ||
-                info.eligible.some(id => id !== 's02')) throw new Error('unsupported plan');
+                info.eligible.some(id => typeof id !== 'string' || !/^[a-z0-9_-]{1,64}$/.test(id))) throw new Error('unsupported plan');
             if (!Number.isSafeInteger(info.uniqueCompletedCount) || info.uniqueCompletedCount < 0 ||
                 !Number.isSafeInteger(info.unmappedCount) || info.unmappedCount < 0 || info.unmappedCount > info.uniqueCompletedCount ||
                 ![null, 'archive_exists', 'no_eligible'].includes(info.blockedReason)) throw new Error('unsupported plan');
             const blocked = info.blockedReason === 'archive_exists' ? ' بایگانی موجود است و برای جلوگیری از بازنویسی انتقال مسدود شد.' : '';
-            saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ بدون نگاشت: ' + info.unmappedCount + '؛ قابل انتقال: ' + (info.eligible.join('، ') || 'هیچ‌کدام') + '. سایر تکمیل‌ها، نمره‌ها و یادداشت‌ها نمایش جدید ندارند اما نسخه خام حفظ می‌شود.' + blocked);
+            const eligiblePreview = info.eligible.length > 8
+              ? info.eligible.slice(0, 8).join('، ') + ' و ' + (info.eligible.length - 8) + ' مورد دیگر'
+              : (info.eligible.join('، ') || 'هیچ‌کدام');
+            saveStatus('پیش‌نمایش: ' + info.uniqueCompletedCount + ' شناسه قدیمی؛ بدون نگاشت: ' + info.unmappedCount + '؛ قابل انتقال (' + info.eligible.length + ' مورد): ' + eligiblePreview + '. نمره‌ها و یادداشت‌ها در رابط جدید نمایش ندارند اما نسخه خام در بایگانی حفظ می‌شود.' + blocked);
             if (info.migrationAvailable && info.eligible.length) { plan=info; migrate.hidden=false; }
           } catch (_) { saveStatus('قالب قدیمی قابل تشخیص نیست یا نشست تغییر کرده است؛ داده تغییر نکرد.'); }
           finally { preview.disabled = false; }
         });
         migrate.addEventListener('click', async () => {
-          if (!plan || !window.confirm('فقط تکمیل درس s02 منتقل می‌شود؛ سایر تکمیل‌ها، نمره‌ها و یادداشت‌ها در نسخه خام حفظ می‌شوند اما در رابط جدید نمایش داده نمی‌شوند. ادامه می‌دهید؟')) return;
+          if (!plan || !window.confirm('تکمیل ' + plan.eligible.length + ' درس تأییدشده منتقل می‌شود؛ نسخه خام کامل (شامل نمره‌ها، یادداشت‌ها و شناسه‌های بدون نگاشت) در بایگانی و پشتیبان قابل بازگشت حفظ می‌شود. ادامه می‌دهید؟')) return;
           revisionConflict=true; preview.disabled=true; migrate.disabled=true;
           try {
             const response=await fetch('/api/academy/progress/migrate', {method:'POST', credentials:'same-origin',
@@ -382,6 +385,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   <div style="padding:0 20px"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-legacy-migrate" type="button" hidden>انتقال تکمیل s02 پس از تأیید</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button></div>
   <main class="container" id="app-root"></main>
 
+  <script src="/academy-assets/academy-simulator.js?v=20261127a"></script>
   <script src="/academy-assets/lesson-engine.js?v=20261123c"></script>
   <script src="/academy-assets/academy-catalog.js?v=20261123c"></script>
   <script src="/academy-assets/academy-journey.js?v=20261123c"></script>

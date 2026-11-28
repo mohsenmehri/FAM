@@ -1,0 +1,349 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "adv_ec",
+  "objectiveId": "adv_ec",
+  "kind": "lesson",
+  "track": "مهندسی پیشرفته (Advanced Engineering)",
+  "course": "c5-advanced-eng",
+  "domain": "Link Aggregation & First-Hop Redundancy",
+  "title": "مهندسی پیشرفته: EtherChannel Load-Balancing، L3 Port-Channel و مقایسه FHRP (HSRP/VRRP/GLBP)",
+  "titleEn": "Advanced EtherChannel Hashing, L3 Port-Channel & FHRP (HSRP/VRRP/GLBP)",
+  "estimatedMinutes": 55,
+  "prerequisites": [
+    "ccna_02",
+    "ccna_04"
+  ],
+  "evidence": "شبیه‌سازی Python محلی است؛ سناریوی تجهیز مرجع و روی تجهیز اجرا نشده است.",
+  "reviewStatus": "خودبازبینی فنی نویسنده انجام شده؛ بازبینی مستقل انسانی انجام نشده است",
+  "source": "Consolidated v5 rewrite audited against legacy adv_ec (5a747490) and Agent 1 draft (641d02ee)",
+  "meta": {
+    "version": "reviewed.1",
+    "legacyId": "adv_ec",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc5798",
+      "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/configuration_guide/lyr2/b_179_lyr2_9300_cg/configuring_etherchannels.html"
+    ],
+    "limitations": [
+      "هیچ تجهیز واقعی شبکه، سخت‌افزار ASIC یا سرویس تولیدی در این محیط اجرا نشده است.",
+      "آزمایشگاه academy-labs/agent3/adv_ec_lab.py یک مدل محلی Python 3 است و جایگزین آزمایشگاه زنده نیست.",
+      "بازبینی انجام‌شده خودبازبینی فنی نویسنده است و بازبینی مستقل انسانی محسوب نمی‌شود."
+    ],
+    "legacyAuditFixes": [
+      "حذف ادعای مطلق «ممنوعیت round-robin در استاندارد اترنت» و حذف ادعای همگانی «نگاشت ۳ بیتی (۸ سطل) در تمام سوئیچ‌های سیسکو»: تصریح وابستگی جدول Hash به ASIC و پلتفرم.",
+      "تصریح دقیق اینکه تغییر کلید Hash به‌تنهایی توازن بار را تضمین نمی‌کند (وابستگی به Flow Entropy و محدودیت تک‌جریان Elephant Flow).",
+      "تعدیل ادعای مطلق زمان Failover در FHRP و افزودن شبیه‌ساز محلی adv_ec_lab.py برای Flow Entropy و Object Tracking + Preempt."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ خودبازبینی نویسنده نه بازبینی مستقل انسانی",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/adv_ec-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-advanced-eng",
+      "blueprint": "/academy-assets/v5/blueprints/adv_ec.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/adv_ec_lab.py"
+    },
+    "technicalAuditFixes": [
+      "حذف ادعای مطلق «ممنوعیت round-robin در استاندارد اترنت» و حذف ادعای همگانی «نگاشت ۳ بیتی (۸ سطل) در تمام سوئیچ‌های سیسکو»: تصریح وابستگی جدول Hash به ASIC و پلتفرم.",
+      "تصریح دقیق اینکه تغییر کلید Hash به‌تنهایی توازن بار را تضمین نمی‌کند (وابستگی به Flow Entropy و محدودیت تک‌جریان Elephant Flow).",
+      "تعدیل ادعای مطلق زمان Failover در FHRP و افزودن شبیه‌ساز محلی adv_ec_lab.py برای Flow Entropy و Object Tracking + Preempt."
+    ]
+  },
+  "sections": [
+    {
+      "id": "adv_ec-section-1",
+      "title": "مسئله واقعی: چرا یک Port-Channel چهارلینکی گاهی ۹۵٪ بار را روی یک لینک می‌فرستد؟",
+      "html": "<p>پس از تجمیع چهار لینک ۱۰ گیگابیتی با LACP، ممکن است در زمان پشتیبان‌گیری یک لینک اشباع و سه لینک دیگر بیکار بمانند! علت خرابی LACP نیست، بلکه انتخاب کلید Hash نامناسب (مثلاً <code>dst-ip</code> برای ترافیک به سمت یک سرور واحد) است که تنوع کافی (Flow Entropy) ندارد و تمام جریان‌ها را به یک عضو می‌فرستد.</p>"
+    },
+    {
+      "id": "adv_ec-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> مبانی STP/LACP (<code>ccna_02</code>) و HSRP پایه (<code>ccna_04</code>).</p><ul><li>تحلیل <strong>Per-Flow Hashing</strong> و علت ترجیح آن بر توزیع Per-Packet در شبکه‌های TCP/IP.</li><li>انتخاب کلید Hash متناسب با ترافیک با درک وابستگی به ASIC و Flow Entropy.</li><li>ساخت <strong>Layer 3 EtherChannel (<code>no switchport</code>)</strong> برای حذف وابستگی به STP.</li><li>مقایسه مهندسی <strong>HSRP</strong>، <strong>VRRP (RFC 5798)</strong> و <strong>GLBP</strong> با Object Tracking و <code>preempt</code>.</li></ul>"
+    },
+    {
+      "id": "adv_ec-section-3",
+      "title": "چرا EtherChannel معمولاً Per-Flow است نه Per-Packet Round-Robin؟",
+      "html": "<p>ارسال متناوب بسته‌های یک نشست TCP روی چند لینک مجزا می‌تواند به‌دلیل تفاوت جزئی تأخیر صف‌ها باعث <strong>Out-of-Order Delivery</strong> و افت شدید سرعت TCP شود. پیاده‌سازی‌های رایج 802.1AX/EtherChannel از <strong>Per-Flow Hashing</strong> استفاده می‌کنند تا تمام بسته‌های یک جریان روی یک لینک ثابت بمانند؛ در نتیجه یک جریان واحد بیش از ظرفیت یک لینک عضو مصرف نمی‌کند.</p>"
+    },
+    {
+      "id": "adv_ec-section-4",
+      "title": "انتخاب کلید Hash، Flow Entropy و وابستگی به ASIC",
+      "html": "<p>الگوریتم دقیق Hash و تعداد سطل‌های داخلی به <strong>معماری ASIC و مدل سوئیچ</strong> وابسته است و نباید یک عدد ۳بیتی واحد را به تمام مدل‌ها تعمیم داد. همچنین تغییر روش Hash به‌تنهایی توازن را تضمین نمی‌کند؛ اگر کل ترافیک یک Elephant Flow منفرد باشد، روی یک لینک واحد باقی می‌ماند.</p>"
+    },
+    {
+      "id": "adv_ec-section-5",
+      "title": "Layer 3 EtherChannel (`no switchport`) و حذف گلوگاه STP",
+      "html": "<p>با اجرای <code>no switchport</code> روی Port-Channel و اعضای هم‌تنظیم آن میان Distribution و Core، آدرس IP مستقیماً روی <code>Port-channel</code> تنظیم شده و پروتکل مسیریابی (OSPF/BGP) اجرا می‌شود؛ در نتیجه STP در آن پیوند حذف و تجمیع لینک در لایه ۳ انجام می‌گردد.</p>"
+    },
+    {
+      "id": "adv_ec-section-6",
+      "title": "نمودار معماری: انتخاب لینک با Hash در EtherChannel و Failover در FHRP",
+      "html": "<p>نمودار زیر تفکیک Flow Hash در EtherChannel و مسیر Failover در FHRP با IP SLA Tracking را نشان می‌دهد.</p><svg viewBox=\"0 0 780 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"EtherChannel Hashing and FHRP Tracking\"><rect width=\"780\" height=\"210\" rx=\"12\" fill=\"#f8fafc\"/><text x=\"390\" y=\"26\" text-anchor=\"middle\" font-size=\"13\" font-weight=\"bold\" fill=\"#0f172a\">EtherChannel Per-Flow Hash &amp; FHRP Active Failover with Tracking</text><defs><marker id=\"arw\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L0,6 L8,3 z\" fill=\"#334155\"/></marker></defs><rect x=\"20\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"135\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Flow Tuple Input</text><rect x=\"34\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\"/><text x=\"135\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">src-ip / dst-ip / L4 ports</text><rect x=\"34\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#1d4ed8\" stroke-dasharray=\"4 2\"/><text x=\"135\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Higher entropy -&gt; better spread</text><line x1=\"250\" y1=\"118\" x2=\"275\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"275\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"390\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#92400e\">Port-Channel (L2 or L3)</text><rect x=\"289\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"390\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">Per-flow ASIC hash -&gt; Link 1..N</text><rect x=\"289\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#d97706\" stroke-dasharray=\"4 2\"/><text x=\"390\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">Avoids TCP out-of-order delivery</text><line x1=\"505\" y1=\"118\" x2=\"530\" y2=\"118\" stroke=\"#334155\" stroke-width=\"2\" marker-end=\"url(#arw)\"/><rect x=\"530\" y=\"44\" width=\"230\" height=\"146\" rx=\"10\" fill=\"#ecfdf5\" stroke=\"#059669\" stroke-width=\"2\"/><text x=\"645\" y=\"72\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#065f46\">FHRP + IP SLA Track</text><rect x=\"544\" y=\"88\" width=\"202\" height=\"40\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\"/><text x=\"645\" y=\"112\" text-anchor=\"middle\" font-size=\"10.5\" fill=\"#0f172a\">R1 Active (-dec on WAN fail)</text><rect x=\"544\" y=\"138\" width=\"202\" height=\"38\" rx=\"6\" fill=\"#ffffff\" stroke=\"#059669\" stroke-dasharray=\"4 2\"/><text x=\"645\" y=\"161\" text-anchor=\"middle\" font-size=\"10\" fill=\"#334155\">R2 takes over ONLY if preempt ON</text></svg>"
+    },
+    {
+      "id": "adv_ec-section-7",
+      "title": "مقایسه مهندسی HSRP، VRRP (RFC 5798) و GLBP",
+      "html": "<table><thead><tr><th>ویژگی</th><th>HSRP (v1/v2)</th><th>VRRP (RFC 5798)</th><th>GLBP</th></tr></thead><tbody><tr><td><strong>استاندارد</strong></td><td>اختصاصی سیسکو</td><td>استاندارد باز IETF</td><td>اختصاصی سیسکو</td></tr><tr><td><strong>نقش‌ها</strong></td><td>Active / Standby</td><td>Master / Backup</td><td>AVG + تا ۴ AVF</td></tr><tr><td><strong>Preempt پیش‌فرض</strong></td><td>خاموش</td><td>فعال</td><td>وابسته به نقش</td></tr><tr><td><strong>توزیع بار در یک گروه</strong></td><td>خیر</td><td>خیر</td><td>بله (چند Virtual MAC)</td></tr></tbody></table>"
+    },
+    {
+      "id": "adv_ec-section-8",
+      "title": "تله کلاسیک FHRP: نبود Preempt و ناکافی بودن Decrement",
+      "html": "<p>اگر R1 با اولویت ۱۱۰ و کاهش <code>decrement 20</code> دچار افت WAN شود، اولویتش به ۹۰ می‌رسد؛ اما اگر روی R2 (اولویت ۱۰۰) دستور <code>preempt</code> فعال نباشد، R2 نقش Active را نمی‌گیرد و ترافیک سیاه‌چاله می‌شود! همچنین اگر <code>decrement</code> آن‌قدر کوچک باشد که اولویت مؤثر R1 همچنان بالاتر از R2 بماند، Failover رخ نمی‌دهد.</p>"
+    },
+    {
+      "id": "adv_ec-section-9",
+      "title": "تأخیر بازگشت (`preempt delay minimum`) برای پیشگیری از سیاه‌چاله",
+      "html": "<p>پس از ریبوت روتر اصلی، فعال کردن <code>preempt delay minimum</code> (مثلاً ۶۰ تا ۱۲۰ ثانیه متناسب با همگرایی IGP/BGP) مانع بازپس‌گیری زودهنگام نقش Active پیش از تکمیل جدول مسیریابی می‌شود.</p>"
+    },
+    {
+      "id": "adv_ec-section-10",
+      "title": "مرز واقعی زمان Failover و نقش BFD",
+      "html": "<p>زمان واقعی Failover در FHRP به تایمرهای Hello/Hold، پشتیبانی از BFD، بار CPU و همگرایی لایه ۲/۳ بستگی دارد و نباید بدون اندازه‌گیری محیطی، عدد تأخیر تضمینی مطلق ادعا کرد.</p>"
+    },
+    {
+      "id": "adv_ec-section-11",
+      "title": "قوانین تشکیل LACP (802.1AX) و یکسان‌سازی پارامترها",
+      "html": "<p>در LACP حالت <code>active-active</code> یا <code>active-passive</code> باندل می‌سازد اما <code>passive-passive</code> هرگز تشکیل نمی‌شود. سرعت، Duplex، حالت L2/L3 و VLANهای مجاز تمام اعضا باید یکسان باشند.</p>"
+    },
+    {
+      "id": "adv_ec-section-12",
+      "title": "چک‌لیست عیب‌یابی EtherChannel و FHRP",
+      "html": "<ul><li>بررسی شمارنده‌های خروجی هر عضو و تطابق کلید Hash با الگوی ترافیک.</li><li>بررسی علت <code>I</code>/<code>s</code>/<code>D</code> در <code>show etherchannel summary</code>.</li><li>بررسی وضعیت Track، مقدار Decrement و فعال بودن Preempt در Standby.</li></ul>"
+    },
+    {
+      "id": "adv_ec-section-13",
+      "title": "تمرین تحلیلی سناریو (تک‌سرور پشتیبان و افت WAN)",
+      "html": "<p><strong>سناریو:</strong> ۳۲ جریان کلاینت به یک سرور با <code>dst-ip</code> همگی روی یک لینک می‌افتند، اما با <code>src-dst-ip-port</code> روی ۴ لینک توزیع می‌شوند؛ همچنین مدل FHRP نبود <code>preempt</code> را به‌عنوان علت گیرکردن روی R1 آشکار می‌کند (قابل اجرا در <code>adv_ec_lab.py</code>).</p>"
+    },
+    {
+      "id": "adv_ec-section-14",
+      "title": "منابع مرجع، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc5798\" target=\"_blank\" rel=\"noopener\">RFC 5798 (VRRPv3)</a> و راهنمای EtherChannel در Cisco Catalyst 9300 IOS-XE.</p><p><strong>مرز اجرا:</strong> آزمایشگاه <code>adv_ec_lab.py</code> یک مدل محلی Python 3 است و رفتار ASIC یا تایمرهای زنده را اجرا نمی‌کند.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "EtherChannel / LAG",
+      "fa": "تجمیع لینک",
+      "simple": "ترکیب چند لینک فیزیکی اترنت به یک لینک منطقی واحد."
+    },
+    {
+      "term": "LACP (802.1AX)",
+      "fa": "پروتکل کنترل تجمیع لینک",
+      "simple": "استاندارد باز مذاکره پویا برای تشکیل و پایش باندل."
+    },
+    {
+      "term": "Per-Flow Hashing",
+      "fa": "درهم‌سازی مبتنی بر جریان",
+      "simple": "ارسال همه بسته‌های یک جریان روی یک لینک ثابت برای حفظ ترتیب TCP."
+    },
+    {
+      "term": "Flow Entropy",
+      "fa": "تنوع جریان‌ها",
+      "simple": "میزان تنوع فیلدهای IP/Port/MAC که بر توزیع واقعی بار اثر می‌گذارد."
+    },
+    {
+      "term": "Elephant Flow",
+      "fa": "تک‌جریان حجیم",
+      "simple": "یک نشست ترافیکی بزرگ که به سقف ظرفیت یک لینک عضو محدود می‌ماند."
+    },
+    {
+      "term": "Layer 3 Port-Channel",
+      "fa": "پورت‌چنل لایه ۳",
+      "simple": "باندل دارای no switchport و آدرس IP مستقل از STP."
+    },
+    {
+      "term": "FHRP",
+      "fa": "افزونگی گام نخست",
+      "simple": "خانواده پروتکل‌های دروازه پیش‌فرض افزونه (HSRP/VRRP/GLBP)."
+    },
+    {
+      "term": "HSRP",
+      "fa": "پروتکل روتر آماده به‌کار",
+      "simple": "پروتکل سیسکو با نقش‌های Active/Standby و پیش‌فرض Preempt خاموش."
+    },
+    {
+      "term": "VRRP (RFC 5798)",
+      "fa": "افزونگی روتر مجازی",
+      "simple": "استاندارد باز IETF با نقش‌های Master/Backup و پیش‌فرض Preempt فعال."
+    },
+    {
+      "term": "GLBP",
+      "fa": "توازن بار دروازه",
+      "simple": "پروتکل سیسکو با AVG و تا ۴ AVF برای توزیع بار درون یک گروه."
+    },
+    {
+      "term": "Preemption",
+      "fa": "بازپس‌گیری نقش فعال",
+      "simple": "تصاحب نقش Active توسط روتر دارای اولویت بالاتر."
+    },
+    {
+      "term": "Preempt Delay",
+      "fa": "تأخیر بازپس‌گیری",
+      "simple": "مکث کنترل‌شده پیش از بازپس‌گیری Active تا تکمیل همگرایی مسیریابی."
+    },
+    {
+      "term": "Object Tracking",
+      "fa": "پایش شیء مسیر/لینک",
+      "simple": "کاهش خودکار اولویت FHRP هنگام افت لینک بالادست یا ناکامی IP SLA."
+    },
+    {
+      "term": "Out-of-Order Delivery",
+      "fa": "تحویل خارج از ترتیب",
+      "simple": "برهم‌خوردن ترتیب بسته‌های یک جریان TCP و افت کارایی."
+    },
+    {
+      "term": "AVG / AVF",
+      "fa": "دروازه/فورواردکننده مجازی فعال",
+      "simple": "دو نقش کلیدی در GLBP برای پاسخ ARP و فوروارد ترافیک."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "title": "آزمایشگاه و سناریوی مرجع: Advanced EtherChannel Hashing, L3 Port-Channel & FHRP (HSRP/VRRP/GLBP)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش ۱ یک <strong>شبیه‌ساز محلی Python 3 (stdlib)</strong> است که منطق درس را با آزمون‌های مثبت و منفی اجرا می‌کند؛ بخش ۲ صرفاً <strong>سناریوی مرجع طراحی‌شده CLI</strong> (اجرا نشده روی سخت‌افزار واقعی) است. هیچ تجهیز واقعی شبکه یا سرویس تولیدی متصل نشده است.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>کد زیر دقیقاً همان فایل <code>academy-labs/agent3/adv_ec_lab.py</code> است:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/adv_ec_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for adv_ec (EtherChannel Flow Hashing &amp; FHRP Priority/Tracking Model).\n\nEducational local model only — no live Cisco Catalyst/Nexus switch, hardware ASIC hash\npipeline, or real HSRP/VRRP/GLBP multicast control plane is contacted.\nModels:\n1. Illustrative per-flow hash distribution across N member links using dst-ip vs src-dst-ip-port\n   (demonstrating why flow entropy &amp; hash key choice matter, without assuming a single universal\n   hardware hash bit-width across all switch ASICs).\n2. FHRP (HSRP/VRRP) active election with preemption, IP SLA object-tracking decrement,\n   and failover eligibility.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport hashlib\nimport ipaddress\n\nVALID_HASH_MODES = frozenset({&quot;dst-ip&quot;, &quot;src-dst-ip&quot;, &quot;src-dst-ip-port&quot;})\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r}&quot;)\n    return val\n\n\ndef _require_int_range(val: object, name: str, lo: int, hi: int) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (lo &lt;= val &lt;= hi):\n        raise ValueError(f&quot;{name} must be an int in {lo}..{hi}, got {val!r}&quot;)\n    return val\n\n\ndef simulate_etherchannel_hash(\n    flows: list[dict[str, object]],\n    member_count: int,\n    hash_mode: str,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Illustrative deterministic per-flow hash distribution across N links (NOT ASIC-exact).&quot;&quot;&quot;\n    n_links = _require_int_range(member_count, &quot;member_count&quot;, 1, 16)\n    if not isinstance(hash_mode, str) or hash_mode not in VALID_HASH_MODES:\n        raise ValueError(f&quot;hash_mode must be in {sorted(VALID_HASH_MODES)}&quot;)\n    if not isinstance(flows, list) or not flows:\n        raise ValueError(&quot;flows must be a non-empty list of flow dicts&quot;)\n\n    counts = [0] * n_links\n    for flow in flows:\n        if not isinstance(flow, dict):\n            raise ValueError(&quot;each flow must be a dict&quot;)\n        src_ip = str(ipaddress.ip_address(str(flow[&quot;src_ip&quot;])))\n        dst_ip = str(ipaddress.ip_address(str(flow[&quot;dst_ip&quot;])))\n        src_port = _require_int_range(flow[&quot;src_port&quot;], &quot;src_port&quot;, 1, 65535)\n        dst_port = _require_int_range(flow[&quot;dst_port&quot;], &quot;dst_port&quot;, 1, 65535)\n        if hash_mode == &quot;dst-ip&quot;:\n            key = dst_ip\n        elif hash_mode == &quot;src-dst-ip&quot;:\n            key = f&quot;{src_ip}|{dst_ip}&quot;\n        else:\n            key = f&quot;{src_ip}:{src_port}|{dst_ip}:{dst_port}&quot;\n        digest = hashlib.sha256(key.encode(&quot;ascii&quot;)).digest()\n        bucket = int.from_bytes(digest[:4], &quot;big&quot;) % n_links\n        counts[bucket] += 1\n\n    utilized_links = sum(1 for c in counts if c &gt; 0)\n    return {\n        &quot;hash_mode&quot;: hash_mode,\n        &quot;member_count&quot;: n_links,\n        &quot;per_link_flow_counts&quot;: counts,\n        &quot;utilized_links&quot;: utilized_links,\n        &quot;max_link_share_pct&quot;: round((max(counts) / len(flows)) * 100.0, 2),\n        &quot;model_scope_note&quot;: &quot;Illustrative SHA-256 flow-entropy model only; real switch ASIC hash algorithms and bucket tables vary by hardware platform.&quot;,\n    }\n\n\ndef evaluate_fhrp_failover(\n    r1_priority: int,\n    r2_priority: int,\n    track_decrement: int,\n    uplink_up: bool,\n    r2_preempt: bool,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model HSRP/VRRP active router election before and after tracked uplink failure.&quot;&quot;&quot;\n    p1 = _require_int_range(r1_priority, &quot;r1_priority&quot;, 0, 255)\n    p2 = _require_int_range(r2_priority, &quot;r2_priority&quot;, 0, 255)\n    dec = _require_int_range(track_decrement, &quot;track_decrement&quot;, 0, 255)\n    up = _require_bool(uplink_up, &quot;uplink_up&quot;)\n    preempt = _require_bool(r2_preempt, &quot;r2_preempt&quot;)\n\n    eff_p1 = p1 if up else max(0, p1 - dec)\n    if up:\n        active = &quot;R1&quot; if eff_p1 &gt;= p2 else &quot;R2&quot;\n        reason = &quot;UPLINK_UP_NORMAL_ELECTION&quot;\n    else:\n        if p2 &gt; eff_p1 and preempt:\n            active = &quot;R2&quot;\n            reason = &quot;PREEMPT_FAILOVER_TO_R2_AFTER_TRACK_DECREMENT&quot;\n        elif p2 &gt; eff_p1 and not preempt:\n            active = &quot;R1&quot;\n            reason = &quot;STUCK_ON_R1_BECAUSE_R2_PREEMPT_DISABLED&quot;\n        else:\n            active = &quot;R1&quot;\n            reason = &quot;DECREMENT_TOO_SMALL_R1_STILL_HIGHER&quot;\n\n    return {\n        &quot;r1_effective_priority&quot;: eff_p1,\n        &quot;r2_priority&quot;: p2,\n        &quot;active_router_in_model&quot;: active,\n        &quot;reason&quot;: reason,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Catalyst/Nexus ASIC or real FHRP peers are contacted.&quot;)\n    # Many users talking to a single server IP (e.g., backup server)\n    flows = [\n        {&quot;src_ip&quot;: f&quot;10.10.1.{i}&quot;, &quot;dst_ip&quot;: &quot;10.20.0.50&quot;, &quot;src_port&quot;: 40000 + i, &quot;dst_port&quot;: 443}\n        for i in range(10, 42)\n    ]\n    poor = simulate_etherchannel_hash(flows, member_count=4, hash_mode=&quot;dst-ip&quot;)\n    better = simulate_etherchannel_hash(flows, member_count=4, hash_mode=&quot;src-dst-ip-port&quot;)\n    assert poor[&quot;utilized_links&quot;] == 1 and better[&quot;utilized_links&quot;] &gt; 1\n    print(&quot;dst-ip hash (single server hotspot):&quot;, poor)\n    print(&quot;src-dst-ip-port hash (distributed):&quot;, better)\n\n    no_preempt = evaluate_fhrp_failover(110, 100, track_decrement=20, uplink_up=False, r2_preempt=False)\n    with_preempt = evaluate_fhrp_failover(110, 100, track_decrement=20, uplink_up=False, r2_preempt=True)\n    assert no_preempt[&quot;active_router_in_model&quot;] == &quot;R1&quot;\n    assert with_preempt[&quot;active_router_in_model&quot;] == &quot;R2&quot;\n    print(&quot;FHRP failover with preempt:&quot;, with_preempt)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><h4>بخش ۲: سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</h4><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE L3 EtherChannel &amp; HSRP + Tracking (NOT executed on live hardware)\nport-channel load-balance src-dst-mixed-ip-port\ninterface Port-channel1\n no switchport\n ip address 10.0.12.1 255.255.255.252\ntrack 10 interface GigabitEthernet0/0/0 line-protocol\ninterface Vlan10\n standby version 2\n standby 10 ip 10.10.10.1\n standby 10 priority 110\n standby 10 preempt delay minimum 60\n standby 10 track 10 decrement 20</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی یا شبکه تولیدی نیست.</p>",
+      "executionStatus": "شبیه‌سازی محلی Python 3 (Mock) اجرا و تأیید شده؛ سناریوی تجهیز مرجع و روی تجهیز واقعی اجرا نشده است."
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "چرا EtherChannel معمولاً از <strong>Per-Flow Hashing</strong> به‌جای ارسال بسته-به-بسته استفاده می‌کند؟",
+      "options": [
+        "برای پیشگیری از Out-of-Order Delivery در نشست‌های TCP",
+        "زیرا اترنت بیش از یک کابل نمی‌پذیرد",
+        "زیرا LACP رمزنگاری است",
+        "برای حذف MAC"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>حفظ بسته‌های یک جریان روی یک لینک از برهم‌خوردن ترتیب TCP جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "اگر ۳۲ کلاینت به یک سرور واحد متصل شوند و کلید Hash روی <code>dst-ip</code> باشد چه رخ می‌دهد؟",
+      "options": [
+        "توزیع مساوی روی ۴ لینک",
+        "همه جریان‌ها به یک لینک نگاشت شده و گلوگاه ایجاد می‌شود",
+        "LACP قطع می‌شود",
+        "به BGP می‌رود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>یکسان بودن <code>dst-ip</code> باعث تولید یک خروجی Hash ثابت برای همه جریان‌ها می‌شود.</p>"
+    },
+    {
+      "title": "آیا تغییر کلید Hash باعث تقسیم یک جریان TCP واحد (Elephant Flow) بین چند لینک عضو می‌شود؟",
+      "options": [
+        "بله همیشه",
+        "خیر؛ یک جریان واحد روی یک لینک عضو باقی می‌ماند",
+        "فقط در LACP Passive",
+        "فقط در IPv6"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در Per-Flow Hashing یک جریان واحد حداکثر از ظرفیت یک لینک عضو استفاده می‌کند.</p>"
+    },
+    {
+      "title": "مزیت کلیدی <strong>Layer 3 EtherChannel</strong> میان Distribution و Core چیست؟",
+      "options": [
+        "اجبار به STP",
+        "مسیریابی مستقیم لایه ۳ بدون وابستگی به STP روی آن پیوند",
+        "حذف IP",
+        "حذف ARP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>با <code>no switchport</code> لینک در لایه ۳ عمل کرده و از محدودیت STP رها می‌شود.</p>"
+    },
+    {
+      "title": "در HSRP پس از کاهش اولویت R1 از ۱۱۰ به ۹۰، اگر روی R2 (اولویت ۱۰۰) دستور <code>preempt</code> خاموش باشد چه می‌شود؟",
+      "options": [
+        "R2 فوری Active می‌شود",
+        "R1 با اولویت ۹۰ همچنان Active می‌ماند و Failover انجام نمی‌شود",
+        "هر دو Active می‌شوند",
+        "VRRP فعال می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در HSRP باید <code>preempt</code> روی روتر Standby فعال شود تا تصاحب نقش انجام گیرد.</p>"
+    },
+    {
+      "title": "کدام ویژگی در <strong>VRRP (RFC 5798)</strong> نسبت به HSRP متمایز است؟",
+      "options": [
+        "اختصاصی سیسکو است",
+        "استاندارد باز IETF است و Preempt به‌صورت پیش‌فرض فعال است",
+        "فقط برای دو VLAN است",
+        "IP مجازی ندارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>VRRP استاندارد باز چندفروشنده با پیش‌فرض Preempt فعال است.</p>"
+    },
+    {
+      "title": "تفاوت <strong>GLBP</strong> با HSRP و VRRP چیست؟",
+      "options": [
+        "GLBP با یک AVG و چند AVF بار خروجی کلاینت‌ها را درون یک گروه واحد بین چند روتر توزیع می‌کند",
+        "GLBP مک مجازی ندارد",
+        "GLBP استاندارد IEEE است",
+        "فقط یک فورواردکننده دارد"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>AVG به ARP کلاینت‌ها با MAC مجازی AVFهای مختلف پاسخ می‌دهد.</p>"
+    },
+    {
+      "title": "هدف از <strong><code>preempt delay minimum</code></strong> چیست؟",
+      "options": [
+        "کند کردن همیشگی لینک",
+        "مکث پیش از بازپس‌گیری Active تا جدول مسیریابی پس از ریبوت کاملاً همگرا شود",
+        "حذف IP SLA",
+        "تغییر Hello"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>از سیاه‌چاله شدن موقت ترافیک هنگام بازگشت سریع روتر اصلی جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "دو سر لینک با LACP <code>passive</code> چه نتیجه‌ای دارد؟",
+      "options": [
+        "باندل تشکیل می‌شود",
+        "هیچ سمتی مذاکره را آغاز نمی‌کند و باندل شکل نمی‌گیرد",
+        "تبدیل به PAgP",
+        "تبدیل به L3"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>حداقل یک سمت باید <code>active</code> باشد.</p>"
+    },
+    {
+      "title": "اگر R1=110، R2=100 و <code>decrement=5</code> باشد، پس از افت لینک پایش‌شده کدام روتر Active است؟",
+      "options": [
+        "R2",
+        "R1 چون اولویت مؤثر ۱۰۵ هنوز بیشتر از ۱۰۰ است",
+        "هیچ‌کدام",
+        "GLBP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مقدار decrement باید از اختلاف اولویت دو روتر بزرگ‌تر باشد.</p>"
+    },
+    {
+      "title": "درباره تعداد سطل‌های Hash سخت‌افزاری کدام جمله دقیق‌تر است؟",
+      "options": [
+        "همه سوئیچ‌ها دقیقاً ۸ سطل ۳بیتی دارند",
+        "الگوریتم Hash و تعداد سطل‌ها به معماری ASIC و پلتفرم سوئیچ وابسته است",
+        "تعداد لینک بی‌اثر است",
+        "فقط MAC استفاده می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>معماری جدول Hash بین پلتفرم‌ها و ASICهای مختلف متفاوت است.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه <code>adv_ec_lab.py</code> چیست؟",
+      "options": [
+        "تست سخت‌افزار Catalyst 9500",
+        "تضمین Failover زیر ۵۰ms",
+        "شبیه‌ساز محلی Python 3 برای Flow Entropy و منطق FHRP بدون سخت‌افزار زنده",
+        "اجرای زنده LACP"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>کد محلی صرفاً منطق مدل‌شده را بررسی می‌کند.</p>"
+    }
+  ]
+}
