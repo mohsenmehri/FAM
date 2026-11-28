@@ -1,0 +1,344 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_04",
+  "objectiveId": "ccna_04",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "IP Services",
+  "title": "CCNA (سرویس‌های IP): افزونگی دروازه HSRP، همگام‌سازی NTP، ثبت وقایع Syslog و پایش SNMPv3",
+  "titleEn": "CCNA IP Services: HSRP Gateway Redundancy, NTP, Syslog & SNMPv3",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_04 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_04",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc5905",
+      "https://www.rfc-editor.org/rfc/rfc5424",
+      "https://www.rfc-editor.org/rfc/rfc3414",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipapp_fhrp/configuration/xe-16/fhp-xe-16-book/fhp-hsrp.html"
+    ],
+    "limitations": [
+      "هیچ روتر سیسکو، سرور NTP، کلکتور Syslog یا سرور SNMP واقعی در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای آزمون انتخابات HSRP/Preempt/Dual-Active، سلسله‌مراتب Stratum در NTP، فیلتر شدت Syslog و ممیزی امنیتی SNMP است."
+    ],
+    "legacyAuditFixes": [
+      "تفکیک دقیق HSRPv1 (224.0.0.2، MAC 0000.0c07.acXX، گروه‌های 0..255) از HSRPv2 (224.0.0.102، MAC 0000.0c9f.fXXX، گروه‌های 0..4095) و تصریح اختصاصی بودن HSRP در برابر VRRP استاندارد.",
+      "افزودن نکته حیاتی preempt delay minimum برای جلوگیری از سیاه‌چاله ترافیک پیش از همگرایی OSPF/BGP پس از ریبوت روتر.",
+      "تصریح محدوده RFC 5905 برای NTP (Stratum 1..15 همگام، 16 غیرهمگام)، تفاوت SNMP Trap با Inform و گزینه Syslog امن روی TLS/TCP 6514."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_04-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_04.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_04_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲A: بازنویسی ۱۴ بخش/۱۵ واژه/۱۲ پرسش + ساخت ccna_04_lab.py با اعتبارسنجی سخت‌گیرانه نسخه/گروه/Priority/Stratum/Severity و bool."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_04-section-1",
+      "title": "مسئله واقعی: چرا افزونگی دروازه، همگام‌سازی زمان و پایش امن ستون عملیات شبکه‌اند؟",
+      "html": "<p>یک رایانه کاربر فقط یک Default Gateway دارد؛ اگر روتر اصلی خراب شود، وجود روتر دوم بدون پروتکل افزونگی گام نخست (FHRP) هیچ کمکی نمی‌کند. همچنین هنگام وقوع حمله یا قطعی، اگر ساعت روترها با NTP همگام نباشد، لاگ‌های Syslog قابل تطبیق زمانی نیستند و اگر SNMP با نسخه متن‌ساده v2c فعال باشد، مهاجم با شنود شبکه می‌تواند رمز مدیریتی را به دست آورد.</p>"
+    },
+    {
+      "id": "ccna_04-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> مفاهیم Default Gateway، ARP، UDP و مدیریت پایه IOS.</p><ul><li>پیکربندی و عیب‌یابی <strong>HSRP</strong> (نسخه ۱ و ۲، Priority، <code>preempt</code> همراه با تأخیر و جلوگیری از Dual-Active).</li><li>درک معماری سلسله‌مراتبی <strong>NTP</strong> (RFC 5905، Stratum 0..16 و پورت UDP 123).</li><li>پیکربندی فیلتر سطوح شدت <strong>Syslog</strong> (0 تا 7) و شناخت انتقال امن TLS (پورت TCP 6514).</li><li>مقایسه امنیتی <strong>SNMPv2c</strong> با <strong>SNMPv3 (<code>authPriv</code>)</strong> و تفکیک پورت‌های UDP 161 و 162 (Trap در برابر Inform).</li></ul>"
+    },
+    {
+      "id": "ccna_04-section-3",
+      "title": "معماری FHRP و مقایسه HSRPv1، HSRPv2 و VRRP",
+      "html": "<p>پروتکل‌های <strong>FHRP</strong> به دو یا چند روتر اجازه می‌دهند یک آدرس <strong>Virtual IP (VIP)</strong> و یک <strong>Virtual MAC</strong> مشترک به کلاینت‌ها ارائه دهند. <strong>HSRP</strong> اختصاصی سیسکو و <strong>VRRP</strong> استاندارد باز IETF (RFC 5798 / RFC 9568) است. در HSRP، نسخه <strong>v1</strong> از <code>224.0.0.2</code>، گروه <code>0..255</code> و MAC <code>0000.0c07.acXX</code> استفاده می‌کند؛ در حالی که <strong>v2</strong> از <code>224.0.0.102</code>، گروه <code>0..4095</code>، MAC <code>0000.0c9f.fXXX</code> و پشتیبانی IPv6 بهره می‌برد (هر دو روی UDP 1985؛ و نسخه ۱ و ۲ ناسازگارند).</p>"
+    },
+    {
+      "id": "ccna_04-section-4",
+      "title": "انتخابات Active/Standby، نقش preempt و اهمیت preempt delay",
+      "html": "<p>روتری که <strong>Priority بالاتر</strong> (پیش‌فرض 100؛ بازه 0..255) و در صورت تساوی، IP فیزیکی بزرگ‌تر دارد، <strong>Active</strong> می‌شود. پس از ریبوت روتر Active اصلی، هنگام بازگشت <strong>تنها در صورتی نقش Active را پس می‌گیرد که <code>standby &lt;grp&gt; preempt</code></strong> روی آن تنظیم شده باشد. افزودن <code>preempt delay minimum &lt;sec&gt;</code> (مثلاً 60 ثانیه) ضروری است تا پیش از پس گرفتن ترافیک، همگرایی OSPF/BGP تکمیل شود و سیاه‌چاله رخ ندهد.</p>"
+    },
+    {
+      "id": "ccna_04-section-5",
+      "title": "همگام‌سازی زمان با NTP (RFC 5905) و مفهوم Stratum",
+      "html": "<p><strong>NTP (UDP 123)</strong> ساعت همه تجهیزات شبکه را همگام می‌کند. <code>Stratum 0</code> ساعت مرجع فیزیکی (اتمی/GPS)، <code>Stratum 1</code> سرور مستقیم متصل به مرجع، و هر گام بعدی یک واحد افزایش می‌یابد تا حداکثر مجاز <strong>Stratum 15</strong>؛ مقدار <strong>Stratum 16</strong> به معنای عدم همگام‌سازی (Unsynchronized) است.</p>"
+    },
+    {
+      "id": "ccna_04-section-6",
+      "title": "نمودار معماری: چهار سرویس زیرساختی HSRP، NTP، Syslog و SNMPv3",
+      "html": "<p>در نمودار زیر جزئیات کلیدی چهار سرویس حیاتی لایه عملیات شبکه خلاصه شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"HSRP Gateway Redundancy, NTP Stratum, Syslog and SNMPv3\"><rect x=\"16\" y=\"20\" width=\"248\" height=\"180\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"140\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">HSRP (FHRP — Cisco)</text><rect x=\"30\" y=\"58\" width=\"102\" height=\"54\" rx=\"6\" fill=\"#ffffff\" stroke=\"#2563eb\"/><text x=\"81\" y=\"76\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1e40af\">R1 (Active)</text><text x=\"81\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Prio 150 + Preempt</text><text x=\"81\" y=\"105\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">10.0.10.2</text><rect x=\"148\" y=\"58\" width=\"102\" height=\"54\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#3b82f6\"/><text x=\"199\" y=\"76\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1e3a8a\">R2 (Standby)</text><text x=\"199\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Prio 100</text><text x=\"199\" y=\"105\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">10.0.10.3</text><text x=\"140\" y=\"135\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#15803d\">Virtual GW: 10.0.10.1</text><text x=\"140\" y=\"154\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">v1: 224.0.0.2 | v2: 224.0.0.102 (UDP 1985)</text><text x=\"140\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#dc2626\">Version mismatch =&gt; Dual-Active!</text><rect x=\"284\" y=\"20\" width=\"146\" height=\"180\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"357\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">NTP (UDP 123)</text><text x=\"357\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">Stratum 0: GPS/Atomic</text><text x=\"357\" y=\"98\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">Stratum 1..15: Synced</text><text x=\"357\" y=\"122\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">Stratum 16: Unsynced</text><text x=\"357\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">Essential for log</text><text x=\"357\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">correlation &amp; TLS/PKI</text><rect x=\"448\" y=\"20\" width=\"142\" height=\"180\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"519\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Syslog (UDP 514)</text><text x=\"519\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">0: Emergencies</text><text x=\"519\" y=\"90\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">1..3: Alert/Crit/Err</text><text x=\"519\" y=\"108\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">4: Warnings</text><text x=\"519\" y=\"126\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">5..7: Notif/Info/Dbg</text><text x=\"519\" y=\"156\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">trap 4 sends 0..4</text><text x=\"519\" y=\"172\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">(TLS: TCP 6514)</text><rect x=\"608\" y=\"20\" width=\"138\" height=\"180\" rx=\"10\" fill=\"#faf5ff\" stroke=\"#7c3aed\" stroke-width=\"2\"/><text x=\"677\" y=\"44\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#5b21b6\">SNMPv3</text><text x=\"677\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">v1/v2c: Cleartext!</text><text x=\"677\" y=\"100\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#15803d\">v3 authPriv:</text><text x=\"677\" y=\"118\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#4c1d95\">SHA-2 + AES</text><text x=\"677\" y=\"148\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">UDP 161: Poll</text><text x=\"677\" y=\"166\" text-anchor=\"middle\" font-size=\"9\" fill=\"#475569\">UDP 162: Trap/Inform</text></svg>"
+    },
+    {
+      "id": "ccna_04-section-7",
+      "title": "ساختار سطوح شدت Syslog (0 تا 7) و همگام‌سازی Timestamp",
+      "html": "<p><strong>Syslog (RFC 5424)</strong> به‌طور سنتی روی <strong>UDP 514</strong> (و در حالت رمزنگاری‌شده امن روی <strong>TCP/TLS 6514</strong>) پیام‌ها را به سرور SIEM می‌فرستد. شدت پیام‌ها از <strong>0 (Emergencies)</strong> تا <strong>7 (Debugging)</strong> است. دستور <code>logging trap warnings</code> (سطح 4) همه پیام‌های <strong>سطح 0 تا 4 (فراگیر)</strong> را ارسال می‌کند. دستور <code>service timestamps log datetime msec</code> ثبت زمان دقیق را فعال می‌سازد.</p>"
+    },
+    {
+      "id": "ccna_04-section-8",
+      "title": "مقایسه نسخه‌های SNMP و تفاوت Trap با Inform",
+      "html": "<table><thead><tr><th>نسخه SNMP</th><th>احراز هویت</th><th>رمزنگاری</th><th>ارزیابی امنیتی</th></tr></thead><tbody><tr><td>SNMPv1 / v2c</td><td>Community String متن ساده</td><td>ندارد</td><td><strong>ناامن</strong></td></tr><tr><td>SNMPv3 <code>noAuthNoPriv</code></td><td>فقط نام کاربری</td><td>ندارد</td><td>ناامن برای شبکه تولیدی</td></tr><tr><td>SNMPv3 <code>authNoPriv</code></td><td>HMAC (SHA-2)</td><td>ندارد</td><td>بدون رمزنگاری محموله</td></tr><tr><td><strong>SNMPv3 <code>authPriv</code></strong></td><td><strong>HMAC (SHA-2)</strong></td><td><strong>AES-128/256</strong></td><td><strong>انتخاب توصیه‌شده تولیدی</strong></td></tr></tbody></table><p>درخواست‌های مدیریتی روی <strong>UDP 161</strong> و هشدارهای <strong>Trap</strong> (بدون تأییدیه) و <strong>Inform</strong> (دارای تأییدیه) روی <strong>UDP 162</strong> ارسال می‌شوند.</p>"
+    },
+    {
+      "id": "ccna_04-section-9",
+      "title": "ردیابی لینک بالادستی در HSRP (Object Tracking)",
+      "html": "<p>با اتصال <code>track</code> (روی وضعیت اینترفیس یا IP SLA) به HSRP (<code>standby 10 track 1 decrement 60</code>)، هنگام افت لینک WAN از Priority کاسته می‌شود تا روتر Standby (با فرض فعال بودن <code>preempt</code>) بلافاصله نقش Active را بر عهده بگیرد.</p>"
+    },
+    {
+      "id": "ccna_04-section-10",
+      "title": "تلفیق عملیاتی چهار سرویس و محدودسازی دسترسی مدیریتی",
+      "html": "<p>بدون NTP دقیق، لاگ‌های Syslog هنگام رخداد HSRP Failover قابل همبستگی نیستند و بدون SNMPv3/Telemetry کاهش Priority به تیم NOC هشدار داده نمی‌شود. دسترسی NTP، Syslog و SNMP باید روی VRF مدیریتی یا با ACL محدود به سرورهای مجاز باشد.</p>"
+    },
+    {
+      "id": "ccna_04-section-11",
+      "title": "کژفهمی‌های رایج در HSRP، NTP، Syslog و SNMP",
+      "html": "<ul><li><strong>کژفهمی ۱: «تنظیم Priority بالاتر به‌تنهایی باعث بازگشت به Active پس از ریبوت می‌شود.»</strong> واقعیت: بدون <code>standby &lt;grp&gt; preempt</code> روتر در حالت Standby می‌ماند.</li><li><strong>کژفهمی ۲: «تنظیم <code>logging trap 4</code> فقط پیام‌های سطح 4 را می‌فرستد.»</strong> واقعیت: سطوح 0 تا 4 ارسال می‌شوند.</li><li><strong>کژفهمی ۳: «SNMPv2c با Community پیچیده امن است.»</strong> واقعیت: متن ساده است و فقط SNMPv3 <code>authPriv</code> رمزنگاری واقعی دارد.</li></ul>"
+    },
+    {
+      "id": "ccna_04-section-12",
+      "title": "عیب‌یابی حالت Dual-Active (Split-Brain) در HSRP",
+      "html": "<p>اگر در <code>show standby brief</code> هر دو روتر R1 و R2 خود را <code>Active</code> و همتا را <code>unknown</code> نشان دهند، علت نرسیدن پیام‌های Hello (UDP 1985) است: یکسان بودن نسخه HSRPv1/v2، شماره گروه، VLAN مشترک و عدم مسدودسازی Multicast (<code>224.0.0.2</code> / <code>224.0.0.102</code>) در ACL را بررسی کنید.</p>"
+    },
+    {
+      "id": "ccna_04-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> R1 با Priority 150 بدون <code>preempt</code> و R2 با Priority 100 در HSRPv2 گروه 10 کار می‌کنند. R1 ریبوت شده و R2 Active می‌شود. پس از بازگشت R1 کدام Active است؟ <strong>پاسخ:</strong> R2 همچنان Active می‌ماند زیرا <code>preempt</code> روی R1 فعال نشده است.</p><p><strong>تمرین ۲:</strong> سروری با Stratum 15 به‌عنوان منبع NTP یک روتر تنظیم شده است. وضعیت همگام‌سازی چیست؟ <strong>پاسخ:</strong> روتر Stratum 16 محاسبه می‌کند که طبق RFC 5905 غیرهمگام (Unsynchronized) است.</p>"
+    },
+    {
+      "id": "ccna_04-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc5905\" target=\"_blank\" rel=\"noopener\">RFC 5905 (NTPv4)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc5424\" target=\"_blank\" rel=\"noopener\">RFC 5424 (پروتکل Syslog)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc3414\" target=\"_blank\" rel=\"noopener\">RFC 3414 (امنیت USM در SNMPv3)</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipapp_fhrp/configuration/xe-16/fhp-xe-16-book/fhp-hsrp.html\" target=\"_blank\" rel=\"noopener\">راهنمای HSRP در Cisco IOS-XE</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر یا سرور واقعی NTP/Syslog/SNMP در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "FHRP",
+      "fa": "پروتکل افزونگی گام نخست",
+      "simple": "خانواده پروتکل‌هایی (HSRP/VRRP/GLBP) که یک Default Gateway مجازی افزونه می‌سازند."
+    },
+    {
+      "term": "HSRP",
+      "fa": "پروتکل روتر پشتیبان داغ",
+      "simple": "پروتکل اختصاصی سیسکو برای انتخاب روتر Active و Standby با Virtual IP/MAC مشترک."
+    },
+    {
+      "term": "HSRPv1 vs HSRPv2",
+      "fa": "نسخه‌های ۱ و ۲ HSRP",
+      "simple": "v1 از 224.0.0.2 (گروه 0..255) و v2 از 224.0.0.102 (گروه 0..4095 و IPv6) استفاده می‌کنند و ناسازگارند."
+    },
+    {
+      "term": "Preempt",
+      "fa": "بازپس‌گیری نقش Active",
+      "simple": "قابلیت پس گرفتن نقش Active توسط روتر با Priority بالاتر پس از بازیابی."
+    },
+    {
+      "term": "Preempt Delay",
+      "fa": "تأخیر بازپس‌گیری",
+      "simple": "توقف کنترل‌شده پیش از Preempt تا همگرایی پروتکل‌های مسیریابی تکمیل شود."
+    },
+    {
+      "term": "Dual-Active",
+      "fa": "حالت دو-فعال (Split-Brain)",
+      "simple": "خرابی HSRP هنگام نرسیدن Hello میان دو روتر که باعث فعال شدن هم‌زمان هر دو می‌شود."
+    },
+    {
+      "term": "Object Tracking",
+      "fa": "ردیابی مسیر بالادستی",
+      "simple": "کاهش خودکار Priority در HSRP هنگام افت لینک WAN یا شکست IP SLA."
+    },
+    {
+      "term": "NTP (UDP 123)",
+      "fa": "پروتکل زمان شبکه",
+      "simple": "همگام‌سازی دقیق ساعت تجهیزات شبکه طبق RFC 5905."
+    },
+    {
+      "term": "NTP Stratum",
+      "fa": "لایه سلسله‌مراتبی زمان",
+      "simple": "فاصله از ساعت مرجع (0 مرجع فیزیکی، 1..15 همگام، 16 غیرهمگام)."
+    },
+    {
+      "term": "Syslog (UDP 514)",
+      "fa": "پروتکل ثبت مرکزی وقایع",
+      "simple": "ارسال پیام‌های رویداد تجهیزات به سرور مرکزی با ۸ سطح شدت (0 تا 7)."
+    },
+    {
+      "term": "Syslog Severity",
+      "fa": "سطح شدت رویداد",
+      "simple": "از 0 (Emergencies — بحرانی‌ترین) تا 7 (Debugging)؛ تنظیم سطح N شامل 0..N است."
+    },
+    {
+      "term": "SNMPv3 authPriv",
+      "fa": "مد امن SNMPv3",
+      "simple": "تنها حالت دارای هر دو احراز هویت (SHA-2) و رمزنگاری محموله (AES)."
+    },
+    {
+      "term": "SNMP Community String",
+      "fa": "رشته دسترسی SNMPv1/v2c",
+      "simple": "رمز متن ساده و ناامن در نسخه‌های قدیمی SNMP."
+    },
+    {
+      "term": "SNMP Trap vs Inform",
+      "fa": "هشدار بدون/با تأییدیه",
+      "simple": "هر دو روی UDP 162 از تجهیز به مدیر ارسال می‌شوند اما Inform پاسخ تأییدیه می‌گیرد."
+    },
+    {
+      "term": "VRRP",
+      "fa": "پروتکل استاندارد باز FHRP",
+      "simple": "جایگزین استاندارد IETF برای HSRP با پشتیبانی چندفروشنده‌ای."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، رفتار HSRP با و بدون <code>preempt</code>، بروز <code>DUAL_ACTIVE_SPLIT_BRAIN</code> در ناهم‌خوانی نسخه v1/v2، مرز Stratum 15/16 در NTP، فیلتر فراگیر سطوح 0..4 در Syslog و ممیزی امنیتی SNMPv2c در برابر SNMPv3 <code>authPriv</code> را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_04_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_04_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccna_04 (HSRP, NTP Stratum, Syslog Severity &amp; SNMPv3 Security).\n\nNo real Cisco router, NTP server, Syslog collector, or SNMP manager is contacted.\nModels:\n1. HSRP v1 vs v2 compatibility, Active/Standby election, preempt behavior &amp; Dual-Active detection.\n2. NTP Stratum validation (RFC 5905: 1..15 synchronized, 16 unsynchronized).\n3. Syslog inclusive severity filter (0=Emergency .. 7=Debug).\n4. SNMP security posture audit (SNMPv3 authPriv vs cleartext SNMPv2c).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\nSYSLOG_LEVELS = {\n    0: &quot;emergencies&quot;,\n    1: &quot;alerts&quot;,\n    2: &quot;critical&quot;,\n    3: &quot;errors&quot;,\n    4: &quot;warnings&quot;,\n    5: &quot;notifications&quot;,\n    6: &quot;informational&quot;,\n    7: &quot;debugging&quot;,\n}\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_int_range(val: object, name: str, lo: int, hi: int) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (lo &lt;= val &lt;= hi):\n        raise ValueError(f&quot;{name} must be an int in {lo}..{hi} (not bool), got {val!r}&quot;)\n    return val\n\n\ndef evaluate_hsrp_pair(\n    r1: dict[str, object],\n    r2: dict[str, object],\n    hello_reachable: bool = True,\n    current_active: str | None = None,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model HSRP election including version mismatch, split-brain Dual-Active, and preempt.&quot;&quot;&quot;\n    reachable = _require_bool(hello_reachable, &quot;hello_reachable&quot;)\n    if current_active not in (None, &quot;R1&quot;, &quot;R2&quot;):\n        raise ValueError(&quot;current_active must be None, &#x27;R1&#x27;, or &#x27;R2&#x27;&quot;)\n\n    for lbl, r in ((&quot;R1&quot;, r1), (&quot;R2&quot;, r2)):\n        ver = _require_int_range(r[&quot;version&quot;], f&quot;{lbl}.version&quot;, 1, 2)\n        max_grp = 255 if ver == 1 else 4095\n        _require_int_range(r[&quot;group&quot;], f&quot;{lbl}.group&quot;, 0, max_grp)\n        _require_int_range(r[&quot;priority&quot;], f&quot;{lbl}.priority&quot;, 0, 255)\n        _require_bool(r[&quot;preempt&quot;], f&quot;{lbl}.preempt&quot;)\n        ipaddress.IPv4Address(str(r[&quot;ip&quot;]))\n\n    if not reachable or r1[&quot;version&quot;] != r2[&quot;version&quot;] or r1[&quot;group&quot;] != r2[&quot;group&quot;]:\n        return {\n            &quot;healthy&quot;: False,\n            &quot;state&quot;: &quot;DUAL_ACTIVE_SPLIT_BRAIN&quot;,\n            &quot;active_routers&quot;: [&quot;R1&quot;, &quot;R2&quot;],\n            &quot;multicast_group_r1&quot;: &quot;224.0.0.2&quot; if r1[&quot;version&quot;] == 1 else &quot;224.0.0.102&quot;,\n            &quot;multicast_group_r2&quot;: &quot;224.0.0.2&quot; if r2[&quot;version&quot;] == 1 else &quot;224.0.0.102&quot;,\n        }\n\n    k1 = (int(r1[&quot;priority&quot;]), int(ipaddress.IPv4Address(str(r1[&quot;ip&quot;]))))\n    k2 = (int(r2[&quot;priority&quot;]), int(ipaddress.IPv4Address(str(r2[&quot;ip&quot;]))))\n    if k1 == k2:\n        raise ValueError(&quot;R1 and R2 cannot share identical IP addresses&quot;)\n    preferred = &quot;R1&quot; if k1 &gt; k2 else &quot;R2&quot;\n\n    if current_active is None:\n        winner = preferred\n    elif current_active == preferred:\n        winner = preferred\n    else:\n        # Returning higher-priority router takes over ONLY if preempt is enabled!\n        pref_router = r1 if preferred == &quot;R1&quot; else r2\n        winner = preferred if pref_router[&quot;preempt&quot;] else current_active\n\n    return {\n        &quot;healthy&quot;: True,\n        &quot;state&quot;: &quot;ACTIVE_STANDBY&quot;,\n        &quot;active&quot;: winner,\n        &quot;standby&quot;: &quot;R2&quot; if winner == &quot;R1&quot; else &quot;R1&quot;,\n        &quot;multicast_group&quot;: &quot;224.0.0.2&quot; if r1[&quot;version&quot;] == 1 else &quot;224.0.0.102&quot;,\n    }\n\n\ndef evaluate_ntp_stratum(upstream_stratum: int) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Compute local NTP stratum (upstream + 1); stratum 16 is unsynchronized per RFC 5905.&quot;&quot;&quot;\n    up = _require_int_range(upstream_stratum, &quot;upstream_stratum&quot;, 0, 16)\n    local = min(16, up + 1)\n    return {\n        &quot;upstream_stratum&quot;: up,\n        &quot;local_stratum&quot;: local,\n        &quot;synchronized&quot;: local &lt;= 15,\n    }\n\n\ndef filter_syslog_events(events: list[tuple[int, str]], trap_level: int) -&gt; list[dict[str, object]]:\n    &quot;&quot;&quot;Filter syslog events: Cisco `logging trap &lt;level&gt;` sends severities 0..level inclusive.&quot;&quot;&quot;\n    lvl = _require_int_range(trap_level, &quot;trap_level&quot;, 0, 7)\n    if not isinstance(events, list):\n        raise ValueError(&quot;events must be a list of (severity, message) tuples&quot;)\n    out: list[dict[str, object]] = []\n    for sev, msg in events:\n        s = _require_int_range(sev, &quot;event severity&quot;, 0, 7)\n        if not isinstance(msg, str) or not msg.strip():\n            raise ValueError(&quot;event message must be a non-empty str&quot;)\n        if s &lt;= lvl:\n            out.append({&quot;severity&quot;: s, &quot;name&quot;: SYSLOG_LEVELS[s], &quot;message&quot;: msg})\n    return out\n\n\ndef audit_snmp_config(version: str, security_level: str = &quot;&quot;) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Audit SNMP version and security level.&quot;&quot;&quot;\n    if version not in (&quot;v1&quot;, &quot;v2c&quot;, &quot;v3&quot;):\n        raise ValueError(&quot;version must be &#x27;v1&#x27;, &#x27;v2c&#x27;, or &#x27;v3&#x27;&quot;)\n    if version in (&quot;v1&quot;, &quot;v2c&quot;):\n        return {&quot;secure&quot;: False, &quot;cleartext_credentials&quot;: True, &quot;note&quot;: &quot;Community string and payload sent in cleartext&quot;}\n    if security_level not in (&quot;noAuthNoPriv&quot;, &quot;authNoPriv&quot;, &quot;authPriv&quot;):\n        raise ValueError(&quot;SNMPv3 security_level must be &#x27;noAuthNoPriv&#x27;, &#x27;authNoPriv&#x27;, or &#x27;authPriv&#x27;&quot;)\n    return {\n        &quot;secure&quot;: security_level == &quot;authPriv&quot;,\n        &quot;authenticated&quot;: security_level in (&quot;authNoPriv&quot;, &quot;authPriv&quot;),\n        &quot;encrypted&quot;: security_level == &quot;authPriv&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco router, NTP, Syslog, or SNMP server is contacted.&quot;)\n    r1 = {&quot;version&quot;: 2, &quot;group&quot;: 10, &quot;priority&quot;: 150, &quot;preempt&quot;: False, &quot;ip&quot;: &quot;10.0.10.2&quot;}\n    r2 = {&quot;version&quot;: 2, &quot;group&quot;: 10, &quot;priority&quot;: 100, &quot;preempt&quot;: False, &quot;ip&quot;: &quot;10.0.10.3&quot;}\n\n    # Without preempt, R1 returning after failover stays Standby while R2 remains Active\n    no_preempt = evaluate_hsrp_pair(r1, r2, hello_reachable=True, current_active=&quot;R2&quot;)\n    with_preempt = evaluate_hsrp_pair({**r1, &quot;preempt&quot;: True}, r2, hello_reachable=True, current_active=&quot;R2&quot;)\n    split = evaluate_hsrp_pair({**r1, &quot;version&quot;: 1}, r2, hello_reachable=True)\n    assert no_preempt[&quot;active&quot;] == &quot;R2&quot; and with_preempt[&quot;active&quot;] == &quot;R1&quot;\n    assert split[&quot;state&quot;] == &quot;DUAL_ACTIVE_SPLIT_BRAIN&quot;\n    print(&quot;HSRP no-preempt:&quot;, no_preempt[&quot;active&quot;], &quot;| with-preempt:&quot;, with_preempt[&quot;active&quot;], &quot;| v1/v2 mismatch:&quot;, split[&quot;state&quot;])\n\n    # NTP stratum 15 -&gt; local 16 unsynchronized\n    assert evaluate_ntp_stratum(2)[&quot;synchronized&quot;] is True\n    assert evaluate_ntp_stratum(15)[&quot;synchronized&quot;] is False\n\n    # Syslog trap warnings (4) includes 0..4, excludes 5..7\n    ev = [(2, &quot;PSU fail&quot;), (4, &quot;High CPU&quot;), (5, &quot;Link up&quot;), (7, &quot;Debug packet&quot;)]\n    sent = filter_syslog_events(ev, 4)\n    assert [e[&quot;severity&quot;] for e in sent] == [2, 4]\n    assert audit_snmp_config(&quot;v2c&quot;)[&quot;secure&quot;] is False\n    assert audit_snmp_config(&quot;v3&quot;, &quot;authPriv&quot;)[&quot;secure&quot;] is True\n    print(&quot;NTP/Syslog/SNMPv3 checks passed:&quot;, len(sent), &quot;events sent for trap 4.&quot;)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> بدون <code>preempt</code> روتر R2 همچنان Active می‌ماند و با <code>preempt=True</code> روتر R1 بازمی‌گردد؛ ناهم‌خوانی v1/v2 وضعیت <code>DUAL_ACTIVE_SPLIT_BRAIN</code> می‌دهد؛ NTP با مرجع 15 به Stratum 16 غیرهمگام می‌رسد؛ <code>trap_level=4</code> دقیقاً رویدادهای شدت 2 و 4 را عبور می‌دهد؛ و SNMPv2c ناامن و SNMPv3 <code>authPriv</code> امن تشخیص داده می‌شود.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع پیکربندی HSRPv2، NTP، Syslog و SNMPv3 در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE IP Services config (NOT executed on real router)\nconfigure terminal\n interface GigabitEthernet0/1\n  ip address 10.0.10.2 255.255.255.0\n  standby version 2\n  standby 10 ip 10.0.10.1\n  standby 10 priority 150\n  standby 10 preempt delay minimum 60\n ntp server 192.0.2.123 prefer\n service timestamps log datetime msec\n logging host 192.0.2.200\n logging trap warnings\n snmp-server group NOC_RO v3 priv\n snmp-server user nocuser NOC_RO v3 auth sha &lt;AUTH&gt; priv aes 128 &lt;PRIV&gt;\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در HSRP، نبود کدام دستور روی روتر دارای Priority بالاتر باعث می‌شود پس از ریبوت و بازگشت، نقش Active را پس نگیرد؟",
+      "options": [
+        "standby <grp> preempt",
+        "ntp stratum 1",
+        "logging trap 7",
+        "ip nat inside"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بدون <code>preempt</code> روتر با Priority بالاتر پس از بازگشت در حالت Standby می‌ماند.</p>"
+    },
+    {
+      "title": "اگر دستور <code>logging trap warnings</code> (سطح 4) روی روتر تنظیم شود، کدام پیام‌ها به سرور Syslog ارسال می‌شوند؟",
+      "options": [
+        "فقط سطح 4",
+        "تمام پیام‌های سطوح 0 تا 4 (Emergencies تا Warnings)",
+        "فقط سطوح 4 تا 7",
+        "فقط پیام‌های Debugging"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در Syslog عدد کوچک‌تر به‌معنای شدت بحرانی‌تر است؛ بنابراین سطح 4 تمام پیام‌های 0 تا 4 را ارسال می‌کند.</p>"
+    },
+    {
+      "title": "چرا در شبکه‌های تولیدی امروز SNMPv3 با حالت <code>authPriv</code> بر SNMPv2c ترجیح داده می‌شود؟",
+      "options": [
+        "چون SNMPv3 روی لایه ۲ بدون IP کار می‌کند",
+        "چون SNMPv2c رشته Community و داده‌ها را به صورت متن ساده می‌فرستد اما SNMPv3 authPriv هم احراز هویت و هم رمزنگاری دارد",
+        "چون SNMPv3 سرعت پورت را افزایش می‌دهد",
+        "چون SNMPv2c دستور Get ندارد"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>SNMPv2c فاقد رمزنگاری است؛ SNMPv3 <code>authPriv</code> از احراز هویت (SHA-2) و رمزنگاری (AES) بهره می‌برد.</p>"
+    },
+    {
+      "title": "کدام علت می‌تواند باعث حالت <strong>Dual-Active</strong> (هر دو روتر Active و همتا unknown) در HSRP شود؟",
+      "options": [
+        "فعال بودن NTP روی هر دو روتر",
+        "اختلاف نسخه HSRPv1 در یک سمت و HSRPv2 در سمت دیگر، یا مسدود شدن Multicast/UDP 1985 میان دو روتر",
+        "تفاوت نام هاست‌نیم روترها",
+        "استفاده از Syslog سطح 6"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>HSRPv1 از <code>224.0.0.2</code> و HSRPv2 از <code>224.0.0.102</code> استفاده می‌کنند؛ ناهم‌خوانی نسخه یا مسدودسازی Hello باعث Dual-Active می‌شود.</p>"
+    },
+    {
+      "title": "در استاندارد NTP (RFC 5905)، مقدار <strong>Stratum 16</strong> چه معنایی دارد؟",
+      "options": [
+        "دقیق‌ترین ساعت اتمی جهان",
+        "وضعیت غیرهمگام (Unsynchronized) — حداکثر Stratum همگام معتبر 15 است",
+        "پورت پیش‌فرض NTP",
+        "خطای SNMPv3"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>بازه معتبر همگام‌سازی NTP از Stratum 1 تا 15 است و 16 نشانگر عدم همگام‌سازی می‌باشد.</p>"
+    },
+    {
+      "title": "چرا در محیط تولیدی معمولاً دستور <code>standby &lt;grp&gt; preempt delay minimum</code> همراه با <code>preempt</code> توصیه می‌شود؟",
+      "options": [
+        "برای کاهش سرعت پورت به 10Mbps",
+        "تا روتر تازه‌ریبوت‌شده پیش از پس گرفتن نقش Active فرصت تکمیل همگرایی مسیریابی (OSPF/BGP) را داشته باشد و سیاه‌چاله ایجاد نشود",
+        "برای خاموش کردن HSRP",
+        "برای تبدیل HSRP به VRRP"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>پس گرفتن فوری ترافیک پیش از پر شدن جدول مسیرهای بالادستی باعث افت بسته‌های کاربران می‌شود.</p>"
+    },
+    {
+      "title": "تفاوت اصلی <strong>SNMP Trap</strong> و <strong>SNMP Inform</strong> (هر دو روی UDP 162) چیست؟",
+      "options": [
+        "Inform توسط مدیر شبکه تأییدیه (Acknowledgment) دریافت می‌کند اما Trap بدون تأییدیه است",
+        "Trap فقط در SNMPv3 وجود دارد",
+        "Inform روی پورت TCP 80 است",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>پیام Inform قابلیت ارسال مجدد تا دریافت پاسخ تأییدیه از سرور NMS را دارد و مطمئن‌تر از Trap است.</p>"
+    },
+    {
+      "title": "پورت‌های پیش‌فرض NTP، Syslog سنتی و SNMP Polling (Get/Set) به‌ترتیب کدام‌اند؟",
+      "options": [
+        "TCP 22، TCP 80، TCP 443",
+        "UDP 123، UDP 514، UDP 161",
+        "UDP 53، UDP 67، UDP 69",
+        "TCP 179، IP 89، UDP 500"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>NTP روی UDP 123، Syslog سنتی روی UDP 514 (و امن روی TCP/TLS 6514) و SNMP Polling روی UDP 161 کار می‌کنند.</p>"
+    },
+    {
+      "title": "آدرس Multicast پیام‌های Hello در HSRPv2 کدام است؟",
+      "options": [
+        "224.0.0.2",
+        "224.0.0.5",
+        "224.0.0.102",
+        "255.255.255.255"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>HSRPv1 از <code>224.0.0.2</code> و HSRPv2 از <code>224.0.0.102</code> (هر دو با UDP 1985) استفاده می‌کنند.</p>"
+    },
+    {
+      "title": "در محیط چندفروشنده‌ای (مثلاً یک روتر سیسکو در کنار یک روتر جونیپر)، کدام پروتکل FHRP استاندارد باز انتخاب صحیح است؟",
+      "options": [
+        "HSRP",
+        "GLBP",
+        "VRRP (استاندارد IETF RFC 5798 / RFC 9568)",
+        "DTP"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>HSRP اختصاصی سیسکو است؛ برای همکاری چندفروشنده‌ای از استاندارد باز VRRP استفاده می‌شود.</p>"
+    },
+    {
+      "title": "چگونه HSRP می‌تواند هنگام قطعی لینک WAN بالادستی روتر Active، ترافیک کاربران را به روتر Standby منتقل کند؟",
+      "options": [
+        "با اتصال Object Tracking (وضعیت اینترفیس یا IP SLA) به HSRP برای کاهش خودکار Priority و فعال بودن preempt در Standby",
+        "با خاموش کردن NTP",
+        "با تغییر Syslog به سطح 7",
+        "به‌طور خودکار و بدون هیچ تنظیماتی"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>بدون Tracking، روتر Active صرفاً وضعیت لینک LAN را می‌بیند؛ کاهش Priority با <code>track</code> انتقال ایمن به Standby را ممکن می‌سازد.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده روی دو روتر هسته و سرور SIEM واقعی",
+        "تست واقعی SNMP روی تجهیزات سازمانی",
+        "شبیه‌ساز محلی Python 3 برای آزمون HSRP (Preempt/Dual-Active)، NTP Stratum، فیلتر Syslog و ممیزی SNMPv3 بدون اتصال به تجهیزات واقعی",
+        "بدون کد قابل اجرا"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ تجهیز واقعی سیسکو یا سرور زنده متصل نیست.</p>"
+    }
+  ]
+}

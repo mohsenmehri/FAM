@@ -29,6 +29,8 @@ AGENT3_ALLOWED_IDS = {
     "ccie_01", "ccie_sec", "ccie_dc", "ccie_sp", "ccie_wl", "ccie_collab", "ccie_auto",
     # CCDE (20)
     *[f"ccde_{i:02d}" for i in range(1, 21)],
+    # Phase 12A — Transferred CCNA Core Batch (5 of 17 former Agent 1 lessons)
+    "ccna_02_vlan", "ccna_v1", "ccna_v6", "ccna_03", "ccna_04",
 }
 
 FORBIDDEN_LEGACY_TYPOS = (
@@ -73,7 +75,7 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
     def test_discovered_lessons_are_strictly_within_agent3_scope(self):
         discovered = discover_agent3_blueprints()
         discovered_ids = {lesson_id for lesson_id, _ in discovered}
-        self.assertEqual(len(AGENT3_ALLOWED_IDS), 64)
+        self.assertEqual(len(AGENT3_ALLOWED_IDS), 69)
         self.assertEqual(
             discovered_ids,
             AGENT3_ALLOWED_IDS,
@@ -1779,9 +1781,113 @@ class Agent3ContentIntegrityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.run_nornir_style_pilot(inv, "pilot", [""], dry_run=True)
 
+    def test_phase12a_transferred_ccna_core_batch(self):
+        """Phase 12A: independent technical audit & strict lab validation for 5 transferred CCNA lessons."""
+        batch_ids = ("ccna_02_vlan", "ccna_v1", "ccna_v6", "ccna_03", "ccna_04")
+        flagged_imports = {"socket", "http", "urllib", "requests", "subprocess", "os"}
+
+        def load_module(path: Path, mod_name: str):
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            self.assertIsNotNone(spec)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+
+        for lid in batch_ids:
+            lab_path = AGENT3_LAB_DIR / f"{lid}_lab.py"
+            tree = ast.parse(lab_path.read_text(encoding="utf-8"))
+            mods = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    mods.update(n.name.split(".")[0] for n in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    mods.add(node.module.split(".")[0])
+            self.assertEqual(mods & flagged_imports, set(), f"{lid}_lab.py uses flagged import: {mods & flagged_imports}")
+
+        # 1. ccna_02_vlan: discrepancy reconciliation + strict lab tests
+        bp_vlan = json.loads((BLUEPRINT_DIR / "ccna_02_vlan.json").read_text(encoding="utf-8"))
+        txt_vlan = json.dumps(
+            {k: bp_vlan[k] for k in ("title", "sections", "glossary", "stages", "interactiveQuiz")},
+            ensure_ascii=False,
+        )
+        for required in ("10,20,50,999", "nonegotiate", "vlan dot1q tag native", "encapsulation dot1q", "show vlan brief", "نه خروجی زنده"):
+            self.assertIn(required, txt_vlan)
+        self.assertNotIn("اجرا شده روی سوئیچ واقعی", txt_vlan)
+        m_vlan = load_module(AGENT3_LAB_DIR / "ccna_02_vlan_lab.py", "ccna_02_vlan_p12a")
+        ev_bad = m_vlan.audit_trunk_pair(
+            [10, 20, 999], [10, 20, 999], [10, 20], [10, 20, 999], 999, 1, [10, 20, 50]
+        )
+        self.assertFalse(ev_bad["end_to_end_ok"])
+        ev_good = m_vlan.audit_trunk_pair(
+            [10, 20, 50, 999], [10, 20, 50, 999], [10, 20, 50, 999], [10, 20, 50, 999], 999, 999, [10, 20, 50]
+        )
+        self.assertTrue(ev_good["end_to_end_ok"])
+        with self.assertRaises(ValueError):
+            m_vlan.evaluate_dtp_link("trunk", "trunk", sw1_nonegotiate="True")
+        with self.assertRaises(ValueError):
+            m_vlan.audit_trunk_pair([10, 999], [10, 999], [10, 999], [10, 999], 4095, 4095, [10])
+
+        # 2. ccna_v1: container qualification, EST/VST/VGT & shared kernel + strict lab tests
+        bp_v1 = json.loads((BLUEPRINT_DIR / "ccna_v1.json").read_text(encoding="utf-8"))
+        txt_v1 = json.dumps(bp_v1["sections"], ensure_ascii=False)
+        for required in ("EST", "VST", "VGT", "کرنل"):
+            self.assertIn(required, txt_v1)
+        m_v1 = load_module(AGENT3_LAB_DIR / "ccna_v1_lab.py", "ccna_v1_p12a")
+        self.assertFalse(m_v1.audit_vswitch_uplink("EST", [10], "trunk", [10, 20])["reachable"])
+        self.assertFalse(m_v1.audit_vswitch_uplink("VST", [10, 20], "access", [10])["reachable"])
+        self.assertTrue(m_v1.audit_vswitch_uplink("VST", [10, 20], "trunk", [10, 20, 30])["reachable"])
+        with self.assertRaises(ValueError):
+            m_v1.classify_cloud_responsibility("UnknownModel")
+
+        # 3. ccna_v6: vendor-default AD, RFC 5340 vs 5838, fe80 exit-if, IPv6-only RID + strict lab tests
+        bp_v6 = json.loads((BLUEPRINT_DIR / "ccna_v6.json").read_text(encoding="utf-8"))
+        txt_v6 = json.dumps(bp_v6["sections"], ensure_ascii=False)
+        for required in ("RFC 5340", "RFC 5838", "fe80::", "ipv6 unicast-routing"):
+            self.assertIn(required, txt_v6)
+        m_v6 = load_module(AGENT3_LAB_DIR / "ccna_v6_lab.py", "ccna_v6_p12a")
+        self.assertFalse(m_v6.validate_ipv6_static_next_hop("2001:db8:99::/64", "fe80::2", None)["valid"])
+        self.assertTrue(m_v6.validate_ipv6_static_next_hop("2001:db8:99::/64", "fe80::2", "Gi0/0")["valid"])
+        self.assertFalse(m_v6.validate_ospfv3_router_id(False, None)["can_start"])
+        with self.assertRaises(ValueError):
+            m_v6.lookup_best_route("2001:db8:1:2::9", [], ipv6_unicast_routing="True")
+        with self.assertRaises(ValueError):
+            m_v6.validate_ipv6_static_next_hop("2001:db8:99::1/64", "fe80::2", "Gi0/0")
+
+        # 4. ccna_03: complete OSPF adjacency, Mbps ref-bw, 2WAY/DROTHER, Floating Static + strict lab tests
+        bp_03 = json.loads((BLUEPRINT_DIR / "ccna_03.json").read_text(encoding="utf-8"))
+        txt_03 = json.dumps(bp_03["sections"], ensure_ascii=False)
+        for required in ("auto-cost reference-bandwidth", "2WAY", "EXSTART", "IP SLA"):
+            self.assertIn(required, txt_03)
+        m_03 = load_module(AGENT3_LAB_DIR / "ccna_03_lab.py", "ccna_03_p12a")
+        self.assertEqual(m_03.ospf_interface_cost(1000, 100000), 100)
+        self.assertEqual(m_03.ospf_interface_cost(10000, 100000), 10)
+        with self.assertRaises(ValueError):
+            m_03.ospf_interface_cost(10**500, 100)
+        with self.assertRaises(ValueError):
+            m_03.select_floating_static("True", 110, 120)
+
+        # 5. ccna_04: HSRPv1/v2, VRRP, preempt delay, NTP 1..15/16, Syslog 0..7/TLS, SNMPv3 + strict lab tests
+        bp_04 = json.loads((BLUEPRINT_DIR / "ccna_04.json").read_text(encoding="utf-8"))
+        txt_04 = json.dumps(bp_04["sections"], ensure_ascii=False)
+        for required in ("224.0.0.102", "VRRP", "preempt delay", "6514", "authPriv"):
+            self.assertIn(required, txt_04)
+        m_04 = load_module(AGENT3_LAB_DIR / "ccna_04_lab.py", "ccna_04_p12a")
+        self.assertFalse(m_04.evaluate_ntp_stratum(15)["synchronized"])
+        self.assertEqual(m_04.evaluate_ntp_stratum(15)["local_stratum"], 16)
+        self.assertFalse(m_04.audit_snmp_config("v2c")["secure"])
+        self.assertTrue(m_04.audit_snmp_config("v3", "authPriv")["secure"])
+        with self.assertRaises(ValueError):
+            m_04.evaluate_hsrp_pair(
+                {"name": "R1", "version": 2, "group": 10, "priority": 150, "preempt": "True", "ip": "10.0.10.2"},
+                {"name": "R2", "version": 2, "group": 10, "priority": 100, "preempt": False, "ip": "10.0.10.3"},
+            )
+        with self.assertRaises(ValueError):
+            m_04.filter_syslog_events([(8, "bad")], 4)
+
     def test_all_agent3_lab_scripts_execute_cleanly(self):
         scripts = sorted(AGENT3_LAB_DIR.glob("*_lab.py"))
-        self.assertEqual(len(scripts), 64)
+        self.assertEqual(len(scripts), 69)
         for script in scripts:
             with self.subTest(script=script.name):
                 proc = subprocess.run(

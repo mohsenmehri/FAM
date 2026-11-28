@@ -287,3 +287,23 @@
   - مشروط‌سازی `save_config()` به پلتفرم/درایور (بخش ۵، واژه‌نامه، Q6 و `auto_03_lab.py`: IOS/IOS-XE/NX-OS در برابر سیستم‌های Commit-based مثل IOS-XR/JunOS که `NotImplementedError` می‌دهند) و تفکیک لایه‌های تایم‌اوت Netmiko (`conn_timeout`, `auth_timeout`, `banner_timeout`, `read_timeout`, `read_timeout_override`) در بخش ۱۲ و Q11.
 - **وضعیت بازبینی و اجرا:** خودبازبینی نویسنده (بدون بازبینی مستقل انسانی)؛ هر دو آزمایشگاه محلی/Mock بدون تجهیز شبکه زنده هستند؛ تطابق بایتی ۶۴/۶۴ HTML و آزمون `test_phase11_handoff_f3a80939_ccde18_and_auto03_remediation` تأیید شد.
 
+## ۱۲A. پذیرش، ممیزی مستقل و بازسازی v5 دسته اول درس‌های انتقالی سابق ایجنت ۱ (۵ درس هسته CCNA؛ `reviewed.1`)
+
+- **مبنای هماهنگی و منبع خام:** خواندن `AGENT-HANDOFF-fa.md` و `ccna_02_vlan-intake-fa.md` روی شاخه Agent 2 (`arena/ab96c97c-fam` @ `847b16fbf5`) و استخراج کامل شاخه Agent 1 (`arena/96a73266-fam` @ `641d02ee73e0fa86b0972dc1f85474e84abef288`) صرفاً به‌عنوان ماده خام. ادعای ایجنت ۱ مبنی بر «۰ خطای فنی» رد و هر ۵ درس به‌صورت مستقل ممیزی و به ساختار کامل ۱۴بخشی/۱۵واژه‌ای/۱۲سؤالی v5 ارتقا داده شدند.
+- **حل دقیق تناقض `ccna_02_vlan` (بین `academy-data.json` و `agent1_rewrites/ccna_02_vlan.json` و intake ایجنت ۲):**
+  - یکپارچه‌سازی `allowed vlan 10,20,50,999` در تمام دستورات CLI و نمونه خروجی شبیه‌سازی‌شده `show interfaces trunk` (رفع هرس Native VLAN 999 در نسخه `agent1_rewrites` و رفع ناهماهنگی نمونه خروجی `10,20` در `academy-data.json`).
+  - تعریف و همسان‌سازی Voice VLAN 50 در هر دو سوئیچ و روی ترانک، افزودن صریح `switchport mode trunk`، تصریح اینکه `switchport mode access` به‌تنهایی DTP را قطع نمی‌کند و `switchport nonegotiate` (وابسته به پلتفرم/نسخه IOS) ارسال DTP را متوقف می‌سازد، تصریح پیش‌فرض بودن Untagged برای Native VLAN و وجود `vlan dot1q tag native`، وابستگی پلتفرمی `switchport trunk encapsulation dot1q`، محدوده کاتالیست دستور `show vlan brief`، تکمیل چک‌لیست عیب‌یابی (VLAN DB/STP/Link/IP/Filter) و حذف هرگونه ادعای «خروجی زنده».
+- **اصلاحات ممیزی ۴ درس دیگر دسته ۱۲A:**
+  - `ccna_v1`: تعدیل زمان راه‌اندازی کانتینر (حذف ادعای مطلق «چند میلی‌ثانیه»)، تفکیک EST (Access Uplink) از VST/VGT (Trunk Uplink) و مرز امنیتی کرنل مشترک میزبان.
+  - `ccna_v6`: تصریح فروشنده‌محور بودن پیش‌فرض‌های AD سیسکو، تفکیک OSPFv3 کلاسیک (RFC 5340) از Address-Families (RFC 5838)، الزام نام اینترفیس خروجی برای `fe80::` و الزام Router-ID ۳۲بیتی روی روتر صرفاً-IPv6.
+  - `ccna_03`: تکمیل شرایط همسایگی OSPF (یکتایی Router-ID، زیرشبکه روی Broadcast، احراز هویت، پرچم Stub، شکست SPF در ناهم‌خوانی Network Type، محلی بودن Process ID، سلامت `2WAY/DROTHER`)، تصریح واحد Mbps و همسان‌سازی `auto-cost reference-bandwidth` (`100000` برای 100G) و نیاز به IP SLA/BFD در Floating Static روی اترنت.
+  - `ccna_04`: تفکیک HSRPv1 (`224.0.0.2`، 0..255) از HSRPv2 (`224.0.0.102`، 0..4095) و VRRP استاندارد، افزودن `preempt delay minimum`، محدوده NTP RFC 5905 (Stratum 1..15 همگام / 16 غیرهمگام)، Syslog فراگیر 0..7 و TLS 6514، و SNMPv3 `authPriv` همراه با تفاوت Trap/Inform.
+- **طبقه‌بندی صادقانه اجرای ۵ آزمایشگاه جدید دسته ۱۲A (صفر تجهیز زنده، صفر import پرچم‌دار `socket/http/urllib/requests/subprocess/os`):**
+  - `ccna_02_vlan_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI (بدون تجهیز واقعی)
+  - `ccna_v1_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI (بدون تجهیز واقعی)
+  - `ccna_v6_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `ipaddress` + سناریوی مرجع CLI (بدون تجهیز واقعی)
+  - `ccna_03_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib با `ipaddress` + سناریوی مرجع CLI (بدون تجهیز واقعی)
+  - `ccna_04_lab.py` — شبیه‌ساز/Mock محلی درون‌حافظه‌ای Python 3 stdlib + سناریوی مرجع CLI (بدون تجهیز واقعی)
+- **وضعیت بازبینی:** خودبازبینی نویسنده (`author-agent-self-review-not-independent`) — بازبینی مستقل انسانی یا intake توسط Agent 2 هنوز انجام نشده است.
+
+

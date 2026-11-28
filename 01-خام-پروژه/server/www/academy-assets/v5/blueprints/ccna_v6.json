@@ -1,0 +1,344 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_v6",
+  "objectiveId": "ccna_v6",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "IP Connectivity",
+  "title": "CCNA (مسیریابی): مسیریابی Dual-Stack IPv4 و IPv6، Longest Prefix Match، AD/Metric و OSPFv3",
+  "titleEn": "CCNA IP Connectivity: Dual-Stack IPv4/IPv6 Routing, Longest Prefix Match, AD/Metric & OSPFv3",
+  "estimatedMinutes": 45,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_v6 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_v6",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc4291",
+      "https://www.rfc-editor.org/rfc/rfc5340",
+      "https://www.rfc-editor.org/rfc/rfc5838",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/configuration/xe-16/iri-xe-16-book/iri-ipv6-routing.html"
+    ],
+    "limitations": [
+      "هیچ روتر Cisco IOS/IOS-XE واقعی در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 با کتابخانه استاندارد ipaddress برای آزمون LPM، AD/Metric، پرچم ipv6 unicast-routing، اعتبارسنجی Link-Local و Router-ID در OSPFv3 است."
+    ],
+    "legacyAuditFixes": [
+      "تصریح اینکه اعداد AD مانند Static=1، EIGRP=90 و OSPF=110 مقادیر پیش‌فرض فروشنده (سیسکو) هستند و نه ثابت‌های استاندارد RFC.",
+      "تفکیک دقیق OSPFv3 کلاسیک IPv6-only (RFC 5340 / ipv6 router ospf) از OSPFv3 Address-Families (RFC 5838 / router ospfv3).",
+      "توسعه از ۳ بخش/۳ سؤال نسخه قدیمی به ۱۴ بخش، ۱۵ واژه و ۱۲ پرسش همراه با آزمایشگاه قابل اجرا و اعتبارسنجی سخت‌گیرانه."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_v6-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_v6.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_v6_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲A: ساخت ccna_v6_lab.py با کتابخانه استاندارد ipaddress، اعتبارسنجی سخت‌گیرانه CIDR (strict=True)، bool و مرزهای AD/Router-ID."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_v6-section-1",
+      "title": "مسئله واقعی: چرا روتر با داشتن آدرس IPv6 روی اینترفیس‌ها بسته IPv6 را روت نمی‌کند؟",
+      "html": "<p>بسیاری از مهندسانی که برای نخستین بار IPv6 را روی روتر سیسکو فعال می‌کنند، روی هر دو اینترفیس آدرس Global Unicast می‌گذارند و حتی مسیر Static می‌نویسند، اما هیچ بسته‌ای بین زیرشبکه‌ها عبور نمی‌کند و میزبان‌ها نیز پیام Router Advertisement (RA) دریافت نمی‌کنند! علت آن است که در IOS/IOS-XE، برخلاف IPv4، مسیریابی IPv6 به‌طور پیش‌فرض خاموش است و بدون دستور سراسری <code>ipv6 unicast-routing</code> روتر تنها مانند یک میزبان IPv6 رفتار می‌کند.</p>"
+    },
+    {
+      "id": "ccna_v6-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با ساب‌نت‌بندی IPv4 و ساختار آدرس‌های IPv6 (Global Unicast و Link-Local <code>fe80::/10</code>).</p><ul><li>اعمال سلسله‌مراتب تصمیم‌گیری جدول مسیریابی: <strong>Longest Prefix Match (LPM)</strong> -> <strong>Administrative Distance (AD)</strong> -> <strong>Metric</strong> -> <strong>ECMP</strong>.</li><li>درک تفاوت AD (وابسته به فروشنده) با Metric (محاسبه داخلی پروتکل).</li><li>پیکربندی صحیح مسیرهای Static IPv6 با Next-Hop از نوع Link-Local (<code>fe80::</code>) همراه با نام اینترفیس خروجی.</li><li>درک تفاوت OSPFv3 کلاسیک (RFC 5340) با OSPFv3 Address Families (RFC 5838) و الزام Router-ID ۳۲بیتی.</li></ul>"
+    },
+    {
+      "id": "ccna_v6-section-3",
+      "title": "قاعده اول و بی‌چون‌وچرا: Longest Prefix Match (LPM)",
+      "html": "<p>هنگام جست‌وجوی مقصد در جدول مسیریابی (چه در IPv4 و چه در IPv6)، روتر <strong>پیش از بررسی AD یا Metric</strong> تمام مسیرهای منطبق با آدرس مقصد را بررسی کرده و مسیری را برمی‌گزیند که <strong>طولانی‌ترین پیشوند (بیشترین تعداد بیت منطبق)</strong> را دارد. برای مثال، برای مقصد <code>2001:db8:1:2::9</code>، مسیر <code>2001:db8:1:2::/64</code> (حتی اگر از OSPFv3 با AD=110 آموخته شده باشد) همواره بر مسیر <code>2001:db8:1::/48</code> (حتی اگر Static با AD=1 باشد) پیروز می‌شود.</p>"
+    },
+    {
+      "id": "ccna_v6-section-4",
+      "title": "قاعده دوم: Administrative Distance (مقادیر پیش‌فرض سیسکو در برابر سایر فروشندگان)",
+      "html": "<p>فقط زمانی که <strong>دو پروتکل مختلف دقیقاً یک پیشوند یکسان با طول ماسک برابر</strong> را پیشنهاد دهند، روتر با <strong>Administrative Distance (AD)</strong> تصمیم می‌گیرد کدام منبع معتبرتر است (عدد کمتر = اولویت بالاتر). مقادیر رایج آزمون CCNA (Connected=0، Static=1، eBGP=20، EIGRP Internal=90، OSPF=110، IS-IS=115، RIP=120، iBGP=200) <strong>پیش‌فرض‌های فروشنده سیسکو</strong> هستند و در استاندارد RFC ثابت نیستند؛ برای نمونه در Juniper JunOS معادل آن Route Preference نام دارد و Static=5 و OSPF Internal=10 است.</p>"
+    },
+    {
+      "id": "ccna_v6-section-5",
+      "title": "قاعده سوم: Metric و توازن بار ECMP",
+      "html": "<p>اگر دو یا چند مسیر با پیشوند یکسان از <strong>یک پروتکل مسیریابی واحد</strong> (با AD برابر) وجود داشته باشد، مسیر دارای <strong>Metric کمتر</strong> برنده می‌شود (در OSPF مجموع Cost و در EIGRP متریک ترکیبی). اگر چند مسیر از همان پروتکل دقیقاً Metric برابر داشته باشند، روتر می‌تواند آن‌ها را به‌صورت <strong>ECMP</strong> هم‌زمان در جدول مسیر نصب کرده و ترافیک را بر اساس جریان با CEF توزیع کند.</p>"
+    },
+    {
+      "id": "ccna_v6-section-6",
+      "title": "نمودار معماری: زنجیره تصمیم مسیریابی Dual-Stack و نکات کلیدی IPv6",
+      "html": "<p>در نمودار زیر ترتیب دقیق LPM -> AD -> Metric و الزامات کلیدی مسیریابی IPv6 نمایش داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Dual-Stack IPv4 and IPv6 Route Selection Pipeline\"><rect x=\"16\" y=\"24\" width=\"165\" height=\"172\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"98\" y=\"48\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">Step 1: LPM First</text><text x=\"98\" y=\"74\" text-anchor=\"middle\" font-size=\"10\" fill=\"#0f172a\">2001:db8:1:2::/64</text><text x=\"98\" y=\"90\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#15803d\">(OSPFv3, AD 110)</text><text x=\"98\" y=\"116\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1d4ed8\">BEATS</text><text x=\"98\" y=\"140\" text-anchor=\"middle\" font-size=\"10\" fill=\"#475569\">2001:db8:1::/48</text><text x=\"98\" y=\"156\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#64748b\">(Static, AD 1)</text><line x1=\"181\" y1=\"110\" x2=\"215\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><rect x=\"215\" y=\"24\" width=\"175\" height=\"172\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"302\" y=\"48\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">Step 2: Lowest AD*</text><text x=\"302\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">Only for IDENTICAL prefix!</text><text x=\"302\" y=\"100\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Cisco Defaults (*vendor):</text><text x=\"302\" y=\"120\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Connected 0 | Static 1</text><text x=\"302\" y=\"138\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">eBGP 20 | EIGRP 90</text><text x=\"302\" y=\"156\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">OSPF 110 | iBGP 200</text><line x1=\"390\" y1=\"110\" x2=\"424\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><rect x=\"424\" y=\"24\" width=\"145\" height=\"172\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"496\" y=\"48\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Step 3: Metric</text><text x=\"496\" y=\"78\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">Same prefix &amp; protocol</text><text x=\"496\" y=\"104\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">OSPF: Cost</text><text x=\"496\" y=\"124\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">EIGRP: Composite</text><text x=\"496\" y=\"148\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#15803d\">Equal metric =&gt; ECMP</text><line x1=\"569\" y1=\"110\" x2=\"598\" y2=\"110\" stroke=\"#0f172a\" stroke-width=\"2\"/><rect x=\"598\" y=\"24\" width=\"148\" height=\"172\" rx=\"10\" fill=\"#faf5ff\" stroke=\"#7c3aed\" stroke-width=\"2\"/><text x=\"672\" y=\"48\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#5b21b6\">IPv6 Essentials</text><text x=\"672\" y=\"78\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#4c1d95\">ipv6 unicast-routing</text><text x=\"672\" y=\"104\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#4c1d95\">fe80:: next-hop needs</text><text x=\"672\" y=\"120\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#4c1d95\">exit interface!</text><text x=\"672\" y=\"148\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#4c1d95\">OSPFv3 needs 32-bit</text><text x=\"672\" y=\"164\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#4c1d95\">Router-ID</text></svg>"
+    },
+    {
+      "id": "ccna_v6-section-7",
+      "title": "چرا Next-Hop از نوع Link-Local (fe80::) به نام اینترفیس خروجی نیاز دارد؟",
+      "html": "<p>آدرس‌های <strong>Link-Local</strong> در بازه <code>fe80::/10</code> (RFC 4291) صرفاً در محدوده یک لینک محلی معنا دارند و دقیقاً همان آدرس <code>fe80::2</code> ممکن است روی چندین اینترفیس مختلف روتر وجود داشته باشد. به همین دلیل، وقتی در مسیر Static IPv6 یک آدرس Link-Local را به‌عنوان Next-Hop می‌نویسید، <strong>ذکر صریح نام اینترفیس خروجی</strong> (مانند <code>ipv6 route 2001:db8:99::/64 GigabitEthernet0/0 fe80::2</code>) الزامی است.</p>"
+    },
+    {
+      "id": "ccna_v6-section-8",
+      "title": "مقایسه Dual-Stack در جدول مسیر (RIB) و پیش‌نیاز ipv6 unicast-routing",
+      "html": "<table><thead><tr><th>ویژگی</th><th>IPv4 در IOS/IOS-XE</th><th>IPv6 در IOS/IOS-XE</th></tr></thead><tbody><tr><td>وضعیت پیش‌فرض روتینگ</td><td>به‌طور پیش‌فرض فعال (<code>ip routing</code>)</td><td><strong>پیش‌فرض خاموش</strong>؛ نیازمند <code>ipv6 unicast-routing</code></td></tr><tr><td>مسیر پیش‌فرض (Default)</td><td><code>0.0.0.0/0</code></td><td><code>::/0</code></td></tr><tr><td>کشف آدرس لایه ۲ همسایه</td><td>ARP (Broadcast)</td><td>NDP با ICMPv6 (Multicast)</td></tr><tr><td>Next-Hop در OSPF</td><td>آدرس IPv4 اینترفیس همسایه</td><td>آدرس Link-Local (<code>fe80::...</code>) اینترفیس همسایه</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccna_v6-section-9",
+      "title": "OSPFv3 کلاسیک (RFC 5340) در برابر OSPFv3 Address-Families (RFC 5838)",
+      "html": "<p>در پیاده‌سازی کلاسیک OSPFv3 برای IPv6 (<code>ipv6 router ospf 1</code> مطابق RFC 5340)، دستور قدیمی <code>network</code> حذف شده و عضویت هر لینک مستقیماً زیر خود اینترفیس با <code>ipv6 ospf 1 area 0</code> انجام می‌شود. همچنین در پیاده‌سازی مدرن‌تر <strong>OSPFv3 Address-Families</strong> (مطابق RFC 5838 و دستور <code>router ospfv3 1</code> در IOS-XE)، یک فرایند واحد می‌تواند هم‌زمان هر دو خانواده آدرس IPv4 و IPv6 را پشتیبانی کند. در هر دو مدل، OSPFv3 همچنان به یک <strong>Router-ID ۳۲بیتی</strong> (به شکل IPv4 مانند <code>3.3.3.3</code>) نیاز دارد؛ بنابراین روی روتری که هیچ اینترفیس IPv4 فعالی ندارد، بدون تعریف دستی <code>router-id</code> فرایند OSPFv3 بالا نمی‌آید.</p>"
+    },
+    {
+      "id": "ccna_v6-section-10",
+      "title": "استفاده از مسیرهای Static، Fully Specified و Floating Static در Dual-Stack",
+      "html": "<p>در لینک‌های اترنت چنددسترسی، بهترین الگو در هر دو IPv4 و IPv6 استفاده از Next-Hop (یا مسیر Fully Specified شامل اینترفیس + Next-Hop، که برای Link-Local IPv6 الزامی است) می‌باشد. برای مسیر پشتیبان (Floating Static) نیز AD بالاتر از مسیر اصلی در انتهای دستور اضافه می‌شود (با یادآوری نیاز به IP SLA/BFD روی اترنت برای افت غیرمستقیم).</p>"
+    },
+    {
+      "id": "ccna_v6-section-11",
+      "title": "کژفهمی‌های رایج در مسیریابی IPv4 و IPv6",
+      "html": "<ul><li><strong>کژفهمی ۱: «مسیر Static چون AD=1 دارد همیشه بر OSPF پیروز می‌شود.»</strong> واقعیت: AD فقط روی پیشوند یکسان مقایسه می‌شود؛ یک مسیر OSPF با پیشوند <code>/64</code> یا <code>/24</code> همیشه بر مسیر Static با پیشوند کوتاه‌تر <code>/48</code> یا <code>/16</code> پیروز می‌شود.</li><li><strong>کژفهمی ۲: «گذاشتن آدرس IPv6 روی اینترفیس روتر برای روت کردن IPv6 کافی است.»</strong> واقعیت: تا دستور سراسری <code>ipv6 unicast-routing</code> اجرا نشود، روتر نه بسته IPv6 فوروارد می‌کند و نه پیام RA می‌فرستد.</li><li><strong>کژفهمی ۳: «در OSPFv3 هم باید زیر فرایند دستور <code>network ... area 0</code> زد.»</strong> واقعیت: عضویت لینک‌ها در OSPFv3 مستقیماً زیر اینترفیس انجام می‌شود.</li></ul>"
+    },
+    {
+      "id": "ccna_v6-section-12",
+      "title": "عیب‌یابی خطاهای کلاسیک مسیریابی IPv6 و OSPFv3",
+      "html": "<p>اگر روی روتر Dual-Stack دستور <code>ipv6 route 2001:db8:99::/64 fe80::2</code> رد می‌شود، علت نبود نام اینترفیس خروجی برای آدرس Link-Local است (اصلاح: افزودن <code>GigabitEthernet0/0</code> پیش از <code>fe80::2</code>). اگر روی روتر صرفاً-IPv6 همسایگی OSPFv3 تشکیل نمی‌شود، با <code>show ipv6 protocols</code> و <code>show ipv6 ospf</code> بررسی کنید آیا <code>router-id</code> ۳۲بیتی دستی تعریف شده و <code>ipv6 unicast-routing</code> فعال است یا خیر.</p>"
+    },
+    {
+      "id": "ccna_v6-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> جدول مسیر شامل <code>2001:db8:1::/48</code> (Static, AD=1) و <code>2001:db8:1:2::/64</code> (OSPFv3, AD=110) است. بسته به مقصد <code>2001:db8:1:2::9</code> از کدام مسیر می‌رود؟ <strong>پاسخ:</strong> از مسیر OSPFv3؛ چون طول پیشوند <code>/64</code> از <code>/48</code> طولانی‌تر است و LPM همیشه مقدم بر AD است.</p><p><strong>تمرین ۲:</strong> اگر هر دو مسیر دقیقاً <code>2001:db8:1:2::/64</code> بودند (یکی Static با AD=1 و دیگری OSPFv3 با AD=110)، کدام نصب می‌شد؟ <strong>پاسخ:</strong> مسیر Static، زیرا با یکسان شدن طول پیشوند نوبت مقایسه AD می‌رسد و AD=1 از 110 کمتر است.</p>"
+    },
+    {
+      "id": "ccna_v6-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc4291\" target=\"_blank\" rel=\"noopener\">RFC 4291 (معماری آدرس‌دهی IPv6)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc5340\" target=\"_blank\" rel=\"noopener\">RFC 5340 (OSPFv3 برای IPv6)</a>، <a href=\"https://www.rfc-editor.org/rfc/rfc5838\" target=\"_blank\" rel=\"noopener\">RFC 5838 (پشتیبانی Address Families در OSPFv3)</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/configuration/xe-16/iri-xe-16-book/iri-ipv6-routing.html\" target=\"_blank\" rel=\"noopener\">راهنمای مسیریابی IPv6 سیسکو IOS-XE</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی سیسکو در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 با کتابخانه استاندارد <code>ipaddress</code> است و بخش ۲ سناریوی مرجع طراحی‌شده CLI می‌باشد.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Longest Prefix Match (LPM)",
+      "fa": "تطابق طولانی‌ترین پیشوند",
+      "simple": "اولین و مهم‌ترین معیار انتخاب مسیر در IPv4 و IPv6؛ پیشوند خاص‌تر همیشه برنده است."
+    },
+    {
+      "term": "Administrative Distance (AD)",
+      "fa": "فاصله اداری",
+      "simple": "امتیاز اعتبار منبع مسیر (وابسته به فروشنده) برای مقایسه دو پروتکل روی پیشوند یکسان."
+    },
+    {
+      "term": "Metric",
+      "fa": "متریک مسیریابی",
+      "simple": "معیار داخلی یک پروتکل (مانند Cost در OSPF) برای انتخاب بهترین مسیر میان مسیرهای هم‌پروتکل."
+    },
+    {
+      "term": "ECMP",
+      "fa": "توازن بار چندمسیره هم‌هزینه",
+      "simple": "نصب هم‌زمان چند مسیر با پیشوند، AD و Metric برابر در جدول مسیر."
+    },
+    {
+      "term": "Dual-Stack",
+      "fa": "پشته دوگانه IPv4/IPv6",
+      "simple": "اجرای هم‌زمان و مستقل هر دو پروتکل IPv4 و IPv6 روی همان اینترفیس‌ها و تجهیزات."
+    },
+    {
+      "term": "ipv6 unicast-routing",
+      "fa": "فعال‌سازی روتینگ IPv6",
+      "simple": "دستور سراسری الزامی در IOS/IOS-XE برای فعال کردن فوروارد IPv6 و ارسال پیام‌های RA."
+    },
+    {
+      "term": "Link-Local (fe80::/10)",
+      "fa": "آدرس محلی لینک",
+      "simple": "آدرس IPv6 با دامنه محدود به یک لینک که به‌عنوان Next-Hop در OSPFv3 و NDP به کار می‌رود."
+    },
+    {
+      "term": "Global Unicast (GUA)",
+      "fa": "آدرس یکتای سراسری IPv6",
+      "simple": "آدرس IPv6 قابل مسیریابی عمومی در اینترنت یا شبکه سازمانی (بازه 2000::/3)."
+    },
+    {
+      "term": "OSPFv3 (RFC 5340)",
+      "fa": "نسخه سوم OSPF",
+      "simple": "پروتکل Link-State با فعال‌سازی مستقیم روی اینترفیس و نیاز به Router-ID ۳۲بیتی."
+    },
+    {
+      "term": "OSPFv3 Address Families",
+      "fa": "خانواده‌های آدرس OSPFv3",
+      "simple": "گسترش RFC 5838 که به یک فرایند OSPFv3 اجازه حمل هم‌زمان IPv4 و IPv6 را می‌دهد."
+    },
+    {
+      "term": "Router-ID (32-bit)",
+      "fa": "شناسه ۳۲بیتی روتر",
+      "simple": "شناسه یکتا به قالب IPv4 که حتی در شبکه‌های صرفاً-IPv6 برای شروع OSPFv3 الزامی است."
+    },
+    {
+      "term": "RIB",
+      "fa": "جدول اطلاعات مسیریابی",
+      "simple": "جدول کنترل‌پلین شامل بهترین مسیرهای برگزیده از منابع مختلف مسیریابی."
+    },
+    {
+      "term": "FIB / CEF",
+      "fa": "جدول فوروارد سریع",
+      "simple": "جدول بهینه‌سازی‌شده دیتاپلین برای سوئیچینگ سریع بسته‌ها بر اساس RIB."
+    },
+    {
+      "term": "NDP",
+      "fa": "پروتکل کشف همسایه IPv6",
+      "simple": "مجموعه پیام‌های ICMPv6 (NS/NA/RS/RA) جایگزین ARP در IPv6."
+    },
+    {
+      "term": "Fully Specified Static",
+      "fa": "مسیر ایستای کامل",
+      "simple": "مسیر Static شامل هر دو نام اینترفیس خروجی و آدرس Next-Hop (الزامی برای Link-Local)."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی با ماژول استاندارد <code>ipaddress</code> پایتون، تقدم LPM بر AD در Dual-Stack، اثر خاموش بودن <code>ipv6 unicast-routing</code>، الزام نام اینترفیس خروجی برای Next-Hop از نوع <code>fe80::</code> و الزام Router-ID ۳۲بیتی در OSPFv3 را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_v6_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_v6_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccna_v6 (IPv4/IPv6 Routing, Longest Prefix Match, AD/Metric &amp; Link-Local).\n\nNo real Cisco IOS/IOS-XE router is contacted.\nModels:\n1. Strict Dual-Stack Longest Prefix Match (LPM) before Cisco-default AD and Metric tie-breaking.\n2. IPv6 global `ipv6 unicast-routing` gate.\n3. IPv6 Link-Local (`fe80::/10`) static next-hop exit-interface requirement.\n4. OSPFv3 32-bit Router-ID requirement on IPv6-only routers.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_non_neg_int(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or val &lt; 0:\n        raise ValueError(f&quot;{name} must be a non-negative int (not bool), got {val!r}&quot;)\n    return val\n\n\ndef lookup_best_route(\n    destination: str,\n    rib: list[dict[str, object]],\n    ipv6_unicast_routing: bool = True,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Perform strict LPM -&gt; AD -&gt; Metric selection on a Dual-Stack RIB.&quot;&quot;&quot;\n    if not isinstance(destination, str) or not destination.strip():\n        raise ValueError(&quot;destination must be a non-empty IP address string&quot;)\n    v6_enabled = _require_bool(ipv6_unicast_routing, &quot;ipv6_unicast_routing&quot;)\n    dest_ip = ipaddress.ip_address(destination.strip())\n\n    if dest_ip.version == 6 and not v6_enabled:\n        return {\n            &quot;destination&quot;: str(dest_ip),\n            &quot;forwarded&quot;: False,\n            &quot;reason&quot;: &quot;IPV6_UNICAST_ROUTING_DISABLED&quot;,\n            &quot;selected_routes&quot;: [],\n        }\n\n    if not isinstance(rib, list):\n        raise ValueError(&quot;rib must be a list of route dicts&quot;)\n\n    matches: list[tuple[int, int, int, dict[str, object]]] = []\n    for entry in rib:\n        if not isinstance(entry, dict):\n            raise ValueError(&quot;each RIB entry must be a dict&quot;)\n        net = ipaddress.ip_network(str(entry[&quot;prefix&quot;]), strict=True)\n        ad = _require_non_neg_int(entry[&quot;ad&quot;], &quot;ad&quot;)\n        if ad &gt; 255:\n            raise ValueError(f&quot;ad must be in 0..255, got {ad}&quot;)\n        metric = _require_non_neg_int(entry[&quot;metric&quot;], &quot;metric&quot;)\n        if net.version == dest_ip.version and dest_ip in net:\n            # Longest prefix wins FIRST; then lowest AD (vendor-specific default); then lowest metric\n            matches.append((-net.prefixlen, ad, metric, {**entry, &quot;prefix&quot;: str(net)}))\n\n    if not matches:\n        return {\n            &quot;destination&quot;: str(dest_ip),\n            &quot;forwarded&quot;: False,\n            &quot;reason&quot;: &quot;NO_MATCHING_ROUTE&quot;,\n            &quot;selected_routes&quot;: [],\n        }\n\n    matches.sort(key=lambda t: (t[0], t[1], t[2]))\n    best_key = (matches[0][0], matches[0][1], matches[0][2])\n    winners = [m[3] for m in matches if (m[0], m[1], m[2]) == best_key]\n    return {\n        &quot;destination&quot;: str(dest_ip),\n        &quot;forwarded&quot;: True,\n        &quot;ecmp_count&quot;: len(winners),\n        &quot;selected_routes&quot;: winners,\n    }\n\n\ndef validate_ipv6_static_next_hop(\n    prefix: str,\n    next_hop: str,\n    exit_interface: str | None = None,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Validate IPv6 static route syntax, enforcing exit_interface for Link-Local next-hops.&quot;&quot;&quot;\n    net = ipaddress.IPv6Network(prefix, strict=True)\n    nh = ipaddress.IPv6Address(next_hop)\n    is_ll = nh in ipaddress.IPv6Network(&quot;fe80::/10&quot;)\n    has_iface = isinstance(exit_interface, str) and bool(exit_interface.strip())\n    if is_ll and not has_iface:\n        return {\n            &quot;valid&quot;: False,\n            &quot;prefix&quot;: str(net),\n            &quot;next_hop&quot;: str(nh),\n            &quot;reason&quot;: &quot;LINK_LOCAL_NEXT_HOP_REQUIRES_EXIT_INTERFACE&quot;,\n        }\n    return {\n        &quot;valid&quot;: True,\n        &quot;prefix&quot;: str(net),\n        &quot;next_hop&quot;: str(nh),\n        &quot;exit_interface&quot;: exit_interface.strip() if has_iface else None,\n    }\n\n\ndef validate_ospfv3_router_id(\n    has_ipv4_interface: bool,\n    explicit_router_id: str | None = None,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model OSPFv3 32-bit Router-ID requirement on IPv6-only routers.&quot;&quot;&quot;\n    has_v4 = _require_bool(has_ipv4_interface, &quot;has_ipv4_interface&quot;)\n    if explicit_router_id is not None:\n        if not isinstance(explicit_router_id, str):\n            raise ValueError(&quot;explicit_router_id must be a dotted IPv4-format string or None&quot;)\n        rid = ipaddress.IPv4Address(explicit_router_id.strip())\n        if str(rid) == &quot;0.0.0.0&quot;:\n            raise ValueError(&quot;OSPFv3 router-id cannot be 0.0.0.0&quot;)\n        return {&quot;can_start&quot;: True, &quot;router_id&quot;: str(rid), &quot;source&quot;: &quot;explicit&quot;}\n    if has_v4:\n        return {&quot;can_start&quot;: True, &quot;router_id&quot;: &quot;auto_from_ipv4&quot;, &quot;source&quot;: &quot;ipv4_interface&quot;}\n    return {\n        &quot;can_start&quot;: False,\n        &quot;router_id&quot;: None,\n        &quot;reason&quot;: &quot;MISSING_32BIT_ROUTER_ID_ON_IPV6_ONLY_ROUTER&quot;,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco router is contacted.&quot;)\n    rib = [\n        {&quot;prefix&quot;: &quot;2001:db8:1::/48&quot;, &quot;protocol&quot;: &quot;static&quot;, &quot;ad&quot;: 1, &quot;metric&quot;: 0, &quot;next_hop&quot;: &quot;fe80::1&quot;},\n        {&quot;prefix&quot;: &quot;2001:db8:1:2::/64&quot;, &quot;protocol&quot;: &quot;ospfv3&quot;, &quot;ad&quot;: 110, &quot;metric&quot;: 10, &quot;next_hop&quot;: &quot;fe80::2&quot;},\n        {&quot;prefix&quot;: &quot;10.20.0.0/16&quot;, &quot;protocol&quot;: &quot;static&quot;, &quot;ad&quot;: 1, &quot;metric&quot;: 0, &quot;next_hop&quot;: &quot;192.0.2.1&quot;},\n        {&quot;prefix&quot;: &quot;10.20.30.0/24&quot;, &quot;protocol&quot;: &quot;ospf&quot;, &quot;ad&quot;: 110, &quot;metric&quot;: 20, &quot;next_hop&quot;: &quot;192.0.2.2&quot;},\n    ]\n    # LPM beats AD in both IPv6 and IPv4\n    res_v6 = lookup_best_route(&quot;2001:db8:1:2::9&quot;, rib, ipv6_unicast_routing=True)\n    assert res_v6[&quot;forwarded&quot;] is True and res_v6[&quot;selected_routes&quot;][0][&quot;protocol&quot;] == &quot;ospfv3&quot;\n    res_v6_off = lookup_best_route(&quot;2001:db8:1:2::9&quot;, rib, ipv6_unicast_routing=False)\n    assert res_v6_off[&quot;forwarded&quot;] is False and res_v6_off[&quot;reason&quot;] == &quot;IPV6_UNICAST_ROUTING_DISABLED&quot;\n    print(&quot;IPv6 LPM winner:&quot;, res_v6)\n    print(&quot;IPv6 unicast-routing off:&quot;, res_v6_off)\n\n    # Link-Local static check\n    bad_ll = validate_ipv6_static_next_hop(&quot;2001:db8:99::/64&quot;, &quot;fe80::2&quot;, None)\n    good_ll = validate_ipv6_static_next_hop(&quot;2001:db8:99::/64&quot;, &quot;fe80::2&quot;, &quot;GigabitEthernet0/0&quot;)\n    assert bad_ll[&quot;valid&quot;] is False and good_ll[&quot;valid&quot;] is True\n    print(&quot;Link-Local check:&quot;, {&quot;without_iface&quot;: bad_ll[&quot;valid&quot;], &quot;with_iface&quot;: good_ll[&quot;valid&quot;]})\n\n    # OSPFv3 Router-ID on IPv6-only router\n    assert validate_ospfv3_router_id(False, None)[&quot;can_start&quot;] is False\n    assert validate_ospfv3_router_id(False, &quot;3.3.3.3&quot;)[&quot;can_start&quot;] is True\n    print(&quot;OSPFv3 Router-ID check passed.&quot;)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> برای مقصد <code>2001:db8:1:2::9</code> مسیر <code>/64</code> OSPFv3 بر مسیر <code>/48</code> Static پیروز می‌شود؛ با خاموش بودن <code>ipv6_unicast_routing</code> بسته رد می‌شود؛ مسیر Static با <code>fe80::2</code> بدون اینترفیس رد و با <code>GigabitEthernet0/0</code> قبول می‌شود؛ و OSPFv3 بدون IPv4 و بدون Router-ID دستی متوقف می‌گردد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع Dual-Stack و OSPFv3 در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE IPv6 &amp; OSPFv3 config (NOT executed on real router)\nconfigure terminal\n ipv6 unicast-routing\n interface GigabitEthernet0/0\n  ipv6 address 2001:db8:1:1::1/64\n  ipv6 ospf 1 area 0\n ipv6 router ospf 1\n  router-id 3.3.3.3\n ipv6 route 2001:db8:99::/64 GigabitEthernet0/0 fe80::2\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در جدول <code>show ipv6 route</code> دو مسیر <code>2001:db8:1::/48</code> (Static, AD=1) و <code>2001:db8:1:2::/64</code> (OSPFv3, AD=110) وجود دارند. برای مقصد <code>2001:db8:1:2::9</code> کدام انتخاب می‌شود؟",
+      "options": [
+        "مسیر OSPFv3 زیرا طول پیشوند /64 طولانی‌تر از /48 است (LPM مقدم بر AD)",
+        "مسیر Static زیرا AD=1 کمتر از 110 است",
+        "هر دو هم‌زمان با ECMP",
+        "هیچ‌کدام؛ بسته دور ریخته می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در هر دو IPv4 و IPv6، معیار نخست Longest Prefix Match است و AD تنها در صورت یکسان بودن دقیق پیشوند مقایسه می‌شود.</p>"
+    },
+    {
+      "title": "چرا روی یک روتر سیسکو پس از تنظیم آدرس IPv6 روی اینترفیس‌ها و نوشتن مسیر Static، ممکن است هیچ بسته IPv6 فوروارد نشود؟",
+      "options": [
+        "چون IPv6 فقط روی لینک Serial کار می‌کند",
+        "چون مسیریابی IPv6 به‌طور پیش‌فرض خاموش است و دستور سراسری ipv6 unicast-routing اجرا نشده است",
+        "چون باید ARP فعال شود",
+        "چون AD مسیر Static در IPv6 برابر 255 است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در IOS/IOS-XE دستور <code>ipv6 unicast-routing</code> پیش‌نیاز فوروارد بسته‌های IPv6 و ارسال RA است.</p>"
+    },
+    {
+      "title": "چرا دستور <code>ipv6 route 2001:db8:99::/64 fe80::2</code> روی روتر رد می‌شود یا نامعتبر است؟",
+      "options": [
+        "زیرا fe80::2 آدرس Link-Local با دامنه محدود به لینک است و بدون ذکر نام اینترفیس خروجی مبهم می‌باشد",
+        "زیرا پیشوند /64 در IPv6 مجاز نیست",
+        "زیرا مسیر Static در IPv6 پشتیبانی نمی‌شود",
+        "زیرا fe80::2 آدرس Broadcast است"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>آدرس‌های <code>fe80::/10</code> می‌توانند روی چندین اینترفیس تکرار شوند؛ بنابراین ذکر اینترفیس خروجی (مثلاً <code>Gi0/0 fe80::2</code>) الزامی است.</p>"
+    },
+    {
+      "title": "کدام گزاره درباره مقادیر Administrative Distance مانند Static=1 و OSPF=110 دقیق‌تر است؟",
+      "options": [
+        "ثابت‌های اجباری RFC هستند و در همه برندها دقیقاً یکی‌اند",
+        "مقادیر پیش‌فرض فروشنده (سیسکو) هستند و سایر فروشندگان مانند Juniper مقادیر متفاوتی (Route Preference) دارند",
+        "در IPv6 کاربرد ندارند",
+        "بر Longest Prefix Match اولویت دارند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>AD یک مفهوم محلی و وابسته به فروشنده است (در سیسکو OSPF=110 ولی در Juniper OSPF Internal=10).</p>"
+    },
+    {
+      "title": "روی یک روتر صرفاً-IPv6 (بدون هیچ اینترفیس IPv4 فعال)، چه پیش‌نیازی برای شروع به کار فرایند OSPFv3 الزامی است؟",
+      "options": [
+        "تعریف دستی یک router-id ۳۲بیتی (مثلاً 3.3.3.3)",
+        "نوشتن دستور network 2001:db8::/32 area 0",
+        "خاموش کردن ipv6 unicast-routing",
+        "تنظیم آدرس MAC روی 0000.0000.0000"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>OSPFv3 همچنان از شناسه ۳۲بیتی Router-ID استفاده می‌کند و در نبود آدرس IPv4، تنظیم دستی <code>router-id</code> الزامی است.</p>"
+    },
+    {
+      "title": "تفاوت اصلی OSPFv3 کلاسیک (RFC 5340) با OSPFv3 Address-Families (RFC 5838) چیست؟",
+      "options": [
+        "RFC 5838 از دستور network کلاسیک استفاده می‌کند",
+        "RFC 5838 به یک فرایند واحد OSPFv3 اجازه حمل هم‌زمان خانواده‌های آدرس IPv4 و IPv6 را می‌دهد",
+        "RFC 5340 فقط برای IPv4 است",
+        "هیچ تفاوتی ندارند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>OSPFv3 در RFC 5340 برای IPv6 تعریف شد و با RFC 5838 قابلیت چندخانواده IPv4/IPv6 یافت.</p>"
+    },
+    {
+      "title": "در چه شرایطی روتر دو مسیر را به‌صورت ECMP هم‌زمان در جدول مسیر نصب می‌کند؟",
+      "options": [
+        "وقتی دو مسیر پیشوندهای متفاوتی مانند /24 و /16 داشته باشند",
+        "وقتی دو مسیر از پروتکل‌های متفاوت با AD مختلف باشند",
+        "وقتی دو مسیر برای یک پیشوند دقیقاً یکسان، از همان پروتکل و دارای Metric برابر باشند",
+        "همیشه برای هر دو مسیر موجود در شبکه"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>ECMP نیازمند تطابق دقیق پیشوند، AD یکسان (همان پروتکل) و Metric برابر است.</p>"
+    },
+    {
+      "title": "مسیر پیش‌فرض (Default Route) در IPv6 چگونه نوشته می‌شود؟",
+      "options": [
+        "0.0.0.0/0",
+        "::/0",
+        "fe80::/10",
+        "ff00::/8"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در IPv6 پیشوند <code>::/0</code> معادل <code>0.0.0.0/0</code> در IPv4 است و کوتاه‌ترین پیشوند ممکن (۰ بیت) را دارد.</p>"
+    },
+    {
+      "title": "در OSPFv3 کلاسیک، چگونه یک اینترفیس عضو Area 0 می‌شود؟",
+      "options": [
+        "با دستور network زیر ipv6 router ospf",
+        "مستقیماً زیر خود اینترفیس با دستور ipv6 ospf <pid> area 0",
+        "با فعال کردن ARP Proxy",
+        "با دستور ip helper-address"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در OSPFv3 دستور <code>network</code> وجود ندارد و عضویت مستقیماً روی هر اینترفیس تنظیم می‌شود.</p>"
+    },
+    {
+      "title": "اگر برای یک پیشوند دقیقاً یکسان <code>10.20.30.0/24</code>، دو مسیر از EIGRP Internal (AD=90) و OSPF (AD=110) در روتر سیسکو موجود باشد، کدام انتخاب می‌شود؟",
+      "options": [
+        "EIGRP Internal زیرا AD=90 از 110 کمتر است",
+        "OSPF زیرا 110 بزرگ‌تر است",
+        "هر دو با ECMP",
+        "بسته Drop می‌شود"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>وقتی طول پیشوند یکسان باشد، منبع با AD کمتر (در پیش‌فرض سیسکو EIGRP=90 در برابر OSPF=110) انتخاب می‌شود.</p>"
+    },
+    {
+      "title": "در خروجی <code>show ipv6 route</code>، چرا Next-Hop مسیرهای آموخته‌شده از OSPFv3 معمولاً با <code>FE80::</code> شروع می‌شود؟",
+      "options": [
+        "زیرا خطای پیکربندی رخ داده است",
+        "زیرا OSPFv3 به‌طور طبیعی از آدرس Link-Local اینترفیس همسایه به‌عنوان Next-Hop استفاده می‌کند",
+        "زیرا IPv6 Global Unicast ندارد",
+        "زیرا این مسیر مربوط به اینترنت عمومی است"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>استفاده از آدرس Link-Local به‌عنوان Next-Hop رفتار طبیعی پروتکل‌های مسیریابی IPv6 است.</p>"
+    },
+    {
+      "title": "آزمایشگاه این درس چگونه اجرا و راستی‌آزمایی شده است؟",
+      "options": [
+        "روی دو روتر فیزیکی Cisco ISR 4431",
+        "روی شبکه تولیدی IPv6",
+        "به‌صورت شبیه‌ساز محلی Python 3 (با ماژول استاندارد ipaddress) برای آزمون LPM، AD/Metric، پرچم unicast-routing، Link-Local و Router-ID بدون اتصال به روتر واقعی",
+        "فقط متن بدون کد"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ روتر واقعی سیسکو در این محیط متصل نیست.</p>"
+    }
+  ]
+}

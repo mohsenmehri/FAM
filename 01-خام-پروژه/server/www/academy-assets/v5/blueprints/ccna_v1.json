@@ -1,0 +1,343 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_v1",
+  "objectiveId": "ccna_v1",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "Network Fundamentals",
+  "title": "CCNA (مبانی مدرن): مجازی‌سازی سرور، کانتینرها، تگ‌گذاری vSwitch و مدل‌های ابری",
+  "titleEn": "CCNA Fundamentals: Server Virtualization, Containers, vSwitch Tagging & Cloud Models",
+  "estimatedMinutes": 40,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_v1 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_v1",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-145.pdf",
+      "https://techdocs.broadcom.com/us/en/vmware-cis/vsphere/vsphere/8-0/vsphere-networking-8-0/vlan-configuration.html",
+      "https://docs.kernel.org/virt/kvm/index.html"
+    ],
+    "limitations": [
+      "هیچ هایپروایزر ESXi/KVM، موتور کانتینر Docker/containerd یا حساب ابری AWS/Azure در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python برای راستی‌آزمایی سازگاری حالت‌های EST/VST/VGT با پورت سوئیچ فیزیکی و ماتریس مسئولیت مشترک ابری است."
+    ],
+    "legacyAuditFixes": [
+      "تعدیل ادعای مطلق نسخه قدیمی درباره بوت شدن همیشگی کانتینرها در «چند میلی‌ثانیه»: زمان راه‌اندازی کانتینر به اندازه تصویر، فرآیند entrypoint و آماده شدن اپلیکیشن بستگی دارد.",
+      "تکمیل بحث اتصال شبکه مجازی به سوئیچ فیزیکی با تفکیک سه الگوی استاندارد EST (پورت Access)، VST (تگ‌گذاری در vSwitch روی Trunk) و VGT (تگ‌گذاری در Guest VM روی Trunk).",
+      "توضیح دقیق‌تر جایگاه KVM (ماژول کرنل لینوکس با عملکرد هم‌ردیف Type 1) و مرز امنیتی مشترک بودن کرنل میزبان در کانتینرها."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_v1-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_v1.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_v1_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲A: بازنویسی کامل به الگوی ۱۴ بخش/۱۵ واژه/۱۲ پرسش + آزمایشگاه Python Mock برای EST/VST/VGT و مدل مسئولیت مشترک ابری."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_v1-section-1",
+      "title": "مسئله واقعی: چرا تک‌سرویس روی تک‌سرور فیزیکی مقیاس‌پذیر نیست؟",
+      "html": "<p>در معماری سنتی، اجرای هر سرویس روی یک سرور فیزیکی مستقل باعث هدررفت شدید CPU، حافظه، برق و فضای رک می‌شد. مجازی‌سازی اجازه می‌دهد ده‌ها ماشین مجازی یا کانتینر روی چند سرور قدرتمند تجمیع شوند؛ اما در کنار صرفه‌جویی، مرز شبکه از کابل فیزیکی به درون سرور (vSwitch و پورت‌گروپ‌ها) منتقل می‌شود و هر ناهماهنگی کوچک میان تنظیمات VLAN داخل سرور و پورت سوئیچ فیزیکی می‌تواند ارتباط سرویس‌ها با بیرون را به‌کلی قطع کند.</p>"
+    },
+    {
+      "id": "ccna_v1-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> آشنایی با VLAN 802.1Q، پورت‌های Access و Trunk و مفاهیم پایه IP.</p><ul><li>تمایز دقیق <strong>Type 1 (Bare-Metal)</strong> و <strong>Type 2 (Hosted)</strong> Hypervisor و جایگاه KVM.</li><li>درک تفاوت معماری و امنیتی <strong>ماشین مجازی (VM)</strong> با <strong>کانتینر (Container)</strong>.</li><li>تنظیم هم‌خوان لینک میان <strong>vSwitch</strong> و سوئیچ فیزیکی در سه حالت <strong>EST، VST و VGT</strong>.</li><li>تحلیل مدل‌های ابری <strong>On-Premises، IaaS، PaaS و SaaS</strong> طبق تعریف NIST SP 800-145 و مدل مسئولیت مشترک.</li></ul>"
+    },
+    {
+      "id": "ccna_v1-section-3",
+      "title": "معماری Hypervisor: مقایسه Type 1 (Bare-Metal) با Type 2 (Hosted)",
+      "html": "<p><strong>Type 1 Hypervisor</strong> مستقیماً روی سخت‌افزار سرور فیزیکی اجرا می‌شود و منابع CPU، RAM و NIC را میان VMها زمان‌بندی می‌کند (مانند VMware ESXi و Microsoft Hyper-V؛ همچنین <strong>Linux KVM</strong> به‌عنوان ماژول درون کرنل لینوکس عملاً قابلیت و کارایی رده Type 1 فراهم می‌کند). در مقابل، <strong>Type 2 Hypervisor</strong> به‌صورت یک نرم‌افزار روی سیستم‌عامل میزبان (مانند VirtualBox یا VMware Workstation روی لپ‌تاپ مهندس) نصب می‌شود و برای آزمایشگاه شخصی عالی است اما سربار اضافی دارد و انتخاب استاندارد دیتاسنتر تولیدی نیست.</p>"
+    },
+    {
+      "id": "ccna_v1-section-4",
+      "title": "ماشین مجازی (VM) در برابر کانتینر (Container)",
+      "html": "<p>هر <strong>VM</strong> دارای سیستم‌عامل مهمان (Guest OS) و کرنل مستقل است که جداسازی سخت‌افزاری قوی‌تر و امکان اجرای هم‌زمان سیستم‌عامل‌های متفاوت را فراهم می‌کند، اما حافظه و زمان بوت بیشتری می‌برد. در مقابل، <strong>کانتینرها</strong> (با فناوری‌های Linux Namespaces و cgroups) <strong>کرنل سیستم‌عامل میزبان را به اشتراک می‌گذارند</strong>. به‌دلیل نبود مرحله بوت BIOS و کرنل جدید، راه‌اندازی کانتینر معمولاً بسیار سریع‌تر از VM است (البته زمان دقیق آماده به کار شدن به اندازه Image و زمان راه‌اندازی خود اپلیکیشن وابسته است و همیشه «چند میلی‌ثانیه» نیست). همچنین اشتراک کرنل به این معناست که آسیب‌پذیری‌های کرنل میزبان ریسک امنیتی مشترک برای همه کانتینرهای همان میزبان ایجاد می‌کنند.</p>"
+    },
+    {
+      "id": "ccna_v1-section-5",
+      "title": "شبکه‌سازی داخل سرور: vNIC، vSwitch و سه حالت EST / VST / VGT",
+      "html": "<p>ماشین‌های مجازی از طریق <strong>vNIC</strong> به <strong>vSwitch</strong> درون هایپروایزر و سپس از طریق <strong>pNIC</strong> به سوئیچ فیزیکی وصل می‌شوند. سه الگوی استاندارد تگ‌گذاری VLAN:</p><ul><li><strong>EST (External Switch Tagging):</strong> vSwitch تگ نمی‌زند؛ پورت سوئیچ فیزیکی <strong>Access</strong> است و هر Uplink فقط یک VLAN حمل می‌کند.</li><li><strong>VST (Virtual Switch Tagging — رایج‌ترین در دیتاسنتر):</strong> Port Groupهای vSwitch تگ 802.1Q می‌زنند و پورت سوئیچ فیزیکی باید <strong>802.1Q Trunk</strong> با اجازه عبور تمام آن VLANها باشد.</li><li><strong>VGT (Virtual Guest Tagging):</strong> سیستم‌عامل داخل VM تگ 802.1Q تولید می‌کند و پورت سوئیچ فیزیکی باید <strong>Trunk</strong> باشد.</li></ul>"
+    },
+    {
+      "id": "ccna_v1-section-6",
+      "title": "نمودار معماری: هایپروایزر، کانتینر، VST Trunk و مسئولیت مشترک",
+      "html": "<p>در نمودار زیر تفاوت جداسازی کرنل در VM و کانتینر، هم‌خوانی vSwitch با ترانک فیزیکی و مرز مسئولیت در ابر نمایش داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Hypervisor VM vs Container and vSwitch VST Trunk Architecture\"><rect x=\"16\" y=\"18\" width=\"230\" height=\"184\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"131\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#1e3a8a\">Type 1 Hypervisor Host</text><rect x=\"30\" y=\"56\" width=\"96\" height=\"58\" rx=\"6\" fill=\"#ffffff\" stroke=\"#3b82f6\"/><text x=\"78\" y=\"76\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#0f172a\">VM 1 (VLAN 10)</text><text x=\"78\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Own Guest OS</text><text x=\"78\" y=\"105\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">&amp; Own Kernel</text><rect x=\"136\" y=\"56\" width=\"96\" height=\"58\" rx=\"6\" fill=\"#ffffff\" stroke=\"#3b82f6\"/><text x=\"184\" y=\"76\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#0f172a\">VM 2 (VLAN 30)</text><text x=\"184\" y=\"92\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Own Guest OS</text><text x=\"184\" y=\"105\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">&amp; Own Kernel</text><rect x=\"30\" y=\"126\" width=\"202\" height=\"32\" rx=\"6\" fill=\"#dbeafe\" stroke=\"#2563eb\"/><text x=\"131\" y=\"146\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1e40af\">vSwitch (VST: Tags 10 &amp; 30)</text><rect x=\"30\" y=\"166\" width=\"202\" height=\"24\" rx=\"5\" fill=\"#1e3a8a\"/><text x=\"131\" y=\"182\" text-anchor=\"middle\" font-size=\"10\" fill=\"#ffffff\">Bare-Metal Server NIC (pNIC)</text><line x1=\"246\" y1=\"178\" x2=\"310\" y2=\"178\" stroke=\"#0f172a\" stroke-width=\"2.5\"/><rect x=\"310\" y=\"138\" width=\"150\" height=\"64\" rx=\"8\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"385\" y=\"160\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\" fill=\"#92400e\">Physical Switch</text><text x=\"385\" y=\"178\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">802.1Q Trunk Port</text><text x=\"385\" y=\"193\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">Allowed: 10, 30</text><rect x=\"492\" y=\"18\" width=\"252\" height=\"184\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"618\" y=\"42\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"bold\" fill=\"#166534\">Container Host vs Cloud Models</text><rect x=\"508\" y=\"56\" width=\"106\" height=\"44\" rx=\"6\" fill=\"#ffffff\" stroke=\"#22c55e\"/><text x=\"561\" y=\"75\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#14532d\">Container A</text><text x=\"561\" y=\"90\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">App + Libs</text><rect x=\"624\" y=\"56\" width=\"106\" height=\"44\" rx=\"6\" fill=\"#ffffff\" stroke=\"#22c55e\"/><text x=\"677\" y=\"75\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#14532d\">Container B</text><text x=\"677\" y=\"90\" text-anchor=\"middle\" font-size=\"9\" fill=\"#166534\">App + Libs</text><rect x=\"508\" y=\"108\" width=\"222\" height=\"28\" rx=\"5\" fill=\"#dcfce7\" stroke=\"#16a34a\"/><text x=\"619\" y=\"126\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#166534\">Shared Host OS Kernel (Namespaces/cgroups)</text><rect x=\"508\" y=\"144\" width=\"222\" height=\"46\" rx=\"5\" fill=\"#ffffff\" stroke=\"#15803d\"/><text x=\"619\" y=\"162\" text-anchor=\"middle\" font-size=\"9.5\" font-weight=\"bold\" fill=\"#0f172a\">Shared Responsibility: On-Prem | IaaS | PaaS | SaaS</text><text x=\"619\" y=\"179\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">Customer always owns WAN/access, IAM &amp; data governance</text></svg>"
+    },
+    {
+      "id": "ccna_v1-section-7",
+      "title": "توابع شبکه مجازی (NFV / VNF) و روترها/فایروال‌های نرم‌افزاری",
+      "html": "<p>با الگوی <strong>NFV (Network Functions Virtualization)</strong> تجهیزات شبکه‌ای مانند روترهای لبه (مانند Catalyst 8000V)، فایروال‌ها (FTDv) و کنترلرهای بی‌سیم (Catalyst 9800-CL) به‌صورت ماشین مجازی روی سرورهای x86 یا در محیط ابری اجرا می‌شوند. کارایی آن‌ها به CPU Pinning، فناوری‌های شتاب‌دهنده مانند SR-IOV/DPDK و طراحی درست NICها وابسته است.</p>"
+    },
+    {
+      "id": "ccna_v1-section-8",
+      "title": "تعریف ابر و مدل‌های سرویس (NIST SP 800-145): On-Premises، IaaS، PaaS، SaaS",
+      "html": "<table><thead><tr><th>مدل</th><th>سخت‌افزار و مجازی‌سازی</th><th>سیستم‌عامل و VPC/Subnet</th><th>اپلیکیشن و داده</th><th>شبکه دسترسی کاربران/WAN</th></tr></thead><tbody><tr><td><strong>On-Premises</strong></td><td>مشتری</td><td>مشتری</td><td>مشتری</td><td>مشتری</td></tr><tr><td><strong>IaaS</strong></td><td>ارائه‌دهنده ابر</td><td>مشتری</td><td>مشتری</td><td>مشتری</td></tr><tr><td><strong>PaaS</strong></td><td>ارائه‌دهنده ابر</td><td>مدیریت‌شده توسط ارائه‌دهنده</td><td>مشتری</td><td>مشتری</td></tr><tr><td><strong>SaaS</strong></td><td>ارائه‌دهنده ابر</td><td>ارائه‌دهنده ابر</td><td>مشترک (داده و هویت با مشتری)</td><td>مشتری</td></tr></tbody></table>"
+    },
+    {
+      "id": "ccna_v1-section-9",
+      "title": "مدل‌های استقرار ابر: Public، Private، Hybrid و Multi-Cloud",
+      "html": "<p>در <strong>Public Cloud</strong> زیرساخت چندمستأجره از طریق اینترنت یا مدارهای اختصاصی (Direct Connect / ExpressRoute) در دسترس است. در <strong>Private Cloud</strong> زیرساخت اختصاصی یک سازمان است. در <strong>Hybrid Cloud</strong> دیتاسنتر محلی و ابر عمومی به‌صورت یکپارچه کار می‌کنند و در <strong>Multi-Cloud</strong> بیش از یک ارائه‌دهنده ابر عمومی به کار می‌رود. در همه این مدل‌ها، طراحی آدرس‌دهی بدون هم‌پوشانی IP، مسیریابی، رمزنگاری در حال عبور و کنترل دسترسی همچنان مسئولیت تیم شبکه است.</p>"
+    },
+    {
+      "id": "ccna_v1-section-10",
+      "title": "تغییر مدل اقتصادی (CapEx به OpEx) و واقع‌بینی هزینه Egress",
+      "html": "<p>یکی از انگیزه‌های مهاجرت به ابر، کاهش سرمایه‌گذاری اولیه خرید سخت‌افزار (<strong>CapEx</strong>) و حرکت به سمت هزینه مصرفی ماهانه (<strong>OpEx</strong>) و کشسانی سریع (Elasticity) است. با این حال، ابر به‌طور خودکار ارزان‌تر نیست: بارهای کاری ثابت ۲۴×۷ بدون بهینه‌سازی، هزینه‌های خروج داده از ابر (<strong>Cloud Egress</strong>) و نبود حاکمیت FinOps می‌تواند هزینه بلندمدت ابر را از On-Premises فراتر ببرد.</p>"
+    },
+    {
+      "id": "ccna_v1-section-11",
+      "title": "کژفهمی‌های رایج در مجازی‌سازی و ابر",
+      "html": "<ul><li><strong>کژفهمی ۱: «در مدل SaaS یا PaaS دیگر نیازی به تیم شبکه نیست.»</strong> واقعیت: نگهداری سخت‌افزار دیتاسنتر به ارائه‌دهنده واگذار می‌شود، اما دسترسی شعب، SD-WAN/اینترنت، DNS، فایروال، امنیت هویت (IAM) و عیب‌یابی تأخیر همچنان بر عهده سازمان است.</li><li><strong>کژفهمی ۲: «کانتینر همان VM سبک است و کرنل مستقل دارد.»</strong> واقعیت: کانتینرها از کرنل میزبان مشترک استفاده می‌کنند (Namespaces/cgroups) و جداسازی آن‌ها با جداسازی سخت‌افزاری VM یکی نیست.</li><li><strong>کژفهمی ۳: «پورت سوئیچ متصل به سرور ESXi/KVM همیشه باید Trunk باشد.»</strong> واقعیت: در حالت VST و VGT پورت باید Trunk باشد، اما در حالت EST (یک VLAN روی هر Uplink) پورت فیزیکی در حالت Access قرار می‌گیرد.</li></ul>"
+    },
+    {
+      "id": "ccna_v1-section-12",
+      "title": "عیب‌یابی سناریوی قطع ارتباط VMهای یک VLAN جدید با شبکه بیرون",
+      "html": "<p>اگر دو VM درون VLAN 30 روی یک سرور فیزیکی یکدیگر را پینگ می‌کنند اما از شبکه کاربران بیرون قابل دسترسی نیستند، ارتباط داخلی نشان می‌دهد vSwitch و سیستم‌عامل مهمان در سطح محلی پاسخ می‌دهند. گام‌های تشخیص سیستماتیک:</p><ol><li>بررسی تطابق الگوی تگ‌گذاری (VST در برابر پورت Access/Trunk روی سوئیچ فیزیکی).</li><li>اجرای <code>show vlan brief</code> روی سوئیچ فیزیکی برای اطمینان از ساخته و فعال بودن VLAN 30.</li><li>اجرای <code>show interfaces trunk</code> برای اطمینان از حضور VLAN 30 در فهرست <code>allowed vlan</code> پورت متصل به سرور.</li><li>بررسی تنظیمات NIC Teaming / LACP و وجود SVI/روتر لایه ۳ برای خروج از VLAN 30.</li></ol>"
+    },
+    {
+      "id": "ccna_v1-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> سروری با الگوی VST دو Port Group برای VLAN 10 و VLAN 30 دارد، اما پورت سوئیچ فیزیکی متصل به آن روی <code>switchport mode access</code> در VLAN 10 گذاشته شده است. چه رخ می‌دهد؟ <strong>پاسخ:</strong> فریم‌های تگ‌دار 802.1Q ارسالی از vSwitch روی پورت Access پذیرفته نمی‌شوند و ارتباط VLAN 30 (و در صورت تگ‌دار بودن VLAN 10، هر دو) با شبکه بیرونی قطع می‌شود؛ راه‌حل تغییر پورت فیزیکی به 802.1Q Trunk و مجاز کردن هر دو VLAN است.</p><p><strong>تمرین ۲:</strong> یک شرکت سرویس ایمیل خود را به SaaS منتقل کرده اما کاربران شعبه در اتصال به آن قطعی و کندی دارند. مسئولیت اولیه عیب‌یابی مسیر شعبه تا اینترنت با کیست؟ <strong>پاسخ:</strong> مطابق مدل مسئولیت مشترک، شبکه محلی شعبه، WAN/اینترنت، DNS و فایروال خروجی همچنان در حوزه مسئولیت مشتری است.</p>"
+    },
+    {
+      "id": "ccna_v1-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-145.pdf\" target=\"_blank\" rel=\"noopener\">استاندارد تعریف ابر NIST SP 800-145</a>، <a href=\"https://techdocs.broadcom.com/us/en/vmware-cis/vsphere/vsphere/8-0/vsphere-networking-8-0/vlan-configuration.html\" target=\"_blank\" rel=\"noopener\">راهنمای تگ‌گذاری EST/VST/VGT در VMware vSphere</a> و <a href=\"https://docs.kernel.org/virt/kvm/index.html\" target=\"_blank\" rel=\"noopener\">مستندات رسمی Linux KVM</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ هایپروایزر یا حساب ابری زنده در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ یک شبیه‌ساز محلی Python 3 برای آزمون سازگاری تگ‌گذاری و مسئولیت مشترک است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Type 1 Hypervisor",
+      "fa": "هایپروایزر لایه ۱ (Bare-Metal)",
+      "simple": "نرم‌افزار مجازی‌سازی که مستقیماً روی سخت‌افزار سرور اجرا می‌شود (مانند ESXi و Hyper-V)."
+    },
+    {
+      "term": "Type 2 Hypervisor",
+      "fa": "هایپروایزر لایه ۲ (Hosted)",
+      "simple": "مجازی‌ساز نصب‌شده روی سیستم‌عامل میزبان؛ مناسب آزمایشگاه شخصی، نه دیتاسنتر تولیدی."
+    },
+    {
+      "term": "KVM",
+      "fa": "ماشین مجازی مبتنی بر کرنل لینوکس",
+      "simple": "ماژول کرنل لینوکس که میزبان را به هایپروایزر هم‌ردیف Type 1 تبدیل می‌کند."
+    },
+    {
+      "term": "Container",
+      "fa": "کانتینر",
+      "simple": "واحد اجرایی ایزوله‌شده با Namespaces و cgroups که کرنل میزبان را به اشتراک می‌گذارد."
+    },
+    {
+      "term": "vSwitch",
+      "fa": "سوئیچ مجازی",
+      "simple": "سوئیچ لایه ۲ نرم‌افزاری درون هایپروایزر برای اتصال vNICهای ماشین‌های مجازی به هم و به pNIC."
+    },
+    {
+      "term": "EST",
+      "fa": "تگ‌گذاری سوئیچ بیرونی",
+      "simple": "حالتی که vSwitch تگ نمی‌زند و پورت سوئیچ فیزیکی به‌صورت Access یک VLAN را حمل می‌کند."
+    },
+    {
+      "term": "VST",
+      "fa": "تگ‌گذاری سوئیچ مجازی",
+      "simple": "حالت رایج دیتاسنتر که vSwitch تگ 802.1Q می‌زند و پورت سوئیچ فیزیکی باید Trunk باشد."
+    },
+    {
+      "term": "VGT",
+      "fa": "تگ‌گذاری درون مهمان",
+      "simple": "حالتی که خود سیستم‌عامل داخل VM فریم تگ‌دار 802.1Q تولید می‌کند (نیازمند Trunk فیزیکی)."
+    },
+    {
+      "term": "NFV / VNF",
+      "fa": "مجازی‌سازی توابع شبکه",
+      "simple": "اجرای روتر، فایروال یا WLC به‌صورت نرم‌افزاری روی سرورهای استاندارد x86 یا ابر."
+    },
+    {
+      "term": "IaaS",
+      "fa": "زیرساخت به‌عنوان سرویس",
+      "simple": "ارائه‌دهنده سخت‌افزار و مجازی‌سازی را مدیریت می‌کند و سیستم‌عامل/VPC دست مشتری است."
+    },
+    {
+      "term": "PaaS",
+      "fa": "بستر به‌عنوان سرویس",
+      "simple": "ارائه‌دهنده تا سطح سیستم‌عامل/Runtime را مدیریت می‌کند و مشتری روی کد و داده تمرکز دارد."
+    },
+    {
+      "term": "SaaS",
+      "fa": "نرم‌افزار به‌عنوان سرویس",
+      "simple": "نرم‌افزار آماده مصرف؛ مشتری همچنان مسئول داده، هویت کاربران و شبکه دسترسی است."
+    },
+    {
+      "term": "Shared Responsibility",
+      "fa": "مدل مسئولیت مشترک",
+      "simple": "تفکیک دقیق مسئولیت‌های امنیتی و عملیاتی میان ارائه‌دهنده ابر و مشتری."
+    },
+    {
+      "term": "Hybrid Cloud",
+      "fa": "ابر ترکیبی",
+      "simple": "اتصال یکپارچه دیتاسنتر محلی (On-Premises) با یک یا چند ابر عمومی."
+    },
+    {
+      "term": "Cloud Egress",
+      "fa": "هزینه خروج داده از ابر",
+      "simple": "تعرفه انتقال ترافیک از دیتاسنتر ارائه‌دهنده ابر به اینترنت یا شبکه سازمانی."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، سازگاری حالت‌های EST، VST و VGT با پورت سوئیچ فیزیکی (از جمله کشف خطای ارسال چند VLAN روی پورت Access) و ماتریس مسئولیت مشترک در مدل‌های On-Premises، IaaS، PaaS و SaaS را آزمون می‌کنید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_v1_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_v1_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccna_v1 (Virtualization, Containers, vSwitch Tagging &amp; Cloud Models).\n\nNo real ESXi/KVM hypervisor, Docker host, or cloud VPC is executed.\nModels:\n1. EST vs VST vs VGT VLAN tagging compatibility between a host vSwitch and a physical switch port.\n2. VM (guest kernel) vs Container (shared host kernel) architectural boundary.\n3. Cloud Shared Responsibility Matrix (On-Premises, IaaS, PaaS, SaaS).\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nVALID_TAGGING_MODES = frozenset({&quot;EST&quot;, &quot;VST&quot;, &quot;VGT&quot;})\nVALID_PORT_MODES = frozenset({&quot;access&quot;, &quot;trunk&quot;})\nVALID_CLOUD_MODELS = frozenset({&quot;on_premises&quot;, &quot;iaas&quot;, &quot;paas&quot;, &quot;saas&quot;})\n\n\ndef _require_vlan(val: object, name: str) -&gt; int:\n    if isinstance(val, bool) or not isinstance(val, int) or not (1 &lt;= val &lt;= 4094):\n        raise ValueError(f&quot;{name} must be an int in 1..4094 (not bool), got {val!r}&quot;)\n    return val\n\n\ndef _require_vlan_list(vals: object, name: str) -&gt; set[int]:\n    if not isinstance(vals, (list, set, tuple)) or len(vals) == 0:\n        raise ValueError(f&quot;{name} must be a non-empty list/set/tuple of VLAN IDs&quot;)\n    return {_require_vlan(v, f&quot;{name} element&quot;) for v in vals}\n\n\ndef audit_vswitch_uplink(\n    tagging_mode: str,\n    vm_vlans: list[int],\n    switch_port_mode: str,\n    switch_vlans: list[int],\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Validate whether VM/container VLANs can reach the physical network across vSwitch + switch port.&quot;&quot;&quot;\n    if tagging_mode not in VALID_TAGGING_MODES:\n        raise ValueError(f&quot;tagging_mode must be one of {sorted(VALID_TAGGING_MODES)}, got {tagging_mode!r}&quot;)\n    if switch_port_mode not in VALID_PORT_MODES:\n        raise ValueError(f&quot;switch_port_mode must be one of {sorted(VALID_PORT_MODES)}, got {switch_port_mode!r}&quot;)\n    req_vlans = _require_vlan_list(vm_vlans, &quot;vm_vlans&quot;)\n    phys_vlans = _require_vlan_list(switch_vlans, &quot;switch_vlans&quot;)\n\n    issues: list[str] = []\n    if tagging_mode == &quot;EST&quot;:\n        if switch_port_mode != &quot;access&quot;:\n            issues.append(&quot;EST_REQUIRES_ACCESS_PORT: External Switch Tagging expects untagged frames on an access port&quot;)\n        if len(req_vlans) &gt; 1:\n            issues.append(&quot;EST_SINGLE_VLAN_ONLY: an access uplink carries only one VLAN per physical NIC&quot;)\n    else:\n        # VST (vSwitch tags) and VGT (guest VM tags) require 802.1Q trunk on the physical switch port\n        if switch_port_mode != &quot;trunk&quot;:\n            issues.append(f&quot;{tagging_mode}_REQUIRES_TRUNK_PORT: physical switch port must be 802.1Q trunk&quot;)\n\n    missing = sorted(req_vlans - phys_vlans)\n    if missing:\n        issues.append(f&quot;MISSING_VLANS_ON_PHYSICAL_SWITCH: {missing}&quot;)\n\n    return {\n        &quot;tagging_mode&quot;: tagging_mode,\n        &quot;switch_port_mode&quot;: switch_port_mode,\n        &quot;reachable&quot;: len(issues) == 0,\n        &quot;issues&quot;: issues,\n    }\n\n\ndef classify_cloud_responsibility(model: str) -&gt; dict[str, str]:\n    &quot;&quot;&quot;Return customer vs provider responsibility boundaries for On-Prem, IaaS, PaaS, SaaS.&quot;&quot;&quot;\n    if not isinstance(model, str) or model not in VALID_CLOUD_MODELS:\n        raise ValueError(f&quot;model must be one of {sorted(VALID_CLOUD_MODELS)}, got {model!r}&quot;)\n    matrix = {\n        &quot;on_premises&quot;: {\n            &quot;physical_hardware&quot;: &quot;customer&quot;,\n            &quot;hypervisor&quot;: &quot;customer&quot;,\n            &quot;guest_os_and_vpc&quot;: &quot;customer&quot;,\n            &quot;application_and_data&quot;: &quot;customer&quot;,\n            &quot;wan_and_user_access_network&quot;: &quot;customer&quot;,\n        },\n        &quot;iaas&quot;: {\n            &quot;physical_hardware&quot;: &quot;provider&quot;,\n            &quot;hypervisor&quot;: &quot;provider&quot;,\n            &quot;guest_os_and_vpc&quot;: &quot;customer&quot;,\n            &quot;application_and_data&quot;: &quot;customer&quot;,\n            &quot;wan_and_user_access_network&quot;: &quot;customer&quot;,\n        },\n        &quot;paas&quot;: {\n            &quot;physical_hardware&quot;: &quot;provider&quot;,\n            &quot;hypervisor&quot;: &quot;provider&quot;,\n            &quot;guest_os_and_vpc&quot;: &quot;provider_managed&quot;,\n            &quot;application_and_data&quot;: &quot;customer&quot;,\n            &quot;wan_and_user_access_network&quot;: &quot;customer&quot;,\n        },\n        &quot;saas&quot;: {\n            &quot;physical_hardware&quot;: &quot;provider&quot;,\n            &quot;hypervisor&quot;: &quot;provider&quot;,\n            &quot;guest_os_and_vpc&quot;: &quot;provider&quot;,\n            &quot;application_and_data&quot;: &quot;shared_customer_owns_data_and_iam&quot;,\n            &quot;wan_and_user_access_network&quot;: &quot;customer&quot;,\n        },\n    }\n    return matrix[model]\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no real hypervisor, container engine, or cloud VPC is contacted.&quot;)\n    broken = audit_vswitch_uplink(&quot;VST&quot;, [10, 30], &quot;access&quot;, [10])\n    assert broken[&quot;reachable&quot;] is False\n    print(&quot;Broken VST on access port:&quot;, broken)\n\n    fixed = audit_vswitch_uplink(&quot;VST&quot;, [10, 30], &quot;trunk&quot;, [10, 20, 30])\n    assert fixed[&quot;reachable&quot;] is True\n    print(&quot;Fixed VST on 802.1Q trunk:&quot;, fixed)\n\n    iaas = classify_cloud_responsibility(&quot;iaas&quot;)\n    saas = classify_cloud_responsibility(&quot;saas&quot;)\n    assert iaas[&quot;guest_os_and_vpc&quot;] == &quot;customer&quot; and iaas[&quot;physical_hardware&quot;] == &quot;provider&quot;\n    assert saas[&quot;wan_and_user_access_network&quot;] == &quot;customer&quot;\n    print(&quot;IaaS boundaries:&quot;, iaas)\n    print(&quot;SaaS boundaries:&quot;, saas)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> حالت VST روی پورت Access با خطای <code>VST_REQUIRES_TRUNK_PORT</code> و <code>MISSING_VLANS_ON_PHYSICAL_SWITCH</code> رد می‌شود، حالت VST روی Trunk با VLANهای 10 و 30 عبور می‌کند و مرز مسئولیت مشتری/ارائه‌دهنده در IaaS و SaaS دقیق گزارش می‌شود.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع پیکربندی پورت سوئیچ فیزیکی متصل به سرور ESXi/KVM در حالت VST (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Catalyst Uplink to Hypervisor Host (VST mode — NOT executed)\nconfigure terminal\n vlan 10\n  name APP_TIER\n vlan 30\n  name WEB_CONTAINERS\n interface GigabitEthernet1/0/12\n  description Uplink_to_Hypervisor_vSwitch0\n  switchport mode trunk\n  switchport nonegotiate\n  switchport trunk allowed vlan 10,30\n  spanning-tree portfast trunk\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "کدام نوع Hypervisor مستقیماً روی سخت‌افزار فیزیکی اجرا می‌شود و انتخاب استاندارد دیتاسنترهای سازمانی است؟",
+      "options": [
+        "Type 2 Hypervisor (مانند VirtualBox)",
+        "کانتینر Docker",
+        "پروتکل CAPWAP",
+        "Type 1 Hypervisor (Bare-Metal مانند ESXi یا Hyper-V؛ و KVM در کرنل لینوکس)"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>Type 1 Hypervisor بدون سیستم‌عامل واسط دسکتاپ مستقیماً منابع سخت‌افزاری را مدیریت می‌کند و کارایی و پایداری بالاتری در دیتاسنتر دارد.</p>"
+    },
+    {
+      "title": "وقتی از الگوی VST (Virtual Switch Tagging) برای دو VM در VLAN 10 و VLAN 30 روی یک Uplink مشترک استفاده می‌شود، پورت سوئیچ فیزیکی متصل به سرور باید در چه حالتی باشد؟",
+      "options": [
+        "802.1Q Trunk با مجاز کردن VLAN 10 و VLAN 30",
+        "Access روی VLAN 1",
+        "Shutdown",
+        "فقط PortFast بدون تعریف VLAN"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در حالت VST، vSwitch تگ 802.1Q می‌زند و پورت سوئیچ فیزیکی باید Trunk باشد و هر دو VLAN را در پایگاه داده و فهرست مجاز خود داشته باشد.</p>"
+    },
+    {
+      "title": "در کدام الگوی تگ‌گذاری مجازی‌سازی، پورت سوئیچ فیزیکی متصل به سرور در حالت Access قرار می‌گیرد؟",
+      "options": [
+        "VST",
+        "VGT",
+        "EST (External Switch Tagging — یک VLAN برای هر Uplink)",
+        "هر سه حالت"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>در EST هیچ تگی داخل هایپروایزر زده نمی‌شود و پورت Access سوئیچ فیزیکی ترافیک آن Uplink را در یک VLAN واحد قرار می‌دهد.</p>"
+    },
+    {
+      "title": "مهم‌ترین تفاوت معماری میان کانتینر و ماشین مجازی (VM) چیست؟",
+      "options": [
+        "کانتینرها هرکدام یک BIOS و کرنل سیستم‌عامل مستقل دارند",
+        "کانتینرها کرنل سیستم‌عامل میزبان را (با Namespaces و cgroups) به اشتراک می‌گذارند در حالی که هر VM کرنل مهمان مستقل دارد",
+        "VM نمی‌تواند به شبکه متصل شود",
+        "کانتینرها فقط روی سوئیچ لایه ۲ اجرا می‌شوند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اشتراک کرنل میزبان باعث سبکی و راه‌اندازی سریع‌تر کانتینر می‌شود (بسته به Image و اپلیکیشن)، اما سطح ایزولاسیون آن با VM دارای کرنل مستقل متفاوت است.</p>"
+    },
+    {
+      "title": "در کدام مدل ابری، نگهداری سخت‌افزار و هایپروایزر با ارائه‌دهنده است اما مدیریت سیستم‌عامل و شبکه مجازی (VPC/Subnet) بر عهده مشتری است؟",
+      "options": [
+        "SaaS",
+        "IaaS",
+        "PaaS",
+        "On-Premises"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در IaaS مشتری کنترل کامل سیستم‌عامل، IP/Subnet، فایروال‌های مجازی و اپلیکیشن را دارد.</p>"
+    },
+    {
+      "title": "در مدل SaaS کدام بخش همچنان جزو مسئولیت‌های مشتری باقی می‌ماند؟",
+      "options": [
+        "تعویض دیسک خراب سرورهای ابر",
+        "پچ کردن هایپروایزر ارائه‌دهنده",
+        "مدیریت هویت کاربران (IAM)، امنیت داده‌ها و شبکه دسترسی/WAN شعب تا ابر",
+        "هیچ مسئولیتی با مشتری نیست"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>مطابق مدل مسئولیت مشترک، حتی در SaaS نیز داده، دسترسی کاربران و شبکه اتصال سازمان با مشتری است.</p>"
+    },
+    {
+      "title": "اگر VMهای VLAN 30 داخل یک سرور فیزیکی یکدیگر را پینگ کنند اما از بیرون سرور قابل پینگ نباشند، نخستین گزینه‌های محتمل کدام‌اند؟",
+      "options": [
+        "خرابی کرنل لینوکس هر دو VM",
+        "ناهم‌خوانی حالت Trunk/Access، نبود VLAN 30 در پایگاه یا allowed vlan سوئیچ فیزیکی، یا مشکل NIC Teaming/مسیر لایه ۳",
+        "خاموش بودن مانیتور سرور",
+        "تفاوت مدل ماوس روی لپ‌تاپ ادمین"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>موفقیت پینگ داخلی نشان می‌دهد vSwitch محلی سالم است و مشکل در مرز Uplink فیزیکی (VLAN/Trunk/Teaming) یا مسیریابی بیرونی قرار دارد.</p>"
+    },
+    {
+      "title": "در الگوی VGT (Virtual Guest Tagging)، تگ 802.1Q در کدام لایه به فریم اضافه می‌شود؟",
+      "options": [
+        "توسط خود سیستم‌عامل داخل ماشین مجازی (مانند روتر یا فایروال مجازی)",
+        "توسط کابل اترنت",
+        "توسط سرور DNS",
+        "توسط Type 2 Hypervisor فقط روی ویندوز"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>در VGT خود Guest OS درایور 802.1Q دارد و vSwitch باید فریم‌های تگ‌دار را به ترانک فیزیکی عبور دهد.</p>"
+    },
+    {
+      "title": "چرا بیان مطلق «کانتینرها همیشه ظرف چند میلی‌ثانیه بوت می‌شوند» دقیق نیست؟",
+      "options": [
+        "چون کانتینرها همیشه کندتر از VM هستند",
+        "زیرا گرچه مرحله بوت BIOS/کرنل حذف شده، زمان واقعی آماده به کار شدن به اندازه Image، راه‌اندازی شبکه/ذخیره‌ساز و Initialization خود اپلیکیشن وابسته است",
+        "چون کانتینر فقط روی ویندوز کار می‌کند",
+        "چون کانتینر از TCP پشتیبانی نمی‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>راه‌اندازی کانتینر معمولاً بسیار سریع‌تر از VM است اما زمان واقعی آماده شدن سرویس (مثلاً یک سرویس JVM سنگین) ممکن است چند ثانیه طول بکشد.</p>"
+    },
+    {
+      "title": "کدام گزینه نمونه درستی از NFV / VNF در شبکه‌های مدرن است؟",
+      "options": [
+        "اجرای یک روتر یا فایروال مجازی (مانند Catalyst 8000V یا FTDv) روی سرور x86 یا محیط ابری",
+        "کشیدن کابل فیبر نوری بین دو ساختمان",
+        "تعویض منبع تغذیه سوئیچ",
+        "اتصال کابل کنسول RS-232"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>NFV توابع شبکه را از سخت‌افزار اختصاصی جدا کرده و به‌صورت ماشین مجازی/کانتینر اجرا می‌کند.</p>"
+    },
+    {
+      "title": "چرا انتقال به ابر عمومی الزاماً در همه سناریوها ارزان‌تر از On-Premises نیست؟",
+      "options": [
+        "چون ابر عمومی اینترنت ندارد",
+        "به‌دلیل هزینه‌های مستمر OpEx برای بارهای کاری ثابت ۲۴×۷ بدون بهینه‌سازی و هزینه‌های خروج داده (Cloud Egress)",
+        "چون ابر عمومی از IPv4 پشتیبانی نمی‌کند",
+        "چون در ابر عمومی نمی‌توان ماشین مجازی ساخت"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>صرفه‌جویی واقعی ابر به کشسانی، بهینه‌سازی منابع (FinOps) و مدیریت دقیق ترافیک Egress وابسته است.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای واقعی ESXi و AWS VPC",
+        "اجرای زنده کانتینر روی سوئیچ Catalyst",
+        "شبیه‌ساز محلی Python 3 برای اعتبارسنجی منطق EST/VST/VGT و ماتریس مسئولیت مشترک بدون اتصال به هایپروایزر یا ابر واقعی",
+        "فاقد کد قابل اجرا"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>آزمایشگاه بخش ۱ در Python 3 اجرا و تست شده و هیچ هایپروایزر یا ابر زنده‌ای در این محیط متصل نیست.</p>"
+    }
+  ]
+}

@@ -1,0 +1,342 @@
+{
+  "schema": "fam-app-blueprint-v1",
+  "lessonId": "ccna_03",
+  "objectiveId": "ccna_03",
+  "kind": "lesson",
+  "track": "CCNA v1.1 (Transferred & Audited)",
+  "course": "c5-ccna-v11-transfer",
+  "domain": "IP Connectivity",
+  "title": "CCNA (مسیریابی): Static، Default، Floating Static و OSPF Single-Area (Area 0)",
+  "titleEn": "CCNA IP Connectivity: Static, Default, Floating Static & Single-Area OSPFv2",
+  "estimatedMinutes": 50,
+  "prerequisites": [],
+  "evidence": "Designed — Not Run",
+  "reviewStatus": "بازبینی معنایی توسط نویسنده انجام شده؛ بازبینی مستقل انجام نشده است",
+  "source": "Legacy ccna_03 (Agent 1 641d02ee) audited & rewritten by Agent 3",
+  "meta": {
+    "version": "reviewed.2",
+    "legacyId": "ccna_03",
+    "transferredFrom": "arena/96a73266-fam@641d02ee73e0fa86b0972dc1f85474e84abef288",
+    "sources": [
+      "https://www.rfc-editor.org/rfc/rfc2328",
+      "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_ospf/configuration/xe-16/iro-xe-16-book/iro-cfg.html"
+    ],
+    "limitations": [
+      "هیچ روتر Cisco IOS/IOS-XE یا همسایگی زنده OSPF در این محیط اجرا نشده است.",
+      "آزمایشگاه یک شبیه‌ساز محلی Python 3 برای آزمون محاسبه Cost با Reference Bandwidth، شرایط کامل همسایگی OSPF و تغییر مسیر Floating Static است."
+    ],
+    "legacyAuditFixes": [
+      "تکمیل فهرست شرایط همسایگی OSPF در نسخه قدیمی: افزودن یکتایی Router-ID، تطابق Subnet/Mask روی لینک‌های Broadcast، احراز هویت، پرچم‌های Area و ریسک اختلال SPF در ناهم‌خوانی Network Type.",
+      "توضیح دقیق واحد Mbps در دستور auto-cost reference-bandwidth و الزام همسان‌سازی آن روی همه روترهای دامنه OSPF.",
+      "افزودن نکته عملیاتی نیاز به IP SLA/BFD برای کشف خرابی‌های غیرمستقیم در Floating Static روی لینک‌های اترنت."
+    ],
+    "semanticReview": {
+      "date": "2026-11-27",
+      "scope": "همه ۱۴ بخش، ۱۵ واژه، ۱۲ پرسش، نمودار SVG و کد Python Mock؛ بازبینی نویسنده نه مستقل",
+      "reviewer": "author-agent-self-review-not-independent",
+      "evidence": "academy-labs/reviews/ccna_03-review-fa.md"
+    },
+    "integration": {
+      "recommendedPath": "fam-c5",
+      "recommendedCourse": "c5-ccna-v11-transfer",
+      "blueprint": "/academy-assets/v5/blueprints/ccna_03.json",
+      "labScript": "01-خام-پروژه/academy-labs/agent3/ccna_03_lab.py"
+    },
+    "technicalAuditFixes": [
+      "فاز ۱۲A: بازنویسی ۱۴ بخش/۱۵ واژه/۱۲ پرسش + ساخت ccna_03_lab.py با اعتبارسنجی سخت‌گیرانه اعداد متناهی/سرریز، IPv4Interface، bool و حالات FULL/2WAY/EXSTART."
+    ]
+  },
+  "sections": [
+    {
+      "id": "ccna_03-section-1",
+      "title": "مسئله واقعی: مرز مقیاس‌پذیری Static Route و ضرورت پروتکل پویای OSPF",
+      "html": "<p>در یک شبکه دو یا سه روتری، نوشتن مسیرهای Static ساده و کم‌مصرف است؛ اما وقتی ۱۵ روتر و ده‌ها زیرشبکه دارید و یک فیبر میانی قطع می‌شود، تغییر دستی صدها جدول مسیر عملاً غیرممکن است. پروتکل <strong>OSPFv2 (RFC 2328)</strong> یک پروتکل مسیریابی Link-State استاندارد و باز است که با ساخت نقشه کامل توپولوژی (LSDB) و اجرای الگوریتم Dijkstra (SPF)، هنگام قطعی لینک به‌طور خودکار مسیر جایگزین را محاسبه می‌کند.</p>"
+    },
+    {
+      "id": "ccna_03-section-2",
+      "title": "هدف یادگیری و پیش‌نیازها",
+      "html": "<p><strong>پیش‌نیازها:</strong> ساب‌نت‌بندی IPv4، مفهوم Longest Prefix Match و Administrative Distance.</p><ul><li>پیکربندی مسیرهای Static، Default (<code>0.0.0.0/0</code>) و <strong>Floating Static</strong> با AD بالاتر از مسیر اصلی.</li><li>پیکربندی OSPFv2 تک‌ناحیه‌ای (Area 0) با دستور <code>network</code> یا روش مدرن فعال‌سازی روی اینترفیس (<code>ip ospf 1 area 0</code>).</li><li>تنظیم همسان <code>auto-cost reference-bandwidth</code> روی تمام روترها برای تفکیک لینک‌های 1G، 10G و 100G.</li><li>تشخیص دقیق همه شرایط همسایگی OSPF، دلیل سلامت حالت <code>2WAY/DROTHER</code> و عیب‌یابی گیر کردن در <code>EXSTART</code>.</li></ul>"
+    },
+    {
+      "id": "ccna_03-section-3",
+      "title": "مسیر Static، Default و Floating Static (با نکته ردیابی خرابی)",
+      "html": "<p>مسیر <strong>Static</strong> به شکل <code>ip route &lt;prefix&gt; &lt;mask&gt; &lt;next-hop&gt;</code> (با AD پیش‌فرض 1 در سیسکو) نوشته می‌شود و مسیر <strong>Default</strong> برای ارسال ترافیک مقاصد ناشناخته به شکل <code>ip route 0.0.0.0 0.0.0.0 &lt;next-hop&gt;</code> تعریف می‌گردد. در <strong>Floating Static Route</strong>، یک AD بالاتر از پروتکل اصلی (مثلاً AD=120 در کنار OSPF با AD=110) اضافه می‌شود تا این مسیر صرفاً پس از حذف مسیر اصلی نصب گردد. روی لینک‌های اترنت که ممکن است با افت غیرمستقیم همچنان Up بمانند، ترکیب با <strong>IP SLA + Track</strong> یا <strong>BFD</strong> لازم است.</p>"
+    },
+    {
+      "id": "ccna_03-section-4",
+      "title": "معماری Link-State، جدول همسایگی، LSDB و الگوریتم SPF",
+      "html": "<p>هر روتر OSPF سه جدول نگهداری می‌کند: (۱) <strong>Neighbor Table</strong> (کشف با Hello روی <code>224.0.0.5</code>)، (۲) <strong>LSDB</strong> همگام درون هر Area، و (۳) <strong>RIB</strong> ساخته‌شده با الگوریتم <strong>SPF (Dijkstra)</strong> بر مبنای کمترین <strong>Cost</strong>. پیام‌های OSPF مستقیماً روی IP با Protocol Number <strong>89</strong> حمل می‌شوند.</p>"
+    },
+    {
+      "id": "ccna_03-section-5",
+      "title": "انتخاب Router-ID و روش‌های ورود اینترفیس به OSPF",
+      "html": "<p>الگوریتم انتخاب <strong>Router-ID</strong> در سیسکو: (۱) دستور دستی <code>router-id x.x.x.x</code>، (۲) بالاترین آدرس IP اینترفیس <code>Loopback</code> فعال، (۳) بالاترین آدرس IP اینترفیس فیزیکی فعال. عضویت اینترفیس‌ها با <code>network &lt;ip&gt; &lt;wildcard&gt; area 0</code> یا مستقیم زیر اینترفیس با <code>ip ospf 1 area 0</code> انجام می‌شود.</p>"
+    },
+    {
+      "id": "ccna_03-section-6",
+      "title": "نمودار معماری: شرایط همسایگی OSPF، حالت 2WAY/DROTHER و Reference Bandwidth",
+      "html": "<p>در نمودار زیر شرایط تشکیل همسایگی OSPF، نقش DR/BDR و اثر تنظیم Reference Bandwidth نمایش داده شده است.</p><svg viewBox=\"0 0 760 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"OSPF Single-Area Adjacency, DR/BDR and Reference Bandwidth\"><rect x=\"16\" y=\"22\" width=\"215\" height=\"176\" rx=\"10\" fill=\"#eff6ff\" stroke=\"#1d4ed8\" stroke-width=\"2\"/><text x=\"123\" y=\"46\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#1e3a8a\">OSPF Adjacency Checks</text><text x=\"123\" y=\"72\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Must Match: Area, Hello/Dead,</text><text x=\"123\" y=\"88\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Subnet/Mask, Auth, Stub Flags, MTU</text><text x=\"123\" y=\"112\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">Must Differ: Router-ID</text><text x=\"123\" y=\"136\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#15803d\">Local Only: Process ID (1 != 99 OK)</text><text x=\"123\" y=\"160\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#92400e\">Network Type mismatch breaks SPF!</text><rect x=\"260\" y=\"22\" width=\"235\" height=\"176\" rx=\"10\" fill=\"#fef3c7\" stroke=\"#d97706\" stroke-width=\"2\"/><text x=\"377\" y=\"46\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#92400e\">Broadcast Segment (DR/BDR)</text><rect x=\"278\" y=\"64\" width=\"84\" height=\"34\" rx=\"5\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"320\" y=\"85\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#92400e\">DR</text><rect x=\"394\" y=\"64\" width=\"84\" height=\"34\" rx=\"5\" fill=\"#ffffff\" stroke=\"#d97706\"/><text x=\"436\" y=\"85\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#92400e\">BDR</text><rect x=\"278\" y=\"138\" width=\"84\" height=\"34\" rx=\"5\" fill=\"#fffbeb\" stroke=\"#b45309\"/><text x=\"320\" y=\"159\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">DROTHER 1</text><rect x=\"394\" y=\"138\" width=\"84\" height=\"34\" rx=\"5\" fill=\"#fffbeb\" stroke=\"#b45309\"/><text x=\"436\" y=\"159\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#78350f\">DROTHER 2</text><line x1=\"362\" y1=\"155\" x2=\"394\" y2=\"155\" stroke=\"#15803d\" stroke-width=\"2\" stroke-dasharray=\"4,2\"/><text x=\"378\" y=\"125\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"bold\" fill=\"#15803d\">2WAY (Healthy!)</text><line x1=\"320\" y1=\"98\" x2=\"320\" y2=\"138\" stroke=\"#0f172a\" stroke-width=\"1.5\"/><line x1=\"436\" y1=\"98\" x2=\"436\" y2=\"138\" stroke=\"#0f172a\" stroke-width=\"1.5\"/><rect x=\"524\" y=\"22\" width=\"220\" height=\"176\" rx=\"10\" fill=\"#f0fdf4\" stroke=\"#15803d\" stroke-width=\"2\"/><text x=\"634\" y=\"46\" text-anchor=\"middle\" font-size=\"11.5\" font-weight=\"bold\" fill=\"#166534\">Cost &amp; Floating Static</text><text x=\"634\" y=\"74\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#14532d\">Cost = max(1, int(RefBW / LinkBW))</text><text x=\"634\" y=\"96\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#dc2626\">Default 100M: 1G=1, 10G=1!</text><text x=\"634\" y=\"118\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#15803d\">Ref 100G: 1G=100, 10G=10, 100G=1</text><text x=\"634\" y=\"148\" text-anchor=\"middle\" font-size=\"9.5\" fill=\"#0f172a\">Floating Static: AD &gt; Primary AD</text><text x=\"634\" y=\"166\" text-anchor=\"middle\" font-size=\"9\" fill=\"#334155\">(Pair with IP SLA/BFD on Ethernet)</text></svg>"
+    },
+    {
+      "id": "ccna_03-section-7",
+      "title": "محاسبه Cost و ضرورت همسان‌سازی auto-cost reference-bandwidth",
+      "html": "<p>فرمول محاسبه Cost در OSPF سیسکو برابر <code>max(1, int(Reference_Bandwidth / Link_Bandwidth))</code> با پیش‌فرض <strong>100 Mbps</strong> است! در نتیجه لینک‌های 100M، 1G، 10G و 100G همگی Cost=1 می‌گیرند. با اجرای <code>auto-cost reference-bandwidth 100000</code> (100 Gbps) روی <strong>تمام روترهای دامنه OSPF</strong>، لینک 100G=1، لینک 10G=10 و لینک 1G=100 می‌شود.</p>"
+    },
+    {
+      "id": "ccna_03-section-8",
+      "title": "انتخاب DR/BDR، حالت سالم 2WAY و بهینه‌سازی Point-to-Point",
+      "html": "<p>روی شبکه‌های Broadcast، یک <strong>DR</strong> و <strong>BDR</strong> با بالاترین <code>ip ospf priority</code> (پیش‌فرض 1؛ 0=عدم شرکت) و سپس بالاترین Router-ID به‌صورت <strong>غیرپیش‌دستانه (Non-preemptive)</strong> انتخاب می‌شوند. روی لینک‌های مستقیم دو روتر، تنظیم <code>ip ospf network point-to-point</code> انتخاب DR/BDR را حذف می‌کند.</p>"
+    },
+    {
+      "id": "ccna_03-section-9",
+      "title": "شرایط کامل همسایگی OSPF، امنیت با passive-interface و تبلیغ Default Route",
+      "html": "<table><thead><tr><th>پارامتر</th><th>اثر عدم تطابق</th></tr></thead><tbody><tr><td>Area ID، تایمرهای Hello/Dead، احراز هویت، پرچم Stub/NSSA، زیرشبکه (روی Broadcast)</td><td>همسایگی شکل نمی‌گیرد (DOWN)</td></tr><tr><td>یکتایی Router-ID</td><td>همسایگی تشکیل نمی‌شود</td></tr><tr><td>MTU دو طرف لینک</td><td>توقف در <strong>EXSTART/EXCHANGE</strong></td></tr><tr><td>Network Type (Broadcast در برابر P2P)</td><td>با تایمر برابر ممکن است FULL شود اما <strong>SPF شکست می‌خورد</strong>!</td></tr><tr><td><strong>Process ID</strong></td><td><strong>هیچ مانعی ایجاد نمی‌کند</strong> (صرفاً محلی است)</td></tr></tbody></table><p>با <code>passive-interface</code> ارسال Hello روی پورت کاربران متوقف می‌شود ضمن حفظ تبلیغ زیرشبکه، و با <code>default-information originate</code> مسیر پیش‌فرض در OSPF توزیع می‌گردد.</p>"
+    },
+    {
+      "id": "ccna_03-section-10",
+      "title": "مراحل ۷گانه ماشین حالت همسایگی OSPF",
+      "html": "<p>مراحل تشکیل همسایگی به‌ترتیب: <code>Down</code> -> <code>Init</code> -> <code>2-Way</code> (حالت نهایی دو <code>DROTHER</code>) -> <code>ExStart</code> (Master/Slave و MTU) -> <code>Exchange</code> (DBD) -> <code>Loading</code> (LSR/LSU) -> <code>Full</code>.</p>"
+    },
+    {
+      "id": "ccna_03-section-11",
+      "title": "کژفهمی‌های رایج در OSPF Single-Area",
+      "html": "<ul><li><strong>کژفهمی ۱: «حالت <code>2WAY/DROTHER</code> نشانه خرابی است.»</strong> واقعیت: کاملاً سالم است؛ DROTHERها فقط با DR/BDR به FULL می‌رسند.</li><li><strong>کژفهمی ۲: «شماره Process ID دو روتر همسایه باید برابر باشد.»</strong> واقعیت: Process ID صرفاً محلی است.</li><li><strong>کژفهمی ۳: «دستور <code>network 10.0.0.0 0.255.255.255 area 0</code> پیشوند <code>/8</code> تبلیغ می‌کند.»</strong> واقعیت: فقط اینترفیس‌های منطبق را انتخاب می‌کند و هر اینترفیس با ماسک واقعی خودش تبلیغ می‌شود.</li></ul>"
+    },
+    {
+      "id": "ccna_03-section-12",
+      "title": "عیب‌یابی سیستماتیک همسایگی OSPF",
+      "html": "<p>اگر پینگ مستقیم موفق است اما همسایه‌ای نیست، با <code>show ip ospf interface</code> Area، Passive، تایمرها، زیرشبکه و احراز هویت را بررسی کنید. در توقف <code>EXSTART</code> مقدار MTU را یکسان کنید و در نبود مسیر با وجود <code>FULL</code>، تطابق <code>Network Type</code> را چک نمایید.</p>"
+    },
+    {
+      "id": "ccna_03-section-13",
+      "title": "تمرین تحلیلی با پاسخ تشریحی",
+      "html": "<p><strong>تمرین ۱:</strong> روی شبکه‌ای با لینک‌های 1G، 10G و 100G چه مقدار Reference Bandwidth مناسب است؟ <strong>پاسخ:</strong> تنظیم همسان <code>100000</code> (100 Gbps) روی همه روترها تا 100G=1، 10G=10 و 1G=100 تفکیک شوند.</p><p><strong>تمرین ۲:</strong> با <code>passive-interface Gi0/1</code> آیا زیرشبکه <code>Gi0/1</code> تبلیغ می‌شود؟ <strong>پاسخ:</strong> بله، همچنان در LSA Type 1 تبلیغ می‌شود و فقط Hello متوقف می‌گردد.</p>"
+    },
+    {
+      "id": "ccna_03-section-14",
+      "title": "منابع فنی، محدودیت‌ها و مرز اجرا",
+      "html": "<p><strong>منابع مرجع:</strong> <a href=\"https://www.rfc-editor.org/rfc/rfc2328\" target=\"_blank\" rel=\"noopener\">RFC 2328 (OSPFv2)</a> و <a href=\"https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_ospf/configuration/xe-16/iro-xe-16-book/iro-cfg.html\" target=\"_blank\" rel=\"noopener\">راهنمای پیکربندی OSPF سیسکو IOS-XE</a>.</p><p><strong>محدودیت‌ها و مرز اجرا:</strong> هیچ روتر واقعی سیسکو یا فرایند زنده OSPF در این محیط اجرا نشده است؛ آزمایشگاه بخش ۱ شبیه‌ساز محلی Python 3 و بخش ۲ سناریوی مرجع CLI است.</p>"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "OSPFv2 (RFC 2328)",
+      "fa": "پروتکل Link-State IPv4",
+      "simple": "پروتکل مسیریابی داخلی استاندارد باز مبتنی بر LSDB و الگوریتم Dijkstra."
+    },
+    {
+      "term": "LSDB",
+      "fa": "پایگاه داده وضعیت لینک‌ها",
+      "simple": "نقشه کامل توپولوژی یک Area که در تمام روترهای همان Area همسان است."
+    },
+    {
+      "term": "SPF (Dijkstra)",
+      "fa": "الگوریتم کوتاه‌ترین مسیر",
+      "simple": "الگوریتم محاسبه درخت بهترین مسیرها با کمترین مجموع Cost روی LSDB."
+    },
+    {
+      "term": "Reference Bandwidth",
+      "fa": "پهنای باند مرجع Cost",
+      "simple": "مقدار پایه محاسبه Cost (پیش‌فرض 100Mbps) که باید همسان روی همه روترها بالا برده شود."
+    },
+    {
+      "term": "Process ID",
+      "fa": "شناسه محلی فرایند OSPF",
+      "simple": "شماره محلی درون هر روتر که نیازی به یکسان بودن بین دو همسایه ندارد."
+    },
+    {
+      "term": "Router-ID",
+      "fa": "شناسه یکتای روتر",
+      "simple": "شناسه ۳۲بیتی که باید در کل دامنه OSPF یکتا باشد تا همسایگی و LSA دچار تعارض نشوند."
+    },
+    {
+      "term": "DR / BDR",
+      "fa": "روتر برگزیده و پشتیبان",
+      "simple": "دو روتر مرکزی روی لینک Broadcast برای کاهش مبادله تکراری LSAها (غیرپیش‌دستانه)."
+    },
+    {
+      "term": "DROTHER (2WAY)",
+      "fa": "روتر غیر DR/BDR",
+      "simple": "وضعیت کاملاً سالم میان دو روتر غیر DR/BDR روی یک سگمنت Broadcast."
+    },
+    {
+      "term": "EXSTART Stuck",
+      "fa": "توقف در مرحله EXSTART",
+      "simple": "علامت کلاسیک اختلاف MTU بین دو روتر همسایه هنگام تبادل DBD."
+    },
+    {
+      "term": "passive-interface",
+      "fa": "اینترفیس غیرفعال OSPF",
+      "simple": "متوقف کردن ارسال/دریافت Hello روی پورت کاربران ضمن حفظ تبلیغ زیرشبکه آن."
+    },
+    {
+      "term": "Floating Static Route",
+      "fa": "مسیر ایستای پشتیبان",
+      "simple": "مسیر Static با AD بزرگ‌تر از مسیر اصلی که فقط پس از حذف مسیر اصلی فعال می‌شود."
+    },
+    {
+      "term": "Default Route",
+      "fa": "مسیر پیش‌فرض",
+      "simple": "مسیر 0.0.0.0/0 برای ارسال ترافیک مقاصد ناشناخته به سمت خروجی."
+    },
+    {
+      "term": "default-information originate",
+      "fa": "تبلیغ مسیر پیش‌فرض در OSPF",
+      "simple": "توزیع مسیر 0.0.0.0/0 از روتر مرزی به سایر روترهای دامنه OSPF."
+    },
+    {
+      "term": "Wildcard Mask",
+      "fa": "ماسک معکوس OSPF",
+      "simple": "الگوی بیتی در دستور network برای تطبیق اینترفیس‌های روتر."
+    },
+    {
+      "term": "IP Protocol 89",
+      "fa": "شماره پروتکل OSPF",
+      "simple": "OSPF مستقیماً درون بسته IP با شماره پروتکل 89 (بدون TCP/UDP) حمل می‌شود."
+    }
+  ],
+  "stages": {
+    "lab": {
+      "executionStatus": "Designed — Not Run (بخش ۱ شبیه‌ساز محلی Python؛ بخش ۲ سناریوی مرجع اجرا نشده روی تجهیز واقعی)",
+      "html": "<p><strong>وضعیت اجرای آزمایشگاه:</strong> بخش اول یک <strong>شبیه‌ساز/مدل محلی (Local Mock) در Python 3</strong> است که در محیط Python 3 اجرا و با تست خودکار بررسی شده است؛ بخش دوم یک <strong>سناریوی مرجع طراحی‌شده (اجرا نشده روی تجهیز واقعی)</strong> است. هیچ سوئیچ، روتر یا سرور تولیدی سیسکو در این محیط اجرا نشده است.</p><p>در این آزمایشگاه محلی، اثر Reference Bandwidth روی Cost لینک‌های 1G/10G، تشکیل همسایگی OSPF با Process ID متفاوت، گیر کردن در <code>EXSTART</code> هنگام اختلاف MTU، سلامت <code>2WAY/DROTHER</code> و رفتار Floating Static را می‌آزمایید.</p><h4>بخش ۱: اجرای کد آزمایشگاه محلی</h4><p>پیش‌نیاز: Python 3.10+. کد زیر دقیقاً همان فایل <code>academy-labs/agent3/ccna_03_lab.py</code> است؛ آن را با دستور زیر اجرا کنید:</p><pre dir=\"ltr\"><code>python3 01-خام-پروژه/academy-labs/agent3/ccna_03_lab.py</code></pre><pre dir=\"ltr\"><code>&quot;&quot;&quot;Local Python Mock for ccna_03 (Static/Floating Static Routing &amp; OSPF Single-Area).\n\nNo real Cisco router or live OSPF process is contacted.\nModels:\n1. OSPF Cost calculation with configurable reference-bandwidth (default 100 Mbps vs 10G/100G).\n2. OSPF Single-Area adjacency checks (Area, Hello/Dead, Subnet, MTU, Router-ID, Auth, Passive,\n   Network Type, DROTHER 2WAY normalcy, and local-only Process ID).\n3. Floating Static Route selection when primary dynamic/static route is active vs withdrawn.\n&quot;&quot;&quot;\nfrom __future__ import annotations\n\nimport ipaddress\nimport math\n\nVALID_OSPF_NET_TYPES = frozenset({&quot;broadcast&quot;, &quot;point_to_point&quot;})\n\n\ndef _require_bool(val: object, name: str) -&gt; bool:\n    if not isinstance(val, bool):\n        raise ValueError(f&quot;{name} must be a strict Python bool, got {val!r} ({type(val).__name__})&quot;)\n    return val\n\n\ndef _require_pos_finite(val: object, name: str) -&gt; float:\n    if isinstance(val, bool) or not isinstance(val, (int, float)):\n        raise ValueError(f&quot;{name} must be a positive finite number (not bool), got {val!r}&quot;)\n    try:\n        f = float(val)\n    except OverflowError as exc:\n        raise ValueError(f&quot;{name} overflowed IEEE-754 float: {val!r}&quot;) from exc\n    if not math.isfinite(f) or f &lt;= 0:\n        raise ValueError(f&quot;{name} must be positive and finite, got {val!r}&quot;)\n    return f\n\n\ndef ospf_interface_cost(link_bw_mbps: float, ref_bw_mbps: float = 100.0) -&gt; int:\n    &quot;&quot;&quot;Compute Cisco-style OSPF cost = max(1, int(ref_bw_mbps / link_bw_mbps)).&quot;&quot;&quot;\n    bw = _require_pos_finite(link_bw_mbps, &quot;link_bw_mbps&quot;)\n    ref = _require_pos_finite(ref_bw_mbps, &quot;ref_bw_mbps&quot;)\n    ratio = ref / bw\n    if not math.isfinite(ratio):\n        raise ValueError(&quot;OSPF cost calculation overflowed&quot;)\n    return max(1, int(ratio))\n\n\ndef check_ospf_adjacency(r1: dict[str, object], r2: dict[str, object]) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Evaluate OSPF Single-Area neighbor state between two interfaces.&quot;&quot;&quot;\n    for label, r in ((&quot;r1&quot;, r1), (&quot;r2&quot;, r2)):\n        if not isinstance(r, dict):\n            raise ValueError(f&quot;{label} must be a dict&quot;)\n        ipaddress.IPv4Address(str(r[&quot;router_id&quot;]))\n        ipaddress.IPv4Interface(str(r[&quot;interface_ip&quot;]))\n        if r.get(&quot;network_type&quot;, &quot;broadcast&quot;) not in VALID_OSPF_NET_TYPES:\n            raise ValueError(f&quot;{label} network_type must be in {sorted(VALID_OSPF_NET_TYPES)}&quot;)\n        _require_bool(r.get(&quot;passive&quot;, False), f&quot;{label}.passive&quot;)\n        for fld in (&quot;area&quot;, &quot;hello_sec&quot;, &quot;dead_sec&quot;, &quot;mtu&quot;, &quot;process_id&quot;, &quot;priority&quot;):\n            v = r[fld]\n            if isinstance(v, bool) or not isinstance(v, int) or v &lt; 0:\n                raise ValueError(f&quot;{label}.{fld} must be a non-negative int (not bool)&quot;)\n\n    blockers: list[str] = []\n    warnings: list[str] = []\n\n    if r1[&quot;passive&quot;] or r2[&quot;passive&quot;]:\n        blockers.append(&quot;PASSIVE_INTERFACE: no OSPF Hello packets exchanged on passive interface&quot;)\n    if r1[&quot;router_id&quot;] == r2[&quot;router_id&quot;]:\n        blockers.append(&quot;DUPLICATE_ROUTER_ID: neighbor Router IDs must be unique&quot;)\n    if r1[&quot;area&quot;] != r2[&quot;area&quot;]:\n        blockers.append(f&quot;AREA_MISMATCH: R1 area {r1[&#x27;area&#x27;]} vs R2 area {r2[&#x27;area&#x27;]}&quot;)\n    if r1[&quot;hello_sec&quot;] != r2[&quot;hello_sec&quot;] or r1[&quot;dead_sec&quot;] != r2[&quot;dead_sec&quot;]:\n        blockers.append(&quot;TIMER_MISMATCH: Hello and Dead intervals must match&quot;)\n    if r1.get(&quot;auth_key&quot;, &quot;&quot;) != r2.get(&quot;auth_key&quot;, &quot;&quot;):\n        blockers.append(&quot;AUTH_MISMATCH: OSPF authentication credentials differ&quot;)\n\n    net1 = ipaddress.IPv4Interface(str(r1[&quot;interface_ip&quot;])).network\n    net2 = ipaddress.IPv4Interface(str(r2[&quot;interface_ip&quot;])).network\n    if net1 != net2:\n        blockers.append(f&quot;SUBNET_MISMATCH: {net1} vs {net2}&quot;)\n\n    # Process ID is locally significant — mismatch does NOT prevent adjacency!\n    if r1[&quot;process_id&quot;] != r2[&quot;process_id&quot;]:\n        warnings.append(&quot;LOCAL_PROCESS_ID_DIFFERS_OK: Process ID is locally significant only&quot;)\n\n    if blockers:\n        return {&quot;state&quot;: &quot;DOWN&quot;, &quot;full_or_healthy&quot;: False, &quot;blockers&quot;: blockers, &quot;warnings&quot;: warnings}\n\n    if r1[&quot;mtu&quot;] != r2[&quot;mtu&quot;]:\n        return {\n            &quot;state&quot;: &quot;EXSTART_STUCK&quot;,\n            &quot;full_or_healthy&quot;: False,\n            &quot;blockers&quot;: [f&quot;MTU_MISMATCH: R1={r1[&#x27;mtu&#x27;]} vs R2={r2[&#x27;mtu&#x27;]}&quot;],\n            &quot;warnings&quot;: warnings,\n        }\n\n    nt1 = r1.get(&quot;network_type&quot;, &quot;broadcast&quot;)\n    nt2 = r2.get(&quot;network_type&quot;, &quot;broadcast&quot;)\n    if nt1 != nt2:\n        warnings.append(&quot;NETWORK_TYPE_MISMATCH_SPF_RISK: adjacency may reach FULL if timers match, but SPF route installation breaks (Type 1 vs Type 2 LSA)&quot;)\n\n    if nt1 == &quot;broadcast&quot; and nt2 == &quot;broadcast&quot; and r1[&quot;priority&quot;] == 0 and r2[&quot;priority&quot;] == 0:\n        return {\n            &quot;state&quot;: &quot;2WAY_DROTHER&quot;,\n            &quot;full_or_healthy&quot;: True,\n            &quot;blockers&quot;: [],\n            &quot;warnings&quot;: warnings + [&quot;DROTHER_2WAY_NORMAL: two DROTHER peers remain in 2WAY on broadcast links&quot;],\n        }\n\n    return {\n        &quot;state&quot;: &quot;FULL&quot;,\n        &quot;full_or_healthy&quot;: nt1 == nt2,\n        &quot;blockers&quot;: [] if nt1 == nt2 else [&quot;SPF_BROKEN_BY_NETWORK_TYPE_MISMATCH&quot;],\n        &quot;warnings&quot;: warnings,\n    }\n\n\ndef select_floating_static(\n    primary_up: bool,\n    primary_ad: int = 110,\n    floating_ad: int = 120,\n) -&gt; dict[str, object]:\n    &quot;&quot;&quot;Model floating static failover (requires floating_ad &gt; primary_ad).&quot;&quot;&quot;\n    up = _require_bool(primary_up, &quot;primary_up&quot;)\n    for name, v in ((&quot;primary_ad&quot;, primary_ad), (&quot;floating_ad&quot;, floating_ad)):\n        if isinstance(v, bool) or not isinstance(v, int) or not (1 &lt;= v &lt;= 254):\n            raise ValueError(f&quot;{name} must be an int in 1..254, got {v!r}&quot;)\n    if floating_ad &lt;= primary_ad:\n        raise ValueError(&quot;floating_ad must be strictly greater than primary_ad to act as backup&quot;)\n    return {\n        &quot;active_path&quot;: &quot;primary&quot; if up else &quot;floating_static_backup&quot;,\n        &quot;installed_ad&quot;: primary_ad if up else floating_ad,\n    }\n\n\ndef main() -&gt; None:\n    print(&quot;Local Python Mock only — no live Cisco router or OSPF network is contacted.&quot;)\n    # 1. Reference bandwidth distinction\n    assert ospf_interface_cost(1000, 100) == 1 and ospf_interface_cost(10000, 100) == 1\n    assert ospf_interface_cost(1000, 100000) == 100 and ospf_interface_cost(10000, 100000) == 10\n    print(&quot;Cost @ ref=100G (1G vs 10G):&quot;, ospf_interface_cost(1000, 100000), ospf_interface_cost(10000, 100000))\n\n    # 2. Healthy OSPF adjacency despite DIFFERENT Process IDs (1 vs 99)\n    r1 = {&quot;router_id&quot;: &quot;1.1.1.1&quot;, &quot;interface_ip&quot;: &quot;10.10.0.1/30&quot;, &quot;area&quot;: 0, &quot;hello_sec&quot;: 10, &quot;dead_sec&quot;: 40, &quot;mtu&quot;: 1500, &quot;process_id&quot;: 1, &quot;priority&quot;: 1, &quot;passive&quot;: False, &quot;network_type&quot;: &quot;broadcast&quot;}\n    r2 = {&quot;router_id&quot;: &quot;2.2.2.2&quot;, &quot;interface_ip&quot;: &quot;10.10.0.2/30&quot;, &quot;area&quot;: 0, &quot;hello_sec&quot;: 10, &quot;dead_sec&quot;: 40, &quot;mtu&quot;: 1500, &quot;process_id&quot;: 99, &quot;priority&quot;: 1, &quot;passive&quot;: False, &quot;network_type&quot;: &quot;broadcast&quot;}\n    adj_ok = check_ospf_adjacency(r1, r2)\n    assert adj_ok[&quot;state&quot;] == &quot;FULL&quot; and adj_ok[&quot;full_or_healthy&quot;] is True\n\n    # 3. MTU mismatch -&gt; EXSTART_STUCK\n    adj_mtu = check_ospf_adjacency(r1, {**r2, &quot;mtu&quot;: 1400})\n    assert adj_mtu[&quot;state&quot;] == &quot;EXSTART_STUCK&quot;\n    print(&quot;Adjacency OK (different PIDs):&quot;, adj_ok[&quot;state&quot;], &quot;| MTU mismatch:&quot;, adj_mtu[&quot;state&quot;])\n\n    # 4. Floating static failover\n    assert select_floating_static(True)[&quot;active_path&quot;] == &quot;primary&quot;\n    assert select_floating_static(False)[&quot;active_path&quot;] == &quot;floating_static_backup&quot;\n    print(&quot;Floating static failover verified.&quot;)\n\n\nif __name__ == &quot;__main__&quot;:\n    main()\n</code></pre><p><strong>خروجی مورد انتظار:</strong> با <code>ref_bw=100000</code> مقدار Cost لینک 1G برابر 100 و لینک 10G برابر 10 محاسبه می‌شود؛ همسایگی با Process ID متفاوت (1 و 99) به <code>FULL</code> می‌رسد؛ اختلاف MTU باعث <code>EXSTART_STUCK</code> می‌شود؛ و با افت مسیر اصلی، Floating Static فعال می‌گردد.</p><h4>بخش ۲: سناریوی مرجع طراحی‌شده (تجهیز واقعی اجرا نشده)</h4><p><strong>الگوی مرجع OSPF Single-Area و Floating Static در Cisco IOS-XE (اجرا نشده روی سخت‌افزار واقعی):</strong></p><pre dir=\"ltr\"><code>! Reference Cisco IOS-XE Single-Area OSPF &amp; Floating Static (NOT executed)\nconfigure terminal\n router ospf 1\n  router-id 1.1.1.1\n  auto-cost reference-bandwidth 100000\n  passive-interface default\n  no passive-interface GigabitEthernet0/0\n interface GigabitEthernet0/0\n  ip address 10.10.0.1 255.255.255.252\n  ip ospf network point-to-point\n  ip ospf 1 area 0\n ip route 192.168.20.0 255.255.255.0 10.99.0.2 120\nend</code></pre><p><strong>مرز شواهد:</strong> اجرای کد محلی فقط منطق مدل‌شده را می‌آزماید و جایگزین آزمایش روی سخت‌افزار واقعی سیسکو یا شبکه تولیدی نیست.</p>"
+    },
+    "quiz": {
+      "passingScore": 80,
+      "questionCount": 12
+    }
+  },
+  "interactiveQuiz": [
+    {
+      "title": "در شبکه‌های دارای لینک‌های 1Gbps، 10Gbps و 100Gbps، چرا باید <code>auto-cost reference-bandwidth 100000</code> را روی همه روترهای OSPF تنظیم کرد؟",
+      "options": [
+        "چون بدون آن OSPF اصلاً همسایه نمی‌شود",
+        "تا بسته‌های Broadcast از روتر عبور کنند",
+        "تا AD از 110 به 1 کاهش یابد",
+        "چون با پیش‌فرض 100Mbps همه لینک‌های 100M و بالاتر Cost یکسان 1 می‌گیرند و تفکیک سرعت انجام نمی‌شود"
+      ],
+      "correctIndex": 3,
+      "explanationHtml": "<p>در فرمول Cost، اعداد کسری به 1 گرد می‌شوند؛ بالا بردن یکسان Reference Bandwidth روی کل دامنه (مثلاً 100000 Mbps برای 100G) تفکیک دقیق سرعت‌ها را ممکن می‌سازد.</p>"
+    },
+    {
+      "title": "کدام مورد برای برقراری همسایگی <code>FULL</code> در OSPF الزامی <strong>نیست</strong>؟",
+      "options": [
+        "یکسان بودن شماره Process ID در دو روتر",
+        "یکسان بودن تایمرهای Hello و Dead",
+        "یکسان بودن شماره Area",
+        "یکسان بودن MTU دو طرف لینک"
+      ],
+      "correctIndex": 0,
+      "explanationHtml": "<p>Process ID صرفاً محلی است؛ اما Area، تایمرها، زیرشبکه، احراز هویت، پرچم Stub، یکتایی Router-ID و MTU برای تشکیل کامل همسایگی حیاتی‌اند.</p>"
+    },
+    {
+      "title": "دستور <code>passive-interface Gi0/1</code> در OSPF چه اثری دارد؟",
+      "options": [
+        "پورت Gi0/1 را خاموش (shutdown) می‌کند",
+        "زیرشبکه Gi0/1 همچنان تبلیغ می‌شود اما پیام Hello ارسال نمی‌شود و همسایه‌ای از آن سمت پذیرفته نمی‌شود",
+        "AD را به 200 تغییر می‌دهد",
+        "پورت را به Trunk تبدیل می‌کند"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>این دستور از تشکیل همسایگی غیرمجاز در سمت کاربران جلوگیری می‌کند بی‌آنکه دسترسی به زیرشبکه آن پورت قطع شود.</p>"
+    },
+    {
+      "title": "اگر دو روتر OSPF پینگ مستقیم سالم دارند اما در <code>show ip ospf neighbor</code> در حالت <code>EXSTART</code> گیر کرده‌اند، محتمل‌ترین علت چیست؟",
+      "options": [
+        "تفاوت Process ID",
+        "اختلاف MTU بین دو اینترفیس متصل",
+        "وجود دو DROTHER در یک VLAN",
+        "تنظیم Router-ID دستی"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>اختلاف MTU مانع تکمیل تبادل DBD در مرحله ExStart می‌شود؛ راه‌حل صحیح یکسان‌سازی MTU دو سمت است.</p>"
+    },
+    {
+      "title": "در یک سگمنت اترنت Broadcast با ۴ روتر OSPF، مشاهده وضعیت <code>2WAY/DROTHER</code> میان دو روتر غیر DR/BDR چه معنایی دارد؟",
+      "options": [
+        "لینک دچار حلقه لایه ۲ شده است",
+        "وضعیت کاملاً طبیعی و سالم است؛ DROTHERها تنها با DR و BDR به FULL می‌رسند",
+        "تایمرهای Hello اختلاف دارند",
+        "باید Process ID یکسان شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>در شبکه‌های Broadcast تنها ارتباط با DR و BDR به <code>FULL</code> می‌رسد و <code>2WAY</code> میان DROTHERها طبیعی است.</p>"
+    },
+    {
+      "title": "چه رخ می‌دهد اگر یک سر لینک OSPF روی <code>broadcast</code> و سر دیگر روی <code>point-to-point</code> باشد و تایمرهای Hello/Dead به‌صورت دستی برابر شوند؟",
+      "options": [
+        "هیچ مشکلی پیش نمی‌آید",
+        "همسایگی ممکن است به FULL برسد اما محاسبه SPF و نصب مسیرها به‌دلیل ناهم‌خوانی LSA Type 1/Type 2 شکست می‌خورد",
+        "لینک خودکار به BGP تبدیل می‌شود",
+        "پورت وارد Err-Disabled می‌شود"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تطابق نوع شبکه OSPF برای تفسیر درست توپولوژی در الگوریتم SPF ضروری است.</p>"
+    },
+    {
+      "title": "چگونه می‌توان یک مسیر Static پشتیبان (Floating Static) تعریف کرد که فقط هنگام حذف مسیر OSPF (AD=110) فعال شود؟",
+      "options": [
+        "تعیین AD=1 برای مسیر Static",
+        "تعیین AD بزرگ‌تر از 110 (مثلاً 120) در انتهای دستور ip route و در صورت لینک اترنت ترکیب با IP SLA/BFD",
+        "تعیین AD=0",
+        "خاموش کردن ip routing"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>مسیر Floating Static باید AD بزرگ‌تر از مسیر اصلی داشته باشد تا در شرایط عادی در RIB نصب نشود.</p>"
+    },
+    {
+      "title": "ترتیب صحیح انتخاب Router-ID در OSPF سیسکو (در غیاب تنظیم دستی) چیست؟",
+      "options": [
+        "پایین‌ترین آدرس MAC",
+        "بالاترین آدرس IP اینترفیس Loopback فعال، و در نبود آن بالاترین آدرس IP اینترفیس فیزیکی فعال",
+        "کمترین آدرس IP در شبکه",
+        "شماره Process ID ضربدر 10"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>تنظیم دستی <code>router-id</code> اولویت اول است؛ سپس بالاترین IP لوپ‌بک Up و در نهایت بالاترین IP فیزیکی Up/Up.</p>"
+    },
+    {
+      "title": "بسته‌های OSPF روی کدام پروتکل لایه انتقال/شبکه حمل می‌شوند؟",
+      "options": [
+        "TCP پورت 179",
+        "UDP پورت 520",
+        "مستقیماً روی IP با Protocol Number 89",
+        "ICMP Echo"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>OSPF مستقیماً درون هدر IP با شماره پروتکل 89 ارسال می‌شود.</p>"
+    },
+    {
+      "title": "اگر روتری پس از انتخاب DR با Priority بالاتری به یک سگمنت Broadcast متصل شود، آیا بلافاصله جای DR فعلی را می‌گیرد؟",
+      "options": [
+        "بله، بلافاصله در ۱ ثانیه DR می‌شود",
+        "خیر، انتخابات DR/BDR غیرپیش‌دستانه (Non-preemptive) است و تا ریست فرایند یا افت DR/BDR فعلی تغییری رخ نمی‌دهد",
+        "فقط در صورت تفاوت Process ID",
+        "فقط در IPv6"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>غیرپیش‌دستانه بودن انتخابات DR/BDR از ناپایداری بی‌مورد توپولوژی جلوگیری می‌کند.</p>"
+    },
+    {
+      "title": "نقش دقیق دستور <code>network 10.10.0.0 0.0.0.255 area 0</code> در OSPFv2 چیست؟",
+      "options": [
+        "فقط تبلیغ پیشوند 10.10.0.0/24 بدون در نظر گرفتن اینترفیس‌ها",
+        "انتخاب اینترفیس‌های محلی روتر که IP آن‌ها در این بازه قرار می‌گیرد تا OSPF روی آن‌ها فعال شده و ماسک واقعی همان اینترفیس‌ها تبلیغ شود",
+        "بستن پورت‌های کاربری",
+        "تنظیم MTU روی 1500"
+      ],
+      "correctIndex": 1,
+      "explanationHtml": "<p>دستور <code>network</code> صرفاً یک فیلتر انتخاب اینترفیس است و می‌توان به‌جای آن مستقیماً زیر اینترفیس از <code>ip ospf 1 area 0</code> استفاده کرد.</p>"
+    },
+    {
+      "title": "مرز شواهد آزمایشگاه این درس چیست؟",
+      "options": [
+        "اجرای زنده OSPF روی ۴ روتر سیسکو",
+        "اتصال واقعی به شبکه سازمانی",
+        "شبیه‌ساز محلی Python 3 برای آزمون Cost/Reference Bandwidth، قوانین همسایگی OSPF و Floating Static بدون اتصال به روتر واقعی",
+        "فاقد کد تست‌شده"
+      ],
+      "correctIndex": 2,
+      "explanationHtml": "<p>بخش ۱ شبیه‌ساز محلی Python 3 است و بخش ۲ سناریوی مرجع CLI اجرا نشده می‌باشد.</p>"
+    }
+  ]
+}

@@ -1,11 +1,11 @@
-# راهنمای ادغام محتوای ایجنت ۳ (Agent 3 Integration Guide — ۶۴ درس)
+# راهنمای ادغام محتوای ایجنت ۳ (Agent 3 Integration Guide — ۶۹ درس: ۶۴ اصلی + ۵ انتقالی CCNA دسته ۱۲A)
 
-تاریخ تولید و اعتبارسنجی: **۲۰۲۶-۱۱-۲۷** | شاخه کاری: `arena/941b9e62-fam` | مبنای مقایسه قدیمی: `5a7474902c8d729950288198953686702cfd85dc`
+تاریخ تولید و اعتبارسنجی: **۲۰۲۶-۱۱-۲۷** | شاخه کاری: `arena/941b9e62-fam` | مبنای مقایسه قدیمی: `5a7474902c8d729950288198953686702cfd85dc` (و منبع خام ایجنت ۱ @ `641d02ee`)
 
 ## ۱. خلاصه دامنه و سیاست بدون تعارض (Zero-Conflict Scope)
 
-- **تعداد دقیق درس‌های تحویلی ایجنت ۳:** **۶۴ درس** شامل ۶ درس Specialist پایه، ۱۲ درس Specialist عمیق، ۱۹ درس Automation (همه `auto_01` تا `auto_20` **به استثنای `auto_12`** که در دامنه ایجنت ۲ قرار دارد)، ۷ درس CCIE و ۲۰ درس CCDE.
-- **بدون دست‌کاری فایل‌های مشترک هسته:** فایل‌های مشترک `curriculum-catalog.json`، `lesson-engine.js`، `server/app.py` و `tests/test_academy_content.py` دست‌نخورده باقی مانده‌اند تا ادغام موازی با ایجنت ۱ (۳۵ درس پایه) و ایجنت ۲ (۱۵ درس + کاتالوگ/موتور) بدون هیچ Merge Conflict انجام شود.
+- **تعداد دقیق درس‌های تحویلی ایجنت ۳ تا پایان دسته ۱۲A:** **۶۹ درس** شامل ۶۴ درس اصلی (۶ Specialist پایه، ۱۲ Specialist عمیق، ۱۹ Automation به‌جز `auto_12`، ۷ CCIE و ۲۰ CCDE) + **۵ درس نخست از ۱۷ درس انتقالی سابق ایجنت ۱ (دسته ۱۲A — هسته CCNA):** `ccna_02_vlan`, `ccna_v1`, `ccna_v6`, `ccna_03`, `ccna_04`.
+- **بدون دست‌کاری فایل‌های مشترک هسته:** فایل‌های مشترک `curriculum-catalog.json`، `lesson-engine.js`، `server/app.py` و `tests/test_academy_content.py` دست‌نخورده باقی مانده‌اند (`SHARED_FILES_TOUCHED=0`) و نسخه‌های محلی ادغام‌شده توسط Agent 2 روی `arena/ab96c97c-fam` بازنویسی نمی‌شوند.
 - **استاندارد فنی هر ۶۴ درس:** قالب رسمی `fam-app-blueprint-v1`، حداقل **۱۴ بخش آموزشی فارسی** (با حداقل ۱ نمودار SVG معتبر XML دارای `viewBox`)، حداقل **۱۵ واژه تخصصی**، دقیقاً **۱۲ پرسش چهارگزینه‌ای با گزینه‌های یکتا و پاسخ تشریحی**، **اسکریپت آزمایشگاه مستقل Python 3 (stdlib-only)** به‌صورت Verbatim HTML-Escaped در `stages.lab.html` و فایل ثبت بازبینی معنایی اختصاصی.
 
 ## ۲. شفافیت وضعیت اجرا (تفکیک دقیق ۶۴ آزمایشگاه) و وضعیت بازبینی
@@ -108,7 +108,17 @@
 | `ccde_19` | ۹.۱۹ CCDE — مطالعه موردی جامع ۲: نوسازی اپراتور مخابراتی و ۵G (شرکت Aria-Telecom) | `fam-ccde` / `ccde-design` | `/academy-assets/v5/blueprints/ccde_19.json` | `academy-labs/agent3/ccde_19_lab.py` | `academy-labs/reviews/ccde_19-review-fa.md` |
 | `ccde_20` | ۹.۲۰ CCDE — مستندسازی HLD/LLD، دفاع از معماری، تله‌های آزمون 400-007 و جمع‌بندی نهایی آکادمی فام | `fam-ccde` / `ccde-design` | `/academy-assets/v5/blueprints/ccde_20.json` | `academy-labs/agent3/ccde_20_lab.py` | `academy-labs/reviews/ccde_20-review-fa.md` |
 
-**جمع کل درس‌های احصاشده و تاییدشده:** `64` درس (دقیقاً ۶۴ از ۶۴).
+### مسیر CCNA v1.1 انتقالی (دسته ۱۲A — ۵ درس از ۱۷ درس سابق ایجنت ۱)
+
+| شناسه | عنوان فارسی | مسیر / دوره پیشنهادی | Blueprint | Lab Script | گزارش بازبینی |
+|---|---|---|---|---|---|
+| `ccna_02_vlan` | CCNA (سوئیچینگ): VLANها، Trunk 802.1Q، Voice VLAN و Native VLAN (بازبینی و رفع تناقض) | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_02_vlan.json` | `academy-labs/agent3/ccna_02_vlan_lab.py` | `academy-labs/reviews/ccna_02_vlan-review-fa.md` |
+| `ccna_v1` | CCNA (معماری): مجازی‌سازی سرور، Hypervisor (Type 1/2)، کانتینرها و سوئیچ‌های مجازی | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_v1.json` | `academy-labs/agent3/ccna_v1_lab.py` | `academy-labs/reviews/ccna_v1-review-fa.md` |
+| `ccna_v6` | CCNA (مسیریابی): مسیریابی Dual-Stack IPv4 و IPv6، Longest Prefix Match، AD/Metric و OSPFv3 | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_v6.json` | `academy-labs/agent3/ccna_v6_lab.py` | `academy-labs/reviews/ccna_v6-review-fa.md` |
+| `ccna_03` | CCNA (مسیریابی): Static، Default، Floating Static و OSPF Single-Area (Area 0) | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_03.json` | `academy-labs/agent3/ccna_03_lab.py` | `academy-labs/reviews/ccna_03-review-fa.md` |
+| `ccna_04` | CCNA (سرویس‌های IP): افزونگی دروازه HSRP، همگام‌سازی NTP، ثبت وقایع Syslog و پایش SNMPv3 | `fam-c5` / `c5-ccna-v11-transfer` | `/academy-assets/v5/blueprints/ccna_04.json` | `academy-labs/agent3/ccna_04_lab.py` | `academy-labs/reviews/ccna_04-review-fa.md` |
+
+**جمع کل درس‌های احصاشده و تاییدشده:** `69` درس (`64` اصلی + `5` انتقالی دسته ۱۲A).
 
 ## ۴. خلاصه مهم‌ترین اصلاحات ممیزی نسخه قدیمی (Legacy Audit Fixes)
 
