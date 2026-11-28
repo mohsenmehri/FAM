@@ -102,10 +102,54 @@ async function waitFor(fn) {
     if (testUrl.startsWith('file:///C:/')) {
       await waitFor(() => ww.document.querySelector('[data-lesson-quiz]'));
       assert.equal(ww.document.querySelector('.fa-error'), null);
+      // Verify v6 Live Topology UI upgrades: sticky TOC, per-lesson notes, study timer, offline banner host
+      assert.ok(ww.document.querySelector('#le-toc-list .lesson-toc-link'), 'lesson TOC must render');
+      assert.ok(ww.document.querySelector('#le-lesson-notes'), 'per-lesson notes textarea must render');
+      assert.ok(ww.document.querySelector('.side-timer-display'), 'sidebar study timer must render');
+      assert.ok(ww.document.querySelector('.offline-banner-host [role=note]'), 'offline banner must mount inside .offline-banner-host');
     }
     winDom.window.close();
   }
 
+  // Verify dashboard Live Topology Hero, Daily Missions, Theme toggle, and dedicated #/lab Workbench
+  const dashDom = new JSDOM(html, {
+    url: 'file:///C:/Users/Mohsen/Downloads/FAM-Academy-Offline.html#/dashboard',
+    runScripts: 'dangerously',
+    virtualConsole: vc,
+    beforeParse(win) {
+      win.Response = global.Response;
+      win.matchMedia = () => ({matches:false, addEventListener(){}, removeEventListener(){}, addListener(){}, removeListener(){}});
+      win.fetch = () => { throw new Error('unexpected network fetch'); };
+      win.HTMLElement.prototype.scrollIntoView = function(){};
+    },
+  });
+  const dw = dashDom.window;
+  await waitFor(() => dw.document.querySelector('.hero-topo-svg'));
+  assert.ok(dw.document.querySelector('.mission-card [data-mission-id]'), 'daily missions must render');
+  const themeBtn = dw.document.querySelector('.theme-toggle');
+  assert.ok(themeBtn, 'theme toggle must exist');
+  themeBtn.click();
+  assert.equal(dw.document.documentElement.dataset.theme, 'light');
+  themeBtn.click();
+  assert.equal(dw.document.documentElement.dataset.theme, 'dark');
+  dashDom.window.close();
+
+  const labDom = new JSDOM(html, {
+    url: 'file:///C:/Users/Mohsen/Downloads/FAM-Academy-Offline.html#/lab',
+    runScripts: 'dangerously',
+    virtualConsole: vc,
+    beforeParse(win) {
+      win.Response = global.Response;
+      win.matchMedia = () => ({matches:false, addEventListener(){}, removeEventListener(){}, addListener(){}, removeListener(){}});
+      win.fetch = () => { throw new Error('unexpected network fetch'); };
+      win.HTMLElement.prototype.scrollIntoView = function(){};
+    },
+  });
+  const lw = labDom.window;
+  await waitFor(() => lw.document.querySelector('#lab-sim-mount [data-fam-cli-simulator]'));
+  assert.ok(lw.document.querySelectorAll('.lab-scenario-item').length >= 47, 'lab workbench must list exact scenarios');
+  labDom.window.close();
+
   assert.deepEqual(errors,[]);
-  console.log('jsdom offline: bundled lessons, Windows file:///C:/ + about:blank loading, network blocking, quiz local persistence and reload passed');
+  console.log('jsdom offline: bundled lessons, v6 Live Topology UI (hero, timer, missions, TOC, notes, #/lab, theme), Windows file:///C:/ + about:blank loading, network blocking, quiz local persistence and reload passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

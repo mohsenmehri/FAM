@@ -463,26 +463,72 @@
           <nav id="le-stage-bar" class="stepper lesson-stepper" aria-label="بخش‌های درس">
             ${sections.map((s, idx) => `<button type="button" id="side-sec-${escapeHtml(s.id)}" class="stepper-item le-stage-pill" data-stage-idx="${idx}" data-stage-id="${escapeHtml(s.id)}" aria-label="بخش ${idx + 1}: ${escapeHtml(s.title)}"><span class="stepper-dot">${stageIcon(s.id, idx)}</span><span class="stepper-label">${escapeHtml(stageLabels[s.id] || s.title)}</span></button>`).join('')}
           </nav>` : ''}
-        <div class="lesson-content">
-          ${sections.map((s, idx) => {
-            const hiddenStyle = (hasStages(bp) && idx !== 0) ? ' style="display:none"' : '';
-            return `<article id="sec-${s.id}" class="card le-stage-card" data-stage-idx="${idx}"${hiddenStyle}><header class="lesson-stage-heading"><span class="lesson-stage-number">${idx + 1}</span><div><span class="lesson-stage-caption">بخش ${idx + 1} از ${sections.length}</span><h2>${escapeHtml(s.title)}</h2></div></header><div class="lesson-stage-content">${s.html}</div></article>`;
-          }).join('')}
-          ${hasStages(bp) ? `
-          <div class="step-foot lesson-step-foot">
-            <button id="le-stage-prev" class="btn" type="button">بخش قبلی</button>
-            <button id="le-stage-next" class="btn primary" type="button">بخش بعدی</button>
-          </div>` : ''}
-          <div class="lesson-adjacent">
-            <button id="le-prev-btn" class="btn" ${adj.prev ? '' : 'disabled'}>درس قبلی${adj.prev ? ': ' + escapeHtml(adj.prev.title) : ''}</button>
-            <button id="le-next-btn" class="btn" ${adj.next ? '' : 'disabled'}>${adj.next ? 'درس بعدی: ' + escapeHtml(adj.next.title) : 'درس بعدی'}</button>
+        <div class="lesson-body-grid">
+          <div class="lesson-content">
+            ${sections.map((s, idx) => {
+              const hiddenStyle = (hasStages(bp) && idx !== 0) ? ' style="display:none"' : '';
+              return `<article id="sec-${s.id}" class="card le-stage-card" data-stage-idx="${idx}"${hiddenStyle}><header class="lesson-stage-heading"><span class="lesson-stage-number">${idx + 1}</span><div><span class="lesson-stage-caption">بخش ${idx + 1} از ${sections.length}</span><h2>${escapeHtml(s.title)}</h2></div></header><div class="lesson-stage-content">${s.html}</div></article>`;
+            }).join('')}
+            ${hasStages(bp) ? `
+            <div class="step-foot lesson-step-foot">
+              <button id="le-stage-prev" class="btn" type="button">بخش قبلی</button>
+              <button id="le-stage-next" class="btn primary" type="button">بخش بعدی</button>
+            </div>` : ''}
+            <div class="lesson-adjacent">
+              <button id="le-prev-btn" class="btn" ${adj.prev ? '' : 'disabled'}>درس قبلی${adj.prev ? ': ' + escapeHtml(adj.prev.title) : ''}</button>
+              <button id="le-next-btn" class="btn" ${adj.next ? '' : 'disabled'}>${adj.next ? 'درس بعدی: ' + escapeHtml(adj.next.title) : 'درس بعدی'}</button>
+            </div>
           </div>
+          <aside class="lesson-side-rail" aria-label="فهرست و یادداشت‌های درس">
+            <section class="lesson-rail-card">
+              <h3><span>فهرست بخش‌های درس</span><span class="side-pill">${sections.length}</span></h3>
+              <nav class="lesson-toc-list" id="le-toc-list">
+                ${sections.map((s, idx) => `<button type="button" class="lesson-toc-link${idx === 0 ? ' active' : ''}" data-toc-idx="${idx}" data-toc-target="sec-${escapeHtml(s.id)}"><span class="lesson-toc-num">${idx + 1}</span><span>${escapeHtml(s.title)}</span></button>`).join('')}
+              </nav>
+            </section>
+            <section class="lesson-rail-card">
+              <h3><span>یادداشت شخصی این درس</span></h3>
+              <textarea id="le-lesson-notes" class="lesson-notes-area" placeholder="نکات کلیدی، فرمان‌های مهم یا سؤال‌های خود را اینجا بنویسید..."></textarea>
+              <div id="le-notes-status" class="lesson-notes-meta">ذخیره خودکار محلی در همین مرورگر</div>
+            </section>
+          </aside>
         </div>
       </div>`;
 
     const backBtn = container.querySelector('#le-back-cat');
     if (backBtn && opts.onBackToCatalog) backBtn.onclick = opts.onBackToCatalog;
     setupGlossaryToggle(container);
+
+    // Sticky TOC + Per-Lesson Personal Notes (local browser storage, safe try/catch)
+    const NOTES_STORAGE_KEY = 'fam.academy.notes.v1';
+    const notesArea = container.querySelector('#le-lesson-notes');
+    const notesStatus = container.querySelector('#le-notes-status');
+    if (notesArea && bp.lessonId) {
+      try {
+        const allNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '{}');
+        if (allNotes && typeof allNotes[bp.lessonId] === 'string') notesArea.value = allNotes[bp.lessonId];
+      } catch (_) {}
+      let saveTimer = null;
+      notesArea.addEventListener('input', () => {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          try {
+            const allNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '{}') || {};
+            allNotes[bp.lessonId] = notesArea.value;
+            localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(allNotes));
+            if (notesStatus) notesStatus.textContent = 'یادداشت به‌صورت محلی ذخیره شد.';
+          } catch (_) {
+            if (notesStatus) notesStatus.textContent = 'ذخیره محلی یادداشت در دسترس نیست.';
+          }
+        }, 250);
+      });
+    }
+
+    const syncTocActive = (idx) => {
+      container.querySelectorAll('.lesson-toc-link').forEach((btn, i) => {
+        btn.classList.toggle('active', i === idx);
+      });
+    };
 
     let activeStageIdx = 0;
     const isStaged = hasStages(bp) > 0;
@@ -494,6 +540,7 @@
         if (current) pill.setAttribute('aria-current', 'step');
         else pill.removeAttribute('aria-current');
       });
+      syncTocActive(activeStageIdx);
     };
     const setActiveStage = (nextIdx) => {
       if (!isStaged) return;
@@ -507,6 +554,18 @@
       if (nextS) nextS.disabled = activeStageIdx === sections.length - 1;
       updateStageProgress();
     };
+    container.querySelectorAll('.lesson-toc-link').forEach((btn, i) => {
+      btn.onclick = () => {
+        if (isStaged) {
+          setActiveStage(i);
+          container.querySelector('#le-stage-bar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          syncTocActive(i);
+          const target = container.querySelector('#' + btn.dataset.tocTarget);
+          target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+    });
     if (isStaged) {
       container.querySelectorAll('.le-stage-pill').forEach((pill, i) => {
         pill.onclick = () => {
@@ -531,6 +590,7 @@
         const nowDone = toggleLessonDone(bp.lessonId);
         compBtn.textContent = nowDone ? '✅ تکمیل شده (لغو تکمیل)' : 'علامت‌گذاری به‌عنوان تکمیل‌شده';
         compBtn.className = `btn ${nowDone ? '' : 'primary'}`;
+        window.dispatchEvent(new CustomEvent('fam-academy-progress-updated'));
       };
     }
 

@@ -451,7 +451,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
 @media(max-width:650px){.fa-topbar{align-items:flex-start}.fa-brand{margin-bottom:4px}.fa-nav{width:100%;overflow-x:auto;flex-wrap:nowrap}.fa-nav .btn{white-space:nowrap}.fa-path-grid{grid-template-columns:1fr}.fa-hero{padding:20px}.fa-hero h1{font-size:30px}.fa-stat{padding:11px}.fa-stat strong{font-size:18px}.fa-lesson-row{align-items:flex-start;flex-wrap:wrap}.fa-lesson-row button{margin-right:46px}}
 @media(prefers-reduced-motion:no-preference){.fa-path-card{transition:transform .2s,border-color .2s}.fa-path-card:hover{transform:translateY(-3px);border-color:#7b9cff77}}
 </style>
-  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261123c">
+  <link rel="stylesheet" href="/academy-assets/academy-reference-ui.css?v=20261128a">
 </head>
 <body>
   <header class="topbar fa-topbar">
@@ -467,16 +467,20 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   </div>
 </header>
 
-  <div id="academy-save-status" role="status" aria-live="polite" style="padding:0 20px;color:var(--warn)"></div>
-  <div style="padding:0 20px"><button id="academy-export-progress" type="button" hidden>دریافت نسخه خام پیشرفت حساب</button><small> نسخه ممکن است یادداشت و اطلاعات حساس داشته باشد؛ در محل امن نگهداری کنید. این دریافت، مهاجرت یا بازیابی نیست.</small></div>
-  <div style="padding:0 20px"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-legacy-migrate" type="button" hidden>انتقال تکمیل درس‌های تأییدشده</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button><button id="academy-legacy-archive-toggle" type="button" aria-expanded="false" hidden>مشاهده خواندنی آرشیو نسخه قدیمی (نمره‌ها و یادداشت‌ها)</button></div>
-  <section id="academy-legacy-archive-panel" aria-label="آرشیو خواندنی نسخه قدیمی" hidden style="margin:10px 20px;padding:14px 16px;border:1px solid #475569;border-radius:10px;"></section>
+  <section id="academy-account-tools" class="account-tools-bar" aria-label="مدیریت داده، پشتیبان و آرشیو حساب">
+    <div class="account-tools-card">
+      <div id="academy-save-status" role="status" aria-live="polite"></div>
+      <div class="account-tools-row"><button id="academy-export-progress" type="button" hidden>دریافت نسخه خام پیشرفت حساب</button><small>نسخه ممکن است یادداشت و اطلاعات حساس داشته باشد؛ در محل امن نگهداری کنید. این دریافت، مهاجرت یا بازیابی نیست.</small></div>
+      <div class="account-tools-row"><button id="academy-legacy-preview" type="button" hidden>بررسی بدون تغییر پیشرفت قدیمی</button><button id="academy-legacy-migrate" type="button" hidden>انتقال تکمیل درس‌های تأییدشده</button><button id="academy-backups-load" type="button" hidden>نمایش نسخه‌های پشتیبان حساب</button><select id="academy-backups-select" aria-label="نسخه پشتیبان پیشرفت" hidden></select><button id="academy-backups-restore" type="button" hidden>بازیابی نسخه انتخابی</button><button id="academy-legacy-archive-toggle" type="button" aria-expanded="false" hidden>مشاهده خواندنی آرشیو نسخه قدیمی (نمره‌ها و یادداشت‌ها)</button></div>
+      <section id="academy-legacy-archive-panel" aria-label="آرشیو خواندنی نسخه قدیمی" hidden style="margin:10px 0 0;padding:14px 16px;border:1px solid #475569;border-radius:10px;"></section>
+    </div>
+  </section>
   <main class="container" id="app-root"></main>
 
   <script src="/academy-assets/academy-simulator.js?v=20261127a"></script>
-  <script src="/academy-assets/lesson-engine.js?v=20261123c"></script>
-  <script src="/academy-assets/academy-catalog.js?v=20261123c"></script>
-  <script src="/academy-assets/academy-journey.js?v=20261123c"></script>
+  <script src="/academy-assets/lesson-engine.js?v=20261128a"></script>
+  <script src="/academy-assets/academy-catalog.js?v=20261128a"></script>
+  <script src="/academy-assets/academy-journey.js?v=20261128a"></script>
   <script nonce="__FAM_CSP_NONCE__">
 (() => {
   'use strict';
@@ -507,8 +511,10 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
         window.FamJourney.renderProgress();
         return;
       }
-      if (restoreInitialHash && (!location.hash || location.hash === '#/dashboard') && !window.FamAcademyBridge?.progress?.profile?.onboardingComplete) {
-        window.FamJourney.openProfile({first:true});
+      if (restoreInitialHash && location.hash === '#/lab') {
+        restoreInitialHash = false;
+        if (window.FamAcademyCatalog?.renderLabWorkbench) window.FamAcademyCatalog.renderLabWorkbench(root, catalog, openBlueprint);
+        return;
       }
       if (restoreInitialHash) {
         restoreInitialHash = false;
@@ -559,8 +565,18 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
     }
   }
 
+  async function openLabView() {
+    if (!catalog) {
+      await loadCatalog();
+    }
+    if (catalog && window.FamAcademyCatalog?.renderLabWorkbench) {
+      window.FamAcademyCatalog.renderLabWorkbench(root, catalog, openBlueprint);
+    }
+  }
+  window.addEventListener('fam-open-lab', () => { openLabView(); });
   window.addEventListener('hashchange', () => {
     if (location.hash === '#/progress') window.FamJourney.renderProgress();
+    else if (location.hash === '#/lab') openLabView();
     else if (location.hash === '#/dashboard') loadCatalog();
     else if (location.hash === '#/paths') loadCatalog(true);
   });
@@ -1154,7 +1170,7 @@ html[data-theme="light"] .fa-hero{background:linear-gradient(115deg,#e2ecff,var(
   sel.addEventListener("change", runFilter);
 })();
 </script>
-  <script src="/academy-assets/academy-reference-shell.js?v=20261123c"></script>
+  <script src="/academy-assets/academy-reference-shell.js?v=20261128a"></script>
 </body>
 
 </html>
