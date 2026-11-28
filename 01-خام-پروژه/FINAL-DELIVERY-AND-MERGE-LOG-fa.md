@@ -2,7 +2,7 @@
 
 **شاخه تحویل:** `arena/941b9e62-fam`  
 **تاریخ به‌روزرسانی:** `2026-11-27`  
-**وضعیت انتشار:** **آماده انتشار نهایی اعلام نمی‌شود** (نیازمند بازبینی مستقل انسانی، اجرای آزمون مرورگر واقعی `tests/browser/browser.test.cjs` و آزمون ارتقا روی محیط staging/VM پیش از استقرار تولیدی).
+**وضعیت انتشار:** **آماده انتشار نهایی اعلام نمی‌شود** (نیازمند بازبینی مستقل انسانی، اجرای آزمون مرورگر واقعی `01-خام-پروژه/tests/browser/run_browser_test.py` با `puppeteer-core` و Chromium واقعی، و آزمون ارتقا روی محیط staging/VM پیش از استقرار تولیدی).
 
 ---
 
@@ -16,7 +16,8 @@
 | شاخه یکپارچه‌ساز (ایجنت ۲) | `arena/ab96c97c-fam` | `c1d913da9e1db13b44b694fa5e3352295d40a2e9` | انتخاب هدفمند ۱۴۸ فایل تولیدی، UI، API مهاجرت/پشتیبان/بازیابی، سازنده آفلاین، ۱۳ درس پایه/بنیادی (`s02..s12`, `ccna_01`, `ccna_02`) و ۱۳ درس هم‌پوشان سخت‌سازی‌شده (`auto_01..08,10,16,20`, `ccna_02_vlan`, `ccna_v1`) پس از مقایسه diff-به‌-diff؛ حذف پوشه موقت `candidates/` و تست‌های موقت میان‌ایجنتی |
 | خروجی ایجنت ۱ | `arena/96a73266-fam` (`agent1_rewrites/`, `agent1_evidence/`) | `641d02ee73e0fa86b0972dc1f85474e84abef288` | **بدون بازبینی پذیرفته نشد.** پیش‌نویس‌های ۳بخشی/۳سؤالی به ساختار کامل ۱۶بخشی Curriculum 5.0 با اصلاحات فنی (به‌ویژه `adv_pvl` درباره مرز امنیتی L3/VTPv3 و `adv_ec` درباره ASIC/Flow Entropy و ۱۸ درس نهایی `adv_*`/`ccnp_*`) بازنویسی و همراه با آزمایشگاه محلی Python 3 و گزارش خودبازبینی تحویل شدند |
 | نقطه عطف ۱ (یکپارچه‌سازی پایه) | `arena/941b9e62-fam` | `39773e90c5346688bf756f163e942e6a62cb2364` | تکمیل ۹۶/۱۱۴ شناسه تاریخی + زیرساخت A2 + رفع ایراد `ccna_v6` |
-| نقطه عطف ۲ (پوشش ۱۱۴/۱۱۴ + شبیه‌ساز اولیه) | `arena/941b9e62-fam` | `bc5bcef83fd01ff101ee4f2788ace0592e09f438` | تکمیل ۱۸ درس نهایی، مهاجرت ۱۱۴ شناسه و بسته آفلاین؛ در ممیزی بعدی ۵۵ خروجی placeholder در شبیه‌ساز، regex سست IP در `ping`/`traceroute` و ۲ پیش‌نیاز شکسته در `academy-stage-zero-06-client-server-fa.json` شناسایی و در کمیت اصلاحی برطرف شدند |
+| نقطه عطف ۲ (پوشش ۱۱۴/۱۱۴ + شبیه‌ساز اولیه) | `arena/941b9e62-fam` | `bc5bcef83fd01ff101ee4f2788ace0592e09f438` | تکمیل ۱۸ درس نهایی، مهاجرت ۱۱۴ شناسه و بسته آفلاین؛ در ممیزی بعدی ۵۵ خروجی placeholder در شبیه‌ساز، regex سست IP در `ping`/`traceroute` و ۲ پیش‌نیاز شکسته در `academy-stage-zero-06-client-server-fa.json` شناسایی شدند |
+| اصلاح ممیزی ۱ (حذف placeholder و IP سخت‌گیرانه) | `arena/941b9e62-fam` | `77dfb7e5b20586967afbf738ac8d3fe160caa0c7` | حذف هر ۵۵ placeholder شبیه‌ساز (۱۲۵ فرمان معتبر، ۴۷ اختصاصی + ۸۰ پیش‌فرض مسیر)، اعتبارسنجی دقیق IPv4/IPv6، حالت `(config-if)#`، رفع ۲ پیش‌نیاز شکسته و بازتولید بسته آفلاین و Manifest |
 
 ---
 
@@ -66,7 +67,13 @@
 - **آزمون‌های Node/jsdom:** ۶ مجموعه (`academy_progress_behavior.js`, `quiz.test.cjs` روی ۱۲۷ درس، `offline.test.cjs`, `migrate.test.cjs`, `restore.test.cjs`, `simulator.test.cjs` شامل تست‌های منفی IP، حالت `(config-if)#`، صفر placeholder و تطبیق ۴۷ سناریوی اختصاصی + ۸۰ سناریوی پیش‌فرض مسیر).
 - **یکپارچگی Manifest:** `01-خام-پروژه/MANIFEST.sha256` بازتولید و با `sha256sum -c` بررسی شد.
 - **وضعیت آزمون مرورگر واقعی (صریح و بدون پنهان‌کاری):**
-  1. **مرورگر واقعی (`01-خام-پروژه/tests/browser/browser.test.cjs`):** به دلیل نصب نبودن Chromium/Chrome/Firefox و Playwright در این محیط سندباکس، **اجرا نشده است**. بنابراین رفتار واقعی رندرینگ RTL، فونت‌ها، اسکرول، استایل‌ها، کوکی/CSRF پشت `nginx`/TLS و چندتب واقعی مرورگر هنوز تأیید نشده است. روی سرور یا ماشین staging دارای Node و Chromium/Playwright باید پس از نصب، با دستور زیر اجرا شود:
-     `NODE_PATH=/path/to/playwright/node_modules node 01-خام-پروژه/tests/browser/browser.test.cjs`
+  1. **مرورگر واقعی (`01-خام-پروژه/tests/browser/browser.test.cjs` از طریق `run_browser_test.py` و `puppeteer-core`):** اسکریپت `browser.test.cjs` با وضعیت فعلی برنامه همگام شد (جایگزینی انتظار منسوخ «دوره ۱۱۴ درسی کامل نیست» با بررسی بنر واقعی ۱۲۷ درسی آفلاین + افزودن بررسی نصب شبیه‌ساز، اجرای غیر-placeholder فرمان `terraform plan` و رد IP نامعتبر `ping 999.999.999.999`) و نحو جاوااسکریپت و انطباق آن با بنر `FAM-Academy-Offline.html` در تست‌های خودکار تأیید شد. **اما خود Chromium واقعی در این محیط سندباکس نصب نیست و قابل دانلود نیست**؛ بنابراین اجرای واقعی مرورگر روی رندرینگ RTL، فونت‌ها، اسکرول، کوکی/CSRF پشت `nginx`/TLS و چندتب واقعی هنوز انجام نشده است. روی ماشین staging/VM دارای Chromium سازگار و `puppeteer-core@24.15.0` با دستور زیر اجرا می‌شود (جزئیات در `01-خام-پروژه/tests/browser/README-fa.md`):
+     ```bash
+     mkdir -p /tmp/fam-browser-deps
+     npm install --prefix /tmp/fam-browser-deps puppeteer-core@24.15.0
+     NODE_PATH=/tmp/fam-browser-deps/node_modules \
+     FAM_CHROMIUM_PATH="$(command -v chromium || command -v chromium-browser || command -v google-chrome)" \
+     .venv/bin/python 01-خام-پروژه/tests/browser/run_browser_test.py
+     ```
   2. **داده واقعی تولیدی (Production VM):** مهاجرت پیشرفت صرفاً روی SQLite آزمایشی اجرا شده و روی دیتابیس واقعی کاربران VMware اجرا نشده است.
   3. **تجهیزات شبکه زنده:** هیچ فرمان IOS/IOS-XE/NX-OS/SD-WAN روی سخت‌افزار زنده اجرا نشده است.

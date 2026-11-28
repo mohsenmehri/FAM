@@ -90,6 +90,34 @@ class Final18LessonsTests(unittest.TestCase):
             for prereq in bp.get("prerequisites", []):
                 self.assertIn(prereq, valid_ids, f"dangling prerequisite {prereq} in {lid}")
 
+    def test_browser_smoke_script_matches_current_offline_banner_and_syntax(self):
+        browser_test = ROOT / "tests/browser/browser.test.cjs"
+        harness = ROOT / "tests/browser/run_browser_test.py"
+        src = browser_test.read_text(encoding="utf-8")
+        offline_html = (ROOT.parent / "FAM-Academy-Offline.html").read_text(encoding="utf-8")
+        self.assertIn("require('puppeteer-core')", src)
+        self.assertNotIn("دوره ۱۱۴ درسی کامل نیست", src)
+        for expected_fragment in (
+            "شامل هر 127 درس فعال",
+            "همگام نیست",
+            "نه بازبینی مستقل انسانی",
+            "اتصال به تجهیزات واقعی وجود ندارد",
+        ):
+            self.assertIn(expected_fragment, src)
+            self.assertIn(expected_fragment, offline_html)
+        syntax = subprocess.run(["node", "--check", str(browser_test)], capture_output=True, text=True, timeout=15)
+        self.assertEqual(syntax.returncode, 0, syntax.stderr + syntax.stdout)
+        py_check = subprocess.run([sys.executable, "-m", "py_compile", str(harness)], capture_output=True, text=True, timeout=15)
+        self.assertEqual(py_check.returncode, 0, py_check.stderr + py_check.stdout)
+        # Verify harness fails cleanly when FAM_CHROMIUM_PATH is unset
+        no_chrome = subprocess.run(
+            [sys.executable, str(harness)],
+            env={k: v for k, v in __import__("os").environ.items() if k != "FAM_CHROMIUM_PATH"},
+            capture_output=True, text=True, timeout=15,
+        )
+        self.assertNotEqual(no_chrome.returncode, 0)
+        self.assertIn("FAM_CHROMIUM_PATH", no_chrome.stderr + no_chrome.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
